@@ -157,6 +157,15 @@ ifneq (,$(findstring avx,$(TARGET)))
 export override CFLAGS+=-DENABLE_AVX
 endif
 
+
+### Convert `THESEUS_CONFIG` values into `RUSTFLAGS` by prepending "--cfg " to each one.
+### Note: this change to RUSTFLAGS is exported as an external shell environment variable
+###       in order to make it easy to pass to sub-make invocations.
+###       However, this means we must not explicitly not use it for `cargo run` tool invocations,
+###       because those should be built as normal for the host OS environment.
+export override RUSTFLAGS += $(patsubst %,--cfg %, $(THESEUS_CONFIG))
+
+
 ### Convenience targets for building Theseus with all features enabled.
 all: full
 full : export override CARGOFLAGS += --all-features
@@ -202,7 +211,7 @@ build: $(nano_core_binary)
 	done; wait
 
 ## Second, copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
-	@cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
+	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
 		-i "$(TARGET_DEPS_DIR)" \
 		--output-objects $(OBJECT_FILES_BUILD_DIR) \
 		--output-deps $(DEPS_BUILD_DIR) \
@@ -272,9 +281,6 @@ endif
 
 
 ## This target invokes the actual Rust build process via `cargo`.
-##
-## The below line converts `THESEUS_CONFIG` values into `RUSTFLAGS` by prepending "--cfg " to each one.
-cargo : export override RUSTFLAGS += $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 cargo: check-rustc 
 	@echo -e "\n=================== BUILDING ALL CRATES ==================="
 	@echo -e "\t TARGET: \"$(TARGET)\""
@@ -318,18 +324,18 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 
 	@$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
 ## Dump readelf output for verification. See pull request #542 for more details:
-##	@cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
+##	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 ##		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
 ## 		>  $(ROOT_DIR)/readelf_output
 ## run "readelf" on the nano_core binary, remove irrelevant LOCAL symbols from the ELF file, demangle it, serialize it, and then output to a serde file
-	@cargo run --release --manifest-path $(ROOT_DIR)/tools/serialize_nano_core/Cargo.toml \
-		<(cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
+	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/serialize_nano_core/Cargo.toml \
+		<(RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 		<($(CROSS)readelf -S -s -W $(nano_core_binary) \
 		| sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;')) \
 		> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.serde
 ## `.sym`: this doesn't parse the object file at compile time, instead including the modified output of "readelf" as a boot module so it can then
 ## be parsed during boot. See pull request #542 for more details.
-##	@cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
+##	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 ##		<($(CROSS)readelf -S -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
 ##		>  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 ##	@echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
@@ -359,7 +365,7 @@ endif
 ### This target should be invoked when all of contents of `ISOFILES` are ready to be packaged into an ISO.
 grub:
 	@mkdir -p $(ISOFILES)/boot/grub
-	@cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(ISOFILES)/modules/ -o $(ISOFILES)/boot/grub/grub.cfg
+	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(ISOFILES)/modules/ -o $(ISOFILES)/boot/grub/grub.cfg
 	@$(GRUB_MKRESCUE) -o $(iso) $(ISOFILES)  2> /dev/null
 
 
@@ -367,7 +373,7 @@ grub:
 ### This target should be invoked when all of contents of `ISOFILES` are ready to be packaged into an ISO.
 limine:
 	@cd $(OBJECT_FILES_BUILD_DIR)/ && ls | cpio --no-absolute-filenames -o > $(ISOFILES)/modules.cpio
-	@cargo run -r --manifest-path $(ROOT_DIR)/tools/limine_compress_modules/Cargo.toml -- -i $(ISOFILES)/modules.cpio -o $(ISOFILES)/modules.cpio.lz4
+	@RUSTFLAGS="" cargo run -r --manifest-path $(ROOT_DIR)/tools/limine_compress_modules/Cargo.toml -- -i $(ISOFILES)/modules.cpio -o $(ISOFILES)/modules.cpio.lz4
 	@rm $(ISOFILES)/modules.cpio
 	@cp cfg/limine.cfg $(LIMINE_DIR)/limine-cd.bin $(LIMINE_DIR)/limine-cd-efi.bin $(LIMINE_DIR)/limine.sys $(ISOFILES)/
 	@rm -f $(iso)
