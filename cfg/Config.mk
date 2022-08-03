@@ -56,30 +56,30 @@ BUILD_STD_CARGOFLAGS += -Z build-std-features=compiler-builtins-mem
 ## which avoids always having to unpack the crate's .rlib archive to extract the object files within.
 ## Note that we still do have to extract and partially link object files from .rlib archives for crates that
 ## use a build script to generate additional object files during build time.
-RUSTFLAGS += --emit=obj
+export override RUSTFLAGS += --emit=obj
 ## enable debug info even for release builds
-RUSTFLAGS += -C debuginfo=2
+export override RUSTFLAGS += -C debuginfo=2
 ## using a large code model 
-RUSTFLAGS += -C code-model=large
+export override RUSTFLAGS += -C code-model=large
 ## use static relocation model to avoid GOT-based relocation types and .got/.got.plt sections
-RUSTFLAGS += -C relocation-model=static
+export override RUSTFLAGS += -C relocation-model=static
 ## promote unused must-use types (like Result) to an error
-RUSTFLAGS += -D unused-must-use
+export override RUSTFLAGS += -D unused-must-use
 
 ## As of Dec 31, 2018, this is needed to make loadable mode work, because otherwise, 
 ## some core generic function implementations won't exist in the object files.
 ## Details here: https://github.com/rust-lang/rust/pull/57268
 ## Relevant rusct commit: https://github.com/jethrogb/rust/commit/71990226564e9fe327bc9ea969f9d25e8c6b58ed#diff-8ad3595966bf31a87e30e1c585628363R8
 ## Either "trampolines" or "disabled" works here, not sure how they're different
-RUSTFLAGS += -Z merge-functions=disabled
-# RUSTFLAGS += -Z merge-functions=trampolines
+export override RUSTFLAGS += -Z merge-functions=disabled
+# export override RUSTFLAGS += -Z merge-functions=trampolines
 
 ## This prevents monomorphized instances of generic functions from being shared across crates.
 ## It vastly simplifies the procedure of finding missing symbols in the crate loader,
 ## because we know that instances of generic functions will not be found in another crate
 ## besides the current crate or the crate that defines the function.
 ## As far as I can tell, this does not have a significant impact on object code size or performance.
-RUSTFLAGS += -Z share-generics=no
+export override RUSTFLAGS += -Z share-generics=no
 
 ## This forces frame pointers to be generated, i.e., the stack base pointer (RBP register on x86_64)
 ## will be used to store the starting address of the current stack frame.
@@ -88,4 +88,4 @@ RUSTFLAGS += -Z share-generics=no
 ## Note that this reduces the number of registers available to the compiler (by reserving RBP),
 ## so it often results in slightly lowered performance. 
 ## By default, this is not enabled.
-# RUSTFLAGS += -C force-frame-pointers=yes
+# export override RUSTFLAGS += -C force-frame-pointers=yes
