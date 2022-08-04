@@ -7,4 +7,5 @@ edition = "2021"
 [dependencies]
 fs_node = { path = "../fs_node" }
 hashbrown = "0.11.2"
+path = { path = "../path" }
 root = { path = "../root" }

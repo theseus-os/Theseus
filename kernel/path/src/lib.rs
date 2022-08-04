@@ -49,7 +49,7 @@ impl fmt::Display for Path {
 impl From<String> for Path {
     #[inline]
     fn from(path: String) -> Self {
-        Path {path: path}
+        Path { path }
     }
 }
 
