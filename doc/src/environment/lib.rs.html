@@ -61,25 +61,60 @@
 <span id="55">55</span>
 <span id="56">56</span>
 <span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 
-<span class="kw">use</span> <span class="ident">alloc</span>::{
-    <span class="ident">string::String</span>,
-    <span class="ident">sync::Arc</span>,
-};
-<span class="kw">use</span> <span class="ident">fs_node::DirRef</span>;
+<span class="kw">use</span> <span class="ident">alloc</span>::{<span class="ident">string::String</span>, <span class="ident">sync::Arc</span>};
+<span class="kw">use</span> <span class="ident">core::fmt</span>;
+<span class="kw">use</span> <span class="ident">fs_node</span>::{<span class="ident">DirRef</span>, <span class="ident">FileOrDir</span>};
 <span class="kw">use</span> <span class="ident">hashbrown::HashMap</span>;
+<span class="kw">use</span> <span class="ident">path::Path</span>;
 
-<span class="doccomment">/// A structure that contains environment state for a given `Task` or group of `Task`s.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">/// A structure that contains environment state for a given `Task` or group of</span>
+<span class="doccomment">/// `Task`s.</span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// A default environment can be created with the following state:</span>
 <span class="doccomment">/// * The working directory is the `root` directory.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Environment</span> {
-    <span class="doccomment">/// The &quot;current working directory&quot;, i.e., </span>
+    <span class="doccomment">/// The &quot;current working directory&quot;, i.e.,</span>
     <span class="doccomment">/// where a task&#39;s relative path begins upon first execution.</span>
-    <span class="kw">pub</span> <span class="ident">working_dir</span>: <span class="ident">DirRef</span>, 
+    <span class="kw">pub</span> <span class="ident">working_dir</span>: <span class="ident">DirRef</span>,
     <span class="kw">pub</span> <span class="ident">variables</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">String</span><span class="op">&gt;</span>,
 }
 
@@ -89,6 +124,19 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cwd</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
         <span class="kw">let</span> <span class="ident">wd</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">working_dir</span>.<span class="ident">lock</span>();
         <span class="ident">wd</span>.<span class="ident">get_absolute_path</span>()
+    }
+
+    <span class="doccomment">/// Changes the current working directory.</span>
+    <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">alias</span>(<span class="string">&quot;change&quot;</span>))]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">chdir</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">Path</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="kw">match</span> <span class="ident">path</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">working_dir</span>) {
+            <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::Dir</span>(<span class="ident">dir_ref</span>)) =&gt; {
+                <span class="self">self</span>.<span class="ident">working_dir</span> <span class="op">=</span> <span class="ident">dir_ref</span>;
+                <span class="prelude-val">Ok</span>(())
+            }
+            <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::File</span>(<span class="kw">_</span>)) =&gt; <span class="prelude-val">Err</span>(<span class="ident">Error::NotADirectory</span>),
+            <span class="prelude-val">None</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">Error::NotFound</span>),
+        }
     }
 
     <span class="doccomment">/// Returns the value of the environment variable with the given `key`.</span>
@@ -116,6 +164,28 @@
             <span class="ident">working_dir</span>: <span class="ident">Arc::clone</span>(<span class="ident">root::get_root</span>()),
             <span class="ident">variables</span>: <span class="ident">HashMap::new</span>(),
         }
+    }
+}
+
+<span class="doccomment">/// A specialized [`Result`] type for environment operations.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// [`Result`]: core::result::Result</span>
+<span class="kw">pub</span> <span class="kw">type</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">core::result::Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">Error</span><span class="op">&gt;</span>;
+
+<span class="doccomment">/// The error type for environment operations.</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Error</span> {
+    <span class="doccomment">/// A filesystem node was, unexpectedly, not a directory.</span>
+    <span class="ident">NotADirectory</span>,
+    <span class="doccomment">/// A filesystem node wasn&#39;t found.</span>
+    <span class="ident">NotFound</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">Error</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
+        <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">Error::NotADirectory</span> =&gt; <span class="string">&quot;not a directory&quot;</span>,
+            <span class="ident">Error::NotFound</span> =&gt; <span class="string">&quot;entity not found&quot;</span>,
+        })
     }
 }
 </code></pre></div>
