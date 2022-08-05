@@ -8,5 +8,6 @@
   "arch": "x86_64",
   "os": "theseus",
   "features": "-mmx,-sse,+soft-float",
-  "disable-redzone": true
+  "disable-redzone": true,
+  "executables": true
 }
