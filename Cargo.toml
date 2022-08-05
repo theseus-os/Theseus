@@ -18,9 +18,9 @@ members = [
 
 ## Default members are the crates built by default if no specific packages (crates)
 ## are specified when invoking `cargo build`.
-## Currently, this is only relevant when overriding the Makefile's default `CARGOFLAGS`,
-## which has the default value of `--workspace`, ensuring that all `members` above are built
-## `CARGOFLAGS` are explicitly set when invoking `make`.
+## Currently, this is only relevant when overriding the Makefile's default `FEATURES`,
+## which has the default value of `--workspace`, ensuring that all `members` above 
+## are built even when `FEATURES` is explicitly set when invoking `make`.
 ##
 ## So far, this includes only the minimum crates required to allow Theseus to boot.
 default-members = [
