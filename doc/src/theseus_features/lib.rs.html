@@ -12,14 +12,100 @@
 <span id="6">6</span>
 <span id="7">7</span>
 <span id="8">8</span>
-</pre><pre class="rust"><code><span class="doccomment">//! See this crate&#39;s `Cargo.toml` file for more details.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! This crate exists solely to hold a centralized list of features </span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate exists solely to hold a centralized list of features </span>
 <span class="doccomment">//! used across all Theseus crates for conditional compilation and configuration.</span>
 <span class="doccomment">//!  </span>
 <span class="doccomment">//! It has no code, logic, or data.</span>
+<span class="doccomment">//! </span>
+<span class="doccomment">//! ## How to specify optional crates/features in Theseus</span>
+<span class="doccomment">//! </span>
+<span class="doccomment">//! To make a crate (or folder of crates) optional, do the following:</span>
+<span class="doccomment">//! 1. Add it to the set of `exclude`s in the top-level Theseus `Cargo.toml` file.</span>
+<span class="doccomment">//! 2. Add it as an optional dependency in this crate&#39;s `Cargo.toml` file, ensuring `optional = true`.</span>
+<span class="doccomment">//! 3. [Optional] Add it as a feature below, in order to give it a specific name.</span>
+<span class="doccomment">//!    * Technically this isn&#39;t required, but it can offer a clearer/different name.</span>
+<span class="doccomment">//!    * You can optionally add it to the `default` set of features,</span>
+<span class="doccomment">//!      or create a new group of features that includes it, </span>
+<span class="doccomment">//!      or even add it to an existing set of features.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! </span>
+<span class="doccomment">//! ## How to customize what is included in a Theseus build</span>
+<span class="doccomment">//! </span>
+<span class="doccomment">//! When building Theseus using `make`, you can choose which of the features </span>
+<span class="doccomment">//! specified in this crate&#39;s `Cargo.toml` file are enabled.</span>
+<span class="doccomment">//! Simply set the `FEATURES` environment variable, which has the default value of `--workspace`.</span>
+<span class="doccomment">//! </span>
+<span class="doccomment">//! The `FEATURES` variable is passed directly into `cargo build`, meaning that is must</span>
+<span class="doccomment">//! follow the formatting expected by `cargo build.</span>
+<span class="doccomment">//! &gt; Run `cargo build --help` to see more details about what arguments cargo expects.</span>
+<span class="doccomment">//! </span>
+<span class="doccomment">//! ```sh</span>
+<span class="doccomment">//! # Build the bare minimum `default-members` of the Theseus workspace, </span>
+<span class="doccomment">//! # excluding those specified by the `default` feature in this crate&#39;s `Cargo.toml`.</span>
+<span class="doccomment">//! make FEATURES=--no-default-features</span>
+<span class="doccomment">//! </span>
+<span class="doccomment">//! # Build the bare minimum `default-members` of the Theseus workspace, plus all optional crates.</span>
+<span class="doccomment">//! make FEATURES=--all-features</span>
+<span class="doccomment">//! </span>
+<span class="doccomment">//! # Build the standard Theseus workspace plus all optional crates. </span>
+<span class="doccomment">//! # This is what `make full` or `make all` does.</span>
+<span class="doccomment">//! make FEATURES=&quot;--workspace --all-features&quot;</span>
+<span class="doccomment">//! </span>
+<span class="doccomment">//! # Build the bare minimum `default-members` of the Theseus workspace, plus the `ps` crate.</span>
+<span class="doccomment">//! make FEATURES=&quot;--features ps&quot;</span>
+<span class="doccomment">//! </span>
+<span class="doccomment">//! # Build the standard Theseus workspace plus the crates needed for the below `wasmtime` feature</span>
+<span class="doccomment">//! # and the `test_panic` crate.</span>
+<span class="doccomment">//! make FEATURES=&quot;--workspace --features wasmtime --features test_panic&quot; </span>
+<span class="doccomment">//! ```</span>
+
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
+
+<span class="comment">// Intentionally left blank.</span>
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="theseus_features" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
 </body></html>
