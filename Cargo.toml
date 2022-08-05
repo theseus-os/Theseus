@@ -111,7 +111,7 @@ getopts = { git = "https://github.com/theseus-os/getopts" }
 smoltcp = { git = "https://github.com/m-labs/smoltcp" }
 
 ### Patch `libc` so we can use libc-specific types when using `cfg(target_os = "theseus")`.
-libc = { path = "ports/libc" }
+libc = { git = "https://github.com/theseus-os/libc", branch = "theseus" }
 ### Patch `core2` with newer functions from `std::io`, e.g., additional `Seek` trait functions
 core2 = { path = "libs/core2" }
 ### Patch `bincode` because the version on crates.io doesn't handle no_std features correctly.
