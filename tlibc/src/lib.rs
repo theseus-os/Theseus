@@ -3,7 +3,6 @@
 #![no_std]
 #![feature(ptr_internals)]
 #![feature(c_variadic)]
-#![feature(untagged_unions)]
 #![feature(core_intrinsics)]
 #![feature(linkage)]
 #![feature(thread_local)]

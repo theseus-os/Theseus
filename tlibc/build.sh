@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-set -x
 
 # capture all output to a file
 # script -e .script_output
@@ -39,6 +38,7 @@ rm -vf ./target/x86_64-theseus/release/libtlibc.d
 cp -vf ./target/x86_64-theseus/release/deps/libtlibc-*.a  ./target/x86_64-theseus/release/libtlibc.a
 
 
+set -x
 
 ### Create a partially-linked object (.o) file from all of the tlibc crate object files,
 ### being sure to include the C code components.

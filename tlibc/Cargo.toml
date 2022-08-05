@@ -16,7 +16,7 @@ cbitset = "0.2.0"
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]
-version = "1.2.0"
+version = "1.4.0"
 
 [dependencies.memory]
 path = "../kernel/memory"
@@ -45,7 +45,6 @@ cc = "1.0.25"
 crate-type = ["lib", "staticlib"]
 
 
-### Patch section was copied from the top-level Theseus Cargo.toml
 [patch.crates-io]
 ### Patch `spin` to use the `pause` asm instruction in busy-wait loops,
 ### because the `core::hint::spin_loop()` only uses it if "sse2" is enabled.
@@ -56,3 +55,31 @@ volatile = { git = "https://github.com/theseus-os/volatile" }
 getopts = { git = "https://github.com/theseus-os/getopts" }
 ### use the latest version of smoltcp from github; the one on crates.io is out of date
 smoltcp = { git = "https://github.com/m-labs/smoltcp" }
+
+### Patch `libc` so we can use libc-specific types when using `cfg(target_os = "theseus")`.
+libc = { path = "../ports/libc" }
+### Patch `core2` with newer functions from `std::io`, e.g., additional `Seek` trait functions
+core2 = { path = "../libs/core2" }
+### Patch `bincode` because the version on crates.io doesn't handle no_std features correctly.
+bincode = { git = "https://github.com/bincode-org/bincode" }
+
+##############################################################################################
+#################### Below are patches for wasmtime-related crates. ##########################
+##############################################################################################
+wasmparser = { git = "https://github.com/theseus-os/wasm-tools", branch = "no-std-wasmparser" }
+backtrace = { path = "../ports/backtrace" }
+region = { path = "../ports/region" }
+thiserror_core2 = { path = "../libs/thiserror-core2" }
+
+### These profiles fix the new rustc behavior of splitting one crate into many object files. 
+### That messes up our module loading, which is bad!
+### See this link about profiles: https://doc.rust-lang.org/cargo/reference/manifest.html
+# workaround rust-lang/rust#47074
+[profile.dev]
+codegen-units = 1
+incremental = false
+
+# workaround rust-lang/rust#47074
+[profile.release]
+codegen-units = 1
+incremental = false

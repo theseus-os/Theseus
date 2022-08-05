@@ -48,6 +48,11 @@ fn main() {
         .flag("-static-libgcc")
         .flag("-z max-page-size=4096")
 
+        // Theseus's loader/linker expects all sections to be kept separate
+        // or merged by its own partial relinking script.
+        .flag("-ffunction-sections")
+        .flag("-fdata-sections")
+
         // disable PLT, Procedure Linkage Table, a type of relocation entry Theseus doesn't yet support
         .flag("-fno-plt")
         .use_plt(false)
