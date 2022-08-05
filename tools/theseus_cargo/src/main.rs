@@ -19,7 +19,6 @@
 
 // we may wish to use the rustc_metadata crate to parse .rmeta files to get the exact version/hash of each dependency.
 // #![feature(rustc_private)] 
-#![feature(command_access)]
 
 extern crate getopts;
 extern crate clap;
@@ -203,6 +202,21 @@ fn main() -> Result<(), String> {
         )?;
     }
 
+    // Print out a warning that we don't currently forward cargo features
+    // from the original build config for Theseus to the current crate being built.
+    if build_config.features.contains("--features") {
+        eprintln!("\n\x1b[33;1mImportant warning/note: \x1b[22m
+        theseus_cargo currently ignores cargo features used to build Theseus.
+        You may need to specify them as features in your this crate's Cargo.toml,
+        but this should only be necessary if this crate uses features 
+        for Theseus crates that weren't specified in the original build of Theseus. 
+        \x1b[1m--> This is currently an untested edge case. <--\x1b[22m
+        Features specified and ignored:
+          {:?} \x1b[0m",
+            build_config.features
+        );
+    }
+
     Ok(())
 }
 
@@ -281,7 +295,7 @@ fn run_initial_cargo<P: AsRef<Path>>(
         .stdout(Stdio::piped());
     
     // Ensure that we use only the arguments specifed by the Theseus build config.
-    cmd.arg(&build_config.cargoflags)
+    cmd.args(build_config.cargoflags.split_whitespace())
         .arg("--target").arg(&build_config.target);
 
     // Ensure that we run the cargo command with the maximum verbosity level, which is -vv.
@@ -716,6 +730,7 @@ struct BuildConfig {
     sysroot:       PathBuf,
     rustflags:     String,
     cargoflags:    String,
+    features:      String,
     host_deps:     PathBuf,
 }
 impl BuildConfig {
@@ -731,6 +746,8 @@ impl BuildConfig {
         build_config.target     = build_config.target    .trim().into();
         build_config.rustflags  = build_config.rustflags .trim().into();
         build_config.cargoflags = build_config.cargoflags.trim().into();
+        build_config.features   = build_config.features  .trim().into();
+
         Ok(build_config)
     }
 }
