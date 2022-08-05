@@ -664,7 +664,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "418d37c8b1d42553c93648be529cb70f920d3baf8ef469b74b9638df426e0b4c"
 dependencies = [
  "cfg-if 1.0.0",
- "libc 0.2.127",
+ "libc",
  "wasi",
 ]
 
@@ -854,13 +854,8 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.107"
-
-[[package]]
-name = "libc"
 version = "0.2.127"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "505e71a4706fa491e9b1b55f51b95d4037d0821ee40131190475f692b35b009b"
+source = "git+https://github.com/theseus-os/libc?branch=theseus#32f6c23ac80c9ea9b93c4377f15f407964d16c44"
 
 [[package]]
 name = "libterm"
@@ -1743,7 +1738,7 @@ dependencies = [
  "cstr_core",
  "heap",
  "lazy_static",
- "libc 0.2.107",
+ "libc",
  "log",
  "memchr",
  "memory",
