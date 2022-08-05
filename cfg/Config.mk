@@ -22,9 +22,11 @@ KERNEL_PREFIX       ?= k\#
 APP_PREFIX          ?= a\#
 EXECUTABLE_PREFIX   ?= e\#
 
-## By default, the Makefile will build the entire Theseus workspace.
-## However, one can override which crates are built by setting `CARGOFLAGS`.
-CARGOFLAGS ?= --workspace
+## By default, the Makefile will build the entire Theseus workspace
+## as specified by the `members` set in the top-level `Cargo.toml` file
+## (excluding the crates that are part of the `exclude` set).
+## However, one can override which crates are built by setting `FEATURES`.
+FEATURES ?= --workspace
 
 ## Build modes: debug is development mode, release is with full optimizations.
 ## We build using release mode by default, because running in debug mode is quite slow.

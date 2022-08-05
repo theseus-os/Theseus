@@ -5,15 +5,8 @@ description = "Set of global features used for configuration and conditional com
 version = "0.1.0"
 edition = "2021"
 
-## Note: to make a crate (or folder of crates) optional, do the following:
-## 1. Add it to the top-level Theseus `Cargo.toml` "exclude" list.
-## 2. Add it as an optional dependency below, ensuring `optional = true`.
-## 3. [Optional] Add it as a feature below, in order to give it a specific name.
-##    Technically this isn't required, but it can offer a clearer/different name.
-##
-## You can optionally add it to the `default` set of features,
-## or create a new group of features that includes it, 
-## or even add it to an existing set of features.
+## Note: see this crate's top-level documentation (or its `lib.rs` file)
+##       for more information on how this crate works and how Theseus handles features.
 
 [dependencies]
 theseus_std = { path = "../ports/theseus_std", optional = true }

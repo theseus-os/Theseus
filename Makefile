@@ -72,7 +72,7 @@ $(error Error: could not find 'grub-mkrescue' or 'grub2-mkrescue', please instal
 else ifeq ($(bootloader),limine)
 	## Check if the limine directory exists. 
 	ifneq (,$(wildcard $(LIMINE_DIR)/.))
-		export override CARGOFLAGS += --features extract_boot_modules
+		export override FEATURES += --features extract_boot_modules
 	else
 $(error Error: missing '$(LIMINE_DIR)' directory! Please follow the limine instructions in the README)
 	endif
@@ -166,9 +166,11 @@ endif
 export override RUSTFLAGS += $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 
 
-### Convenience targets for building Theseus with all features enabled.
+### Convenience targets for building the entire Theseus workspace
+### with all optional features enabled. 
+### See `theseus_features/src/lib.rs` for more details on what this includes.
 all: full
-full : export override CARGOFLAGS += --all-features
+full : export override FEATURES += --workspace --all-features
 full: iso
 
 
@@ -248,6 +250,7 @@ endif
 	@echo -e 'sysroot = "./sysroot"' >> $(THESEUS_BUILD_TOML)
 	@echo -e 'rustflags = "$(RUSTFLAGS)"' >> $(THESEUS_BUILD_TOML)
 	@echo -e 'cargoflags = "$(CARGOFLAGS)"' >> $(THESEUS_BUILD_TOML)
+	@echo -e 'features = "$(FEATURES)"' >> $(THESEUS_BUILD_TOML)
 	@echo -e 'host_deps = "./host_deps"' >> $(THESEUS_BUILD_TOML)
 
 ## Fifth, strip debug information if requested. This reduces object file size, improving load times and reducing memory usage.
@@ -287,7 +290,7 @@ cargo: check-rustc
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) --target $(TARGET)
+	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) $(BUILD_STD_CARGOFLAGS) --target $(TARGET)
 
 ## We tried using the "cargo rustc" command here instead of "cargo build" to avoid cargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of cargo rebuilding everything).
@@ -887,7 +890,7 @@ loadable: run
 
 
 ### builds and runs Theseus with wasmtime enabled.
-wasmtime : export override CARGOFLAGS += --features wasmtime
+wasmtime : export override FEATURES += --features wasmtime
 wasmtime: run
 
 
