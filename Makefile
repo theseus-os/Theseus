@@ -168,7 +168,7 @@ export override RUSTFLAGS += $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 
 ### Convenience targets for building the entire Theseus workspace
 ### with all optional features enabled. 
-### See `theseus_cargo/Cargo.toml` for more details about what this includes.
+### See `theseus_features/src/lib.rs` for more details on what this includes.
 all: full
 full : export override FEATURES += --workspace --all-features
 full: iso
