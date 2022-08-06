@@ -1,3 +1,4 @@
+#![feature(let_chains)]
 #![no_std]
 
 #[macro_use] extern crate alloc;

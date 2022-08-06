@@ -27,13 +27,14 @@ extern crate logger;
 extern crate core2;
 extern crate window_manager;
 
-use stdio::{StdioReader, StdioWriter, KeyEventReadGuard,
-            KeyEventQueueReader};
+use stdio::{KeyEventReadGuard, KeyEventQueueReader};
 use spin::{Mutex, MutexGuard};
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use libterm::Terminal;
+
+pub use stdio::{StdioReader, StdioWriter};
 
 /// Stores the stdio queues, key event queue and the pointer to the terminal
 /// for applications. This structure is provided for application's use and only
