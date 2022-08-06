@@ -25,6 +25,6 @@ path = "../panic_wrapper"
 [dependencies.unwind]
 path = "../unwind"
 
-
-[lib]
-crate-type = ["rlib"]
+[features]
+default = ["std-handlers"]
+std-handlers = []
