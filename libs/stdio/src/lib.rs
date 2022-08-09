@@ -3,10 +3,14 @@
 //! to keyboard events.
 #![no_std]
 
+#[macro_use]
+extern crate log;
+
 extern crate alloc;
 extern crate spin;
 extern crate core2;
 extern crate keycodes_ascii;
+extern crate waker;
 
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
@@ -17,9 +21,15 @@ use spin::{Mutex, MutexGuard};
 use core2::io::{Read, Write};
 use keycodes_ascii::KeyEvent;
 use core::ops::Deref;
+use waker::AtomicWaker;
+use core::task::Poll;
+use core::task::Context;
+use core::future::poll_fn;
 
 /// A ring buffer with an EOF mark.
 pub struct RingBufferEof<T> {
+    /// Future waker.
+    waker: AtomicWaker,
     /// The ring buffer.
     queue: VecDeque<T>,
     /// The EOF mark. We meet EOF when it equals `true`.
@@ -76,10 +86,32 @@ impl<T> RingBufferEof<T> {
     /// Create a new ring buffer.
     fn new() -> RingBufferEof<T> {
         RingBufferEof {
+        	waker: AtomicWaker::new(),
             queue: VecDeque::new(),
             end: false
         }
     }
+    
+	pub async fn pop_front(&mut self) -> Option<T> {
+		poll_fn(|cx: &mut Context<'_>| {
+		    // quick check to avoid registration if already done.
+		    if let Some(popped) = self.queue.pop_front() {
+		    	info!("poll ready!");
+		        return Poll::Ready(Some(popped));
+		    }
+
+			info!("register waker!");
+		    self.waker.register(cx.waker());
+
+		    // Need to check condition **after** `register` to avoid a race
+		    // condition that would result in lost notifications.
+		    if let Some(popped) = self.queue.pop_front() {
+		        Poll::Ready(Some(popped))
+		    } else {
+		        Poll::Pending
+		    }
+		}).await
+	}
 }
 
 impl Stdio {
@@ -180,6 +212,49 @@ impl StdioReader {
             if new_cnt == 0 && locked.is_eof() { return Ok(total_cnt); }
         }
     }
+    
+    pub async fn _read_line(&mut self, buf: &mut String) -> Result<usize, core2::io::Error> {
+        let mut total_cnt = 0usize;    // total number of bytes read this time
+        let mut new_cnt;               // number of bytes returned from a `read()` invocation
+        let mut tmp_buf = Vec::new();  // temporary buffer
+        let mut line_finished = false; // mark if we have finished a line
+
+        // Copy from the inner buffer. Process the remaining characters from last read first.
+        tmp_buf.resize(self.inner_buf.len(), 0);
+        tmp_buf[0..self.inner_content_len].clone_from_slice(&self.inner_buf[0..self.inner_content_len]);
+        new_cnt = self.inner_content_len;
+        self.inner_content_len = 0;
+
+        loop {
+            // Try to find an '\n' character.
+            let mut cnt_before_new_line = new_cnt;
+            for (idx, c) in tmp_buf[0..new_cnt].iter().enumerate() {
+                if *c as char == '\n' {
+                    cnt_before_new_line = idx + 1;
+                    line_finished = true;
+                    break;
+                }
+            }
+
+            // Append new characters to output buffer (until '\n').
+            total_cnt += cnt_before_new_line;
+            let new_str = String::from_utf8_lossy(&tmp_buf[0..cnt_before_new_line]);
+            buf.push_str(&new_str);
+
+            // If we have read a whole line, copy any byte left to inner buffer, and then return.
+            if line_finished {
+                self.inner_buf[0..new_cnt-cnt_before_new_line].clone_from_slice(&tmp_buf[cnt_before_new_line..new_cnt]);
+                self.inner_content_len = new_cnt - cnt_before_new_line;
+                return Ok(total_cnt);
+            }
+
+            // We have not finished a whole line. Try to read more from the ring buffer, until
+            // we hit EOF.
+            let mut locked = self.lock();
+            new_cnt = locked._read(&mut tmp_buf[..]).await?;
+            if new_cnt == 0 && locked.is_eof() { return Ok(total_cnt); }
+        }
+    }
 }
 
 impl StdioWriter {
@@ -264,9 +339,41 @@ impl<'a> StdioReadGuard<'a> {
         return Ok(cnt);
     }
 
-    /// Returns the number of bytes still in the read buffer.
+    /// Returns the number of bytes still in the read buffer. Async Version
     pub fn remaining_bytes(&self) -> usize {
         return self.guard.lock().queue.len();
+    }
+    
+    pub async fn _read(&mut self, buf: &mut [u8]) -> Result<usize, core2::io::Error> {
+
+        // Deal with the edge case that the buffer specified was 0 bytes in length.
+        if buf.len() == 0 { return Ok(0); }
+
+        let mut cnt: usize = 0;
+        loop {
+            let end; // EOF flag
+            {
+                let mut locked_ring_buf = self.guard.lock();
+                let mut buf_iter = buf[cnt..].iter_mut();
+
+                // Keep reading if we have empty space in the output buffer
+                // and available byte in the ring buffer.
+                while let Some(buf_entry) = buf_iter.next() {
+                    if let Some(queue_elem) = locked_ring_buf.pop_front().await {
+                        *buf_entry = queue_elem;
+                        cnt += 1;
+                    } else {
+                        break;
+                    }
+                }
+
+                end = locked_ring_buf.end;
+            } // the lock on the ring buffer is guaranteed to be dropped here
+
+            // Break if we have read something or we encounter EOF.
+            if cnt > 0 || end { break; }
+        }
+        return Ok(cnt);
     }
 }
 
@@ -411,3 +518,4 @@ impl Deref for KeyEventReadGuard {
         &self.reader
     }
 }
+

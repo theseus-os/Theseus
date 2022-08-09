@@ -167,6 +167,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "async_task"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "app_io",
+ "core2",
+ "futures-util",
+ "interrupts",
+ "log",
+ "nonblocking",
+ "scheduler",
+ "sleep",
+ "spawn",
+ "spin 0.9.0",
+ "stdio",
+ "task",
+ "terminal_print",
+ "unified_channel",
+ "wait_condition",
+]
+
+[[package]]
 name = "ata"
 version = "0.1.0"
 dependencies = [
@@ -656,6 +678,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam-queue"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1cd42583b04998a5363558e5f9291ee5a5ff6b49944332103f251e7479a82aa7"
+dependencies = [
+ "cfg-if 1.0.0",
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "crossbeam-utils"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1119,6 +1151,30 @@ dependencies = [
  "log",
  "memory",
  "spin 0.9.0",
+]
+
+[[package]]
+name = "futures-core"
+version = "0.3.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c09fd04b7e4073ac7156a9539b57a484a8ea920f79c7c675d05d289ab6110d3"
+
+[[package]]
+name = "futures-task"
+version = "0.3.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57c66a976bf5909d801bbef33416c41372779507e7a6b3a5e25e4749c58f776a"
+
+[[package]]
+name = "futures-util"
+version = "0.3.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8b7abd5d659d9b90c8cba917f6ec750a74e2dc23902ef9cd4cc8c8b22e6036a"
+dependencies = [
+ "futures-core",
+ "futures-task",
+ "pin-project-lite",
+ "pin-utils",
 ]
 
 [[package]]
@@ -2125,6 +2181,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "nonblocking"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-queue",
+ "futures-core",
+ "irq_safety",
+ "log",
+ "scheduler",
+ "task",
+]
+
+[[package]]
 name = "ns"
 version = "0.1.0"
 dependencies = [
@@ -2350,6 +2418,18 @@ dependencies = [
  "log",
  "port_io",
 ]
+
+[[package]]
+name = "pin-project-lite"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0a7ae3ac2f1173085d398531c705756c94a4c56843785df85a60c1a0afac116"
+
+[[package]]
+name = "pin-utils"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
 name = "ping"
@@ -3126,7 +3206,9 @@ version = "0.1.0"
 dependencies = [
  "core2",
  "keycodes_ascii",
+ "log",
  "spin 0.9.0",
+ "waker",
 ]
 
 [[package]]
@@ -3842,6 +3924,11 @@ dependencies = [
  "scheduler",
  "task",
 ]
+
+[[package]]
+name = "waker"
+version = "0.1.0"
+source = "git+https://github.com/kavanmevada/nosys-waker?rev=9040386#9040386801ad3c33fccd4a37cbdb352650890fa1"
 
 [[package]]
 name = "wasi"

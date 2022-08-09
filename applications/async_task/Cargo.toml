@@ -1,0 +1,55 @@
+[package]
+name = "async_task"
+version = "0.1.0"
+description = "Tests the async/await tasks"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
+spin = "0.9.0"
+
+[dependencies.futures-util]
+version = "0.3.4"
+default-features = false
+features = ["alloc"]
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.apic]
+path = "../../kernel/apic"
+
+[dependencies.scheduler]
+path = "../../kernel/scheduler"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"
+
+[dependencies.wait_condition]
+path = "../../kernel/wait_condition"
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+[dependencies.app_io]
+path = "../../kernel/app_io"
+
+[dependencies.interrupts]
+path = "../../kernel/interrupts"
+
+[dependencies.stdio]
+path = "../../libs/stdio"
+
+[dependencies.unified_channel]
+path = "../../kernel/unified_channel"
+
+[dependencies.sleep]
+path = "../../kernel/sleep"
+
+[dependencies.nonblocking]
+path = "../../kernel/nonblocking"
+
