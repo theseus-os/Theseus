@@ -724,6 +724,24 @@
 <span id="718">718</span>
 <span id="719">719</span>
 <span id="720">720</span>
+<span id="721">721</span>
+<span id="722">722</span>
+<span id="723">723</span>
+<span id="724">724</span>
+<span id="725">725</span>
+<span id="726">726</span>
+<span id="727">727</span>
+<span id="728">728</span>
+<span id="729">729</span>
+<span id="730">730</span>
+<span id="731">731</span>
+<span id="732">732</span>
+<span id="733">733</span>
+<span id="734">734</span>
+<span id="735">735</span>
+<span id="736">736</span>
+<span id="737">737</span>
+<span id="738">738</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="attribute">#![<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
@@ -747,6 +765,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bit_field</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">msr</span>;
 
+<span class="kw">use</span> <span class="ident">core::fmt</span>;
 <span class="kw">use</span> <span class="ident">volatile</span>::{<span class="ident">Volatile</span>, <span class="ident">ReadOnly</span>, <span class="ident">WriteOnly</span>};
 <span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
 <span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
@@ -864,12 +883,10 @@
 <span class="doccomment">/// Initially maps the base APIC MMIO register frames so that we can know which LAPIC (core) we are.</span>
 <span class="doccomment">/// This only does something for apic/xapic systems, it does nothing for x2apic systems, as required.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">_page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">x2</span> <span class="op">=</span> <span class="ident">has_x2apic</span>();
-    <span class="macro">debug!</span>(<span class="string">&quot;is x2apic? {}.  IA32_APIC_BASE (phys addr): {:X?}&quot;</span>, 
-        <span class="ident">x2</span>, <span class="ident">PhysicalAddress::new</span>(<span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="kw">as</span> <span class="ident">usize</span>)
-    );
+    <span class="kw">let</span> <span class="ident">is_x2apic</span> <span class="op">=</span> <span class="ident">has_x2apic</span>();
+    <span class="macro">debug!</span>(<span class="string">&quot;is x2apic? {}. IA32_APIC_BASE (phys addr): {:X?}&quot;</span>, <span class="ident">is_x2apic</span>, <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>));
 
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">x2</span> {
+    <span class="kw">if</span> <span class="op">!</span><span class="ident">is_x2apic</span> {
         <span class="comment">// Ensure the local apic is enabled in xapic mode, otherwise we&#39;ll get a General Protection fault</span>
         <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_APIC_BASE</span>, <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="op">|</span> <span class="ident">IA32_APIC_XAPIC_ENABLE</span>); }
     }
@@ -1004,289 +1021,329 @@
 }
 <span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">RegisterArray</span><span class="op">&gt;</span>(), <span class="number">8</span> <span class="op">*</span> (<span class="number">4</span> <span class="op">+</span> <span class="number">12</span>));
 
+<span class="doccomment">/// The Local APIC&#39;s vector table local interrupt pins.</span>
+<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">alias</span>(<span class="string">&quot;lvt&quot;</span>, <span class="string">&quot;lint&quot;</span>, <span class="string">&quot;lint0&quot;</span>, <span class="string">&quot;lint1&quot;</span>))]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">LvtLint</span> {
+    <span class="ident">Pin0</span>,
+    <span class="ident">Pin1</span>,
+}
+<span class="kw">impl</span> <span class="ident">LvtLint</span> {
+    <span class="doccomment">/// Returns the MSR used to access this LvtLint pin.</span>
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">fn</span> <span class="ident">msr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u32</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident"><span class="self">Self</span>::Pin0</span> =&gt; <span class="ident">IA32_X2APIC_LVT_LINT0</span>,
+            <span class="ident"><span class="self">Self</span>::Pin1</span> =&gt; <span class="ident">IA32_X2APIC_LVT_LINT1</span>,
+        }
+    }
+}
+
+<span class="doccomment">/// The inner type of the Local APIC (xapic or x2apic)</span>
+<span class="doccomment">/// used within the [`LocalApic`] struct.</span>
+<span class="kw">enum</span> <span class="ident">LapicType</span> {
+    <span class="ident">X2Apic</span>,
+    <span class="ident">XApic</span>(<span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">ApicRegisters</span><span class="op">&gt;</span>),
+}
+<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">LapicType</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
+        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{}&quot;</span>,
+            <span class="kw">match</span> <span class="self">self</span> {
+                <span class="ident"><span class="self">Self</span>::X2Apic</span>   =&gt; <span class="string">&quot;x2apic&quot;</span>,
+                <span class="ident"><span class="self">Self</span>::XApic</span>(<span class="kw">_</span>) =&gt; <span class="string">&quot;xapic&quot;</span>,
+            }
+        )
+    }
+}
+
 
 <span class="doccomment">/// This structure represents a single APIC in the system, there is one per core. </span>
+<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">alias</span> <span class="op">=</span> <span class="string">&quot;lapic&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LocalApic</span> {
-    <span class="doccomment">/// Only exists for xapic, should be None for x2apic systems.</span>
-    <span class="kw">pub</span> <span class="ident">regs</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">ApicRegisters</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// The inner lapic object that disambiguates between xapic and x2apic.</span>
+    <span class="ident">inner</span>: <span class="ident">LapicType</span>,
     <span class="doccomment">/// The processor id of this APIC.</span>
-    <span class="kw">pub</span> <span class="ident">processor</span>: <span class="ident">u8</span>,
+    <span class="ident">processor</span>: <span class="ident">u8</span>,
     <span class="doccomment">/// The APIC system id of this APIC.</span>
-    <span class="kw">pub</span> <span class="ident">apic_id</span>: <span class="ident">u8</span>,
+    <span class="ident">apic_id</span>: <span class="ident">u8</span>,
     <span class="doccomment">/// Whether this `LocalApic` is the bootstrap processor (the first processor to boot up).</span>
-    <span class="kw">pub</span> <span class="ident">is_bsp</span>: <span class="ident">bool</span>,
+    <span class="ident">is_bsp</span>: <span class="ident">bool</span>,
 }
-<span class="kw">use</span> <span class="ident">core::fmt</span>;
 <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">LocalApic</span> {
-        <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-            <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;LocalApic {{processor: {}, apic_id: {}, is_bsp: {}}}&quot;</span>,
-                <span class="self">self</span>.<span class="ident">processor</span>, <span class="self">self</span>.<span class="ident">apic_id</span>, <span class="self">self</span>.<span class="ident">is_bsp</span>
-            )
-        }
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
+        <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;LocalApic&quot;</span>)
+            .<span class="ident">field</span>(<span class="string">&quot;type&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span>)
+            .<span class="ident">field</span>(<span class="string">&quot;apic_id&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">apic_id</span>)
+            .<span class="ident">field</span>(<span class="string">&quot;processor&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">processor</span>)
+            .<span class="ident">field</span>(<span class="string">&quot;is_bsp&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">is_bsp</span>)
+            .<span class="ident">finish</span>()
+    }
 }
 
 <span class="kw">impl</span> <span class="ident">LocalApic</span> {
+    <span class="doccomment">/// Creates and initializes a new `LocalApic` for the current CPU core</span>
+    <span class="doccomment">/// and adds it to the global set of initialized lapics.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// ## Important Usage Note</span>
     <span class="doccomment">/// This MUST be invoked from the AP core itself when it is booting up.</span>
     <span class="doccomment">/// The BSP cannot invoke this for other APs (it can only invoke it for itself).</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>, <span class="ident">processor</span>: <span class="ident">u8</span>, <span class="ident">apic_id</span>: <span class="ident">u8</span>, <span class="ident">is_bsp</span>: <span class="ident">bool</span>, <span class="ident">nmi_lint</span>: <span class="ident">u8</span>, <span class="ident">nmi_flags</span>: <span class="ident">u16</span>) 
-        -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">LocalApic</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>
-    {
-        <span class="comment">// This MSR is used to hold a CPU&#39;s ID (which is an OS-chosen value).</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
+        <span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>,
+        <span class="ident">processor</span>: <span class="ident">u8</span>,
+        <span class="ident">apic_id</span>: <span class="ident">u8</span>,
+        <span class="ident">is_bsp</span>: <span class="ident">bool</span>,
+        <span class="ident">nmi_lint</span>: <span class="ident">u8</span>,
+        <span class="ident">nmi_flags</span>: <span class="ident">u16</span>
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">LocalApic</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+
+        <span class="kw">let</span> <span class="ident">nmi_lint</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">nmi_lint</span> {
+            <span class="number">0</span> =&gt; <span class="ident">LvtLint::Pin0</span>,
+            <span class="number">1</span> =&gt; <span class="ident">LvtLint::Pin1</span>,
+            <span class="ident">_invalid</span> =&gt; {
+                <span class="macro">error!</span>(<span class="string">&quot;BUG: invalid `nmi_lint` value (must be `0` or `1`) in \
+                    LocalApic::new(processor: {}, apic_id: {}, is_bsp: {}, nmi_lint: {}, nmi_flags: {}&quot;</span>,
+                    <span class="ident">processor</span>, <span class="ident">apic_id</span>, <span class="ident">is_bsp</span>, <span class="ident">nmi_lint</span>, <span class="ident">nmi_flags</span>
+                );
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: invalid `nmi_lint` value, must be `0` or `1`&quot;</span>);
+            }
+        };
+
+        <span class="comment">// Theseus uses this MSR to hold each CPU&#39;s ID (which is an OS-chosen value).</span>
         <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_TSC_AUX</span>, <span class="ident">apic_id</span> <span class="kw">as</span> <span class="ident">u64</span>); }
 
+        <span class="kw">if</span> <span class="ident">is_bsp</span> {
+            <span class="ident">BSP_PROCESSOR_ID</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">apic_id</span>); 
+        }
+
+        <span class="kw">let</span> <span class="ident">inner</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">has_x2apic</span>() {
+            <span class="ident">LapicType::X2Apic</span>
+        } <span class="kw">else</span> {
+            <span class="ident">LapicType::XApic</span>(
+                <span class="ident">BoxRefMut::new</span>(<span class="ident">Box::new</span>(<span class="ident">map_apic</span>(<span class="ident">page_table</span>)<span class="question-mark">?</span>))
+                    .<span class="ident">try_map_mut</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> <span class="ident">mp</span>.<span class="ident">as_type_mut</span>::<span class="op">&lt;</span><span class="ident">ApicRegisters</span><span class="op">&gt;</span>(<span class="number">0</span>))<span class="question-mark">?</span>
+            )
+        };
 		<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lapic</span> <span class="op">=</span> <span class="ident">LocalApic</span> {
-            <span class="ident">regs</span>: <span class="prelude-val">None</span>, <span class="comment">// None by default (for x2apics). if xapic, it will be set to Some later</span>
-            <span class="ident">processor</span>: <span class="ident">processor</span>,
-            <span class="ident">apic_id</span>: <span class="ident">apic_id</span>,
-            <span class="ident">is_bsp</span>: <span class="ident">is_bsp</span>,
-		};
+            <span class="ident">inner</span>,
+            <span class="ident">processor</span>,
+            <span class="ident">apic_id</span>,
+            <span class="ident">is_bsp</span>,
+        };
 
-        <span class="kw">if</span> <span class="ident">is_bsp</span> {
-            <span class="ident">BSP_PROCESSOR_ID</span>.<span class="ident">call_once</span>( <span class="op">|</span><span class="op">|</span> <span class="ident">apic_id</span>); 
-        }
-
-        <span class="kw">if</span> <span class="ident">has_x2apic</span>() { 
-            <span class="ident">lapic</span>.<span class="ident">enable_x2apic</span>();
-            <span class="ident">lapic</span>.<span class="ident">init_timer_x2apic</span>();
-        } 
-        <span class="kw">else</span> { 
-            <span class="comment">// offset into the apic_mapped_page is always 0, regardless of the physical address</span>
-            <span class="kw">let</span> <span class="ident">apic_regs</span> <span class="op">=</span> <span class="ident">BoxRefMut::new</span>(<span class="ident">Box::new</span>(<span class="ident">map_apic</span>(<span class="ident">page_table</span>)<span class="question-mark">?</span>)).<span class="ident">try_map_mut</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> <span class="ident">mp</span>.<span class="ident">as_type_mut</span>::<span class="op">&lt;</span><span class="ident">ApicRegisters</span><span class="op">&gt;</span>(<span class="number">0</span>))<span class="question-mark">?</span>;
-            <span class="ident">lapic</span>.<span class="ident">regs</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">apic_regs</span>);
-            <span class="ident">lapic</span>.<span class="ident">enable_apic</span>()<span class="question-mark">?</span>;
-            <span class="ident">lapic</span>.<span class="ident">init_timer</span>()<span class="question-mark">?</span>;
-        }
-
-        <span class="ident">lapic</span>.<span class="ident">set_nmi</span>(<span class="ident">nmi_lint</span>, <span class="ident">nmi_flags</span>)<span class="question-mark">?</span>;
+        <span class="ident">lapic</span>.<span class="ident">enable</span>();
+        <span class="ident">lapic</span>.<span class="ident">init_lvt_timer</span>();
+        <span class="ident">lapic</span>.<span class="ident">set_nmi</span>(<span class="ident">nmi_lint</span>, <span class="ident">nmi_flags</span>);
         <span class="macro">info!</span>(<span class="string">&quot;Found new processor core ({:?})&quot;</span>, <span class="ident">lapic</span>);
-		<span class="prelude-val">Ok</span>(<span class="ident">lapic</span>)
+		<span class="prelude-val">Ok</span>(<span class="ident">lapic</span>)      
     }
 
-    <span class="doccomment">/// enables the spurious interrupt vector, which enables the APIC itself.</span>
-    <span class="kw">fn</span> <span class="ident">enable_apic</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">has_x2apic</span>(), <span class="string">&quot;an x2apic system must not use enable_apic(), it should use enable_x2apic() instead.&quot;</span>);
 
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">apic_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)   -&gt; <span class="ident">u8</span>   { <span class="self">self</span>.<span class="ident">apic_id</span> }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">processor</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span>   { <span class="self">self</span>.<span class="ident">processor</span> }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_bsp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; <span class="ident">bool</span> { <span class="self">self</span>.<span class="ident">is_bsp</span> }
+
+    <span class="doccomment">/// Enable this lapic by initializing it to a clean state</span>
+    <span class="doccomment">/// and enabling its spurious interrupt vector.</span>
+    <span class="kw">fn</span> <span class="ident">enable</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="kw">let</span> <span class="ident">is_bsp</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="op">&amp;</span> <span class="ident">IA32_APIC_BASE_MSR_IS_BSP</span> <span class="op">==</span> <span class="ident">IA32_APIC_BASE_MSR_IS_BSP</span>;
-        <span class="comment">// globally enable the apic by setting the xapic_enable bit</span>
-        <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_APIC_BASE</span>, <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="op">|</span> <span class="ident">IA32_APIC_XAPIC_ENABLE</span>); }
-        <span class="macro">info!</span>(<span class="string">&quot;LAPIC ID {:#x}, version: {:#x}, is_bsp: {}&quot;</span>, <span class="self">self</span>.<span class="ident">id</span>(), <span class="self">self</span>.<span class="ident">version</span>(), <span class="ident">is_bsp</span>);
-        <span class="kw">if</span> <span class="ident">is_bsp</span> {
-            <span class="ident">INTERRUPT_CHIP</span>.<span class="ident">store</span>(<span class="ident">InterruptChip::APIC</span>);
-        }
 
-        <span class="comment">// init APIC to a clean state</span>
-        <span class="comment">// see this: http://wiki.osdev.org/APIC#Logical_Destination_Mode</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">regs</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">regs</span> {
-            <span class="ident">regs</span>.<span class="ident">destination_format</span>.<span class="ident">write</span>(<span class="number">0xFFFF_FFFF</span>);
-            <span class="macro">info!</span>(<span class="string">&quot;enable_apic(): LDR = {:#X}&quot;</span>, <span class="ident">regs</span>.<span class="ident">destination_format</span>.<span class="ident">read</span>());
-            <span class="ident">regs</span>.<span class="ident">lvt_timer</span>.<span class="ident">write</span>(<span class="ident">APIC_DISABLE</span>);
-            <span class="ident">regs</span>.<span class="ident">lvt_perf_monitor</span>.<span class="ident">write</span>(<span class="ident">APIC_NMI</span>);
-            <span class="ident">regs</span>.<span class="ident">lvt_lint0</span>.<span class="ident">write</span>(<span class="ident">APIC_DISABLE</span>);
-            <span class="ident">regs</span>.<span class="ident">lvt_lint1</span>.<span class="ident">write</span>(<span class="ident">APIC_DISABLE</span>);
-            <span class="ident">regs</span>.<span class="ident">task_priority</span>.<span class="ident">write</span>(<span class="number">0</span>);
+        <span class="comment">// Globally enable the xapic/x2apic by setting the XAPIC_ENABLE (and optionally X2APIC_ENABLE) bits</span>
+        <span class="kw">let</span> <span class="ident">enable_bitmask</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="op">|</span> <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span> {
+            <span class="ident">LapicType::X2Apic</span>   =&gt; <span class="ident">IA32_APIC_XAPIC_ENABLE</span> <span class="op">|</span> <span class="ident">IA32_APIC_X2APIC_ENABLE</span>,
+            <span class="ident">LapicType::XApic</span>(<span class="kw">_</span>) =&gt; <span class="ident">IA32_APIC_XAPIC_ENABLE</span>
+        };
+        <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_APIC_BASE</span>, <span class="ident">enable_bitmask</span>); }
 
-            <span class="comment">// set bit 8 to allow receiving interrupts (still need to &quot;sti&quot;)</span>
-            <span class="ident">regs</span>.<span class="ident">spurious_interrupt_vector</span>.<span class="ident">write</span>(<span class="ident">APIC_SPURIOUS_INTERRUPT_VECTOR</span> <span class="op">|</span> <span class="ident">APIC_SW_ENABLE</span>);   
-            <span class="prelude-val">Ok</span>(())         
-        }
-        <span class="kw">else</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;enable_apic(): FATAL ERROR: regs (ApicRegisters) were None! Were they initialized right?&quot;</span>);
-            <span class="prelude-val">Err</span>(<span class="string">&quot;enable_apic(): FATAL ERROR: regs (ApicRegisters) were None! Were they initialized right?&quot;</span>)
+        <span class="kw">let</span> <span class="ident">id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">id</span>();
+        <span class="kw">let</span> <span class="ident">version</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">version</span>();
+
+        <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span> {
+            <span class="ident">LapicType::X2Apic</span> =&gt; {
+                <span class="macro">info!</span>(<span class="string">&quot;LAPIC x2 ID {:#x}, version: {:#x}, is_bsp: {}&quot;</span>, <span class="ident">id</span>, <span class="ident">version</span>, <span class="ident">is_bsp</span>);
+                <span class="kw">if</span> <span class="ident">is_bsp</span> {
+                    <span class="ident">INTERRUPT_CHIP</span>.<span class="ident">store</span>(<span class="ident">InterruptChip::X2APIC</span>);
+                }
+
+                <span class="comment">// Init x2APIC to a known clean state.</span>
+                <span class="comment">// Note: in x2apic, there is no DFR reg because only cluster mode is enabled; </span>
+                <span class="comment">//       there is no flat logical mode, and the IA32_X2APIC_LDR is read-only.</span>
+                <span class="kw">let</span> <span class="ident">ldr</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_LDR</span>);
+                <span class="kw">let</span> <span class="ident">cluster_id</span> <span class="op">=</span> (<span class="ident">ldr</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">16</span>) <span class="op">&amp;</span> <span class="number">0xFFFF</span>; <span class="comment">// highest 16 bits</span>
+                <span class="kw">let</span> <span class="ident">logical_id</span> <span class="op">=</span> <span class="ident">ldr</span> <span class="op">&amp;</span> <span class="number">0xFFFF</span>; <span class="comment">// lowest 16 bits</span>
+                <span class="macro">info!</span>(<span class="string">&quot;x2LAPIC ID {:#x}, version {:#X}, (cluster {:#X} logical {:#X}), is_bsp: {}&quot;</span>,
+                    <span class="ident">id</span>, <span class="ident">version</span>, <span class="ident">cluster_id</span>, <span class="ident">logical_id</span>, <span class="ident">is_bsp</span>
+                );
+                <span class="comment">// NOTE: we&#39;re not yet using logical or cluster mode APIC addressing, only physical APIC addressing.</span>
+                
+                <span class="kw">unsafe</span> {
+                    <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_TIMER</span>,  <span class="ident">APIC_DISABLE</span> <span class="kw">as</span> <span class="ident">u64</span>);
+                    <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_PMI</span>,    <span class="ident">APIC_NMI</span> <span class="kw">as</span> <span class="ident">u64</span>);
+                    <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_LINT0</span>,  <span class="ident">APIC_DISABLE</span> <span class="kw">as</span> <span class="ident">u64</span>);
+                    <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_LINT1</span>,  <span class="ident">APIC_DISABLE</span> <span class="kw">as</span> <span class="ident">u64</span>);
+                    <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_TPR</span>,        <span class="number">0</span>);
+                    
+                    <span class="comment">// set bit 8 to start receiving interrupts (still need to &quot;sti&quot;)</span>
+                    <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_SIVR</span>, (<span class="ident">APIC_SPURIOUS_INTERRUPT_VECTOR</span> <span class="op">|</span> <span class="ident">APIC_SW_ENABLE</span>) <span class="kw">as</span> <span class="ident">u64</span>); 
+                }
+            }
+            <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; {
+                <span class="comment">// Globally enable the apic by setting the XAPIC_ENABLE bit</span>
+                <span class="kw">let</span> <span class="ident">enable_bitmask</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="op">|</span> <span class="ident">IA32_APIC_XAPIC_ENABLE</span>;
+                <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_APIC_BASE</span>, <span class="ident">enable_bitmask</span>); }
+                <span class="macro">info!</span>(<span class="string">&quot;LAPIC ID {:#x}, version: {:#x}, is_bsp: {}&quot;</span>, <span class="ident">id</span>, <span class="ident">version</span>, <span class="ident">is_bsp</span>);
+                <span class="kw">if</span> <span class="ident">is_bsp</span> {
+                    <span class="ident">INTERRUPT_CHIP</span>.<span class="ident">store</span>(<span class="ident">InterruptChip::APIC</span>);
+                }
+
+                <span class="comment">// Init APIC to a clean known state.</span>
+                <span class="comment">// See &lt;http://wiki.osdev.org/APIC#Logical_Destination_Mode&gt;</span>
+                <span class="ident">regs</span>.<span class="ident">destination_format</span>.<span class="ident">write</span>(<span class="number">0xFFFF_FFFF</span>);
+                <span class="ident">regs</span>.<span class="ident">lvt_timer</span>.<span class="ident">write</span>(<span class="ident">APIC_DISABLE</span>);
+                <span class="ident">regs</span>.<span class="ident">lvt_perf_monitor</span>.<span class="ident">write</span>(<span class="ident">APIC_NMI</span>);
+                <span class="ident">regs</span>.<span class="ident">lvt_lint0</span>.<span class="ident">write</span>(<span class="ident">APIC_DISABLE</span>);
+                <span class="ident">regs</span>.<span class="ident">lvt_lint1</span>.<span class="ident">write</span>(<span class="ident">APIC_DISABLE</span>);
+                <span class="ident">regs</span>.<span class="ident">task_priority</span>.<span class="ident">write</span>(<span class="number">0</span>);
+
+                <span class="comment">// set bit 8 to allow receiving interrupts (still need to &quot;sti&quot;)</span>
+                <span class="ident">regs</span>.<span class="ident">spurious_interrupt_vector</span>.<span class="ident">write</span>(<span class="ident">APIC_SPURIOUS_INTERRUPT_VECTOR</span> <span class="op">|</span> <span class="ident">APIC_SW_ENABLE</span>);   
+            }
         }
     }
-
-
-    <span class="kw">fn</span> <span class="ident">enable_x2apic</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="macro">assert!</span>(<span class="ident">has_x2apic</span>(), <span class="string">&quot;an apic/xapic system must not use enable_x2apic(), it should use enable_apic() instead.&quot;</span>);
-
-        <span class="kw">let</span> <span class="ident">is_bsp</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="op">&amp;</span> <span class="ident">IA32_APIC_BASE_MSR_IS_BSP</span> <span class="op">==</span> <span class="ident">IA32_APIC_BASE_MSR_IS_BSP</span>;
-        <span class="comment">// globally enable the x2apic by setting both the x2apic and xapic enable bits</span>
-        <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_APIC_BASE</span>, <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="op">|</span> <span class="ident">IA32_APIC_XAPIC_ENABLE</span> <span class="op">|</span> <span class="ident">IA32_APIC_X2APIC_ENABLE</span>); }
-        <span class="macro">info!</span>(<span class="string">&quot;LAPIC x2 ID {:#x}, version: {:#x}, is_bsp: {}&quot;</span>, <span class="self">self</span>.<span class="ident">id</span>(), <span class="self">self</span>.<span class="ident">version</span>(), <span class="ident">is_bsp</span>);
-        <span class="kw">if</span> <span class="ident">is_bsp</span> {
-            <span class="ident">INTERRUPT_CHIP</span>.<span class="ident">store</span>(<span class="ident">InterruptChip::X2APIC</span>);
-        }
-
-
-        <span class="comment">// init x2APIC to a clean state, just as in enable_apic() above </span>
-        <span class="comment">// Note: in x2apic, there is not DFR reg because only cluster mode is enabled; there is no flat logical mode</span>
-        <span class="comment">// Note: in x2apic, the IA32_X2APIC_LDR is read-only.</span>
-        <span class="kw">let</span> <span class="ident">ldr</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_LDR</span>);
-        <span class="kw">let</span> <span class="ident">cluster_id</span> <span class="op">=</span> (<span class="ident">ldr</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">16</span>) <span class="op">&amp;</span> <span class="number">0xFFFF</span>; <span class="comment">// highest 16 bits</span>
-        <span class="kw">let</span> <span class="ident">logical_id</span> <span class="op">=</span> <span class="ident">ldr</span> <span class="op">&amp;</span> <span class="number">0xFFFF</span>; <span class="comment">// lowest 16 bits</span>
-        <span class="macro">info!</span>(<span class="string">&quot;x2LAPIC ID {:#x}, version {:#X}, (cluster {:#X} logical {:#X}), is_bsp: {}&quot;</span>, <span class="self">self</span>.<span class="ident">id</span>(), <span class="self">self</span>.<span class="ident">version</span>(), <span class="ident">cluster_id</span>, <span class="ident">logical_id</span>, <span class="ident">is_bsp</span>);
-        <span class="comment">// NOTE: we&#39;re not yet using logical or cluster mode APIC addressing, but rather only physical APIC addressing</span>
-        
-        <span class="kw">unsafe</span> {
-            <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_TIMER</span>,  <span class="ident">APIC_DISABLE</span> <span class="kw">as</span> <span class="ident">u64</span>);
-            <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_PMI</span>,    <span class="ident">APIC_NMI</span> <span class="kw">as</span> <span class="ident">u64</span>);
-            <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_LINT0</span>,  <span class="ident">APIC_DISABLE</span> <span class="kw">as</span> <span class="ident">u64</span>);
-            <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_LINT1</span>,  <span class="ident">APIC_DISABLE</span> <span class="kw">as</span> <span class="ident">u64</span>);
-            <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_TPR</span>,        <span class="number">0</span>);
-            
-            <span class="comment">// set bit 8 to start receiving interrupts (still need to &quot;sti&quot;)</span>
-            <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_SIVR</span>, (<span class="ident">APIC_SPURIOUS_INTERRUPT_VECTOR</span> <span class="op">|</span> <span class="ident">APIC_SW_ENABLE</span>) <span class="kw">as</span> <span class="ident">u64</span>); 
-        }
-    }
-
 
     <span class="doccomment">/// Returns the number of APIC ticks that occurred during the given number of `microseconds`.</span>
-    <span class="kw">fn</span> <span class="ident">calibrate_apic_timer</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">microseconds</span>: <span class="ident">u32</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u32</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">has_x2apic</span>(), <span class="string">&quot;an x2apic system must not use calibrate_apic_timer(), it should use calibrate_apic_timer_x2() instead.&quot;</span>);
-        
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">regs</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">regs</span> {
-            <span class="ident">regs</span>.<span class="ident">timer_divide</span>.<span class="ident">write</span>(<span class="number">3</span>); <span class="comment">// set divide value to 16</span>
-            <span class="kw">const</span> <span class="ident">INITIAL_COUNT</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">0xFFFF_FFFF</span>; <span class="comment">// the max count, since we&#39;re counting down</span>
-            
-            <span class="ident">regs</span>.<span class="ident">timer_initial_count</span>.<span class="ident">write</span>(<span class="ident">INITIAL_COUNT</span>); <span class="comment">// set counter to max value</span>
-
-            <span class="comment">// wait or the given period using the PIT clock</span>
-            <span class="ident">pit_wait</span>(<span class="ident">microseconds</span>).<span class="ident">unwrap</span>();
-
-            <span class="ident">regs</span>.<span class="ident">lvt_timer</span>.<span class="ident">write</span>(<span class="ident">APIC_DISABLE</span>); <span class="comment">// stop apic timer</span>
-            <span class="kw">let</span> <span class="ident">after</span> <span class="op">=</span> <span class="ident">regs</span>.<span class="ident">timer_current_count</span>.<span class="ident">read</span>();
-            <span class="kw">let</span> <span class="ident">elapsed</span> <span class="op">=</span> <span class="ident">INITIAL_COUNT</span> <span class="op">-</span> <span class="ident">after</span>;
-            <span class="prelude-val">Ok</span>(<span class="ident">elapsed</span>)
-        }
-        <span class="kw">else</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;calibrate_apic_timer(): FATAL ERROR: regs (ApicRegisters) were None! Were they initialized right?&quot;</span>);
-            <span class="prelude-val">Err</span>(<span class="string">&quot;calibrate_apic_timer(): FATAL ERROR: regs (ApicRegisters) were None! Were they initialized right?&quot;</span>)
-        }
-    }
-
-
-    <span class="doccomment">/// Returns the number of APIC ticks that occurred during the given number of `microseconds`.</span>
-    <span class="kw">fn</span> <span class="ident">calibrate_x2apic_timer</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">microseconds</span>: <span class="ident">u32</span>) -&gt; <span class="ident">u64</span> {
-        <span class="macro">assert!</span>(<span class="ident">has_x2apic</span>(), <span class="string">&quot;an apic/xapic system must not use calibrate_x2apic_timer(), it should use calibrate_apic_timer_x2() instead.&quot;</span>);
-        <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_DIV_CONF</span>, <span class="number">3</span>); } <span class="comment">// set divide value to 16</span>
+    <span class="kw">fn</span> <span class="ident">calibrate_lapic_timer</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">microseconds</span>: <span class="ident">u32</span>) -&gt; <span class="ident">u64</span> {
+        <span class="comment">// Start with the max counter value, since we&#39;re counting down</span>
         <span class="kw">const</span> <span class="ident">INITIAL_COUNT</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">0xFFFF_FFFF</span>;
+
+        <span class="kw">let</span> <span class="ident">end_count</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span> {
+            <span class="ident">LapicType::X2Apic</span> =&gt; {
+                <span class="kw">unsafe</span> { 
+                    <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_DIV_CONF</span>, <span class="number">3</span>); <span class="comment">// set divide value to 16</span>
+                    <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_INIT_COUNT</span>, <span class="ident">INITIAL_COUNT</span>);
+                }
+
+                <span class="comment">// wait for the given period using the PIT clock</span>
+                <span class="ident">pit_wait</span>(<span class="ident">microseconds</span>).<span class="ident">unwrap</span>();
+
+                <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_TIMER</span>, <span class="ident">APIC_DISABLE</span> <span class="kw">as</span> <span class="ident">u64</span>); } <span class="comment">// stop apic timer</span>
+                <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_CUR_COUNT</span>)
+            }
+            <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; {
+                <span class="ident">regs</span>.<span class="ident">timer_divide</span>.<span class="ident">write</span>(<span class="number">3</span>); <span class="comment">// set divide value to 16</span>
+                <span class="ident">regs</span>.<span class="ident">timer_initial_count</span>.<span class="ident">write</span>(<span class="ident">INITIAL_COUNT</span> <span class="kw">as</span> <span class="ident">u32</span>);
+
+                <span class="comment">// wait for the given period using the PIT clock</span>
+                <span class="ident">pit_wait</span>(<span class="ident">microseconds</span>).<span class="ident">unwrap</span>();
+
+                <span class="ident">regs</span>.<span class="ident">lvt_timer</span>.<span class="ident">write</span>(<span class="ident">APIC_DISABLE</span>); <span class="comment">// stop apic timer</span>
+                <span class="ident">regs</span>.<span class="ident">timer_current_count</span>.<span class="ident">read</span>() <span class="kw">as</span> <span class="ident">u64</span>
+            }
+        };
         
-        <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_INIT_COUNT</span>, <span class="ident">INITIAL_COUNT</span>); } <span class="comment">// set counter to max value</span>
-
-        <span class="comment">// wait or the given period using the PIT clock</span>
-        <span class="ident">pit_wait</span>(<span class="ident">microseconds</span>).<span class="ident">unwrap</span>();
-
-        <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_TIMER</span>, <span class="ident">APIC_DISABLE</span> <span class="kw">as</span> <span class="ident">u64</span>); } <span class="comment">// stop apic timer</span>
-        <span class="kw">let</span> <span class="ident">after</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_CUR_COUNT</span>);
-        <span class="kw">let</span> <span class="ident">elapsed</span> <span class="op">=</span> <span class="ident">INITIAL_COUNT</span> <span class="op">-</span> <span class="ident">after</span>;
-        <span class="ident">elapsed</span>
+        <span class="ident">INITIAL_COUNT</span> <span class="op">-</span> <span class="ident">end_count</span>
     }
 
-
-    <span class="kw">fn</span> <span class="ident">init_timer</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">has_x2apic</span>(), <span class="string">&quot;an x2apic system must not use init_timer(), it should use init_timer_x2apic() instead.&quot;</span>);
+    <span class="doccomment">/// After this lapic has been enabled, initialize its LVT timer.</span>
+    <span class="kw">fn</span> <span class="ident">init_lvt_timer</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="kw">let</span> <span class="ident">apic_period</span> <span class="op">=</span> <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">apic_timer_fixed</span>) {
-            <span class="macro">info!</span>(<span class="string">&quot;apic_timer_fixed config: overriding APIC timer period to {}&quot;</span>, <span class="number">0x10000</span>);
+            <span class="macro">info!</span>(<span class="string">&quot;apic_timer_fixed config: overriding LocalAPIC LVT timer period to {}&quot;</span>, <span class="number">0x10000</span>);
             <span class="number">0x10000</span> <span class="comment">// for bochs, which doesn&#39;t do apic periods right</span>
         } <span class="kw">else</span> {
-            <span class="self">self</span>.<span class="ident">calibrate_apic_timer</span>(<span class="ident">CONFIG_TIMESLICE_PERIOD_MICROSECONDS</span>)<span class="question-mark">?</span>
+            <span class="self">self</span>.<span class="ident">calibrate_lapic_timer</span>(<span class="ident">CONFIG_TIMESLICE_PERIOD_MICROSECONDS</span>)
         };
-        <span class="macro">trace!</span>(<span class="string">&quot;APIC {}, timer period count: {}({:#X})&quot;</span>, <span class="self">self</span>.<span class="ident">apic_id</span>, <span class="ident">apic_period</span>, <span class="ident">apic_period</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;LocalApic {}, timer period count: {} ({:#X})&quot;</span>, <span class="self">self</span>.<span class="ident">apic_id</span>, <span class="ident">apic_period</span>, <span class="ident">apic_period</span>);
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">regs</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">regs</span> {
-            <span class="ident">regs</span>.<span class="ident">timer_divide</span>.<span class="ident">write</span>(<span class="number">3</span>); <span class="comment">// set divide value to 16 ( ... how does 3 =&gt; 16 )</span>
-            <span class="comment">// map APIC timer to an interrupt handler in the IDT</span>
-            <span class="ident">regs</span>.<span class="ident">lvt_timer</span>.<span class="ident">write</span>(<span class="number">0x22</span> <span class="op">|</span> <span class="ident">APIC_TIMER_PERIODIC</span>); 
-            <span class="ident">regs</span>.<span class="ident">timer_initial_count</span>.<span class="ident">write</span>(<span class="ident">apic_period</span>); 
-
-            <span class="ident">regs</span>.<span class="ident">lvt_thermal</span>.<span class="ident">write</span>(<span class="number">0</span>);
-            <span class="ident">regs</span>.<span class="ident">lvt_error</span>.<span class="ident">write</span>(<span class="number">0</span>);
-
-            <span class="comment">// os dev wiki guys say that setting this again as a last step helps on some strange hardware.</span>
-            <span class="ident">regs</span>.<span class="ident">timer_divide</span>.<span class="ident">write</span>(<span class="number">3</span>);
-
-            <span class="prelude-val">Ok</span>(())
-        }
-        <span class="kw">else</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;calibrate_apic_timer(): FATAL ERROR: regs (ApicRegisters) were None! Were they initialized right?&quot;</span>);
-            <span class="prelude-val">Err</span>(<span class="string">&quot;calibrate_apic_timer(): FATAL ERROR: regs (ApicRegisters) were None! Were they initialized right?&quot;</span>)
-        }
-    }
-
-
-    <span class="kw">fn</span> <span class="ident">init_timer_x2apic</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="macro">assert!</span>(<span class="ident">has_x2apic</span>(), <span class="string">&quot;an apic/xapic system must not use init_timerx2(), it should use init_timer() instead.&quot;</span>);
-        <span class="kw">let</span> <span class="ident">x2apic_period</span> <span class="op">=</span> <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">apic_timer_fixed</span>) {
-            <span class="macro">info!</span>(<span class="string">&quot;apic_timer_fixed config: overriding X2APIC timer period to {}&quot;</span>, <span class="number">0x10000</span>);
-            <span class="number">0x10000</span> <span class="comment">// for bochs, which doesn&#39;t do x2apic periods right</span>
-        } <span class="kw">else</span> {
-            <span class="self">self</span>.<span class="ident">calibrate_x2apic_timer</span>(<span class="ident">CONFIG_TIMESLICE_PERIOD_MICROSECONDS</span>)
-        };
-        <span class="macro">trace!</span>(<span class="string">&quot;X2APIC {}, timer period count: {}({:#X})&quot;</span>, <span class="self">self</span>.<span class="ident">apic_id</span>, <span class="ident">x2apic_period</span>, <span class="ident">x2apic_period</span>);
-
-        <span class="kw">unsafe</span> {
-            <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_DIV_CONF</span>, <span class="number">3</span>); <span class="comment">// set divide value to 16 ( ... how does 3 =&gt; 16 )</span>
-            
-            <span class="comment">// map X2APIC timer to an interrupt handler in the IDT, which we currently use IRQ 0x22 for</span>
-            <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_TIMER</span>, <span class="number">0x22</span> <span class="op">|</span> <span class="ident">APIC_TIMER_PERIODIC</span> <span class="kw">as</span> <span class="ident">u64</span>); 
-            <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_INIT_COUNT</span>, <span class="ident">x2apic_period</span>); 
-
-            <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_THERMAL</span>, <span class="number">0</span>);
-            <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_ESR</span>, <span class="number">0</span>);
-
-            <span class="comment">// os dev wiki guys say that setting this again as a last step helps on some strange hardware.</span>
-            <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_DIV_CONF</span>, <span class="number">3</span>);
-        }
-    }
-
+        <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span> {
+            <span class="ident">LapicType::X2Apic</span> =&gt; <span class="kw">unsafe</span> {
+                <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_DIV_CONF</span>, <span class="number">3</span>); <span class="comment">// set divide value to 16 ( ... how does 3 =&gt; 16 )</span>
+                
+                <span class="comment">// map X2APIC timer to an interrupt handler in the IDT, which we currently use IRQ 0x22 for</span>
+                <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_TIMER</span>, <span class="number">0x22</span> <span class="op">|</span> <span class="ident">APIC_TIMER_PERIODIC</span> <span class="kw">as</span> <span class="ident">u64</span>); 
+                <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_INIT_COUNT</span>, <span class="ident">apic_period</span>); 
     
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> {
-        <span class="kw">let</span> <span class="ident">id</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">has_x2apic</span>() {
-            <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_APICID</span>) <span class="kw">as</span> <span class="ident">u32</span> <span class="kw">as</span> <span class="ident">u8</span>
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">raw</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_ref</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">lapic_id</span>.<span class="ident">read</span>();
-            (<span class="ident">raw</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">24</span>) <span class="kw">as</span> <span class="ident">u8</span>
-        };
-        <span class="macro">assert!</span>(<span class="ident">id</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">apic_id</span>, <span class="string">&quot;LocalApic::id() {} wasn&#39;t the same as given apic_id {}!&quot;</span>, <span class="ident">id</span>, <span class="self">self</span>.<span class="ident">apic_id</span>);
-        <span class="ident">id</span>
-    }
+                <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_THERMAL</span>, <span class="number">0</span>);
+                <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_ESR</span>, <span class="number">0</span>);
+    
+                <span class="comment">// os dev wiki guys say that setting this again as a last step helps on some strange hardware.</span>
+                <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_DIV_CONF</span>, <span class="number">3</span>);
+            }
+            <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; {
+                <span class="ident">regs</span>.<span class="ident">timer_divide</span>.<span class="ident">write</span>(<span class="number">3</span>); <span class="comment">// set divide value to 16 ( ... how does 3 =&gt; 16 )</span>
+                <span class="comment">// map APIC timer to an interrupt handler in the IDT</span>
+                <span class="ident">regs</span>.<span class="ident">lvt_timer</span>.<span class="ident">write</span>(<span class="number">0x22</span> <span class="op">|</span> <span class="ident">APIC_TIMER_PERIODIC</span>); 
+                <span class="ident">regs</span>.<span class="ident">timer_initial_count</span>.<span class="ident">write</span>(<span class="ident">apic_period</span> <span class="kw">as</span> <span class="ident">u32</span>); 
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">version</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u32</span> {
-        <span class="kw">if</span> <span class="ident">has_x2apic</span>() {
-            (<span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_VERSION</span>) <span class="op">&amp;</span> <span class="number">0xFFFF_FFFF</span>) <span class="kw">as</span> <span class="ident">u32</span>
-        } <span class="kw">else</span> {
-            <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_ref</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">lapic_version</span>.<span class="ident">read</span>()
+                <span class="ident">regs</span>.<span class="ident">lvt_thermal</span>.<span class="ident">write</span>(<span class="number">0</span>);
+                <span class="ident">regs</span>.<span class="ident">lvt_error</span>.<span class="ident">write</span>(<span class="number">0</span>);
+
+                <span class="comment">// os dev wiki guys say that setting this again as a last step helps on some strange hardware.</span>
+                <span class="ident">regs</span>.<span class="ident">timer_divide</span>.<span class="ident">write</span>(<span class="number">3</span>);
+            }
         }
     }
 
+    <span class="doccomment">/// Returns the ID of this lapic.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> {
+        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span> {
+            <span class="ident">LapicType::X2Apic</span> =&gt; <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_APICID</span>) <span class="kw">as</span> <span class="ident">u32</span> <span class="kw">as</span> <span class="ident">u8</span>,
+            <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; {
+                <span class="kw">let</span> <span class="ident">raw</span> <span class="op">=</span> <span class="ident">regs</span>.<span class="ident">lapic_id</span>.<span class="ident">read</span>();
+                (<span class="ident">raw</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">24</span>) <span class="kw">as</span> <span class="ident">u8</span>
+            }
+        }
+    }
+
+    <span class="doccomment">/// Returns the version of this lapic.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">version</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u32</span> {
+        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span> {
+            <span class="ident">LapicType::X2Apic</span> =&gt; (<span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_VERSION</span>) <span class="op">&amp;</span> <span class="number">0xFFFF_FFFF</span>) <span class="kw">as</span> <span class="ident">u32</span>,
+            <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; <span class="ident">regs</span>.<span class="ident">lapic_version</span>.<span class="ident">read</span>()
+        }
+    }
+
+    <span class="doccomment">/// Returns the value of this lapic&#39;s error register.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">error</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u32</span> {
-        <span class="kw">let</span> <span class="ident">raw</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">has_x2apic</span>() {
-            (<span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_ESR</span>) <span class="op">&amp;</span> <span class="number">0xFFFF_FFFF</span>) <span class="kw">as</span> <span class="ident">u32</span>
-        } <span class="kw">else</span> {
-            <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_ref</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">error_status</span>.<span class="ident">read</span>()
+        <span class="kw">let</span> <span class="ident">raw</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span> {
+            <span class="ident">LapicType::X2Apic</span> =&gt; (<span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_ESR</span>) <span class="op">&amp;</span> <span class="number">0xFFFF_FFFF</span>) <span class="kw">as</span> <span class="ident">u32</span>,
+            <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; <span class="ident">regs</span>.<span class="ident">error_status</span>.<span class="ident">read</span>(),
         };
         <span class="ident">raw</span> <span class="op">&amp;</span> <span class="number">0x0000_00F0</span>
     }
 
+    <span class="doccomment">/// Clears/resets this lapic&#39;s error register.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear_error</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">if</span> <span class="ident">has_x2apic</span>() {
-            <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_ESR</span>, <span class="number">0</span>); }
-        } <span class="kw">else</span> {
-            <span class="comment">// a no-op, since apic/xapic cannot write to the error status register</span>
+        <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span> {
+            <span class="ident">LapicType::X2Apic</span> =&gt; <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_ESR</span>, <span class="number">0</span>) },
+            <span class="ident">LapicType::XApic</span>(<span class="ident">_regs</span>) =&gt; {
+                <span class="comment">// a no-op, since apic/xapic cannot write to the error status register</span>
+            }
         }
     }
 
+    <span class="doccomment">/// Reads the current value of this lapic&#39;s Interrupt Control Register.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">icr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span> {
-        <span class="kw">if</span> <span class="ident">has_x2apic</span>() {
-            <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_ICR</span>)
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">high</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_ref</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">interrupt_command_high</span>.<span class="ident">read</span>();
-            <span class="kw">let</span> <span class="ident">low</span>  <span class="op">=</span> <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_ref</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">interrupt_command_low</span>.<span class="ident">read</span>();
-            ((<span class="ident">high</span> <span class="kw">as</span> <span class="ident">u64</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">32</span>) <span class="op">|</span> (<span class="ident">low</span> <span class="kw">as</span> <span class="ident">u64</span>)
+        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span> {
+            <span class="ident">LapicType::X2Apic</span> =&gt; <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_ICR</span>),
+            <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; {
+                <span class="kw">let</span> <span class="ident">high</span> <span class="op">=</span> <span class="ident">regs</span>.<span class="ident">interrupt_command_high</span>.<span class="ident">read</span>();
+                <span class="kw">let</span> <span class="ident">low</span>  <span class="op">=</span> <span class="ident">regs</span>.<span class="ident">interrupt_command_low</span>.<span class="ident">read</span>();
+                ((<span class="ident">high</span> <span class="kw">as</span> <span class="ident">u64</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">32</span>) <span class="op">|</span> (<span class="ident">low</span> <span class="kw">as</span> <span class="ident">u64</span>)
+            }
         }
     }
 
+    <span class="doccomment">/// Writes `value` to this lapic&#39;s Interrupt Control Register.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_icr</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u64</span>) {
-        <span class="kw">if</span> <span class="ident">has_x2apic</span>() {
-            <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_ICR</span>, <span class="ident">value</span>); }
-        } <span class="kw">else</span> {
-            <span class="kw">const</span> <span class="ident">ICR_DELIVERY_STATUS</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">12</span>;
-            <span class="kw">while</span> <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_ref</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">interrupt_command_low</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="ident">ICR_DELIVERY_STATUS</span> <span class="op">==</span> <span class="ident">ICR_DELIVERY_STATUS</span> {} <span class="comment">// wait until ready</span>
-            <span class="kw">let</span> <span class="ident">high</span> <span class="op">=</span> (<span class="ident">value</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">32</span>) <span class="kw">as</span> <span class="ident">u32</span>;
-            <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_mut</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">interrupt_command_high</span>.<span class="ident">write</span>(<span class="ident">high</span>); <span class="comment">// sets part of ICR register, but doesn&#39;t yet issue the IPI</span>
-            <span class="kw">let</span> <span class="ident">low</span> <span class="op">=</span> <span class="ident">value</span> <span class="kw">as</span> <span class="ident">u32</span>;
-            <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_mut</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">interrupt_command_low</span>.<span class="ident">write</span>(<span class="ident">low</span>); <span class="comment">// this actually issues the IPI</span>
-            <span class="kw">while</span> <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_ref</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">interrupt_command_low</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="ident">ICR_DELIVERY_STATUS</span> <span class="op">==</span> <span class="ident">ICR_DELIVERY_STATUS</span> {} <span class="comment">// wait until finished</span>
+        <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span> {
+            <span class="ident">LapicType::X2Apic</span> =&gt; <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_ICR</span>, <span class="ident">value</span>) },
+            <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; {
+                <span class="kw">const</span> <span class="ident">ICR_DELIVERY_STATUS</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">12</span>;
+                <span class="kw">while</span> <span class="ident">regs</span>.<span class="ident">interrupt_command_low</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="ident">ICR_DELIVERY_STATUS</span> <span class="op">==</span> <span class="ident">ICR_DELIVERY_STATUS</span> {} <span class="comment">// wait until ready</span>
+                <span class="kw">let</span> <span class="ident">high</span> <span class="op">=</span> (<span class="ident">value</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">32</span>) <span class="kw">as</span> <span class="ident">u32</span>;
+                <span class="ident">regs</span>.<span class="ident">interrupt_command_high</span>.<span class="ident">write</span>(<span class="ident">high</span>); <span class="comment">// sets part of ICR register, but doesn&#39;t yet issue the IPI</span>
+                <span class="kw">let</span> <span class="ident">low</span> <span class="op">=</span> <span class="ident">value</span> <span class="kw">as</span> <span class="ident">u32</span>;
+                <span class="ident">regs</span>.<span class="ident">interrupt_command_low</span>.<span class="ident">write</span>(<span class="ident">low</span>); <span class="comment">// this actually issues the IPI</span>
+                <span class="kw">while</span> <span class="ident">regs</span>.<span class="ident">interrupt_command_low</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="ident">ICR_DELIVERY_STATUS</span> <span class="op">==</span> <span class="ident">ICR_DELIVERY_STATUS</span> {} <span class="comment">// wait until finished</span>
+            }
         }
     }
 
@@ -1314,50 +1371,35 @@
         <span class="self">self</span>.<span class="ident">set_icr</span>(<span class="ident">icr</span>);
     }
 
-
+    <span class="doccomment">/// Send an End Of Interrupt (EOI) signal to this local APIC,</span>
+    <span class="doccomment">/// which indicates that the calling interrupt handler has finished handling the current interrupt.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">eoi</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="comment">// 0 is the only valid value to write to the EOI register/msr, others cause General Protection Fault</span>
-        <span class="kw">if</span> <span class="ident">has_x2apic</span>() {
-            <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_EOI</span>, <span class="number">0</span>); }
-        } <span class="kw">else</span> {
-            <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_mut</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">eoi</span>.<span class="ident">write</span>(<span class="number">0</span>);
+        <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span> {
+            <span class="ident">LapicType::X2Apic</span> =&gt; <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_EOI</span>, <span class="number">0</span>) },
+            <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; <span class="ident">regs</span>.<span class="ident">eoi</span>.<span class="ident">write</span>(<span class="number">0</span>),
         }
-    }
-
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_ldr</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
-        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">has_x2apic</span>(),<span class="string">&quot;set_ldr(): Setting LDR MSR for x2apic is forbidden! (causes GPF)&quot;</span>);
-        <span class="kw">let</span> <span class="ident">old_ldr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_ref</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">destination_format</span>.<span class="ident">read</span>();
-        <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_mut</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">destination_format</span>.<span class="ident">write</span>(<span class="ident">old_ldr</span> <span class="op">&amp;</span> <span class="number">0x00FF_FFFF</span> <span class="op">|</span> <span class="ident">value</span>);
     }
 
     <span class="doccomment">/// Set the NonMaskableInterrupt redirect for this LocalApic.</span>
     <span class="doccomment">/// Argument `lint` can be either 0 or 1, since each local APIC has two LVT LINTs</span>
     <span class="doccomment">/// (Local Vector Table Local INTerrupts)</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_nmi</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">lint</span>: <span class="ident">u8</span>, <span class="ident">flags</span>: <span class="ident">u16</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">has_x2apic</span>() {
-            <span class="kw">match</span> <span class="ident">lint</span> {
-                <span class="number">0</span> =&gt; <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_LINT0</span>, (<span class="ident">flags</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">12</span>) <span class="kw">as</span> <span class="ident">u64</span> <span class="op">|</span> <span class="ident">APIC_NMI</span> <span class="kw">as</span> <span class="ident">u64</span>) }, <span class="comment">// or APIC_NMI | 0x2000 ??</span>
-                <span class="number">1</span> =&gt; <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_LINT1</span>, (<span class="ident">flags</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">12</span>) <span class="kw">as</span> <span class="ident">u64</span> <span class="op">|</span> <span class="ident">APIC_NMI</span> <span class="kw">as</span> <span class="ident">u64</span>) },
-                <span class="kw">_</span> =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;set_nmi(): invalid lint {}, must be 0 or 1!&quot;</span>),
-            }
-        } <span class="kw">else</span> {
-            <span class="kw">match</span> <span class="ident">lint</span> {
-                <span class="number">0</span> =&gt; <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_mut</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">lvt_lint0</span>.<span class="ident">write</span>( (<span class="ident">flags</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">12</span>) <span class="kw">as</span> <span class="ident">u32</span> <span class="op">|</span> <span class="ident">APIC_NMI</span>), <span class="comment">// or APIC_NMI | 0x2000 ??</span>
-                <span class="number">1</span> =&gt; <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_mut</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">lvt_lint1</span>.<span class="ident">write</span>( (<span class="ident">flags</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">12</span>) <span class="kw">as</span> <span class="ident">u32</span> <span class="op">|</span> <span class="ident">APIC_NMI</span>),
-                <span class="kw">_</span> =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;set_nmi(): invalid lint {}, must be 0 or 1!&quot;</span>),
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_nmi</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">lint</span>: <span class="ident">LvtLint</span>, <span class="ident">flags</span>: <span class="ident">u16</span>) {
+        <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> (<span class="ident">flags</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">12</span>) <span class="kw">as</span> <span class="ident">u32</span> <span class="op">|</span> <span class="ident">APIC_NMI</span>; <span class="comment">// or APIC_NMI | 0x2000 ??</span>
+        <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span> {
+            <span class="ident">LapicType::X2Apic</span> =&gt; <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">lint</span>.<span class="ident">msr</span>(), <span class="ident">value</span> <span class="kw">as</span> <span class="ident">u64</span>) },
+            <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; <span class="kw">match</span> <span class="ident">lint</span> {
+                <span class="ident">LvtLint::Pin0</span> =&gt; <span class="ident">regs</span>.<span class="ident">lvt_lint0</span>.<span class="ident">write</span>(<span class="ident">value</span>),
+                <span class="ident">LvtLint::Pin1</span> =&gt; <span class="ident">regs</span>.<span class="ident">lvt_lint1</span>.<span class="ident">write</span>(<span class="ident">value</span>),
             }
         }
-
-        <span class="prelude-val">Ok</span>(())
     }
-
 
     <span class="doccomment">/// Returns the values of the 8 in-service registers for this APIC,</span>
     <span class="doccomment">/// which is a series of bitmasks that shows which interrupt lines are currently being serviced. </span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_isr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [<span class="ident">u32</span>; <span class="number">8</span>] {
-        <span class="kw">if</span> <span class="ident">has_x2apic</span>() {
-            [
+        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span> {
+            <span class="ident">LapicType::X2Apic</span> =&gt; [
                 <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_ISR0</span>) <span class="kw">as</span> <span class="ident">u32</span>, 
                 <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_ISR1</span>) <span class="kw">as</span> <span class="ident">u32</span>,
                 <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_ISR2</span>) <span class="kw">as</span> <span class="ident">u32</span>, 
@@ -1366,30 +1408,26 @@
                 <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_ISR5</span>) <span class="kw">as</span> <span class="ident">u32</span>,
                 <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_ISR6</span>) <span class="kw">as</span> <span class="ident">u32</span>,
                 <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_ISR7</span>) <span class="kw">as</span> <span class="ident">u32</span>,
-            ]
-        }
-        <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="kw-2">ref</span> <span class="ident">isr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_ref</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">in_service_registers</span>;
-            [
-                <span class="ident">isr</span>.<span class="ident">reg0</span>.<span class="ident">read</span>(),
-                <span class="ident">isr</span>.<span class="ident">reg1</span>.<span class="ident">read</span>(),
-                <span class="ident">isr</span>.<span class="ident">reg2</span>.<span class="ident">read</span>(),
-                <span class="ident">isr</span>.<span class="ident">reg3</span>.<span class="ident">read</span>(),
-                <span class="ident">isr</span>.<span class="ident">reg4</span>.<span class="ident">read</span>(),
-                <span class="ident">isr</span>.<span class="ident">reg5</span>.<span class="ident">read</span>(),
-                <span class="ident">isr</span>.<span class="ident">reg6</span>.<span class="ident">read</span>(),
-                <span class="ident">isr</span>.<span class="ident">reg7</span>.<span class="ident">read</span>(),
+            ],
+            <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; [
+                <span class="ident">regs</span>.<span class="ident">in_service_registers</span>.<span class="ident">reg0</span>.<span class="ident">read</span>(),
+                <span class="ident">regs</span>.<span class="ident">in_service_registers</span>.<span class="ident">reg1</span>.<span class="ident">read</span>(),
+                <span class="ident">regs</span>.<span class="ident">in_service_registers</span>.<span class="ident">reg2</span>.<span class="ident">read</span>(),
+                <span class="ident">regs</span>.<span class="ident">in_service_registers</span>.<span class="ident">reg3</span>.<span class="ident">read</span>(),
+                <span class="ident">regs</span>.<span class="ident">in_service_registers</span>.<span class="ident">reg4</span>.<span class="ident">read</span>(),
+                <span class="ident">regs</span>.<span class="ident">in_service_registers</span>.<span class="ident">reg5</span>.<span class="ident">read</span>(),
+                <span class="ident">regs</span>.<span class="ident">in_service_registers</span>.<span class="ident">reg6</span>.<span class="ident">read</span>(),
+                <span class="ident">regs</span>.<span class="ident">in_service_registers</span>.<span class="ident">reg7</span>.<span class="ident">read</span>(),
             ]
         }
     }
-
 
     <span class="doccomment">/// Returns the values of the 8 request registers for this APIC,</span>
     <span class="doccomment">/// which is a series of bitmasks that shows which interrupt lines are currently raised, </span>
     <span class="doccomment">/// but not yet being serviced.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_irr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [<span class="ident">u32</span>; <span class="number">8</span>] {
-        <span class="kw">if</span> <span class="ident">has_x2apic</span>() {
-            [ 
+        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span> {
+            <span class="ident">LapicType::X2Apic</span> =&gt; [ 
                 <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_IRR0</span>) <span class="kw">as</span> <span class="ident">u32</span>, 
                 <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_IRR1</span>) <span class="kw">as</span> <span class="ident">u32</span>,
                 <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_IRR2</span>) <span class="kw">as</span> <span class="ident">u32</span>, 
@@ -1398,19 +1436,16 @@
                 <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_IRR5</span>) <span class="kw">as</span> <span class="ident">u32</span>,
                 <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_IRR6</span>) <span class="kw">as</span> <span class="ident">u32</span>,
                 <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_IRR7</span>) <span class="kw">as</span> <span class="ident">u32</span>,
-            ]
-        }
-        <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="kw-2">ref</span> <span class="ident">irr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_ref</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">interrupt_request_registers</span>;
-            [
-                <span class="ident">irr</span>.<span class="ident">reg0</span>.<span class="ident">read</span>(),
-                <span class="ident">irr</span>.<span class="ident">reg1</span>.<span class="ident">read</span>(),
-                <span class="ident">irr</span>.<span class="ident">reg2</span>.<span class="ident">read</span>(),
-                <span class="ident">irr</span>.<span class="ident">reg3</span>.<span class="ident">read</span>(),
-                <span class="ident">irr</span>.<span class="ident">reg4</span>.<span class="ident">read</span>(),
-                <span class="ident">irr</span>.<span class="ident">reg5</span>.<span class="ident">read</span>(),
-                <span class="ident">irr</span>.<span class="ident">reg6</span>.<span class="ident">read</span>(),
-                <span class="ident">irr</span>.<span class="ident">reg7</span>.<span class="ident">read</span>(),
+            ],
+            <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; [
+                <span class="ident">regs</span>.<span class="ident">interrupt_request_registers</span>.<span class="ident">reg0</span>.<span class="ident">read</span>(),
+                <span class="ident">regs</span>.<span class="ident">interrupt_request_registers</span>.<span class="ident">reg1</span>.<span class="ident">read</span>(),
+                <span class="ident">regs</span>.<span class="ident">interrupt_request_registers</span>.<span class="ident">reg2</span>.<span class="ident">read</span>(),
+                <span class="ident">regs</span>.<span class="ident">interrupt_request_registers</span>.<span class="ident">reg3</span>.<span class="ident">read</span>(),
+                <span class="ident">regs</span>.<span class="ident">interrupt_request_registers</span>.<span class="ident">reg4</span>.<span class="ident">read</span>(),
+                <span class="ident">regs</span>.<span class="ident">interrupt_request_registers</span>.<span class="ident">reg5</span>.<span class="ident">read</span>(),
+                <span class="ident">regs</span>.<span class="ident">interrupt_request_registers</span>.<span class="ident">reg6</span>.<span class="ident">read</span>(),
+                <span class="ident">regs</span>.<span class="ident">interrupt_request_registers</span>.<span class="ident">reg7</span>.<span class="ident">read</span>(),
             ]
         }
     }
@@ -1421,16 +1456,17 @@
         <span class="comment">// It needs to be reset for another interrupt to occur.</span>
         <span class="kw">const</span> <span class="ident">INT_MASK_BIT</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">16</span>;
 
-        <span class="kw">if</span> <span class="ident">has_x2apic</span>() {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reg</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_LVT_PMI</span>);
-            <span class="ident">reg</span>.<span class="ident">set_bit</span>(<span class="ident">INT_MASK_BIT</span>, <span class="bool-val">false</span>);
-            <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_PMI</span>, <span class="ident">reg</span>) };
-        }
-        <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">pmr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">as_mut</span>().<span class="ident">expect</span>(<span class="string">&quot;ApicRegisters&quot;</span>).<span class="ident">lvt_perf_monitor</span>; 
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reg</span> <span class="op">=</span> <span class="ident">pmr</span>.<span class="ident">read</span>();
-            <span class="ident">reg</span>.<span class="ident">set_bit</span>(<span class="ident">INT_MASK_BIT</span>, <span class="bool-val">false</span>);
-            <span class="ident">pmr</span>.<span class="ident">write</span>(<span class="ident">reg</span>);
+        <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span> {
+            <span class="ident">LapicType::X2Apic</span> =&gt; {
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_LVT_PMI</span>);
+                <span class="ident">value</span>.<span class="ident">set_bit</span>(<span class="ident">INT_MASK_BIT</span>, <span class="bool-val">false</span>);
+                <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_PMI</span>, <span class="ident">value</span>) };
+            }
+            <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; {
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">regs</span>.<span class="ident">lvt_perf_monitor</span>.<span class="ident">read</span>();
+                <span class="ident">value</span>.<span class="ident">set_bit</span>(<span class="ident">INT_MASK_BIT</span>, <span class="bool-val">false</span>);
+                <span class="ident">regs</span>.<span class="ident">lvt_perf_monitor</span>.<span class="ident">write</span>(<span class="ident">value</span>);
+            }
         }
     }
 }
