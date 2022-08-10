@@ -2676,50 +2676,39 @@ impl CrateNamespace {
  
             // Try to find and load the missing crate object file from this namespace's directory or its recursive namespace's directory,
             // (or from the backup namespace's directory set).
-            // We *do not* search recursively here since we want the new crate to be loaded into the namespace 
-            // that contains its crate object file, not a higher-level namespace. 
-            // Checking recursive namespaces will occur at the end of this function during the recursive call to this same function.
-            let (potential_crate_file, ns_of_crate_file) = match self.method_get_crate_object_file_starting_with(&potential_crate_name) {
-                Some(found) => found,
-                // TODO: should we be blindly recursively searching the backup namespace's files?
-                None => match temp_backup_namespace.and_then(|backup| backup.method_get_crate_object_file_starting_with(&potential_crate_name)) {
-                    // do not modify the backup namespace, instead load its crate into this namespace
-                    Some((crate_file_in_backup_ns, _backup_ns)) => (crate_file_in_backup_ns, self),
-                    None => {
-                        warn!("Couldn't find a single crate object file with prefix {:?} that may contain symbol {:?} in namespace {:?}.", 
-                            potential_crate_name, demangled_full_symbol, self.name);
-                        continue;
-                    }
+            // The files in recursive namespaces are appended after the files in the initial
+            // namespace, so they'll only be searched if the symbol isn't found in the current
+            // namespace.
+            // TODO: should we be blindly recursively searching the backup namespace's files?
+            for (potential_crate_file, ns_of_crate_file) in self.method_get_crate_object_files_starting_with(&potential_crate_name) {
+                let potential_crate_file_path = Path::new(potential_crate_file.lock().get_absolute_path());
+                // Check to make sure this crate is not already loaded into this namespace (or its recursive namespace).
+                if self.get_crate(crate_name_from_path(&potential_crate_file_path)).is_some() {
+                    trace!("  (skipping already-loaded crate {:?})", potential_crate_file_path);
+                    continue;
                 }
-            };
-                          
-            let potential_crate_file_path = Path::new(potential_crate_file.lock().get_absolute_path());
-            // Check to make sure this crate is not already loaded into this namespace (or its recursive namespace).
-            if self.get_crate(crate_name_from_path(&potential_crate_file_path)).is_some() {
-                trace!("  (skipping already-loaded crate {:?})", potential_crate_file_path);
-                continue;
-            }
-            #[cfg(not(loscd_eval))]
-            info!("Symbol {:?} not initially found in namespace {:?}, attempting to load crate {:?} into namespace {:?} that may contain it.", 
-                demangled_full_symbol, self.name, potential_crate_name, ns_of_crate_file.name);
+                #[cfg(not(loscd_eval))]
+                info!("Symbol {:?} not initially found in namespace {:?}, attempting to load crate {:?} into namespace {:?} that may contain it.", 
+                    demangled_full_symbol, self.name, potential_crate_name, ns_of_crate_file.name);
 
-            match ns_of_crate_file.load_crate(&potential_crate_file, temp_backup_namespace, kernel_mmi_ref, verbose_log) {
-                Ok((_new_crate_ref, _num_new_syms)) => {
-                    // try again to find the missing symbol, now that we've loaded the missing crate
-                    if let Some(sec) = ns_of_crate_file.get_symbol_internal(demangled_full_symbol) {
-                        return Some(sec);
-                    } else {
-                        // the missing symbol wasn't in this crate, continue to load the other potential containing crates.
-                        trace!("Loaded symbol's containing crate {:?}, but still couldn't find the symbol {:?}.", 
-                            potential_crate_file_path, demangled_full_symbol);
+                match ns_of_crate_file.load_crate(&potential_crate_file, temp_backup_namespace, kernel_mmi_ref, verbose_log) {
+                    Ok((_new_crate_ref, _num_new_syms)) => {
+                        // try again to find the missing symbol, now that we've loaded the missing crate
+                        if let Some(sec) = ns_of_crate_file.get_symbol_internal(demangled_full_symbol) {
+                            return Some(sec);
+                        } else {
+                            // the missing symbol wasn't in this crate, continue to load the other potential containing crates.
+                            trace!("Loaded symbol's containing crate {:?}, but still couldn't find the symbol {:?}.", 
+                                potential_crate_file_path, demangled_full_symbol);
+                        }
+                    }
+                    Err(_e) => {
+                        error!("Found symbol's (\"{}\") containing crate, but couldn't load the crate file {:?}. Error: {:?}",
+                            demangled_full_symbol, potential_crate_file_path, _e);
+                        // We *could* return an error here, but we might as well continue on to trying to load other crates.
                     }
                 }
-                Err(_e) => {
-                    error!("Found symbol's (\"{}\") containing crate, but couldn't load the crate file {:?}. Error: {:?}",
-                        demangled_full_symbol, potential_crate_file_path, _e);
-                    // We *could* return an error here, but we might as well continue on to trying to load other crates.
-                }
-            }
+            } 
         }
 
         None
