@@ -1,25 +1,6 @@
 #![no_std]
 
-#![allow(dead_code)]
-
 extern crate alloc;
-#[macro_use] extern crate lazy_static;
-#[macro_use] extern crate log;
-#[macro_use] extern crate static_assertions;
-extern crate volatile;
-extern crate zerocopy;
-extern crate owning_ref;
-extern crate irq_safety;
-extern crate atomic_linked_list;
-extern crate memory;
-extern crate spin;
-extern crate kernel_config;
-extern crate raw_cpuid;
-extern crate x86_64;
-extern crate pit_clock;
-extern crate crossbeam_utils;
-extern crate bit_field;
-extern crate msr;
 
 use core::fmt;
 use volatile::{Volatile, ReadOnly, WriteOnly};
@@ -36,7 +17,16 @@ use atomic_linked_list::atomic_map::AtomicMap;
 use crossbeam_utils::atomic::AtomicCell;
 use pit_clock::pit_wait;
 use bit_field::BitField;
+use static_assertions::{const_assert, const_assert_eq};
+use lazy_static::lazy_static;
+use log::{error, info, debug, trace};
 
+/// The IRQ vector number defined by the IDT for Local APIC timer interrupts.
+/// 
+/// TODO: once we invert the dependency relationship between `interrupts`
+///       and all other crates, we should be able to define this in `interrupts`
+///       and then use that definition here.
+const LOCAL_APIC_LVT_IRQ: u8 = 0x22;
 
 /// The interrupt chip that is currently configured on this machine. 
 /// The default is `InterruptChip::PIC`, but the typical case is `APIC` or `X2APIC`,
@@ -317,9 +307,11 @@ impl fmt::Debug for LapicType {
 pub struct LocalApic {
     /// The inner lapic object that disambiguates between xapic and x2apic.
     inner: LapicType,
-    /// The processor id of this APIC.
+    /// The processor id of this APIC,
+    /// obtained from the `MADT` ACPI table entry.
     processor: u8,
-    /// The APIC system id of this APIC.
+    /// The APIC system id of this APIC,
+    /// obtained from the `MADT` ACPI table entry.
     apic_id: u8,
     /// Whether this `LocalApic` is the bootstrap processor (the first processor to boot up).
     is_bsp: bool,
@@ -393,9 +385,26 @@ impl LocalApic {
     }
 
 
-    pub fn apic_id(&self)   -> u8   { self.apic_id }
-    pub fn processor(&self) -> u8   { self.processor }
-    pub fn is_bsp(&self)    -> bool { self.is_bsp }
+    /// Returns the APIC ID of this lapic.
+    /// 
+    /// This value comes from the `MADT` ACPI table entry that was used
+    /// to boot up this CPU core.
+    /// 
+    /// Currently this returns the same value as [`LocalApic::id()`].
+    pub fn apic_id(&self) -> u8 { self.apic_id }
+
+    /// Returns the "processor ID" of this lapic,
+    /// which is usually a meaningless value.
+    /// 
+    /// This value comes from the `MADT` ACPI table entry that was used
+    /// to boot up this CPU core.
+    pub fn processor(&self) -> u8 { self.processor }
+
+    /// Returns `true` if this CPU core was the BootStrap Processor (BSP),
+    /// i.e., the first CPU to boot and run the OS code.
+    /// 
+    /// There is only one BSP per system.
+    pub fn is_bsp(&self) -> bool { self.is_bsp }
 
     /// Enable this lapic by initializing it to a clean state
     /// and enabling its spurious interrupt vector.
@@ -512,8 +521,8 @@ impl LocalApic {
             LapicType::X2Apic => unsafe {
                 wrmsr(IA32_X2APIC_DIV_CONF, 3); // set divide value to 16 ( ... how does 3 => 16 )
                 
-                // map X2APIC timer to an interrupt handler in the IDT, which we currently use IRQ 0x22 for
-                wrmsr(IA32_X2APIC_LVT_TIMER, 0x22 | APIC_TIMER_PERIODIC as u64); 
+                // map X2APIC timer to the `LOCAL_APIC_LVT_IRQ` interrupt handler in the IDT
+                wrmsr(IA32_X2APIC_LVT_TIMER, LOCAL_APIC_LVT_IRQ as u64 | APIC_TIMER_PERIODIC as u64); 
                 wrmsr(IA32_X2APIC_INIT_COUNT, apic_period); 
     
                 wrmsr(IA32_X2APIC_LVT_THERMAL, 0);
@@ -525,7 +534,7 @@ impl LocalApic {
             LapicType::XApic(regs) => {
                 regs.timer_divide.write(3); // set divide value to 16 ( ... how does 3 => 16 )
                 // map APIC timer to an interrupt handler in the IDT
-                regs.lvt_timer.write(0x22 | APIC_TIMER_PERIODIC); 
+                regs.lvt_timer.write(LOCAL_APIC_LVT_IRQ as u32 | APIC_TIMER_PERIODIC); 
                 regs.timer_initial_count.write(apic_period as u32); 
 
                 regs.lvt_thermal.write(0);
@@ -537,7 +546,26 @@ impl LocalApic {
         }
     }
 
-    /// Returns the ID of this lapic.
+    /// Enable (unmask) or disable (mask) the LVT timer interrupt on this lapic.
+    /// 
+    /// This does **not** modify the timer's current count value.
+    pub fn enable_lvt_timer(&mut self, enable: bool) {
+        let value = if enable {
+            LOCAL_APIC_LVT_IRQ as u32 | APIC_TIMER_PERIODIC
+        } else {
+            APIC_DISABLE
+        };
+        match &mut self.inner {
+            LapicType::X2Apic => unsafe {
+                wrmsr(IA32_X2APIC_LVT_TIMER, value as u64)
+            },
+            LapicType::XApic(regs) => regs.lvt_timer.write(value),
+        }
+    }
+
+    /// Reads the hardware-provided ID of this lapic (from its registers).
+    /// 
+    /// Currently, this matches the value returned by [`LocalApic::apic_id()`].
     pub fn id(&self) -> u8 {
         match &self.inner {
             LapicType::X2Apic => rdmsr(IA32_X2APIC_APICID) as u32 as u8,
