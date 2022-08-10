@@ -1,10 +1,13 @@
 #![no_std]
 
-pub use panic_entry as _;
+pub extern crate core2;
+pub extern crate panic_entry_inner;
+pub extern crate app_io;
+extern crate heap;
+
+pub use panic_entry_inner as _;
 
 pub use app_io as stdio;
-
-pub use core2;
 
 pub mod alloc {
     use core::alloc::{GlobalAlloc, Layout};

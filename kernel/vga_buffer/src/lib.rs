@@ -45,8 +45,8 @@ macro_rules! print_raw {
 
 #[macro_export]
 macro_rules! println_raw {
-    ($fmt:expr) => (print_raw!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print_raw!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => ($crate::print_raw!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => ($crate::print_raw!(concat!($fmt, "\n"), $($arg)*));
 }
 
 #[doc(hidden)]
