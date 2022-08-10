@@ -177,6 +177,8 @@ full: iso
 ### Convenience target for building the ISO using the below $(iso) target
 iso: $(iso)
 
+iso_no_rebuild: extra_files copy_kernel $(bootloader)
+
 ### This target builds an .iso OS image from all of the compiled crates.
 $(iso): clean-old-build build extra_files copy_kernel $(bootloader)
 

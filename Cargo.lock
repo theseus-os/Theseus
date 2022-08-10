@@ -2271,9 +2271,18 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
+ "panic_entry_inner",
  "panic_wrapper",
- "unwind",
  "vga_buffer",
+]
+
+[[package]]
+name = "panic_entry_inner"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "mod_mgmt",
+ "unwind",
 ]
 
 [[package]]
@@ -3421,6 +3430,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_std"
+version = "0.1.0"
+
+[[package]]
 name = "test_std_fs"
 version = "0.1.0"
 dependencies = [
@@ -3543,6 +3556,7 @@ dependencies = [
  "test_realtime",
  "test_restartable",
  "test_serial_echo",
+ "test_std",
  "test_std_fs",
  "test_thread_local",
  "test_wait_queue",
