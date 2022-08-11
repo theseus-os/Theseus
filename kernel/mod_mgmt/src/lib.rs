@@ -2569,12 +2569,12 @@ impl CrateNamespace {
             }
         }
 
-        // Finally, try to load the crate containing the missing symbol.
+        // Finally, try to load the crate that may contain the missing symbol.
         if let Some(weak_sec) = self.load_crate_for_missing_symbol(demangled_full_symbol, temp_backup_namespace, kernel_mmi_ref, verbose_log) {
             weak_sec
         } else {
             #[cfg(not(loscd_eval))]
-            debug!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
+            warn!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
             Weak::default() // same as returning None, since it must be upgraded to an Arc before being used
         }
     }
@@ -2654,15 +2654,17 @@ impl CrateNamespace {
     }
 
 
-    /// Attempts to find and load the crate containing the given `demangled_full_symbol`. 
-    /// If successful, the new crate is loaded into this `CrateNamespace` and the symbol's section is returned.
+    /// Attempts to find and load the crate that may contain the given `demangled_full_symbol`. 
     /// 
+    /// If successful, the new crate is loaded into this `CrateNamespace` and the symbol's section is returned.
     /// If this namespace does not contain any matching crates, its recursive namespaces are searched as well.
+    /// Note that this function may end up loading *multiple* crates into this `CrateNamespace` or its
+    /// recursive namespaces, since there may be multiple crates that may contain the given `demangled_full_symbol`.
     /// 
     /// This approach only works for mangled symbols that contain a crate name, such as "my_crate::foo". 
     /// If "foo()" was marked no_mangle, then we don't know which crate to load because there is no "my_crate::" prefix before it.
     /// 
-    /// This is the final attempt to find a symbol within [`get_symbol_or_load()`](#method.get_symbol_or_load).
+    /// This is the final attempt to find a symbol within [`CrateNamespace::get_symbol_or_load()`].
     fn load_crate_for_missing_symbol(
         &self,
         demangled_full_symbol: &str,
@@ -2676,10 +2678,8 @@ impl CrateNamespace {
  
             // Try to find and load the missing crate object file from this namespace's directory or its recursive namespace's directory,
             // (or from the backup namespace's directory set).
-            // The files in recursive namespaces are appended after the files in the initial
-            // namespace, so they'll only be searched if the symbol isn't found in the current
-            // namespace.
-            // TODO: should we be blindly recursively searching the backup namespace's files?
+            // The object files from the recursive namespace(s) are appended after the files in the initial namespace,
+            // so they'll only be searched if the symbol isn't found in the current namespace.
             for (potential_crate_file, ns_of_crate_file) in self.method_get_crate_object_files_starting_with(&potential_crate_name) {
                 let potential_crate_file_path = Path::new(potential_crate_file.lock().get_absolute_path());
                 // Check to make sure this crate is not already loaded into this namespace (or its recursive namespace).
@@ -2711,6 +2711,7 @@ impl CrateNamespace {
             } 
         }
 
+        warn!("Couldn't find/load crate(s) that may contain the missing symbol {:?}", demangled_full_symbol);
         None
     }
 
