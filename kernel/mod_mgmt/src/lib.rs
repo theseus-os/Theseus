@@ -2662,10 +2662,16 @@ impl CrateNamespace {
     /// This approach only works for mangled symbols that contain a crate name, such as "my_crate::foo". 
     /// If "foo()" was marked no_mangle, then we don't know which crate to load because there is no "my_crate::" prefix before it.
     /// 
-    /// Note: this function may end up loading *multiple* crates into this `CrateNamespace` 
-    /// or its recursive namespaces, due to two reasons:
+    /// Note: while attempting to find the missing `demangled_full_symbol`, this function may end up
+    /// loading *multiple* crates into this `CrateNamespace` or its recursive namespaces, due to two reasons:
     /// 1. The `demangled_full_symbol` may have multiple crate prefixes within it.
+    ///    * For example, `<page_allocator::AllocatedPages as core::ops::drop::Drop>::drop::h55e0a4c312ccdd63`
+    ///      contains two possible crate prefixes: `page_allocator` and `core`.
     /// 2. There may be multiple versions of a single crate.
+    /// 
+    /// Possible crates are iteratively loaded and searched until the missing symbol is found.
+    /// Currently, crates that were loaded but did *not* contain the missing symbol are *not* unloaded,
+    /// but you could manually unload them later with no adverse effects to reclaim memory.
     /// 
     /// This is the final attempt to find a symbol within [`CrateNamespace::get_symbol_or_load()`].
     fn load_crate_for_missing_symbol(
