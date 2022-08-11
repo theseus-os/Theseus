@@ -59,7 +59,7 @@ use alloc::{
     sync::Arc,
 };
 use crossbeam_utils::atomic::AtomicCell;
-use irq_safety::{MutexIrqSafe, interrupts_enabled};
+use irq_safety::{MutexIrqSafe, interrupts_enabled, hold_interrupts};
 use memory::MmiRef;
 use stack::Stack;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
@@ -710,33 +710,38 @@ impl Task {
         //     }
         // }
 
-        // update runstates
-        self.running_on_cpu.store(None.into()); // no longer running
-        next.running_on_cpu.store(Some(apic_id).into()); // now running on this core
-
-        // Switch page tables. 
-        // Since there is only a single address space (as userspace support is currently disabled),
-        // we do not need to do this at all.
-        if false {
-            let prev_mmi = &self.mmi;
-            let next_mmi = &next.mmi;
-            
-            if Arc::ptr_eq(prev_mmi, next_mmi) {
-                // do nothing because we're not changing address spaces
-                // debug!("task_switch [3]: prev_mmi is the same as next_mmi!");
-            } else {
-                // time to change to a different address space and switch the page tables!
-                let mut prev_mmi_locked = prev_mmi.lock();
-                let next_mmi_locked = next_mmi.lock();
-                // debug!("task_switch [3]: switching tables! From {} {:?} to {} {:?}", 
-                //         self.name, prev_mmi_locked.page_table, next.name, next_mmi_locked.page_table);
-
-                prev_mmi_locked.page_table.switch(&next_mmi_locked.page_table);
-            }
-        }
+        // // Switch page tables. 
+        // // Since there is only a single address space (as userspace support is currently disabled),
+        // // we do not need to do this at all.
+        // if false {
+        //     let prev_mmi = &self.mmi;
+        //     let next_mmi = &next.mmi;
+        //    
+        //     if Arc::ptr_eq(prev_mmi, next_mmi) {
+        //         // do nothing because we're not changing address spaces
+        //         // debug!("task_switch [3]: prev_mmi is the same as next_mmi!");
+        //     } else {
+        //         // time to change to a different address space and switch the page tables!
+        //         let mut prev_mmi_locked = prev_mmi.lock();
+        //         let next_mmi_locked = next_mmi.lock();
+        //         // debug!("task_switch [3]: switching tables! From {} {:?} to {} {:?}", 
+        //         //         self.name, prev_mmi_locked.page_table, next.name, next_mmi_locked.page_table);
+        //
+        //         prev_mmi_locked.page_table.switch(&next_mmi_locked.page_table);
+        //     }
+        // }
        
-        // update the current task to `next`
-        next.set_as_current_task();
+        // Set runstates and current task *atomically*, i.e., by disabling interrupts.
+        // This is necessary to ensure that any interrupt handlers that may run on this CPU
+        // during the schedule/task_switch routines cannot observe inconsistencies
+        // in task runstates, e.g., when an interrupt handler accesses the current task context.
+        {
+            let _held_interrupts = hold_interrupts();
+            self.running_on_cpu.store(None.into()); // no longer running
+            next.running_on_cpu.store(Some(apic_id).into()); // now running on this core
+            next.set_as_current_task();
+            drop(_held_interrupts);
+        }
 
         // If the current task is exited, then we need to remove the cyclical TaskRef reference in its TaskLocalData.
         // We store the removed TaskLocalData in the next Task struct so that we can access it after the context switch.
@@ -820,19 +825,50 @@ impl Task {
                 }
             }
         }
-        
-        // Here, `self` (curr) is now `next` because the stacks have been switched, 
-        // and `next` has become some other random task based on a previous task switch operation.
-        // Do not make any assumptions about what `next` is now, since it's unknown. 
+        ///////////////////////////////////////////////////////////////////////////////////////////
+        // *** Important Notes about Behavior after a Context Switch ***
+        //
+        // Here, after the actual context switch operation above,
+        // `self` (curr) is now `next` because the stacks have been switched, 
+        // and `next` has become another random task based on a previous task switch.
+        // We cannot make any assumptions about what `next` is now, since it's unknown. 
+        //
+        // If this is **NOT** the first time the newly-current task (`self`) has run,
+        // then it will resume execution below as normal because this is where it left off
+        // when the context switch operation occurred.
+        //
+        // However, if this **is** the first time that the newly-current task (`self`) 
+        // has been switched to and is running, the control flow will **NOT** proceed here.
+        // Instead, it will have directly jumped to its entry point, which is `task_wrapper()`.
+        //
+        // As such, anything we do below should also be done in `task_wrapper()`.
+        // Thus, we want to ensure that post-context switch actions below are kept minimal
+        // and are easy to replicate in `task_wrapper()`.
+        ///////////////////////////////////////////////////////////////////////////////////////////
 
-        // Now, as a final action, we drop any data that the original previous task 
-        // prepared for droppage before the context switch occurred.
+        self.post_context_switch_action();
+    }
+
+
+    /// Perform any actions needed after a context switch.
+    /// 
+    /// Currently this only does two things:
+    /// 1. Drops any data that the original previous task (before the context switch)
+    ///    prepared for us to drop, as specified by `TaskInner::drop_after_task_switch`.
+    /// 2. Obtains the preemption guard such that preemption can be re-enabled
+    ///    when it is appropriate to do so.
+    #[doc(hidden)]
+    pub fn post_context_switch_action(&self) {
+        // Step 1: 
         {
             let mut inner = self.inner.lock();
             let prev_task_data_to_drop = inner.drop_after_task_switch.take();
             drop(inner); // release the lock as soon as possible
             drop(prev_task_data_to_drop);
         }
+
+        // Step 2: TODO
+        // TODO
     }
 }
 
@@ -860,21 +896,15 @@ impl fmt::Display for Task {
 
 
 /// A shareable, cloneable reference to a `Task` that exposes more methods
-/// for task management, and accesses the enclosed `Task` by locking it. 
+/// for task management and auto-derefs into an immutable `&Task` reference.
 /// 
 /// The `TaskRef` type is necessary because in many places across Theseus,
 /// a reference to a Task is used. 
 /// For example, task lists, task spawning, task management, scheduling, etc. 
 /// 
-/// Essentially a newtype wrapper around `Arc<Lock<Task>>` 
-/// where `Lock` is some mutex-like locking type.
-/// Currently, `Lock` is a `MutexIrqSafe`, so it **does not** allow
-/// multiple readers simultaneously; that will cause deadlock.
-/// 
-/// `TaskRef` implements the [`PartialEq`] and [`Eq`] traits; 
+/// ## Equality comparisons
+/// `TaskRef` implements the [`PartialEq`] and [`Eq`] traits to ensure that
 /// two `TaskRef`s are considered equal if they point to the same underlying `Task`.
-/// 
-/// `TaskRef` also auto-derefs into an immutable `Task` reference.
 #[derive(Debug, Clone)]
 pub struct TaskRef(Arc<Task>);
 
@@ -882,7 +912,7 @@ impl TaskRef {
     /// Creates a new `TaskRef` that wraps the given `Task`.
     /// 
     /// Also initializes the given `Task`'s `TaskLocalData` struct,
-    /// which will be used to determine the current `Task` on each CPU core.
+    /// which will be used to determine the current `Task` on each CPU.
     pub fn new(task: Task) -> TaskRef {
         let task_id = task.id;
         let taskref = TaskRef(Arc::new(task));
@@ -930,7 +960,7 @@ impl TaskRef {
     /// that the current task has cleanly exited.
     /// 
     /// # Locking / Deadlock
-    /// This method obtains a writable lock on the underlying Task in order to mutate its state.
+    /// This method obtains a writable lock on the underlying Task's inner state.
     /// 
     /// # Return
     /// * Returns `Ok` if the exit status was successfully set.     
@@ -955,7 +985,7 @@ impl TaskRef {
     /// that the current task has crashed or failed and has been killed by the system.
     /// 
     /// # Locking / Deadlock
-    /// This method obtains a writable lock on the underlying Task in order to mutate its state.
+    /// This method obtains a writable lock on the underlying Task's inner state.
     /// 
     /// # Return
     /// * Returns `Ok` if the exit status was successfully set.     
@@ -984,7 +1014,7 @@ impl TaskRef {
     /// **
     /// 
     /// # Locking / Deadlock
-    /// This method obtains a writable lock on the underlying Task in order to mutate its state.
+    /// This method obtains a writable lock on the underlying Task's inner state.
     /// 
     /// # Return
     /// * Returns `Ok` if the exit status was successfully set to the given `KillReason`.     
@@ -1008,16 +1038,16 @@ impl TaskRef {
             return Err("BUG: task was already exited! (did not overwrite its existing exit value)");
         }
         {
-            self.0.runstate.store(RunState::Exited);
             let mut inner = self.0.inner.lock();
             inner.exit_value = Some(val);
+            self.0.runstate.store(RunState::Exited);
 
             // Corner case: if the task isn't currently running (as with killed tasks), 
             // we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.
             if !self.0.is_running() {
                 trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*self.0);
                 drop(inner.task_local_data.take());
-            }
+=            }
         }
 
         #[cfg(runqueue_spillful)] {   

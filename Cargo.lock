@@ -2732,6 +2732,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "irq_safety",
  "log",
+ "preemption",
  "runqueue",
  "scheduler_priority",
  "scheduler_realtime",

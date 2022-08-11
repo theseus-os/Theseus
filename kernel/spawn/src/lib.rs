@@ -466,11 +466,22 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
+    let func;
+    let arg;
+
     // This is scoped to ensure that absolutely no resources that require dropping are held
     // when invoking the task's entry function, in order to simplify cleanup when unwinding.
-    // That is, only non-droppable values on the stack are allowed, nothing can be allocated/locked.
-    let (func, arg) = {
+    // That is, only non-droppable values on the stack are allowed.
+    {
         let curr_task = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (before task func).");
+
+        // The first time that a task runs, its entry function `task_wrapper()` is jumped to
+        // from the `task_switch()` function, right after the end of `context_switch`(),
+        // Thus, the first thing we must do here is to perform post-context switch actions,
+        // because this is the first code to run immediately after a context switch
+        // switches to this task for the first time.
+        // For more details, see the comments at the end of `Task::task_switch()`.
+        curr_task.post_context_switch_action();
 
         // This task's function and argument were placed at the bottom of the stack when this task was spawned.
         let task_func_arg = curr_task.with_kstack(|kstack| {
@@ -480,16 +491,19 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
                 *tfa_boxed // un-box it
             })
         }).expect("BUG: task_wrapper: couldn't access task's function/argument at bottom of stack");
-        let (func, arg) = (task_func_arg.func, task_func_arg.arg);
+        func = task_func_arg.func;
+        arg  = task_func_arg.arg;
+        
 
         #[cfg(not(any(rq_eval, downtime_eval)))]
         debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
             curr_task.name.clone(), debugit!(func), core::any::type_name::<F>(), debugit!(arg)
         );
-
-        (func, arg)
     };
 
+        // The first time that a task runs, its entry function `task_wrapper()` is jumped to
+    // from the `task_switch()` function, right after the end of `context_switch`(),
+    // Therefore, we need to undo the atomicity operations that were done during 
     enable_interrupts(); // we must enable interrupts for the new task, otherwise we won't be able to preempt it.
 
     // Now we actually invoke the entry point function that this Task was spawned for, catching a panic if one occurs.
