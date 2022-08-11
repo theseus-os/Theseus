@@ -3306,7 +3306,6 @@
 <span id="3300">3300</span>
 <span id="3301">3301</span>
 <span id="3302">3302</span>
-<span id="3303">3303</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
@@ -5878,12 +5877,12 @@
             }
         }
 
-        <span class="comment">// Finally, try to load the crate containing the missing symbol.</span>
+        <span class="comment">// Finally, try to load the crate that may contain the missing symbol.</span>
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">weak_sec</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">load_crate_for_missing_symbol</span>(<span class="ident">demangled_full_symbol</span>, <span class="ident">temp_backup_namespace</span>, <span class="ident">kernel_mmi_ref</span>, <span class="ident">verbose_log</span>) {
             <span class="ident">weak_sec</span>
         } <span class="kw">else</span> {
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">loscd_eval</span>))]</span>
-            <span class="macro">debug!</span>(<span class="string">&quot;Symbol \&quot;{}\&quot; not found. Try loading the specific crate manually first.&quot;</span>, <span class="ident">demangled_full_symbol</span>);
+            <span class="macro">warn!</span>(<span class="string">&quot;Symbol \&quot;{}\&quot; not found. Try loading the specific crate manually first.&quot;</span>, <span class="ident">demangled_full_symbol</span>);
             <span class="ident">Weak::default</span>() <span class="comment">// same as returning None, since it must be upgraded to an Arc before being used</span>
         }
     }
@@ -5963,15 +5962,26 @@
     }
 
 
-    <span class="doccomment">/// Attempts to find and load the crate containing the given `demangled_full_symbol`. </span>
-    <span class="doccomment">/// If successful, the new crate is loaded into this `CrateNamespace` and the symbol&#39;s section is returned.</span>
+    <span class="doccomment">/// Attempts to find and load the crate that may contain the given `demangled_full_symbol`. </span>
     <span class="doccomment">/// </span>
+    <span class="doccomment">/// If successful, the new crate is loaded into this `CrateNamespace` and the symbol&#39;s section is returned.</span>
     <span class="doccomment">/// If this namespace does not contain any matching crates, its recursive namespaces are searched as well.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// This approach only works for mangled symbols that contain a crate name, such as &quot;my_crate::foo&quot;. </span>
     <span class="doccomment">/// If &quot;foo()&quot; was marked no_mangle, then we don&#39;t know which crate to load because there is no &quot;my_crate::&quot; prefix before it.</span>
     <span class="doccomment">/// </span>
-    <span class="doccomment">/// This is the final attempt to find a symbol within [`get_symbol_or_load()`](#method.get_symbol_or_load).</span>
+    <span class="doccomment">/// Note: while attempting to find the missing `demangled_full_symbol`, this function may end up</span>
+    <span class="doccomment">/// loading *multiple* crates into this `CrateNamespace` or its recursive namespaces, due to two reasons:</span>
+    <span class="doccomment">/// 1. The `demangled_full_symbol` may have multiple crate prefixes within it.</span>
+    <span class="doccomment">///    * For example, `&lt;page_allocator::AllocatedPages as core::ops::drop::Drop&gt;::drop::h55e0a4c312ccdd63`</span>
+    <span class="doccomment">///      contains two possible crate prefixes: `page_allocator` and `core`.</span>
+    <span class="doccomment">/// 2. There may be multiple versions of a single crate.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// Possible crates are iteratively loaded and searched until the missing symbol is found.</span>
+    <span class="doccomment">/// Currently, crates that were loaded but did *not* contain the missing symbol are *not* unloaded,</span>
+    <span class="doccomment">/// but you could manually unload them later with no adverse effects to reclaim memory.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// This is the final attempt to find a symbol within [`CrateNamespace::get_symbol_or_load()`].</span>
     <span class="kw">fn</span> <span class="ident">load_crate_for_missing_symbol</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">demangled_full_symbol</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
@@ -5985,52 +5995,40 @@
  
             <span class="comment">// Try to find and load the missing crate object file from this namespace&#39;s directory or its recursive namespace&#39;s directory,</span>
             <span class="comment">// (or from the backup namespace&#39;s directory set).</span>
-            <span class="comment">// We *do not* search recursively here since we want the new crate to be loaded into the namespace </span>
-            <span class="comment">// that contains its crate object file, not a higher-level namespace. </span>
-            <span class="comment">// Checking recursive namespaces will occur at the end of this function during the recursive call to this same function.</span>
-            <span class="kw">let</span> (<span class="ident">potential_crate_file</span>, <span class="ident">ns_of_crate_file</span>) <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">method_get_crate_object_file_starting_with</span>(<span class="kw-2">&amp;</span><span class="ident">potential_crate_name</span>) {
-                <span class="prelude-val">Some</span>(<span class="ident">found</span>) =&gt; <span class="ident">found</span>,
-                <span class="comment">// TODO: should we be blindly recursively searching the backup namespace&#39;s files?</span>
-                <span class="prelude-val">None</span> =&gt; <span class="kw">match</span> <span class="ident">temp_backup_namespace</span>.<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">backup</span><span class="op">|</span> <span class="ident">backup</span>.<span class="ident">method_get_crate_object_file_starting_with</span>(<span class="kw-2">&amp;</span><span class="ident">potential_crate_name</span>)) {
-                    <span class="comment">// do not modify the backup namespace, instead load its crate into this namespace</span>
-                    <span class="prelude-val">Some</span>((<span class="ident">crate_file_in_backup_ns</span>, <span class="ident">_backup_ns</span>)) =&gt; (<span class="ident">crate_file_in_backup_ns</span>, <span class="self">self</span>),
-                    <span class="prelude-val">None</span> =&gt; {
-                        <span class="macro">warn!</span>(<span class="string">&quot;Couldn&#39;t find a single crate object file with prefix {:?} that may contain symbol {:?} in namespace {:?}.&quot;</span>, 
-                            <span class="ident">potential_crate_name</span>, <span class="ident">demangled_full_symbol</span>, <span class="self">self</span>.<span class="ident">name</span>);
-                        <span class="kw">continue</span>;
-                    }
+            <span class="comment">// The object files from the recursive namespace(s) are appended after the files in the initial namespace,</span>
+            <span class="comment">// so they&#39;ll only be searched if the symbol isn&#39;t found in the current namespace.</span>
+            <span class="kw">for</span> (<span class="ident">potential_crate_file</span>, <span class="ident">ns_of_crate_file</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">method_get_crate_object_files_starting_with</span>(<span class="kw-2">&amp;</span><span class="ident">potential_crate_name</span>) {
+                <span class="kw">let</span> <span class="ident">potential_crate_file_path</span> <span class="op">=</span> <span class="ident">Path::new</span>(<span class="ident">potential_crate_file</span>.<span class="ident">lock</span>().<span class="ident">get_absolute_path</span>());
+                <span class="comment">// Check to make sure this crate is not already loaded into this namespace (or its recursive namespace).</span>
+                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">get_crate</span>(<span class="ident">crate_name_from_path</span>(<span class="kw-2">&amp;</span><span class="ident">potential_crate_file_path</span>)).<span class="ident">is_some</span>() {
+                    <span class="macro">trace!</span>(<span class="string">&quot;  (skipping already-loaded crate {:?})&quot;</span>, <span class="ident">potential_crate_file_path</span>);
+                    <span class="kw">continue</span>;
                 }
-            };
-                          
-            <span class="kw">let</span> <span class="ident">potential_crate_file_path</span> <span class="op">=</span> <span class="ident">Path::new</span>(<span class="ident">potential_crate_file</span>.<span class="ident">lock</span>().<span class="ident">get_absolute_path</span>());
-            <span class="comment">// Check to make sure this crate is not already loaded into this namespace (or its recursive namespace).</span>
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">get_crate</span>(<span class="ident">crate_name_from_path</span>(<span class="kw-2">&amp;</span><span class="ident">potential_crate_file_path</span>)).<span class="ident">is_some</span>() {
-                <span class="macro">trace!</span>(<span class="string">&quot;  (skipping already-loaded crate {:?})&quot;</span>, <span class="ident">potential_crate_file_path</span>);
-                <span class="kw">continue</span>;
-            }
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">loscd_eval</span>))]</span>
-            <span class="macro">info!</span>(<span class="string">&quot;Symbol {:?} not initially found in namespace {:?}, attempting to load crate {:?} into namespace {:?} that may contain it.&quot;</span>, 
-                <span class="ident">demangled_full_symbol</span>, <span class="self">self</span>.<span class="ident">name</span>, <span class="ident">potential_crate_name</span>, <span class="ident">ns_of_crate_file</span>.<span class="ident">name</span>);
+                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">loscd_eval</span>))]</span>
+                <span class="macro">info!</span>(<span class="string">&quot;Symbol {:?} not initially found in namespace {:?}, attempting to load crate {:?} into namespace {:?} that may contain it.&quot;</span>, 
+                    <span class="ident">demangled_full_symbol</span>, <span class="self">self</span>.<span class="ident">name</span>, <span class="ident">potential_crate_name</span>, <span class="ident">ns_of_crate_file</span>.<span class="ident">name</span>);
 
-            <span class="kw">match</span> <span class="ident">ns_of_crate_file</span>.<span class="ident">load_crate</span>(<span class="kw-2">&amp;</span><span class="ident">potential_crate_file</span>, <span class="ident">temp_backup_namespace</span>, <span class="ident">kernel_mmi_ref</span>, <span class="ident">verbose_log</span>) {
-                <span class="prelude-val">Ok</span>((<span class="ident">_new_crate_ref</span>, <span class="ident">_num_new_syms</span>)) =&gt; {
-                    <span class="comment">// try again to find the missing symbol, now that we&#39;ve loaded the missing crate</span>
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">sec</span>) <span class="op">=</span> <span class="ident">ns_of_crate_file</span>.<span class="ident">get_symbol_internal</span>(<span class="ident">demangled_full_symbol</span>) {
-                        <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">sec</span>);
-                    } <span class="kw">else</span> {
-                        <span class="comment">// the missing symbol wasn&#39;t in this crate, continue to load the other potential containing crates.</span>
-                        <span class="macro">trace!</span>(<span class="string">&quot;Loaded symbol&#39;s containing crate {:?}, but still couldn&#39;t find the symbol {:?}.&quot;</span>, 
-                            <span class="ident">potential_crate_file_path</span>, <span class="ident">demangled_full_symbol</span>);
+                <span class="kw">match</span> <span class="ident">ns_of_crate_file</span>.<span class="ident">load_crate</span>(<span class="kw-2">&amp;</span><span class="ident">potential_crate_file</span>, <span class="ident">temp_backup_namespace</span>, <span class="ident">kernel_mmi_ref</span>, <span class="ident">verbose_log</span>) {
+                    <span class="prelude-val">Ok</span>((<span class="ident">_new_crate_ref</span>, <span class="ident">_num_new_syms</span>)) =&gt; {
+                        <span class="comment">// try again to find the missing symbol, now that we&#39;ve loaded the missing crate</span>
+                        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">sec</span>) <span class="op">=</span> <span class="ident">ns_of_crate_file</span>.<span class="ident">get_symbol_internal</span>(<span class="ident">demangled_full_symbol</span>) {
+                            <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">sec</span>);
+                        } <span class="kw">else</span> {
+                            <span class="comment">// the missing symbol wasn&#39;t in this crate, continue to load the other potential containing crates.</span>
+                            <span class="macro">trace!</span>(<span class="string">&quot;Loaded symbol&#39;s containing crate {:?}, but still couldn&#39;t find the symbol {:?}.&quot;</span>, 
+                                <span class="ident">potential_crate_file_path</span>, <span class="ident">demangled_full_symbol</span>);
+                        }
+                    }
+                    <span class="prelude-val">Err</span>(<span class="ident">_e</span>) =&gt; {
+                        <span class="macro">error!</span>(<span class="string">&quot;Found symbol&#39;s (\&quot;{}\&quot;) containing crate, but couldn&#39;t load the crate file {:?}. Error: {:?}&quot;</span>,
+                            <span class="ident">demangled_full_symbol</span>, <span class="ident">potential_crate_file_path</span>, <span class="ident">_e</span>);
+                        <span class="comment">// We *could* return an error here, but we might as well continue on to trying to load other crates.</span>
                     }
                 }
-                <span class="prelude-val">Err</span>(<span class="ident">_e</span>) =&gt; {
-                    <span class="macro">error!</span>(<span class="string">&quot;Found symbol&#39;s (\&quot;{}\&quot;) containing crate, but couldn&#39;t load the crate file {:?}. Error: {:?}&quot;</span>,
-                        <span class="ident">demangled_full_symbol</span>, <span class="ident">potential_crate_file_path</span>, <span class="ident">_e</span>);
-                    <span class="comment">// We *could* return an error here, but we might as well continue on to trying to load other crates.</span>
-                }
-            }
+            } 
         }
 
+        <span class="macro">warn!</span>(<span class="string">&quot;Couldn&#39;t find/load crate(s) that may contain the missing symbol {:?}&quot;</span>, <span class="ident">demangled_full_symbol</span>);
         <span class="prelude-val">None</span>
     }
 
