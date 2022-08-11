@@ -742,28 +742,37 @@
 <span id="736">736</span>
 <span id="737">737</span>
 <span id="738">738</span>
+<span id="739">739</span>
+<span id="740">740</span>
+<span id="741">741</span>
+<span id="742">742</span>
+<span id="743">743</span>
+<span id="744">744</span>
+<span id="745">745</span>
+<span id="746">746</span>
+<span id="747">747</span>
+<span id="748">748</span>
+<span id="749">749</span>
+<span id="750">750</span>
+<span id="751">751</span>
+<span id="752">752</span>
+<span id="753">753</span>
+<span id="754">754</span>
+<span id="755">755</span>
+<span id="756">756</span>
+<span id="757">757</span>
+<span id="758">758</span>
+<span id="759">759</span>
+<span id="760">760</span>
+<span id="761">761</span>
+<span id="762">762</span>
+<span id="763">763</span>
+<span id="764">764</span>
+<span id="765">765</span>
+<span id="766">766</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
-<span class="attribute">#![<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">static_assertions</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">volatile</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">zerocopy</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">owning_ref</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">atomic_linked_list</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">raw_cpuid</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">x86_64</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pit_clock</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">crossbeam_utils</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bit_field</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">msr</span>;
 
 <span class="kw">use</span> <span class="ident">core::fmt</span>;
 <span class="kw">use</span> <span class="ident">volatile</span>::{<span class="ident">Volatile</span>, <span class="ident">ReadOnly</span>, <span class="ident">WriteOnly</span>};
@@ -780,7 +789,16 @@
 <span class="kw">use</span> <span class="ident">crossbeam_utils::atomic::AtomicCell</span>;
 <span class="kw">use</span> <span class="ident">pit_clock::pit_wait</span>;
 <span class="kw">use</span> <span class="ident">bit_field::BitField</span>;
+<span class="kw">use</span> <span class="ident">static_assertions</span>::{<span class="ident">const_assert</span>, <span class="ident">const_assert_eq</span>};
+<span class="kw">use</span> <span class="ident">lazy_static::lazy_static</span>;
+<span class="kw">use</span> <span class="ident">log</span>::{<span class="ident">error</span>, <span class="ident">info</span>, <span class="ident">debug</span>, <span class="ident">trace</span>};
 
+<span class="doccomment">/// The IRQ vector number defined by the IDT for Local APIC timer interrupts.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// TODO: once we invert the dependency relationship between `interrupts`</span>
+<span class="doccomment">///       and all other crates, we should be able to define this in `interrupts`</span>
+<span class="doccomment">///       and then use that definition here.</span>
+<span class="kw">const</span> <span class="ident">LOCAL_APIC_LVT_IRQ</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x22</span>;
 
 <span class="doccomment">/// The interrupt chip that is currently configured on this machine. </span>
 <span class="doccomment">/// The default is `InterruptChip::PIC`, but the typical case is `APIC` or `X2APIC`,</span>
@@ -1061,9 +1079,11 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LocalApic</span> {
     <span class="doccomment">/// The inner lapic object that disambiguates between xapic and x2apic.</span>
     <span class="ident">inner</span>: <span class="ident">LapicType</span>,
-    <span class="doccomment">/// The processor id of this APIC.</span>
+    <span class="doccomment">/// The processor id of this APIC,</span>
+    <span class="doccomment">/// obtained from the `MADT` ACPI table entry.</span>
     <span class="ident">processor</span>: <span class="ident">u8</span>,
-    <span class="doccomment">/// The APIC system id of this APIC.</span>
+    <span class="doccomment">/// The APIC system id of this APIC,</span>
+    <span class="doccomment">/// obtained from the `MADT` ACPI table entry.</span>
     <span class="ident">apic_id</span>: <span class="ident">u8</span>,
     <span class="doccomment">/// Whether this `LocalApic` is the bootstrap processor (the first processor to boot up).</span>
     <span class="ident">is_bsp</span>: <span class="ident">bool</span>,
@@ -1137,9 +1157,26 @@
     }
 
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">apic_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)   -&gt; <span class="ident">u8</span>   { <span class="self">self</span>.<span class="ident">apic_id</span> }
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">processor</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span>   { <span class="self">self</span>.<span class="ident">processor</span> }
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_bsp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; <span class="ident">bool</span> { <span class="self">self</span>.<span class="ident">is_bsp</span> }
+    <span class="doccomment">/// Returns the APIC ID of this lapic.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// This value comes from the `MADT` ACPI table entry that was used</span>
+    <span class="doccomment">/// to boot up this CPU core.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// Currently this returns the same value as [`LocalApic::id()`].</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">apic_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> { <span class="self">self</span>.<span class="ident">apic_id</span> }
+
+    <span class="doccomment">/// Returns the &quot;processor ID&quot; of this lapic,</span>
+    <span class="doccomment">/// which is usually a meaningless value.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// This value comes from the `MADT` ACPI table entry that was used</span>
+    <span class="doccomment">/// to boot up this CPU core.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">processor</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> { <span class="self">self</span>.<span class="ident">processor</span> }
+
+    <span class="doccomment">/// Returns `true` if this CPU core was the BootStrap Processor (BSP),</span>
+    <span class="doccomment">/// i.e., the first CPU to boot and run the OS code.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// There is only one BSP per system.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_bsp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> { <span class="self">self</span>.<span class="ident">is_bsp</span> }
 
     <span class="doccomment">/// Enable this lapic by initializing it to a clean state</span>
     <span class="doccomment">/// and enabling its spurious interrupt vector.</span>
@@ -1256,8 +1293,8 @@
             <span class="ident">LapicType::X2Apic</span> =&gt; <span class="kw">unsafe</span> {
                 <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_DIV_CONF</span>, <span class="number">3</span>); <span class="comment">// set divide value to 16 ( ... how does 3 =&gt; 16 )</span>
                 
-                <span class="comment">// map X2APIC timer to an interrupt handler in the IDT, which we currently use IRQ 0x22 for</span>
-                <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_TIMER</span>, <span class="number">0x22</span> <span class="op">|</span> <span class="ident">APIC_TIMER_PERIODIC</span> <span class="kw">as</span> <span class="ident">u64</span>); 
+                <span class="comment">// map X2APIC timer to the `LOCAL_APIC_LVT_IRQ` interrupt handler in the IDT</span>
+                <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_TIMER</span>, <span class="ident">LOCAL_APIC_LVT_IRQ</span> <span class="kw">as</span> <span class="ident">u64</span> <span class="op">|</span> <span class="ident">APIC_TIMER_PERIODIC</span> <span class="kw">as</span> <span class="ident">u64</span>); 
                 <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_INIT_COUNT</span>, <span class="ident">apic_period</span>); 
     
                 <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_THERMAL</span>, <span class="number">0</span>);
@@ -1269,7 +1306,7 @@
             <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; {
                 <span class="ident">regs</span>.<span class="ident">timer_divide</span>.<span class="ident">write</span>(<span class="number">3</span>); <span class="comment">// set divide value to 16 ( ... how does 3 =&gt; 16 )</span>
                 <span class="comment">// map APIC timer to an interrupt handler in the IDT</span>
-                <span class="ident">regs</span>.<span class="ident">lvt_timer</span>.<span class="ident">write</span>(<span class="number">0x22</span> <span class="op">|</span> <span class="ident">APIC_TIMER_PERIODIC</span>); 
+                <span class="ident">regs</span>.<span class="ident">lvt_timer</span>.<span class="ident">write</span>(<span class="ident">LOCAL_APIC_LVT_IRQ</span> <span class="kw">as</span> <span class="ident">u32</span> <span class="op">|</span> <span class="ident">APIC_TIMER_PERIODIC</span>); 
                 <span class="ident">regs</span>.<span class="ident">timer_initial_count</span>.<span class="ident">write</span>(<span class="ident">apic_period</span> <span class="kw">as</span> <span class="ident">u32</span>); 
 
                 <span class="ident">regs</span>.<span class="ident">lvt_thermal</span>.<span class="ident">write</span>(<span class="number">0</span>);
@@ -1281,7 +1318,26 @@
         }
     }
 
-    <span class="doccomment">/// Returns the ID of this lapic.</span>
+    <span class="doccomment">/// Enable (unmask) or disable (mask) the LVT timer interrupt on this lapic.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// This does **not** modify the timer&#39;s current count value.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enable_lvt_timer</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">enable</span>: <span class="ident">bool</span>) {
+        <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">enable</span> {
+            <span class="ident">LOCAL_APIC_LVT_IRQ</span> <span class="kw">as</span> <span class="ident">u32</span> <span class="op">|</span> <span class="ident">APIC_TIMER_PERIODIC</span>
+        } <span class="kw">else</span> {
+            <span class="ident">APIC_DISABLE</span>
+        };
+        <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span> {
+            <span class="ident">LapicType::X2Apic</span> =&gt; <span class="kw">unsafe</span> {
+                <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_LVT_TIMER</span>, <span class="ident">value</span> <span class="kw">as</span> <span class="ident">u64</span>)
+            },
+            <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; <span class="ident">regs</span>.<span class="ident">lvt_timer</span>.<span class="ident">write</span>(<span class="ident">value</span>),
+        }
+    }
+
+    <span class="doccomment">/// Reads the hardware-provided ID of this lapic (from its registers).</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// Currently, this matches the value returned by [`LocalApic::apic_id()`].</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> {
         <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span> {
             <span class="ident">LapicType::X2Apic</span> =&gt; <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_APICID</span>) <span class="kw">as</span> <span class="ident">u32</span> <span class="kw">as</span> <span class="ident">u8</span>,

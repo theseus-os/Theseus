@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["hold_preemption","Prevents preemption (preemptive task switching) from occurring until the returned guard object is dropped."],["preemption_enabled","Returns `true` if preemption is currently enabled on this CPU."]],"struct":[["PreemptionGuard","A guard type that ensures preemption is disabled as long as it is held."]]};
