@@ -2658,11 +2658,14 @@ impl CrateNamespace {
     /// 
     /// If successful, the new crate is loaded into this `CrateNamespace` and the symbol's section is returned.
     /// If this namespace does not contain any matching crates, its recursive namespaces are searched as well.
-    /// Note that this function may end up loading *multiple* crates into this `CrateNamespace` or its
-    /// recursive namespaces, since there may be multiple crates that may contain the given `demangled_full_symbol`.
     /// 
     /// This approach only works for mangled symbols that contain a crate name, such as "my_crate::foo". 
     /// If "foo()" was marked no_mangle, then we don't know which crate to load because there is no "my_crate::" prefix before it.
+    /// 
+    /// Note: this function may end up loading *multiple* crates into this `CrateNamespace` 
+    /// or its recursive namespaces, due to two reasons:
+    /// 1. The `demangled_full_symbol` may have multiple crate prefixes within it.
+    /// 2. There may be multiple versions of a single crate.
     /// 
     /// This is the final attempt to find a symbol within [`CrateNamespace::get_symbol_or_load()`].
     fn load_crate_for_missing_symbol(
