@@ -4,6 +4,7 @@
 //! safe task state management, e.g., through preemption-safe locks.
 
 #![no_std]
+#![feature(negative_impls)]
 
 extern crate alloc;
 
@@ -58,19 +59,34 @@ pub fn hold_preemption() -> PreemptionGuard {
 /// Call [`hold_preemption()`] to obtain a `PreemptionGuard`.
 /// 
 /// Preemption *may* be re-enabled when this guard is dropped,
-/// but not necessarily so, because other tasks on this CPU 
-/// may also have acquired a `PreemptionGuard`.
+/// but not necessarily so, because other previous functions 
+/// in the call stack may have already acquired a `PreemptionGuard`.
+/// 
+/// This type does not implement `Send` because it is invalid
+/// to move it across a "thread" boundary (into a different task).
 pub struct PreemptionGuard {
     /// The APIC ID of the CPU on which preemption was held.
-    /// This is not necessary, it's just used for sanity checks or debugging.
+    /// 
+    /// This is just used for strict sanity checks to ensure that
+    /// a guard isn't created on one CPU and then dropped on a different CPU.
     apic_id: u8,
     /// Whether preemption was enabled when this guard was created.
     preemption_was_enabled: bool,
 }
 
+// Similar guard types in Rust `std` are not `Send`.
+impl !Send for PreemptionGuard { }
+
 impl PreemptionGuard {
-    /// Returns `true` if preemption was originally enabled
-    /// when this guard was created and disabled them.
+    /// Returns whether preemption was originally enabled when this guard was created.
+    /// 
+    /// # Return
+    /// * `true`: indicates that the caller function/task holding this guard
+    ///    was the one that caused the transition from preemption
+    ///    being enabled on this CPU to being disabled.
+    /// * `false`: indicates that preemption was already disabled
+    ///    and that no transition occurred when the caller function/task
+    ///    obtained this guard.
     pub fn preemption_was_enabled(&self) -> bool {
         self.preemption_was_enabled
     }
@@ -105,9 +121,8 @@ impl Drop for PreemptionGuard {
 /// Returns `true` if preemption is currently enabled on this CPU.
 /// 
 /// Note that this value can't be used as a lock indicator or property,
-/// as it is just a snapshot offers no guarantee that preemption will be enabled
-/// or disabled on the next attempt to enable/disable it
-/// or acquire a preemption-safe lock.
+/// as it is just a snapshot that offers no guarantee that preemption
+/// will continue to be enabled or disabled immediately after returning.
 pub fn preemption_enabled() -> bool {
     let apic_id = apic::get_my_apic_id();
     let val = PREEMPTION_COUNT[apic_id as usize].load(Ordering::Relaxed);
