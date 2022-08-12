@@ -3038,6 +3038,7 @@ dependencies = [
  "pause",
  "runqueue",
  "scheduler",
+ "spin 0.9.0",
  "stack",
  "task",
  "thread_local_macro",
