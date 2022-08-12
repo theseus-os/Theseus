@@ -855,7 +855,7 @@ dependencies = [
 [[package]]
 name = "libc"
 version = "0.2.127"
-source = "git+https://github.com/theseus-os/libc?branch=theseus#32f6c23ac80c9ea9b93c4377f15f407964d16c44"
+source = "git+https://github.com/theseus-os/libc?branch=theseus#5e1da08f39d9b25c649f1152e0084585b0adf725"
 
 [[package]]
 name = "libterm"
@@ -1574,6 +1574,7 @@ dependencies = [
  "pause",
  "runqueue",
  "scheduler",
+ "spin 0.9.0",
  "stack",
  "task",
  "thread_local_macro",
