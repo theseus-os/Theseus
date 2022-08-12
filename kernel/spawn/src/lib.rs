@@ -93,7 +93,7 @@ pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
                 if let Some(task) = BOOTSTRAP_TASKS.lock().pop() {
                     task.join().unwrap();
                     if let Some(_) = task.take_exit_value() {
-                        info!("Cleaned up bootstrap task {:?}", task);
+                        // trace!("Cleaned up bootstrap task {:?}", task);
                         num_tasks_cleaned += 1;
                     } else {
                         panic!("BUG: bootstrap task didn't exit before cleanup: {:?}", task);
@@ -111,8 +111,12 @@ pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
     Ok(())
 }
 
-/// A wrapper around a `TaskRef` for bootstrapped tasks, which when dropped,
-/// marks itself as exited and removes itself from runqueues.
+/// A wrapper around a `TaskRef` for bootstrapped tasks, which are the tasks
+/// that represent the first thread of execution on each CPU when it first boots.
+/// 
+/// When a bootstrap task has done everything it needs to do, 
+/// it should invoke [`BootstrapTaskRef::finish()`] to indicate that it's finished,
+/// which will then mark itself as exited and remove itself from runqueues.
 /// 
 /// See [`init()`] and [`task::bootstrap_task()`].
 #[derive(Debug, Clone)]
