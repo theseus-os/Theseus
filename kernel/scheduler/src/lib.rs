@@ -88,5 +88,3 @@ pub fn set_periodicity(_task: &TaskRef, _period: usize) -> Result<(), &'static s
         Err("no scheduler that supports periodic tasks is currently loaded")
     }
 }
-
-

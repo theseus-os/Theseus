@@ -29,6 +29,7 @@ extern crate fs_node;
 extern crate catch_unwind;
 extern crate fault_crate_swap;
 extern crate pause;
+extern crate spin;
 extern crate thread_local_macro;
 
 
@@ -39,6 +40,7 @@ use alloc::{
     sync::Arc,
     boxed::Box,
 };
+use spin::Mutex;
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo};
 use stack::Stack;
@@ -62,6 +64,7 @@ pub fn init(
     runqueue::init(apic_id)?;
     
     let task_ref = task::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
+    BOOTSTRAP_TASKS.lock().push(task_ref.clone());
     runqueue::add_task_to_specific_runqueue(apic_id, task_ref.clone())?;
     Ok(BootstrapTaskRef {
         apic_id, 
@@ -69,13 +72,54 @@ pub fn init(
     })
 }
 
-/// A wrapper around a `TaskRef` that is for bootstrapped tasks. 
+/// The set of bootstrap tasks that are created using `task::bootstrap_task()`.
+/// These require special cleanup; see [`cleanup_bootstrap_tasks()`].
+static BOOTSTRAP_TASKS: Mutex<Vec<TaskRef>> = Mutex::new(Vec::new());
+
+/// Spawns a dedicated task to cleanup all bootstrap tasks
+/// by reaping them, i.e., taking their exit value.
 /// 
-/// See `spawn::init()` and `task::bootstrap_task()`.
+/// This allows them to be fully dropped and cleaned up safely,
+/// as it would be invalid to reap and cleanup bootstrap tasks
+/// while the actual bootstrapped task was still running.
 /// 
-/// This exists such that a bootstrapped task can be marked as exited and removed
-/// when being dropped.
-#[derive(Debug)]
+/// ## Arguments
+/// * `num_tasks`: the number of bootstrap tasks that must be cleaned up.
+pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
+    new_task_builder(
+        |total_tasks: usize| {
+            let mut num_tasks_cleaned = 0;
+            while num_tasks_cleaned < total_tasks {
+                if let Some(task) = BOOTSTRAP_TASKS.lock().pop() {
+                    task.join().unwrap();
+                    if let Some(_) = task.take_exit_value() {
+                        // trace!("Cleaned up bootstrap task {:?}", task);
+                        num_tasks_cleaned += 1;
+                    } else {
+                        panic!("BUG: bootstrap task didn't exit before cleanup: {:?}", task);
+                    }
+                }
+            }
+            info!("Cleaned up all {} bootstrap tasks.", total_tasks);
+            *BOOTSTRAP_TASKS.lock() = Vec::new(); // replace the Vec to drop it
+        },
+        num_tasks,
+    )
+    .name(String::from("bootstrap_task_cleanup"))
+    .spawn()?;
+
+    Ok(())
+}
+
+/// A wrapper around a `TaskRef` for bootstrapped tasks, which are the tasks
+/// that represent the first thread of execution on each CPU when it first boots.
+/// 
+/// When a bootstrap task has done everything it needs to do, 
+/// it should invoke [`BootstrapTaskRef::finish()`] to indicate that it's finished,
+/// which will then mark itself as exited and remove itself from runqueues.
+/// 
+/// See [`init()`] and [`task::bootstrap_task()`].
+#[derive(Debug, Clone)]
 pub struct BootstrapTaskRef {
     #[allow(dead_code)]
     apic_id: u8,
@@ -87,12 +131,31 @@ impl Deref for BootstrapTaskRef {
         &self.task_ref
     }
 }
+impl BootstrapTaskRef {
+    /// This function represents the final step of each CPU's initialization procedure.
+    /// 
+    /// This function does the following:
+    /// 1. Consumes this bootstrap task such that it can no longer be accessed.
+    /// 2. Marks this bootstrap task as exited.
+    /// 3. Removes this bootstrap task from all this CPU's runqueue.
+    /// 
+    /// This function consumes this bootstrap task, marks it as exited
+    pub fn finish(self) {
+        drop(self);
+    }
+}
 impl Drop for BootstrapTaskRef {
+    // See the documentation for `BootstrapTaskRef::finish()` for more details.
     fn drop(&mut self) {
-        // trace!("Dropping Bootstrap Task on core {}: {:?}", self.apic_id, self.task_ref);
+        // trace!("Finishing Bootstrap Task on core {}: {:?}", self.apic_id, self.task_ref);
         remove_current_task_from_runqueue(&self.task_ref);
-        let _res1 = self.mark_as_exited(Box::new(()));
-        let _ev = self.take_exit_value();
+        self.mark_as_exited(Box::new(()))
+            .expect("BUG: bootstrap task was unable to mark itself as exited");
+
+        // Note: we can mark this bootstrap task as exited here, but we cannot 
+        // reap it (take its exit value) safely because it might be currently running.
+        // Doing so would cause its stack to be deallocated and the current execution to fail.
+        // Instead, that is done in `cleanup_bootstrap_tasks()`.
     }
 }
 
@@ -484,11 +547,23 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
+    let task_entry_func;
+    let task_arg;
+
     // This is scoped to ensure that absolutely no resources that require dropping are held
     // when invoking the task's entry function, in order to simplify cleanup when unwinding.
-    // That is, only non-droppable values on the stack are allowed, nothing can be allocated/locked.
-    let (func, arg) = {
+    // *No* local variables should exist on the stack at the end of this function,
+    // except for the task's `func` and `arg`, which are obviously required.
+    {
         let curr_task = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (before task func).");
+
+        // The first time that a task runs, its entry function `task_wrapper()` is jumped to
+        // from the `task_switch()` function, right after the end of `context_switch`(),
+        // Thus, the first thing we must do here is to perform post-context switch actions,
+        // because this is the first code to run immediately after a context switch
+        // switches to this task for the first time.
+        // For more details, see the comments at the end of `Task::task_switch()`.
+        curr_task.post_context_switch_action();
 
         // This task's function and argument were placed at the bottom of the stack when this task was spawned.
         let task_func_arg = curr_task.with_kstack(|kstack| {
@@ -498,20 +573,26 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
                 *tfa_boxed // un-box it
             })
         }).expect("BUG: task_wrapper: couldn't access task's function/argument at bottom of stack");
-        let (func, arg) = (task_func_arg.func, task_func_arg.arg);
+        task_entry_func = task_func_arg.func;
+        task_arg  = task_func_arg.arg;
 
         #[cfg(not(any(rq_eval, downtime_eval)))]
         debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
-            curr_task.name.clone(), debugit!(func), core::any::type_name::<F>(), debugit!(arg)
+            curr_task.name.clone(), debugit!(task_entry_func), core::any::type_name::<F>(), debugit!(task_arg)
         );
-
-        (func, arg)
     };
 
-    enable_interrupts(); // we must enable interrupts for the new task, otherwise we won't be able to preempt it.
+    // The first time that a task runs, its entry function `task_wrapper()` is jumped to
+    // from the `task_switch()` function, right after the context switch occurred.
+    // Since the `task_switch()` function was originally invoked from an interrupt handler,
+    // interrupts were disabled but never had the chance to be re-enabled
+    // because we did not return from the interrupt handler as usual.
+    // Therefore, we need to re-enabled interrupts here to ensure that things continue
+    // to run as normal, with interrupts enabled so we can properly preempt this task.
+    enable_interrupts();
 
     // Now we actually invoke the entry point function that this Task was spawned for, catching a panic if one occurs.
-    catch_unwind::catch_unwind_with_arg(func, arg)
+    catch_unwind::catch_unwind_with_arg(task_entry_func, task_arg)
 }
 
 /// The entry point for all new `Task`s except restartable tasks. 
@@ -787,25 +868,24 @@ fn remove_current_task_from_runqueue(current_task: &TaskRef) {
     }
 }
 
-/// Spawns an idle task on the given `core` if specified, otherwise on the current core. 
-/// Then, it adds adds the new idle task to that core's runqueue.
-pub fn create_idle_task(core: Option<u8>) -> Result<TaskRef, &'static str> {
-    let apic_id = core.unwrap_or_else(|| get_my_apic_id());
+/// Spawns an idle task on the current CPU and adds it to this CPU's runqueue.
+pub fn create_idle_task() -> Result<TaskRef, &'static str> {
+    let apic_id = get_my_apic_id();
     debug!("Spawning a new idle task on core {}", apic_id);
 
-    new_task_builder(dummy_idle_task, apic_id)
+    new_task_builder(idle_task_entry, apic_id)
         .name(format!("idle_task_core_{}", apic_id))
         .idle(apic_id)
         .spawn_restartable(None)
 }
 
-/// Dummy `idle_task` to be used if original `idle_task` crashes.
+/// A basic idle task that does nothing but loop endlessly.
 /// 
 /// Note: the current spawn API does not support spawning a task with the return type `!`,
 /// so we use `()` here instead. 
 #[inline(never)]
-fn dummy_idle_task(_apic_id: u8) {
-    info!("Entered idle task loop on core {}: {:?}", _apic_id, task::get_my_current_task());
+fn idle_task_entry(_apic_id: u8) {
+    info!("Entered idle task loop on core {}: {:?}", apic::get_my_apic_id(), task::get_my_current_task());
     loop {
         // TODO: put this core into a low-power state
         pause::spin_loop_hint();
