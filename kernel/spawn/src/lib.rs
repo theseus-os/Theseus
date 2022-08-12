@@ -354,15 +354,33 @@ impl<F, A, R> TaskBuilder<F, A, R>
         self.pin_on_core(core_id)
     }
 
-    /// Like `spawn()`, this finishes this `TaskBuilder` and spawns the new task. 
-    /// It additionally stores the new Task's function and argument within the Task,
+    /// Like [`TaskBuilder::spawn()`], this finishes this `TaskBuilder` and spawns the new task.
+    /// It also stores the new Task's function and argument within the Task,
     /// enabling it to be restarted upon exit.
     /// 
-    /// This merely makes the new task Runnable, it does not switch to it immediately; that will happen on the next scheduler invocation.
+    /// ## Arguments
+    /// * `restart_with_arg`: if `Some`, this argument will be passed into the restarted task
+    ///    instead of the argument initially provided to [`new_task_builder()`].
+    /// 
+    /// Note that the argument initially provided to `new_task_builder()` will *always*
+    /// be passed into the initially-spawned instance of this task.
+    /// The `restart_with_arg` value is only used as an argument for *future* instances
+    /// of this task that are re-spawned (restarted) if the initial task exits.
+    /// 
+    /// This allows one to spawn a task that is restartable but performs a given action
+    /// with its initial argument only once.
+    /// This is typically achieved by using an `Option<T>` for the argument type `A`:
+    /// * The argument `Some(T)` is passed into `new_task_builder()`,
+    ///   such that it is used for and passed to the first spawned instance of this task.
+    /// * The argument `None` is used for `restart_with_arg`,
+    ///   such that it is used for and passed to the subsequent restarted instances of this task.
+    /// 
+    /// This function merely makes the new task Runnable, it does not switch to it immediately;
+    /// that will happen on the next scheduler invocation.
     #[inline(never)]
-    pub fn spawn_restartable(mut self) -> Result<TaskRef, &'static str> {
+    pub fn spawn_restartable(mut self, restart_with_arg: Option<A>) -> Result<TaskRef, &'static str> {
         let restart_info = RestartInfo {
-            argument: Box::new(self.argument.clone()),
+            argument: Box::new(restart_with_arg.unwrap_or_else(|| self.argument.clone())),
             func: Box::new(self.func.clone()),
         };
 
@@ -725,7 +743,7 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
             if let Some(core) = current_task.pinned_core() {
                 new_task = new_task.pin_on_core(core);
             }
-            new_task.spawn_restartable()
+            new_task.spawn_restartable(None)
                 .expect("Failed to respawn the restartable task");
         } else {
             error!("BUG: Restartable task has no restart information available");
@@ -778,7 +796,7 @@ pub fn create_idle_task(core: Option<u8>) -> Result<TaskRef, &'static str> {
     new_task_builder(dummy_idle_task, apic_id)
         .name(format!("idle_task_core_{}", apic_id))
         .idle(apic_id)
-        .spawn_restartable()
+        .spawn_restartable(None)
 }
 
 /// Dummy `idle_task` to be used if original `idle_task` crashes.
