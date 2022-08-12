@@ -818,6 +818,86 @@
 <span id="812">812</span>
 <span id="813">813</span>
 <span id="814">814</span>
+<span id="815">815</span>
+<span id="816">816</span>
+<span id="817">817</span>
+<span id="818">818</span>
+<span id="819">819</span>
+<span id="820">820</span>
+<span id="821">821</span>
+<span id="822">822</span>
+<span id="823">823</span>
+<span id="824">824</span>
+<span id="825">825</span>
+<span id="826">826</span>
+<span id="827">827</span>
+<span id="828">828</span>
+<span id="829">829</span>
+<span id="830">830</span>
+<span id="831">831</span>
+<span id="832">832</span>
+<span id="833">833</span>
+<span id="834">834</span>
+<span id="835">835</span>
+<span id="836">836</span>
+<span id="837">837</span>
+<span id="838">838</span>
+<span id="839">839</span>
+<span id="840">840</span>
+<span id="841">841</span>
+<span id="842">842</span>
+<span id="843">843</span>
+<span id="844">844</span>
+<span id="845">845</span>
+<span id="846">846</span>
+<span id="847">847</span>
+<span id="848">848</span>
+<span id="849">849</span>
+<span id="850">850</span>
+<span id="851">851</span>
+<span id="852">852</span>
+<span id="853">853</span>
+<span id="854">854</span>
+<span id="855">855</span>
+<span id="856">856</span>
+<span id="857">857</span>
+<span id="858">858</span>
+<span id="859">859</span>
+<span id="860">860</span>
+<span id="861">861</span>
+<span id="862">862</span>
+<span id="863">863</span>
+<span id="864">864</span>
+<span id="865">865</span>
+<span id="866">866</span>
+<span id="867">867</span>
+<span id="868">868</span>
+<span id="869">869</span>
+<span id="870">870</span>
+<span id="871">871</span>
+<span id="872">872</span>
+<span id="873">873</span>
+<span id="874">874</span>
+<span id="875">875</span>
+<span id="876">876</span>
+<span id="877">877</span>
+<span id="878">878</span>
+<span id="879">879</span>
+<span id="880">880</span>
+<span id="881">881</span>
+<span id="882">882</span>
+<span id="883">883</span>
+<span id="884">884</span>
+<span id="885">885</span>
+<span id="886">886</span>
+<span id="887">887</span>
+<span id="888">888</span>
+<span id="889">889</span>
+<span id="890">890</span>
+<span id="891">891</span>
+<span id="892">892</span>
+<span id="893">893</span>
+<span id="894">894</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks</span>
 <span class="doccomment">//! and convenient builder patterns for customizing new tasks. </span>
 <span class="doccomment">//! </span>
@@ -849,6 +929,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">catch_unwind</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fault_crate_swap</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pause</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">thread_local_macro</span>;
 
 
@@ -859,6 +940,7 @@
     <span class="ident">sync::Arc</span>,
     <span class="ident">boxed::Box</span>,
 };
+<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
 <span class="kw">use</span> <span class="ident">irq_safety</span>::{<span class="ident">MutexIrqSafe</span>, <span class="ident">hold_interrupts</span>, <span class="ident">enable_interrupts</span>};
 <span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">get_kernel_mmi_ref</span>, <span class="ident">MemoryManagementInfo</span>};
 <span class="kw">use</span> <span class="ident">stack::Stack</span>;
@@ -882,6 +964,7 @@
     <span class="ident">runqueue::init</span>(<span class="ident">apic_id</span>)<span class="question-mark">?</span>;
     
     <span class="kw">let</span> <span class="ident">task_ref</span> <span class="op">=</span> <span class="ident">task::bootstrap_task</span>(<span class="ident">apic_id</span>, <span class="ident">stack</span>, <span class="ident">kernel_mmi_ref</span>)<span class="question-mark">?</span>;
+    <span class="ident">BOOTSTRAP_TASKS</span>.<span class="ident">lock</span>().<span class="ident">push</span>(<span class="ident">task_ref</span>.<span class="ident">clone</span>());
     <span class="ident">runqueue::add_task_to_specific_runqueue</span>(<span class="ident">apic_id</span>, <span class="ident">task_ref</span>.<span class="ident">clone</span>())<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>(<span class="ident">BootstrapTaskRef</span> {
         <span class="ident">apic_id</span>, 
@@ -889,13 +972,54 @@
     })
 }
 
-<span class="doccomment">/// A wrapper around a `TaskRef` that is for bootstrapped tasks. </span>
+<span class="doccomment">/// The set of bootstrap tasks that are created using `task::bootstrap_task()`.</span>
+<span class="doccomment">/// These require special cleanup; see [`cleanup_bootstrap_tasks()`].</span>
+<span class="kw">static</span> <span class="ident">BOOTSTRAP_TASKS</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">TaskRef</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">Vec::new</span>());
+
+<span class="doccomment">/// Spawns a dedicated task to cleanup all bootstrap tasks</span>
+<span class="doccomment">/// by reaping them, i.e., taking their exit value.</span>
 <span class="doccomment">/// </span>
-<span class="doccomment">/// See `spawn::init()` and `task::bootstrap_task()`.</span>
+<span class="doccomment">/// This allows them to be fully dropped and cleaned up safely,</span>
+<span class="doccomment">/// as it would be invalid to reap and cleanup bootstrap tasks</span>
+<span class="doccomment">/// while the actual bootstrapped task was still running.</span>
 <span class="doccomment">/// </span>
-<span class="doccomment">/// This exists such that a bootstrapped task can be marked as exited and removed</span>
-<span class="doccomment">/// when being dropped.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="doccomment">/// ## Arguments</span>
+<span class="doccomment">/// * `num_tasks`: the number of bootstrap tasks that must be cleaned up.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cleanup_bootstrap_tasks</span>(<span class="ident">num_tasks</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="ident">new_task_builder</span>(
+        <span class="op">|</span><span class="ident">total_tasks</span>: <span class="ident">usize</span><span class="op">|</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">num_tasks_cleaned</span> <span class="op">=</span> <span class="number">0</span>;
+            <span class="kw">while</span> <span class="ident">num_tasks_cleaned</span> <span class="op">&lt;</span> <span class="ident">total_tasks</span> {
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">task</span>) <span class="op">=</span> <span class="ident">BOOTSTRAP_TASKS</span>.<span class="ident">lock</span>().<span class="ident">pop</span>() {
+                    <span class="ident">task</span>.<span class="ident">join</span>().<span class="ident">unwrap</span>();
+                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw">_</span>) <span class="op">=</span> <span class="ident">task</span>.<span class="ident">take_exit_value</span>() {
+                        <span class="comment">// trace!(&quot;Cleaned up bootstrap task {:?}&quot;, task);</span>
+                        <span class="ident">num_tasks_cleaned</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                    } <span class="kw">else</span> {
+                        <span class="macro">panic!</span>(<span class="string">&quot;BUG: bootstrap task didn&#39;t exit before cleanup: {:?}&quot;</span>, <span class="ident">task</span>);
+                    }
+                }
+            }
+            <span class="macro">info!</span>(<span class="string">&quot;Cleaned up all {} bootstrap tasks.&quot;</span>, <span class="ident">total_tasks</span>);
+            <span class="kw-2">*</span><span class="ident">BOOTSTRAP_TASKS</span>.<span class="ident">lock</span>() <span class="op">=</span> <span class="ident">Vec::new</span>(); <span class="comment">// replace the Vec to drop it</span>
+        },
+        <span class="ident">num_tasks</span>,
+    )
+    .<span class="ident">name</span>(<span class="ident">String::from</span>(<span class="string">&quot;bootstrap_task_cleanup&quot;</span>))
+    .<span class="ident">spawn</span>()<span class="question-mark">?</span>;
+
+    <span class="prelude-val">Ok</span>(())
+}
+
+<span class="doccomment">/// A wrapper around a `TaskRef` for bootstrapped tasks, which are the tasks</span>
+<span class="doccomment">/// that represent the first thread of execution on each CPU when it first boots.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// When a bootstrap task has done everything it needs to do, </span>
+<span class="doccomment">/// it should invoke [`BootstrapTaskRef::finish()`] to indicate that it&#39;s finished,</span>
+<span class="doccomment">/// which will then mark itself as exited and remove itself from runqueues.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// See [`init()`] and [`task::bootstrap_task()`].</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BootstrapTaskRef</span> {
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
     <span class="ident">apic_id</span>: <span class="ident">u8</span>,
@@ -907,12 +1031,31 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">task_ref</span>
     }
 }
+<span class="kw">impl</span> <span class="ident">BootstrapTaskRef</span> {
+    <span class="doccomment">/// This function represents the final step of each CPU&#39;s initialization procedure.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// This function does the following:</span>
+    <span class="doccomment">/// 1. Consumes this bootstrap task such that it can no longer be accessed.</span>
+    <span class="doccomment">/// 2. Marks this bootstrap task as exited.</span>
+    <span class="doccomment">/// 3. Removes this bootstrap task from all this CPU&#39;s runqueue.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// This function consumes this bootstrap task, marks it as exited</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">finish</span>(<span class="self">self</span>) {
+        <span class="ident">drop</span>(<span class="self">self</span>);
+    }
+}
 <span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">BootstrapTaskRef</span> {
+    <span class="comment">// See the documentation for `BootstrapTaskRef::finish()` for more details.</span>
     <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="comment">// trace!(&quot;Dropping Bootstrap Task on core {}: {:?}&quot;, self.apic_id, self.task_ref);</span>
+        <span class="comment">// trace!(&quot;Finishing Bootstrap Task on core {}: {:?}&quot;, self.apic_id, self.task_ref);</span>
         <span class="ident">remove_current_task_from_runqueue</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">task_ref</span>);
-        <span class="kw">let</span> <span class="ident">_res1</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">mark_as_exited</span>(<span class="ident">Box::new</span>(()));
-        <span class="kw">let</span> <span class="ident">_ev</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">take_exit_value</span>();
+        <span class="self">self</span>.<span class="ident">mark_as_exited</span>(<span class="ident">Box::new</span>(()))
+            .<span class="ident">expect</span>(<span class="string">&quot;BUG: bootstrap task was unable to mark itself as exited&quot;</span>);
+
+        <span class="comment">// Note: we can mark this bootstrap task as exited here, but we cannot </span>
+        <span class="comment">// reap it (take its exit value) safely because it might be currently running.</span>
+        <span class="comment">// Doing so would cause its stack to be deallocated and the current execution to fail.</span>
+        <span class="comment">// Instead, that is done in `cleanup_bootstrap_tasks()`.</span>
     }
 }
 
@@ -1304,11 +1447,23 @@
           <span class="ident">R</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
           <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="ident">A</span>) -&gt; <span class="ident">R</span>, 
 {
+    <span class="kw">let</span> <span class="ident">task_entry_func</span>;
+    <span class="kw">let</span> <span class="ident">task_arg</span>;
+
     <span class="comment">// This is scoped to ensure that absolutely no resources that require dropping are held</span>
     <span class="comment">// when invoking the task&#39;s entry function, in order to simplify cleanup when unwinding.</span>
-    <span class="comment">// That is, only non-droppable values on the stack are allowed, nothing can be allocated/locked.</span>
-    <span class="kw">let</span> (<span class="ident">func</span>, <span class="ident">arg</span>) <span class="op">=</span> {
+    <span class="comment">// *No* local variables should exist on the stack at the end of this function,</span>
+    <span class="comment">// except for the task&#39;s `func` and `arg`, which are obviously required.</span>
+    {
         <span class="kw">let</span> <span class="ident">curr_task</span> <span class="op">=</span> <span class="ident">get_my_current_task</span>().<span class="ident">expect</span>(<span class="string">&quot;BUG: task_wrapper: couldn&#39;t get current task (before task func).&quot;</span>);
+
+        <span class="comment">// The first time that a task runs, its entry function `task_wrapper()` is jumped to</span>
+        <span class="comment">// from the `task_switch()` function, right after the end of `context_switch`(),</span>
+        <span class="comment">// Thus, the first thing we must do here is to perform post-context switch actions,</span>
+        <span class="comment">// because this is the first code to run immediately after a context switch</span>
+        <span class="comment">// switches to this task for the first time.</span>
+        <span class="comment">// For more details, see the comments at the end of `Task::task_switch()`.</span>
+        <span class="ident">curr_task</span>.<span class="ident">post_context_switch_action</span>();
 
         <span class="comment">// This task&#39;s function and argument were placed at the bottom of the stack when this task was spawned.</span>
         <span class="kw">let</span> <span class="ident">task_func_arg</span> <span class="op">=</span> <span class="ident">curr_task</span>.<span class="ident">with_kstack</span>(<span class="op">|</span><span class="ident">kstack</span><span class="op">|</span> {
@@ -1318,20 +1473,26 @@
                 <span class="kw-2">*</span><span class="ident">tfa_boxed</span> <span class="comment">// un-box it</span>
             })
         }).<span class="ident">expect</span>(<span class="string">&quot;BUG: task_wrapper: couldn&#39;t access task&#39;s function/argument at bottom of stack&quot;</span>);
-        <span class="kw">let</span> (<span class="ident">func</span>, <span class="ident">arg</span>) <span class="op">=</span> (<span class="ident">task_func_arg</span>.<span class="ident">func</span>, <span class="ident">task_func_arg</span>.<span class="ident">arg</span>);
+        <span class="ident">task_entry_func</span> <span class="op">=</span> <span class="ident">task_func_arg</span>.<span class="ident">func</span>;
+        <span class="ident">task_arg</span>  <span class="op">=</span> <span class="ident">task_func_arg</span>.<span class="ident">arg</span>;
 
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">any</span>(<span class="ident">rq_eval</span>, <span class="ident">downtime_eval</span>)))]</span>
         <span class="macro">debug!</span>(<span class="string">&quot;task_wrapper [1]: \&quot;{}\&quot; about to call task entry func {:?} {{{}}} with arg {:?}&quot;</span>,
-            <span class="ident">curr_task</span>.<span class="ident">name</span>.<span class="ident">clone</span>(), <span class="macro">debugit!</span>(<span class="ident">func</span>), <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(), <span class="macro">debugit!</span>(<span class="ident">arg</span>)
+            <span class="ident">curr_task</span>.<span class="ident">name</span>.<span class="ident">clone</span>(), <span class="macro">debugit!</span>(<span class="ident">task_entry_func</span>), <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(), <span class="macro">debugit!</span>(<span class="ident">task_arg</span>)
         );
-
-        (<span class="ident">func</span>, <span class="ident">arg</span>)
     };
 
-    <span class="ident">enable_interrupts</span>(); <span class="comment">// we must enable interrupts for the new task, otherwise we won&#39;t be able to preempt it.</span>
+    <span class="comment">// The first time that a task runs, its entry function `task_wrapper()` is jumped to</span>
+    <span class="comment">// from the `task_switch()` function, right after the context switch occurred.</span>
+    <span class="comment">// Since the `task_switch()` function was originally invoked from an interrupt handler,</span>
+    <span class="comment">// interrupts were disabled but never had the chance to be re-enabled</span>
+    <span class="comment">// because we did not return from the interrupt handler as usual.</span>
+    <span class="comment">// Therefore, we need to re-enabled interrupts here to ensure that things continue</span>
+    <span class="comment">// to run as normal, with interrupts enabled so we can properly preempt this task.</span>
+    <span class="ident">enable_interrupts</span>();
 
     <span class="comment">// Now we actually invoke the entry point function that this Task was spawned for, catching a panic if one occurs.</span>
-    <span class="ident">catch_unwind::catch_unwind_with_arg</span>(<span class="ident">func</span>, <span class="ident">arg</span>)
+    <span class="ident">catch_unwind::catch_unwind_with_arg</span>(<span class="ident">task_entry_func</span>, <span class="ident">task_arg</span>)
 }
 
 <span class="doccomment">/// The entry point for all new `Task`s except restartable tasks. </span>
@@ -1607,25 +1768,24 @@
     }
 }
 
-<span class="doccomment">/// Spawns an idle task on the given `core` if specified, otherwise on the current core. </span>
-<span class="doccomment">/// Then, it adds adds the new idle task to that core&#39;s runqueue.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_idle_task</span>(<span class="ident">core</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">TaskRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">apic_id</span> <span class="op">=</span> <span class="ident">core</span>.<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">get_my_apic_id</span>());
+<span class="doccomment">/// Spawns an idle task on the current CPU and adds it to this CPU&#39;s runqueue.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_idle_task</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">TaskRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">apic_id</span> <span class="op">=</span> <span class="ident">get_my_apic_id</span>();
     <span class="macro">debug!</span>(<span class="string">&quot;Spawning a new idle task on core {}&quot;</span>, <span class="ident">apic_id</span>);
 
-    <span class="ident">new_task_builder</span>(<span class="ident">dummy_idle_task</span>, <span class="ident">apic_id</span>)
+    <span class="ident">new_task_builder</span>(<span class="ident">idle_task_entry</span>, <span class="ident">apic_id</span>)
         .<span class="ident">name</span>(<span class="macro">format!</span>(<span class="string">&quot;idle_task_core_{}&quot;</span>, <span class="ident">apic_id</span>))
         .<span class="ident">idle</span>(<span class="ident">apic_id</span>)
         .<span class="ident">spawn_restartable</span>(<span class="prelude-val">None</span>)
 }
 
-<span class="doccomment">/// Dummy `idle_task` to be used if original `idle_task` crashes.</span>
+<span class="doccomment">/// A basic idle task that does nothing but loop endlessly.</span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// Note: the current spawn API does not support spawning a task with the return type `!`,</span>
 <span class="doccomment">/// so we use `()` here instead. </span>
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
-<span class="kw">fn</span> <span class="ident">dummy_idle_task</span>(<span class="ident">_apic_id</span>: <span class="ident">u8</span>) {
-    <span class="macro">info!</span>(<span class="string">&quot;Entered idle task loop on core {}: {:?}&quot;</span>, <span class="ident">_apic_id</span>, <span class="ident">task::get_my_current_task</span>());
+<span class="kw">fn</span> <span class="ident">idle_task_entry</span>(<span class="ident">_apic_id</span>: <span class="ident">u8</span>) {
+    <span class="macro">info!</span>(<span class="string">&quot;Entered idle task loop on core {}: {:?}&quot;</span>, <span class="ident">apic::get_my_apic_id</span>(), <span class="ident">task::get_my_current_task</span>());
     <span class="kw">loop</span> {
         <span class="comment">// TODO: put this core into a low-power state</span>
         <span class="ident">pause::spin_loop_hint</span>();

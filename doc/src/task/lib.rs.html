@@ -1165,6 +1165,38 @@
 <span id="1159">1159</span>
 <span id="1160">1160</span>
 <span id="1161">1161</span>
+<span id="1162">1162</span>
+<span id="1163">1163</span>
+<span id="1164">1164</span>
+<span id="1165">1165</span>
+<span id="1166">1166</span>
+<span id="1167">1167</span>
+<span id="1168">1168</span>
+<span id="1169">1169</span>
+<span id="1170">1170</span>
+<span id="1171">1171</span>
+<span id="1172">1172</span>
+<span id="1173">1173</span>
+<span id="1174">1174</span>
+<span id="1175">1175</span>
+<span id="1176">1176</span>
+<span id="1177">1177</span>
+<span id="1178">1178</span>
+<span id="1179">1179</span>
+<span id="1180">1180</span>
+<span id="1181">1181</span>
+<span id="1182">1182</span>
+<span id="1183">1183</span>
+<span id="1184">1184</span>
+<span id="1185">1185</span>
+<span id="1186">1186</span>
+<span id="1187">1187</span>
+<span id="1188">1188</span>
+<span id="1189">1189</span>
+<span id="1190">1190</span>
+<span id="1191">1191</span>
+<span id="1192">1192</span>
+<span id="1193">1193</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, </span>
 <span class="doccomment">//! and the associated code for dealing with tasks.</span>
 <span class="doccomment">//! </span>
@@ -1226,7 +1258,7 @@
     <span class="ident">sync::Arc</span>,
 };
 <span class="kw">use</span> <span class="ident">crossbeam_utils::atomic::AtomicCell</span>;
-<span class="kw">use</span> <span class="ident">irq_safety</span>::{<span class="ident">MutexIrqSafe</span>, <span class="ident">interrupts_enabled</span>};
+<span class="kw">use</span> <span class="ident">irq_safety</span>::{<span class="ident">MutexIrqSafe</span>, <span class="ident">interrupts_enabled</span>, <span class="ident">hold_interrupts</span>};
 <span class="kw">use</span> <span class="ident">memory::MmiRef</span>;
 <span class="kw">use</span> <span class="ident">stack::Stack</span>;
 <span class="kw">use</span> <span class="ident">kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES</span>;
@@ -1456,12 +1488,13 @@
     <span class="doccomment">/// The `TaskLocalData` refers back to this `Task` struct, thus it must be initialized later</span>
     <span class="doccomment">/// after the task has been fully created, which currently occurs in `TaskRef::new()`.</span>
     <span class="ident">task_local_data</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="ident">TaskLocalData</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Data that should be dropped after a task switch; for example, the previous Task&#39;s [`TaskLocalData`].</span>
-    <span class="ident">drop_after_task_switch</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Any</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Data that should be dropped after switching away from a task that has exited.</span>
+    <span class="doccomment">/// Currently, this only contains the previous Task&#39;s [`TaskLocalData`].</span>
+    <span class="ident">drop_after_task_switch</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="ident">TaskLocalData</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// The kernel stack, which all `Task`s must have in order to execute.</span>
     <span class="kw">pub</span> <span class="ident">kstack</span>: <span class="ident">Stack</span>,
     <span class="doccomment">/// Whether or not this task is pinned to a certain core.</span>
-    <span class="doccomment">/// The idle tasks (like idle_task) are always pinned to their respective cores.</span>
+    <span class="doccomment">/// The idle tasks are always pinned to their respective cores.</span>
     <span class="kw">pub</span> <span class="ident">pinned_core</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
     <span class="doccomment">/// The function that will be called when this `Task` panics or fails due to a machine exception.</span>
     <span class="doccomment">/// It will be invoked before the task is cleaned up via stack unwinding.</span>
@@ -1840,6 +1873,7 @@
     <span class="doccomment">/// # Locking / Deadlock</span>
     <span class="doccomment">/// Obtains the locks on both this `Task`&#39;s inner state and the given `next` `Task`&#39;s inner state</span>
     <span class="doccomment">/// in order to mutate them. </span>
+    <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">task_switch</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">next</span>: <span class="kw-2">&amp;</span><span class="ident">Task</span>, <span class="ident">apic_id</span>: <span class="ident">u8</span>) {
         <span class="comment">// debug!(&quot;task_switch [0]: (AP {}) prev {:?}, next {:?}, interrupts?: {}&quot;, apic_id, self, next, irq_safety::interrupts_enabled());</span>
 
@@ -1877,39 +1911,44 @@
         <span class="comment">//     }</span>
         <span class="comment">// }</span>
 
-        <span class="comment">// update runstates</span>
-        <span class="self">self</span>.<span class="ident">running_on_cpu</span>.<span class="ident">store</span>(<span class="prelude-val">None</span>.<span class="ident">into</span>()); <span class="comment">// no longer running</span>
-        <span class="ident">next</span>.<span class="ident">running_on_cpu</span>.<span class="ident">store</span>(<span class="prelude-val">Some</span>(<span class="ident">apic_id</span>).<span class="ident">into</span>()); <span class="comment">// now running on this core</span>
-
-        <span class="comment">// Switch page tables. </span>
-        <span class="comment">// Since there is only a single address space (as userspace support is currently disabled),</span>
-        <span class="comment">// we do not need to do this at all.</span>
-        <span class="kw">if</span> <span class="bool-val">false</span> {
-            <span class="kw">let</span> <span class="ident">prev_mmi</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mmi</span>;
-            <span class="kw">let</span> <span class="ident">next_mmi</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">next</span>.<span class="ident">mmi</span>;
-            
-            <span class="kw">if</span> <span class="ident">Arc::ptr_eq</span>(<span class="ident">prev_mmi</span>, <span class="ident">next_mmi</span>) {
-                <span class="comment">// do nothing because we&#39;re not changing address spaces</span>
-                <span class="comment">// debug!(&quot;task_switch [3]: prev_mmi is the same as next_mmi!&quot;);</span>
-            } <span class="kw">else</span> {
-                <span class="comment">// time to change to a different address space and switch the page tables!</span>
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">prev_mmi_locked</span> <span class="op">=</span> <span class="ident">prev_mmi</span>.<span class="ident">lock</span>();
-                <span class="kw">let</span> <span class="ident">next_mmi_locked</span> <span class="op">=</span> <span class="ident">next_mmi</span>.<span class="ident">lock</span>();
-                <span class="comment">// debug!(&quot;task_switch [3]: switching tables! From {} {:?} to {} {:?}&quot;, </span>
-                <span class="comment">//         self.name, prev_mmi_locked.page_table, next.name, next_mmi_locked.page_table);</span>
-
-                <span class="ident">prev_mmi_locked</span>.<span class="ident">page_table</span>.<span class="ident">switch</span>(<span class="kw-2">&amp;</span><span class="ident">next_mmi_locked</span>.<span class="ident">page_table</span>);
-            }
-        }
+        <span class="comment">// // Switch page tables. </span>
+        <span class="comment">// // Since there is only a single address space (as userspace support is currently disabled),</span>
+        <span class="comment">// // we do not need to do this at all.</span>
+        <span class="comment">// if false {</span>
+        <span class="comment">//     let prev_mmi = &amp;self.mmi;</span>
+        <span class="comment">//     let next_mmi = &amp;next.mmi;</span>
+        <span class="comment">//    </span>
+        <span class="comment">//     if Arc::ptr_eq(prev_mmi, next_mmi) {</span>
+        <span class="comment">//         // do nothing because we&#39;re not changing address spaces</span>
+        <span class="comment">//         // debug!(&quot;task_switch [3]: prev_mmi is the same as next_mmi!&quot;);</span>
+        <span class="comment">//     } else {</span>
+        <span class="comment">//         // time to change to a different address space and switch the page tables!</span>
+        <span class="comment">//         let mut prev_mmi_locked = prev_mmi.lock();</span>
+        <span class="comment">//         let next_mmi_locked = next_mmi.lock();</span>
+        <span class="comment">//         // debug!(&quot;task_switch [3]: switching tables! From {} {:?} to {} {:?}&quot;, </span>
+        <span class="comment">//         //         self.name, prev_mmi_locked.page_table, next.name, next_mmi_locked.page_table);</span>
+        <span class="comment">//</span>
+        <span class="comment">//         prev_mmi_locked.page_table.switch(&amp;next_mmi_locked.page_table);</span>
+        <span class="comment">//     }</span>
+        <span class="comment">// }</span>
        
-        <span class="comment">// update the current task to `next`</span>
-        <span class="ident">next</span>.<span class="ident">set_as_current_task</span>();
+        <span class="comment">// Set runstates and current task *atomically*, i.e., by disabling interrupts.</span>
+        <span class="comment">// This is necessary to ensure that any interrupt handlers that may run on this CPU</span>
+        <span class="comment">// during the schedule/task_switch routines cannot observe inconsistencies</span>
+        <span class="comment">// in task runstates, e.g., when an interrupt handler accesses the current task context.</span>
+        {
+            <span class="kw">let</span> <span class="ident">_held_interrupts</span> <span class="op">=</span> <span class="ident">hold_interrupts</span>();
+            <span class="self">self</span>.<span class="ident">running_on_cpu</span>.<span class="ident">store</span>(<span class="prelude-val">None</span>.<span class="ident">into</span>()); <span class="comment">// no longer running</span>
+            <span class="ident">next</span>.<span class="ident">running_on_cpu</span>.<span class="ident">store</span>(<span class="prelude-val">Some</span>(<span class="ident">apic_id</span>).<span class="ident">into</span>()); <span class="comment">// now running on this core</span>
+            <span class="ident">next</span>.<span class="ident">set_as_current_task</span>();
+            <span class="ident">drop</span>(<span class="ident">_held_interrupts</span>);
+        }
 
         <span class="comment">// If the current task is exited, then we need to remove the cyclical TaskRef reference in its TaskLocalData.</span>
         <span class="comment">// We store the removed TaskLocalData in the next Task struct so that we can access it after the context switch.</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">has_exited</span>() {
             <span class="comment">// trace!(&quot;task_switch(): preparing to drop TaskLocalData for running task {}&quot;, self);</span>
-            <span class="ident">next</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">drop_after_task_switch</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">task_local_data</span>.<span class="ident">take</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">tld_box</span><span class="op">|</span> <span class="ident">tld_box</span> <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Any</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>);
+            <span class="ident">next</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">drop_after_task_switch</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">task_local_data</span>.<span class="ident">take</span>();
         }
 
         <span class="kw">let</span> <span class="ident">prev_task_saved_sp</span>: <span class="kw-2">*mut</span> <span class="ident">usize</span> <span class="op">=</span> {
@@ -1987,19 +2026,50 @@
                 }
             }
         }
-        
-        <span class="comment">// Here, `self` (curr) is now `next` because the stacks have been switched, </span>
-        <span class="comment">// and `next` has become some other random task based on a previous task switch operation.</span>
-        <span class="comment">// Do not make any assumptions about what `next` is now, since it&#39;s unknown. </span>
+        <span class="comment">///////////////////////////////////////////////////////////////////////////////////////////</span>
+        <span class="comment">// *** Important Notes about Behavior after a Context Switch ***</span>
+        <span class="comment">//</span>
+        <span class="comment">// Here, after the actual context switch operation above,</span>
+        <span class="comment">// `self` (curr) is now `next` because the stacks have been switched, </span>
+        <span class="comment">// and `next` has become another random task based on a previous task switch.</span>
+        <span class="comment">// We cannot make any assumptions about what `next` is now, since it&#39;s unknown. </span>
+        <span class="comment">//</span>
+        <span class="comment">// If this is **NOT** the first time the newly-current task (`self`) has run,</span>
+        <span class="comment">// then it will resume execution below as normal because this is where it left off</span>
+        <span class="comment">// when the context switch operation occurred.</span>
+        <span class="comment">//</span>
+        <span class="comment">// However, if this **is** the first time that the newly-current task (`self`) </span>
+        <span class="comment">// has been switched to and is running, the control flow will **NOT** proceed here.</span>
+        <span class="comment">// Instead, it will have directly jumped to its entry point, which is `task_wrapper()`.</span>
+        <span class="comment">//</span>
+        <span class="comment">// As such, anything we do below should also be done in `task_wrapper()`.</span>
+        <span class="comment">// Thus, we want to ensure that post-context switch actions below are kept minimal</span>
+        <span class="comment">// and are easy to replicate in `task_wrapper()`.</span>
+        <span class="comment">///////////////////////////////////////////////////////////////////////////////////////////</span>
 
-        <span class="comment">// Now, as a final action, we drop any data that the original previous task </span>
-        <span class="comment">// prepared for droppage before the context switch occurred.</span>
+        <span class="self">self</span>.<span class="ident">post_context_switch_action</span>();
+    }
+
+
+    <span class="doccomment">/// Perform any actions needed after a context switch.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// Currently this only does two things:</span>
+    <span class="doccomment">/// 1. Drops any data that the original previous task (before the context switch)</span>
+    <span class="doccomment">///    prepared for us to drop, as specified by `TaskInner::drop_after_task_switch`.</span>
+    <span class="doccomment">/// 2. Obtains the preemption guard such that preemption can be re-enabled</span>
+    <span class="doccomment">///    when it is appropriate to do so.</span>
+    <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">post_context_switch_action</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="comment">// Step 1: </span>
         {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>();
             <span class="kw">let</span> <span class="ident">prev_task_data_to_drop</span> <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">drop_after_task_switch</span>.<span class="ident">take</span>();
             <span class="ident">drop</span>(<span class="ident">inner</span>); <span class="comment">// release the lock as soon as possible</span>
             <span class="ident">drop</span>(<span class="ident">prev_task_data_to_drop</span>);
         }
+
+        <span class="comment">// Step 2: TODO</span>
+        <span class="comment">// TODO</span>
     }
 }
 
@@ -2027,21 +2097,15 @@
 
 
 <span class="doccomment">/// A shareable, cloneable reference to a `Task` that exposes more methods</span>
-<span class="doccomment">/// for task management, and accesses the enclosed `Task` by locking it. </span>
+<span class="doccomment">/// for task management and auto-derefs into an immutable `&amp;Task` reference.</span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// The `TaskRef` type is necessary because in many places across Theseus,</span>
 <span class="doccomment">/// a reference to a Task is used. </span>
 <span class="doccomment">/// For example, task lists, task spawning, task management, scheduling, etc. </span>
 <span class="doccomment">/// </span>
-<span class="doccomment">/// Essentially a newtype wrapper around `Arc&lt;Lock&lt;Task&gt;&gt;` </span>
-<span class="doccomment">/// where `Lock` is some mutex-like locking type.</span>
-<span class="doccomment">/// Currently, `Lock` is a `MutexIrqSafe`, so it **does not** allow</span>
-<span class="doccomment">/// multiple readers simultaneously; that will cause deadlock.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// `TaskRef` implements the [`PartialEq`] and [`Eq`] traits; </span>
+<span class="doccomment">/// ## Equality comparisons</span>
+<span class="doccomment">/// `TaskRef` implements the [`PartialEq`] and [`Eq`] traits to ensure that</span>
 <span class="doccomment">/// two `TaskRef`s are considered equal if they point to the same underlying `Task`.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// `TaskRef` also auto-derefs into an immutable `Task` reference.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TaskRef</span>(<span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>);
 
@@ -2049,7 +2113,7 @@
     <span class="doccomment">/// Creates a new `TaskRef` that wraps the given `Task`.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// Also initializes the given `Task`&#39;s `TaskLocalData` struct,</span>
-    <span class="doccomment">/// which will be used to determine the current `Task` on each CPU core.</span>
+    <span class="doccomment">/// which will be used to determine the current `Task` on each CPU.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">task</span>: <span class="ident">Task</span>) -&gt; <span class="ident">TaskRef</span> {
         <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">task</span>.<span class="ident">id</span>;
         <span class="kw">let</span> <span class="ident">taskref</span> <span class="op">=</span> <span class="ident">TaskRef</span>(<span class="ident">Arc::new</span>(<span class="ident">task</span>));
@@ -2097,7 +2161,7 @@
     <span class="doccomment">/// that the current task has cleanly exited.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// # Locking / Deadlock</span>
-    <span class="doccomment">/// This method obtains a writable lock on the underlying Task in order to mutate its state.</span>
+    <span class="doccomment">/// This method obtains a writable lock on the underlying Task&#39;s inner state.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// # Return</span>
     <span class="doccomment">/// * Returns `Ok` if the exit status was successfully set.     </span>
@@ -2122,7 +2186,7 @@
     <span class="doccomment">/// that the current task has crashed or failed and has been killed by the system.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// # Locking / Deadlock</span>
-    <span class="doccomment">/// This method obtains a writable lock on the underlying Task in order to mutate its state.</span>
+    <span class="doccomment">/// This method obtains a writable lock on the underlying Task&#39;s inner state.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// # Return</span>
     <span class="doccomment">/// * Returns `Ok` if the exit status was successfully set.     </span>
@@ -2151,7 +2215,7 @@
     <span class="doccomment">/// **</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// # Locking / Deadlock</span>
-    <span class="doccomment">/// This method obtains a writable lock on the underlying Task in order to mutate its state.</span>
+    <span class="doccomment">/// This method obtains a writable lock on the underlying Task&#39;s inner state.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// # Return</span>
     <span class="doccomment">/// * Returns `Ok` if the exit status was successfully set to the given `KillReason`.     </span>
@@ -2175,9 +2239,9 @@
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: task was already exited! (did not overwrite its existing exit value)&quot;</span>);
         }
         {
-            <span class="self">self</span>.<span class="number">0</span>.<span class="ident">runstate</span>.<span class="ident">store</span>(<span class="ident">RunState::Exited</span>);
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">inner</span>.<span class="ident">lock</span>();
             <span class="ident">inner</span>.<span class="ident">exit_value</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">val</span>);
+            <span class="self">self</span>.<span class="number">0</span>.<span class="ident">runstate</span>.<span class="ident">store</span>(<span class="ident">RunState::Exited</span>);
 
             <span class="comment">// Corner case: if the task isn&#39;t currently running (as with killed tasks), </span>
             <span class="comment">// we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.</span>
@@ -2259,8 +2323,8 @@
     <span class="comment">// set this as this core&#39;s current task, since it&#39;s obviously running</span>
     <span class="ident">task_ref</span>.<span class="ident">set_as_current_task</span>();
     <span class="kw">if</span> <span class="ident">get_my_current_task</span>().<span class="ident">is_none</span>() {
-        <span class="macro">error!</span>(<span class="string">&quot;BUG: bootstrap_task(): failed to properly set the new idle task as the current task on AP {}&quot;</span>, <span class="ident">apic_id</span>);
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: bootstrap_task(): failed to properly set the new idle task as the current task&quot;</span>);
+        <span class="macro">error!</span>(<span class="string">&quot;BUG: bootstrap_task(): failed to properly set the new boostrapped task as the current task on AP {}&quot;</span>, <span class="ident">apic_id</span>);
+        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: bootstrap_task(): failed to properly set the new bootstrapped task as the current task&quot;</span>);
     }
 
     <span class="comment">// insert the new task into the task list</span>

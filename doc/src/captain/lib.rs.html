@@ -183,6 +183,10 @@
 <span id="177">177</span>
 <span id="178">178</span>
 <span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. </span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! The `captain` steers the ship of Theseus, meaning that it contains basic logic </span>
@@ -309,7 +313,8 @@
         <span class="ident">ap_start_realmode_end</span>,
         <span class="prelude-val">Some</span>(<span class="ident">kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION</span>),
     )<span class="question-mark">?</span>;
-    <span class="macro">info!</span>(<span class="string">&quot;Finished handling and booting up all {} AP cores.&quot;</span>, <span class="ident">ap_count</span>);
+    <span class="kw">let</span> <span class="ident">cpu_count</span> <span class="op">=</span> <span class="ident">ap_count</span> <span class="op">+</span> <span class="number">1</span>;
+    <span class="macro">info!</span>(<span class="string">&quot;Finished handling and booting up all {} AP cores; {} total CPUs are running.&quot;</span>, <span class="ident">ap_count</span>, <span class="ident">cpu_count</span>);
 
     <span class="comment">// //initialize the per core heaps</span>
     <span class="ident">multiple_heaps::switch_to_multiple_heaps</span>()<span class="question-mark">?</span>;
@@ -339,19 +344,22 @@
             .<span class="ident">spawn</span>()<span class="question-mark">?</span>;
     }
 
-    <span class="comment">// Now that initialization is complete, we can spawn various system tasks/daemons</span>
+    <span class="comment">// Now that key subsystems are initialized, we can spawn various system tasks/daemons</span>
     <span class="comment">// and then the first application(s).</span>
     <span class="ident">console::start_connection_detection</span>()<span class="question-mark">?</span>;
     <span class="ident">first_application::start</span>()<span class="question-mark">?</span>;
 
     <span class="macro">info!</span>(<span class="string">&quot;captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...&quot;</span>, <span class="ident">bsp_apic_id</span>);
-    <span class="ident">spawn::create_idle_task</span>(<span class="prelude-val">Some</span>(<span class="ident">bsp_apic_id</span>))<span class="question-mark">?</span>;
-    
-    <span class="comment">// Now that we&#39;ve created a new idle task for this core, we can drop ourself&#39;s bootstrapped task.</span>
-    <span class="ident">drop</span>(<span class="ident">bootstrap_task</span>);
-    <span class="comment">// Before we finish initialization, drop any other local stack variables that still exist.</span>
+    <span class="comment">// The following final initialization steps are important, and order matters:</span>
+    <span class="comment">// 1. Drop any other local stack variables that still exist.</span>
     <span class="ident">drop</span>(<span class="ident">kernel_mmi_ref</span>);
-
+    <span class="comment">// 2. Create the idle task for this CPU.</span>
+    <span class="ident">spawn::create_idle_task</span>()<span class="question-mark">?</span>;
+    <span class="comment">// 3. Cleanup bootstrap tasks, which handles this one and all other APs&#39; bootstrap tasks.</span>
+    <span class="ident">spawn::cleanup_bootstrap_tasks</span>(<span class="ident">cpu_count</span>)<span class="question-mark">?</span>;
+    <span class="comment">// 4. &quot;Finish&quot; this bootstrap task, indicating it has exited and no longer needs to run.</span>
+    <span class="ident">bootstrap_task</span>.<span class="ident">finish</span>();
+    <span class="comment">// 5. Enable interrupts such that other tasks can be scheduled in.</span>
     <span class="ident">enable_interrupts</span>();
     <span class="comment">// ****************************************************</span>
     <span class="comment">// NOTE: nothing below here is guaranteed to run again!</span>

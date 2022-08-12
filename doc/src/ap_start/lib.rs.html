@@ -113,6 +113,7 @@
 <span id="107">107</span>
 <span id="108">108</span>
 <span id="109">109</span>
+<span id="110">110</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for booting up secondary CPU cores, </span>
 <span class="doccomment">//! aka application processors (APs) on x86_64.</span>
 <span class="doccomment">//! </span>
@@ -204,14 +205,15 @@
     <span class="ident">get_lapics</span>().<span class="ident">insert</span>(<span class="ident">apic_id</span>, <span class="ident">RwLockIrqSafe::new</span>(<span class="ident">lapic</span>));
     <span class="ident">tlb_shootdown::init</span>();
 
-    <span class="macro">info!</span>(<span class="string">&quot;Initialization complete on AP core {}. Spawning idle task...&quot;</span>, <span class="ident">apic_id</span>);
-    <span class="ident">spawn::create_idle_task</span>(<span class="prelude-val">Some</span>(<span class="ident">apic_id</span>)).<span class="ident">unwrap</span>();
-
-    <span class="comment">// Now that we&#39;ve created a new idle task for this core, we can drop ourself&#39;s bootstrapped task.</span>
-    <span class="ident">drop</span>(<span class="ident">bootstrap_task</span>);
-    <span class="comment">// Before we finish initialization, drop any other local stack variables that still exist.</span>
-    <span class="comment">//   (currently none others to drop)    </span>
-
+    <span class="macro">info!</span>(<span class="string">&quot;Initialization complete on AP core {}. Spawning idle task and enabling interrupts...&quot;</span>, <span class="ident">apic_id</span>);
+    <span class="comment">// The following final initialization steps are important, and order matters:</span>
+    <span class="comment">// 1. Drop any other local stack variables that still exist.</span>
+    <span class="comment">// (currently nothing else needs to be dropped)</span>
+    <span class="comment">// 2. Create the idle task for this CPU.</span>
+    <span class="ident">spawn::create_idle_task</span>().<span class="ident">unwrap</span>();
+    <span class="comment">// 3. &quot;Finish&quot; this bootstrap task, indicating it has exited and no longer needs to run.</span>
+    <span class="ident">bootstrap_task</span>.<span class="ident">finish</span>();
+    <span class="comment">// 4. Enable interrupts such that other tasks can be scheduled in.</span>
     <span class="ident">enable_interrupts</span>();
     <span class="comment">// ****************************************************</span>
     <span class="comment">// NOTE: nothing below here is guaranteed to run again!</span>
@@ -219,7 +221,7 @@
 
     <span class="ident">scheduler::schedule</span>();
     <span class="kw">loop</span> { 
-        <span class="macro">error!</span>(<span class="string">&quot;BUG: ap_start::kstart_ap(): AP&#39;s bootstrap task was rescheduled after being dead!&quot;</span>);
+        <span class="macro">error!</span>(<span class="string">&quot;BUG: ap_start::kstart_ap(): CPU {} bootstrap task was rescheduled after being dead!&quot;</span>, <span class="ident">apic_id</span>);
     }
 }</code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ap_start" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
