@@ -29,9 +29,9 @@ pub fn main(args: Vec<String>) -> isize {
     let all_lapics = get_lapics();
     for lapic in all_lapics.iter() {
         let lapic = lapic.1;
-        let apic_id = lapic.read().apic_id;
-        let processor = lapic.read().processor;
-        let is_bsp = lapic.read().is_bsp;
+        let apic_id = lapic.read().apic_id();
+        let processor = lapic.read().processor();
+        let is_bsp = lapic.read().is_bsp();
         let core_type = if is_bsp {"BSP Core"}
                         else {"AP Core"};
 

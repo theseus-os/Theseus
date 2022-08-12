@@ -2427,6 +2427,14 @@ name = "port_io"
 version = "0.2.1"
 
 [[package]]
+name = "preemption"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "log",
+]
+
+[[package]]
 name = "print"
 version = "0.1.0"
 dependencies = [
