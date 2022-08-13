@@ -350,11 +350,11 @@ pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
         let (bottom, top) = taskref.with_kstack(|kstack| 
             (kstack.bottom().value(), kstack.top_usable().value())
         ); 
-        // debug!("Bottom and top of stack of task {} are {:X} {:X}", taskref.name, bottom, top);
+        // debug!("Bottom and top of stack of task {} are {:X} {:X}", taskref.name(), bottom, top);
 
         match constant_offset_fix(&swap_ranges, bottom, top) {
             Err (e) => {
-                debug! {"Failed to perform constant offset fix for the stack for task {} due to {}", taskref.name, e.to_string()};
+                debug! {"Failed to perform constant offset fix for the stack for task {} due to {}", taskref.name(), e.to_string()};
             },
             _ => {},
         }

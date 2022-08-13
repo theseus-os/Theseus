@@ -280,7 +280,9 @@ impl fmt::Debug for OptionU8 {
 /// Currently, we only publicize the fields here that need to be modified externally,
 /// primarily by the `spawn` crate for creating and running new tasks. 
 pub struct TaskInner {
-    /// The status or value this Task exited with, if it has already exited.
+    /// The name of the task.
+    pub name: String,
+    /// The status or value this task exited with, if it has already exited.
     exit_value: Option<ExitValue>,
     /// the saved stack pointer value, used for task switching.
     pub saved_sp: usize,
@@ -325,8 +327,6 @@ pub struct Task {
 
     /// The unique identifier of this Task.
     pub id: usize,
-    /// The simple name of this Task.
-    pub name: String,
     /// Which cpu core this Task is currently running on;
     /// `None` if not currently running.
     /// We use `OptionU8` instead of `Option<u8>` to ensure that 
@@ -375,16 +375,19 @@ const_assert!(AtomicCell::<RunState>::is_lock_free());
 
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let inner = self.inner.try_lock();
         let mut ds = f.debug_struct("Task");
-        ds.field("name", &self.name)
-            .field("id", &self.id)
+        match inner {
+            Some(ref inner) => ds.field("name", &inner.name),
+            None => ds.field("name", &"<locked>"),
+        };
+        ds.field("id", &self.id)
             .field("running_on", &self.running_on_cpu())
             .field("runstate", &self.runstate());
-        if let Some(inner) = self.inner.try_lock() {
-            ds.field("pinned", &inner.pinned_core);
-        } else {
-            ds.field("pinned", &"<Locked>");
-        }
+        match inner {
+            Some(inner) => ds.field("pinned", &inner.pinned_core),
+            None => ds.field("pinned", &"<locked>"),
+        };
         ds.finish()
     }
 }
@@ -451,6 +454,7 @@ impl Task {
 
         Task {
             inner: MutexIrqSafe::new(TaskInner {
+                name: format!("task_{}", task_id),
                 exit_value: None,
                 saved_sp: 0,
                 task_local_data: None,
@@ -462,7 +466,6 @@ impl Task {
                 restart_info: None,
             }),
             id: task_id,
-            name: format!("task_{}", task_id),
             runstate: AtomicCell::new(RunState::Initing),
             running_on_cpu: AtomicCell::new(None.into()),
             mmi,
@@ -528,6 +531,14 @@ impl Task {
     /// Returns the namespace in which this `Task` is loaded/linked into and runs within.
     pub fn get_namespace(&self) -> &Arc<CrateNamespace> {
         &self.namespace
+    }
+
+    pub fn name(&self) -> String {
+        self.inner.lock().name.clone()
+    }
+
+    pub fn set_name(&self, name: String) {
+        self.inner.lock().name = name;
     }
 
     /// Exposes read-only access to this `Task`'s [`Stack`] by invoking
@@ -854,7 +865,11 @@ impl Drop for Task {
 
 impl fmt::Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}{{{}}}", self.name, self.id)
+        let inner = self.inner.try_lock();
+        match inner {
+            Some(inner) => write!(f, "{}{{{}}}", inner.name, self.id),
+            None => write!(f, "NAME{{{}}}", self.id),
+        }
     }
 }
 
@@ -1082,7 +1097,7 @@ pub fn bootstrap_task(
         None,
         bootstrap_task_cleanup_failure,
     );
-    bootstrap_task.name = format!("bootstrap_task_core_{}", apic_id);
+    bootstrap_task.inner_mut().name = format!("bootstrap_task_core_{}", apic_id);
     bootstrap_task.runstate.store(RunState::Runnable);
     bootstrap_task.running_on_cpu.store(Some(apic_id).into()); 
     bootstrap_task.inner.get_mut().pinned_core = Some(apic_id); // can only run on this CPU core

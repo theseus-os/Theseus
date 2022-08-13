@@ -2574,8 +2574,26 @@ impl CrateNamespace {
         if let Some(weak_sec) = self.load_crate_for_missing_symbol(demangled_full_symbol, temp_backup_namespace, kernel_mmi_ref, verbose_log) {
             weak_sec
         } else {
-            #[cfg(not(loscd_eval))]
-            warn!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
+            if let "__rust_panic_cleanup" | "__rust_start_panic" = demangled_full_symbol {
+                if let Some((file, ns)) = self.method_get_crate_object_file_starting_with("panic_unwind") {
+                    match ns.load_crate(&file, temp_backup_namespace, kernel_mmi_ref, verbose_log) {
+                        Ok(_) => {
+                            if let Some(sec) = ns.get_symbol_internal(demangled_full_symbol) {
+                                info!("succesfully loaded panic_unwind");
+                                return sec;
+                            } else {
+                                error!("panic_unwind didn't contain `{demangled_full_symbol}``");
+                            }
+                        },
+                        Err(_) => error!("error loading panic_unwind"),
+                    }
+                } else {
+                    error!("tried loading `{demangled_full_symbol}`, but panic_unwind crate does not exist");
+                }
+            } else {
+                #[cfg(not(loscd_eval))]
+                warn!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
+            }
             Weak::default() // same as returning None, since it must be upgraded to an Arc before being used
         }
     }

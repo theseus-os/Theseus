@@ -43,6 +43,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bincode"
+version = "2.0.0-rc.1"
+source = "git+https://github.com/bincode-org/bincode#3a4f2991ff952535b21078d3371e112d8a1f4ab4"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bincode_derive"
 version = "2.0.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -463,7 +471,7 @@ dependencies = [
 name = "mod_mgmt"
 version = "0.1.0"
 dependencies = [
- "bincode",
+ "bincode 2.0.0-rc.1 (git+https://github.com/bincode-org/bincode)",
  "bootloader_modules",
  "const_format",
  "cow_arc",
@@ -714,7 +722,7 @@ dependencies = [
 name = "serialize_nano_core"
 version = "0.1.0"
 dependencies = [
- "bincode",
+ "bincode 2.0.0-rc.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "crate_metadata",
  "hashbrown",
  "kernel_config",

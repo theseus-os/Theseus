@@ -32,6 +32,18 @@ pub fn alloc_stack(
     inner_alloc_stack(pages, page_table)
 }
 
+/// Allocates a new stack and maps it to the active page table.
+///
+/// Like [`alloc_stack`] but takes in the size of the stack in bytes rather than pages.
+pub fn alloc_stack_by_bytes(
+    size_in_bytes: usize,
+    page_table: &mut Mapper,
+) -> Option<Stack> {
+    // Allocate enough pages for an additional guard page.
+    let pages = page_allocator::allocate_pages_by_bytes(size_in_bytes + PAGE_SIZE)?;
+    inner_alloc_stack(pages, page_table)
+}
+
 /// The inner implementation of stack allocation. 
 /// 
 /// `pages` is the combined `AllocatedPages` object that holds

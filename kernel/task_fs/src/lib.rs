@@ -248,7 +248,7 @@ impl TaskFile {
         };  
 
         format!("{0:<10} {1}\n{2:<10} {3}\n{4:<10} {5:?}\n{6:<10} {7}\n{8:<10} {9}\n{10:<10} {11:<10}", 
-            "name", self.taskref.name,
+            "name", self.taskref.name(),
             "task id", self.taskref.id,
             "runstate", self.taskref.runstate(),
             "cpu", cpu,
@@ -264,7 +264,7 @@ impl FsNode for TaskFile {
     }
 
     fn get_name(&self) -> String {
-        self.taskref.name.clone()
+        self.taskref.name()
     }
 
     fn get_parent_dir(&self) -> Option<DirRef> {
