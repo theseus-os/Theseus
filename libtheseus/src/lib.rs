@@ -1,9 +1,15 @@
 #![no_std]
 
+pub extern crate app_io;
 pub extern crate core2;
 pub extern crate panic_entry_inner;
-pub extern crate app_io;
+
 extern crate heap;
+extern crate memory;
+extern crate scheduler;
+extern crate spawn;
+extern crate stack;
+extern crate task as theseus_task;
 
 pub use panic_entry_inner as _;
 
@@ -28,4 +34,15 @@ pub mod alloc {
     pub unsafe fn realloc(ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
         GLOBAL_ALLOCATOR.realloc(ptr, layout, new_size)
     }
+}
+
+pub mod mem {
+    pub use memory::get_kernel_mmi_ref;
+}
+
+pub mod task {
+    pub use scheduler::schedule as yield_now;
+    pub use spawn::new_task_builder;
+    pub use stack::alloc_stack_by_bytes;
+    pub use theseus_task::{get_my_current_task, TaskRef};
 }

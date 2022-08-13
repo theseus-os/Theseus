@@ -41,7 +41,7 @@ pub fn main(args: Vec<String>) -> isize {
             let mut runqueue_contents = String::new();
             for task in runqueue.iter() {
                 runqueue_contents.push_str(&format!("{} ({}) {}\n", 
-                    task.name, 
+                    task.name(), 
                     task.id,
                     if task.is_running() { "*" } else { "" },
                 ));

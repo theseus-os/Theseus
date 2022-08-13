@@ -158,7 +158,7 @@ fn update_and_insert_fault_entry_internal(
 
     // Add name of current task
     fe.running_task = {
-        Some(curr_task.name.clone())
+        Some(curr_task.name())
     };
 
     // If task is from an application add application crate name. `None` if not 

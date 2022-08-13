@@ -47,7 +47,7 @@ pub fn main(args: Vec<String>) -> isize {
     for (id, task) in TASKLIST.lock().iter() {
         num_tasks += 1;
         if matches.opt_present("b") {
-            task_string.push_str(&format!("{0:<5}  {1}\n", id, task.name));
+            task_string.push_str(&format!("{0:<5}  {1}\n", id, task.name()));
         }
         else {
             // All printed fields below must be strings to ensure the width formatting specifier below works properly.
@@ -68,7 +68,7 @@ pub fn main(args: Vec<String>) -> isize {
             #[cfg(not(priority_scheduler))] {
                 task_string.push_str(
                     &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5}\n", 
-                    id, runstate, cpu, pinned, task_type, task.name)
+                    id, runstate, cpu, pinned, task_type, task.name())
                 );
             }
         }

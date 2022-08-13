@@ -150,7 +150,6 @@ impl Drop for BootstrapTaskRef {
 /// # Note 
 /// The new task will not be spawned until [`TaskBuilder::spawn()`](struct.TaskBuilder.html#method.spawn) is invoked. 
 /// See the `TaskBuilder` documentation for more details. 
-/// 
 pub fn new_task_builder<F, A, R>(
     func: F,
     argument: A
@@ -188,7 +187,6 @@ type MainFunc = fn(MainFuncArg) -> MainFuncRet;
 /// * `new_namespace`: if provided, the new application task will be spawned within the new `CrateNamespace`,
 ///    meaning that the new application crate will be linked against the crates within that new namespace. 
 ///    If not provided, the new Task will be spawned within the same namespace as the current task.
-/// 
 pub fn new_application_task_builder(
     crate_object_file: Path, // TODO FIXME: use `mod_mgmt::IntoCrateObjectFile`,
     new_namespace: Option<Arc<CrateNamespace>>,
@@ -260,6 +258,7 @@ pub struct TaskBuilder<F, A, R> {
     pin_on_core: Option<u8>,
     blocked: bool,
     idle: bool,
+    stack: Option<Stack>,
     post_build_function: Option<Box< dyn FnOnce(&mut Task) -> Result<(), &'static str> >>,
 
     #[cfg(simd_personality)]
@@ -273,36 +272,36 @@ impl<F, A, R> TaskBuilder<F, A, R>
 {
     /// Creates a new `Task` from the given function `func`
     /// that will be passed the argument `arg` when spawned. 
-    fn new(func: F, argument: A) -> TaskBuilder<F, A, R> {
+    fn new(func: F, argument: A) -> Self {
         TaskBuilder {
-            argument: argument,
-            func: func,
+            argument,
+            func,
             _return_type: PhantomData,
             name: None,
             pin_on_core: None,
             blocked: false,
             idle: false,
             post_build_function: None,
-
+            stack: None,
             #[cfg(simd_personality)]
             simd: SimdExt::None,
         }
     }
-
+    
     /// Set the String name for the new Task.
-    pub fn name(mut self, name: String) -> TaskBuilder<F, A, R> {
+    pub fn name(mut self, name: String) -> Self {
         self.name = Some(name);
         self
     }
 
     /// Set the argument that will be passed to the new Task's entry function.
-    pub fn argument(mut self, argument: A) -> TaskBuilder<F, A, R> {
+    pub fn argument(mut self, argument: A) -> Self {
         self.argument = argument;
         self
     }
 
     /// Pin the new Task to a specific core.
-    pub fn pin_on_core(mut self, core_apic_id: u8) -> TaskBuilder<F, A, R> {
+    pub fn pin_on_core(mut self, core_apic_id: u8) -> Self {
         self.pin_on_core = Some(core_apic_id);
         self
     }
@@ -310,7 +309,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
     /// Mark this new Task as a SIMD-enabled Task 
     /// that can run SIMD instructions and use SIMD registers.
     #[cfg(simd_personality)]
-    pub fn simd(mut self, extension: SimdExt) -> TaskBuilder<F, A, R> {
+    pub fn simd(mut self, extension: SimdExt) -> Self {
         self.simd = extension;
         self
     }
@@ -320,8 +319,16 @@ impl<F, A, R> TaskBuilder<F, A, R>
     /// e.g., to set up other things for the newly-spawned (but not yet running) task. 
     /// 
     /// Note that the new Task will not be `Runnable` until it is explicitly set as such.
-    pub fn block(mut self) -> TaskBuilder<F, A, R> {
+    pub fn block(mut self) -> Self {
         self.blocked = true;
+        self
+    }
+    
+    /// Set the kernel stack for the task to use.
+    ///
+    /// If not specified, a stack with the default stack size will be created for the task.
+    pub fn stack(mut self, stack: Stack) -> Self {
+        self.stack = Some(stack);
         self
     }
 
@@ -331,11 +338,11 @@ impl<F, A, R> TaskBuilder<F, A, R>
     #[inline(never)]
     pub fn spawn(self) -> Result<JoinableTaskRef, &'static str> {
         let mut new_task = Task::new(
-            None,
+            self.stack,
             task_cleanup_failure::<F, A, R>,
         )?;
         // If a Task name wasn't provided, then just use the function's name.
-        new_task.name = self.name.unwrap_or_else(|| String::from(core::any::type_name::<F>()));
+        new_task.inner_mut().name = self.name.unwrap_or_else(|| String::from(core::any::type_name::<F>()));
     
         #[cfg(simd_personality)] {  
             new_task.simd = self.simd;
@@ -608,7 +615,7 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
 
         #[cfg(not(any(rq_eval, downtime_eval)))]
         debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
-            curr_task.name.clone(), debugit!(task_entry_func), core::any::type_name::<F>(), debugit!(task_arg)
+            curr_task.name(), debugit!(func), core::any::type_name::<F>(), debugit!(task_arg)
         );
     };
 
@@ -684,9 +691,9 @@ fn task_cleanup_success_internal<R>(current_task: TaskRef, exit_value: R) -> (Pr
     let preemption_guard = hold_preemption();
 
     #[cfg(not(rq_eval))]
-    debug!("task_cleanup_success: {:?} successfully exited with return value {:?}", current_task.name, debugit!(exit_value));
+    debug!("task_cleanup_success: {:?} successfully exited with return value {:?}", current_task.name(), debugit!(exit_value));
     if current_task.mark_as_exited(Box::new(exit_value)).is_err() {
-        error!("task_cleanup_success: {:?} task could not set exit value, because task had already exited. Is this correct?", current_task.name);
+        error!("task_cleanup_success: {:?} task could not set exit value, because task had already exited. Is this correct?", current_task.name());
     }
 
     (preemption_guard, current_task)
@@ -721,10 +728,10 @@ fn task_cleanup_failure_internal(current_task: TaskRef, kill_reason: task::KillR
     let preemption_guard = hold_preemption();
 
     #[cfg(not(downtime_eval))]
-    debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.name, kill_reason);
+    debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.name(), kill_reason);
 
     if current_task.mark_as_killed(kill_reason).is_err() {
-        error!("task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?", current_task.name);
+        error!("task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?", current_task.name());
     }
 
     (preemption_guard, current_task)
@@ -859,7 +866,7 @@ fn task_restartable_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, cu
 
         if let Some((func, arg)) = restartable_info {
             let mut new_task = new_task_builder(func, arg)
-                .name(current_task.name.clone());
+                .name(current_task.name());
             if let Some(core) = current_task.pinned_core() {
                 new_task = new_task.pin_on_core(core);
             }

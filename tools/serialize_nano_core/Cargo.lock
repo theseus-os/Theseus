@@ -24,6 +24,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bincode"
+version = "2.0.0-rc.1"
+source = "git+https://github.com/bincode-org/bincode#3a4f2991ff952535b21078d3371e112d8a1f4ab4"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bincode_derive"
 version = "2.0.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -76,6 +84,169 @@ name = "libc"
 version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "349d5a591cd28b49e1d1037471617a32ddcda5731b99419008085f72d5a53836"
+
+[[package]]
+name = "lock_api"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "327fa5b6a6940e4699ec49a9beae1ea4845c6bab9314e4f84ac68742139d8c53"
+dependencies = [
+ "autocfg",
+ "scopeguard",
+]
+
+[[package]]
+name = "lockable"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "spin 0.9.3",
+]
+
+[[package]]
+name = "log"
+version = "0.4.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
+dependencies = [
+ "cfg-if",
+]
+
+[[package]]
+name = "memchr"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
+
+[[package]]
+name = "memfs"
+version = "0.1.0"
+dependencies = [
+ "fs_node",
+ "io",
+ "irq_safety",
+ "log",
+ "memory",
+ "spin 0.9.3",
+]
+
+[[package]]
+name = "memoffset"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "043175f069eda7b85febe4a74abbaeff828d9f8b448515d3151a14a3542811aa"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
+name = "memory"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list",
+ "bit_field 0.7.0",
+ "bitflags",
+ "frame_allocator",
+ "irq_safety",
+ "kernel_config",
+ "lazy_static",
+ "log",
+ "memory_structs",
+ "memory_x86_64",
+ "multiboot2",
+ "page_allocator",
+ "page_table_entry",
+ "spin 0.9.3",
+ "x86_64",
+ "xmas-elf",
+ "zerocopy",
+]
+
+[[package]]
+name = "memory_structs"
+version = "0.1.0"
+dependencies = [
+ "bit_field 0.7.0",
+ "derive_more",
+ "entryflags_x86_64",
+ "kernel_config",
+ "multiboot2",
+ "paste",
+ "xmas-elf",
+ "zerocopy",
+]
+
+[[package]]
+name = "memory_x86_64"
+version = "0.1.0"
+dependencies = [
+ "entryflags_x86_64",
+ "kernel_config",
+ "log",
+ "memory_structs",
+ "multiboot2",
+ "x86_64",
+]
+
+[[package]]
+name = "mod_mgmt"
+version = "0.1.0"
+dependencies = [
+ "bincode 2.0.0-rc.1 (git+https://github.com/bincode-org/bincode)",
+ "bootloader_modules",
+ "const_format",
+ "cow_arc",
+ "crate_metadata",
+ "crate_name_utils",
+ "cstr_core",
+ "fs_node",
+ "hashbrown",
+ "kernel_config",
+ "lazy_static",
+ "log",
+ "memfs",
+ "memory",
+ "path",
+ "qp-trie",
+ "rangemap",
+ "root",
+ "rustc-demangle",
+ "serde",
+ "spin 0.9.3",
+ "util",
+ "vfs_node",
+ "xmas-elf",
+]
+
+[[package]]
+name = "multiboot2"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6170b6f12ea75d8d0f5621e3ed780b041a666c4a5b904c77261fe343d0e798d"
+dependencies = [
+ "bitflags",
+]
+
+[[package]]
+name = "nb"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "801d31da0513b6ec5214e9bf433a77966320625a37860f910be265be6e18d06f"
+dependencies = [
+ "nb 1.0.0",
+]
+
+[[package]]
+name = "nb"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "546c37ac5d9e56f55e73b677106873d9d9f5190605e41a856503623648488cae"
+
+[[package]]
+name = "new_debug_unreachable"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
 
 [[package]]
 name = "once_cell"
