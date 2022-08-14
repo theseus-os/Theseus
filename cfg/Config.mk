@@ -49,9 +49,9 @@ endif
 ## Tell cargo to build our own target-specific version of the `core` and `alloc` crates.
 ## Also ensure that core memory functions (e.g., memcpy) are included in the build and not name-mangled.
 ## We keep these flags separate from the regular CARGOFLAGS for purposes of easily creating a sysroot directory.
-# BUILD_STD_CARGOFLAGS += -Z unstable-options
-# BUILD_STD_CARGOFLAGS += -Z build-std=core,alloc
-# BUILD_STD_CARGOFLAGS += -Z build-std-features=compiler-builtins-mem
+BUILD_STD_CARGOFLAGS += -Z unstable-options
+BUILD_STD_CARGOFLAGS += -Z build-std=core,alloc
+BUILD_STD_CARGOFLAGS += -Z build-std-features=compiler-builtins-mem
 
 
 ## Tell rustc to output the native object file for each crate,

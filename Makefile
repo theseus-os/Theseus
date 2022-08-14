@@ -19,6 +19,7 @@ debug ?= none
 net ?= none
 merge_sections ?= yes
 bootloader ?= grub
+local_rust ?= none
 
 ## test for Windows Subsystem for Linux (Linux on Windows)
 IS_WSL = $(shell grep -is 'microsoft' /proc/version)
@@ -292,7 +293,36 @@ cargo: check-rustc
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
+ifeq ($(local_rust),none)
 	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) $(BUILD_STD_CARGOFLAGS) --target $(TARGET)
+else ifdef local_rust_recursive
+	$(eval override RUSTFLAGS += -L $(local_rust)/build/x86_64-unknown-linux-gnu/stage0-std/$(TARGET)/release/deps -L $(ROOT_DIR)/target/$(TARGET)/release/deps -L $(ROOT_DIR)/target/release/deps)
+	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) --target $(TARGET)
+else
+	$(eval override RUSTFLAGS += -L $(local_rust)/build/x86_64-unknown-linux-gnu/stage0-std/$(TARGET)/release/deps -L $(ROOT_DIR)/target/$(TARGET)/release/deps -L $(ROOT_DIR)/target/release/deps)
+	cd $(local_rust) && RUST_TARGET_PATH=/home/klim/Projects/Theseus/cfg RUSTFLAGS='$(RUSTFLAGS)' ./x.py build library/alloc --stage 0 --target $(TARGET)
+
+# TODO: This assumes all of libtheseus' dependencies are covered by --no-default-features.
+	RUSTFLAGS='$(RUSTFLAGS)' make build FEATURES=--no-default-features local_rust=$(local_rust) local_rust_recursive=yes
+
+	cd $(local_rust) && RUSTFLAGS='$(RUSTFLAGS)' RUST_TARGET_PATH='$(CFG_DIR)' ./x.py build library/std --stage 0 --target $(TARGET)
+
+# Build the rest of Theseus (mostly applications)
+# TODO: I don't think this passes down config options.
+	$(eval override FEATURES += --features std)
+	RUSTFLAGS='$(RUSTFLAGS)' make build local_rust=$(local_rust) local_rust_recursive=yes FEATURES='$(FEATURES)'
+
+# copy over the std obj files
+	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
+		-i $(local_rust)/build/x86_64-unknown-linux-gnu/stage0-std/$(TARGET)/release/deps \
+		--output-objects $(OBJECT_FILES_BUILD_DIR) \
+		--output-deps $(DEPS_BUILD_DIR) \
+		--output-sysroot $(DEPS_SYSROOT_DIR)/lib/rustlib/$(TARGET)/lib \
+		-k ./kernel \
+		-a ./applications \
+		--kernel-prefix $(KERNEL_PREFIX) \
+		--app-prefix $(APP_PREFIX)
+endif
 
 ## We tried using the "cargo rustc" command here instead of "cargo build" to avoid cargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of cargo rebuilding everything).
@@ -460,7 +490,9 @@ theseus_cargo: $(wildcard $(THESEUS_CARGO)/Cargo.*)  $(wildcard$(THESEUS_CARGO)/
 clean:
 	@rm -rf $(BUILD_DIR)
 	cargo clean
-	
+ifneq ($(local_rust), none)
+	cd $(local_rust) && ./x.py clean
+endif
 
 ### Removes only the old files that were copied into the build directory from a previous build.
 ### This is necessary to avoid lingering build files that aren't relevant to a new build,

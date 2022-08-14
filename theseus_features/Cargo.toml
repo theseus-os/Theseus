@@ -148,10 +148,14 @@ theseus_tests = [
     "test_realtime",
     "test_restartable",
     "test_serial_echo",
-    "test_std",
     "test_std_fs",
     "test_wait_queue",
     "test_wasmtime",
     "tls_test",
     "unwind_test",
+]
+
+# Includes applications that can only be built with the `local_rust` build.
+std = [
+    "test_std",
 ]
