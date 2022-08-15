@@ -124,7 +124,8 @@ pub fn init(
         ap_start_realmode_end,
         Some(kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION),
     )?;
-    info!("Finished handling and booting up all {} AP cores.", ap_count);
+    let cpu_count = ap_count + 1;
+    info!("Finished handling and booting up all {} AP cores; {} total CPUs are running.", ap_count, cpu_count);
 
     // //initialize the per core heaps
     multiple_heaps::switch_to_multiple_heaps()?;
@@ -154,19 +155,22 @@ pub fn init(
             .spawn()?;
     }
 
-    // Now that initialization is complete, we can spawn various system tasks/daemons
+    // Now that key subsystems are initialized, we can spawn various system tasks/daemons
     // and then the first application(s).
     console::start_connection_detection()?;
     first_application::start()?;
 
     info!("captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...", bsp_apic_id);
-    spawn::create_idle_task(Some(bsp_apic_id))?;
-    
-    // Now that we've created a new idle task for this core, we can drop ourself's bootstrapped task.
-    drop(bootstrap_task);
-    // Before we finish initialization, drop any other local stack variables that still exist.
+    // The following final initialization steps are important, and order matters:
+    // 1. Drop any other local stack variables that still exist.
     drop(kernel_mmi_ref);
-
+    // 2. Create the idle task for this CPU.
+    spawn::create_idle_task()?;
+    // 3. Cleanup bootstrap tasks, which handles this one and all other APs' bootstrap tasks.
+    spawn::cleanup_bootstrap_tasks(cpu_count)?;
+    // 4. "Finish" this bootstrap task, indicating it has exited and no longer needs to run.
+    bootstrap_task.finish();
+    // 5. Enable interrupts such that other tasks can be scheduled in.
     enable_interrupts();
     // ****************************************************
     // NOTE: nothing below here is guaranteed to run again!

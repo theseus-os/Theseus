@@ -89,14 +89,15 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     get_lapics().insert(apic_id, RwLockIrqSafe::new(lapic));
     tlb_shootdown::init();
 
-    info!("Initialization complete on AP core {}. Spawning idle task...", apic_id);
-    spawn::create_idle_task(Some(apic_id)).unwrap();
-
-    // Now that we've created a new idle task for this core, we can drop ourself's bootstrapped task.
-    drop(bootstrap_task);
-    // Before we finish initialization, drop any other local stack variables that still exist.
-    //   (currently none others to drop)    
-
+    info!("Initialization complete on AP core {}. Spawning idle task and enabling interrupts...", apic_id);
+    // The following final initialization steps are important, and order matters:
+    // 1. Drop any other local stack variables that still exist.
+    // (currently nothing else needs to be dropped)
+    // 2. Create the idle task for this CPU.
+    spawn::create_idle_task().unwrap();
+    // 3. "Finish" this bootstrap task, indicating it has exited and no longer needs to run.
+    bootstrap_task.finish();
+    // 4. Enable interrupts such that other tasks can be scheduled in.
     enable_interrupts();
     // ****************************************************
     // NOTE: nothing below here is guaranteed to run again!
@@ -104,6 +105,6 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
 
     scheduler::schedule();
     loop { 
-        error!("BUG: ap_start::kstart_ap(): AP's bootstrap task was rescheduled after being dead!");
+        error!("BUG: ap_start::kstart_ap(): CPU {} bootstrap task was rescheduled after being dead!", apic_id);
     }
 }

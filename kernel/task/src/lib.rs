@@ -289,12 +289,13 @@ pub struct TaskInner {
     /// The `TaskLocalData` refers back to this `Task` struct, thus it must be initialized later
     /// after the task has been fully created, which currently occurs in `TaskRef::new()`.
     task_local_data: Option<Box<TaskLocalData>>,
-    /// Data that should be dropped after a task switch; for example, the previous Task's [`TaskLocalData`].
-    drop_after_task_switch: Option<Box<dyn Any + Send>>,
+    /// Data that should be dropped after switching away from a task that has exited.
+    /// Currently, this only contains the previous Task's [`TaskLocalData`].
+    drop_after_task_switch: Option<Box<TaskLocalData>>,
     /// The kernel stack, which all `Task`s must have in order to execute.
     pub kstack: Stack,
     /// Whether or not this task is pinned to a certain core.
-    /// The idle tasks (like idle_task) are always pinned to their respective cores.
+    /// The idle tasks are always pinned to their respective cores.
     pub pinned_core: Option<u8>,
     /// The function that will be called when this `Task` panics or fails due to a machine exception.
     /// It will be invoked before the task is cleaned up via stack unwinding.
@@ -673,6 +674,7 @@ impl Task {
     /// # Locking / Deadlock
     /// Obtains the locks on both this `Task`'s inner state and the given `next` `Task`'s inner state
     /// in order to mutate them. 
+    #[doc(hidden)]
     pub fn task_switch(&self, next: &Task, apic_id: u8) {
         // debug!("task_switch [0]: (AP {}) prev {:?}, next {:?}, interrupts?: {}", apic_id, self, next, irq_safety::interrupts_enabled());
 
@@ -747,7 +749,7 @@ impl Task {
         // We store the removed TaskLocalData in the next Task struct so that we can access it after the context switch.
         if self.has_exited() {
             // trace!("task_switch(): preparing to drop TaskLocalData for running task {}", self);
-            next.inner.lock().drop_after_task_switch = self.inner.lock().task_local_data.take().map(|tld_box| tld_box as Box<dyn Any + Send>);
+            next.inner.lock().drop_after_task_switch = self.inner.lock().task_local_data.take();
         }
 
         let prev_task_saved_sp: *mut usize = {
@@ -1047,7 +1049,7 @@ impl TaskRef {
             if !self.0.is_running() {
                 trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*self.0);
                 drop(inner.task_local_data.take());
-=            }
+            }
         }
 
         #[cfg(runqueue_spillful)] {   
@@ -1122,8 +1124,8 @@ pub fn bootstrap_task(
     // set this as this core's current task, since it's obviously running
     task_ref.set_as_current_task();
     if get_my_current_task().is_none() {
-        error!("BUG: bootstrap_task(): failed to properly set the new idle task as the current task on AP {}", apic_id);
-        return Err("BUG: bootstrap_task(): failed to properly set the new idle task as the current task");
+        error!("BUG: bootstrap_task(): failed to properly set the new boostrapped task as the current task on AP {}", apic_id);
+        return Err("BUG: bootstrap_task(): failed to properly set the new bootstrapped task as the current task");
     }
 
     // insert the new task into the task list
