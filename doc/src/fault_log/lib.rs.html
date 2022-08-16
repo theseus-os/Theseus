@@ -277,9 +277,6 @@
 <span id="271">271</span>
 <span id="272">272</span>
 <span id="273">273</span>
-<span id="274">274</span>
-<span id="275">275</span>
-<span id="276">276</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate logs all the faults occuring within Theseus. </span>
 <span class="doccomment">//! Maintains a list of exceptions and panics that has occured since booting up. </span>
 <span class="doccomment">//! This crate does not hold reference to any task or app. </span>
@@ -288,7 +285,6 @@
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">drain_filter</span>)]</span>
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">vga_buffer</span>; <span class="comment">// for println_raw!()</span>
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">print</span>; <span class="comment">// for regular println!()</span>
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
@@ -409,10 +405,8 @@
 }
 
 
-<span class="macro">lazy_static!</span> {    
-    <span class="doccomment">/// The structure to hold the list of all faults so far occured in the system</span>
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">FAULT_LIST</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FaultEntry</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">Vec::new</span>());
-}
+<span class="doccomment">/// The structure to hold the list of all faults so far occured in the system</span>
+<span class="kw">static</span> <span class="ident">FAULT_LIST</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FaultEntry</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">Vec::new</span>());
 
 <span class="doccomment">/// Clears the log of faults so far occured in the system </span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear_fault_log</span>() {

@@ -322,12 +322,8 @@
 <span id="316">316</span>
 <span id="317">317</span>
 <span id="318">318</span>
-<span id="319">319</span>
-<span id="320">320</span>
-<span id="321">321</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
 <span class="comment">// #[macro_use] extern crate log;</span>
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bitflags</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bit_field</span>;
@@ -355,10 +351,8 @@
 <span class="kw">use</span> <span class="ident">memory::VirtualAddress</span>;
 
 
-<span class="macro">lazy_static!</span> {
-    <span class="doccomment">/// The GDT list, one per core, indexed by a key of apic_id</span>
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">GDT</span>: <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">Gdt</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicMap::new</span>();
-}
+<span class="doccomment">/// The GDT list, one per core, indexed by a key of apic_id</span>
+<span class="kw">static</span> <span class="ident">GDT</span>: <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">Gdt</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicMap::new</span>();
 
 
 <span class="kw">static</span> <span class="ident">KERNEL_CODE_SELECTOR</span>:  <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">SegmentSelector</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();

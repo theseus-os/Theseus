@@ -1144,11 +1144,11 @@
 <span class="kw">impl</span> <span class="ident">MappedPages</span> {
     <span class="doccomment">/// Returns an empty MappedPages object that performs no allocation or mapping actions. </span>
     <span class="doccomment">/// Can be used as a placeholder, but will not permit any real usage. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="ident">MappedPages</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="ident">MappedPages</span> {
         <span class="ident">MappedPages</span> {
-            <span class="ident">page_table_p4</span>: <span class="ident">get_current_p4</span>(),
+            <span class="ident">page_table_p4</span>: <span class="ident">Frame::containing_address</span>(<span class="ident">PhysicalAddress::zero</span>()),
             <span class="ident">pages</span>: <span class="ident">AllocatedPages::empty</span>(),
-            <span class="ident">flags</span>: <span class="ident">Default::default</span>(),
+            <span class="ident">flags</span>: <span class="ident">EntryFlags::zero</span>(),
         }
     }
 

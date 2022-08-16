@@ -904,6 +904,8 @@
 <span id="898">898</span>
 <span id="899">899</span>
 <span id="900">900</span>
+<span id="901">901</span>
+<span id="902">902</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the Performance Monitoring Unit </span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! We have support for PMU version 2. Each succesive PMU version includes the features provided by the previous versions.</span>
@@ -965,6 +967,7 @@
 <span class="doccomment">//! So, if you run `pmu_x86::init()` and `pmu_x86::start_samples()` on CPU core 2, it will only sample events on core 2.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">const_btree_new</span>)]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
@@ -1032,18 +1035,19 @@
 <span class="doccomment">/// Bitmap to store the cores which have sampling results ready to be retrieved. It records information for 256 cores.</span>
 <span class="kw">static</span> <span class="ident">RESULTS_READY</span>: [<span class="ident">AtomicU64</span>; <span class="ident">WORDS_IN_BITMAP</span>] <span class="op">=</span> [<span class="ident">AtomicU64::new</span>(<span class="number">0</span>), <span class="ident">AtomicU64::new</span>(<span class="number">0</span>), <span class="ident">AtomicU64::new</span>(<span class="number">0</span>), <span class="ident">AtomicU64::new</span>(<span class="number">0</span>)];
 
-<span class="macro">lazy_static!</span>{
+<span class="macro">lazy_static!</span> {
     <span class="doccomment">/// PMU version supported by the current hardware. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.</span>
     <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">PMU_VERSION</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">CpuId::new</span>().<span class="ident">get_performance_monitoring_info</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">pmi</span><span class="op">|</span> <span class="ident">pmi</span>.<span class="ident">version_id</span>()).<span class="ident">unwrap_or</span>(<span class="number">0</span>);
     <span class="doccomment">/// The number of general purpose PMCs that can be used. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.</span>
     <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">NUM_PMC</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">CpuId::new</span>().<span class="ident">get_performance_monitoring_info</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">pmi</span><span class="op">|</span> <span class="ident">pmi</span>.<span class="ident">number_of_counters</span>()).<span class="ident">unwrap_or</span>(<span class="number">0</span>);
     <span class="doccomment">/// The number of fixed function counters. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.</span>
     <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">NUM_FIXED_FUNC_COUNTERS</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">CpuId::new</span>().<span class="ident">get_performance_monitoring_info</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">pmi</span><span class="op">|</span> <span class="ident">pmi</span>.<span class="ident">fixed_function_counters</span>()).<span class="ident">unwrap_or</span>(<span class="number">0</span>);
-    <span class="doccomment">/// Set to store the cores that the PMU has already been initialized on</span>
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">CORES_INITIALIZED</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">BTreeSet</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">BTreeSet::new</span>());
-    <span class="doccomment">/// The sampling information for each core</span>
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">SAMPLING_INFO</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">SampledEvents</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span>  <span class="ident">MutexIrqSafe::new</span>(<span class="ident">BTreeMap::new</span>());
 }
+
+<span class="doccomment">/// Set to store the cores that the PMU has already been initialized on</span>
+<span class="kw">static</span> <span class="ident">CORES_INITIALIZED</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">BTreeSet</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">BTreeSet::new</span>());
+<span class="doccomment">/// The sampling information for each core</span>
+<span class="kw">static</span> <span class="ident">SAMPLING_INFO</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">SampledEvents</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span>  <span class="ident">MutexIrqSafe::new</span>(<span class="ident">BTreeMap::new</span>());
 
 <span class="doccomment">/// Used to select the event type to count. Event types are described in the Intel SDM 18.2.1 for PMU Version 1.</span>
 <span class="doccomment">/// The discriminant value for each event type is the value written to the event select register for a general purpose PMC.</span>

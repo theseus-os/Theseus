@@ -282,9 +282,6 @@
 <span id="276">276</span>
 <span id="277">277</span>
 <span id="278">278</span>
-<span id="279">279</span>
-<span id="280">280</span>
-<span id="281">281</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate defines a framebuffer compositor.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! A framebuffer compositor composites a list of framebuffers into a single destination framebuffer.</span>
@@ -306,13 +303,12 @@
 <span class="doccomment">//! The cache is basically a rectangular region in the destination framebuffer, and we define the structure `CacheBlock` to represent that cached region.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">const_btree_new</span>)]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">compositor</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">framebuffer</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">hashbrown</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">shapes</span>;
 
@@ -329,14 +325,12 @@
 <span class="doccomment">/// The height of a cache block. In every iteration the compositor will deal with groups of 16 rows and cache them.</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CACHE_BLOCK_HEIGHT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">16</span>;
 
-<span class="macro">lazy_static!</span> {
-    <span class="doccomment">/// The instance of the framebuffer compositor.</span>
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">FRAME_COMPOSITOR</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">FrameCompositor</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(
-        <span class="ident">FrameCompositor</span>{
-            <span class="ident">caches</span>: <span class="ident">BTreeMap::new</span>()
-        }
-    );
-}
+<span class="doccomment">/// The instance of the framebuffer compositor.</span>
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">FRAME_COMPOSITOR</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">FrameCompositor</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(
+    <span class="ident">FrameCompositor</span>{
+        <span class="ident">caches</span>: <span class="ident">BTreeMap::new</span>()
+    }
+);
 
 <span class="doccomment">/// A `CacheBlock` represents the cached (previously-composited) content of a range of rows in the source framebuffer. </span>
 <span class="doccomment">/// It specifies the rectangular region in the destination framebuffer and the hash.</span>

@@ -349,10 +349,6 @@
 <span id="343">343</span>
 <span id="344">344</span>
 <span id="345">345</span>
-<span id="346">346</span>
-<span id="347">347</span>
-<span id="348">348</span>
-<span id="349">349</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A simple library that handles stdio queues for applications running in terminal instances.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! This provides some APIs similar to Rust&#39;s `std::io` for applications to access those queues.</span>
@@ -370,8 +366,8 @@
 <span class="doccomment">//!    destructs all stdio queues</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">const_btree_new</span>)]</span>
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">stdio</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
@@ -447,20 +443,16 @@
     <span class="kw">use</span> <span class="ident">IoControlFlags</span>;
     <span class="kw">use</span> <span class="ident">IoStreams</span>;
 
-    <span class="macro">lazy_static!</span> {
-        <span class="doccomment">/// Map a task to its IoControlFlags structure.</span>
-        <span class="doccomment">/// When shells call `insert_child_streams`, the default value is automatically inserted for that task.</span>
-        <span class="doccomment">/// When shells call `remove_child_streams`, the corresponding structure is removed from this map.</span>
-        <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">APP_IO_CTRL_FLAGS</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">IoControlFlags</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">BTreeMap::new</span>());
-    }
+    <span class="doccomment">/// Map a task to its IoControlFlags structure.</span>
+    <span class="doccomment">/// When shells call `insert_child_streams`, the default value is automatically inserted for that task.</span>
+    <span class="doccomment">/// When shells call `remove_child_streams`, the corresponding structure is removed from this map.</span>
+    <span class="kw">static</span> <span class="ident">APP_IO_CTRL_FLAGS</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">IoControlFlags</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">BTreeMap::new</span>());
 
-    <span class="macro">lazy_static!</span> {
-        <span class="doccomment">/// Map a task id to its IoStreams structure.</span>
-        <span class="doccomment">/// Shells should call `insert_child_streams` when spawning a new app,</span>
-        <span class="doccomment">/// which effectively stores a new key value pair to this map. </span>
-        <span class="doccomment">/// After a shell&#39;s child app exits, the shell should call `remove_child_streams` to clean it up.</span>
-        <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">APP_IO_STREAMS</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">IoStreams</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">BTreeMap::new</span>());
-    }
+    <span class="doccomment">/// Map a task id to its IoStreams structure.</span>
+    <span class="doccomment">/// Shells should call `insert_child_streams` when spawning a new app,</span>
+    <span class="doccomment">/// which effectively stores a new key value pair to this map. </span>
+    <span class="doccomment">/// After a shell&#39;s child app exits, the shell should call `remove_child_streams` to clean it up.</span>
+    <span class="kw">static</span> <span class="ident">APP_IO_STREAMS</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">IoStreams</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">BTreeMap::new</span>());
 
     <span class="doccomment">/// Lock and returns the `MutexGuard` of `APP_IO_CTRL_FLAGS`. Use `lock_all_maps()` if</span>
     <span class="doccomment">/// you want to lock both of the maps to avoid deadlock.</span>
@@ -493,7 +485,7 @@
         )
 }
 
-<span class="doccomment">/// Lock all shared states (i.e. those defined in `lazy_static!`) and execute the closure.</span>
+<span class="doccomment">/// Lock all shared states (i.e. those defined as `static`s) and execute the closure.</span>
 <span class="doccomment">/// This function is mainly provided for the shell to clean up the pointers stored in the map</span>
 <span class="doccomment">/// without causing a deadlock. In other words, by using this function, shell can prevent the</span>
 <span class="doccomment">/// application from holding the lock of these shared maps before killing it. Otherwise, the</span>

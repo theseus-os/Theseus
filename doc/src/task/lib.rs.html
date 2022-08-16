@@ -1195,8 +1195,6 @@
 <span id="1189">1189</span>
 <span id="1190">1190</span>
 <span id="1191">1191</span>
-<span id="1192">1192</span>
-<span id="1193">1193</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, </span>
 <span class="doccomment">//! and the associated code for dealing with tasks.</span>
 <span class="doccomment">//! </span>
@@ -1226,9 +1224,9 @@
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">panic_info_message</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">const_btree_new</span>)]</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">static_assertions</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
@@ -1314,10 +1312,8 @@
 }
 
 
-<span class="macro">lazy_static!</span> {
-    <span class="doccomment">/// The list of all Tasks in the system.</span>
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">TASKLIST</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">TaskRef</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">BTreeMap::new</span>());
-}
+<span class="doccomment">/// The list of all Tasks in the system.</span>
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">TASKLIST</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">TaskRef</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">BTreeMap::new</span>());
 
 
 <span class="doccomment">/// returns a shared reference to the `Task` specified by the given `task_id`</span>

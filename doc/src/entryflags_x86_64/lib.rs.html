@@ -184,6 +184,18 @@
 <span id="178">178</span>
 <span id="179">179</span>
 <span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate defines the structure of page table entry flags on x86_64.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
@@ -204,7 +216,6 @@
     <span class="doccomment">/// * Bits `[52:62]` (inclusive) are available for custom OS usage.</span>
     <span class="doccomment">/// * Bit  `63` is reserved by hardware for access flags (noexec).</span>
     <span class="doccomment">/// </span>
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
     <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">EntryFlags</span>: <span class="ident">u64</span> {
         <span class="doccomment">/// If set, this page is currently &quot;present&quot; in memory. </span>
         <span class="doccomment">/// If not set, this page is not in memory, e.g., not mapped, paged to disk, etc.</span>
@@ -253,6 +264,13 @@
 <span class="macro">const_assert_eq!</span>(<span class="ident">EntryFlags::all</span>().<span class="ident">bits</span>() <span class="op">&amp;</span> <span class="number">0x000_FFFFFFFFFF_000</span>, <span class="number">0</span>);
 
 <span class="kw">impl</span> <span class="ident">EntryFlags</span> {
+    <span class="doccomment">/// Returns a new, all-zero `EntryFlags` with no bits enabled.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// This is a `const` version of `Default::default`.</span>
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">zero</span>() -&gt; <span class="ident">EntryFlags</span> {
+        <span class="ident">EntryFlags::from_bits_truncate</span>(<span class="number">0</span>)
+    }
+
     <span class="doccomment">/// Returns `true` if the page the entry points to is a huge page.</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">is_huge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">intersects</span>(<span class="ident">EntryFlags::HUGE_PAGE</span>)
@@ -362,6 +380,12 @@
         }
 
         <span class="ident">flags</span>
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">EntryFlags</span> {
+    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
+        <span class="ident"><span class="self">Self</span>::zero</span>()
     }
 }
 </code></pre></div>

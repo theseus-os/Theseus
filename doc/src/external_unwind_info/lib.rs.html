@@ -122,8 +122,6 @@
 <span id="116">116</span>
 <span id="117">117</span>
 <span id="118">118</span>
-<span id="119">119</span>
-<span id="120">120</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Registers and stores unwind information from external components.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! Typically, Theseus maintains metadata about all crates loaded and linked into system.</span>
@@ -159,22 +157,20 @@
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">map_try_insert</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">const_btree_new</span>)]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 
 <span class="kw">use</span> <span class="ident">core::ops</span>::{<span class="ident">Range</span>, <span class="ident">Bound</span>::{<span class="ident">Included</span>, <span class="ident">Unbounded</span>}};
 <span class="kw">use</span> <span class="ident">alloc::collections::BTreeMap</span>;
-<span class="kw">use</span> <span class="ident">lazy_static::lazy_static</span>;
 <span class="kw">use</span> <span class="ident">memory::VirtualAddress</span>;
 <span class="kw">use</span> <span class="ident">spin::Mutex</span>;
 <span class="kw">use</span> <span class="ident">log</span>::<span class="kw-2">*</span>;
 
-<span class="macro">lazy_static!</span> {
-    <span class="doccomment">/// The system-wide set of unwind information registered by external components.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// The map key is the text section&#39;s base `VirtualAddress`.</span>
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">EXTERNAL_UNWIND_INFO</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span>, <span class="ident">ExternalUnwindInfo</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">BTreeMap::new</span>());
-}
+<span class="doccomment">/// The system-wide set of unwind information registered by external components.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// The map key is the text section&#39;s base `VirtualAddress`.</span>
+<span class="kw">static</span> <span class="ident">EXTERNAL_UNWIND_INFO</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span>, <span class="ident">ExternalUnwindInfo</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">BTreeMap::new</span>());
 
 <span class="doccomment">/// Unwinding information for an external (non-Theseus) component.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>

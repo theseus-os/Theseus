@@ -256,7 +256,6 @@
 <span id="250">250</span>
 <span id="251">251</span>
 <span id="252">252</span>
-<span id="253">253</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Definitions for the ACPI table</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! RSDT is the Root System Descriptor Table, whereas</span>
@@ -265,6 +264,7 @@
 <span class="doccomment">//! to point to other ACPI SDTs, while the RSDT uses 32-bit physical addresses.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">const_btree_new</span>)]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
@@ -312,6 +312,15 @@
 }
 
 <span class="kw">impl</span> <span class="ident">AcpiTables</span> {
+    <span class="doccomment">/// Returns a new empty `AcpiTables` object.</span>
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="ident">AcpiTables</span> {
+        <span class="ident">AcpiTables</span> {
+            <span class="ident">mapped_pages</span>: <span class="ident">MappedPages::empty</span>(),
+            <span class="ident">frames</span>: <span class="ident">FrameRange::empty</span>(),
+            <span class="ident">tables</span>: <span class="ident">BTreeMap::new</span>(),
+        }
+    }
+
     <span class="doccomment">/// Map the ACPI table that exists at the given PhysicalAddress, where an `SDT` header must exist.</span>
     <span class="doccomment">/// Ensures that the entire ACPI table is mapped, including extra length that may be specified within the SDT.</span>
     <span class="doccomment">/// </span>
@@ -499,17 +508,6 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mapped_pages</span>
     }
 }
-
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">AcpiTables</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="ident">AcpiTables</span> {
-        <span class="ident">AcpiTables</span> {
-            <span class="ident">mapped_pages</span>: <span class="ident">MappedPages::empty</span>(),
-            <span class="ident">frames</span>: <span class="ident">FrameRange::empty</span>(),
-            <span class="ident">tables</span>: <span class="ident">BTreeMap::new</span>(),
-        }
-    }
-}
-
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="acpi_table" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
 </body></html>

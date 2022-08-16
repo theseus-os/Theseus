@@ -339,10 +339,6 @@
 <span id="333">333</span>
 <span id="334">334</span>
 <span id="335">335</span>
-<span id="336">336</span>
-<span id="337">337</span>
-<span id="338">338</span>
-<span id="339">339</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `RunQueue` structure, for priority scheduler. </span>
 <span class="doccomment">//! `RunQueue` structure is essentially a list of Tasks</span>
 <span class="doccomment">//! that it used for scheduling purposes.</span>
@@ -351,7 +347,6 @@
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">atomic_linked_list</span>;
@@ -427,12 +422,9 @@
 }
 
 
-<span class="macro">lazy_static!</span> {
-    <span class="doccomment">/// There is one runqueue per core, each core only accesses its own private runqueue</span>
-    <span class="doccomment">/// and allows the scheduler to select a task from that runqueue to schedule in.</span>
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">RUNQUEUES</span>: <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">RwLockIrqSafe</span><span class="op">&lt;</span><span class="ident">RunQueue</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicMap::new</span>();
-}
-
+<span class="doccomment">/// There is one runqueue per core, each core only accesses its own private runqueue</span>
+<span class="doccomment">/// and allows the scheduler to select a task from that runqueue to schedule in.</span>
+<span class="kw">static</span> <span class="ident">RUNQUEUES</span>: <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">RwLockIrqSafe</span><span class="op">&lt;</span><span class="ident">RunQueue</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicMap::new</span>();
 
 <span class="doccomment">/// A list of references to `Task`s (`PriorityTaskRef`s) </span>
 <span class="doccomment">/// that is used to store the `Task`s (and associated scheduler related data) </span>

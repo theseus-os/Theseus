@@ -767,9 +767,6 @@
 <span id="761">761</span>
 <span id="762">762</span>
 <span id="763">763</span>
-<span id="764">764</span>
-<span id="765">765</span>
-<span id="766">766</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
@@ -790,7 +787,6 @@
 <span class="kw">use</span> <span class="ident">pit_clock::pit_wait</span>;
 <span class="kw">use</span> <span class="ident">bit_field::BitField</span>;
 <span class="kw">use</span> <span class="ident">static_assertions</span>::{<span class="ident">const_assert</span>, <span class="ident">const_assert_eq</span>};
-<span class="kw">use</span> <span class="ident">lazy_static::lazy_static</span>;
 <span class="kw">use</span> <span class="ident">log</span>::{<span class="ident">error</span>, <span class="ident">info</span>, <span class="ident">debug</span>, <span class="ident">trace</span>};
 
 <span class="doccomment">/// The IRQ vector number defined by the IDT for Local APIC timer interrupts.</span>
@@ -816,10 +812,8 @@
 <span class="comment">// Ensure that `AtomicCell&lt;InterruptChip&gt;` is actually a lock-free atomic.</span>
 <span class="macro">const_assert!</span>(<span class="ident">AtomicCell</span>::<span class="op">&lt;</span><span class="ident">InterruptChip</span><span class="op">&gt;</span><span class="ident">::is_lock_free</span>());
 
-
-<span class="macro">lazy_static!</span> {
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">LOCAL_APICS</span>: <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">RwLockIrqSafe</span><span class="op">&lt;</span><span class="ident">LocalApic</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicMap::new</span>();
-}
+<span class="doccomment">/// The set of system-wide `LocalApic`s, one per CPU core.</span>
+<span class="kw">static</span> <span class="ident">LOCAL_APICS</span>: <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">RwLockIrqSafe</span><span class="op">&lt;</span><span class="ident">LocalApic</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicMap::new</span>();
 
 <span class="doccomment">/// The processor id (from the ACPI MADT table) of the bootstrap processor</span>
 <span class="kw">static</span> <span class="ident">BSP_PROCESSOR_ID</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>(); 

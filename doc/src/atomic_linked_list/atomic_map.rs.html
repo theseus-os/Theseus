@@ -245,6 +245,8 @@
 <span id="239">239</span>
 <span id="240">240</span>
 <span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
 </pre><pre class="rust"><code><span class="doccomment">/// A generic map based on a singly-linked list data structure that is lock-free </span>
 <span class="doccomment">/// and uses `AtomicPtr`s to ensure safety in the face of multithreaded access.</span>
 <span class="doccomment">/// Each node remains in the same spot in memory once it is allocated,</span>
@@ -285,10 +287,12 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">K</span>: <span class="ident">PartialEq</span> {
-    <span class="doccomment">/// create a new empty AtomicMap.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Create a new empty AtomicMap.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// Does not perform any allocation until a new node is created.</span>
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
         <span class="ident">AtomicMap</span> {
-            <span class="ident">head</span>: <span class="ident">AtomicPtr::default</span>(), <span class="comment">// null ptr</span>
+            <span class="ident">head</span>: <span class="ident">AtomicPtr::new</span>(<span class="ident">core::ptr::null_mut</span>()), <span class="comment">// null ptr</span>
         }
     }
 

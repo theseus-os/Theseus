@@ -164,7 +164,7 @@
 
     <span class="comment">// __lazy_static_create!(RQEMPTY, AtomicMap&lt;u8, RwLockIrqSafe&lt;runqueue_round_robin::RunQueue&gt;&gt;);</span>
     <span class="comment">// lazy_static! { static ref RQEMPTY: AtomicMap&lt;u8, RwLockIrqSafe&lt;runqueue_round_robin::RunQueue&gt;&gt; = AtomicMap::new(); }</span>
-    <span class="kw">let</span> <span class="ident">rq_ptr</span> <span class="op">=</span> <span class="ident">runqueue_round_robin::RUNQUEUES</span>.<span class="ident">deref</span>() <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span>;
+    <span class="kw">let</span> <span class="ident">rq_ptr</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">runqueue_round_robin::RUNQUEUES</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span>;
     <span class="kw">let</span> <span class="ident">once_rq</span> <span class="op">=</span> <span class="ident">core::mem::replace</span>(
         <span class="kw">unsafe</span> { <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span>(<span class="ident">rq_ptr</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">RwLockIrqSafe</span><span class="op">&lt;</span><span class="ident">runqueue_round_robin::RunQueue</span><span class="op">&gt;</span><span class="op">&gt;</span>) }, 
         <span class="ident">AtomicMap::new</span>()

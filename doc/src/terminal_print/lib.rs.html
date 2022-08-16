@@ -91,8 +91,6 @@
 <span id="85">85</span>
 <span id="86">86</span>
 <span id="87">87</span>
-<span id="88">88</span>
-<span id="89">89</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Applications that want to print to their parent terminal must import this crate</span>
 <span class="doccomment">//! To print, applications can call the println! or print! macros</span>
 <span class="doccomment">//! </span>
@@ -108,9 +106,9 @@
 <span class="doccomment">//! If an application itself spawns child tasks, those will not be able to properly print through these interfaces.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">const_btree_new</span>)]</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">logger</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">dfqueue</span>;
@@ -139,11 +137,9 @@
     });
 }
 
-<span class="macro">lazy_static!</span> {
-    <span class="doccomment">/// Maps the child application&#39;s task ID to its parent terminal print_producer to track parent-child relationships between</span>
-    <span class="doccomment">/// applications so that applications can print to the correct terminal</span>
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">TERMINAL_PRINT_PRODUCERS</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">DFQueueProducer</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">BTreeMap::new</span>());
-}
+<span class="doccomment">/// Maps the child application&#39;s task ID to its parent terminal print_producer to track parent-child relationships between</span>
+<span class="doccomment">/// applications so that applications can print to the correct terminal</span>
+<span class="kw">static</span> <span class="ident">TERMINAL_PRINT_PRODUCERS</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">DFQueueProducer</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">BTreeMap::new</span>());
 
 <span class="doccomment">/// Adds the (child application&#39;s task ID, parent terminal print_producer) key-val pair to the map </span>
 <span class="doccomment">/// Simulates connecting an output stream to the application</span>

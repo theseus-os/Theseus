@@ -139,38 +139,16 @@
 <span id="133">133</span>
 <span id="134">134</span>
 <span id="135">135</span>
-<span id="136">136</span>
-<span id="137">137</span>
-<span id="138">138</span>
-<span id="139">139</span>
-<span id="140">140</span>
-<span id="141">141</span>
-<span id="142">142</span>
-<span id="143">143</span>
-<span id="144">144</span>
-<span id="145">145</span>
-<span id="146">146</span>
-<span id="147">147</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Code to parse the ACPI tables, based off of Redox. </span>
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="attribute">#![<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span> <span class="comment">//  to suppress warnings for unused functions/methods</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">volatile</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>; 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">ioapic</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pit_clock</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">ap_start</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pic</span>; 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">apic</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">hpet</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pause</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">acpi_table</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">acpi_table_handler</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">rsdp</span>;
@@ -189,11 +167,9 @@
 <span class="kw">use</span> <span class="ident">acpi_table_handler::acpi_table_handler</span>;
 
 
-<span class="macro">lazy_static!</span> {
-    <span class="doccomment">/// The singleton instance of the `AcpiTables` struct,</span>
-    <span class="doccomment">/// which contains the MappedPages and location of all discovered ACPI tables.</span>
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">ACPI_TABLES</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">AcpiTables</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">AcpiTables::default</span>());
-}
+<span class="doccomment">/// The singleton instance of the `AcpiTables` struct,</span>
+<span class="doccomment">/// which contains the MappedPages and location of all discovered ACPI tables.</span>
+<span class="kw">static</span> <span class="ident">ACPI_TABLES</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">AcpiTables</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">AcpiTables::empty</span>());
 
 <span class="doccomment">/// Returns a reference to the singleton instance of all ACPI tables </span>
 <span class="doccomment">/// that have been discovered, mapped, and parsed so far.</span>

@@ -60,13 +60,8 @@
 <span id="54">54</span>
 <span id="55">55</span>
 <span id="56">56</span>
-<span id="57">57</span>
-<span id="58">58</span>
-<span id="59">59</span>
-<span id="60">60</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">atomic_linked_list</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
@@ -83,11 +78,8 @@
 <span class="doccomment">/// The index of the double fault stack in a TaskStateSegment (TSS)</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DOUBLE_FAULT_IST_INDEX</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
 
-
-<span class="macro">lazy_static!</span> {
-    <span class="doccomment">/// The TSS list, one per core, indexed by a key of apic_id.</span>
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">TSS</span>: <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">TaskStateSegment</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicMap::new</span>();
-}
+<span class="doccomment">/// The TSS list, one per core, indexed by a key of apic_id.</span>
+<span class="kw">static</span> <span class="ident">TSS</span>: <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">TaskStateSegment</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicMap::new</span>();
 
 
 <span class="doccomment">/// Sets the current core&#39;s TSS privilege stack 0 (RSP0) entry, which points to the stack that </span>

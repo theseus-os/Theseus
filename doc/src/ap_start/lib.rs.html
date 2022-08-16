@@ -111,19 +111,15 @@
 <span id="105">105</span>
 <span id="106">106</span>
 <span id="107">107</span>
-<span id="108">108</span>
-<span id="109">109</span>
-<span id="110">110</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for booting up secondary CPU cores, </span>
 <span class="doccomment">//! aka application processors (APs) on x86_64.</span>
 <span class="doccomment">//! </span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">const_btree_new</span>)]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">stack</span>;
@@ -148,11 +144,9 @@
 <span class="doccomment">/// False means the AP hasn&#39;t started or hasn&#39;t yet finished booting.</span>
 <span class="kw">pub</span> <span class="kw">static</span> <span class="ident">AP_READY_FLAG</span>: <span class="ident">AtomicBool</span> <span class="op">=</span> <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>);
 
-<span class="macro">lazy_static!</span> {
-    <span class="doccomment">/// Temporary storage for transferring allocated `Stack`s from </span>
-    <span class="doccomment">/// the main bootstrap processor (BSP) to the AP processor being booted in `kstart_ap()` below.</span>
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">AP_STACKS</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">Stack</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">BTreeMap::new</span>());
-}
+<span class="doccomment">/// Temporary storage for transferring allocated `Stack`s from </span>
+<span class="doccomment">/// the main bootstrap processor (BSP) to the AP processor being booted in `kstart_ap()` below.</span>
+<span class="kw">static</span> <span class="ident">AP_STACKS</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">Stack</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">BTreeMap::new</span>());
 
 <span class="doccomment">/// Insert a new stack that was allocated for the AP with the given `apic_id`.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">insert_ap_stack</span>(<span class="ident">apic_id</span>: <span class="ident">u8</span>, <span class="ident">stack</span>: <span class="ident">Stack</span>) {
