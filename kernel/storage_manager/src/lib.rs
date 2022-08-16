@@ -5,7 +5,6 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate lazy_static;
 extern crate spin;
 extern crate owning_ref;
 extern crate pci;
@@ -22,11 +21,8 @@ use storage_device::StorageControllerRef;
 
 pub use storage_device::*;
 
-
-lazy_static! {
-    /// A list of all of the available and initialized storage controllers that exist on this system.
-    static ref STORAGE_CONTROLLERS: Mutex<Vec<StorageControllerRef>> = Mutex::new(Vec::new());
-}
+/// A list of all of the available and initialized storage controllers that exist on this system.
+static STORAGE_CONTROLLERS: Mutex<Vec<StorageControllerRef>> = Mutex::new(Vec::new());
 
 /// Returns an iterator over all initialized storage controllers on this system.
 /// 

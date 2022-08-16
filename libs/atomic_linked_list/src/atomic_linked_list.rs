@@ -34,10 +34,12 @@ pub struct AtomicLinkedList<T> {
 }
 
 impl<T> AtomicLinkedList<T> {
-    /// create a new empty AtomicLinkedList.
-    pub fn new() -> AtomicLinkedList<T> {
+    /// Create a new empty AtomicLinkedList.
+    /// 
+    /// Does not perform any allocation until a new node is created.
+    pub const fn new() -> AtomicLinkedList<T> {
         AtomicLinkedList {
-            head: AtomicPtr::default(), // null ptr
+            head: AtomicPtr::new(core::ptr::null_mut()), // null ptr
         }
     }
 

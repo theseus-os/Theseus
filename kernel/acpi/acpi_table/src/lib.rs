@@ -6,6 +6,7 @@
 //! to point to other ACPI SDTs, while the RSDT uses 32-bit physical addresses.
 
 #![no_std]
+#![feature(const_btree_new)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -53,6 +54,15 @@ pub struct AcpiTables {
 }
 
 impl AcpiTables {
+    /// Returns a new empty `AcpiTables` object.
+    pub const fn empty() -> AcpiTables {
+        AcpiTables {
+            mapped_pages: MappedPages::empty(),
+            frames: FrameRange::empty(),
+            tables: BTreeMap::new(),
+        }
+    }
+
     /// Map the ACPI table that exists at the given PhysicalAddress, where an `SDT` header must exist.
     /// Ensures that the entire ACPI table is mapped, including extra length that may be specified within the SDT.
     /// 
@@ -240,14 +250,3 @@ impl AcpiTables {
         &self.mapped_pages
     }
 }
-
-impl Default for AcpiTables {
-    fn default() -> AcpiTables {
-        AcpiTables {
-            mapped_pages: MappedPages::empty(),
-            frames: FrameRange::empty(),
-            tables: BTreeMap::new(),
-        }
-    }
-}
-

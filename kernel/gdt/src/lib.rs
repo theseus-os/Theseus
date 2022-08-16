@@ -1,6 +1,5 @@
 #![no_std]
 
-#[macro_use] extern crate lazy_static;
 // #[macro_use] extern crate log;
 #[macro_use] extern crate bitflags;
 extern crate bit_field;
@@ -28,10 +27,8 @@ use spin::Once;
 use memory::VirtualAddress;
 
 
-lazy_static! {
-    /// The GDT list, one per core, indexed by a key of apic_id
-    static ref GDT: AtomicMap<u8, Gdt> = AtomicMap::new();
-}
+/// The GDT list, one per core, indexed by a key of apic_id
+static GDT: AtomicMap<u8, Gdt> = AtomicMap::new();
 
 
 static KERNEL_CODE_SELECTOR:  Once<SegmentSelector> = Once::new();

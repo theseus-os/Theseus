@@ -13,9 +13,9 @@
 //! If an application itself spawns child tasks, those will not be able to properly print through these interfaces.
 
 #![no_std]
+#![feature(const_btree_new)]
 
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate lazy_static;
 extern crate logger;
 extern crate task;
 extern crate dfqueue;
@@ -44,11 +44,9 @@ macro_rules! print {
     });
 }
 
-lazy_static! {
-    /// Maps the child application's task ID to its parent terminal print_producer to track parent-child relationships between
-    /// applications so that applications can print to the correct terminal
-    static ref TERMINAL_PRINT_PRODUCERS: Mutex<BTreeMap<usize, DFQueueProducer<Event>>> = Mutex::new(BTreeMap::new());
-}
+/// Maps the child application's task ID to its parent terminal print_producer to track parent-child relationships between
+/// applications so that applications can print to the correct terminal
+static TERMINAL_PRINT_PRODUCERS: Mutex<BTreeMap<usize, DFQueueProducer<Event>>> = Mutex::new(BTreeMap::new());
 
 /// Adds the (child application's task ID, parent terminal print_producer) key-val pair to the map 
 /// Simulates connecting an output stream to the application

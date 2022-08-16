@@ -3,7 +3,6 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate lazy_static;
 extern crate spin;
 extern crate memory;
 extern crate volatile;
@@ -21,11 +20,9 @@ use atomic_linked_list::atomic_map::AtomicMap;
 use owning_ref::BoxRefMut;
 
 
-lazy_static! {
-    /// The system-wide list of all `IoApic`s, of which there is usually one, 
-    /// but larger systems can have multiple IoApic chips.
-    static ref IOAPICS: AtomicMap<u8, Mutex<IoApic>> = AtomicMap::new();
-}
+/// The system-wide list of all `IoApic`s, of which there is usually one, 
+/// but larger systems can have multiple IoApic chips.
+static IOAPICS: AtomicMap<u8, Mutex<IoApic>> = AtomicMap::new();
 
 
 /// Returns a reference to the list of IoApics.

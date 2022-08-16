@@ -18,7 +18,6 @@ bitflags! {
     /// * Bits `[52:62]` (inclusive) are available for custom OS usage.
     /// * Bit  `63` is reserved by hardware for access flags (noexec).
     /// 
-    #[derive(Default)]
     pub struct EntryFlags: u64 {
         /// If set, this page is currently "present" in memory. 
         /// If not set, this page is not in memory, e.g., not mapped, paged to disk, etc.
@@ -67,6 +66,13 @@ bitflags! {
 const_assert_eq!(EntryFlags::all().bits() & 0x000_FFFFFFFFFF_000, 0);
 
 impl EntryFlags {
+    /// Returns a new, all-zero `EntryFlags` with no bits enabled.
+    /// 
+    /// This is a `const` version of `Default::default`.
+    pub const fn zero() -> EntryFlags {
+        EntryFlags::from_bits_truncate(0)
+    }
+
     /// Returns `true` if the page the entry points to is a huge page.
     pub const fn is_huge(&self) -> bool {
         self.intersects(EntryFlags::HUGE_PAGE)
@@ -176,5 +182,11 @@ impl EntryFlags {
         }
 
         flags
+    }
+}
+
+impl Default for EntryFlags {
+    fn default() -> Self {
+        Self::zero()
     }
 }

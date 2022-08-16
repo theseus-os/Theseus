@@ -4,20 +4,10 @@
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 
 #[macro_use] extern crate log;
-#[macro_use] extern crate lazy_static;
 extern crate alloc;
-extern crate volatile;
-extern crate irq_safety; 
 extern crate spin;
 extern crate memory;
-extern crate kernel_config;
-extern crate ioapic;
-extern crate pit_clock;
-extern crate ap_start;
-extern crate pic; 
-extern crate apic;
 extern crate hpet;
-extern crate pause;
 extern crate acpi_table;
 extern crate acpi_table_handler;
 extern crate rsdp;
@@ -36,11 +26,9 @@ use acpi_table::AcpiTables;
 use acpi_table_handler::acpi_table_handler;
 
 
-lazy_static! {
-    /// The singleton instance of the `AcpiTables` struct,
-    /// which contains the MappedPages and location of all discovered ACPI tables.
-    static ref ACPI_TABLES: Mutex<AcpiTables> = Mutex::new(AcpiTables::default());
-}
+/// The singleton instance of the `AcpiTables` struct,
+/// which contains the MappedPages and location of all discovered ACPI tables.
+static ACPI_TABLES: Mutex<AcpiTables> = Mutex::new(AcpiTables::empty());
 
 /// Returns a reference to the singleton instance of all ACPI tables 
 /// that have been discovered, mapped, and parsed so far.

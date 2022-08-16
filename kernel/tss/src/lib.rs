@@ -1,6 +1,5 @@
 #![no_std]
 
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate atomic_linked_list;
 extern crate memory;
@@ -17,11 +16,8 @@ use memory::VirtualAddress;
 /// The index of the double fault stack in a TaskStateSegment (TSS)
 pub const DOUBLE_FAULT_IST_INDEX: usize = 0;
 
-
-lazy_static! {
-    /// The TSS list, one per core, indexed by a key of apic_id.
-    static ref TSS: AtomicMap<u8, Mutex<TaskStateSegment>> = AtomicMap::new();
-}
+/// The TSS list, one per core, indexed by a key of apic_id.
+static TSS: AtomicMap<u8, Mutex<TaskStateSegment>> = AtomicMap::new();
 
 
 /// Sets the current core's TSS privilege stack 0 (RSP0) entry, which points to the stack that 

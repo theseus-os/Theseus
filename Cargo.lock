@@ -8,26 +8,16 @@ version = "0.1.0"
 dependencies = [
  "acpi_table",
  "acpi_table_handler",
- "ap_start",
- "apic",
  "dmar",
  "fadt",
  "hpet",
- "ioapic",
  "iommu",
- "irq_safety",
- "kernel_config",
- "lazy_static",
  "log",
  "madt",
  "memory",
- "pause",
- "pic",
- "pit_clock",
  "rsdp",
  "rsdt",
  "spin 0.9.0",
- "volatile 0.2.7",
 ]
 
 [[package]]
@@ -94,12 +84,10 @@ dependencies = [
  "interrupts",
  "irq_safety",
  "kernel_config",
- "lazy_static",
  "log",
  "memory",
  "scheduler",
  "spawn",
- "spin 0.9.0",
  "stack",
  "tlb_shootdown",
 ]
@@ -113,7 +101,6 @@ dependencies = [
  "crossbeam-utils",
  "irq_safety",
  "kernel_config",
- "lazy_static",
  "log",
  "memory",
  "msr",
@@ -134,7 +121,6 @@ dependencies = [
  "core2",
  "event_types",
  "keycodes_ascii",
- "lazy_static",
  "libterm",
  "log",
  "logger",
@@ -978,7 +964,6 @@ dependencies = [
 name = "external_unwind_info"
 version = "0.1.0"
 dependencies = [
- "lazy_static",
  "log",
  "memory",
  "spin 0.9.0",
@@ -1029,7 +1014,6 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "irq_safety",
- "lazy_static",
  "log",
  "memory",
  "print",
@@ -1088,7 +1072,6 @@ dependencies = [
  "compositor",
  "framebuffer",
  "hashbrown",
- "lazy_static",
  "shapes",
  "spin 0.9.0",
 ]
@@ -1128,7 +1111,6 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "bitflags",
- "lazy_static",
  "log",
  "memory",
  "spin 0.9.0",
@@ -1369,7 +1351,6 @@ name = "ioapic"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "lazy_static",
  "log",
  "memory",
  "owning_ref",
@@ -2071,7 +2052,6 @@ name = "network_manager"
 version = "0.1.0"
 dependencies = [
  "e1000",
- "lazy_static",
  "log",
  "owning_ref",
  "smoltcp",
@@ -2674,7 +2654,6 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "irq_safety",
- "lazy_static",
  "log",
  "single_simd_task_optimization",
  "task",
@@ -2686,7 +2665,6 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "irq_safety",
- "lazy_static",
  "log",
  "task",
 ]
@@ -2697,7 +2675,6 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "irq_safety",
- "lazy_static",
  "log",
  "single_simd_task_optimization",
  "task",
@@ -3155,7 +3132,6 @@ name = "storage_manager"
 version = "0.1.0"
 dependencies = [
  "ata",
- "lazy_static",
  "log",
  "owning_ref",
  "pci",
@@ -3221,7 +3197,6 @@ dependencies = [
  "environment",
  "irq_safety",
  "kernel_config",
- "lazy_static",
  "log",
  "memory",
  "mod_mgmt",
@@ -3253,7 +3228,6 @@ version = "0.1.0"
 dependencies = [
  "dfqueue",
  "event_types",
- "lazy_static",
  "logger",
  "spin 0.9.0",
  "task",
@@ -3309,7 +3283,6 @@ dependencies = [
  "framebuffer_drawer",
  "getopts",
  "hpet",
- "lazy_static",
  "log",
  "rendezvous",
  "runqueue",
@@ -3401,7 +3374,6 @@ name = "test_restartable"
 version = "0.1.0"
 dependencies = [
  "getopts",
- "lazy_static",
  "log",
  "spawn",
  "spin 0.9.0",
@@ -3630,7 +3602,6 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "atomic_linked_list",
- "lazy_static",
  "log",
  "memory",
  "spin 0.9.0",
