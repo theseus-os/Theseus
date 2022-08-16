@@ -549,6 +549,7 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
 {
     let task_entry_func;
     let task_arg;
+    let recovered_preemption_guard;
 
     // This is scoped to ensure that absolutely no resources that require dropping are held
     // when invoking the task's entry function, in order to simplify cleanup when unwinding.
@@ -563,7 +564,7 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
         // because this is the first code to run immediately after a context switch
         // switches to this task for the first time.
         // For more details, see the comments at the end of `Task::task_switch()`.
-        curr_task.post_context_switch_action();
+        recovered_preemption_guard = curr_task.post_context_switch_action();
 
         // This task's function and argument were placed at the bottom of the stack when this task was spawned.
         let task_func_arg = curr_task.with_kstack(|kstack| {
@@ -587,8 +588,10 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
     // Since the `task_switch()` function was originally invoked from an interrupt handler,
     // interrupts were disabled but never had the chance to be re-enabled
     // because we did not return from the interrupt handler as usual.
-    // Therefore, we need to re-enabled interrupts here to ensure that things continue
-    // to run as normal, with interrupts enabled so we can properly preempt this task.
+    // Therefore, we need to re-enable interrupts and preemption here to ensure that
+    // things continue to run as normal, with interrupts and preemption enabled
+    // such that we can properly preempt this task.
+    drop(recovered_preemption_guard);
     enable_interrupts();
 
     // Now we actually invoke the entry point function that this Task was spawned for, catching a panic if one occurs.

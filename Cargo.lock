@@ -3226,6 +3226,7 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
+ "preemption",
  "root",
  "spin 0.9.0",
  "stack",

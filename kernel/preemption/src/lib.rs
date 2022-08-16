@@ -39,7 +39,8 @@ pub fn hold_preemption() -> PreemptionGuard {
     };
 
     if preemption_was_enabled {
-        log::error!("Disabling preemption on CPU {}", apic_id);
+        // log::trace!(" CPU {}:   disabling preemption", apic_id);
+        
         // When transitioning from preemption being enabled to disabled,
         // we must disable the local APIC timer used for preemptive task switching.
         apic::get_my_apic()
@@ -75,8 +76,12 @@ pub struct PreemptionGuard {
     preemption_was_enabled: bool,
 }
 
-// Similar guard types in Rust `std` are not `Send`.
-impl !Send for PreemptionGuard { }
+// TODO FIXME: currently we transfer a `PreemptionGuard` between tasks
+//             during a task switch (right before and right after the context switch).
+//             Thus, this type needs to impl `Send`, even though it doesn't make sense
+//             to move it across a thread boundary in the general case.
+// // Similar guard types in Rust `std` are not `Send`.
+// impl !Send for PreemptionGuard { }
 
 impl PreemptionGuard {
     /// Returns whether preemption was originally enabled when this guard was created.
@@ -104,7 +109,8 @@ impl Drop for PreemptionGuard {
 
         let prev_val = PREEMPTION_COUNT[apic_id as usize].fetch_sub(1, Ordering::Relaxed);
         if prev_val == 1 {
-            log::error!("Re-enabling preemption on CPU {}", apic_id);
+            // log::trace!("CPU {}: re-enabling preemption", apic_id);
+
             // If the previous counter value was 1, that means the current value is 1,
             // which indicates we are transitioning from preemption disabled to enabled on this CPU.
             // Thus, we re-enable the local APIC timer used for preemptive task switching.

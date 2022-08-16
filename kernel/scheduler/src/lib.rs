@@ -19,9 +19,8 @@ use task::{get_my_current_task, TaskRef};
 /// Yields the current CPU by selecting a new `Task` to run 
 /// and then switching to that new `Task`.
 ///
-/// Preemption will be disabled while this function runs in order to
-/// avoid problems with this function not being reentrant.
-/// Interrupts are not disabled because it is not necessary.
+/// Preemption will be disabled while this function runs,
+/// but interrupts are not disabled because it is not necessary.
 ///
 /// ## Return
 /// * `true` if a new task was selected and switched to.
@@ -32,7 +31,7 @@ pub fn schedule() -> bool {
     // If preemption was not previously enabled (before we disabled it above),
     // then we shouldn't perform a task switch here.
     if !preemption_guard.preemption_was_enabled() {
-        log::warn!("Note: preemption was disabled on CPU {}, skipping scheduler.", get_my_apic_id());
+        // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", get_my_apic_id());
         return false;
     }
 
@@ -51,22 +50,16 @@ pub fn schedule() -> bool {
         return false; // keep running the same current task
     };
 
-    // No need to task switch if the chosen task is the same as the current task.
-    if curr_task == &next_task {
-        return false;
-    }
+    let (did_switch, recovered_preemption_guard) = curr_task.task_switch(
+        next_task.deref(),
+        apic_id,
+        preemption_guard,
+    ); 
 
-    trace!("BEFORE TASK_SWITCH CALL (AP {}), current: {:?}, next: {:?}, interrupts are {}", apic_id, curr_task, next_task, irq_safety::interrupts_enabled());
+    // trace!("AFTER TASK_SWITCH CALL (AP {}) new current: {:?}, interrupts are {}", apic_id, get_my_current_task(), irq_safety::interrupts_enabled());
 
-    curr_task.task_switch(next_task.deref(), apic_id); 
-
-    trace!("AFTER TASK_SWITCH CALL (AP {}) new current: {:?}, interrupts are {}", apic_id, get_my_current_task(), irq_safety::interrupts_enabled());
-
-    // TODO
-    // TODO: handle the stack being switched and therefore the preemption_guard being different.
-    //       Perhaps we could pass it into `task_switch` and have `task_switch` return the next task's preemption_guard?
- 
-    true
+    drop(recovered_preemption_guard);
+    did_switch
 }
 
 /// Changes the priority of the given task with the given priority level.

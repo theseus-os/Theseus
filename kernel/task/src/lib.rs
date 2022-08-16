@@ -38,6 +38,7 @@ extern crate stack;
 extern crate tss;
 extern crate mod_mgmt;
 extern crate context_switch;
+extern crate preemption;
 extern crate environment;
 extern crate root;
 extern crate x86_64;
@@ -46,12 +47,14 @@ extern crate kernel_config;
 extern crate crossbeam_utils;
 
 
-use core::fmt;
-use core::hash::{Hash, Hasher};
-use core::sync::atomic::{Ordering, AtomicUsize};
-use core::any::Any;
-use core::panic::PanicInfo;
-use core::ops::Deref;
+use core::{
+    fmt,
+    hash::{Hash, Hasher},
+    sync::atomic::{Ordering, AtomicUsize},
+    any::Any,
+    panic::PanicInfo,
+    ops::Deref,
+};
 use alloc::{
     boxed::Box,
     collections::BTreeMap,
@@ -67,6 +70,7 @@ use mod_mgmt::{AppCrateRef, CrateNamespace, TlsDataImage};
 use environment::Environment;
 use spin::Mutex;
 use x86_64::registers::model_specific::{GsBase, FsBase};
+use preemption::PreemptionGuard;
 
 
 /// The function signature of the callback that will be invoked
@@ -289,6 +293,15 @@ pub struct TaskInner {
     /// The `TaskLocalData` refers back to this `Task` struct, thus it must be initialized later
     /// after the task has been fully created, which currently occurs in `TaskRef::new()`.
     task_local_data: Option<Box<TaskLocalData>>,
+    /// The preemption guard that was used for safely task switching to this task.
+    ///
+    /// The `PreemptionGuard` is stored here right before a context switch begins
+    /// and then retrieved from here right after the context switch ends.
+    ///
+    /// TODO: this (and perhaps `task_local_data`) should be kept in per-CPU variables
+    ///       rather than within the `TaskInner` structure, because they aren't really related
+    ///       to a specific task, but rather to a specific CPU's preemption status.
+    preemption_guard: Option<PreemptionGuard>,
     /// Data that should be dropped after switching away from a task that has exited.
     /// Currently, this only contains the previous Task's [`TaskLocalData`].
     drop_after_task_switch: Option<Box<TaskLocalData>>,
@@ -455,6 +468,7 @@ impl Task {
                 exit_value: None,
                 saved_sp: 0,
                 task_local_data: None,
+                preemption_guard: None,
                 drop_after_task_switch: None,
                 kstack,
                 pinned_core: None,
@@ -671,26 +685,59 @@ impl Task {
 
     /// Switches from the current task (`self`) to the given `next` task.
     /// 
-    /// # Locking / Deadlock
-    /// Obtains the locks on both this `Task`'s inner state and the given `next` `Task`'s inner state
-    /// in order to mutate them. 
-    #[doc(hidden)]
-    pub fn task_switch(&self, next: &Task, apic_id: u8) {
-        // debug!("task_switch [0]: (AP {}) prev {:?}, next {:?}, interrupts?: {}", apic_id, self, next, irq_safety::interrupts_enabled());
+    /// ## Arguments
+    /// * `next`: the task to switch to.
+    /// * `apic_id`: the ID of the current CPU.
+    /// * `preemption_guard`: a guard that is used to ensure preemption is disabled
+    ///   for the duration of this task switch operation.
+    ///
+    /// ## Important Note about Control Flow
+    /// If this is the first time that `next` task has been switched to,
+    /// the control flow will *NOT* return from this function,
+    /// and will instead jump to a wrapper function that will directly invoke
+    /// the `next` task's entry point function.
+    ///
+    /// Control flow may eventually return to this point, but not until another
+    /// task switch occurs away from the given `next` task to a different task.
+    /// Note that regardless of control flow, the return values will always be valid and correct.
+    ///
+    /// ## Return
+    /// Returns a tuple of:
+    /// 1. a `bool` indicating whether an actual task switch occurred:
+    ///    * If `true`, the task switch did occur, and `next` is now the current task.
+    ///    * If `false`, the task switch did not occur, and `self` is still the current task.
+    /// 2. a [`PreemptionGuard`] that allows the caller to determine for how long
+    ///    preemption remains disabled, i.e., until the guard is dropped.
+    ///
+    /// ## Locking / Deadlock
+    /// Obtains brief locks on both this `Task`'s inner state and
+    /// the given `next` `Task`'s inner state in order to mutate them.
+    pub fn task_switch(
+        &self,
+        next: &Task,
+        apic_id: u8,
+        preemption_guard: PreemptionGuard,
+    ) -> (bool, PreemptionGuard) {
+        // No need to task switch if the next task is the same as the current task.
+        if self.id == next.id {
+            return (false, preemption_guard);
+        }
+
+        // trace!("task_switch [0]: (CPU {}) prev {:?}, next {:?}, interrupts?: {}", apic_id, self, next, irq_safety::interrupts_enabled());
 
         // These conditions are checked elsewhere, but can be re-enabled if we want to be extra strict.
         // if !next.is_runnable() {
         //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
-        //     return;
+        //     return (false, preemption_guard);
         // }
         // if next.is_running() {
         //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
-        //     return;
+        //     return (false, preemption_guard);
         // }
         // if let Some(pc) = next.pinned_core() {
         //     if pc != apic_id {
         //         error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\n\tCurrent: {:?}, Next: {:?}", pc, apic_id, self, next);
-        //         return;
+        //         return (false, preemption_guard);
         //     }
         // }
 
@@ -708,7 +755,7 @@ impl Task {
         //         // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
         //     } else {
         //         error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
-        //         return;
+        //         return (false, preemption_guard);
         //     }
         // }
 
@@ -743,6 +790,14 @@ impl Task {
             next.running_on_cpu.store(Some(apic_id).into()); // now running on this core
             next.set_as_current_task();
             drop(_held_interrupts);
+        }
+
+        // Move the preemption guard into the next task such that we can use retrieve it
+        // after the below context switch operation has completed.
+        //
+        // TODO: this should be moved into per-CPU storage areas rather than the task struct.
+        {
+            next.inner.lock().preemption_guard = Some(preemption_guard);
         }
 
         // If the current task is exited, then we need to remove the cyclical TaskRef reference in its TaskLocalData.
@@ -848,7 +903,8 @@ impl Task {
         // and are easy to replicate in `task_wrapper()`.
         ///////////////////////////////////////////////////////////////////////////////////////////
 
-        self.post_context_switch_action();
+        let recovered_preemption_guard = self.post_context_switch_action();
+        (true, recovered_preemption_guard)
     }
 
 
@@ -860,17 +916,21 @@ impl Task {
     /// 2. Obtains the preemption guard such that preemption can be re-enabled
     ///    when it is appropriate to do so.
     #[doc(hidden)]
-    pub fn post_context_switch_action(&self) {
-        // Step 1: 
+    pub fn post_context_switch_action(&self) -> PreemptionGuard {
+        // Step 1: drop data from previously running task
         {
-            let mut inner = self.inner.lock();
-            let prev_task_data_to_drop = inner.drop_after_task_switch.take();
-            drop(inner); // release the lock as soon as possible
+            let prev_task_data_to_drop = self.inner.lock().drop_after_task_switch.take();
             drop(prev_task_data_to_drop);
         }
 
-        // Step 2: TODO
-        // TODO
+        // Step 2: retake ownership of preemption guard in order to re-enable preemption.
+        {
+            self.inner
+                .lock()
+                .preemption_guard
+                .take()
+                .expect("BUG: post_context_switch_action: no PreemptionGuard existed")
+        }
     }
 }
 
