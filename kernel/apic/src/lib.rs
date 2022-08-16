@@ -18,7 +18,6 @@ use crossbeam_utils::atomic::AtomicCell;
 use pit_clock::pit_wait;
 use bit_field::BitField;
 use static_assertions::{const_assert, const_assert_eq};
-use lazy_static::lazy_static;
 use log::{error, info, debug, trace};
 
 /// The IRQ vector number defined by the IDT for Local APIC timer interrupts.
@@ -44,10 +43,8 @@ pub enum InterruptChip {
 // Ensure that `AtomicCell<InterruptChip>` is actually a lock-free atomic.
 const_assert!(AtomicCell::<InterruptChip>::is_lock_free());
 
-
-lazy_static! {
-    static ref LOCAL_APICS: AtomicMap<u8, RwLockIrqSafe<LocalApic>> = AtomicMap::new();
-}
+/// The set of system-wide `LocalApic`s, one per CPU core.
+static LOCAL_APICS: AtomicMap<u8, RwLockIrqSafe<LocalApic>> = AtomicMap::new();
 
 /// The processor id (from the ACPI MADT table) of the bootstrap processor
 static BSP_PROCESSOR_ID: Once<u8> = Once::new(); 

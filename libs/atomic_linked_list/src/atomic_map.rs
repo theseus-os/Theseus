@@ -38,10 +38,12 @@ pub struct AtomicMap<K, V> where K: PartialEq {
 }
 
 impl<K, V> AtomicMap<K, V> where K: PartialEq {
-    /// create a new empty AtomicMap.
-    pub fn new() -> AtomicMap<K, V> {
+    /// Create a new empty AtomicMap.
+    /// 
+    /// Does not perform any allocation until a new node is created.
+    pub const fn new() -> AtomicMap<K, V> {
         AtomicMap {
-            head: AtomicPtr::default(), // null ptr
+            head: AtomicPtr::new(core::ptr::null_mut()), // null ptr
         }
     }
 

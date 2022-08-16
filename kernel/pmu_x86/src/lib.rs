@@ -59,6 +59,7 @@
 //! So, if you run `pmu_x86::init()` and `pmu_x86::start_samples()` on CPU core 2, it will only sample events on core 2.
 
 #![no_std]
+#![feature(const_btree_new)]
 
 extern crate spin;
 #[macro_use] extern crate lazy_static;
@@ -126,18 +127,19 @@ static CORES_SAMPLING: [AtomicU64; WORDS_IN_BITMAP] = [AtomicU64::new(0), Atomic
 /// Bitmap to store the cores which have sampling results ready to be retrieved. It records information for 256 cores.
 static RESULTS_READY: [AtomicU64; WORDS_IN_BITMAP] = [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)];
 
-lazy_static!{
+lazy_static! {
     /// PMU version supported by the current hardware. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.
     static ref PMU_VERSION: u8 = CpuId::new().get_performance_monitoring_info().map(|pmi| pmi.version_id()).unwrap_or(0);
     /// The number of general purpose PMCs that can be used. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.
     static ref NUM_PMC: u8 = CpuId::new().get_performance_monitoring_info().map(|pmi| pmi.number_of_counters()).unwrap_or(0);
     /// The number of fixed function counters. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.
     static ref NUM_FIXED_FUNC_COUNTERS: u8 = CpuId::new().get_performance_monitoring_info().map(|pmi| pmi.fixed_function_counters()).unwrap_or(0);
-    /// Set to store the cores that the PMU has already been initialized on
-    static ref CORES_INITIALIZED: MutexIrqSafe<BTreeSet<u8>> = MutexIrqSafe::new(BTreeSet::new());
-    /// The sampling information for each core
-    static ref SAMPLING_INFO: MutexIrqSafe<BTreeMap<u8, SampledEvents>> =  MutexIrqSafe::new(BTreeMap::new());
 }
+
+/// Set to store the cores that the PMU has already been initialized on
+static CORES_INITIALIZED: MutexIrqSafe<BTreeSet<u8>> = MutexIrqSafe::new(BTreeSet::new());
+/// The sampling information for each core
+static SAMPLING_INFO: MutexIrqSafe<BTreeMap<u8, SampledEvents>> =  MutexIrqSafe::new(BTreeMap::new());
 
 /// Used to select the event type to count. Event types are described in the Intel SDM 18.2.1 for PMU Version 1.
 /// The discriminant value for each event type is the value written to the event select register for a general purpose PMC.

@@ -314,11 +314,11 @@ impl Deref for MappedPages {
 impl MappedPages {
     /// Returns an empty MappedPages object that performs no allocation or mapping actions. 
     /// Can be used as a placeholder, but will not permit any real usage. 
-    pub fn empty() -> MappedPages {
+    pub const fn empty() -> MappedPages {
         MappedPages {
-            page_table_p4: get_current_p4(),
+            page_table_p4: Frame::containing_address(PhysicalAddress::zero()),
             pages: AllocatedPages::empty(),
-            flags: Default::default(),
+            flags: EntryFlags::zero(),
         }
     }
 

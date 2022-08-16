@@ -2,7 +2,6 @@
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate terminal_print;
 extern crate getopts;
 extern crate spin;
@@ -49,12 +48,9 @@ macro_rules! CPU_ID {
 
 // ------------------------- Window fault injection section -------------------------------------------
 
-lazy_static! {
-
-    /// The structure to hold the list of all faults so far occured in the system
-    pub static ref DOWNTIME_SEND_LOCK: Mutex<PassStruct> = Mutex::new(PassStruct{count : 0, user : 0});
-    pub static ref DOWNTIME_RECEIVE_LOCK: Mutex<PassStruct> = Mutex::new(PassStruct{count : 0, user : 0});
-}
+/// The structure to hold the list of all faults so far occured in the system
+pub static DOWNTIME_SEND_LOCK: Mutex<PassStruct> = Mutex::new(PassStruct{count : 0, user : 0});
+pub static DOWNTIME_RECEIVE_LOCK: Mutex<PassStruct> = Mutex::new(PassStruct{count : 0, user : 0});
 
 /// Setup two tasks to send cordinates and receive a response
 pub fn set_graphics_measuring_task() -> (){

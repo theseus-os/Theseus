@@ -22,7 +22,6 @@ extern crate task;
 extern crate irq_safety;
 extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate lazy_static;
 extern crate atomic_linked_list;
 
 use task::TaskRef;
@@ -94,11 +93,9 @@ impl RealtimeTaskRef {
     }
 }
 
-lazy_static! {
-    /// There is one runqueue per core, each core only accesses its own private runqueue
-    /// and allows the scheduler to select a task from that runqueue to schedule in
-    static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
-}
+/// There is one runqueue per core, each core only accesses its own private runqueue
+/// and allows the scheduler to select a task from that runqueue to schedule in
+static RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
 
 /// A list of `Task`s and their associated realtime scheduler data that may be run on a given CPU core.
 ///

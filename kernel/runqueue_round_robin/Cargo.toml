@@ -5,13 +5,7 @@ description = "Functions and types for handling runqueues, i.e., lists of tasks 
 version = "0.1.0"
 
 [dependencies]
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "1.4.0"
+log = "0.4.8"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"

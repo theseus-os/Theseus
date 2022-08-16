@@ -2,7 +2,6 @@
 
 extern crate alloc;
 // #[macro_use] extern crate log;
-#[macro_use] extern crate lazy_static;
 extern crate spin;
 extern crate owning_ref;
 extern crate smoltcp;
@@ -19,10 +18,8 @@ use smoltcp::{
 
 
 
-lazy_static! {
-    /// A list of all of the available and initialized network interfaces that exist on this system.
-    pub static ref NETWORK_INTERFACES: Mutex<Vec<NetworkInterfaceRef>> = Mutex::new(Vec::new());
-}
+/// A list of all of the available and initialized network interfaces that exist on this system.
+pub static NETWORK_INTERFACES: Mutex<Vec<NetworkInterfaceRef>> = Mutex::new(Vec::new());
 
 /// A trait that represents a Network Interface within Theseus. 
 /// Currently this is a thin wrapper around what `smoltcp` offers. 

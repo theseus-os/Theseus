@@ -15,8 +15,8 @@
 //!    destructs all stdio queues
 
 #![no_std]
+#![feature(const_btree_new)]
 
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate stdio;
 extern crate spin;
@@ -92,20 +92,16 @@ mod shared_maps {
     use IoControlFlags;
     use IoStreams;
 
-    lazy_static! {
-        /// Map a task to its IoControlFlags structure.
-        /// When shells call `insert_child_streams`, the default value is automatically inserted for that task.
-        /// When shells call `remove_child_streams`, the corresponding structure is removed from this map.
-        static ref APP_IO_CTRL_FLAGS: Mutex<BTreeMap<usize, IoControlFlags>> = Mutex::new(BTreeMap::new());
-    }
+    /// Map a task to its IoControlFlags structure.
+    /// When shells call `insert_child_streams`, the default value is automatically inserted for that task.
+    /// When shells call `remove_child_streams`, the corresponding structure is removed from this map.
+    static APP_IO_CTRL_FLAGS: Mutex<BTreeMap<usize, IoControlFlags>> = Mutex::new(BTreeMap::new());
 
-    lazy_static! {
-        /// Map a task id to its IoStreams structure.
-        /// Shells should call `insert_child_streams` when spawning a new app,
-        /// which effectively stores a new key value pair to this map. 
-        /// After a shell's child app exits, the shell should call `remove_child_streams` to clean it up.
-        static ref APP_IO_STREAMS: Mutex<BTreeMap<usize, IoStreams>> = Mutex::new(BTreeMap::new());
-    }
+    /// Map a task id to its IoStreams structure.
+    /// Shells should call `insert_child_streams` when spawning a new app,
+    /// which effectively stores a new key value pair to this map. 
+    /// After a shell's child app exits, the shell should call `remove_child_streams` to clean it up.
+    static APP_IO_STREAMS: Mutex<BTreeMap<usize, IoStreams>> = Mutex::new(BTreeMap::new());
 
     /// Lock and returns the `MutexGuard` of `APP_IO_CTRL_FLAGS`. Use `lock_all_maps()` if
     /// you want to lock both of the maps to avoid deadlock.
@@ -138,7 +134,7 @@ pub fn get_my_terminal() -> Option<Arc<Mutex<Terminal>>> {
         )
 }
 
-/// Lock all shared states (i.e. those defined in `lazy_static!`) and execute the closure.
+/// Lock all shared states (i.e. those defined as `static`s) and execute the closure.
 /// This function is mainly provided for the shell to clean up the pointers stored in the map
 /// without causing a deadlock. In other words, by using this function, shell can prevent the
 /// application from holding the lock of these shared maps before killing it. Otherwise, the

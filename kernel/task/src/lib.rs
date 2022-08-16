@@ -27,9 +27,9 @@
 
 #![no_std]
 #![feature(panic_info_message)]
+#![feature(const_btree_new)]
 
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 #[macro_use] extern crate static_assertions;
 extern crate irq_safety;
@@ -115,10 +115,8 @@ impl PanicInfoOwned {
 }
 
 
-lazy_static! {
-    /// The list of all Tasks in the system.
-    pub static ref TASKLIST: MutexIrqSafe<BTreeMap<usize, TaskRef>> = MutexIrqSafe::new(BTreeMap::new());
-}
+/// The list of all Tasks in the system.
+pub static TASKLIST: MutexIrqSafe<BTreeMap<usize, TaskRef>> = MutexIrqSafe::new(BTreeMap::new());
 
 
 /// returns a shared reference to the `Task` specified by the given `task_id`

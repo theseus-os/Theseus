@@ -6,7 +6,6 @@
 #![no_std]
 #![feature(drain_filter)]
 
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
 #[macro_use] extern crate print; // for regular println!()
 #[macro_use] extern crate log;
@@ -127,10 +126,8 @@ impl FaultEntry {
 }
 
 
-lazy_static! {    
-    /// The structure to hold the list of all faults so far occured in the system
-    static ref FAULT_LIST: MutexIrqSafe<Vec<FaultEntry>> = MutexIrqSafe::new(Vec::new());
-}
+/// The structure to hold the list of all faults so far occured in the system
+static FAULT_LIST: MutexIrqSafe<Vec<FaultEntry>> = MutexIrqSafe::new(Vec::new());
 
 /// Clears the log of faults so far occured in the system 
 pub fn clear_fault_log() {
