@@ -3303,14 +3303,10 @@
 <span id="3297">3297</span>
 <span id="3298">3298</span>
 <span id="3299">3299</span>
-<span id="3300">3300</span>
-<span id="3301">3301</span>
-<span id="3302">3302</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
 
 <span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">cmp::max</span>, <span class="ident">fmt</span>, <span class="ident">mem::size_of</span>, <span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">Range</span>}};
 <span class="kw">use</span> <span class="ident">alloc</span>::{<span class="ident">boxed::Box</span>, <span class="ident">collections</span>::{<span class="ident">BTreeMap</span>, <span class="ident">btree_map</span>, <span class="ident">BTreeSet</span>}, <span class="ident">string</span>::{<span class="ident">String</span>, <span class="ident">ToString</span>}, <span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">Weak</span>}, <span class="ident">vec::Vec</span>};
@@ -3359,23 +3355,21 @@
     <span class="ident">root::get_root</span>().<span class="ident">lock</span>().<span class="ident">get_dir</span>(<span class="ident">NAMESPACES_DIRECTORY_NAME</span>)
 }
 
-<span class="macro">lazy_static!</span> {
-    <span class="doccomment">/// The thread-local storage (TLS) area &quot;image&quot; that is used as the initial data for each `Task`.</span>
-    <span class="doccomment">/// When spawning a new task, the new task will create its own local TLS area</span>
-    <span class="doccomment">/// with this `TlsInitializer` as the initial data values.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Implementation Notes/Shortcomings</span>
-    <span class="doccomment">/// Currently, a single system-wide `TlsInitializer` instance is shared across all namespaces.</span>
-    <span class="doccomment">/// In the future, each namespace should hold its own TLS sections in its TlsInitializer area.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// However, this is quite complex because each namespace must be aware of the TLS sections</span>
-    <span class="doccomment">/// in BOTH its underlying recursive namespace AND its (multiple) &quot;parent&quot; namespace(s)</span>
-    <span class="doccomment">/// that recursively depend on it, since no two TLS sections can conflict (have the same offset).</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Thus, we stick with a singleton `TlsInitializer` instance, which makes sense </span>
-    <span class="doccomment">/// because it behaves much like an allocator, in that it reserves space (index ranges) in the TLS area.</span>
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">TLS_INITIALIZER</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">TlsInitializer</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">TlsInitializer::empty</span>());
-}
+<span class="doccomment">/// The thread-local storage (TLS) area &quot;image&quot; that is used as the initial data for each `Task`.</span>
+<span class="doccomment">/// When spawning a new task, the new task will create its own local TLS area</span>
+<span class="doccomment">/// with this `TlsInitializer` as the initial data values.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// # Implementation Notes/Shortcomings</span>
+<span class="doccomment">/// Currently, a single system-wide `TlsInitializer` instance is shared across all namespaces.</span>
+<span class="doccomment">/// In the future, each namespace should hold its own TLS sections in its TlsInitializer area.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// However, this is quite complex because each namespace must be aware of the TLS sections</span>
+<span class="doccomment">/// in BOTH its underlying recursive namespace AND its (multiple) &quot;parent&quot; namespace(s)</span>
+<span class="doccomment">/// that recursively depend on it, since no two TLS sections can conflict (have the same offset).</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// Thus, we stick with a singleton `TlsInitializer` instance, which makes sense </span>
+<span class="doccomment">/// because it behaves much like an allocator, in that it reserves space (index ranges) in the TLS area.</span>
+<span class="kw">static</span> <span class="ident">TLS_INITIALIZER</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">TlsInitializer</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">TlsInitializer::empty</span>());
 
 
 <span class="doccomment">/// Create a new application `CrateNamespace` that uses the default application directory </span>
@@ -6363,7 +6357,7 @@
 
 <span class="kw">impl</span> <span class="ident">TlsInitializer</span> {
     <span class="doccomment">/// Creates an empty TLS initializer with no TLS data sections.</span>
-    <span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="ident">TlsInitializer</span> {
+    <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="ident">TlsInitializer</span> {
         <span class="ident">TlsInitializer</span> {
             <span class="comment">// The data image will be generated lazily on the next request to use it.</span>
             <span class="ident">data_cache</span>: <span class="ident">Vec::new</span>(),
