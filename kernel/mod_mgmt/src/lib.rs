@@ -2,7 +2,6 @@
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate lazy_static;
 
 use core::{cmp::max, fmt, mem::size_of, ops::{Deref, Range}};
 use alloc::{boxed::Box, collections::{BTreeMap, btree_map, BTreeSet}, string::{String, ToString}, sync::{Arc, Weak}, vec::Vec};
@@ -51,23 +50,21 @@ pub fn get_namespaces_directory() -> Option<DirRef> {
     root::get_root().lock().get_dir(NAMESPACES_DIRECTORY_NAME)
 }
 
-lazy_static! {
-    /// The thread-local storage (TLS) area "image" that is used as the initial data for each `Task`.
-    /// When spawning a new task, the new task will create its own local TLS area
-    /// with this `TlsInitializer` as the initial data values.
-    /// 
-    /// # Implementation Notes/Shortcomings
-    /// Currently, a single system-wide `TlsInitializer` instance is shared across all namespaces.
-    /// In the future, each namespace should hold its own TLS sections in its TlsInitializer area.
-    /// 
-    /// However, this is quite complex because each namespace must be aware of the TLS sections
-    /// in BOTH its underlying recursive namespace AND its (multiple) "parent" namespace(s)
-    /// that recursively depend on it, since no two TLS sections can conflict (have the same offset).
-    /// 
-    /// Thus, we stick with a singleton `TlsInitializer` instance, which makes sense 
-    /// because it behaves much like an allocator, in that it reserves space (index ranges) in the TLS area.
-    static ref TLS_INITIALIZER: Mutex<TlsInitializer> = Mutex::new(TlsInitializer::empty());
-}
+/// The thread-local storage (TLS) area "image" that is used as the initial data for each `Task`.
+/// When spawning a new task, the new task will create its own local TLS area
+/// with this `TlsInitializer` as the initial data values.
+/// 
+/// # Implementation Notes/Shortcomings
+/// Currently, a single system-wide `TlsInitializer` instance is shared across all namespaces.
+/// In the future, each namespace should hold its own TLS sections in its TlsInitializer area.
+/// 
+/// However, this is quite complex because each namespace must be aware of the TLS sections
+/// in BOTH its underlying recursive namespace AND its (multiple) "parent" namespace(s)
+/// that recursively depend on it, since no two TLS sections can conflict (have the same offset).
+/// 
+/// Thus, we stick with a singleton `TlsInitializer` instance, which makes sense 
+/// because it behaves much like an allocator, in that it reserves space (index ranges) in the TLS area.
+static TLS_INITIALIZER: Mutex<TlsInitializer> = Mutex::new(TlsInitializer::empty());
 
 
 /// Create a new application `CrateNamespace` that uses the default application directory 
@@ -3055,7 +3052,7 @@ const POINTER_SIZE: usize = size_of::<usize>();
 
 impl TlsInitializer {
     /// Creates an empty TLS initializer with no TLS data sections.
-    fn empty() -> TlsInitializer {
+    const fn empty() -> TlsInitializer {
         TlsInitializer {
             // The data image will be generated lazily on the next request to use it.
             data_cache: Vec::new(),

@@ -1889,7 +1889,6 @@ dependencies = [
  "fs_node",
  "hashbrown",
  "kernel_config",
- "lazy_static",
  "log",
  "lz4_flex",
  "memfs",
@@ -2513,9 +2512,8 @@ checksum = "d34f1408f55294453790c48b2f1ebbb1c5b4b7563eb1f418bcfcfdbb06ebb4e7"
 
 [[package]]
 name = "rangemap"
-version = "0.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6cb84161aa5e5eaa263fadf53172fee10b72fa7aad3a37e0a7aa1aefec2423e"
+version = "1.0.3"
+source = "git+https://github.com/theseus-os/rangemap?branch=const_fn_constructor#be8b0ee4cfe51d587d4317f37a2db7c75f2d2647"
 
 [[package]]
 name = "raw-cpuid"
