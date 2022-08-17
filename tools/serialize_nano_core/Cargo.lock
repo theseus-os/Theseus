@@ -473,7 +473,6 @@ dependencies = [
  "fs_node",
  "hashbrown",
  "kernel_config",
- "lazy_static",
  "log",
  "memfs",
  "memory",
@@ -610,9 +609,8 @@ dependencies = [
 
 [[package]]
 name = "rangemap"
-version = "0.1.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3929836cb64d09ee7deee59635c3d9bffbc1c0373e247efff6272abd62a11baa"
+version = "1.0.3"
+source = "git+https://github.com/theseus-os/rangemap?branch=const_fn_constructor#be8b0ee4cfe51d587d4317f37a2db7c75f2d2647"
 
 [[package]]
 name = "root"
