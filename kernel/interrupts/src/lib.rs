@@ -11,7 +11,7 @@ use ps2::handle_mouse_packet;
 use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc, InterruptDescriptorTable};
 use spin::Once;
 // use rtc;
-use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
+use core::sync::atomic::{AtomicUsize, Ordering};
 use memory::VirtualAddress;
 use apic::{INTERRUPT_CHIP, InterruptChip};
 use locked_idt::LockedIdt;
@@ -168,8 +168,6 @@ pub fn init_ap(
 
 /// Establishes the default interrupt handlers that are statically known.
 fn set_handlers(idt: &mut InterruptDescriptorTable) {
-    idt[0x21].set_handler_fn(ps2_keyboard_handler);
-
     // idt[0x28].set_handler_fn(rtc_handler);
     idt[0x2C].set_handler_fn(ps2_mouse_handler);
     idt[0x2E].set_handler_fn(primary_ata_handler);
@@ -306,54 +304,6 @@ pub fn eoi(irq: Option<u8>) {
             }  
         }
     }
-}
-
-
-// see this: https://forum.osdev.org/viewtopic.php?f=1&t=32655
-static EXTENDED_SCANCODE: AtomicBool = AtomicBool::new(false);
-
-/// 0x21
-extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame) {
-
-    let indicator = ps2::ps2_status_register();
-
-    // whether there is any data on the port 0x60
-    if indicator & 0x01 == 0x01 {
-        //whether the data is coming from the mouse
-        if indicator & 0x20 != 0x20 {
-            // in this interrupt, we must read the PS2_PORT scancode register before acknowledging the interrupt.
-            let scan_code = ps2::ps2_read_data();
-            // trace!("PS2_PORT interrupt: raw scan_code {:#X}", scan_code);
-
-
-            let extended = EXTENDED_SCANCODE.load(Ordering::SeqCst);
-
-            // 0xE0 indicates an extended scancode, so we must wait for the next interrupt to get the actual scancode
-            if scan_code == 0xE0 {
-                if extended {
-                    error!("PS2_PORT interrupt: got two extended scancodes (0xE0) in a row! Shouldn't happen.");
-                }
-                // mark it true for the next interrupt
-                EXTENDED_SCANCODE.store(true, Ordering::SeqCst);
-            } else if scan_code == 0xE1 {
-                error!("PAUSE/BREAK key pressed ... ignoring it!");
-                // TODO: handle this, it's a 6-byte sequence (over the next 5 interrupts)
-                EXTENDED_SCANCODE.store(true, Ordering::SeqCst);
-            } else { // a regular scancode, go ahead and handle it
-                // if the previous interrupt's scan_code was an extended scan_code, then this one is not
-                if extended {
-                    EXTENDED_SCANCODE.store(false, Ordering::SeqCst);
-                }
-                if scan_code != 0 {  // a scan code of zero is a PS2_PORT error that we can ignore
-                    if let Err(e) = keyboard::handle_keyboard_input(scan_code, extended) {
-                        error!("ps2_keyboard_handler: error handling PS2_PORT input: {:?}", e);
-                    }
-                }
-            }
-        }
-    }
-    
-    eoi(Some(IRQ_BASE_OFFSET + 0x1));
 }
 
 /// 0x2C
