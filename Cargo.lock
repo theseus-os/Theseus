@@ -157,12 +157,14 @@ name = "ata"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "interrupts",
  "io",
  "log",
  "pci",
  "port_io",
  "spin 0.9.0",
  "storage_device",
+ "x86_64",
 ]
 
 [[package]]

@@ -1,25 +1,24 @@
-//! Support for accessing ATA drives (IDE).
+//! Basic driver for accessing ATA drives (IDE) as a storage device.
 //! 
 //! The primary struct of interest is [`AtaDrive`].
+//! 
+//! Support for DMA is not yet implemented, but the slower port-based I/O is fully supported.
 
 #![no_std]
+#![feature(abi_x86_interrupt)]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
-extern crate spin;
-extern crate port_io;
-extern crate pci;
-#[macro_use] extern crate bitflags;
-extern crate storage_device;
-extern crate io;
 
 use core::fmt;
+use bitflags::bitflags;
 use spin::Mutex;
-use alloc::{boxed::Box, string::String, sync::Arc};
+use alloc::{boxed::Box, format, string::String, sync::Arc};
 use port_io::{Port, PortReadOnly, PortWriteOnly};
 use pci::PciDevice;
 use storage_device::{StorageDevice, StorageDeviceRef, StorageController};
 use io::{BlockIo, BlockReader, BlockWriter, IoError, KnownLength};
+use x86_64::structures::idt::InterruptStackFrame;
 
 
 const SECTOR_SIZE_IN_BYTES: usize = 512;
@@ -750,6 +749,21 @@ impl IdeController {
 		// TODO: use the BAR4 for DMA in the future
 		let _bus_master_base = pci_device.bars[4]; 
 
+		// Register interrupt handlers for the primary and secondary ATA buses.
+		// They're not yet used for anything but will determine when a DMA transfer has completed.
+		interrupts::register_interrupt(ATA_PRIMARY_IRQ, primary_ata_handler).map_err(|e| {
+			error!("ATA Primary Bus IRQ {:#X} was already in use by handler {:#X}! Sharing IRQs is currently unsupported.", 
+				ATA_PRIMARY_IRQ, e,
+			);
+			"ATA Primary Bus IRQ was already in use! Sharing IRQs is currently unsupported."
+		})?;
+		interrupts::register_interrupt(ATA_SECONDARY_IRQ, secondary_ata_handler).map_err(|e| {
+			error!("ATA Secondary Bus IRQ {:#X} was already in use by handler {:#X}! Sharing IRQs is currently unsupported.", 
+				ATA_SECONDARY_IRQ, e,
+			);
+			"ATA Secondary Bus IRQ was already in use! Sharing IRQs is currently unsupported."
+		})?;
+
 		let primary_bus = Arc::new(Mutex::new(AtaBus::new(primary_bus_data_port, primary_bus_control_port)));
 		let secondary_bus = Arc::new(Mutex::new(AtaBus::new(secondary_bus_data_port, secondary_bus_control_port)));
 
@@ -862,6 +876,26 @@ impl<'c> Iterator for IdeControllerIter<'c> {
 			}
 		}
 	}
+}
+
+
+/// The primary ATA interrupt is connected to IRQ 0xE by default.
+/// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2E.
+const ATA_PRIMARY_IRQ:   u8 = interrupts::IRQ_BASE_OFFSET + 0xE;
+/// The secondary ATA interrupt is connected to IRQ 0xF by default.
+/// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2F.
+const ATA_SECONDARY_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + 0xF;
+
+/// The primary ATA interrupt handler. Not yet used for anything, but useful for DMA.
+extern "x86-interrupt" fn primary_ata_handler(_stack_frame: InterruptStackFrame ) {
+    info!("Primary ATA Interrupt ({:#X})", ATA_PRIMARY_IRQ);
+    interrupts::eoi(Some(ATA_PRIMARY_IRQ));
+}
+
+/// The primary ATA interrupt handler. Not yet used for anything, but useful for DMA.
+extern "x86-interrupt" fn secondary_ata_handler(_stack_frame: InterruptStackFrame ) {
+    info!("Secondary ATA Interrupt ({:#X})", ATA_SECONDARY_IRQ);
+    interrupts::eoi(Some(ATA_SECONDARY_IRQ));
 }
 
 
