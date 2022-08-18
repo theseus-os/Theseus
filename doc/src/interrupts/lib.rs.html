@@ -410,24 +410,6 @@
 <span id="404">404</span>
 <span id="405">405</span>
 <span id="406">406</span>
-<span id="407">407</span>
-<span id="408">408</span>
-<span id="409">409</span>
-<span id="410">410</span>
-<span id="411">411</span>
-<span id="412">412</span>
-<span id="413">413</span>
-<span id="414">414</span>
-<span id="415">415</span>
-<span id="416">416</span>
-<span id="417">417</span>
-<span id="418">418</span>
-<span id="419">419</span>
-<span id="420">420</span>
-<span id="421">421</span>
-<span id="422">422</span>
-<span id="423">423</span>
-<span id="424">424</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Basic interrupt handling structures and simple handler routines.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
@@ -598,8 +580,6 @@
 <span class="doccomment">/// Establishes the default interrupt handlers that are statically known.</span>
 <span class="kw">fn</span> <span class="ident">set_handlers</span>(<span class="ident">idt</span>: <span class="kw-2">&amp;mut</span> <span class="ident">InterruptDescriptorTable</span>) {
     <span class="comment">// idt[0x28].set_handler_fn(rtc_handler);</span>
-    <span class="ident">idt</span>[<span class="number">0x2E</span>].<span class="ident">set_handler_fn</span>(<span class="ident">primary_ata_handler</span>);
-    <span class="ident">idt</span>[<span class="number">0x2F</span>].<span class="ident">set_handler_fn</span>(<span class="ident">secondary_ata_handler</span>);
 
     <span class="ident">idt</span>[<span class="ident">tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">set_handler_fn</span>(<span class="ident">ipi_handler</span>);
 }
@@ -831,22 +811,6 @@
     
 <span class="comment">//     rtc::handle_rtc_interrupt();</span>
 <span class="comment">// }</span>
-
-
-<span class="doccomment">/// 0x2E</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">primary_ata_handler</span>(<span class="ident">_stack_frame</span>: <span class="ident">InterruptStackFrame</span> ) {
-    <span class="macro">info!</span>(<span class="string">&quot;Primary ATA Interrupt (0x2E)&quot;</span>);
-
-    <span class="ident">eoi</span>(<span class="prelude-val">Some</span>(<span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0xE</span>));
-}
-
-
-<span class="doccomment">/// 0x2F</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">secondary_ata_handler</span>(<span class="ident">_stack_frame</span>: <span class="ident">InterruptStackFrame</span> ) {
-    <span class="macro">info!</span>(<span class="string">&quot;Secondary ATA Interrupt (0x2F)&quot;</span>);
-    
-    <span class="ident">eoi</span>(<span class="prelude-val">Some</span>(<span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0xF</span>));
-}
 
 
 <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">ipi_handler</span>(<span class="ident">_stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
