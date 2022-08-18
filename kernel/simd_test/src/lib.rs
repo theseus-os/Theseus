@@ -6,7 +6,6 @@
 cfg_if! { if #[cfg(all(simd_personality, target_feature = "sse2"))] {
 
 #[macro_use] extern crate log;
-// extern crate pit_clock;
 extern crate core_simd;
 
 use core_simd::f64x4;
@@ -28,9 +27,6 @@ pub fn test1(_: ()) {
             debug!("SIMD TEST1 (should be 1.111, 11.11, 111.1, 1111): {:?}", x);
         }
         loop_ctr += 1;
-        // for _ in 1..10 {
-        //     let _ = pit_clock::pit_wait(50000);
-        // }
     }
 }
 
@@ -50,9 +46,6 @@ pub fn test2(_: ()) {
             trace!("SIMD TEST2 (should be 2.222, 22.22, 222.2, 2222): {:?}", x);
         }
         loop_ctr += 1;
-        // for _ in 1..10 {
-        //     let _ = pit_clock::pit_wait(50000);
-        // }
     }
 }
 

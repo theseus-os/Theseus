@@ -24,8 +24,8 @@ path = "../stack"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.pit_clock]
-path = "../pit_clock"
+[dependencies.pit_clock_basic]
+path = "../pit_clock_basic"
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"

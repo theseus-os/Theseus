@@ -18,7 +18,7 @@ extern crate irq_safety;
 extern crate kernel_config;
 extern crate memory;
 extern crate pci; 
-extern crate pit_clock;
+extern crate pit_clock_basic;
 extern crate bit_field;
 extern crate interrupts;
 extern crate x86_64;
@@ -681,7 +681,7 @@ impl IxgbeNic {
 
         //wait 10 ms
         let wait_time = 10_000;
-        let _ =pit_clock::pit_wait(wait_time);
+        pit_clock_basic::pit_wait(wait_time)?;
 
         //disable flow control.. write 0 TO FCTTV, FCRTL, FCRTH, FCRTV and FCCFG
         for fcttv in regs2.fcttv.iter_mut() {
@@ -718,7 +718,7 @@ impl IxgbeNic {
 
         while Self::acquire_semaphore(regs3)? {
             //wait 10 ms
-            let _ =pit_clock::pit_wait(wait_time);
+            pit_clock_basic::pit_wait(wait_time)?;
         }
 
         // setup PHY and the link 
@@ -756,7 +756,7 @@ impl IxgbeNic {
         let mut tries = 0;
 
         while (regs2.links.read() & LINKS_SPEED_MASK == 0) && (tries < total_tries) {
-            let _ = pit_clock::pit_wait(wait_time);
+            let _ = pit_clock_basic::pit_wait(wait_time); // wait, or try again regardless
             tries += 1;
         }
     }

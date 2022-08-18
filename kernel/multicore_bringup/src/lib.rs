@@ -12,7 +12,7 @@ extern crate volatile;
 extern crate zerocopy;
 extern crate irq_safety;
 extern crate memory;
-extern crate pit_clock;
+extern crate pit_clock_basic;
 extern crate stack;
 extern crate kernel_config;
 extern crate apic;
@@ -310,7 +310,7 @@ fn bring_up_ap(
     }
 
     debug!("waiting 10 ms...");
-    pit_clock::pit_wait(10000).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to pit_wait 10 ms. Error: {:?}", _e); });
+    pit_clock_basic::pit_wait(10000).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to pit_wait 10 ms. Error: {:?}", _e); });
     debug!("done waiting.");
 
     // // Send DEASSERT INIT IPI
@@ -347,8 +347,8 @@ fn bring_up_ap(
         bsp_lapic.set_icr(icr);
     }
 
-    pit_clock::pit_wait(300).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to pit_wait 300 us. Error {:?}", _e); });
-    pit_clock::pit_wait(200).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to pit_wait 200 us. Error {:?}", _e); });
+    pit_clock_basic::pit_wait(300).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to pit_wait 300 us. Error {:?}", _e); });
+    pit_clock_basic::pit_wait(200).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to pit_wait 200 us. Error {:?}", _e); });
 
     bsp_lapic.clear_error();
     let esr = bsp_lapic.error();

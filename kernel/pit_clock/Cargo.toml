@@ -5,10 +5,14 @@ description = "PIT (Programmable Interval Timer) support for Theseus, x86 only."
 version = "0.1.0"
 
 [dependencies]
-spin = "0.9.0"
+log = "0.4.8"
+x86_64 = "0.14.8"
 
-[dependencies.log]
-version = "0.4.8"
+[dependencies.pit_clock_basic]
+path = "../pit_clock_basic"
+
+[dependencies.interrupts]
+path = "../interrupts"
 
 [dependencies.port_io]
 path = "../../libs/port_io"

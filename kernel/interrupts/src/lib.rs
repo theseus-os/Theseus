@@ -10,13 +10,12 @@ pub use pic::IRQ_BASE_OFFSET;
 use ps2::handle_mouse_packet;
 use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc, InterruptDescriptorTable};
 use spin::Once;
-use kernel_config::time::CONFIG_PIT_FREQUENCY_HZ; //, CONFIG_RTC_FREQUENCY_HZ};
 // use rtc;
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use memory::VirtualAddress;
 use apic::{INTERRUPT_CHIP, InterruptChip};
 use locked_idt::LockedIdt;
-use log::{error, warn, info, debug, trace};
+use log::{error, warn, info, debug};
 use vga_buffer::{print_raw, println_raw};
 
 
@@ -118,6 +117,16 @@ pub fn init(
                 new_entry.set_handler_fn(unimplemented_interrupt_handler);
             }
         }
+
+        // This crate has a fixed dependency on the `apic` crate,
+        // because `apic` functionality is required to implement certain functions, e.g., `eoi()`.
+        // Thus, we statically reserve the IDT entries used by the APIC,
+        // instead of making it dynamically register that interrupt like other devices do.
+        // Currently this includeds only the APIC LVT timer and spurious interrupt handler.
+        new_idt[apic::LOCAL_APIC_LVT_IRQ as usize]
+            .set_handler_fn(lapic_timer_handler);
+        new_idt[apic::APIC_SPURIOUS_INTERRUPT_IRQ as usize]
+            .set_handler_fn(apic_spurious_interrupt_handler); 
     }
 
     // try to load our new IDT    
@@ -150,9 +159,7 @@ pub fn init_ap(
 
 /// Establishes the default interrupt handlers that are statically known.
 fn set_handlers(idt: &mut InterruptDescriptorTable) {
-    idt[0x20].set_handler_fn(pit_timer_handler);
     idt[0x21].set_handler_fn(ps2_keyboard_handler);
-    idt[0x22].set_handler_fn(lapic_timer_handler);
     idt[0x27].set_handler_fn(pic_spurious_interrupt_handler); 
 
     // idt[0x28].set_handler_fn(rtc_handler);
@@ -160,7 +167,6 @@ fn set_handlers(idt: &mut InterruptDescriptorTable) {
     idt[0x2E].set_handler_fn(primary_ata_handler);
     idt[0x2F].set_handler_fn(secondary_ata_handler);
 
-    idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
     idt[tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
 }
 
@@ -181,7 +187,7 @@ pub fn init_handlers_pic() {
     let slave_pic_mask: u8 = 0b0000_1000; // everything is allowed except 0x2B 
     PIC.call_once(|| pic::ChainedPics::init(master_pic_mask, slave_pic_mask));
 
-    pit_clock::init(CONFIG_PIT_FREQUENCY_HZ);
+    // pit_clock::init(CONFIG_PIT_FREQUENCY_HZ);
     // let rtc_handler = rtc::init(CONFIG_RTC_FREQUENCY_HZ, rtc_interrupt_func);
     // IDT.lock()[0x28].set_handler_fn(rtc_handler.unwrap());
 }
@@ -199,7 +205,7 @@ pub fn init_handlers_pic() {
 pub fn register_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), u64> {
     let mut idt = IDT.lock();
 
-    // If the existing handler stored in the IDT either missing (has an address of `0`)
+    // If the existing handler stored in the IDT is either missing (has an address of `0`)
     // or is the default handler, that signifies the interrupt number is available.
     let idt_entry = &mut idt[interrupt_num as usize];
     let existing_handler_addr = idt_entry.handler_addr().as_u64();
@@ -207,7 +213,7 @@ pub fn register_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), u6
         idt_entry.set_handler_fn(func);
         Ok(())
     } else {
-        trace!("register_interrupt: the requested interrupt IRQ {} was already in use", interrupt_num);
+        error!("register_interrupt: the requested interrupt IRQ {} was already in use", interrupt_num);
         Err(existing_handler_addr)
     }
 } 
@@ -283,14 +289,6 @@ pub fn eoi(irq: Option<u8>) {
             }  
         }
     }
-}
-
-
-/// 0x20
-extern "x86-interrupt" fn pit_timer_handler(_stack_frame: InterruptStackFrame) {
-    pit_clock::handle_timer_interrupt();
-
-	eoi(Some(IRQ_BASE_OFFSET + 0x0));
 }
 
 
