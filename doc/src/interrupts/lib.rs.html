@@ -488,8 +488,6 @@
 <span id="482">482</span>
 <span id="483">483</span>
 <span id="484">484</span>
-<span id="485">485</span>
-<span id="486">486</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Basic interrupt handling structures and simple handler routines.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
@@ -502,13 +500,12 @@
 <span class="kw">use</span> <span class="ident">ps2::handle_mouse_packet</span>;
 <span class="kw">use</span> <span class="ident">x86_64::structures::idt</span>::{<span class="ident">InterruptStackFrame</span>, <span class="ident">HandlerFunc</span>, <span class="ident">InterruptDescriptorTable</span>};
 <span class="kw">use</span> <span class="ident">spin::Once</span>;
-<span class="kw">use</span> <span class="ident">kernel_config::time::CONFIG_PIT_FREQUENCY_HZ</span>; <span class="comment">//, CONFIG_RTC_FREQUENCY_HZ};</span>
 <span class="comment">// use rtc;</span>
 <span class="kw">use</span> <span class="ident">core::sync::atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">memory::VirtualAddress</span>;
 <span class="kw">use</span> <span class="ident">apic</span>::{<span class="ident">INTERRUPT_CHIP</span>, <span class="ident">InterruptChip</span>};
 <span class="kw">use</span> <span class="ident">locked_idt::LockedIdt</span>;
-<span class="kw">use</span> <span class="ident">log</span>::{<span class="ident">error</span>, <span class="ident">warn</span>, <span class="ident">info</span>, <span class="ident">debug</span>, <span class="ident">trace</span>};
+<span class="kw">use</span> <span class="ident">log</span>::{<span class="ident">error</span>, <span class="ident">warn</span>, <span class="ident">info</span>, <span class="ident">debug</span>};
 <span class="kw">use</span> <span class="ident">vga_buffer</span>::{<span class="ident">print_raw</span>, <span class="ident">println_raw</span>};
 
 
@@ -610,6 +607,16 @@
                 <span class="ident">new_entry</span>.<span class="ident">set_handler_fn</span>(<span class="ident">unimplemented_interrupt_handler</span>);
             }
         }
+
+        <span class="comment">// This crate has a fixed dependency on the `apic` crate,</span>
+        <span class="comment">// because `apic` functionality is required to implement certain functions, e.g., `eoi()`.</span>
+        <span class="comment">// Thus, we statically reserve the IDT entries used by the APIC,</span>
+        <span class="comment">// instead of making it dynamically register that interrupt like other devices do.</span>
+        <span class="comment">// Currently this includeds only the APIC LVT timer and spurious interrupt handler.</span>
+        <span class="ident">new_idt</span>[<span class="ident">apic::LOCAL_APIC_LVT_IRQ</span> <span class="kw">as</span> <span class="ident">usize</span>]
+            .<span class="ident">set_handler_fn</span>(<span class="ident">lapic_timer_handler</span>);
+        <span class="ident">new_idt</span>[<span class="ident">apic::APIC_SPURIOUS_INTERRUPT_IRQ</span> <span class="kw">as</span> <span class="ident">usize</span>]
+            .<span class="ident">set_handler_fn</span>(<span class="ident">apic_spurious_interrupt_handler</span>); 
     }
 
     <span class="comment">// try to load our new IDT    </span>
@@ -642,9 +649,7 @@
 
 <span class="doccomment">/// Establishes the default interrupt handlers that are statically known.</span>
 <span class="kw">fn</span> <span class="ident">set_handlers</span>(<span class="ident">idt</span>: <span class="kw-2">&amp;mut</span> <span class="ident">InterruptDescriptorTable</span>) {
-    <span class="ident">idt</span>[<span class="number">0x20</span>].<span class="ident">set_handler_fn</span>(<span class="ident">pit_timer_handler</span>);
     <span class="ident">idt</span>[<span class="number">0x21</span>].<span class="ident">set_handler_fn</span>(<span class="ident">ps2_keyboard_handler</span>);
-    <span class="ident">idt</span>[<span class="number">0x22</span>].<span class="ident">set_handler_fn</span>(<span class="ident">lapic_timer_handler</span>);
     <span class="ident">idt</span>[<span class="number">0x27</span>].<span class="ident">set_handler_fn</span>(<span class="ident">pic_spurious_interrupt_handler</span>); 
 
     <span class="comment">// idt[0x28].set_handler_fn(rtc_handler);</span>
@@ -652,7 +657,6 @@
     <span class="ident">idt</span>[<span class="number">0x2E</span>].<span class="ident">set_handler_fn</span>(<span class="ident">primary_ata_handler</span>);
     <span class="ident">idt</span>[<span class="number">0x2F</span>].<span class="ident">set_handler_fn</span>(<span class="ident">secondary_ata_handler</span>);
 
-    <span class="ident">idt</span>[<span class="ident">apic::APIC_SPURIOUS_INTERRUPT_VECTOR</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">set_handler_fn</span>(<span class="ident">apic_spurious_interrupt_handler</span>); 
     <span class="ident">idt</span>[<span class="ident">tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">set_handler_fn</span>(<span class="ident">ipi_handler</span>);
 }
 
@@ -673,7 +677,7 @@
     <span class="kw">let</span> <span class="ident">slave_pic_mask</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0b0000_1000</span>; <span class="comment">// everything is allowed except 0x2B </span>
     <span class="ident">PIC</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">pic::ChainedPics::init</span>(<span class="ident">master_pic_mask</span>, <span class="ident">slave_pic_mask</span>));
 
-    <span class="ident">pit_clock::init</span>(<span class="ident">CONFIG_PIT_FREQUENCY_HZ</span>);
+    <span class="comment">// pit_clock::init(CONFIG_PIT_FREQUENCY_HZ);</span>
     <span class="comment">// let rtc_handler = rtc::init(CONFIG_RTC_FREQUENCY_HZ, rtc_interrupt_func);</span>
     <span class="comment">// IDT.lock()[0x28].set_handler_fn(rtc_handler.unwrap());</span>
 }
@@ -691,7 +695,7 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_interrupt</span>(<span class="ident">interrupt_num</span>: <span class="ident">u8</span>, <span class="ident">func</span>: <span class="ident">HandlerFunc</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">u64</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">idt</span> <span class="op">=</span> <span class="ident">IDT</span>.<span class="ident">lock</span>();
 
-    <span class="comment">// If the existing handler stored in the IDT either missing (has an address of `0`)</span>
+    <span class="comment">// If the existing handler stored in the IDT is either missing (has an address of `0`)</span>
     <span class="comment">// or is the default handler, that signifies the interrupt number is available.</span>
     <span class="kw">let</span> <span class="ident">idt_entry</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">idt</span>[<span class="ident">interrupt_num</span> <span class="kw">as</span> <span class="ident">usize</span>];
     <span class="kw">let</span> <span class="ident">existing_handler_addr</span> <span class="op">=</span> <span class="ident">idt_entry</span>.<span class="ident">handler_addr</span>().<span class="ident">as_u64</span>();
@@ -699,7 +703,7 @@
         <span class="ident">idt_entry</span>.<span class="ident">set_handler_fn</span>(<span class="ident">func</span>);
         <span class="prelude-val">Ok</span>(())
     } <span class="kw">else</span> {
-        <span class="macro">trace!</span>(<span class="string">&quot;register_interrupt: the requested interrupt IRQ {} was already in use&quot;</span>, <span class="ident">interrupt_num</span>);
+        <span class="macro">error!</span>(<span class="string">&quot;register_interrupt: the requested interrupt IRQ {} was already in use&quot;</span>, <span class="ident">interrupt_num</span>);
         <span class="prelude-val">Err</span>(<span class="ident">existing_handler_addr</span>)
     }
 } 
@@ -775,14 +779,6 @@
             }  
         }
     }
-}
-
-
-<span class="doccomment">/// 0x20</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">pit_timer_handler</span>(<span class="ident">_stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="ident">pit_clock::handle_timer_interrupt</span>();
-
-	<span class="ident">eoi</span>(<span class="prelude-val">Some</span>(<span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0x0</span>));
 }
 
 

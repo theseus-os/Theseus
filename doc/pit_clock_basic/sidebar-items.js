@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["CHANNEL0","Port for Channel 0; used for PIT interrupts."],["PIT_DEFAULT_DIVIDEND_HZ","the timer’s default frequency is 1.19 MHz"],["PIT_MINIMUM_FREQ",""]],"fn":[["pit_wait","Waits (blocking) for the given number of `microseconds` using the PIT Channel 2."]],"static":[["PIT_CHANNEL_0",""],["PIT_COMMAND",""]]};

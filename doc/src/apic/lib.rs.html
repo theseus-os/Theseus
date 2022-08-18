@@ -766,7 +766,6 @@
 <span id="760">760</span>
 <span id="761">761</span>
 <span id="762">762</span>
-<span id="763">763</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
@@ -784,17 +783,15 @@
 <span class="kw">use</span> <span class="ident">kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS</span>;
 <span class="kw">use</span> <span class="ident">atomic_linked_list::atomic_map::AtomicMap</span>;
 <span class="kw">use</span> <span class="ident">crossbeam_utils::atomic::AtomicCell</span>;
-<span class="kw">use</span> <span class="ident">pit_clock::pit_wait</span>;
+<span class="kw">use</span> <span class="ident">pit_clock_basic::pit_wait</span>;
 <span class="kw">use</span> <span class="ident">bit_field::BitField</span>;
 <span class="kw">use</span> <span class="ident">static_assertions</span>::{<span class="ident">const_assert</span>, <span class="ident">const_assert_eq</span>};
 <span class="kw">use</span> <span class="ident">log</span>::{<span class="ident">error</span>, <span class="ident">info</span>, <span class="ident">debug</span>, <span class="ident">trace</span>};
 
-<span class="doccomment">/// The IRQ vector number defined by the IDT for Local APIC timer interrupts.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// TODO: once we invert the dependency relationship between `interrupts`</span>
-<span class="doccomment">///       and all other crates, we should be able to define this in `interrupts`</span>
-<span class="doccomment">///       and then use that definition here.</span>
-<span class="kw">const</span> <span class="ident">LOCAL_APIC_LVT_IRQ</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x22</span>;
+<span class="doccomment">/// The IRQ number reserved for Local APIC timer interrupts in the IDT.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOCAL_APIC_LVT_IRQ</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x22</span>;
+<span class="doccomment">/// The IRQ number reserved for spurios interrupts (as recommended by OS dev wiki).</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">APIC_SPURIOUS_INTERRUPT_IRQ</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0xFF</span>;
 
 <span class="doccomment">/// The interrupt chip that is currently configured on this machine. </span>
 <span class="doccomment">/// The default is `InterruptChip::PIC`, but the typical case is `APIC` or `X2APIC`,</span>
@@ -936,7 +933,6 @@
 
 
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">APIC_SPURIOUS_INTERRUPT_VECTOR</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">0xFF</span>; <span class="comment">// as recommended by everyone on os dev wiki</span>
 <span class="kw">const</span> <span class="ident">IA32_APIC_XAPIC_ENABLE</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">11</span>; <span class="comment">// 0x800</span>
 <span class="kw">const</span> <span class="ident">IA32_APIC_X2APIC_ENABLE</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">10</span>; <span class="comment">// 0x400</span>
 <span class="kw">const</span> <span class="ident">IA32_APIC_BASE_MSR_IS_BSP</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">8</span>; <span class="comment">// 0x100</span>
@@ -1109,6 +1105,8 @@
         <span class="ident">nmi_flags</span>: <span class="ident">u16</span>
     ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">LocalApic</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
 
+        <span class="macro">trace!</span>(<span class="string">&quot;size of LocalApic: {}&quot;</span>, <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">LocalApic</span><span class="op">&gt;</span>());
+
         <span class="kw">let</span> <span class="ident">nmi_lint</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">nmi_lint</span> {
             <span class="number">0</span> =&gt; <span class="ident">LvtLint::Pin0</span>,
             <span class="number">1</span> =&gt; <span class="ident">LvtLint::Pin1</span>,
@@ -1213,7 +1211,7 @@
                     <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_TPR</span>,        <span class="number">0</span>);
                     
                     <span class="comment">// set bit 8 to start receiving interrupts (still need to &quot;sti&quot;)</span>
-                    <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_SIVR</span>, (<span class="ident">APIC_SPURIOUS_INTERRUPT_VECTOR</span> <span class="op">|</span> <span class="ident">APIC_SW_ENABLE</span>) <span class="kw">as</span> <span class="ident">u64</span>); 
+                    <span class="ident">wrmsr</span>(<span class="ident">IA32_X2APIC_SIVR</span>, (<span class="ident">APIC_SPURIOUS_INTERRUPT_IRQ</span> <span class="kw">as</span> <span class="ident">u32</span> <span class="op">|</span> <span class="ident">APIC_SW_ENABLE</span>) <span class="kw">as</span> <span class="ident">u64</span>); 
                 }
             }
             <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; {
@@ -1235,7 +1233,7 @@
                 <span class="ident">regs</span>.<span class="ident">task_priority</span>.<span class="ident">write</span>(<span class="number">0</span>);
 
                 <span class="comment">// set bit 8 to allow receiving interrupts (still need to &quot;sti&quot;)</span>
-                <span class="ident">regs</span>.<span class="ident">spurious_interrupt_vector</span>.<span class="ident">write</span>(<span class="ident">APIC_SPURIOUS_INTERRUPT_VECTOR</span> <span class="op">|</span> <span class="ident">APIC_SW_ENABLE</span>);   
+                <span class="ident">regs</span>.<span class="ident">spurious_interrupt_vector</span>.<span class="ident">write</span>(<span class="ident">APIC_SPURIOUS_INTERRUPT_IRQ</span> <span class="kw">as</span> <span class="ident">u32</span> <span class="op">|</span> <span class="ident">APIC_SW_ENABLE</span>);   
             }
         }
     }

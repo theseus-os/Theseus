@@ -100,6 +100,7 @@ sourcesIndex["percent_encoding"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["physical_nic"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["pic"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["pit_clock"] = {"name":"","files":["lib.rs"]};
+sourcesIndex["pit_clock_basic"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["pmu_x86"] = {"name":"","files":["lib.rs","stat.rs"]};
 sourcesIndex["port_io"] = {"name":"","files":["lib.rs","x86.rs"]};
 sourcesIndex["preemption"] = {"name":"","files":["lib.rs"]};
