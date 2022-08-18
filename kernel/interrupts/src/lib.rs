@@ -27,6 +27,15 @@ pub static IDT: LockedIdt = LockedIdt::new();
 /// The single system-wide Programmable Interrupt Controller (PIC) chip.
 static PIC: Once<pic::ChainedPics> = Once::new();
 
+/// The list of IRQs reserved for Theseus-specific usage that cannot be
+/// used for general device interrupt handlers.
+/// These cannot be accessed by [`register_interrupt()`] or [`deregister_interrupt()`].
+static RESERVED_IRQ_LIST: [u8; 3] = [
+    pic::PIC_SPURIOUS_INTERRUPT_IRQ,
+    apic::LOCAL_APIC_LVT_IRQ,
+    apic::APIC_SPURIOUS_INTERRUPT_IRQ,
+];
+
 
 /// Returns `true` if the given address is the exception handler in the current `IDT`
 /// for any exception in which the CPU pushes an error code onto the stack.
@@ -117,12 +126,12 @@ pub fn init(
                 new_entry.set_handler_fn(unimplemented_interrupt_handler);
             }
         }
-
-        // This crate has a fixed dependency on the `apic` crate,
-        // because `apic` functionality is required to implement certain functions, e.g., `eoi()`.
-        // Thus, we statically reserve the IDT entries used by the APIC,
+        // This crate has a fixed dependency on the `pic` and `apic` crates,
+        // because they are required to implement certain functions, e.g., `eoi()`.
+        // Thus, we statically reserve the IDT entries used by the PIC & APIC,
         // instead of making it dynamically register that interrupt like other devices do.
-        // Currently this includeds only the APIC LVT timer and spurious interrupt handler.
+        new_idt[pic::PIC_SPURIOUS_INTERRUPT_IRQ as usize]
+            .set_handler_fn(pic_spurious_interrupt_handler);
         new_idt[apic::LOCAL_APIC_LVT_IRQ as usize]
             .set_handler_fn(lapic_timer_handler);
         new_idt[apic::APIC_SPURIOUS_INTERRUPT_IRQ as usize]
@@ -160,7 +169,6 @@ pub fn init_ap(
 /// Establishes the default interrupt handlers that are statically known.
 fn set_handlers(idt: &mut InterruptDescriptorTable) {
     idt[0x21].set_handler_fn(ps2_keyboard_handler);
-    idt[0x27].set_handler_fn(pic_spurious_interrupt_handler); 
 
     // idt[0x28].set_handler_fn(rtc_handler);
     idt[0x2C].set_handler_fn(ps2_mouse_handler);
@@ -192,13 +200,14 @@ pub fn init_handlers_pic() {
     // IDT.lock()[0x28].set_handler_fn(rtc_handler.unwrap());
 }
 
-/// Registers an interrupt handler. 
-/// The function fails if the interrupt number is already in use. 
-/// 
+/// Registers an interrupt handler at the given IRQ interrupt number.
+///
+/// The function fails if the interrupt number is reserved or is already in use.
+///
 /// # Arguments 
 /// * `interrupt_num`: the interrupt (IRQ vector) that is being requested.
 /// * `func`: the handler to be registered, which will be invoked when the interrupt occurs.
-/// 
+///
 /// # Return
 /// * `Ok(())` if successfully registered, or
 /// * `Err(existing_handler_address)` if the given `interrupt_num` was already in use.
@@ -218,11 +227,12 @@ pub fn register_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), u6
     }
 } 
 
-/// Returns an interrupt number assigned by the OS and sets its handler function. 
-/// The function fails if there is no unused interrupt number.
-/// 
+/// Allocates and returns an unused interrupt number and sets its handler function.
+///
+/// Returns an error if there are no unused interrupt number, which is highly unlikely.
+///
 /// # Arguments
-/// * `func` - the handler for the assigned interrupt number
+/// * `func`: the handler for the assigned interrupt number.
 pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
     let mut idt = IDT.lock();
 
@@ -238,15 +248,22 @@ pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
     Ok(interrupt_num as u8)
 } 
 
-/// Returns an interrupt to the system by setting the handler to the default function. 
-/// The application provides the current interrupt handler as a safety check. 
-/// The function fails if the current handler and 'func' do not match
-/// 
+/// Deregisters an interrupt handler, making it available to the rest of the system again.
+///
+/// As a sanity/safety check, the caller must provide the `interrupt_handler`
+/// that is currently registered for the given IRQ `interrupt_num`.
+/// This function returns an error if the currently-registered handler does not match 'func'.
+///
 /// # Arguments
-/// * `interrupt_num` - the interrupt that needs to be deregistered
-/// * `func` - the handler that should currently be stored for 'interrupt_num'
+/// * `interrupt_num`: the IRQ that needs to be deregistered
+/// * `func`: the handler that should currently be stored for 'interrupt_num'
 pub fn deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), &'static str> {
     let mut idt = IDT.lock();
+
+    if RESERVED_IRQ_LIST.contains(&interrupt_num) {
+        error!("deregister_interrupt: Cannot free reserved interrupt number, IRQ {}", interrupt_num);
+        return Err("deregister_interrupt: Cannot free reserved interrupt IRQ number");
+    }
 
     // check if the handler stored is the same as the one provided
     // this is to make sure no other application can deregister your interrupt
@@ -262,7 +279,7 @@ pub fn deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), 
 
 /// Send an end of interrupt signal, notifying the interrupt chip that
 /// the given interrupt request `irq` has been serviced. 
-/// 
+///
 /// This function supports all types of interrupt chips -- APIC, x2apic, PIC --
 /// and will perform the correct EOI operation based on which chip is currently active.
 ///
