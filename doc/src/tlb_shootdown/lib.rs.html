@@ -108,8 +108,6 @@
 <span id="102">102</span>
 <span id="103">103</span>
 <span id="104">104</span>
-<span id="105">105</span>
-<span id="106">106</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for broadcasting and handling TLB shootdown IPIs. </span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
@@ -129,8 +127,6 @@
 <span class="kw">use</span> <span class="ident">pause::spin_loop_hint</span>;
 
 
-<span class="doccomment">/// The IRQ number used for IPIs</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TLB_SHOOTDOWN_IPI_IRQ</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x40</span>;
 <span class="doccomment">/// The number of remaining cores that still need to handle the curerent TLB shootdown IPI</span>
 <span class="kw">pub</span> <span class="kw">static</span> <span class="ident">TLB_SHOOTDOWN_IPI_COUNT</span>: <span class="ident">AtomicUsize</span> <span class="op">=</span> <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>);
 <span class="doccomment">/// The lock that makes sure only one set of TLB shootdown IPIs is concurrently happening</span>

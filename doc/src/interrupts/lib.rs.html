@@ -403,13 +403,6 @@
 <span id="397">397</span>
 <span id="398">398</span>
 <span id="399">399</span>
-<span id="400">400</span>
-<span id="401">401</span>
-<span id="402">402</span>
-<span id="403">403</span>
-<span id="404">404</span>
-<span id="405">405</span>
-<span id="406">406</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Basic interrupt handling structures and simple handler routines.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
@@ -580,8 +573,6 @@
 <span class="doccomment">/// Establishes the default interrupt handlers that are statically known.</span>
 <span class="kw">fn</span> <span class="ident">set_handlers</span>(<span class="ident">idt</span>: <span class="kw-2">&amp;mut</span> <span class="ident">InterruptDescriptorTable</span>) {
     <span class="comment">// idt[0x28].set_handler_fn(rtc_handler);</span>
-
-    <span class="ident">idt</span>[<span class="ident">tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">set_handler_fn</span>(<span class="ident">ipi_handler</span>);
 }
 
 
@@ -811,11 +802,6 @@
     
 <span class="comment">//     rtc::handle_rtc_interrupt();</span>
 <span class="comment">// }</span>
-
-
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">ipi_handler</span>(<span class="ident">_stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="ident">eoi</span>(<span class="prelude-val">None</span>);
-}
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="interrupts" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
 </body></html>
