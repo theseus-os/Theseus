@@ -17,8 +17,6 @@ use apic::{LocalApic, get_my_apic, core_count, LapicIpiDestination};
 use pause::spin_loop_hint;
 
 
-/// The IRQ number used for IPIs
-pub const TLB_SHOOTDOWN_IPI_IRQ: u8 = 0x40;
 /// The number of remaining cores that still need to handle the curerent TLB shootdown IPI
 pub static TLB_SHOOTDOWN_IPI_COUNT: AtomicUsize = AtomicUsize::new(0);
 /// The lock that makes sure only one set of TLB shootdown IPIs is concurrently happening
