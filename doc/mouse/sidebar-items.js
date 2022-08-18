@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["handle_mouse_input","return a Mouse Event according to the data"],["init","Initialize the mouse driver."],["mouse_to_print","print the mouse actions"]]};
+window.SIDEBAR_ITEMS = {"fn":[["init","Initialize the PS2 mouse driver and register its interrupt handler."]]};

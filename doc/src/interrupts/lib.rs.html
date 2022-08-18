@@ -428,33 +428,6 @@
 <span id="422">422</span>
 <span id="423">423</span>
 <span id="424">424</span>
-<span id="425">425</span>
-<span id="426">426</span>
-<span id="427">427</span>
-<span id="428">428</span>
-<span id="429">429</span>
-<span id="430">430</span>
-<span id="431">431</span>
-<span id="432">432</span>
-<span id="433">433</span>
-<span id="434">434</span>
-<span id="435">435</span>
-<span id="436">436</span>
-<span id="437">437</span>
-<span id="438">438</span>
-<span id="439">439</span>
-<span id="440">440</span>
-<span id="441">441</span>
-<span id="442">442</span>
-<span id="443">443</span>
-<span id="444">444</span>
-<span id="445">445</span>
-<span id="446">446</span>
-<span id="447">447</span>
-<span id="448">448</span>
-<span id="449">449</span>
-<span id="450">450</span>
-<span id="451">451</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Basic interrupt handling structures and simple handler routines.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
@@ -464,7 +437,6 @@
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">pic::IRQ_BASE_OFFSET</span>;
 
-<span class="kw">use</span> <span class="ident">ps2::handle_mouse_packet</span>;
 <span class="kw">use</span> <span class="ident">x86_64::structures::idt</span>::{<span class="ident">InterruptStackFrame</span>, <span class="ident">HandlerFunc</span>, <span class="ident">InterruptDescriptorTable</span>};
 <span class="kw">use</span> <span class="ident">spin::Once</span>;
 <span class="comment">// use rtc;</span>
@@ -626,7 +598,6 @@
 <span class="doccomment">/// Establishes the default interrupt handlers that are statically known.</span>
 <span class="kw">fn</span> <span class="ident">set_handlers</span>(<span class="ident">idt</span>: <span class="kw-2">&amp;mut</span> <span class="ident">InterruptDescriptorTable</span>) {
     <span class="comment">// idt[0x28].set_handler_fn(rtc_handler);</span>
-    <span class="ident">idt</span>[<span class="number">0x2C</span>].<span class="ident">set_handler_fn</span>(<span class="ident">ps2_mouse_handler</span>);
     <span class="ident">idt</span>[<span class="number">0x2E</span>].<span class="ident">set_handler_fn</span>(<span class="ident">primary_ata_handler</span>);
     <span class="ident">idt</span>[<span class="number">0x2F</span>].<span class="ident">set_handler_fn</span>(<span class="ident">secondary_ata_handler</span>);
 
@@ -763,31 +734,6 @@
     }
 }
 
-<span class="doccomment">/// 0x2C</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">ps2_mouse_handler</span>(<span class="ident">_stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-
-    <span class="kw">let</span> <span class="ident">indicator</span> <span class="op">=</span> <span class="ident">ps2::ps2_status_register</span>();
-
-    <span class="comment">// whether there is any data on the port 0x60</span>
-    <span class="kw">if</span> <span class="ident">indicator</span> <span class="op">&amp;</span> <span class="number">0x01</span> <span class="op">==</span> <span class="number">0x01</span> {
-        <span class="comment">//whether the data is coming from the mouse</span>
-        <span class="kw">if</span> <span class="ident">indicator</span> <span class="op">&amp;</span> <span class="number">0x20</span> <span class="op">==</span> <span class="number">0x20</span> {
-            <span class="kw">let</span> <span class="ident">readdata</span> <span class="op">=</span> <span class="ident">handle_mouse_packet</span>();
-            <span class="kw">if</span> (<span class="ident">readdata</span> <span class="op">&amp;</span> <span class="number">0x80</span> <span class="op">==</span> <span class="number">0x80</span>) <span class="op">|</span><span class="op">|</span> (<span class="ident">readdata</span> <span class="op">&amp;</span> <span class="number">0x40</span> <span class="op">==</span> <span class="number">0x40</span>) {
-                <span class="macro">error!</span>(<span class="string">&quot;The overflow bits in the mouse data packet&#39;s first byte are set! Discarding the whole packet.&quot;</span>);
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">readdata</span> <span class="op">&amp;</span> <span class="number">0x08</span> <span class="op">==</span> <span class="number">0</span> {
-                <span class="macro">error!</span>(<span class="string">&quot;Third bit should in the mouse data packet&#39;s first byte should be always be 1. Discarding the whole packet since the bit is 0 now.&quot;</span>);
-            } <span class="kw">else</span> {
-                <span class="kw">let</span> <span class="ident">_mouse_event</span> <span class="op">=</span> <span class="ident">mouse::handle_mouse_input</span>(<span class="ident">readdata</span>);
-                <span class="comment">// mouse::mouse_to_print(&amp;_mouse_event);</span>
-            }
-
-        }
-
-    }
-
-    <span class="ident">eoi</span>(<span class="prelude-val">Some</span>(<span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0xc</span>));
-}
 
 <span class="kw">pub</span> <span class="kw">static</span> <span class="ident">APIC_TIMER_TICKS</span>: <span class="ident">AtomicUsize</span> <span class="op">=</span> <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>);
 <span class="doccomment">/// 0x22</span>

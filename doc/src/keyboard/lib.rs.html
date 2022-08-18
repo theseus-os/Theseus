@@ -291,7 +291,7 @@
 
     <span class="comment">// whether there is any data on the port 0x60</span>
     <span class="kw">if</span> <span class="ident">indicator</span> <span class="op">&amp;</span> <span class="number">0x01</span> <span class="op">==</span> <span class="number">0x01</span> {
-        <span class="comment">//whether the data is coming from the mouse</span>
+        <span class="comment">// Skip this if the PS2 event came from the mouse, not the keyboard</span>
         <span class="kw">if</span> <span class="ident">indicator</span> <span class="op">&amp;</span> <span class="number">0x20</span> <span class="op">!</span><span class="op">=</span> <span class="number">0x20</span> {
             <span class="comment">// in this interrupt, we must read the PS2_PORT scancode register before acknowledging the interrupt.</span>
             <span class="kw">let</span> <span class="ident">scan_code</span> <span class="op">=</span> <span class="ident">ps2::ps2_read_data</span>();
