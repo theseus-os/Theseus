@@ -8,11 +8,14 @@ use fs_node::{DirRef, FileOrDir};
 use hashbrown::HashMap;
 use path::Path;
 
+pub type IntoIter = hashbrown::hash_map::IntoIter<String, String>;
+
 /// A structure that contains environment state for a given `Task` or group of
 /// `Task`s.
 ///
 /// A default environment can be created with the following state:
 /// * The working directory is the `root` directory.
+#[derive(Clone)]
 pub struct Environment {
     /// The "current working directory", i.e.,
     /// where a task's relative path begins upon first execution.
@@ -57,6 +60,16 @@ impl Environment {
     #[doc(alias("remove_var"))]
     pub fn unset(&mut self, key: &str) {
         self.variables.remove(key);
+    }
+}
+
+impl core::iter::IntoIterator for Environment {
+    type Item = (String, String);
+
+    type IntoIter = IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.variables.into_iter()
     }
 }
 

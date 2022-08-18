@@ -4,7 +4,9 @@ pub extern crate app_io;
 pub extern crate core2;
 pub extern crate panic_entry_inner;
 
+extern crate environment;
 extern crate heap;
+extern crate kernel_config;
 extern crate memory;
 extern crate scheduler;
 extern crate spawn;
@@ -37,12 +39,14 @@ pub mod alloc {
 }
 
 pub mod mem {
+    pub use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
     pub use memory::get_kernel_mmi_ref;
 }
 
 pub mod task {
+    pub use environment::EnvIter;
     pub use scheduler::schedule as yield_now;
     pub use spawn::new_task_builder;
     pub use stack::alloc_stack_by_bytes;
-    pub use theseus_task::{get_my_current_task, TaskRef};
+    pub use theseus_task::{get_my_current_task, get_my_current_task_id, TaskRef};
 }

@@ -4,3 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+spawn = { path = "../../kernel/spawn" }
+memory = { path = "../../kernel/memory" }
+stack = { path = "../../kernel/stack" }

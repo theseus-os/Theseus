@@ -9,5 +9,6 @@
   "os": "theseus",
   "features": "-mmx,-sse,+soft-float",
   "disable-redzone": true,
-  "executables": true
+  "executables": true,
+  "has-thread-local": true
 }
