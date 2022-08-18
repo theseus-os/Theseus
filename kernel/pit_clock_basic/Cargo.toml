@@ -1,0 +1,15 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "pit_clock_basic"
+description = "Basic support for waiting using the PIT (Programmable Interval Timer)"
+version = "0.1.0"
+
+[dependencies]
+spin = "0.9.0"
+log = "0.4.8"
+
+[dependencies.port_io]
+path = "../../libs/port_io"
+
+[lib]
+crate-type = ["rlib"]

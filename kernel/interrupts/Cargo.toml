@@ -26,9 +26,6 @@ path = "../../libs/port_io"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.kernel_config]
-path = "../kernel_config"
-
 [dependencies.apic]
 path = "../apic"
 
@@ -49,9 +46,6 @@ path = "../exceptions_early"
 
 [dependencies.task]
 path = "../task"
-
-[dependencies.pit_clock]
-path = "../pit_clock"
 
 [dependencies.keyboard]
 path = "../keyboard"

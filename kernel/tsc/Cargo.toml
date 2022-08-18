@@ -5,12 +5,10 @@ description = "TSC (TimeStamp Counter) support for performance counters on x86. 
 version = "0.1.0"
 
 [dependencies]
+log = "0.4.8"
 
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.pit_clock]
-path = "../pit_clock"
+[dependencies.pit_clock_basic]
+path = "../pit_clock_basic"
 
 
 [lib]

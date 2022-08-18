@@ -105,7 +105,7 @@ dependencies = [
  "memory",
  "msr",
  "owning_ref",
- "pit_clock",
+ "pit_clock_basic",
  "raw-cpuid",
  "spin 0.9.0",
  "static_assertions",
@@ -1304,7 +1304,6 @@ dependencies = [
  "exceptions_early",
  "gdt",
  "irq_safety",
- "kernel_config",
  "keyboard",
  "lazy_static",
  "locked_idt",
@@ -1312,7 +1311,6 @@ dependencies = [
  "memory",
  "mouse",
  "pic",
- "pit_clock",
  "port_io",
  "ps2",
  "scheduler",
@@ -1419,7 +1417,7 @@ dependencies = [
  "pci",
  "physical_nic",
  "pic",
- "pit_clock",
+ "pit_clock_basic",
  "rand",
  "runqueue",
  "spin 0.9.0",
@@ -1960,7 +1958,7 @@ dependencies = [
  "memory",
  "mod_mgmt",
  "pause",
- "pit_clock",
+ "pit_clock_basic",
  "spin 0.9.0",
  "stack",
  "volatile 0.2.7",
@@ -2349,6 +2347,17 @@ dependencies = [
 
 [[package]]
 name = "pit_clock"
+version = "0.1.0"
+dependencies = [
+ "interrupts",
+ "log",
+ "pit_clock_basic",
+ "port_io",
+ "x86_64",
+]
+
+[[package]]
+name = "pit_clock_basic"
 version = "0.1.0"
 dependencies = [
  "log",
@@ -2919,7 +2928,6 @@ dependencies = [
  "cfg-if 0.1.10",
  "core_simd",
  "log",
- "pit_clock",
 ]
 
 [[package]]
@@ -3591,7 +3599,7 @@ name = "tsc"
 version = "0.1.0"
 dependencies = [
  "log",
- "pit_clock",
+ "pit_clock_basic",
 ]
 
 [[package]]
