@@ -259,6 +259,8 @@
 <span id="253">253</span>
 <span id="254">254</span>
 <span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the x86 PIC (8259 Programmable Interrupt Controller),</span>
 <span class="doccomment">//! which handles basic interrupts.</span>
 <span class="doccomment">//! In multicore mode, this isn&#39;t used in favor of the APIC interface.</span>
@@ -279,6 +281,8 @@
 <span class="doccomment">/// which occupy the first 32 IRQ vectors.</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">IRQ_BASE_OFFSET</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x20</span>;
 
+<span class="doccomment">/// The IRQ number reserved for spurious PIC interrupts (as recommended by OS dev wiki).</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PIC_SPURIOUS_INTERRUPT_IRQ</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0x7</span>;
 
 <span class="doccomment">/// Command sent to read the Interrupt Request Register.</span>
 <span class="kw">const</span> <span class="ident">CMD_IRR</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x0A</span>;

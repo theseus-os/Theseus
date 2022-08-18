@@ -488,6 +488,23 @@
 <span id="482">482</span>
 <span id="483">483</span>
 <span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Basic interrupt handling structures and simple handler routines.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
@@ -516,6 +533,15 @@
 
 <span class="doccomment">/// The single system-wide Programmable Interrupt Controller (PIC) chip.</span>
 <span class="kw">static</span> <span class="ident">PIC</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">pic::ChainedPics</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+
+<span class="doccomment">/// The list of IRQs reserved for Theseus-specific usage that cannot be</span>
+<span class="doccomment">/// used for general device interrupt handlers.</span>
+<span class="doccomment">/// These cannot be accessed by [`register_interrupt()`] or [`deregister_interrupt()`].</span>
+<span class="kw">static</span> <span class="ident">RESERVED_IRQ_LIST</span>: [<span class="ident">u8</span>; <span class="number">3</span>] <span class="op">=</span> [
+    <span class="ident">pic::PIC_SPURIOUS_INTERRUPT_IRQ</span>,
+    <span class="ident">apic::LOCAL_APIC_LVT_IRQ</span>,
+    <span class="ident">apic::APIC_SPURIOUS_INTERRUPT_IRQ</span>,
+];
 
 
 <span class="doccomment">/// Returns `true` if the given address is the exception handler in the current `IDT`</span>
@@ -607,12 +633,12 @@
                 <span class="ident">new_entry</span>.<span class="ident">set_handler_fn</span>(<span class="ident">unimplemented_interrupt_handler</span>);
             }
         }
-
-        <span class="comment">// This crate has a fixed dependency on the `apic` crate,</span>
-        <span class="comment">// because `apic` functionality is required to implement certain functions, e.g., `eoi()`.</span>
-        <span class="comment">// Thus, we statically reserve the IDT entries used by the APIC,</span>
+        <span class="comment">// This crate has a fixed dependency on the `pic` and `apic` crates,</span>
+        <span class="comment">// because they are required to implement certain functions, e.g., `eoi()`.</span>
+        <span class="comment">// Thus, we statically reserve the IDT entries used by the PIC &amp; APIC,</span>
         <span class="comment">// instead of making it dynamically register that interrupt like other devices do.</span>
-        <span class="comment">// Currently this includeds only the APIC LVT timer and spurious interrupt handler.</span>
+        <span class="ident">new_idt</span>[<span class="ident">pic::PIC_SPURIOUS_INTERRUPT_IRQ</span> <span class="kw">as</span> <span class="ident">usize</span>]
+            .<span class="ident">set_handler_fn</span>(<span class="ident">pic_spurious_interrupt_handler</span>);
         <span class="ident">new_idt</span>[<span class="ident">apic::LOCAL_APIC_LVT_IRQ</span> <span class="kw">as</span> <span class="ident">usize</span>]
             .<span class="ident">set_handler_fn</span>(<span class="ident">lapic_timer_handler</span>);
         <span class="ident">new_idt</span>[<span class="ident">apic::APIC_SPURIOUS_INTERRUPT_IRQ</span> <span class="kw">as</span> <span class="ident">usize</span>]
@@ -650,7 +676,6 @@
 <span class="doccomment">/// Establishes the default interrupt handlers that are statically known.</span>
 <span class="kw">fn</span> <span class="ident">set_handlers</span>(<span class="ident">idt</span>: <span class="kw-2">&amp;mut</span> <span class="ident">InterruptDescriptorTable</span>) {
     <span class="ident">idt</span>[<span class="number">0x21</span>].<span class="ident">set_handler_fn</span>(<span class="ident">ps2_keyboard_handler</span>);
-    <span class="ident">idt</span>[<span class="number">0x27</span>].<span class="ident">set_handler_fn</span>(<span class="ident">pic_spurious_interrupt_handler</span>); 
 
     <span class="comment">// idt[0x28].set_handler_fn(rtc_handler);</span>
     <span class="ident">idt</span>[<span class="number">0x2C</span>].<span class="ident">set_handler_fn</span>(<span class="ident">ps2_mouse_handler</span>);
@@ -682,13 +707,14 @@
     <span class="comment">// IDT.lock()[0x28].set_handler_fn(rtc_handler.unwrap());</span>
 }
 
-<span class="doccomment">/// Registers an interrupt handler. </span>
-<span class="doccomment">/// The function fails if the interrupt number is already in use. </span>
-<span class="doccomment">/// </span>
+<span class="doccomment">/// Registers an interrupt handler at the given IRQ interrupt number.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// The function fails if the interrupt number is reserved or is already in use.</span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Arguments </span>
 <span class="doccomment">/// * `interrupt_num`: the interrupt (IRQ vector) that is being requested.</span>
 <span class="doccomment">/// * `func`: the handler to be registered, which will be invoked when the interrupt occurs.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Return</span>
 <span class="doccomment">/// * `Ok(())` if successfully registered, or</span>
 <span class="doccomment">/// * `Err(existing_handler_address)` if the given `interrupt_num` was already in use.</span>
@@ -708,11 +734,12 @@
     }
 } 
 
-<span class="doccomment">/// Returns an interrupt number assigned by the OS and sets its handler function. </span>
-<span class="doccomment">/// The function fails if there is no unused interrupt number.</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">/// Allocates and returns an unused interrupt number and sets its handler function.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Returns an error if there are no unused interrupt number, which is highly unlikely.</span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `func` - the handler for the assigned interrupt number</span>
+<span class="doccomment">/// * `func`: the handler for the assigned interrupt number.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_msi_interrupt</span>(<span class="ident">func</span>: <span class="ident">HandlerFunc</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">idt</span> <span class="op">=</span> <span class="ident">IDT</span>.<span class="ident">lock</span>();
 
@@ -728,15 +755,22 @@
     <span class="prelude-val">Ok</span>(<span class="ident">interrupt_num</span> <span class="kw">as</span> <span class="ident">u8</span>)
 } 
 
-<span class="doccomment">/// Returns an interrupt to the system by setting the handler to the default function. </span>
-<span class="doccomment">/// The application provides the current interrupt handler as a safety check. </span>
-<span class="doccomment">/// The function fails if the current handler and &#39;func&#39; do not match</span>
-<span class="doccomment">/// </span>
+<span class="doccomment">/// Deregisters an interrupt handler, making it available to the rest of the system again.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// As a sanity/safety check, the caller must provide the `interrupt_handler`</span>
+<span class="doccomment">/// that is currently registered for the given IRQ `interrupt_num`.</span>
+<span class="doccomment">/// This function returns an error if the currently-registered handler does not match &#39;func&#39;.</span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `interrupt_num` - the interrupt that needs to be deregistered</span>
-<span class="doccomment">/// * `func` - the handler that should currently be stored for &#39;interrupt_num&#39;</span>
+<span class="doccomment">/// * `interrupt_num`: the IRQ that needs to be deregistered</span>
+<span class="doccomment">/// * `func`: the handler that should currently be stored for &#39;interrupt_num&#39;</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">deregister_interrupt</span>(<span class="ident">interrupt_num</span>: <span class="ident">u8</span>, <span class="ident">func</span>: <span class="ident">HandlerFunc</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">idt</span> <span class="op">=</span> <span class="ident">IDT</span>.<span class="ident">lock</span>();
+
+    <span class="kw">if</span> <span class="ident">RESERVED_IRQ_LIST</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">interrupt_num</span>) {
+        <span class="macro">error!</span>(<span class="string">&quot;deregister_interrupt: Cannot free reserved interrupt number, IRQ {}&quot;</span>, <span class="ident">interrupt_num</span>);
+        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;deregister_interrupt: Cannot free reserved interrupt IRQ number&quot;</span>);
+    }
 
     <span class="comment">// check if the handler stored is the same as the one provided</span>
     <span class="comment">// this is to make sure no other application can deregister your interrupt</span>
@@ -752,7 +786,7 @@
 
 <span class="doccomment">/// Send an end of interrupt signal, notifying the interrupt chip that</span>
 <span class="doccomment">/// the given interrupt request `irq` has been serviced. </span>
-<span class="doccomment">/// </span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// This function supports all types of interrupt chips -- APIC, x2apic, PIC --</span>
 <span class="doccomment">/// and will perform the correct EOI operation based on which chip is currently active.</span>
 <span class="doccomment">///</span>
