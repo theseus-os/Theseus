@@ -401,7 +401,7 @@
     <span class="ident">init_serial_port</span>(<span class="ident">SerialPortAddress::COM1</span>);
     <span class="ident">init_serial_port</span>(<span class="ident">SerialPortAddress::COM2</span>);
 
-    <span class="ident">keyboard::init</span>(<span class="ident">key_producer</span>);
+    <span class="ident">keyboard::init</span>(<span class="ident">key_producer</span>)<span class="question-mark">?</span>;
     <span class="ident">mouse::init</span>(<span class="ident">mouse_producer</span>);
 
     <span class="comment">// Initialize/scan the PCI bus to discover PCI devices</span>

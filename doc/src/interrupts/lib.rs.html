@@ -455,56 +455,6 @@
 <span id="449">449</span>
 <span id="450">450</span>
 <span id="451">451</span>
-<span id="452">452</span>
-<span id="453">453</span>
-<span id="454">454</span>
-<span id="455">455</span>
-<span id="456">456</span>
-<span id="457">457</span>
-<span id="458">458</span>
-<span id="459">459</span>
-<span id="460">460</span>
-<span id="461">461</span>
-<span id="462">462</span>
-<span id="463">463</span>
-<span id="464">464</span>
-<span id="465">465</span>
-<span id="466">466</span>
-<span id="467">467</span>
-<span id="468">468</span>
-<span id="469">469</span>
-<span id="470">470</span>
-<span id="471">471</span>
-<span id="472">472</span>
-<span id="473">473</span>
-<span id="474">474</span>
-<span id="475">475</span>
-<span id="476">476</span>
-<span id="477">477</span>
-<span id="478">478</span>
-<span id="479">479</span>
-<span id="480">480</span>
-<span id="481">481</span>
-<span id="482">482</span>
-<span id="483">483</span>
-<span id="484">484</span>
-<span id="485">485</span>
-<span id="486">486</span>
-<span id="487">487</span>
-<span id="488">488</span>
-<span id="489">489</span>
-<span id="490">490</span>
-<span id="491">491</span>
-<span id="492">492</span>
-<span id="493">493</span>
-<span id="494">494</span>
-<span id="495">495</span>
-<span id="496">496</span>
-<span id="497">497</span>
-<span id="498">498</span>
-<span id="499">499</span>
-<span id="500">500</span>
-<span id="501">501</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Basic interrupt handling structures and simple handler routines.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
@@ -518,7 +468,7 @@
 <span class="kw">use</span> <span class="ident">x86_64::structures::idt</span>::{<span class="ident">InterruptStackFrame</span>, <span class="ident">HandlerFunc</span>, <span class="ident">InterruptDescriptorTable</span>};
 <span class="kw">use</span> <span class="ident">spin::Once</span>;
 <span class="comment">// use rtc;</span>
-<span class="kw">use</span> <span class="ident">core::sync::atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
+<span class="kw">use</span> <span class="ident">core::sync::atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">memory::VirtualAddress</span>;
 <span class="kw">use</span> <span class="ident">apic</span>::{<span class="ident">INTERRUPT_CHIP</span>, <span class="ident">InterruptChip</span>};
 <span class="kw">use</span> <span class="ident">locked_idt::LockedIdt</span>;
@@ -675,8 +625,6 @@
 
 <span class="doccomment">/// Establishes the default interrupt handlers that are statically known.</span>
 <span class="kw">fn</span> <span class="ident">set_handlers</span>(<span class="ident">idt</span>: <span class="kw-2">&amp;mut</span> <span class="ident">InterruptDescriptorTable</span>) {
-    <span class="ident">idt</span>[<span class="number">0x21</span>].<span class="ident">set_handler_fn</span>(<span class="ident">ps2_keyboard_handler</span>);
-
     <span class="comment">// idt[0x28].set_handler_fn(rtc_handler);</span>
     <span class="ident">idt</span>[<span class="number">0x2C</span>].<span class="ident">set_handler_fn</span>(<span class="ident">ps2_mouse_handler</span>);
     <span class="ident">idt</span>[<span class="number">0x2E</span>].<span class="ident">set_handler_fn</span>(<span class="ident">primary_ata_handler</span>);
@@ -813,54 +761,6 @@
             }  
         }
     }
-}
-
-
-<span class="comment">// see this: https://forum.osdev.org/viewtopic.php?f=1&amp;t=32655</span>
-<span class="kw">static</span> <span class="ident">EXTENDED_SCANCODE</span>: <span class="ident">AtomicBool</span> <span class="op">=</span> <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>);
-
-<span class="doccomment">/// 0x21</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">ps2_keyboard_handler</span>(<span class="ident">_stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-
-    <span class="kw">let</span> <span class="ident">indicator</span> <span class="op">=</span> <span class="ident">ps2::ps2_status_register</span>();
-
-    <span class="comment">// whether there is any data on the port 0x60</span>
-    <span class="kw">if</span> <span class="ident">indicator</span> <span class="op">&amp;</span> <span class="number">0x01</span> <span class="op">==</span> <span class="number">0x01</span> {
-        <span class="comment">//whether the data is coming from the mouse</span>
-        <span class="kw">if</span> <span class="ident">indicator</span> <span class="op">&amp;</span> <span class="number">0x20</span> <span class="op">!</span><span class="op">=</span> <span class="number">0x20</span> {
-            <span class="comment">// in this interrupt, we must read the PS2_PORT scancode register before acknowledging the interrupt.</span>
-            <span class="kw">let</span> <span class="ident">scan_code</span> <span class="op">=</span> <span class="ident">ps2::ps2_read_data</span>();
-            <span class="comment">// trace!(&quot;PS2_PORT interrupt: raw scan_code {:#X}&quot;, scan_code);</span>
-
-
-            <span class="kw">let</span> <span class="ident">extended</span> <span class="op">=</span> <span class="ident">EXTENDED_SCANCODE</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
-
-            <span class="comment">// 0xE0 indicates an extended scancode, so we must wait for the next interrupt to get the actual scancode</span>
-            <span class="kw">if</span> <span class="ident">scan_code</span> <span class="op">==</span> <span class="number">0xE0</span> {
-                <span class="kw">if</span> <span class="ident">extended</span> {
-                    <span class="macro">error!</span>(<span class="string">&quot;PS2_PORT interrupt: got two extended scancodes (0xE0) in a row! Shouldn&#39;t happen.&quot;</span>);
-                }
-                <span class="comment">// mark it true for the next interrupt</span>
-                <span class="ident">EXTENDED_SCANCODE</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">scan_code</span> <span class="op">==</span> <span class="number">0xE1</span> {
-                <span class="macro">error!</span>(<span class="string">&quot;PAUSE/BREAK key pressed ... ignoring it!&quot;</span>);
-                <span class="comment">// TODO: handle this, it&#39;s a 6-byte sequence (over the next 5 interrupts)</span>
-                <span class="ident">EXTENDED_SCANCODE</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
-            } <span class="kw">else</span> { <span class="comment">// a regular scancode, go ahead and handle it</span>
-                <span class="comment">// if the previous interrupt&#39;s scan_code was an extended scan_code, then this one is not</span>
-                <span class="kw">if</span> <span class="ident">extended</span> {
-                    <span class="ident">EXTENDED_SCANCODE</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
-                }
-                <span class="kw">if</span> <span class="ident">scan_code</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {  <span class="comment">// a scan code of zero is a PS2_PORT error that we can ignore</span>
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">keyboard::handle_keyboard_input</span>(<span class="ident">scan_code</span>, <span class="ident">extended</span>) {
-                        <span class="macro">error!</span>(<span class="string">&quot;ps2_keyboard_handler: error handling PS2_PORT input: {:?}&quot;</span>, <span class="ident">e</span>);
-                    }
-                }
-            }
-        }
-    }
-    
-    <span class="ident">eoi</span>(<span class="prelude-val">Some</span>(<span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0x1</span>));
 }
 
 <span class="doccomment">/// 0x2C</span>

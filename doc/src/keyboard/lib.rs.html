@@ -159,22 +159,77 @@
 <span id="153">153</span>
 <span id="154">154</span>
 <span id="155">155</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+</pre><pre class="rust"><code><span class="doccomment">//! A basic driver for a keyboard connected to the legacy PS2 port.</span>
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">keycodes_ascii</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">event_types</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">ps2</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mpmc</span>;
+<span class="attribute">#![<span class="ident">no_std</span>]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">abi_x86_interrupt</span>)]</span>
+
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
 
-
+<span class="kw">use</span> <span class="ident">core::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">keycodes_ascii</span>::{<span class="ident">Keycode</span>, <span class="ident">KeyboardModifiers</span>, <span class="ident">KEY_RELEASED_OFFSET</span>, <span class="ident">KeyAction</span>, <span class="ident">KeyEvent</span>};
 <span class="kw">use</span> <span class="ident">spin::Once</span>;
 <span class="kw">use</span> <span class="ident">mpmc::Queue</span>;
 <span class="kw">use</span> <span class="ident">event_types::Event</span>;
-<span class="kw">use</span> <span class="ident">ps2</span>::{<span class="ident">init_ps2_port1</span>,<span class="ident">test_ps2_port1</span>,<span class="ident">keyboard_led</span>,<span class="ident">keyboard_detect</span>,<span class="ident">KeyboardType</span>};
+<span class="kw">use</span> <span class="ident">ps2</span>::{<span class="ident">init_ps2_port1</span>, <span class="ident">test_ps2_port1</span>, <span class="ident">keyboard_led</span>, <span class="ident">keyboard_detect</span>, <span class="ident">KeyboardType</span>};
+<span class="kw">use</span> <span class="ident">x86_64::structures::idt::InterruptStackFrame</span>;
 
+<span class="doccomment">/// The first PS2 port for the keyboard is connected directly to IRQ 1.</span>
+<span class="doccomment">/// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x21.</span>
+<span class="kw">const</span> <span class="ident">PS2_KEYBOARD_IRQ</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">interrupts::IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0x1</span>;
 
 <span class="comment">// TODO: avoid unsafe static mut using the following: https://www.reddit.com/r/rust/comments/1wvxcn/lazily_initialized_statics/cf61im5/</span>
 <span class="kw">static</span> <span class="kw-2">mut</span> <span class="ident">KBD_MODIFIERS</span>: <span class="ident">KeyboardModifiers</span> <span class="op">=</span> <span class="ident">KeyboardModifiers::new</span>();
@@ -189,37 +244,97 @@
 <span class="doccomment">/// Bitmask for the Caps Lock keyboard LED</span>
 <span class="kw">const</span> <span class="ident">CAPS_LED</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0b100</span>;
 
-<span class="doccomment">/// Initialize the keyboard driver. </span>
-<span class="doccomment">/// Arguments: a reference to a queue onto which keyboard events should be enqueued. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">keyboard_queue_producer</span>: <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>) { 
-    <span class="comment">// set keyboard to scancode set 1</span>
-
-    <span class="comment">//init the first ps2 port for keyboard</span>
+<span class="doccomment">/// Initialize the PS2 keyboard driver and register its interrupt handler.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// ## Arguments</span>
+<span class="doccomment">/// * `keyboard_queue_producer`: the queue onto which the keyboard interrupt handler</span>
+<span class="doccomment">///    will push new keyboard events when a key action occurs.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">keyboard_queue_producer</span>: <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="comment">// Init the first ps2 port, which is used for the keyboard.</span>
     <span class="ident">init_ps2_port1</span>();
-    <span class="comment">//test the first port</span>
+    <span class="comment">// Test the first port.</span>
+    <span class="comment">// TODO: return an error if this test fails.</span>
     <span class="ident">test_ps2_port1</span>();
-    <span class="kw">match</span> <span class="ident">keyboard_detect</span>(){
-        <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; { 
-            <span class="macro">error!</span>(<span class="string">&quot;failed to read keyboard type due to: {} &quot;</span>, <span class="ident">e</span>)
-        },
-        <span class="prelude-val">Ok</span>(<span class="ident">s</span>) =&gt; {
-            <span class="kw">match</span> <span class="ident">s</span> {
-                <span class="ident">KeyboardType::AncientATKeyboard</span> =&gt; <span class="macro">info!</span>(<span class="string">&quot;Ancient AT Keyboard with translator enabled in the PS/2 Controller&quot;</span>),
-                <span class="ident">KeyboardType::MF2Keyboard</span> =&gt; <span class="macro">info!</span>(<span class="string">&quot;MF2Keyboard&quot;</span>),
-                <span class="ident">KeyboardType::MF2KeyboardWithPSControllerTranslator</span> =&gt; <span class="macro">info!</span>(<span class="string">&quot;MF2 Keyboard with translator enabled in PS/2 Controller&quot;</span>),
+    <span class="comment">// Detect which kind of keyboard is connected.</span>
+    <span class="comment">// TODO: actually do something with the keyboard type.</span>
+    <span class="kw">match</span> <span class="ident">keyboard_detect</span>() {
+        <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::AncientATKeyboard</span>) =&gt; <span class="macro">info!</span>(<span class="string">&quot;Ancient AT Keyboard with translator enabled in the PS/2 Controller&quot;</span>),
+        <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::MF2Keyboard</span>) =&gt; <span class="macro">info!</span>(<span class="string">&quot;MF2Keyboard&quot;</span>),
+        <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::MF2KeyboardWithPSControllerTranslator</span>) =&gt; <span class="macro">info!</span>(<span class="string">&quot;MF2 Keyboard with translator enabled in PS/2 Controller&quot;</span>),
+        <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
+            <span class="macro">error!</span>(<span class="string">&quot;Failed to detect the Ps2 keyboard type, error: {} &quot;</span>, <span class="ident">e</span>);
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Failed to detect the PS2 keyboard type&quot;</span>);
+        }
+    }
+
+    <span class="comment">// TODO: set keyboard to scancode set 1, since that&#39;s the only one we support (?)</span>
+
+    <span class="comment">// Register the interrupt handler</span>
+    <span class="ident">interrupts::register_interrupt</span>(<span class="ident">PS2_KEYBOARD_IRQ</span>, <span class="ident">ps2_keyboard_handler</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+        <span class="macro">error!</span>(<span class="string">&quot;PS2 keyboard IRQ {:#X} was already in use by handler {:#X}! Sharing IRQs is currently unsupported.&quot;</span>, 
+            <span class="ident">PS2_KEYBOARD_IRQ</span>, <span class="ident">e</span>,
+        );
+        <span class="string">&quot;PS2 keyboard IRQ was already in use! Sharing IRQs is currently unsupported.&quot;</span>
+    })<span class="question-mark">?</span>;
+
+    <span class="comment">// Final step: set the producer end of the keyboard event queue.</span>
+    <span class="ident">KEYBOARD_PRODUCER</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">keyboard_queue_producer</span>);
+    <span class="prelude-val">Ok</span>(())
+}
+
+<span class="doccomment">/// The interrupt handler for a ps2-connected keyboard, registered at IRQ 0x21.</span>
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">ps2_keyboard_handler</span>(<span class="ident">_stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+    <span class="comment">// see this: https://forum.osdev.org/viewtopic.php?f=1&amp;t=32655</span>
+    <span class="kw">static</span> <span class="ident">EXTENDED_SCANCODE</span>: <span class="ident">AtomicBool</span> <span class="op">=</span> <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>);
+
+    <span class="kw">let</span> <span class="ident">indicator</span> <span class="op">=</span> <span class="ident">ps2::ps2_status_register</span>();
+
+    <span class="comment">// whether there is any data on the port 0x60</span>
+    <span class="kw">if</span> <span class="ident">indicator</span> <span class="op">&amp;</span> <span class="number">0x01</span> <span class="op">==</span> <span class="number">0x01</span> {
+        <span class="comment">//whether the data is coming from the mouse</span>
+        <span class="kw">if</span> <span class="ident">indicator</span> <span class="op">&amp;</span> <span class="number">0x20</span> <span class="op">!</span><span class="op">=</span> <span class="number">0x20</span> {
+            <span class="comment">// in this interrupt, we must read the PS2_PORT scancode register before acknowledging the interrupt.</span>
+            <span class="kw">let</span> <span class="ident">scan_code</span> <span class="op">=</span> <span class="ident">ps2::ps2_read_data</span>();
+            <span class="comment">// trace!(&quot;PS2_PORT interrupt: raw scan_code {:#X}&quot;, scan_code);</span>
+
+
+            <span class="kw">let</span> <span class="ident">extended</span> <span class="op">=</span> <span class="ident">EXTENDED_SCANCODE</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
+
+            <span class="comment">// 0xE0 indicates an extended scancode, so we must wait for the next interrupt to get the actual scancode</span>
+            <span class="kw">if</span> <span class="ident">scan_code</span> <span class="op">==</span> <span class="number">0xE0</span> {
+                <span class="kw">if</span> <span class="ident">extended</span> {
+                    <span class="macro">error!</span>(<span class="string">&quot;PS2_PORT interrupt: got two extended scancodes (0xE0) in a row! Shouldn&#39;t happen.&quot;</span>);
+                }
+                <span class="comment">// mark it true for the next interrupt</span>
+                <span class="ident">EXTENDED_SCANCODE</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
+            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">scan_code</span> <span class="op">==</span> <span class="number">0xE1</span> {
+                <span class="macro">error!</span>(<span class="string">&quot;PAUSE/BREAK key pressed ... ignoring it!&quot;</span>);
+                <span class="comment">// TODO: handle this, it&#39;s a 6-byte sequence (over the next 5 interrupts)</span>
+                <span class="ident">EXTENDED_SCANCODE</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
+            } <span class="kw">else</span> { <span class="comment">// a regular scancode, go ahead and handle it</span>
+                <span class="comment">// if the previous interrupt&#39;s scan_code was an extended scan_code, then this one is not</span>
+                <span class="kw">if</span> <span class="ident">extended</span> {
+                    <span class="ident">EXTENDED_SCANCODE</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
+                }
+                <span class="kw">if</span> <span class="ident">scan_code</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {  <span class="comment">// a scan code of zero is a PS2_PORT error that we can ignore</span>
+                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">handle_keyboard_input</span>(<span class="ident">scan_code</span>, <span class="ident">extended</span>) {
+                        <span class="macro">error!</span>(<span class="string">&quot;ps2_keyboard_handler: error handling PS2_PORT input: {:?}&quot;</span>, <span class="ident">e</span>);
+                    }
+                }
             }
         }
     }
-    <span class="ident">KEYBOARD_PRODUCER</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> {
-        <span class="ident">keyboard_queue_producer</span>
-    });
+    
+    <span class="ident">interrupts::eoi</span>(<span class="prelude-val">Some</span>(<span class="ident">PS2_KEYBOARD_IRQ</span>));
 }
 
 
 
-<span class="doccomment">/// returns Ok(()) if everything was handled properly.</span>
+<span class="doccomment">/// Called from the keyboard interrupt handler when a keystroke is recognized.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// Returns Ok(()) if everything was handled properly.</span>
 <span class="doccomment">/// Otherwise, returns an error string.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_keyboard_input</span>(<span class="ident">scan_code</span>: <span class="ident">u8</span>, <span class="ident">extended</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">handle_keyboard_input</span>(<span class="ident">scan_code</span>: <span class="ident">u8</span>, <span class="ident">extended</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="comment">// SAFE: no real race conditions with keyboard presses</span>
     <span class="kw">let</span> <span class="ident">modifiers</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;mut</span> <span class="ident">KBD_MODIFIERS</span> };
     <span class="comment">// debug!(&quot;KBD_MODIFIERS before {}: {:?}&quot;, scan_code, modifiers);</span>
@@ -261,42 +376,33 @@
         <span class="kw">_</span> =&gt; { } <span class="comment">// do nothing</span>
     }
 
-<span class="comment">//    debug!(&quot;KBD_MODIFIERS after {}: {:?}&quot;, scan_code, modifiers);</span>
+    <span class="comment">// debug!(&quot;KBD_MODIFIERS after {}: {:?}&quot;, scan_code, modifiers);</span>
 
     <span class="comment">// second,  put the keycode and it&#39;s action (pressed or released) in the keyboard queue</span>
-    <span class="kw">match</span> <span class="ident">scan_code</span> {
-        <span class="ident">x</span> =&gt; { 
-            <span class="kw">let</span> (<span class="ident">adjusted_scan_code</span>, <span class="ident">action</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">x</span> <span class="op">&lt;</span> <span class="ident">KEY_RELEASED_OFFSET</span> { 
-                (<span class="ident">scan_code</span>, <span class="ident">KeyAction::Pressed</span>) 
-            } <span class="kw">else</span> { 
-                (<span class="ident">scan_code</span> <span class="op">-</span> <span class="ident">KEY_RELEASED_OFFSET</span>, <span class="ident">KeyAction::Released</span>) 
-            };
+    <span class="kw">let</span> (<span class="ident">adjusted_scan_code</span>, <span class="ident">action</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">scan_code</span> <span class="op">&lt;</span> <span class="ident">KEY_RELEASED_OFFSET</span> { 
+        (<span class="ident">scan_code</span>, <span class="ident">KeyAction::Pressed</span>) 
+    } <span class="kw">else</span> { 
+        (<span class="ident">scan_code</span> <span class="op">-</span> <span class="ident">KEY_RELEASED_OFFSET</span>, <span class="ident">KeyAction::Released</span>) 
+    };
 
-            <span class="kw">let</span> <span class="ident">keycode</span> <span class="op">=</span> <span class="ident">Keycode::from_scancode</span>(<span class="ident">adjusted_scan_code</span>); 
-            <span class="kw">match</span> <span class="ident">keycode</span> {
-                <span class="prelude-val">Some</span>(<span class="ident">keycode</span>) =&gt; {
-                    <span class="kw">let</span> <span class="ident">event</span> <span class="op">=</span> <span class="ident">Event::new_keyboard_event</span>(<span class="ident">KeyEvent::new</span>(<span class="ident">keycode</span>, <span class="ident">action</span>, <span class="ident">modifiers</span>.<span class="ident">clone</span>()));
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">producer</span>) <span class="op">=</span> <span class="ident">KEYBOARD_PRODUCER</span>.<span class="ident">get</span>() {
-                        <span class="ident">producer</span>.<span class="ident">push</span>(<span class="ident">event</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;keyboard input queue is full&quot;</span>)
-                    }
-                    <span class="kw">else</span> {
-                        <span class="macro">warn!</span>(<span class="string">&quot;handle_keyboard_input(): KEYBOARD_PRODUCER wasn&#39;t yet initialized, dropping keyboard event {:?}.&quot;</span>, <span class="ident">event</span>);
-                        <span class="prelude-val">Err</span>(<span class="string">&quot;keyboard event queue not ready&quot;</span>)
-                    }
-                }
-
-                <span class="kw">_</span> =&gt; {
-                    <span class="kw">if</span> <span class="ident">scan_code</span> <span class="op">==</span> <span class="number">0xe0</span> {
-                        <span class="prelude-val">Ok</span>(()) <span class="comment">//ignore 0xe0 prefix</span>
-                    } <span class="kw">else</span> { 
-                        <span class="macro">warn!</span>(<span class="string">&quot;handle_keyboard_input(): Unknown keycode: {:?}&quot;</span>, <span class="ident">keycode</span>);
-                        <span class="prelude-val">Err</span>(<span class="string">&quot;unknown keyboard scancode&quot;</span>) 
-                    }
-                }
-            }
+    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">keycode</span>) <span class="op">=</span> <span class="ident">Keycode::from_scancode</span>(<span class="ident">adjusted_scan_code</span>) {
+        <span class="kw">let</span> <span class="ident">event</span> <span class="op">=</span> <span class="ident">Event::new_keyboard_event</span>(<span class="ident">KeyEvent::new</span>(<span class="ident">keycode</span>, <span class="ident">action</span>, <span class="ident">modifiers</span>.<span class="ident">clone</span>()));
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">producer</span>) <span class="op">=</span> <span class="ident">KEYBOARD_PRODUCER</span>.<span class="ident">get</span>() {
+            <span class="ident">producer</span>.<span class="ident">push</span>(<span class="ident">event</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;keyboard input queue is full&quot;</span>)
+        } <span class="kw">else</span> {
+            <span class="macro">warn!</span>(<span class="string">&quot;handle_keyboard_input(): KEYBOARD_PRODUCER wasn&#39;t yet initialized, dropping keyboard event {:?}.&quot;</span>, <span class="ident">event</span>);
+            <span class="prelude-val">Err</span>(<span class="string">&quot;keyboard event queue not ready&quot;</span>)
+        }
+    } <span class="kw">else</span> {
+        <span class="kw">if</span> <span class="ident">scan_code</span> <span class="op">==</span> <span class="number">0xE0</span> {
+            <span class="prelude-val">Ok</span>(()) <span class="comment">//ignore 0xE0 prefix</span>
+        } <span class="kw">else</span> { 
+            <span class="macro">error!</span>(<span class="string">&quot;handle_keyboard_input(): Unknown scancode: {:?}, adjusted scancode: {:?}&quot;</span>,
+                <span class="ident">scan_code</span>, <span class="ident">adjusted_scan_code</span>
+            );
+            <span class="prelude-val">Err</span>(<span class="string">&quot;unknown keyboard scancode&quot;</span>) 
         }
     }
-
 }
 
 
@@ -313,6 +419,7 @@
     }
 
     <span class="ident">keyboard_led</span>(<span class="ident">led_bitmask</span>);
-}</code></pre></div>
+}
+</code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="keyboard" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
 </body></html>
