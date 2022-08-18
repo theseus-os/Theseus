@@ -168,8 +168,6 @@ pub fn init_ap(
 /// Establishes the default interrupt handlers that are statically known.
 fn set_handlers(idt: &mut InterruptDescriptorTable) {
     // idt[0x28].set_handler_fn(rtc_handler);
-
-    idt[tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
 }
 
 
@@ -399,8 +397,3 @@ extern "x86-interrupt" fn pic_spurious_interrupt_handler(_stack_frame: Interrupt
     
 //     rtc::handle_rtc_interrupt();
 // }
-
-
-extern "x86-interrupt" fn ipi_handler(_stack_frame: InterruptStackFrame) {
-    eoi(None);
-}
