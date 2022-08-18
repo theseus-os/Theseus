@@ -41,9 +41,6 @@ path = "../exceptions_early"
 [dependencies.task]
 path = "../task"
 
-[dependencies.keyboard]
-path = "../keyboard"
-
 [dependencies.mouse]
 path = "../mouse"
 

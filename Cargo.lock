@@ -1304,7 +1304,6 @@ dependencies = [
  "exceptions_early",
  "gdt",
  "irq_safety",
- "keyboard",
  "locked_idt",
  "log",
  "memory",
@@ -1442,11 +1441,13 @@ name = "keyboard"
 version = "0.1.0"
 dependencies = [
  "event_types",
+ "interrupts",
  "keycodes_ascii",
  "log",
  "mpmc",
  "ps2",
  "spin 0.9.0",
+ "x86_64",
 ]
 
 [[package]]

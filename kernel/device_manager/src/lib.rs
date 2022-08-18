@@ -95,7 +95,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
     init_serial_port(SerialPortAddress::COM1);
     init_serial_port(SerialPortAddress::COM2);
 
-    keyboard::init(key_producer);
+    keyboard::init(key_producer)?;
     mouse::init(mouse_producer);
 
     // Initialize/scan the PCI bus to discover PCI devices

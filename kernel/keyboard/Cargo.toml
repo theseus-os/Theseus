@@ -1,15 +1,15 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "keyboard"
-description = "The keyboard driver"
+description = "A keyboard driver for keyboards connected to the legacy PS2 port"
 version = "0.1.0"
+edition = "2018"
 
 [dependencies]
 spin = "0.9.0"
+x86_64 = "0.14.8"
 mpmc = "0.1.6"
-
-[dependencies.log]
-version = "0.4.8"
+log = "0.4.8"
 
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
@@ -19,6 +19,9 @@ path = "../event_types"
 
 [dependencies.ps2]
 path = "../ps2"
+
+[dependencies.interrupts]
+path = "../interrupts"
 
 
 [lib]
