@@ -22,7 +22,7 @@ use log::{error, info, debug, trace};
 
 /// The IRQ number reserved for Local APIC timer interrupts in the IDT.
 pub const LOCAL_APIC_LVT_IRQ: u8 = 0x22;
-/// The IRQ number reserved for spurios interrupts (as recommended by OS dev wiki).
+/// The IRQ number reserved for spurious APIC interrupts (as recommended by OS dev wiki).
 pub const APIC_SPURIOUS_INTERRUPT_IRQ: u8 = 0xFF;
 
 /// The interrupt chip that is currently configured on this machine. 

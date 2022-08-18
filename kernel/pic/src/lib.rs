@@ -18,6 +18,8 @@ use core::fmt;
 /// which occupy the first 32 IRQ vectors.
 pub const IRQ_BASE_OFFSET: u8 = 0x20;
 
+/// The IRQ number reserved for spurious PIC interrupts (as recommended by OS dev wiki).
+pub const PIC_SPURIOUS_INTERRUPT_IRQ: u8 = IRQ_BASE_OFFSET + 0x7;
 
 /// Command sent to read the Interrupt Request Register.
 const CMD_IRR: u8 = 0x0A;
