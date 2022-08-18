@@ -1,17 +1,21 @@
 [package]
+authors = ["Bowen Liu <liubowenbob@hotmail.com>", "Kevin Boos <kevinaboos@gmail.com>"]
 name = "mouse"
+description = "A keyboard driver for keyboards connected to the legacy PS2 port"
 version = "0.1.0"
-authors = ["Bowen Liu <liubowenbob@hotmail.com>"]
+edition = "2018"
 
 [dependencies]
 spin = "0.9.0"
 mpmc = "0.1.6"
-
-[dependencies.log]
-version = "0.4.8"
+log = "0.4.8"
+x86_64 = "0.14.8"
 
 [dependencies.mouse_data]
 path = "../../libs/mouse_data"
+
+[dependencies.interrupts]
+path = "../interrupts"
 
 [dependencies.ps2]
 path = "../ps2"

@@ -714,10 +714,8 @@ dependencies = [
  "locked_idt",
  "log",
  "memory",
- "mouse",
  "pic",
  "port_io",
- "ps2",
  "scheduler",
  "sleep",
  "spin 0.9.0",
@@ -1020,11 +1018,13 @@ name = "mouse"
 version = "0.1.0"
 dependencies = [
  "event_types",
+ "interrupts",
  "log",
  "mouse_data",
  "mpmc",
  "ps2",
  "spin 0.9.0",
+ "x86_64",
 ]
 
 [[package]]

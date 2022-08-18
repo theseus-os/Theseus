@@ -77,7 +77,7 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame
 
     // whether there is any data on the port 0x60
     if indicator & 0x01 == 0x01 {
-        //whether the data is coming from the mouse
+        // Skip this if the PS2 event came from the mouse, not the keyboard
         if indicator & 0x20 != 0x20 {
             // in this interrupt, we must read the PS2_PORT scancode register before acknowledging the interrupt.
             let scan_code = ps2::ps2_read_data();

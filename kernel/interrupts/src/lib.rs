@@ -7,7 +7,6 @@
 
 pub use pic::IRQ_BASE_OFFSET;
 
-use ps2::handle_mouse_packet;
 use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc, InterruptDescriptorTable};
 use spin::Once;
 // use rtc;
@@ -169,7 +168,6 @@ pub fn init_ap(
 /// Establishes the default interrupt handlers that are statically known.
 fn set_handlers(idt: &mut InterruptDescriptorTable) {
     // idt[0x28].set_handler_fn(rtc_handler);
-    idt[0x2C].set_handler_fn(ps2_mouse_handler);
     idt[0x2E].set_handler_fn(primary_ata_handler);
     idt[0x2F].set_handler_fn(secondary_ata_handler);
 
@@ -306,31 +304,6 @@ pub fn eoi(irq: Option<u8>) {
     }
 }
 
-/// 0x2C
-extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
-
-    let indicator = ps2::ps2_status_register();
-
-    // whether there is any data on the port 0x60
-    if indicator & 0x01 == 0x01 {
-        //whether the data is coming from the mouse
-        if indicator & 0x20 == 0x20 {
-            let readdata = handle_mouse_packet();
-            if (readdata & 0x80 == 0x80) || (readdata & 0x40 == 0x40) {
-                error!("The overflow bits in the mouse data packet's first byte are set! Discarding the whole packet.");
-            } else if readdata & 0x08 == 0 {
-                error!("Third bit should in the mouse data packet's first byte should be always be 1. Discarding the whole packet since the bit is 0 now.");
-            } else {
-                let _mouse_event = mouse::handle_mouse_input(readdata);
-                // mouse::mouse_to_print(&_mouse_event);
-            }
-
-        }
-
-    }
-
-    eoi(Some(IRQ_BASE_OFFSET + 0xc));
-}
 
 pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
 /// 0x22
