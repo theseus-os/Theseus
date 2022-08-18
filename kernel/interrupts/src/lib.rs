@@ -27,7 +27,7 @@ pub static IDT: LockedIdt = LockedIdt::new();
 /// The single system-wide Programmable Interrupt Controller (PIC) chip.
 static PIC: Once<pic::ChainedPics> = Once::new();
 
-/// The list of IRQs reserved for Theseus-specific usage that cannot be 
+/// The list of IRQs reserved for Theseus-specific usage that cannot be
 /// used for general device interrupt handlers.
 /// These cannot be accessed by [`register_interrupt()`] or [`deregister_interrupt()`].
 static RESERVED_IRQ_LIST: [u8; 3] = [
@@ -201,13 +201,13 @@ pub fn init_handlers_pic() {
 }
 
 /// Registers an interrupt handler at the given IRQ interrupt number.
-/// 
-/// The function fails if the interrupt number is reserved or is already in use. 
-/// 
+///
+/// The function fails if the interrupt number is reserved or is already in use.
+///
 /// # Arguments 
 /// * `interrupt_num`: the interrupt (IRQ vector) that is being requested.
 /// * `func`: the handler to be registered, which will be invoked when the interrupt occurs.
-/// 
+///
 /// # Return
 /// * `Ok(())` if successfully registered, or
 /// * `Err(existing_handler_address)` if the given `interrupt_num` was already in use.
@@ -227,10 +227,10 @@ pub fn register_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), u6
     }
 } 
 
-/// Allocates and returns an unused interrupt number and sets its handler function. 
-/// 
+/// Allocates and returns an unused interrupt number and sets its handler function.
+///
 /// Returns an error if there are no unused interrupt number, which is highly unlikely.
-/// 
+///
 /// # Arguments
 /// * `func`: the handler for the assigned interrupt number.
 pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
@@ -249,11 +249,11 @@ pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
 } 
 
 /// Deregisters an interrupt handler, making it available to the rest of the system again.
-/// 
+///
 /// As a sanity/safety check, the caller must provide the `interrupt_handler`
 /// that is currently registered for the given IRQ `interrupt_num`.
 /// This function returns an error if the currently-registered handler does not match 'func'.
-/// 
+///
 /// # Arguments
 /// * `interrupt_num`: the IRQ that needs to be deregistered
 /// * `func`: the handler that should currently be stored for 'interrupt_num'
@@ -279,7 +279,7 @@ pub fn deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), 
 
 /// Send an end of interrupt signal, notifying the interrupt chip that
 /// the given interrupt request `irq` has been serviced. 
-/// 
+///
 /// This function supports all types of interrupt chips -- APIC, x2apic, PIC --
 /// and will perform the correct EOI operation based on which chip is currently active.
 ///
