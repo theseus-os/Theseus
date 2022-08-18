@@ -84,7 +84,7 @@ dependencies = [
  "memory",
  "msr",
  "owning_ref",
- "pit_clock",
+ "pit_clock_basic",
  "raw-cpuid",
  "spin 0.9.0",
  "static_assertions",
@@ -711,15 +711,11 @@ dependencies = [
  "exceptions_early",
  "gdt",
  "irq_safety",
- "kernel_config",
- "keyboard",
- "lazy_static",
  "locked_idt",
  "log",
  "memory",
  "mouse",
  "pic",
- "pit_clock",
  "port_io",
  "ps2",
  "scheduler",
@@ -804,18 +800,6 @@ dependencies = [
 [[package]]
 name = "kernel_config"
 version = "0.1.0"
-
-[[package]]
-name = "keyboard"
-version = "0.1.0"
-dependencies = [
- "event_types",
- "keycodes_ascii",
- "log",
- "mpmc",
- "ps2",
- "spin 0.9.0",
-]
 
 [[package]]
 name = "keycodes_ascii"
@@ -1080,7 +1064,7 @@ dependencies = [
  "memory",
  "mod_mgmt",
  "pause",
- "pit_clock",
+ "pit_clock_basic",
  "spin 0.9.0",
  "stack",
  "volatile 0.2.7",
@@ -1215,7 +1199,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pit_clock"
+name = "pit_clock_basic"
 version = "0.1.0"
 dependencies = [
  "log",
@@ -1727,7 +1711,7 @@ name = "tsc"
 version = "0.1.0"
 dependencies = [
  "log",
- "pit_clock",
+ "pit_clock_basic",
 ]
 
 [[package]]
