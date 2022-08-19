@@ -7,7 +7,7 @@
 
 pub use pic::IRQ_BASE_OFFSET;
 
-use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc, InterruptDescriptorTable};
+use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc};
 use spin::Once;
 // use rtc;
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -138,11 +138,12 @@ pub fn init(
     }
 
     // try to load our new IDT    
-    {
-        info!("trying to load IDT for BSP...");
-        IDT.load();
-        info!("loaded IDT for BSP.");
-    }
+    info!("trying to load IDT for BSP...");
+    IDT.load();
+    info!("loaded IDT for BSP.");
+
+    // Use the APIC instead of the old PIC
+    disable_pic();
 
     Ok(&IDT)
 }
@@ -157,32 +158,25 @@ pub fn init_ap(
     info!("Setting up TSS & GDT for AP {}", apic_id);
     gdt::create_and_load_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
-    // We've already created the IDT initially (currently all APs share the BSP's IDT),
+    // We've already created the IDT initially (currently all CPUs share the initial IDT),
     // so we only need to re-load it here for each AP.
     IDT.load();
     info!("loaded IDT for AP {}.", apic_id);
     Ok(&IDT)
 }
 
-
-/// Establishes the default interrupt handlers that are statically known.
-fn set_handlers(idt: &mut InterruptDescriptorTable) {
-    // idt[0x28].set_handler_fn(rtc_handler);
-}
-
-
-pub fn init_handlers_apic() {
-    // first, do the standard interrupt remapping, but mask all PIC interrupts / disable the PIC
+/// Disables the PIC by masking all of its interrupts, indicating this system uses an APIC.
+fn disable_pic() {
     PIC.call_once(|| pic::ChainedPics::init(0xFF, 0xFF)); // disable all PIC IRQs
-    
-    set_handlers(&mut IDT.lock());
 }
 
-
-pub fn init_handlers_pic() {
-    set_handlers(&mut IDT.lock());
-
-    // init PIC, PIT and RTC interrupts
+/// Enable the PIC by enabling all of its interrupts.
+/// This indicates the system does not have an APIC or that we don't wish to use it.
+/// 
+/// Note: currently we assume all systems have an APIC, so this is not used.
+///       If we ever did re-enable it, we would also need to set up PIT/RTC timer interrupts
+///       for preemptive task switching instead of the APIC LVT timer.
+fn _enable_pic() {
     let master_pic_mask: u8 = 0x0; // allow every interrupt
     let slave_pic_mask: u8 = 0b0000_1000; // everything is allowed except 0x2B 
     PIC.call_once(|| pic::ChainedPics::init(master_pic_mask, slave_pic_mask));
