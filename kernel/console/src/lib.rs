@@ -18,7 +18,7 @@ extern crate text_terminal;
 
 use core::{marker::PhantomData, sync::atomic::{AtomicU16, Ordering}};
 use alloc::string::String;
-use task::TaskRef;
+use task::JoinableTaskRef;
 use async_channel::Receiver;
 use serial_port::{SerialPort, SerialPortAddress, get_serial_port, DataChunk};
 use io::LockableIo;
@@ -40,7 +40,7 @@ pub fn ignore_serial_port_input(serial_port_address: u16) {
 /// by waiting for new data to be received on serial ports.
 ///
 /// Returns the newly-spawned detection task.
-pub fn start_connection_detection() -> Result<TaskRef, &'static str> {
+pub fn start_connection_detection() -> Result<JoinableTaskRef, &'static str> {
 	let (sender, receiver) = async_channel::new_channel(4);
 	serial_port::set_connection_listener(sender);
 

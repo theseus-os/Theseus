@@ -35,16 +35,16 @@ extern crate thread_local_macro;
 
 use core::{marker::PhantomData, mem, ops::Deref};
 use alloc::{
-    vec::Vec,
+    boxed::Box,
     string::{String, ToString},
     sync::Arc,
-    boxed::Box,
+    vec::Vec,
 };
 use spin::Mutex;
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo};
 use stack::Stack;
-use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST};
+use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use apic::get_my_apic_id;
@@ -119,11 +119,11 @@ pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
 /// which will then mark itself as exited and remove itself from runqueues.
 /// 
 /// See [`init()`] and [`task::bootstrap_task()`].
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct BootstrapTaskRef {
     #[allow(dead_code)]
     apic_id: u8,
-    task_ref: TaskRef,
+    task_ref: JoinableTaskRef,
 }
 impl Deref for BootstrapTaskRef {
     type Target = TaskRef;
@@ -178,6 +178,19 @@ pub fn new_task_builder<F, A, R>(
     TaskBuilder::new(func, argument)
 }
 
+
+/// Every executable application must have an entry function named "main".
+const ENTRY_POINT_SECTION_NAME: &'static str = "main";
+
+/// The argument type accepted by the `main` function entry point into each application.
+type MainFuncArg = Vec<String>;
+
+/// The type returned by the `main` function entry point of each application.
+type MainFuncRet = isize;
+
+/// The function signature of the `main` function that every application must have,
+/// as it is the entry point into each application `Task`.
+type MainFunc = fn(MainFuncArg) -> MainFuncRet;
 
 /// Creates a builder for a new application `Task`. 
 /// 
@@ -332,7 +345,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
     /// 
     /// This merely makes the new task Runnable, it does not switch to it immediately; that will happen on the next scheduler invocation.
     #[inline(never)]
-    pub fn spawn(self) -> Result<TaskRef, &'static str> {
+    pub fn spawn(self) -> Result<JoinableTaskRef, &'static str> {
         let mut new_task = Task::new(
             None,
             task_cleanup_failure::<F, A, R>,
@@ -376,21 +389,25 @@ impl<F, A, R> TaskBuilder<F, A, R>
 
         let new_task_id = new_task.id;
         let task_ref = TaskRef::new(new_task);
-        let old_task = TASKLIST.lock().insert(new_task_id, task_ref.clone());
+        let _existing_task = TASKLIST.lock().insert(new_task_id, task_ref.clone());
         // insert should return None, because that means there was no existing task with the same ID 
-        if old_task.is_some() {
-            error!("BUG: TaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
+        if let Some(_existing_task) = _existing_task {
+            error!("BUG: TaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID! {:?}", _existing_task);
             return Err("BUG: TASKLIST a contained a task with the new task's ID");
         }
         
         if let Some(core) = self.pin_on_core {
             runqueue::add_task_to_specific_runqueue(core, task_ref.clone())?;
-        }
-        else {
+        } else {
             runqueue::add_task_to_any_runqueue(task_ref.clone())?;
         }
 
         Ok(task_ref)
+
+        // Ok(TaskJoiner::<R> {
+        //     task: task_ref,
+        //     _phantom: PhantomData,
+        // })
     }
 
 }
@@ -441,7 +458,10 @@ impl<F, A, R> TaskBuilder<F, A, R>
     /// This function merely makes the new task Runnable, it does not switch to it immediately;
     /// that will happen on the next scheduler invocation.
     #[inline(never)]
-    pub fn spawn_restartable(mut self, restart_with_arg: Option<A>) -> Result<TaskRef, &'static str> {
+    pub fn spawn_restartable(
+        mut self,
+        restart_with_arg: Option<A>
+    ) -> Result<JoinableTaskRef, &'static str> {
         let restart_info = RestartInfo {
             argument: Box::new(restart_with_arg.unwrap_or_else(|| self.argument.clone())),
             func: Box::new(self.func.clone()),
@@ -463,18 +483,43 @@ impl<F, A, R> TaskBuilder<F, A, R>
     }
 }
 
-/// Every executable application must have an entry function named "main".
-const ENTRY_POINT_SECTION_NAME: &'static str = "main";
 
-/// The argument type accepted by the `main` function entry point into each application.
-type MainFuncArg = Vec<String>;
+// Note: this is currently not used because it requires many sweeping changes
+//       everywhere that `spawn()` is called to pass on the generic type parameter `R`.
+//
+// /// The object is returned when a new [`Task`] is [`spawn`]ed.
+// /// 
+// /// This allows the "parent" task (the one that spawned this task) to:
+// /// * [`join`] this task, i.e., wait for this task to finish executing,
+// /// * to obtain its [exit value] after it has completed.
+// /// 
+// /// The type parameter `R` is the type that this task will return upon successful completion.
+// /// As such, it is derived from the return type of the entry function `func`
+// /// that was passed into [`new_task_builder()`]
+// /// If dropped, this task will be *detached* and treated as an "orphan" task.
+// /// This means that there is no way for another task to wait for it to complete
+// /// or obtain its exit value.
+// /// As such, this task will be auto-reaped after it exits (in order to avoid zombie tasks).
+// /// 
+// /// Implementation-wise, this is a wrapper around [`JoinableTaskRef`], which marks a task
+// /// as non-joinable when it is dropped.
+// /// This type adds the ability to obtain its exit value as a typed object, 
+// /// because only the [`spawn`] function knows that type `R`, whereas the task itself does not.
+// /// 
+// /// [`spawn`]: TaskBuilder::spawn
+// /// [`join`]: TaskRef::join
+// /// [exit value]: task::ExitValue
+// pub struct TaskJoiner<R: Send + 'static> {
+//     task: JoinableTaskRef,
+//     _phantom: PhantomData<R>,
+// }
+// impl<R: Send + 'static> Deref for TaskJoiner<R> {
+//     type Target = JoinableTaskRef;
+//     fn deref(&self) -> &Self::Target {
+//         &self.task
+//     }
+// }
 
-/// The type returned by the `main` function entry point of each application.
-type MainFuncRet = isize;
-
-/// The function signature of the `main` function that every application must have,
-/// as it is the entry point into each application `Task`.
-type MainFunc = fn(MainFuncArg) -> MainFuncRet;
 
 /// A wrapper around a task's function and argument.
 #[derive(Debug)]
@@ -738,6 +783,13 @@ fn task_cleanup_final_internal(current_task: &TaskRef) {
             (tls_dtor.dtor)(tls_dtor.object_ptr as *mut u8);
         }
     }
+
+    // Third, reap the task if it has been orphaned (if it's non-joinable).
+    if !current_task.is_joinable() {
+        // trace!("Reaping orphaned task... {:?}", current_task);
+        let _exit_value = current_task.take_exit_value();
+        // trace!("Reaped orphaned task {:?}, {:?}", current_task, _exit_value);
+    }
 }
 
 
@@ -869,7 +921,7 @@ fn remove_current_task_from_runqueue(current_task: &TaskRef) {
 }
 
 /// Spawns an idle task on the current CPU and adds it to this CPU's runqueue.
-pub fn create_idle_task() -> Result<TaskRef, &'static str> {
+pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
     let apic_id = get_my_apic_id();
     debug!("Spawning a new idle task on core {}", apic_id);
 

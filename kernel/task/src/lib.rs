@@ -48,7 +48,7 @@ extern crate crossbeam_utils;
 
 use core::fmt;
 use core::hash::{Hash, Hasher};
-use core::sync::atomic::{Ordering, AtomicUsize};
+use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool};
 use core::any::Any;
 use core::panic::PanicInfo;
 use core::ops::Deref;
@@ -337,6 +337,15 @@ pub struct Task {
     ///
     /// This is not public because it permits interior mutability.
     runstate: AtomicCell<RunState>,
+    /// Whether this Task is joinable.
+    /// * If `true`, another task holds the [`JoinableTaskRef`] object that was created
+    ///   by [`TaskRef::new()`], which indicates that that other task is able to
+    ///   wait for this task to exit and thus be able to obtain this task's exit value.
+    /// * If `false`, the [`JoinableTaskRef`] was dropped, and therefore no other task
+    ///   can join this task or obtain its exit value.
+    /// 
+    /// This is not public because it permits interior mutability.
+    joinable: AtomicBool,
     /// Memory management details: page tables, mappings, allocators, etc.
     /// This is shared among all other tasks in the same address space.
     pub mmi: MmiRef, 
@@ -462,8 +471,10 @@ impl Task {
             }),
             id: task_id,
             name: format!("task_{}", task_id),
-            runstate: AtomicCell::new(RunState::Initing),
             running_on_cpu: AtomicCell::new(None.into()),
+            runstate: AtomicCell::new(RunState::Initing),
+            // Tasks are not considered "joinable" until passed to `TaskRef::new()`
+            joinable: AtomicBool::new(false),
             mmi,
             is_an_idle_task: false,
             app_crate,
@@ -503,6 +514,22 @@ impl Task {
     /// Returns the APIC ID of the CPU this `Task` is currently running on.
     pub fn running_on_cpu(&self) -> Option<u8> {
         self.running_on_cpu.load().into()
+    }
+
+    /// Returns `true` if this task is joinable, `false` if not.
+    /// 
+    /// * If `true`, another task holds the [`JoinableTaskRef`] object that was created
+    ///   by [`TaskRef::new()`], which indicates that that other task is able to
+    ///   wait for this task to exit and thus be able to obtain this task's exit value.
+    /// * If `false`, the `TaskJoiner` object was dropped, and therefore no other task
+    ///   can join this task or obtain its exit value.
+    /// 
+    /// When a task is not joinable, it is considered to be an orphan
+    /// and will thus be automatically reaped and cleaned up once it exits
+    /// because no other task is waiting on it to exit.
+    #[doc(alias("orphan", "zombie"))]
+    pub fn is_joinable(&self) -> bool {
+        self.joinable.load(Ordering::Relaxed)
     }
 
     /// Returns the APIC ID of the CPU this `Task` is pinned on,
@@ -614,6 +641,7 @@ impl Task {
     ///
     /// # Locking / Deadlock
     /// Obtains the lock on this `Task`'s inner state in order to mutate it.    
+    #[doc(alias("reap"))]
     pub fn take_exit_value(&self) -> Option<ExitValue> {
         if self.runstate() == RunState::Exited {
             self.runstate.store(RunState::Reaped);
@@ -895,6 +923,49 @@ impl fmt::Display for Task {
 }
 
 
+/// Represents a joinable [`TaskRef`], created by [`TaskRef::new()`].
+/// Auto-derefs into a [`TaskRef`].
+///
+/// This allows another task to:
+/// * [`join`] this task, i.e., wait for this task to finish executing,
+/// * to obtain its [exit value] after it has completed.
+/// 
+/// ## [`Drop`]-based Behavior
+/// The contained [`Task`] is joinable until this object is dropped.
+/// When dropped, this task will be marked as non-joinable and treated as an "orphan" task.
+/// This means that there is no way for another task to wait for it to complete
+/// or obtain its exit value.
+/// As such, this task will be auto-reaped after it exits (in order to avoid zombie tasks).
+/// 
+/// ## Not `Clone`-able
+/// Due to the above drop-based behavior, this type must not implement `Clone`
+/// because it assumes there is only ever one `JoinableTaskRef` per task.
+/// 
+/// However, this type auto-derefs into an inner [`TaskRef`], which *can* be cloned.
+/// 
+// /// Note: this type is considered an internal implementation detail.
+// /// Instead, use the `TaskJoiner` type from the `spawn` crate, 
+// /// which is intended to be the public-facing interface for joining a task.
+#[derive(Debug)]
+pub struct JoinableTaskRef {
+    task: TaskRef,
+}
+assert_not_impl_any!(JoinableTaskRef: Clone);
+impl Deref for JoinableTaskRef {
+    type Target = TaskRef;
+    fn deref(&self) -> &Self::Target {
+        &self.task
+    }
+}
+impl Drop for JoinableTaskRef {
+    /// Marks the inner [`Task`] as not joinable, meaning that it is an orphaned task
+    /// that will be auto-reaped after exiting.
+    fn drop(&mut self) {
+        self.task.joinable.store(false, Ordering::Relaxed);
+    }
+}
+
+
 /// A shareable, cloneable reference to a `Task` that exposes more methods
 /// for task management and auto-derefs into an immutable `&Task` reference.
 /// 
@@ -909,19 +980,29 @@ impl fmt::Display for Task {
 pub struct TaskRef(Arc<Task>);
 
 impl TaskRef {
-    /// Creates a new `TaskRef` that wraps the given `Task`.
+    /// Creates a new `TaskRef`, a shareable wrapper around the given `Task`.
     /// 
-    /// Also initializes the given `Task`'s `TaskLocalData` struct,
+    /// This function also initializes the given `Task`'s `TaskLocalData` struct,
     /// which will be used to determine the current `Task` on each CPU.
-    pub fn new(task: Task) -> TaskRef {
+    /// 
+    /// It does *not* add this task to the system-wide task list or any runqueues,
+    /// nor does it schedule this task in.
+    /// 
+    /// ## Return
+    /// Returns a [`JoinableTaskRef`], which derefs into the newly-created `TaskRef`
+    /// and can be used to "join" this task (wait for it to exit) and obtain its exit value.
+    pub fn new(task: Task) -> JoinableTaskRef {
         let task_id = task.id;
         let taskref = TaskRef(Arc::new(task));
         let tld = TaskLocalData {
-            current_taskref: taskref.clone(),
-            current_task_id: task_id,
+            taskref: taskref.clone(),
+            task_id,
         };
         taskref.0.inner.lock().task_local_data = Some(Box::new(tld));
-        taskref
+
+        // Mark this task as joinable, now that it has been wrapped in the proper type.
+        taskref.joinable.store(true, Ordering::Relaxed);
+        JoinableTaskRef { task: taskref }
     }
 
     /// Blocks until this task has exited or has been killed.
@@ -1097,7 +1178,7 @@ pub fn bootstrap_task(
     apic_id: u8, 
     stack: Stack,
     kernel_mmi_ref: MmiRef,
-) -> Result<TaskRef, &'static str> {
+) -> Result<JoinableTaskRef, &'static str> {
     // Here, we cannot call `Task::new()` because tasking hasn't yet been set up for this core.
     // Instead, we generate all of the `Task` states manually, and create an initial task directly.
     let default_namespace = mod_mgmt::get_initial_kernel_namespace()
@@ -1161,8 +1242,8 @@ fn bootstrap_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason
 // #[repr(C)]
 #[derive(Debug)]
 struct TaskLocalData {
-    current_taskref: TaskRef,
-    current_task_id: usize,
+    taskref: TaskRef,
+    task_id: usize,
 }
 
 /// Returns a reference to the current task's `TaskLocalData` 
@@ -1182,10 +1263,10 @@ fn get_task_local_data() -> Option<&'static TaskLocalData> {
 
 /// Returns a reference to the current task.
 pub fn get_my_current_task() -> Option<&'static TaskRef> {
-    get_task_local_data().map(|tld| &tld.current_taskref)
+    get_task_local_data().map(|tld| &tld.taskref)
 }
 
 /// Returns the current task's ID.
 pub fn get_my_current_task_id() -> Option<usize> {
-    get_task_local_data().map(|tld| tld.current_task_id)
+    get_task_local_data().map(|tld| tld.task_id)
 }
