@@ -341,7 +341,7 @@ pub struct Task {
     /// * If `true`, another task holds the [`JoinableTaskRef`] object that was created
     ///   by [`TaskRef::new()`], which indicates that that other task is able to
     ///   wait for this task to exit and thus be able to obtain this task's exit value.
-    /// * If `false`, the `TaskJoiner` object was dropped, and therefore no other task
+    /// * If `false`, the [`JoinableTaskRef`] was dropped, and therefore no other task
     ///   can join this task or obtain its exit value.
     /// 
     /// This is not public because it permits interior mutability.
@@ -891,6 +891,9 @@ impl Task {
         {
             let mut inner = self.inner.lock();
             let prev_task_data_to_drop = inner.drop_after_task_switch.take();
+            if let Some(ref data) = prev_task_data_to_drop {
+                error!("Task {:?} is dropping previous task's data {:?}", get_my_current_task().unwrap(), data);
+            }
             drop(inner); // release the lock as soon as possible
             drop(prev_task_data_to_drop);
         }
@@ -932,6 +935,7 @@ impl fmt::Display for Task {
 /// Auto-derefs into a [`TaskRef`].
 /// 
 /// The contained [`Task`] remains joinable until this object is dropped.
+#[derive(Debug)]
 pub struct JoinableTaskRef {
     task: TaskRef,
 }
@@ -977,8 +981,8 @@ impl TaskRef {
         let task_id = task.id;
         let taskref = TaskRef(Arc::new(task));
         let tld = TaskLocalData {
-            current_taskref: taskref.clone(),
-            current_task_id: task_id,
+            taskref: taskref.clone(),
+            task_id,
         };
         taskref.0.inner.lock().task_local_data = Some(Box::new(tld));
 
@@ -1160,7 +1164,7 @@ pub fn bootstrap_task(
     apic_id: u8, 
     stack: Stack,
     kernel_mmi_ref: MmiRef,
-) -> Result<TaskRef, &'static str> {
+) -> Result<JoinableTaskRef, &'static str> {
     // Here, we cannot call `Task::new()` because tasking hasn't yet been set up for this core.
     // Instead, we generate all of the `Task` states manually, and create an initial task directly.
     let default_namespace = mod_mgmt::get_initial_kernel_namespace()
@@ -1224,8 +1228,8 @@ fn bootstrap_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason
 // #[repr(C)]
 #[derive(Debug)]
 struct TaskLocalData {
-    current_taskref: TaskRef,
-    current_task_id: usize,
+    taskref: TaskRef,
+    task_id: usize,
 }
 
 /// Returns a reference to the current task's `TaskLocalData` 
@@ -1245,10 +1249,10 @@ fn get_task_local_data() -> Option<&'static TaskLocalData> {
 
 /// Returns a reference to the current task.
 pub fn get_my_current_task() -> Option<&'static TaskRef> {
-    get_task_local_data().map(|tld| &tld.current_taskref)
+    get_task_local_data().map(|tld| &tld.taskref)
 }
 
 /// Returns the current task's ID.
 pub fn get_my_current_task_id() -> Option<usize> {
-    get_task_local_data().map(|tld| tld.current_task_id)
+    get_task_local_data().map(|tld| tld.task_id)
 }

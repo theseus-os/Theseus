@@ -35,16 +35,16 @@ extern crate thread_local_macro;
 
 use core::{marker::PhantomData, mem, ops::Deref};
 use alloc::{
-    vec::Vec,
+    boxed::Box,
     string::{String, ToString},
     sync::Arc,
-    boxed::Box,
+    vec::Vec,
 };
 use spin::Mutex;
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo};
 use stack::Stack;
-use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST};
+use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use apic::get_my_apic_id;
@@ -119,11 +119,11 @@ pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
 /// which will then mark itself as exited and remove itself from runqueues.
 /// 
 /// See [`init()`] and [`task::bootstrap_task()`].
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct BootstrapTaskRef {
     #[allow(dead_code)]
     apic_id: u8,
-    task_ref: TaskRef,
+    task_ref: JoinableTaskRef,
 }
 impl Deref for BootstrapTaskRef {
     type Target = TaskRef;
@@ -147,7 +147,7 @@ impl BootstrapTaskRef {
 impl Drop for BootstrapTaskRef {
     // See the documentation for `BootstrapTaskRef::finish()` for more details.
     fn drop(&mut self) {
-        // trace!("Finishing Bootstrap Task on core {}: {:?}", self.apic_id, self.task_ref);
+        trace!("Finishing Bootstrap Task on core {}: {:?}", self.apic_id, self.task_ref);
         remove_current_task_from_runqueue(&self.task_ref);
         self.mark_as_exited(Box::new(()))
             .expect("BUG: bootstrap task was unable to mark itself as exited");
@@ -345,7 +345,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
     /// 
     /// This merely makes the new task Runnable, it does not switch to it immediately; that will happen on the next scheduler invocation.
     #[inline(never)]
-    pub fn spawn(self) -> Result<TaskRef, &'static str> {
+    pub fn spawn(self) -> Result<JoinableTaskRef, &'static str> {
         let mut new_task = Task::new(
             None,
             task_cleanup_failure::<F, A, R>,
@@ -402,10 +402,12 @@ impl<F, A, R> TaskBuilder<F, A, R>
             runqueue::add_task_to_any_runqueue(task_ref.clone())?;
         }
 
-        Ok(TaskJoiner::<R> {
-            task: task_ref,
-            _phantom: PhantomData,
-        })
+        Ok(task_ref)
+
+        // Ok(TaskJoiner::<R> {
+        //     task: task_ref,
+        //     _phantom: PhantomData,
+        // })
     }
 
 }
@@ -456,7 +458,10 @@ impl<F, A, R> TaskBuilder<F, A, R>
     /// This function merely makes the new task Runnable, it does not switch to it immediately;
     /// that will happen on the next scheduler invocation.
     #[inline(never)]
-    pub fn spawn_restartable(mut self, restart_with_arg: Option<A>) -> Result<TaskRef, &'static str> {
+    pub fn spawn_restartable(
+        mut self,
+        restart_with_arg: Option<A>
+    ) -> Result<JoinableTaskRef, &'static str> {
         let restart_info = RestartInfo {
             argument: Box::new(restart_with_arg.unwrap_or_else(|| self.argument.clone())),
             func: Box::new(self.func.clone()),
@@ -479,38 +484,38 @@ impl<F, A, R> TaskBuilder<F, A, R>
 }
 
 
-/// The object is returned when a new [`Task`] is [`spawn`]ed.
-/// 
-/// This allows the "parent" task (the one that spawned this task) to:
-/// * [`join`] this task, i.e., wait for this task to finish executing,
-/// * to obtain its [exit value] after it has completed.
-/// 
-/// The type parameter `R` is the type that this task will return upon successful completion.
-/// As such, it is derived from the return type of the entry function `func`
-/// that was passed into [`new_task_builder()`]
-/// If dropped, this task will be *detached* and treated as an "orphan" task.
-/// This means that there is no way for another task to wait for it to complete
-/// or obtain its exit value.
-/// As such, this task will be auto-reaped after it exits (in order to avoid zombie tasks).
-/// 
-/// Implementation-wise, this is a wrapper around [`JoinableTaskRef`], which marks a task
-/// as non-joinable when it is dropped.
-/// This type adds the ability to obtain its exit value as a typed object, 
-/// because only the [`spawn`] function knows that type `R`, whereas the task itself does not.
-/// 
-/// [`spawn`]: TaskBuilder::spawn
-/// [`join`]: TaskRef::join
-/// [exit value]: task::ExitValue
-pub struct TaskJoiner<R: Send + 'static> {
-    task: JoinableTaskRef,
-    _phantom: PhantomData<R>,
-}
-impl<R: Send + 'static> Deref for TaskJoiner<R> {
-    type Target = JoinableTaskRef;
-    fn deref(&self) -> &Self::Target {
-        &self.task
-    }
-}
+// /// The object is returned when a new [`Task`] is [`spawn`]ed.
+// /// 
+// /// This allows the "parent" task (the one that spawned this task) to:
+// /// * [`join`] this task, i.e., wait for this task to finish executing,
+// /// * to obtain its [exit value] after it has completed.
+// /// 
+// /// The type parameter `R` is the type that this task will return upon successful completion.
+// /// As such, it is derived from the return type of the entry function `func`
+// /// that was passed into [`new_task_builder()`]
+// /// If dropped, this task will be *detached* and treated as an "orphan" task.
+// /// This means that there is no way for another task to wait for it to complete
+// /// or obtain its exit value.
+// /// As such, this task will be auto-reaped after it exits (in order to avoid zombie tasks).
+// /// 
+// /// Implementation-wise, this is a wrapper around [`JoinableTaskRef`], which marks a task
+// /// as non-joinable when it is dropped.
+// /// This type adds the ability to obtain its exit value as a typed object, 
+// /// because only the [`spawn`] function knows that type `R`, whereas the task itself does not.
+// /// 
+// /// [`spawn`]: TaskBuilder::spawn
+// /// [`join`]: TaskRef::join
+// /// [exit value]: task::ExitValue
+// pub struct TaskJoiner<R: Send + 'static> {
+//     task: JoinableTaskRef,
+//     _phantom: PhantomData<R>,
+// }
+// impl<R: Send + 'static> Deref for TaskJoiner<R> {
+//     type Target = JoinableTaskRef;
+//     fn deref(&self) -> &Self::Target {
+//         &self.task
+//     }
+// }
 
 
 /// A wrapper around a task's function and argument.
@@ -764,7 +769,7 @@ fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason:
 
 /// Internal function that performs final cleanup actions for an exited task.
 #[inline(always)]
-fn task_cleanup_final_internal(current_task: &TaskRef) {
+fn task_cleanup_final_internal<R: Send + 'static>(current_task: &TaskRef) {
     // First, remove the task from its runqueue(s).
     remove_current_task_from_runqueue(current_task);
 
@@ -774,6 +779,13 @@ fn task_cleanup_final_internal(current_task: &TaskRef) {
         unsafe {
             (tls_dtor.dtor)(tls_dtor.object_ptr as *mut u8);
         }
+    }
+
+    // Third, reap the task if it has been orphaned (if it's non-joinable).
+    if !current_task.is_joinable() {
+        trace!("Reaping orphaned task... {:?}", current_task);
+        let _exit_value = current_task.take_exit_value();
+        trace!("Reaped orphaned task {:?}, {:?}", current_task, _exit_value);
     }
 }
 
@@ -785,7 +797,7 @@ fn task_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInterrupts, curr
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
-    task_cleanup_final_internal(&current_task);
+    task_cleanup_final_internal::<R>(&current_task);
     drop(current_task);
     drop(held_interrupts);
     // ****************************************************
@@ -805,7 +817,7 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
          R: Send + 'static,
          F: FnOnce(A) -> R + Send + Clone + 'static, 
 {
-    task_cleanup_final_internal(&current_task);
+    task_cleanup_final_internal::<R>(&current_task);
 
     {
         #[cfg(use_crate_replacement)]
@@ -906,7 +918,7 @@ fn remove_current_task_from_runqueue(current_task: &TaskRef) {
 }
 
 /// Spawns an idle task on the current CPU and adds it to this CPU's runqueue.
-pub fn create_idle_task() -> Result<TaskRef, &'static str> {
+pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
     let apic_id = get_my_apic_id();
     debug!("Spawning a new idle task on core {}", apic_id);
 

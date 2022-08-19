@@ -33,11 +33,11 @@ use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use path::Path;
-use task::{TaskRef, ExitValue, KillReason};
+use task::{ExitValue, KillReason, JoinableTaskRef};
 use libterm::Terminal;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use alloc::sync::Arc;
-use spin::{Mutex, MutexGuard};
+use spin::Mutex;
 use environment::Environment;
 use core::mem;
 use alloc::collections::BTreeMap;
@@ -45,7 +45,7 @@ use stdio::{Stdio, KeyEventQueue, KeyEventQueueReader, KeyEventQueueWriter,
             StdioReader, StdioWriter};
 use core2::io::Write;
 use core::ops::Deref;
-use app_io::{IoStreams, IoControlFlags};
+use app_io::IoStreams;
 use fs_node::FileOrDir;
 
 /// The status of a job.
@@ -66,7 +66,7 @@ enum JobStatus {
 struct Job {
     /// References to the tasks that form this job. They are stored in the same sequence as
     /// in the command line.
-    tasks: Vec<TaskRef>,
+    tasks: Vec<JoinableTaskRef>,
     /// A copy of the task ids. Mainly for performance optimization. Task ids are stored
     /// in the same sequence as in `tasks`.
     task_ids: Vec<usize>,
@@ -396,24 +396,23 @@ impl Shell {
 
         // Ctrl+C signals the shell to exit the job
         if keyevent.modifiers.is_control() && keyevent.keycode == Keycode::C {
-            if let Some(ref fg_job_num) = self.fg_job_num {
-                let task_refs = match self.jobs.get(fg_job_num) {
-                    Some(job) => job.tasks.clone(), 
-                    None => {
-                        self.clear_cmdline(true)?;
-                        self.input_buffer.clear();
-                        self.terminal.lock().print_to_terminal("^C\n".to_string());
-                        self.redisplay_prompt();
-                        return Ok(());
-                    }
-                };
+            let fg_job_num = if let Some(fg_job_num) = self.fg_job_num {
+                fg_job_num
+            } else {
+                // If there is no running foreground job, simply print "^C", refresh, and return.
+                self.clear_cmdline(false)?;
+                self.input_buffer.clear();
+                self.terminal.lock().print_to_terminal("^C\n".to_string());
+                self.history_index = 0;
+                self.redisplay_prompt();
+                return Ok(());
+            };
 
+            if let Some(task_refs) = self.jobs.get(&fg_job_num).map(|job| &job.tasks) {
                 // Lock the shared structure in `app_io` and then kill the running application
-                app_io::lock_and_execute(&move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
-                                                _streamss_guard: MutexGuard<BTreeMap<usize, IoStreams>>| {
-
+                app_io::lock_and_execute(&|_flags_guard, _streams_guard| {
                     // Kill all tasks in the job.
-                    for task_ref in &task_refs {
+                    for task_ref in task_refs {
                         if task_ref.has_exited() { continue; }
                         match task_ref.kill(KillReason::Requested) {
                             Ok(_) => {
@@ -439,33 +438,30 @@ impl Shell {
                 });
                 self.terminal.lock().print_to_terminal("^C\n".to_string());
             } else {
-                self.clear_cmdline(false)?;
+                self.clear_cmdline(true)?;
                 self.input_buffer.clear();
                 self.terminal.lock().print_to_terminal("^C\n".to_string());
-                self.history_index = 0;
                 self.redisplay_prompt();
+                return Ok(());
             }
+            
             return Ok(());
         }
 
         // Ctrl+Z signals the shell to stop the job
         if keyevent.modifiers.is_control() && keyevent.keycode == Keycode::Z {
-            // Do nothing if we have no running foreground job.
+            let fg_job_num = if let Some(fg_job_num) = self.fg_job_num {
+                fg_job_num
+            } else {
+                // Do nothing if we have no running foreground job.
+                return Ok(());
+            };
 
-            if let Some(ref fg_job_num) = self.fg_job_num {
-                let task_refs = match self.jobs.get(fg_job_num) {
-                    Some(job) => job.tasks.clone(), 
-                    None => {
-                        return Ok(());
-                    }
-                };
-
+            if let Some(task_refs) = self.jobs.get(&fg_job_num).map(|job| &job.tasks) {
                 // Lock the shared structure in `app_io` and then stop the running application
-                app_io::lock_and_execute(&move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
-                                                _streams_guard: MutexGuard<BTreeMap<usize, IoStreams>>| {
-                    
+                app_io::lock_and_execute(&|_flags_guard, _streams_guard| {
                     // Stop all tasks in the job.
-                    for task_ref in &task_refs {
+                    for task_ref in task_refs {
                         if task_ref.has_exited() { continue; }
                         task_ref.block();
 
@@ -483,7 +479,6 @@ impl Shell {
                     }
                 });
             }
-
             return Ok(());
         }
 
@@ -656,7 +651,7 @@ impl Shell {
 
     /// Create a single task. `cmd` is the name of the application. `args` are the provided
     /// arguments. It returns a task reference on success.
-    fn create_single_task(&mut self, cmd: String, args: Vec<String>) -> Result<TaskRef, AppErr> {
+    fn create_single_task(&mut self, cmd: String, args: Vec<String>) -> Result<JoinableTaskRef, AppErr> {
 
         // Check that the application actually exists
         let namespace_dir = task::get_my_current_task()
@@ -686,7 +681,7 @@ impl Shell {
     /// Evaluate the command line. It creates a sequence of jobs, which forms a chain of applications that
     /// pipe the output from one to the next, and finally back to the shell. If any task fails to start up,
     /// all tasks that have already been spawned will be killed immeidately before returning error.
-    fn eval_cmdline(&mut self) -> Result<Vec<TaskRef>, AppErr> {
+    fn eval_cmdline(&mut self) -> Result<Vec<JoinableTaskRef>, AppErr> {
 
         let cmdline = self.cmdline.clone();
         let mut task_refs = Vec::new();
@@ -1049,7 +1044,7 @@ impl Shell {
             let mut has_alive = false;  // mark if there is still non-exited task in the job
             let mut is_stopped = false; // mark if any one of the task has been stopped in this job
 
-            let task_refs = job.tasks.clone();
+            let task_refs = &job.tasks;
             for task_ref in task_refs {
                 if task_ref.has_exited() { // a task has exited
                     let exited_task_id = task_ref.id;
