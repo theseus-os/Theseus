@@ -183,10 +183,6 @@
 <span id="177">177</span>
 <span id="178">178</span>
 <span id="179">179</span>
-<span id="180">180</span>
-<span id="181">181</span>
-<span id="182">182</span>
-<span id="183">183</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. </span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! The `captain` steers the ship of Theseus, meaning that it contains basic logic </span>
@@ -291,10 +287,6 @@
         )
     };
     <span class="kw">let</span> <span class="ident">idt</span> <span class="op">=</span> <span class="ident">interrupts::init</span>(<span class="ident">double_fault_stack</span>.<span class="ident">top_unusable</span>(), <span class="ident">privilege_stack</span>.<span class="ident">top_unusable</span>())<span class="question-mark">?</span>;
-    
-    <span class="comment">// init other featureful (non-exception) interrupt handlers</span>
-    <span class="comment">// interrupts::init_handlers_pic();</span>
-    <span class="ident">interrupts::init_handlers_apic</span>();
     
     <span class="comment">// get BSP&#39;s apic id</span>
     <span class="kw">let</span> <span class="ident">bsp_apic_id</span> <span class="op">=</span> <span class="ident">apic::get_bsp_id</span>().<span class="ident">ok_or</span>(<span class="string">&quot;captain::init(): Coudln&#39;t get BSP&#39;s apic_id!&quot;</span>)<span class="question-mark">?</span>;
