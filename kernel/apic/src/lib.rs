@@ -15,18 +15,15 @@ use memory::{PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
 use crossbeam_utils::atomic::AtomicCell;
-use pit_clock::pit_wait;
+use pit_clock_basic::pit_wait;
 use bit_field::BitField;
 use static_assertions::{const_assert, const_assert_eq};
-use lazy_static::lazy_static;
 use log::{error, info, debug, trace};
 
-/// The IRQ vector number defined by the IDT for Local APIC timer interrupts.
-/// 
-/// TODO: once we invert the dependency relationship between `interrupts`
-///       and all other crates, we should be able to define this in `interrupts`
-///       and then use that definition here.
-const LOCAL_APIC_LVT_IRQ: u8 = 0x22;
+/// The IRQ number reserved for Local APIC timer interrupts in the IDT.
+pub const LOCAL_APIC_LVT_IRQ: u8 = 0x22;
+/// The IRQ number reserved for spurious APIC interrupts (as recommended by OS dev wiki).
+pub const APIC_SPURIOUS_INTERRUPT_IRQ: u8 = 0xFF;
 
 /// The interrupt chip that is currently configured on this machine. 
 /// The default is `InterruptChip::PIC`, but the typical case is `APIC` or `X2APIC`,
@@ -44,10 +41,8 @@ pub enum InterruptChip {
 // Ensure that `AtomicCell<InterruptChip>` is actually a lock-free atomic.
 const_assert!(AtomicCell::<InterruptChip>::is_lock_free());
 
-
-lazy_static! {
-    static ref LOCAL_APICS: AtomicMap<u8, RwLockIrqSafe<LocalApic>> = AtomicMap::new();
-}
+/// The set of system-wide `LocalApic`s, one per CPU core.
+static LOCAL_APICS: AtomicMap<u8, RwLockIrqSafe<LocalApic>> = AtomicMap::new();
 
 /// The processor id (from the ACPI MADT table) of the bootstrap processor
 static BSP_PROCESSOR_ID: Once<u8> = Once::new(); 
@@ -170,7 +165,6 @@ fn map_apic(page_table: &mut PageTable) -> Result<MappedPages, &'static str> {
 
 
 
-pub const APIC_SPURIOUS_INTERRUPT_VECTOR: u32 = 0xFF; // as recommended by everyone on os dev wiki
 const IA32_APIC_XAPIC_ENABLE: u64 = 1 << 11; // 0x800
 const IA32_APIC_X2APIC_ENABLE: u64 = 1 << 10; // 0x400
 const IA32_APIC_BASE_MSR_IS_BSP: u64 = 1 << 8; // 0x100
@@ -343,6 +337,8 @@ impl LocalApic {
         nmi_flags: u16
     ) -> Result<LocalApic, &'static str> {
 
+        trace!("size of LocalApic: {}", core::mem::size_of::<LocalApic>());
+
         let nmi_lint = match nmi_lint {
             0 => LvtLint::Pin0,
             1 => LvtLint::Pin1,
@@ -447,7 +443,7 @@ impl LocalApic {
                     wrmsr(IA32_X2APIC_TPR,        0);
                     
                     // set bit 8 to start receiving interrupts (still need to "sti")
-                    wrmsr(IA32_X2APIC_SIVR, (APIC_SPURIOUS_INTERRUPT_VECTOR | APIC_SW_ENABLE) as u64); 
+                    wrmsr(IA32_X2APIC_SIVR, (APIC_SPURIOUS_INTERRUPT_IRQ as u32 | APIC_SW_ENABLE) as u64); 
                 }
             }
             LapicType::XApic(regs) => {
@@ -469,7 +465,7 @@ impl LocalApic {
                 regs.task_priority.write(0);
 
                 // set bit 8 to allow receiving interrupts (still need to "sti")
-                regs.spurious_interrupt_vector.write(APIC_SPURIOUS_INTERRUPT_VECTOR | APIC_SW_ENABLE);   
+                regs.spurious_interrupt_vector.write(APIC_SPURIOUS_INTERRUPT_IRQ as u32 | APIC_SW_ENABLE);   
             }
         }
     }

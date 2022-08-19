@@ -16,10 +16,6 @@ path = "../shapes"
 [dependencies.compositor]
 path = "../compositor"
 
-[dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "1.4.0"
-
 [dependencies.hashbrown]
 version = "0.11.2"
 features = ["nightly"]

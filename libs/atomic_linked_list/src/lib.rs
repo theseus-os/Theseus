@@ -6,7 +6,6 @@
 
 extern crate alloc;
 
-
 /// A basic atomic linked list. 
 pub mod atomic_linked_list;
 

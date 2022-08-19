@@ -6,7 +6,6 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate irq_safety;
 extern crate atomic_linked_list;
@@ -82,12 +81,9 @@ impl PriorityTaskRef {
 }
 
 
-lazy_static! {
-    /// There is one runqueue per core, each core only accesses its own private runqueue
-    /// and allows the scheduler to select a task from that runqueue to schedule in.
-    static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
-}
-
+/// There is one runqueue per core, each core only accesses its own private runqueue
+/// and allows the scheduler to select a task from that runqueue to schedule in.
+static RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
 
 /// A list of references to `Task`s (`PriorityTaskRef`s) 
 /// that is used to store the `Task`s (and associated scheduler related data) 

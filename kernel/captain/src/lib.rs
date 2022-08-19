@@ -103,10 +103,6 @@ pub fn init(
     };
     let idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
     
-    // init other featureful (non-exception) interrupt handlers
-    // interrupts::init_handlers_pic();
-    interrupts::init_handlers_apic();
-    
     // get BSP's apic id
     let bsp_apic_id = apic::get_bsp_id().ok_or("captain::init(): Coudln't get BSP's apic_id!")?;
 

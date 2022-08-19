@@ -6,6 +6,7 @@
 #![feature(core_intrinsics)]
 #![feature(linkage)]
 #![feature(thread_local)]
+#![feature(const_btree_new)]
 
 // Allowances for C-style syntax.
 #![allow(non_upper_case_globals)]
@@ -18,7 +19,6 @@ extern crate heap;
 
 extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate lazy_static;
 extern crate libc; // for C types
 extern crate spin;
 extern crate memchr;

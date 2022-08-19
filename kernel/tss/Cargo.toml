@@ -5,16 +5,9 @@ description = "TSS (Task State Segment support (x86 only) for Theseus"
 version = "0.1.0"
 
 [dependencies]
+log = "0.4.8"
 spin = "0.9.0"
 x86_64 = "0.14.8"
-
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "1.4.0"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"

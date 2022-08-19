@@ -47,8 +47,8 @@ path = "../pci"
 [dependencies.acpi]
 path = "../acpi"
 
-[dependencies.pit_clock]
-path = "../pit_clock"
+[dependencies.pit_clock_basic]
+path = "../pit_clock_basic"
 
 [dependencies.interrupts]
 path = "../interrupts"

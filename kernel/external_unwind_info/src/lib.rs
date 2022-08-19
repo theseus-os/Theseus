@@ -33,22 +33,20 @@
 
 #![no_std]
 #![feature(map_try_insert)]
+#![feature(const_btree_new)]
 
 extern crate alloc;
 
 use core::ops::{Range, Bound::{Included, Unbounded}};
 use alloc::collections::BTreeMap;
-use lazy_static::lazy_static;
 use memory::VirtualAddress;
 use spin::Mutex;
 use log::*;
 
-lazy_static! {
-    /// The system-wide set of unwind information registered by external components.
-    /// 
-    /// The map key is the text section's base `VirtualAddress`.
-    static ref EXTERNAL_UNWIND_INFO: Mutex<BTreeMap<VirtualAddress, ExternalUnwindInfo>> = Mutex::new(BTreeMap::new());
-}
+/// The system-wide set of unwind information registered by external components.
+/// 
+/// The map key is the text section's base `VirtualAddress`.
+static EXTERNAL_UNWIND_INFO: Mutex<BTreeMap<VirtualAddress, ExternalUnwindInfo>> = Mutex::new(BTreeMap::new());
 
 /// Unwinding information for an external (non-Theseus) component.
 #[derive(Debug, Clone)]

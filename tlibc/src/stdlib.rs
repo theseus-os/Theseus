@@ -8,10 +8,8 @@ use alloc::{
 use spin::Mutex;
 
 
-lazy_static! {
-    /// A map from the set of pointers that have been malloc-ed to the layouts they were malloc-ed with.
-    static ref POINTER_LAYOUTS: Mutex<BTreeMap<usize, Layout>> = Mutex::new(BTreeMap::new());
-}
+/// A map from the set of pointers that have been malloc-ed to the layouts they were malloc-ed with.
+static POINTER_LAYOUTS: Mutex<BTreeMap<usize, Layout>> = Mutex::new(BTreeMap::new());
 
 
 #[no_mangle]

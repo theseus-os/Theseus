@@ -3,11 +3,10 @@
 //! 
 
 #![no_std]
+#![feature(const_btree_new)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate lazy_static;
-extern crate spin;
 extern crate irq_safety;
 extern crate memory;
 extern crate stack;
@@ -32,11 +31,9 @@ use apic::{LocalApic, get_lapics};
 /// False means the AP hasn't started or hasn't yet finished booting.
 pub static AP_READY_FLAG: AtomicBool = AtomicBool::new(false);
 
-lazy_static! {
-    /// Temporary storage for transferring allocated `Stack`s from 
-    /// the main bootstrap processor (BSP) to the AP processor being booted in `kstart_ap()` below.
-    static ref AP_STACKS: MutexIrqSafe<BTreeMap<u8, Stack>> = MutexIrqSafe::new(BTreeMap::new());
-}
+/// Temporary storage for transferring allocated `Stack`s from 
+/// the main bootstrap processor (BSP) to the AP processor being booted in `kstart_ap()` below.
+static AP_STACKS: MutexIrqSafe<BTreeMap<u8, Stack>> = MutexIrqSafe::new(BTreeMap::new());
 
 /// Insert a new stack that was allocated for the AP with the given `apic_id`.
 pub fn insert_ap_stack(apic_id: u8, stack: Stack) {

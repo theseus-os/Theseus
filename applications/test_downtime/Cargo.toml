@@ -32,10 +32,6 @@ path = "../../kernel/rendezvous"
 [dependencies.async_channel]
 path = "../../kernel/async_channel"
 
-[dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "1.4.0"
-
 # for WM
 
 [dependencies.window]

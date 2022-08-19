@@ -1,7 +1,7 @@
 #![no_std]
 
 #[macro_use] extern crate log;
-extern crate pit_clock;
+extern crate pit_clock_basic;
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
@@ -67,7 +67,7 @@ pub fn get_tsc_frequency() -> Result<u128, &'static str> {
         // a freq of zero means it hasn't yet been initialized.
         let start = tsc_ticks();
         // wait 10000 us (10 ms)
-        pit_clock::pit_wait(10000)?;
+        pit_clock_basic::pit_wait(10000)?;
         let end = tsc_ticks(); 
 
         let diff = end.sub(&start).ok_or("couldn't subtract end-start TSC tick values")?;

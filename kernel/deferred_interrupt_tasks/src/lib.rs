@@ -56,7 +56,7 @@ extern crate scheduler;
 extern crate interrupts;
 
 use alloc::string::String;
-use task::{TaskRef, get_my_current_task};
+use task::{get_my_current_task, JoinableTaskRef};
 
 pub type InterruptHandlerFunction = x86_64::structures::idt::HandlerFunc;
 
@@ -103,8 +103,8 @@ pub enum InterruptRegistrationError {
 /// e.g., when an interrupt has occurred.
 ///
 /// # Return
-/// * `Ok(TaskRef)` if successfully registered, in which the returned task is the long-running
-///    loop that repeatedly invokes the given `deferred_interrupt_action`.
+/// * `Ok(JoinableTaskRef)` if successfully registered, in which the returned task is the
+///    long-running loop that repeatedly invokes the given `deferred_interrupt_action`.
 /// * `Err(existing_handler_address)` if the given `interrupt_number` was already in use.
 pub fn register_interrupt_handler<DIA, Arg, Success, Failure, S>(
     interrupt_number: u8,
@@ -112,7 +112,7 @@ pub fn register_interrupt_handler<DIA, Arg, Success, Failure, S>(
     deferred_interrupt_action: DIA,
     deferred_action_argument: Arg,
     deferred_task_name: Option<S>,
-) -> Result<TaskRef, InterruptRegistrationError> 
+) -> Result<JoinableTaskRef, InterruptRegistrationError> 
     where DIA: Fn(&Arg) -> Result<Success, Failure> + Send + 'static,
           Arg: Send + 'static,
           S: Into<String>,

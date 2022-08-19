@@ -8,26 +8,16 @@ version = "0.1.0"
 dependencies = [
  "acpi_table",
  "acpi_table_handler",
- "ap_start",
- "apic",
  "dmar",
  "fadt",
  "hpet",
- "ioapic",
  "iommu",
- "irq_safety",
- "kernel_config",
- "lazy_static",
  "log",
  "madt",
  "memory",
- "pause",
- "pic",
- "pit_clock",
  "rsdp",
  "rsdt",
  "spin 0.9.0",
- "volatile 0.2.7",
 ]
 
 [[package]]
@@ -73,12 +63,10 @@ dependencies = [
  "interrupts",
  "irq_safety",
  "kernel_config",
- "lazy_static",
  "log",
  "memory",
  "scheduler",
  "spawn",
- "spin 0.9.0",
  "stack",
  "tlb_shootdown",
 ]
@@ -92,12 +80,11 @@ dependencies = [
  "crossbeam-utils",
  "irq_safety",
  "kernel_config",
- "lazy_static",
  "log",
  "memory",
  "msr",
  "owning_ref",
- "pit_clock",
+ "pit_clock_basic",
  "raw-cpuid",
  "spin 0.9.0",
  "static_assertions",
@@ -113,7 +100,6 @@ dependencies = [
  "core2",
  "event_types",
  "keycodes_ascii",
- "lazy_static",
  "libterm",
  "log",
  "logger",
@@ -519,7 +505,6 @@ dependencies = [
 name = "external_unwind_info"
 version = "0.1.0"
 dependencies = [
- "lazy_static",
  "log",
  "memory",
  "spin 0.9.0",
@@ -561,7 +546,6 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "irq_safety",
- "lazy_static",
  "log",
  "memory",
  "print",
@@ -609,7 +593,6 @@ dependencies = [
  "compositor",
  "framebuffer",
  "hashbrown",
- "lazy_static",
  "shapes",
  "spin 0.9.0",
 ]
@@ -649,7 +632,6 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "bitflags",
- "lazy_static",
  "log",
  "memory",
  "spin 0.9.0",
@@ -728,23 +710,13 @@ dependencies = [
  "apic",
  "exceptions_early",
  "gdt",
- "irq_safety",
- "kernel_config",
- "keyboard",
- "lazy_static",
  "locked_idt",
  "log",
  "memory",
- "mouse",
  "pic",
- "pit_clock",
- "port_io",
- "ps2",
  "scheduler",
  "sleep",
  "spin 0.9.0",
- "task",
- "tlb_shootdown",
  "tss",
  "vga_buffer",
  "x86_64",
@@ -776,7 +748,6 @@ name = "ioapic"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "lazy_static",
  "log",
  "memory",
  "owning_ref",
@@ -823,18 +794,6 @@ dependencies = [
 [[package]]
 name = "kernel_config"
 version = "0.1.0"
-
-[[package]]
-name = "keyboard"
-version = "0.1.0"
-dependencies = [
- "event_types",
- "keycodes_ascii",
- "log",
- "mpmc",
- "ps2",
- "spin 0.9.0",
-]
 
 [[package]]
 name = "keycodes_ascii"
@@ -1035,7 +994,6 @@ dependencies = [
  "fs_node",
  "hashbrown",
  "kernel_config",
- "lazy_static",
  "log",
  "memfs",
  "memory",
@@ -1056,11 +1014,13 @@ name = "mouse"
 version = "0.1.0"
 dependencies = [
  "event_types",
+ "interrupts",
  "log",
  "mouse_data",
  "mpmc",
  "ps2",
  "spin 0.9.0",
+ "x86_64",
 ]
 
 [[package]]
@@ -1100,7 +1060,7 @@ dependencies = [
  "memory",
  "mod_mgmt",
  "pause",
- "pit_clock",
+ "pit_clock_basic",
  "spin 0.9.0",
  "stack",
  "volatile 0.2.7",
@@ -1235,7 +1195,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pit_clock"
+name = "pit_clock_basic"
 version = "0.1.0"
 dependencies = [
  "log",
@@ -1302,9 +1262,8 @@ dependencies = [
 
 [[package]]
 name = "rangemap"
-version = "0.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6cb84161aa5e5eaa263fadf53172fee10b72fa7aad3a37e0a7aa1aefec2423e"
+version = "1.0.3"
+source = "git+https://github.com/theseus-os/rangemap?branch=const_fn_constructor#be8b0ee4cfe51d587d4317f37a2db7c75f2d2647"
 
 [[package]]
 name = "raw-cpuid"
@@ -1367,7 +1326,6 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "irq_safety",
- "lazy_static",
  "log",
  "single_simd_task_optimization",
  "task",
@@ -1379,7 +1337,6 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "irq_safety",
- "lazy_static",
  "log",
  "task",
 ]
@@ -1390,7 +1347,6 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "irq_safety",
- "lazy_static",
  "log",
  "single_simd_task_optimization",
  "task",
@@ -1684,7 +1640,6 @@ dependencies = [
  "environment",
  "irq_safety",
  "kernel_config",
- "lazy_static",
  "log",
  "memory",
  "mod_mgmt",
@@ -1738,7 +1693,6 @@ dependencies = [
  "core2",
  "cstr_core",
  "heap",
- "lazy_static",
  "libc",
  "log",
  "memchr",
@@ -1753,7 +1707,7 @@ name = "tsc"
 version = "0.1.0"
 dependencies = [
  "log",
- "pit_clock",
+ "pit_clock_basic",
 ]
 
 [[package]]
@@ -1762,7 +1716,6 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "atomic_linked_list",
- "lazy_static",
  "log",
  "memory",
  "spin 0.9.0",

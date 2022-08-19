@@ -5,7 +5,6 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate terminal_print;
-#[macro_use] extern crate lazy_static;
 extern crate getopts;
 extern crate alloc;
 extern crate spawn;
@@ -30,10 +29,8 @@ impl Drop for DropStruct {
     }
 }
 
-lazy_static! {
-    /// A lock to check and verify releasing of locks
-    static ref STATIC_LOCK: Mutex<Vec<usize>> = Mutex::new(Vec::new());
-}
+/// A lock to check and verify releasing of locks
+static STATIC_LOCK: Mutex<Vec<usize>> = Mutex::new(Vec::new());
 
 /// An enum to hold the methods we plan to exit a task
 #[derive(Clone)]

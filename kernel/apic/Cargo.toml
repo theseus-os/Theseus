@@ -14,13 +14,7 @@ owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 bit_field = "0.7.0"
 zerocopy = "0.5.0"
 static_assertions = "1.1.0"
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "1.4.0"
+log = "0.4.8"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
@@ -31,8 +25,8 @@ path = "../../libs/atomic_linked_list"
 [dependencies.msr]
 path = "../../libs/msr"
 
-[dependencies.pit_clock]
-path = "../pit_clock"
+[dependencies.pit_clock_basic]
+path = "../pit_clock_basic"
 
 [dependencies.memory]
 path = "../memory"
