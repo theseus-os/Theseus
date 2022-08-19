@@ -891,9 +891,6 @@ impl Task {
         {
             let mut inner = self.inner.lock();
             let prev_task_data_to_drop = inner.drop_after_task_switch.take();
-            if let Some(ref data) = prev_task_data_to_drop {
-                error!("Task {:?} is dropping previous task's data {:?}", get_my_current_task().unwrap(), data);
-            }
             drop(inner); // release the lock as soon as possible
             drop(prev_task_data_to_drop);
         }
@@ -926,19 +923,34 @@ impl fmt::Display for Task {
 }
 
 
-/// Represents a new [`TaskRef`] created by [`TaskRef::new()`].
-/// 
-/// Note: this type is considered an internal implementation detail.
-/// Instead, use the `TaskJoiner` type from the `spawn` crate, 
-/// which is intended to be the public-facing interface for joining a task.
-/// 
+/// Represents a joinable [`TaskRef`], created by [`TaskRef::new()`].
 /// Auto-derefs into a [`TaskRef`].
+///
+/// This allows another task to:
+/// * [`join`] this task, i.e., wait for this task to finish executing,
+/// * to obtain its [exit value] after it has completed.
 /// 
-/// The contained [`Task`] remains joinable until this object is dropped.
+/// ## [`Drop`]-based Behavior
+/// The contained [`Task`] is joinable until this object is dropped.
+/// When dropped, this task will be marked as non-joinable and treated as an "orphan" task.
+/// This means that there is no way for another task to wait for it to complete
+/// or obtain its exit value.
+/// As such, this task will be auto-reaped after it exits (in order to avoid zombie tasks).
+/// 
+/// ## Not `Clone`-able
+/// Due to the above drop-based behavior, this type must not implement `Clone`
+/// because it assumes there is only ever one `JoinableTaskRef` per task.
+/// 
+/// However, this type auto-derefs into an inner [`TaskRef`], which *can* be cloned.
+/// 
+// /// Note: this type is considered an internal implementation detail.
+// /// Instead, use the `TaskJoiner` type from the `spawn` crate, 
+// /// which is intended to be the public-facing interface for joining a task.
 #[derive(Debug)]
 pub struct JoinableTaskRef {
     task: TaskRef,
 }
+assert_not_impl_any!(JoinableTaskRef: Clone);
 impl Deref for JoinableTaskRef {
     type Target = TaskRef;
     fn deref(&self) -> &Self::Target {
@@ -946,11 +958,13 @@ impl Deref for JoinableTaskRef {
     }
 }
 impl Drop for JoinableTaskRef {
+    /// Marks the inner [`Task`] as not joinable, meaning that it is an orphaned task
+    /// that will be auto-reaped after exiting.
     fn drop(&mut self) {
-        warn!("Dropping JoinableTaskRef for {:?}", self.task);
         self.task.joinable.store(false, Ordering::Relaxed);
     }
 }
+
 
 /// A shareable, cloneable reference to a `Task` that exposes more methods
 /// for task management and auto-derefs into an immutable `&Task` reference.

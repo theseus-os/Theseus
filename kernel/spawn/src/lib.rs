@@ -147,7 +147,7 @@ impl BootstrapTaskRef {
 impl Drop for BootstrapTaskRef {
     // See the documentation for `BootstrapTaskRef::finish()` for more details.
     fn drop(&mut self) {
-        trace!("Finishing Bootstrap Task on core {}: {:?}", self.apic_id, self.task_ref);
+        // trace!("Finishing Bootstrap Task on core {}: {:?}", self.apic_id, self.task_ref);
         remove_current_task_from_runqueue(&self.task_ref);
         self.mark_as_exited(Box::new(()))
             .expect("BUG: bootstrap task was unable to mark itself as exited");
@@ -484,6 +484,9 @@ impl<F, A, R> TaskBuilder<F, A, R>
 }
 
 
+// Note: this is currently not used because it requires many sweeping changes
+//       everywhere that `spawn()` is called to pass on the generic type parameter `R`.
+//
 // /// The object is returned when a new [`Task`] is [`spawn`]ed.
 // /// 
 // /// This allows the "parent" task (the one that spawned this task) to:
@@ -769,7 +772,7 @@ fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason:
 
 /// Internal function that performs final cleanup actions for an exited task.
 #[inline(always)]
-fn task_cleanup_final_internal<R: Send + 'static>(current_task: &TaskRef) {
+fn task_cleanup_final_internal(current_task: &TaskRef) {
     // First, remove the task from its runqueue(s).
     remove_current_task_from_runqueue(current_task);
 
@@ -783,9 +786,9 @@ fn task_cleanup_final_internal<R: Send + 'static>(current_task: &TaskRef) {
 
     // Third, reap the task if it has been orphaned (if it's non-joinable).
     if !current_task.is_joinable() {
-        trace!("Reaping orphaned task... {:?}", current_task);
+        // trace!("Reaping orphaned task... {:?}", current_task);
         let _exit_value = current_task.take_exit_value();
-        trace!("Reaped orphaned task {:?}, {:?}", current_task, _exit_value);
+        // trace!("Reaped orphaned task {:?}, {:?}", current_task, _exit_value);
     }
 }
 
@@ -797,7 +800,7 @@ fn task_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInterrupts, curr
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
-    task_cleanup_final_internal::<R>(&current_task);
+    task_cleanup_final_internal(&current_task);
     drop(current_task);
     drop(held_interrupts);
     // ****************************************************
@@ -817,7 +820,7 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
          R: Send + 'static,
          F: FnOnce(A) -> R + Send + Clone + 'static, 
 {
-    task_cleanup_final_internal::<R>(&current_task);
+    task_cleanup_final_internal(&current_task);
 
     {
         #[cfg(use_crate_replacement)]
