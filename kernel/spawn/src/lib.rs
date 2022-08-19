@@ -179,6 +179,19 @@ pub fn new_task_builder<F, A, R>(
 }
 
 
+/// Every executable application must have an entry function named "main".
+const ENTRY_POINT_SECTION_NAME: &'static str = "main";
+
+/// The argument type accepted by the `main` function entry point into each application.
+type MainFuncArg = Vec<String>;
+
+/// The type returned by the `main` function entry point of each application.
+type MainFuncRet = isize;
+
+/// The function signature of the `main` function that every application must have,
+/// as it is the entry point into each application `Task`.
+type MainFunc = fn(MainFuncArg) -> MainFuncRet;
+
 /// Creates a builder for a new application `Task`. 
 /// 
 /// The new task will start at the application crate's entry point `main` function.
@@ -376,21 +389,23 @@ impl<F, A, R> TaskBuilder<F, A, R>
 
         let new_task_id = new_task.id;
         let task_ref = TaskRef::new(new_task);
-        let old_task = TASKLIST.lock().insert(new_task_id, task_ref.clone());
+        let _existing_task = TASKLIST.lock().insert(new_task_id, task_ref.clone());
         // insert should return None, because that means there was no existing task with the same ID 
-        if old_task.is_some() {
-            error!("BUG: TaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
+        if let Some(_existing_task) = _existing_task {
+            error!("BUG: TaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID! {:?}", _existing_task);
             return Err("BUG: TASKLIST a contained a task with the new task's ID");
         }
         
         if let Some(core) = self.pin_on_core {
             runqueue::add_task_to_specific_runqueue(core, task_ref.clone())?;
-        }
-        else {
+        } else {
             runqueue::add_task_to_any_runqueue(task_ref.clone())?;
         }
 
-        Ok(task_ref)
+        Ok(TaskJoiner::<R> {
+            task: task_ref,
+            _phantom: PhantomData,
+        })
     }
 
 }
@@ -463,18 +478,40 @@ impl<F, A, R> TaskBuilder<F, A, R>
     }
 }
 
-/// Every executable application must have an entry function named "main".
-const ENTRY_POINT_SECTION_NAME: &'static str = "main";
 
-/// The argument type accepted by the `main` function entry point into each application.
-type MainFuncArg = Vec<String>;
+/// The object is returned when a new [`Task`] is [`spawn`]ed.
+/// 
+/// This allows the "parent" task (the one that spawned this task) to:
+/// * [`join`] this task, i.e., wait for this task to finish executing,
+/// * to obtain its [exit value] after it has completed.
+/// 
+/// The type parameter `R` is the type that this task will return upon successful completion.
+/// As such, it is derived from the return type of the entry function `func`
+/// that was passed into [`new_task_builder()`]
+/// If dropped, this task will be *detached* and treated as an "orphan" task.
+/// This means that there is no way for another task to wait for it to complete
+/// or obtain its exit value.
+/// As such, this task will be auto-reaped after it exits (in order to avoid zombie tasks).
+/// 
+/// Implementation-wise, this is a wrapper around [`JoinableTaskRef`], which marks a task
+/// as non-joinable when it is dropped.
+/// This type adds the ability to obtain its exit value as a typed object, 
+/// because only the [`spawn`] function knows that type `R`, whereas the task itself does not.
+/// 
+/// [`spawn`]: TaskBuilder::spawn
+/// [`join`]: TaskRef::join
+/// [exit value]: task::ExitValue
+pub struct TaskJoiner<R: Send + 'static> {
+    task: JoinableTaskRef,
+    _phantom: PhantomData<R>,
+}
+impl<R: Send + 'static> Deref for TaskJoiner<R> {
+    type Target = JoinableTaskRef;
+    fn deref(&self) -> &Self::Target {
+        &self.task
+    }
+}
 
-/// The type returned by the `main` function entry point of each application.
-type MainFuncRet = isize;
-
-/// The function signature of the `main` function that every application must have,
-/// as it is the entry point into each application `Task`.
-type MainFunc = fn(MainFuncArg) -> MainFuncRet;
 
 /// A wrapper around a task's function and argument.
 #[derive(Debug)]
