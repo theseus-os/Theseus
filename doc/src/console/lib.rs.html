@@ -182,7 +182,7 @@
 
 <span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">marker::PhantomData</span>, <span class="ident">sync::atomic</span>::{<span class="ident">AtomicU16</span>, <span class="ident">Ordering</span>}};
 <span class="kw">use</span> <span class="ident">alloc::string::String</span>;
-<span class="kw">use</span> <span class="ident">task::TaskRef</span>;
+<span class="kw">use</span> <span class="ident">task::JoinableTaskRef</span>;
 <span class="kw">use</span> <span class="ident">async_channel::Receiver</span>;
 <span class="kw">use</span> <span class="ident">serial_port</span>::{<span class="ident">SerialPort</span>, <span class="ident">SerialPortAddress</span>, <span class="ident">get_serial_port</span>, <span class="ident">DataChunk</span>};
 <span class="kw">use</span> <span class="ident">io::LockableIo</span>;
@@ -204,7 +204,7 @@
 <span class="doccomment">/// by waiting for new data to be received on serial ports.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Returns the newly-spawned detection task.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_connection_detection</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">TaskRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_connection_detection</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">JoinableTaskRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
 	<span class="kw">let</span> (<span class="ident">sender</span>, <span class="ident">receiver</span>) <span class="op">=</span> <span class="ident">async_channel::new_channel</span>(<span class="number">4</span>);
 	<span class="ident">serial_port::set_connection_listener</span>(<span class="ident">sender</span>);
 
