@@ -8,7 +8,7 @@ use fs_node::{DirRef, FileOrDir};
 use hashbrown::HashMap;
 use path::Path;
 
-pub type IntoIter = hashbrown::hash_map::IntoIter<String, String>;
+pub type EnvIter = hashbrown::hash_map::IntoIter<String, String>;
 
 /// A structure that contains environment state for a given `Task` or group of
 /// `Task`s.
@@ -66,7 +66,7 @@ impl Environment {
 impl core::iter::IntoIterator for Environment {
     type Item = (String, String);
 
-    type IntoIter = IntoIter;
+    type IntoIter = EnvIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.variables.into_iter()

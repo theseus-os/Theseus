@@ -3,6 +3,7 @@
 pub extern crate app_io;
 pub extern crate core2;
 pub extern crate panic_entry_inner;
+pub extern crate path;
 
 extern crate environment;
 extern crate heap;
@@ -43,8 +44,11 @@ pub mod mem {
     pub use memory::get_kernel_mmi_ref;
 }
 
+pub mod env {
+    pub use environment::{EnvIter, Error};
+}
+
 pub mod task {
-    pub use environment::EnvIter;
     pub use scheduler::schedule as yield_now;
     pub use spawn::new_task_builder;
     pub use stack::alloc_stack_by_bytes;

@@ -191,7 +191,6 @@ pub fn new_application_task_builder(
     crate_object_file: Path, // TODO FIXME: use `mod_mgmt::IntoCrateObjectFile`,
     new_namespace: Option<Arc<CrateNamespace>>,
 ) -> Result<TaskBuilder<MainFunc, MainFuncArg, MainFuncRet>, &'static str> {
-    
     let namespace = new_namespace.or_else(|| task::get_my_current_task().map(|t| t.get_namespace().clone()))
         .ok_or("spawn::new_application_task_builder(): couldn't get current task to use its CrateNamespace")?;
     
@@ -201,6 +200,7 @@ pub fn new_application_task_builder(
         Some(FileOrDir::File(f)) => f,
         _ => return Err("Couldn't find specified file path for new application crate"),
     };
+
     
     // Load the new application crate
     let app_crate_ref = {

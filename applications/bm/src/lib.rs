@@ -1555,7 +1555,7 @@ fn get_prog_name() -> String {
         }
     };
 
-    taskref.name.clone()
+    taskref.name()
 }
 
 /// Helper function to get the PID of current task

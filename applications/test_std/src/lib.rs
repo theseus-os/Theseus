@@ -1,26 +1,31 @@
-#![feature(restricted_std, unboxed_closures)]
+#![feature(restricted_std)]
 
-fn temp() {
-    println!("Hello from temp");
-}
+pub fn main(__args: Vec<String>) -> isize {
+    let parent_id = std::thread::current().id();
 
-pub fn main() {
-    let p: Box<dyn FnOnce<(), Output = ()>> = Box::new(temp);
-    let mmi_ref = memory::get_kernel_mmi_ref().unwrap();
-    // let stack = stack::alloc_stack_by_bytes(4096, &mut mmi_ref.lock().page_table).unwrap();
-    let stack = stack::alloc_stack_by_bytes(4096 * 16, &mut mmi_ref.lock().page_table).unwrap();
-    println!("{:#?}", stack);
-    let thread = spawn::new_task_builder(|_| p(), ())
-        .stack(stack)
-        .spawn()
-        .unwrap();
-    thread.join().unwrap();
+    std::thread::spawn(move || {
+        let child_id = std::thread::current().id();
+        assert_ne!(parent_id, child_id);
+    })
+    .join()
+    .unwrap();
 
-    // println!("Hello, world!");
+    println!("thread test successful");
 
-    // std::thread::spawn(|| {
-    //     println!("Printing from thread 2");
-    // })
-    // .join()
-    // .unwrap();
+    std::env::set_var("test_std", "true");
+    assert_eq!(std::env::var("test_std").unwrap(), "true");
+
+    println!("env test successful");
+
+    let cwd = std::env::current_dir().unwrap();
+    assert_eq!(cwd, std::path::PathBuf::from("/"));
+
+    std::env::set_current_dir("extra_files").unwrap();
+
+    let cwd = std::env::current_dir().unwrap();
+    assert_eq!(cwd, std::path::PathBuf::from("/extra_files"));
+
+    println!("cwd test successful");
+
+    0
 }

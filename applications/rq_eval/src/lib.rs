@@ -156,7 +156,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
         None,
         |_, _| loop { }, // dummy failure function
     )?;
-    task.name = String::from("rq_eval_single_task_unrunnable");
+    task.set_name(String::from("rq_eval_single_task_unrunnable"));
     let taskref = TaskRef::new(task);
     
     let hpet = get_hpet().ok_or("couldn't get HPET timer")?;

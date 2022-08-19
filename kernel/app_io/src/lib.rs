@@ -40,6 +40,7 @@ pub use stdio::{StdioReader, StdioWriter};
 /// for applications. This structure is provided for application's use and only
 /// contains necessary one-end readers/writers to queues. On the shell side, we have
 /// full control to queues.
+#[derive(Clone)]
 pub struct IoStreams {
     /// The reader to stdin.
     stdin: StdioReader,
@@ -153,6 +154,10 @@ pub fn lock_and_execute<'a, F>(f: &F)
 pub fn insert_child_streams(task_id: usize, streams: IoStreams) -> Option<IoStreams> {
     shared_maps::lock_flag_map().insert(task_id, IoControlFlags::new());
     shared_maps::lock_stream_map().insert(task_id, streams)
+}
+
+pub fn get_streams(task_id: usize) -> Option<IoStreams> {
+    shared_maps::lock_stream_map().get(&task_id).cloned()
 }
 
 /// Shells call this function to remove queues and pointer to terminal for applications. It returns
