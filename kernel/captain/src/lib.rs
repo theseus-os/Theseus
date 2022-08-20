@@ -82,6 +82,8 @@ pub fn init(
         // enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
         logger::mirror_to_vga(mirror_to_vga_cb);
     }
+    
+    let _ = rand::init_once();
 
     // calculate TSC period and initialize it
     // not strictly necessary, but more accurate if we do it early on before interrupts, multicore, and multitasking
