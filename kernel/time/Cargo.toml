@@ -1,0 +1,6 @@
+[package]
+name = "time"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Abstraction for hardware timers"
+edition = "2021"
