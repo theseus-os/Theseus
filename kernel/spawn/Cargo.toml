@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "spawn"
 description = "Functions and wrappers for spawning new Tasks, both kernel threads and userspace processes."
 version = "0.1.0"
+edition = "2018"
 
 
 [dependencies]
@@ -63,6 +64,9 @@ path = "../pause"
 
 [dependencies.thread_local_macro]
 path = "../thread_local_macro"
+
+[dependencies.preemption]
+path = "../preemption"
 
 [lib]
 crate-type = ["rlib"]

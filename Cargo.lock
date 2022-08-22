@@ -3018,6 +3018,7 @@ dependencies = [
  "mod_mgmt",
  "path",
  "pause",
+ "preemption",
  "runqueue",
  "scheduler",
  "spin 0.9.0",
