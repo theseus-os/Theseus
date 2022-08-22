@@ -3,16 +3,12 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "scheduler"
 description = "Provides scheduling functionality for selecting the next task and causing a task switch"
 version = "0.1.0"
-
+edition = "2018"
 
 [dependencies]
 spin = "0.9.0"
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.cfg-if]
-version = "1.0.0"
+log = "0.4.8"
+cfg-if = "1.0.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
@@ -22,6 +18,9 @@ path= "../apic"
 
 [dependencies.task]
 path = "../task"
+
+[dependencies.preemption]
+path = "../preemption"
 
 [dependencies.runqueue]
 path = "../runqueue"

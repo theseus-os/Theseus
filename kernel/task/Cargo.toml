@@ -32,6 +32,9 @@ path = "../mod_mgmt"
 [dependencies.context_switch]
 path = "../context_switch"
 
+[dependencies.preemption]
+path = "../preemption"
+
 [dependencies.environment]
 path = "../environment"
 

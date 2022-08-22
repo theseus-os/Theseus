@@ -1,13 +1,8 @@
 #![no_std]
 
-extern crate alloc;
 #[macro_use] extern crate log;
-extern crate irq_safety;
-extern crate apic;
-extern crate task;
-extern crate runqueue;
-#[macro_use] extern crate cfg_if;
-cfg_if! {
+
+cfg_if::cfg_if! {
     if #[cfg(priority_scheduler)] {
         extern crate scheduler_priority as scheduler;
     } else if #[cfg(realtime_scheduler)] {
@@ -18,16 +13,28 @@ cfg_if! {
 }
 
 use core::ops::Deref;
-use irq_safety::hold_interrupts;
 use apic::get_my_apic_id;
 use task::{get_my_current_task, TaskRef};
 
 /// Yields the current CPU by selecting a new `Task` to run 
-/// and then performs a task switch to that new `Task`.
+/// and then switching to that new `Task`.
 ///
-/// Interrupts will be disabled while this function runs.
+/// Preemption will be disabled while this function runs,
+/// but interrupts are not disabled because it is not necessary.
+///
+/// ## Return
+/// * `true` if a new task was selected and switched to.
+/// * `false` if no new task was selected,
+///    meaning the current task will continue running.
 pub fn schedule() -> bool {
-    let _held_interrupts = hold_interrupts(); // auto-reenables interrupts on early return
+    let preemption_guard = preemption::hold_preemption();
+    // If preemption was not previously enabled (before we disabled it above),
+    // then we shouldn't perform a task switch here.
+    if !preemption_guard.preemption_was_enabled() {
+        // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", get_my_apic_id());
+        return false;
+    }
+
     let apic_id = get_my_apic_id();
 
     let curr_task = if let Some(curr) = get_my_current_task() {
@@ -43,18 +50,16 @@ pub fn schedule() -> bool {
         return false; // keep running the same current task
     };
 
-    // No need to task switch if the chosen task is the same as the current task.
-    if curr_task == &next_task {
-        return false;
-    }
-
-    // trace!("BEFORE TASK_SWITCH CALL (AP {}), current: {:?}, next: {:?}, interrupts are {}", apic_id, curr_task, next_task, irq_safety::interrupts_enabled());
-
-    curr_task.task_switch(next_task.deref(), apic_id); 
+    let (did_switch, recovered_preemption_guard) = curr_task.task_switch(
+        next_task.deref(),
+        apic_id,
+        preemption_guard,
+    ); 
 
     // trace!("AFTER TASK_SWITCH CALL (AP {}) new current: {:?}, interrupts are {}", apic_id, get_my_current_task(), irq_safety::interrupts_enabled());
- 
-    true
+
+    drop(recovered_preemption_guard);
+    did_switch
 }
 
 /// Changes the priority of the given task with the given priority level.
