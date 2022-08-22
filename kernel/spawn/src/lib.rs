@@ -14,24 +14,6 @@
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate debugit;
-extern crate irq_safety;
-extern crate memory;
-extern crate stack;
-extern crate task;
-extern crate runqueue;
-extern crate scheduler;
-extern crate mod_mgmt;
-extern crate apic;
-extern crate context_switch;
-extern crate path;
-extern crate fs_node;
-extern crate catch_unwind;
-extern crate fault_crate_swap;
-extern crate pause;
-extern crate spin;
-extern crate thread_local_macro;
-
 
 use core::{marker::PhantomData, mem, ops::Deref};
 use alloc::{
@@ -40,15 +22,17 @@ use alloc::{
     sync::Arc,
     vec::Vec,
 };
+use debugit::debugit;
 use spin::Mutex;
-use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
-use memory::{get_kernel_mmi_ref, MemoryManagementInfo};
+use irq_safety::enable_interrupts;
+use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
 use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use apic::get_my_apic_id;
 use fs_node::FileOrDir;
+use preemption::{hold_preemption, PreemptionGuard};
 
 #[cfg(simd_personality)]
 use task::SimdExt;
@@ -57,7 +41,7 @@ use task::SimdExt;
 /// Initializes tasking for the given AP core, including creating a runqueue for it
 /// and creating its initial task bootstrapped from the current execution context for that core. 
 pub fn init(
-    kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
+    kernel_mmi_ref: MmiRef,
     apic_id: u8,
     stack: Stack,
 ) -> Result<BootstrapTaskRef, &'static str> {
@@ -604,7 +588,7 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
         let curr_task = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (before task func).");
 
         // The first time that a task runs, its entry function `task_wrapper()` is jumped to
-        // from the `task_switch()` function, right after the end of `context_switch`(),
+        // from the `task_switch()` function, right after the end of `context_switch`().
         // Thus, the first thing we must do here is to perform post-context switch actions,
         // because this is the first code to run immediately after a context switch
         // switches to this task for the first time.
@@ -693,11 +677,11 @@ fn task_wrapper_restartable<F, A, R>() -> !
 /// Internal function cleans up a task that exited properly. 
 /// Contains the shared code between `task_cleanup_success` and `task_cleanup_success_restartable`
 #[inline(always)]
-fn task_cleanup_success_internal<R>(current_task: TaskRef, exit_value: R) -> (irq_safety::HeldInterrupts, TaskRef)
+fn task_cleanup_success_internal<R>(current_task: TaskRef, exit_value: R) -> (PreemptionGuard, TaskRef)
     where R: Send + 'static,
 { 
-    // Disable preemption (currently just disabling interrupts altogether)
-    let held_interrupts = hold_interrupts();
+    // Disable preemption.
+    let preemption_guard = hold_preemption();
 
     #[cfg(not(rq_eval))]
     debug!("task_cleanup_success: {:?} successfully exited with return value {:?}", current_task.name, debugit!(exit_value));
@@ -705,7 +689,7 @@ fn task_cleanup_success_internal<R>(current_task: TaskRef, exit_value: R) -> (ir
         error!("task_cleanup_success: {:?} task could not set exit value, because task had already exited. Is this correct?", current_task.name);
     }
 
-    (held_interrupts, current_task)
+    (preemption_guard, current_task)
 }
 
 /// This function cleans up a task that exited properly.
@@ -714,8 +698,8 @@ fn task_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {   
-    let (held_interrupts, current_task) = task_cleanup_success_internal(current_task, exit_value);
-    task_cleanup_final::<F, A, R>(held_interrupts, current_task)
+    let (preemption_guard, current_task) = task_cleanup_success_internal(current_task, exit_value);
+    task_cleanup_final::<F, A, R>(preemption_guard, current_task)
 }
 
 /// Similar to `task_cleanup_success` but used on restartable_tasks
@@ -724,17 +708,17 @@ fn task_restartable_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: 
           R: Send + 'static,
           F: FnOnce(A) -> R + Send + Clone +'static,
 {
-    let (held_interrupts, current_task) = task_cleanup_success_internal(current_task, exit_value);
-    task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
+    let (preemption_guard, current_task) = task_cleanup_success_internal(current_task, exit_value);
+    task_restartable_cleanup_final::<F, A, R>(preemption_guard, current_task)
 }
 
 
 
 /// Internal function that cleans up a task that did not exit properly.
 #[inline(always)]
-fn task_cleanup_failure_internal(current_task: TaskRef, kill_reason: task::KillReason) -> (irq_safety::HeldInterrupts, TaskRef) {
-    // Disable preemption (currently just disabling interrupts altogether)
-    let held_interrupts = hold_interrupts();
+fn task_cleanup_failure_internal(current_task: TaskRef, kill_reason: task::KillReason) -> (PreemptionGuard, TaskRef) {
+    // Disable preemption.
+    let preemption_guard = hold_preemption();
 
     #[cfg(not(downtime_eval))]
     debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.name, kill_reason);
@@ -743,7 +727,7 @@ fn task_cleanup_failure_internal(current_task: TaskRef, kill_reason: task::KillR
         error!("task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?", current_task.name);
     }
 
-    (held_interrupts, current_task)
+    (preemption_guard, current_task)
 }     
 
 /// This function cleans up a task that did not exit properly,
@@ -758,8 +742,8 @@ fn task_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillR
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
-    let (held_interrupts, current_task) = task_cleanup_failure_internal(current_task, kill_reason);
-    task_cleanup_final::<F, A, R>(held_interrupts, current_task)
+    let (preemption_guard, current_task) = task_cleanup_failure_internal(current_task, kill_reason);
+    task_cleanup_final::<F, A, R>(preemption_guard, current_task)
 }
 
 /// Similar to `task_cleanup_failure` but used on restartable_tasks
@@ -768,8 +752,8 @@ fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason:
           R: Send + 'static,
           F: FnOnce(A) -> R + Send + Clone + 'static, 
 {
-    let (held_interrupts, current_task) = task_cleanup_failure_internal(current_task, kill_reason);
-    task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
+    let (preemption_guard, current_task) = task_cleanup_failure_internal(current_task, kill_reason);
+    task_restartable_cleanup_final::<F, A, R>(preemption_guard, current_task)
 }
 
 
@@ -798,14 +782,14 @@ fn task_cleanup_final_internal(current_task: &TaskRef) {
 
 /// The final piece of the task cleanup logic,
 /// which removes the task from its runqueue and permanently deschedules it. 
-fn task_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInterrupts, current_task: TaskRef) -> ! 
+fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: TaskRef) -> ! 
     where A: Send + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
     task_cleanup_final_internal(&current_task);
     drop(current_task);
-    drop(held_interrupts);
+    drop(preemption_guard);
     // ****************************************************
     // NOTE: nothing below here is guaranteed to run again!
     // ****************************************************
@@ -818,7 +802,7 @@ fn task_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInterrupts, curr
 /// The final piece of the task cleanup logic for restartable tasks.
 /// which removes the task from its runqueue and spawns it again with 
 /// same entry function (F) and argument (A). 
-fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInterrupts, current_task: TaskRef) -> ! 
+fn task_restartable_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: TaskRef) -> !
    where A: Send + Clone + 'static, 
          R: Send + 'static,
          F: FnOnce(A) -> R + Send + Clone + 'static, 
@@ -887,7 +871,7 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
     }
 
     drop(current_task);
-    drop(held_interrupts);
+    drop(preemption_guard);
     // ****************************************************
     // NOTE: nothing below here is guaranteed to run again!
     // ****************************************************
