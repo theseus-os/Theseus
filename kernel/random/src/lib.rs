@@ -1,32 +1,49 @@
+//! A cryptographically secure source of randomness.
+//!
+//! The randomness is provided by a global, cryptographically secure
+//! pseudorandom number generator. More specifically,
+//! [`rand_chacha::ChaCha20Rng`].
+//!
+//! The CSPRNG is instantiated using [`lazy_static`] and hence it is initialized
+//! lazily on the first request for randomness. It attempts to obtains a seed
+//! from the following sources in order:
+//! - `RDSEED`
+//! - `RDRAND`
+//! - `TSC`
+//!
+//! An error will be logged if the `TSC` is used as it is not a high quality
+//! source of randomness.
+//!
+//! If a consumer requires one-off randomness, [`next_u32`], [`next_u64`], or
+//! [`fill_bytes`] should be used. Otherwise, [`init_rng`] should be used to
+//! seed a local PRNG, which can then be used as a source of randomness. Using a
+//! local PRNG avoids contention on the global CSPRNG and allows for PRNGs
+//! better suited for the task (e.g. non-crypto PRNGs).
+
 #![no_std]
 
 use rand_chacha::{
     rand_core::{RngCore, SeedableRng},
     ChaCha20Rng,
 };
-use spin::{mutex::Mutex, once::Once};
+use spin::mutex::Mutex;
 
-/// The global random number generator.
-///
-/// This PRNG is cryptographically-secure. It can be directly accessed using
-/// [`next_u32`], [`next_u64`], and [`fill_bytes`] for one-off randomness.
-/// However, it should mostly be used to seed local PRNGs using [`init_prng`].
-///
-/// Using a single global CSPRNG allows us to feed it with entropy from device
-/// drivers and such.
-static CSPRNG: Once<Mutex<ChaCha20Rng>> = Once::new();
-
-/// Initialises the global CSPRNG.
-///
-/// Only the first call will initialise the CSPRNG. Subsequent calls will
-/// return the already initialised CSPRNG.
-pub fn init_once() -> &'static Mutex<ChaCha20Rng> {
-    CSPRNG.call_once(|| {
+lazy_static::lazy_static! {
+    /// The global random number generator.
+    ///
+    /// This PRNG is cryptographically-secure. It can be directly accessed using
+    /// [`next_u32`], [`next_u64`], and [`fill_bytes`] for one-off randomness.
+    /// However, it should mostly be used to seed local PRNGs using
+    /// [`init_rng`].
+    ///
+    /// Using a single global CSPRNG allows us to feed it with entropy from
+    /// device drivers and such.
+    static ref CSPRNG: Mutex<ChaCha20Rng> = {
         let seed = rdseed_seed()
             .or_else(|_| rdrand_seed())
             .unwrap_or_else(|_| tsc_seed());
         Mutex::new(ChaCha20Rng::from_seed(seed))
-    })
+    };
 }
 
 /// Tries to generate a 32 byte seed using the RDSEED x86 instruction.
@@ -95,27 +112,27 @@ fn tsc_seed() -> [u8; 32] {
 /// Returns a random [`u32`].
 ///
 /// Consider using [`init_rng`] if calling this function in a loop, or if you
-/// don't require cryptographically-secure random numbers.
+/// don't require cryptographically secure random numbers.
 pub fn next_u32() -> u32 {
-    let mut csprng = init_once().lock();
+    let mut csprng = CSPRNG.lock();
     csprng.next_u32()
 }
 
 /// Returns a random [`u64`].
 ///
 /// Consider using [`init_rng`] if calling this function in a loop, or if you
-/// don't require cryptographically-secure random numbers.
+/// don't require cryptographically secure random numbers.
 pub fn next_u64() -> u64 {
-    let mut csprng = init_once().lock();
+    let mut csprng = CSPRNG.lock();
     csprng.next_u64()
 }
 
 /// Fills `dest` with random data.
 ///
 /// Consider using [`init_rng`] if calling this function in a loop, or if you
-/// don't require cryptographically-secure random numbers.
+/// don't require cryptographically secure random numbers.
 pub fn fill_bytes(dest: &mut [u8]) {
-    let mut csprng = init_once().lock();
+    let mut csprng = CSPRNG.lock();
     csprng.fill_bytes(dest);
 }
 
@@ -123,15 +140,11 @@ pub fn fill_bytes(dest: &mut [u8]) {
 ///
 /// Directly accessing the global CSPRNG can be expensive and so it is often
 /// better to seed a local PRNG from the global CSPRNG. Using a local PRNG
-/// allows for much faster non-cryptographically-secure PRNGs to be used.
-///
-/// Even if you require cryptographically-secure randomness, it's often better
-/// to use a local CSPRNG as it doesn't require locking the global CSPRNG,
-/// except during seeding.
+/// also allows for much faster cryptographically insecure PRNGs to be used.
 pub fn init_rng<T>() -> Result<T, ()>
 where
     T: SeedableRng,
 {
-    let mut csprng = init_once().lock();
+    let mut csprng = CSPRNG.lock();
     T::from_rng(&mut *csprng).map_err(|_| ())
 }

@@ -358,7 +358,6 @@ dependencies = [
  "network_manager",
  "ota_update_client",
  "print",
- "rand 0.1.0",
  "scheduler",
  "simd_personality",
  "spawn",
@@ -1413,7 +1412,7 @@ dependencies = [
  "physical_nic",
  "pic",
  "pit_clock_basic",
- "rand 0.8.5",
+ "rand",
  "runqueue",
  "spin 0.9.0",
  "static_assertions",
@@ -2201,7 +2200,7 @@ dependencies = [
  "network_manager",
  "owning_ref",
  "percent-encoding",
- "rand 0.8.5",
+ "rand",
  "sha3",
  "smoltcp",
  "smoltcp_helper",
@@ -2511,18 +2510,6 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.1.0"
-dependencies = [
- "lazy_static",
- "log",
- "rand_chacha",
- "rdrand",
- "spin 0.9.0",
- "tsc",
-]
-
-[[package]]
-name = "rand"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
@@ -2545,6 +2532,18 @@ name = "rand_core"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d34f1408f55294453790c48b2f1ebbb1c5b4b7563eb1f418bcfcfdbb06ebb4e7"
+
+[[package]]
+name = "random"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "log",
+ "rand_chacha",
+ "rdrand",
+ "spin 0.9.0",
+ "tsc",
+]
 
 [[package]]
 name = "rangemap"
@@ -4034,7 +4033,7 @@ dependencies = [
  "memory",
  "more-asserts",
  "mutex_sleep",
- "rand 0.8.5",
+ "rand",
  "region",
  "signal_handler",
  "spin 0.9.0",

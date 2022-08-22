@@ -94,8 +94,5 @@ path = "../task_fs"
 [dependencies.multiple_heaps]
 path = "../multiple_heaps"
 
-[dependencies.rand]
-path = "../rand"
-
 [lib]
 crate-type = ["rlib"]
