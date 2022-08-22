@@ -134,6 +134,14 @@
 <span id="128">128</span>
 <span id="129">129</span>
 <span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Manages preemption on a per-CPU core basis.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! Supports enabling and disabling preemption for the purpose of </span>
@@ -175,6 +183,8 @@
     };
 
     <span class="kw">if</span> <span class="ident">preemption_was_enabled</span> {
+        <span class="comment">// log::trace!(&quot; CPU {}:   disabling preemption&quot;, apic_id);</span>
+        
         <span class="comment">// When transitioning from preemption being enabled to disabled,</span>
         <span class="comment">// we must disable the local APIC timer used for preemptive task switching.</span>
         <span class="ident">apic::get_my_apic</span>()
@@ -210,8 +220,12 @@
     <span class="ident">preemption_was_enabled</span>: <span class="ident">bool</span>,
 }
 
-<span class="comment">// Similar guard types in Rust `std` are not `Send`.</span>
-<span class="kw">impl</span> <span class="op">!</span><span class="ident">Send</span> <span class="kw">for</span> <span class="ident">PreemptionGuard</span> { }
+<span class="comment">// TODO FIXME: currently we transfer a `PreemptionGuard` between tasks</span>
+<span class="comment">//             during a task switch (right before and right after the context switch).</span>
+<span class="comment">//             Thus, this type needs to impl `Send`, even though it doesn&#39;t make sense</span>
+<span class="comment">//             to move it across a thread boundary in the general case.</span>
+<span class="comment">// // Similar guard types in Rust `std` are not `Send`.</span>
+<span class="comment">// impl !Send for PreemptionGuard { }</span>
 
 <span class="kw">impl</span> <span class="ident">PreemptionGuard</span> {
     <span class="doccomment">/// Returns whether preemption was originally enabled when this guard was created.</span>
@@ -239,6 +253,8 @@
 
         <span class="kw">let</span> <span class="ident">prev_val</span> <span class="op">=</span> <span class="ident">PREEMPTION_COUNT</span>[<span class="ident">apic_id</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">fetch_sub</span>(<span class="number">1</span>, <span class="ident">Ordering::Relaxed</span>);
         <span class="kw">if</span> <span class="ident">prev_val</span> <span class="op">==</span> <span class="number">1</span> {
+            <span class="comment">// log::trace!(&quot;CPU {}: re-enabling preemption&quot;, apic_id);</span>
+
             <span class="comment">// If the previous counter value was 1, that means the current value is 1,</span>
             <span class="comment">// which indicates we are transitioning from preemption disabled to enabled on this CPU.</span>
             <span class="comment">// Thus, we re-enable the local APIC timer used for preemptive task switching.</span>

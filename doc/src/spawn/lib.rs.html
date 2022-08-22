@@ -950,6 +950,9 @@
 <span id="944">944</span>
 <span id="945">945</span>
 <span id="946">946</span>
+<span id="947">947</span>
+<span id="948">948</span>
+<span id="949">949</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks</span>
 <span class="doccomment">//! and convenient builder patterns for customizing new tasks. </span>
 <span class="doccomment">//! </span>
@@ -1546,6 +1549,7 @@
 {
     <span class="kw">let</span> <span class="ident">task_entry_func</span>;
     <span class="kw">let</span> <span class="ident">task_arg</span>;
+    <span class="kw">let</span> <span class="ident">recovered_preemption_guard</span>;
 
     <span class="comment">// This is scoped to ensure that absolutely no resources that require dropping are held</span>
     <span class="comment">// when invoking the task&#39;s entry function, in order to simplify cleanup when unwinding.</span>
@@ -1560,7 +1564,7 @@
         <span class="comment">// because this is the first code to run immediately after a context switch</span>
         <span class="comment">// switches to this task for the first time.</span>
         <span class="comment">// For more details, see the comments at the end of `Task::task_switch()`.</span>
-        <span class="ident">curr_task</span>.<span class="ident">post_context_switch_action</span>();
+        <span class="ident">recovered_preemption_guard</span> <span class="op">=</span> <span class="ident">curr_task</span>.<span class="ident">post_context_switch_action</span>();
 
         <span class="comment">// This task&#39;s function and argument were placed at the bottom of the stack when this task was spawned.</span>
         <span class="kw">let</span> <span class="ident">task_func_arg</span> <span class="op">=</span> <span class="ident">curr_task</span>.<span class="ident">with_kstack</span>(<span class="op">|</span><span class="ident">kstack</span><span class="op">|</span> {
@@ -1584,8 +1588,10 @@
     <span class="comment">// Since the `task_switch()` function was originally invoked from an interrupt handler,</span>
     <span class="comment">// interrupts were disabled but never had the chance to be re-enabled</span>
     <span class="comment">// because we did not return from the interrupt handler as usual.</span>
-    <span class="comment">// Therefore, we need to re-enabled interrupts here to ensure that things continue</span>
-    <span class="comment">// to run as normal, with interrupts enabled so we can properly preempt this task.</span>
+    <span class="comment">// Therefore, we need to re-enable interrupts and preemption here to ensure that</span>
+    <span class="comment">// things continue to run as normal, with interrupts and preemption enabled</span>
+    <span class="comment">// such that we can properly preempt this task.</span>
+    <span class="ident">drop</span>(<span class="ident">recovered_preemption_guard</span>);
     <span class="ident">enable_interrupts</span>();
 
     <span class="comment">// Now we actually invoke the entry point function that this Task was spawned for, catching a panic if one occurs.</span>
