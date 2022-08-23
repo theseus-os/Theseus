@@ -360,7 +360,7 @@ pub fn pick_child_core() -> u8 {
 	if nr_tasks_in_rq(child_core) == Some(1) {return child_core;}
 
 	// if failed, try from the last to the first
-	for child_core in (0..apic::core_count() as u8).rev() {
+	for child_core in (0..apic::cpu_count()).rev() {
 		if nr_tasks_in_rq(child_core) == Some(1) {return child_core;}
 	}
 	debug!("WARNING : Cannot pick a child core because cores are busy");

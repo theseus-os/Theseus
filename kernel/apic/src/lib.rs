@@ -2,7 +2,7 @@
 
 extern crate alloc;
 
-use core::fmt;
+use core::{fmt, sync::atomic::{AtomicU8, Ordering}};
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use zerocopy::FromBytes;
 use alloc::boxed::Box;
@@ -44,7 +44,11 @@ const_assert!(AtomicCell::<InterruptChip>::is_lock_free());
 /// The set of system-wide `LocalApic`s, one per CPU core.
 static LOCAL_APICS: AtomicMap<u8, RwLockIrqSafe<LocalApic>> = AtomicMap::new();
 
-/// The processor id (from the ACPI MADT table) of the bootstrap processor
+/// The number of CPUs currently initialized in the system.
+/// This must match the number of Local APICs initialized in the system.
+static CPU_COUNT: AtomicU8 = AtomicU8::new(0);
+
+/// The processor id (from the ACPI MADT table) of the bootstrap CPU.
 static BSP_PROCESSOR_ID: Once<u8> = Once::new(); 
 
 pub fn get_bsp_id() -> Option<u8> {
@@ -66,24 +70,24 @@ pub fn has_x2apic() -> bool {
     *res // because call_once returns a reference to the cached IS_X2APIC value
 }
 
-/// Returns a reference to the list of LocalApics, one per processor core
+/// Returns a reference to the list of LocalApics, one per CPU core.
 pub fn get_lapics() -> &'static AtomicMap<u8, RwLockIrqSafe<LocalApic>> {
 	&LOCAL_APICS
 }
 
-/// Returns the number of processor core (local APICs) that exist on this system.
-pub fn core_count() -> usize {
-    get_lapics().iter().count()
+/// Returns the number of CPUs (cores, or local APICs) that exist 
+/// and are currently initialized on this system.
+#[doc(alias = "cpus")]
+pub fn cpu_count() -> u8 {
+    CPU_COUNT.load(Ordering::Relaxed)
 }
 
-
-/// Returns the APIC ID of the currently executing processor core.
+/// Returns the APIC ID of the currently executing CPU core.
 pub fn get_my_apic_id() -> u8 {
     rdmsr(IA32_TSC_AUX) as u8
 }
 
-
-/// Returns a reference to the LocalApic for the currently executing processsor core.
+/// Returns a reference to the LocalApic for the currently executing CPU core.
 pub fn get_my_apic() -> Option<&'static RwLockIrqSafe<LocalApic>> {
     LOCAL_APICS.get(&get_my_apic_id())
 }
@@ -320,22 +324,27 @@ impl fmt::Debug for LocalApic {
             .finish()
     }
 }
-
+impl Drop for LocalApic {
+    fn drop(&mut self) {
+        error!("Unexpected: dropping {:?}", self);
+        CPU_COUNT.fetch_sub(1, Ordering::Relaxed);
+    }
+}
 impl LocalApic {
     /// Creates and initializes a new `LocalApic` for the current CPU core
-    /// and adds it to the global set of initialized lapics.
+    /// and adds it to the global set of initialized local APICs.
     /// 
     /// ## Important Usage Note
     /// This MUST be invoked from the AP core itself when it is booting up.
     /// The BSP cannot invoke this for other APs (it can only invoke it for itself).
-    pub fn new(
+    pub fn init(
         page_table: &mut PageTable,
         processor: u8,
         apic_id: u8,
         is_bsp: bool,
         nmi_lint: u8,
         nmi_flags: u16
-    ) -> Result<LocalApic, &'static str> {
+    ) -> Result<(), &'static str> {
 
         trace!("size of LocalApic: {}", core::mem::size_of::<LocalApic>());
 
@@ -344,7 +353,7 @@ impl LocalApic {
             1 => LvtLint::Pin1,
             _invalid => {
                 error!("BUG: invalid `nmi_lint` value (must be `0` or `1`) in \
-                    LocalApic::new(processor: {}, apic_id: {}, is_bsp: {}, nmi_lint: {}, nmi_flags: {}",
+                    LocalApic::init(processor: {}, apic_id: {}, is_bsp: {}, nmi_lint: {}, nmi_flags: {}",
                     processor, apic_id, is_bsp, nmi_lint, nmi_flags
                 );
                 return Err("BUG: invalid `nmi_lint` value, must be `0` or `1`");
@@ -377,7 +386,11 @@ impl LocalApic {
         lapic.init_lvt_timer();
         lapic.set_nmi(nmi_lint, nmi_flags);
         info!("Found new processor core ({:?})", lapic);
-		Ok(lapic)      
+
+        let _existing = LOCAL_APICS.insert(apic_id, RwLockIrqSafe::new(lapic));
+        assert!(_existing.is_none(), "Local APIC should not already exist");
+        CPU_COUNT.fetch_add(1, Ordering::Relaxed);
+		Ok(())      
     }
 
 

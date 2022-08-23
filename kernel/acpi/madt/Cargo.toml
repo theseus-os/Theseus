@@ -6,12 +6,7 @@ description = "Support for ACPI MADT"
 
 [dependencies]
 zerocopy = "0.5.0"
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+log = "0.4.8"
 
 [dependencies.memory]
 path = "../../memory"

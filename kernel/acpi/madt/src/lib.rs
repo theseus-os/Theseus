@@ -4,7 +4,6 @@
 #![no_std]
 
 #[macro_use] extern crate log;
-extern crate irq_safety;
 extern crate memory;
 extern crate ioapic;
 extern crate apic;
@@ -15,8 +14,7 @@ extern crate zerocopy;
 
 use core::mem::size_of;
 use memory::{MappedPages, PageTable, PhysicalAddress}; 
-use apic::{LocalApic, get_my_apic_id, get_lapics, get_bsp_id};
-use irq_safety::RwLockIrqSafe;
+use apic::{LocalApic, get_my_apic_id, get_bsp_id};
 use sdt::Sdt;
 use acpi_table::{AcpiSignature, AcpiTables};
 use zerocopy::FromBytes;
@@ -303,7 +301,6 @@ pub struct MadtLocalApicAddressOverride {
 fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Result<(), &'static str> {
     use pic::IRQ_BASE_OFFSET;
 
-    let all_lapics = get_lapics();
     let me = get_my_apic_id();
 
     for madt_entry in madt_iter.clone() {
@@ -311,8 +308,8 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
             if lapic_entry.apic_id == me {
                 let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
 
-                let bsp_lapic = LocalApic::new(page_table, lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags)?;
-                let bsp_id = bsp_lapic.id();
+                LocalApic::init(page_table, lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags)?;
+                let bsp_id = lapic_entry.apic_id;
 
                 // redirect every IoApic's interrupts to the one BSP
                 // TODO FIXME: I'm unsure if this is actually correct!
@@ -328,13 +325,6 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
                     // ioapic_ref.set_irq(0x1, 0xFF, IRQ_BASE_OFFSET + 0x1); 
                     // FIXME: the above line does indeed send the interrupt to all cores, but then they all handle it, instead of just one. 
                 }
-                
-                // add the BSP lapic to the list (should be empty until here)
-                if all_lapics.iter().next().is_some() {
-                    return Err("BUG: LocalApics list wasn't empty when adding BSP!! BSP must be the first core added.");
-                }
-                all_lapics.insert(lapic_entry.apic_id, RwLockIrqSafe::new(bsp_lapic));
-
                 // there's only ever one BSP, so we can exit the loop here
                 break;
             }

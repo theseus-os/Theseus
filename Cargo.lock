@@ -1653,7 +1653,6 @@ dependencies = [
  "acpi_table",
  "apic",
  "ioapic",
- "irq_safety",
  "log",
  "memory",
  "pic",

@@ -19,11 +19,11 @@ extern crate tlb_shootdown;
 
 use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicBool, Ordering};
-use irq_safety::{enable_interrupts, MutexIrqSafe, RwLockIrqSafe};
+use irq_safety::{enable_interrupts, MutexIrqSafe};
 use memory::{VirtualAddress, get_kernel_mmi_ref};
 use stack::Stack;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use apic::{LocalApic, get_lapics};
+use apic::LocalApic;
 
 
 /// An atomic flag used for synchronizing progress between the BSP 
@@ -78,12 +78,8 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     // we do this last (after all other initialization) in order to prevent this lapic
     // from prematurely receiving IPIs or being used in other ways,
     // and also to ensure that if this apic fails to init, it's not accidentally used as a functioning apic in the list.
-    let lapic = {
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        LocalApic::new(&mut kernel_mmi.page_table, processor_id, apic_id, false, nmi_lint, nmi_flags)
-            .expect("kstart_ap(): failed to create LocalApic")
-    };
-    get_lapics().insert(apic_id, RwLockIrqSafe::new(lapic));
+    LocalApic::init(&mut kernel_mmi_ref.lock().page_table, processor_id, apic_id, false, nmi_lint, nmi_flags)
+        .expect("kstart_ap(): failed to create LocalApic");
     tlb_shootdown::init();
 
     info!("Initialization complete on AP core {}. Spawning idle task and enabling interrupts...", apic_id);
