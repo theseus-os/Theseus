@@ -197,7 +197,8 @@ build: $(nano_core_binary)
 	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -c cfg/builder.toml -s relink-rlibs
 
 ## Second, copy all object files into the main build directory and prepend the kernel or app prefix appropriately.
-	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -c cfg/builder.toml -s copy-crate-objects
+	@EXTRA_APP_CRATE_NAMES="$(EXTRA_APP_CRATE_NAMES) libtheseus" \
+	cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -c cfg/builder.toml -s copy-crate-objects
 
 ## Third, perform partial linking on each object file, which shrinks their size 
 ## and most importantly, accelerates their loading and linking at runtime.
@@ -225,7 +226,18 @@ endif
 	@echo -e 'host_deps = "./host_deps"' >> $(THESEUS_BUILD_TOML)
 
 ## Fifth, strip debug information if requested. This reduces object file size, improving load times and reducing memory usage.
+ifeq ($(debug),full)
+# don't strip any files
+else ifeq ($(debug),none)
+# strip all files
 	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -c cfg/builder.toml -s strip-objects
+else ifeq ($(debug),base)
+# strip all object files but the base kernel
+	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- \
+		-q -c cfg/builder.toml -s strip-objects strip-objects.strip-nanocore=false
+else
+$(error Error: unsupported option "debug=$(debug)". Options are 'full', 'none', or 'base')
+endif
 
 #############################
 ### end of "build" target ###
