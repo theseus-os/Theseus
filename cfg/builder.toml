@@ -17,8 +17,6 @@ applications = "{env:APP_PREFIX}"
 executables = "{env:EXECUTABLE_PREFIX}"
 
 [directories]
-kernel = "{theseus-root}/kernel"
-apps = "{theseus-root}/applications"
 cfg = "{env:CFG_DIR}"
 nanocore = "{env:NANO_CORE_BUILD_DIR}"
 isofiles = "{env:ISOFILES}"
@@ -30,19 +28,6 @@ debug-symbols = "{env:DEBUG_SYMBOLS_DIR}"
 sysroot = "{directories.deps}/sysroot/lib/rustlib/{target-name}/lib"
 target-deps = "{env:TARGET_DEPS_DIR}"
 
-# This step is not carried out by the builder atm
-#
-# [gen-mk-config]
-# output = "{directories.cfg}/generated.mk"
-
-# This step is not carried out by the builder atm
-#
-# [build-cells]
-# manifest-path = "{directories.kernel}/nano_core/Cargo.toml"
-# cargo = "cargo"
-# cargo-flags = []
-# rust-flags = []
-
 [link-nanocore]
 static-lib-path = "{env:nano_core_static_lib}"
 asm-sources-dir = "{env:NANO_CORE_SRC_DIR}/boot/arch_{arch}"
@@ -52,50 +37,12 @@ linker-script-path = "{env:linker_script}"
 output-path = "{env:OBJECT_FILES_BUILD_DIR}/{env:KERNEL_PREFIX}nano_core.serde"
 readelf = "{env:CROSS}readelf"
 
-[relink-rlibs]
-linker = "{linker}"
-remove-rlibs-dirs = true
-
 [copy-crate-objects]
-target-dirs = [ "{directories.target-deps}" ]
-extra-apps = [ "libtheseus" ]
-debug-crate-objects = false
+extra-apps = { from-env = "EXTRA_APP_CRATE_NAMES", delimiter = " " }
 
 [relink-objects]
 partial-relinking-script = "{env:partial_relinking_script}"
-linker = "{linker}"
-stripper = "{stripper}"
-
-[strip-objects]
-stripper = "{stripper}"
-strip-nanocore = true
 
 [add-bootloader]
-nanocore-destination = "{directories.boot}/kernel.bin"
 bootloader = "{env:bootloader}"
 grub-mkrescue = "{env:GRUB_MKRESCUE}"
-limine-config = "built-in"
-limine-commit = "3f6a3303434d07e4663544d35fc0beb1b7c26364"
-limine-tarball = "https://github.com/limine-bootloader/limine/archive/{add-bootloader.limine-commit}.tar.gz"
-limine-subdir = "limine-{add-bootloader.limine-commit}"
-tarball-path = "{add-bootloader.extract-dir}.tar.gz"
-extract-dir = "{build-dir}/limine-prebuilt"
-expected-subdir = "{add-bootloader.extract-dir}/{add-bootloader.limine-subdir}"
-downloader = "wget"
-xorriso = "xorriso"
-
-[run-qemu]
-qemu = "qemu-system-{arch}"
-extra-args = [
-    "-boot", "d",
-    "-no-reboot",
-    "-no-shutdown",
-    "-s",
-    "-serial", "mon:stdio",
-    "-serial", "mon:pty",
-    "-m", "512M",
-    "-smp", "4",
-    "-cpu", "Broadwell",
-    "-net", "none",
-    "-cdrom", "{output-iso}",
-]
