@@ -114,7 +114,7 @@ pub fn init(
     
     // boot up the other cores (APs)
     let ap_count = multicore_bringup::handle_ap_cores(
-        kernel_mmi_ref.clone(),
+        &kernel_mmi_ref,
         ap_start_realmode_begin,
         ap_start_realmode_end,
         Some(kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION),

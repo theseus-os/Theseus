@@ -78,7 +78,7 @@ pub struct GraphicInfo {
 ///    that an AP should request from the BIOS when it boots up in 16-bit real mode.
 ///    If `None`, there will be no maximum.
 pub fn handle_ap_cores(
-    kernel_mmi_ref: MmiRef,
+    kernel_mmi_ref: &MmiRef,
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
     max_framebuffer_resolution: Option<(u16, u16)>,
