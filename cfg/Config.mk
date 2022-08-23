@@ -6,21 +6,21 @@
 SHELL := /bin/bash
 
 ## specifies which architecture we're building for
-ARCH ?= x86_64
+export ARCH ?= x86_64
 
 ## The name of the target JSON file (without the ".json" suffix)
-TARGET ?= $(ARCH)-theseus
+export TARGET ?= $(ARCH)-theseus
 
 ## The top level directory of the Theseus project
-ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+export ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 
 ## Where the configuration files are kept, like target json files
-CFG_DIR := $(ROOT_DIR)/cfg
+export CFG_DIR := $(ROOT_DIR)/cfg
 
 ## Prefixes for object files
-KERNEL_PREFIX       ?= k\#
-APP_PREFIX          ?= a\#
-EXECUTABLE_PREFIX   ?= e\#
+export KERNEL_PREFIX       ?= k\#
+export APP_PREFIX          ?= a\#
+export EXECUTABLE_PREFIX   ?= e\#
 
 ## By default, the Makefile will build the entire Theseus workspace
 ## as specified by the `members` set in the top-level `Cargo.toml` file
@@ -31,7 +31,7 @@ FEATURES ?= --workspace
 ## Build modes: debug is development mode, release is with full optimizations.
 ## We build using release mode by default, because running in debug mode is quite slow.
 ## You can set these on the command line like so: "make run BUILD_MODE=release"
-BUILD_MODE ?= release
+export BUILD_MODE ?= release
 ifeq ($(BUILD_MODE),debug)
     ## "debug" builds are the default in cargo, so don't change cargo options. 
     ## However, we do define the DEBUG value for CFLAGS, which is used in the assembly boot code.
