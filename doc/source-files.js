@@ -106,6 +106,7 @@ sourcesIndex["port_io"] = {"name":"","files":["lib.rs","x86.rs"]};
 sourcesIndex["preemption"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["print"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["ps2"] = {"name":"","files":["lib.rs"]};
+sourcesIndex["random"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["rendezvous"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["root"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["rsdp"] = {"name":"","files":["lib.rs"]};
