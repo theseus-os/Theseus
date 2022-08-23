@@ -30,7 +30,7 @@ use volatile::Volatile;
 use zerocopy::FromBytes;
 use memory::{VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, MmiRef};
 use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
-use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id};
+use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id, cpu_count};
 use ap_start::{kstart_ap, AP_READY_FLAG};
 use madt::{Madt, MadtEntry, MadtLocalApic, find_nmi_entry_for_processor};
 use pause::spin_loop_hint;
@@ -82,7 +82,7 @@ pub fn handle_ap_cores(
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
     max_framebuffer_resolution: Option<(u16, u16)>,
-) -> Result<usize, &'static str> {
+) -> Result<u8, &'static str> {
     let ap_startup_size_in_bytes = ap_start_realmode_end.value() - ap_start_realmode_begin.value();
 
     let page_table_phys_addr: PhysicalAddress;
@@ -199,16 +199,16 @@ pub fn handle_ap_cores(
         *GRAPHIC_INFO.lock() = graphic_info.clone();
     }
     
-    // wait for all cores to finish booting and init
+    // Wait for all CPUs to finish booting and init
     info!("handle_ap_cores(): BSP is waiting for APs to boot...");
-    let expected_cores = ap_count + 1;
-    let mut num_known_cores = get_lapics().iter().count();
+    let expected_cpus = ap_count + 1;
+    let mut num_known_cpus = cpu_count();
     let mut iter = 0;
-    while num_known_cores < expected_cores {
+    while num_known_cpus < expected_cpus {
         spin_loop_hint();
-        num_known_cores = get_lapics().iter().count();
+        num_known_cpus = cpu_count();
         if iter == 100000 {
-            trace!("BSP is waiting for APs to boot ({} of {})", num_known_cores, expected_cores);
+            trace!("BSP is waiting for APs to boot ({} of {})", num_known_cpus, expected_cpus);
             iter = 0;
         }
         iter += 1;
