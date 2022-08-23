@@ -62,8 +62,7 @@ pub fn allocate_memory(mem_base: PhysicalAddress, mem_size_in_bytes: usize) -> R
     // debug!("NicInit: memory base: {:#X}, memory size: {}", mem_base, mem_size_in_bytes);
 
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("NicInit::mem_map(): KERNEL_MMI was not yet initialized!")?;
-    let mut kernel_mmi = kernel_mmi_ref.lock();
-    let nic_mapped_page = kernel_mmi.page_table.map_allocated_pages_to(pages_nic, frames_nic, NIC_MAPPING_FLAGS)?;
+    let nic_mapped_page = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(pages_nic, frames_nic, NIC_MAPPING_FLAGS)?;
 
     Ok(nic_mapped_page)
 }

@@ -10,7 +10,6 @@ extern crate alloc;
 extern crate spin;
 extern crate volatile;
 extern crate zerocopy;
-extern crate irq_safety;
 extern crate memory;
 extern crate pit_clock_basic;
 extern crate stack;
@@ -26,12 +25,10 @@ use core::{
     ops::DerefMut,
     sync::atomic::Ordering,
 };
-use alloc::sync::Arc;
 use spin::Mutex;
 use volatile::Volatile;
 use zerocopy::FromBytes;
-use irq_safety::MutexIrqSafe;
-use memory::{VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, MemoryManagementInfo};
+use memory::{VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, MmiRef};
 use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
 use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id};
 use ap_start::{kstart_ap, AP_READY_FLAG};
@@ -74,14 +71,14 @@ pub struct GraphicInfo {
 /// (specifically the MADT (APIC) table).
 /// 
 /// # Arguments: 
-/// * `kernel_mmi_ref`: A reference to the locked MMI structure for the kernel.
+/// * `kernel_mmi_ref`: A reference to the MMI structure with the kernel's page table.
 /// * `ap_start_realmode_begin`: the starting virtual address of where the ap_start realmode code is.
 /// * `ap_start_realmode_end`: the ending virtual address of where the ap_start realmode code is.
 /// * `max_framebuffer_resolution`: the maximum resolution `(width, height)` of the graphical framebuffer
 ///    that an AP should request from the BIOS when it boots up in 16-bit real mode.
 ///    If `None`, there will be no maximum.
 pub fn handle_ap_cores(
-    kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
+    kernel_mmi_ref: MmiRef,
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
     max_framebuffer_resolution: Option<(u16, u16)>,

@@ -281,7 +281,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
         swap_requests, 
         Some(new_namespace_dir), 
         diffs.state_transfer_functions, 
-        &kernel_mmi_ref, 
+        kernel_mmi_ref,
         false, // verbose logging
         false, // enable_crate_cache
     ).map_err(|e| format!("crate swapping failed, error: {}", e))?;

@@ -207,7 +207,7 @@ pub fn new_application_task_builder(
     // Load the new application crate
     let app_crate_ref = {
         let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
-        CrateNamespace::load_crate_as_application(&namespace, &crate_object_file, &kernel_mmi_ref, false)?
+        CrateNamespace::load_crate_as_application(&namespace, &crate_object_file, kernel_mmi_ref, false)?
     };
 
     // Find the "main" entry point function in the new app crate

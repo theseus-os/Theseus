@@ -199,7 +199,7 @@ fn do_swap(
         swap_requests, 
         override_namespace_crate_dir,
         state_transfer_functions,
-        &kernel_mmi_ref,
+        kernel_mmi_ref,
         verbose_log,
         cache_old_crates,
     );

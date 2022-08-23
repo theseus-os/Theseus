@@ -58,10 +58,10 @@ static KERNEL_MMI: Once<MmiRef> = Once::new();
 /// A shareable reference to a `MemoryManagementInfo` struct wrapper in a lock.
 pub type MmiRef = Arc<MutexIrqSafe<MemoryManagementInfo>>;
 
-/// Returns a cloned reference to the kernel's `MemoryManagementInfo`, if initialized.
-/// If not, it returns None.
-pub fn get_kernel_mmi_ref() -> Option<MmiRef> {
-    KERNEL_MMI.get().cloned()
+/// Returns a reference to the kernel's `MemoryManagementInfo`, if initialized.
+/// If not, it returns `None`.
+pub fn get_kernel_mmi_ref() -> Option<&'static MmiRef> {
+    KERNEL_MMI.get()
 }
 
 
@@ -87,14 +87,11 @@ pub struct MemoryManagementInfo {
 /// Currently, this function acquires the lock on the frame allocator and the kernel's `MemoryManagementInfo` instance.
 /// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
 pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<(MappedPages, PhysicalAddress), &'static str> {
+    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous pages!")?;
     let allocated_frames = allocate_frames_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous frames!")?;
-
-    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
-    let mut kernel_mmi = kernel_mmi_ref.lock();
-
     let starting_phys_addr = allocated_frames.start_address();
-    let mp = kernel_mmi.page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags)?;
+    let mp = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags)?;
     Ok((mp, starting_phys_addr))
 }
 
@@ -108,10 +105,9 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
 /// Currently, this function acquires the lock on the kernel's `MemoryManagementInfo` instance.
 /// Thus, the caller should ensure that lock is not held when invoking this function.
 pub fn create_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<MappedPages, &'static str> {
-    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_mapping(): couldn't allocate pages!")?;
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
-    let mut kernel_mmi = kernel_mmi_ref.lock();
-    kernel_mmi.page_table.map_allocated_pages(allocated_pages, flags)
+    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_mapping(): couldn't allocate pages!")?;
+    kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags)
 }
 
 
@@ -243,9 +239,12 @@ pub fn init(
 /// Returns the following tuple, if successful:
 ///  * The kernel's new MemoryManagementInfo
 ///  * The kernel's list of identity-mapped MappedPages which should be dropped before starting the first userspace program. 
-pub fn init_post_heap(page_table: PageTable, mut higher_half_mapped_pages: [Option<MappedPages>; 32], mut identity_mapped_pages: [Option<MappedPages>; 32], heap_mapped_pages: MappedPages) 
--> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>), &'static str> 
-{
+pub fn init_post_heap(
+    page_table: PageTable,
+    mut higher_half_mapped_pages: [Option<MappedPages>; 32],
+    mut identity_mapped_pages: [Option<MappedPages>; 32],
+    heap_mapped_pages: MappedPages
+) -> Result<(MmiRef, Vec<MappedPages>), &'static str> {
     // HERE: heap is initialized! Can now use alloc types.
     // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
     // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.  
