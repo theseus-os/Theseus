@@ -1053,7 +1053,6 @@ dependencies = [
  "acpi",
  "ap_start",
  "apic",
- "irq_safety",
  "kernel_config",
  "log",
  "madt",

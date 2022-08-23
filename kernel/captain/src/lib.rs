@@ -49,12 +49,11 @@ extern crate console;
 
 
 
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::ops::DerefMut;
-use memory::{VirtualAddress, MemoryManagementInfo, MappedPages};
+use memory::{VirtualAddress, MappedPages, MmiRef};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use irq_safety::{MutexIrqSafe, enable_interrupts};
+use irq_safety::enable_interrupts;
 use stack::Stack;
 
 
@@ -71,7 +70,7 @@ pub fn mirror_to_vga_cb(args: core::fmt::Arguments) {
 /// This does all the rest of the module loading and initialization so that the OS 
 /// can continue running and do actual useful work.
 pub fn init(
-    kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, 
+    kernel_mmi_ref: MmiRef,
     identity_mapped_pages: Vec<MappedPages>,
     bsp_initial_stack: Stack,
     ap_start_realmode_begin: VirtualAddress,

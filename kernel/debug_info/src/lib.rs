@@ -583,7 +583,7 @@ impl DebugSymbols {
         let symtab = find_symbol_table(&elf_file)?;
 
         // Allocate a memory region large enough to hold all debug sections.
-        let (mut debug_sections_mp, _debug_sections_vaddr_range) = allocate_debug_section_pages(&elf_file, &kernel_mmi_ref)?;
+        let (mut debug_sections_mp, _debug_sections_vaddr_range) = allocate_debug_section_pages(&elf_file, kernel_mmi_ref)?;
         debug!("debug sections spans {:#X} to {:#X}  (size: {:#X} bytes)",
             _debug_sections_vaddr_range.start, 
             _debug_sections_vaddr_range.end,
@@ -758,7 +758,7 @@ impl DebugSymbols {
                             warn!("Looking for foreign relocation source section {:?}", demangled);
 
                             // search for the symbol's demangled name in the kernel's symbol map
-                            namespace.get_symbol_or_load(&demangled, None, &kernel_mmi_ref, false)
+                            namespace.get_symbol_or_load(&demangled, None, kernel_mmi_ref, false)
                                 .upgrade()
                                 .ok_or("Couldn't get symbol for .debug section's foreign relocation entry, nor load its containing crate")
                                 .map(|sec| (sec.address_range.start, Some(sec)))

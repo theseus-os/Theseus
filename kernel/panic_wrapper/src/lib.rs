@@ -61,13 +61,12 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
                 .or_else(|| mod_mgmt::get_initial_kernel_namespace())
                 .ok_or("couldn't get current task's or default namespace")?;
             let mmi_ref = task::get_my_current_task()
-                .map(|t| t.mmi.clone())
+                .map(|t| &t.mmi)
                 .or_else(|| memory::get_kernel_mmi_ref())
                 .ok_or("couldn't get current task's or default kernel MMI")?;
-            let mmi = mmi_ref.lock();
 
             stack_trace_frame_pointers::stack_trace_using_frame_pointers(
-                &mmi.page_table,
+                &mmi_ref.lock().page_table,
                 &mut |_frame_pointer, instruction_pointer: VirtualAddress| {
                     let symbol_offset = namespace.get_section_containing_address(instruction_pointer, false)
                         .map(|(sec, offset)| (sec.name.clone(), offset));
