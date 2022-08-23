@@ -346,7 +346,7 @@
     <span class="comment">// 2. Create the idle task for this CPU.</span>
     <span class="ident">spawn::create_idle_task</span>()<span class="question-mark">?</span>;
     <span class="comment">// 3. Cleanup bootstrap tasks, which handles this one and all other APs&#39; bootstrap tasks.</span>
-    <span class="ident">spawn::cleanup_bootstrap_tasks</span>(<span class="ident">cpu_count</span>)<span class="question-mark">?</span>;
+    <span class="ident">spawn::cleanup_bootstrap_tasks</span>(<span class="ident">cpu_count</span> <span class="kw">as</span> <span class="ident">usize</span>)<span class="question-mark">?</span>;
     <span class="comment">// 4. &quot;Finish&quot; this bootstrap task, indicating it has exited and no longer needs to run.</span>
     <span class="ident">bootstrap_task</span>.<span class="ident">finish</span>();
     <span class="comment">// 5. Enable interrupts such that other tasks can be scheduled in.</span>

@@ -766,11 +766,24 @@
 <span id="760">760</span>
 <span id="761">761</span>
 <span id="762">762</span>
+<span id="763">763</span>
+<span id="764">764</span>
+<span id="765">765</span>
+<span id="766">766</span>
+<span id="767">767</span>
+<span id="768">768</span>
+<span id="769">769</span>
+<span id="770">770</span>
+<span id="771">771</span>
+<span id="772">772</span>
+<span id="773">773</span>
+<span id="774">774</span>
+<span id="775">775</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 
-<span class="kw">use</span> <span class="ident">core::fmt</span>;
+<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">fmt</span>, <span class="ident">sync::atomic</span>::{<span class="ident">AtomicU8</span>, <span class="ident">Ordering</span>}};
 <span class="kw">use</span> <span class="ident">volatile</span>::{<span class="ident">Volatile</span>, <span class="ident">ReadOnly</span>, <span class="ident">WriteOnly</span>};
 <span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
 <span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
@@ -812,7 +825,11 @@
 <span class="doccomment">/// The set of system-wide `LocalApic`s, one per CPU core.</span>
 <span class="kw">static</span> <span class="ident">LOCAL_APICS</span>: <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">RwLockIrqSafe</span><span class="op">&lt;</span><span class="ident">LocalApic</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicMap::new</span>();
 
-<span class="doccomment">/// The processor id (from the ACPI MADT table) of the bootstrap processor</span>
+<span class="doccomment">/// The number of CPUs currently initialized in the system.</span>
+<span class="doccomment">/// This must match the number of Local APICs initialized in the system.</span>
+<span class="kw">static</span> <span class="ident">CPU_COUNT</span>: <span class="ident">AtomicU8</span> <span class="op">=</span> <span class="ident">AtomicU8::new</span>(<span class="number">0</span>);
+
+<span class="doccomment">/// The processor id (from the ACPI MADT table) of the bootstrap CPU.</span>
 <span class="kw">static</span> <span class="ident">BSP_PROCESSOR_ID</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>(); 
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_bsp_id</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
@@ -834,24 +851,24 @@
     <span class="kw-2">*</span><span class="ident">res</span> <span class="comment">// because call_once returns a reference to the cached IS_X2APIC value</span>
 }
 
-<span class="doccomment">/// Returns a reference to the list of LocalApics, one per processor core</span>
+<span class="doccomment">/// Returns a reference to the list of LocalApics, one per CPU core.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_lapics</span>() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">RwLockIrqSafe</span><span class="op">&lt;</span><span class="ident">LocalApic</span><span class="op">&gt;</span><span class="op">&gt;</span> {
 	<span class="kw-2">&amp;</span><span class="ident">LOCAL_APICS</span>
 }
 
-<span class="doccomment">/// Returns the number of processor core (local APICs) that exist on this system.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">core_count</span>() -&gt; <span class="ident">usize</span> {
-    <span class="ident">get_lapics</span>().<span class="ident">iter</span>().<span class="ident">count</span>()
+<span class="doccomment">/// Returns the number of CPUs (cores, or local APICs) that exist </span>
+<span class="doccomment">/// and are currently initialized on this system.</span>
+<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">alias</span> <span class="op">=</span> <span class="string">&quot;cpus&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cpu_count</span>() -&gt; <span class="ident">u8</span> {
+    <span class="ident">CPU_COUNT</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)
 }
 
-
-<span class="doccomment">/// Returns the APIC ID of the currently executing processor core.</span>
+<span class="doccomment">/// Returns the APIC ID of the currently executing CPU core.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_my_apic_id</span>() -&gt; <span class="ident">u8</span> {
     <span class="ident">rdmsr</span>(<span class="ident">IA32_TSC_AUX</span>) <span class="kw">as</span> <span class="ident">u8</span>
 }
 
-
-<span class="doccomment">/// Returns a reference to the LocalApic for the currently executing processsor core.</span>
+<span class="doccomment">/// Returns a reference to the LocalApic for the currently executing CPU core.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_my_apic</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">RwLockIrqSafe</span><span class="op">&lt;</span><span class="ident">LocalApic</span><span class="op">&gt;</span><span class="op">&gt;</span> {
     <span class="ident">LOCAL_APICS</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">get_my_apic_id</span>())
 }
@@ -1088,22 +1105,27 @@
             .<span class="ident">finish</span>()
     }
 }
-
+<span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">LocalApic</span> {
+    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="macro">error!</span>(<span class="string">&quot;Unexpected: dropping {:?}&quot;</span>, <span class="self">self</span>);
+        <span class="ident">CPU_COUNT</span>.<span class="ident">fetch_sub</span>(<span class="number">1</span>, <span class="ident">Ordering::Relaxed</span>);
+    }
+}
 <span class="kw">impl</span> <span class="ident">LocalApic</span> {
     <span class="doccomment">/// Creates and initializes a new `LocalApic` for the current CPU core</span>
-    <span class="doccomment">/// and adds it to the global set of initialized lapics.</span>
+    <span class="doccomment">/// and adds it to the global set of initialized local APICs.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// ## Important Usage Note</span>
     <span class="doccomment">/// This MUST be invoked from the AP core itself when it is booting up.</span>
     <span class="doccomment">/// The BSP cannot invoke this for other APs (it can only invoke it for itself).</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(
         <span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>,
         <span class="ident">processor</span>: <span class="ident">u8</span>,
         <span class="ident">apic_id</span>: <span class="ident">u8</span>,
         <span class="ident">is_bsp</span>: <span class="ident">bool</span>,
         <span class="ident">nmi_lint</span>: <span class="ident">u8</span>,
         <span class="ident">nmi_flags</span>: <span class="ident">u16</span>
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">LocalApic</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
 
         <span class="macro">trace!</span>(<span class="string">&quot;size of LocalApic: {}&quot;</span>, <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">LocalApic</span><span class="op">&gt;</span>());
 
@@ -1112,7 +1134,7 @@
             <span class="number">1</span> =&gt; <span class="ident">LvtLint::Pin1</span>,
             <span class="ident">_invalid</span> =&gt; {
                 <span class="macro">error!</span>(<span class="string">&quot;BUG: invalid `nmi_lint` value (must be `0` or `1`) in \
-                    LocalApic::new(processor: {}, apic_id: {}, is_bsp: {}, nmi_lint: {}, nmi_flags: {}&quot;</span>,
+                    LocalApic::init(processor: {}, apic_id: {}, is_bsp: {}, nmi_lint: {}, nmi_flags: {}&quot;</span>,
                     <span class="ident">processor</span>, <span class="ident">apic_id</span>, <span class="ident">is_bsp</span>, <span class="ident">nmi_lint</span>, <span class="ident">nmi_flags</span>
                 );
                 <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: invalid `nmi_lint` value, must be `0` or `1`&quot;</span>);
@@ -1145,7 +1167,11 @@
         <span class="ident">lapic</span>.<span class="ident">init_lvt_timer</span>();
         <span class="ident">lapic</span>.<span class="ident">set_nmi</span>(<span class="ident">nmi_lint</span>, <span class="ident">nmi_flags</span>);
         <span class="macro">info!</span>(<span class="string">&quot;Found new processor core ({:?})&quot;</span>, <span class="ident">lapic</span>);
-		<span class="prelude-val">Ok</span>(<span class="ident">lapic</span>)      
+
+        <span class="kw">let</span> <span class="ident">_existing</span> <span class="op">=</span> <span class="ident">LOCAL_APICS</span>.<span class="ident">insert</span>(<span class="ident">apic_id</span>, <span class="ident">RwLockIrqSafe::new</span>(<span class="ident">lapic</span>));
+        <span class="macro">assert!</span>(<span class="ident">_existing</span>.<span class="ident">is_none</span>(), <span class="string">&quot;Local APIC should not already exist&quot;</span>);
+        <span class="ident">CPU_COUNT</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::Relaxed</span>);
+		<span class="prelude-val">Ok</span>(())      
     }
 
 

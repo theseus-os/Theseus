@@ -401,23 +401,12 @@
 <span id="395">395</span>
 <span id="396">396</span>
 <span id="397">397</span>
-<span id="398">398</span>
-<span id="399">399</span>
-<span id="400">400</span>
-<span id="401">401</span>
-<span id="402">402</span>
-<span id="403">403</span>
-<span id="404">404</span>
-<span id="405">405</span>
-<span id="406">406</span>
-<span id="407">407</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the MADT ACPI table, </span>
 <span class="doccomment">//! which includes interrupt and multicore info.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">ioapic</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">apic</span>;
@@ -428,8 +417,7 @@
 
 <span class="kw">use</span> <span class="ident">core::mem::size_of</span>;
 <span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">MappedPages</span>, <span class="ident">PageTable</span>, <span class="ident">PhysicalAddress</span>}; 
-<span class="kw">use</span> <span class="ident">apic</span>::{<span class="ident">LocalApic</span>, <span class="ident">get_my_apic_id</span>, <span class="ident">get_lapics</span>, <span class="ident">get_bsp_id</span>};
-<span class="kw">use</span> <span class="ident">irq_safety::RwLockIrqSafe</span>;
+<span class="kw">use</span> <span class="ident">apic</span>::{<span class="ident">LocalApic</span>, <span class="ident">get_my_apic_id</span>, <span class="ident">get_bsp_id</span>};
 <span class="kw">use</span> <span class="ident">sdt::Sdt</span>;
 <span class="kw">use</span> <span class="ident">acpi_table</span>::{<span class="ident">AcpiSignature</span>, <span class="ident">AcpiTables</span>};
 <span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
@@ -716,7 +704,6 @@
 <span class="kw">fn</span> <span class="ident">handle_bsp_lapic_entry</span>(<span class="ident">madt_iter</span>: <span class="ident">MadtIter</span>, <span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">use</span> <span class="ident">pic::IRQ_BASE_OFFSET</span>;
 
-    <span class="kw">let</span> <span class="ident">all_lapics</span> <span class="op">=</span> <span class="ident">get_lapics</span>();
     <span class="kw">let</span> <span class="ident">me</span> <span class="op">=</span> <span class="ident">get_my_apic_id</span>();
 
     <span class="kw">for</span> <span class="ident">madt_entry</span> <span class="kw">in</span> <span class="ident">madt_iter</span>.<span class="ident">clone</span>() {
@@ -724,8 +711,8 @@
             <span class="kw">if</span> <span class="ident">lapic_entry</span>.<span class="ident">apic_id</span> <span class="op">==</span> <span class="ident">me</span> {
                 <span class="kw">let</span> (<span class="ident">nmi_lint</span>, <span class="ident">nmi_flags</span>) <span class="op">=</span> <span class="ident">find_nmi_entry_for_processor</span>(<span class="ident">lapic_entry</span>.<span class="ident">processor</span>, <span class="ident">madt_iter</span>.<span class="ident">clone</span>());
 
-                <span class="kw">let</span> <span class="ident">bsp_lapic</span> <span class="op">=</span> <span class="ident">LocalApic::new</span>(<span class="ident">page_table</span>, <span class="ident">lapic_entry</span>.<span class="ident">processor</span>, <span class="ident">lapic_entry</span>.<span class="ident">apic_id</span>, <span class="bool-val">true</span>, <span class="ident">nmi_lint</span>, <span class="ident">nmi_flags</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">bsp_id</span> <span class="op">=</span> <span class="ident">bsp_lapic</span>.<span class="ident">id</span>();
+                <span class="ident">LocalApic::init</span>(<span class="ident">page_table</span>, <span class="ident">lapic_entry</span>.<span class="ident">processor</span>, <span class="ident">lapic_entry</span>.<span class="ident">apic_id</span>, <span class="bool-val">true</span>, <span class="ident">nmi_lint</span>, <span class="ident">nmi_flags</span>)<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">bsp_id</span> <span class="op">=</span> <span class="ident">lapic_entry</span>.<span class="ident">apic_id</span>;
 
                 <span class="comment">// redirect every IoApic&#39;s interrupts to the one BSP</span>
                 <span class="comment">// TODO FIXME: I&#39;m unsure if this is actually correct!</span>
@@ -741,13 +728,6 @@
                     <span class="comment">// ioapic_ref.set_irq(0x1, 0xFF, IRQ_BASE_OFFSET + 0x1); </span>
                     <span class="comment">// FIXME: the above line does indeed send the interrupt to all cores, but then they all handle it, instead of just one. </span>
                 }
-                
-                <span class="comment">// add the BSP lapic to the list (should be empty until here)</span>
-                <span class="kw">if</span> <span class="ident">all_lapics</span>.<span class="ident">iter</span>().<span class="ident">next</span>().<span class="ident">is_some</span>() {
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: LocalApics list wasn&#39;t empty when adding BSP!! BSP must be the first core added.&quot;</span>);
-                }
-                <span class="ident">all_lapics</span>.<span class="ident">insert</span>(<span class="ident">lapic_entry</span>.<span class="ident">apic_id</span>, <span class="ident">RwLockIrqSafe::new</span>(<span class="ident">bsp_lapic</span>));
-
                 <span class="comment">// there&#39;s only ever one BSP, so we can exit the loop here</span>
                 <span class="kw">break</span>;
             }

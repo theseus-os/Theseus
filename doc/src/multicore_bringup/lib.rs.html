@@ -401,7 +401,7 @@
 <span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
 <span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>, <span class="ident">MappedPages</span>, <span class="ident">EntryFlags</span>, <span class="ident">MmiRef</span>};
 <span class="kw">use</span> <span class="ident">kernel_config::memory</span>::{<span class="ident">PAGE_SIZE</span>, <span class="ident">PAGE_SHIFT</span>, <span class="ident">KERNEL_STACK_SIZE_IN_PAGES</span>};
-<span class="kw">use</span> <span class="ident">apic</span>::{<span class="ident">LocalApic</span>, <span class="ident">get_lapics</span>, <span class="ident">get_my_apic_id</span>, <span class="ident">has_x2apic</span>, <span class="ident">get_bsp_id</span>};
+<span class="kw">use</span> <span class="ident">apic</span>::{<span class="ident">LocalApic</span>, <span class="ident">get_lapics</span>, <span class="ident">get_my_apic_id</span>, <span class="ident">has_x2apic</span>, <span class="ident">get_bsp_id</span>, <span class="ident">cpu_count</span>};
 <span class="kw">use</span> <span class="ident">ap_start</span>::{<span class="ident">kstart_ap</span>, <span class="ident">AP_READY_FLAG</span>};
 <span class="kw">use</span> <span class="ident">madt</span>::{<span class="ident">Madt</span>, <span class="ident">MadtEntry</span>, <span class="ident">MadtLocalApic</span>, <span class="ident">find_nmi_entry_for_processor</span>};
 <span class="kw">use</span> <span class="ident">pause::spin_loop_hint</span>;
@@ -453,7 +453,7 @@
     <span class="ident">ap_start_realmode_begin</span>: <span class="ident">VirtualAddress</span>,
     <span class="ident">ap_start_realmode_end</span>: <span class="ident">VirtualAddress</span>,
     <span class="ident">max_framebuffer_resolution</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">u16</span>, <span class="ident">u16</span>)<span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">ap_startup_size_in_bytes</span> <span class="op">=</span> <span class="ident">ap_start_realmode_end</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">ap_start_realmode_begin</span>.<span class="ident">value</span>();
 
     <span class="kw">let</span> <span class="ident">page_table_phys_addr</span>: <span class="ident">PhysicalAddress</span>;
@@ -570,16 +570,16 @@
         <span class="kw-2">*</span><span class="ident">GRAPHIC_INFO</span>.<span class="ident">lock</span>() <span class="op">=</span> <span class="ident">graphic_info</span>.<span class="ident">clone</span>();
     }
     
-    <span class="comment">// wait for all cores to finish booting and init</span>
+    <span class="comment">// Wait for all CPUs to finish booting and init</span>
     <span class="macro">info!</span>(<span class="string">&quot;handle_ap_cores(): BSP is waiting for APs to boot...&quot;</span>);
-    <span class="kw">let</span> <span class="ident">expected_cores</span> <span class="op">=</span> <span class="ident">ap_count</span> <span class="op">+</span> <span class="number">1</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">num_known_cores</span> <span class="op">=</span> <span class="ident">get_lapics</span>().<span class="ident">iter</span>().<span class="ident">count</span>();
+    <span class="kw">let</span> <span class="ident">expected_cpus</span> <span class="op">=</span> <span class="ident">ap_count</span> <span class="op">+</span> <span class="number">1</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">num_known_cpus</span> <span class="op">=</span> <span class="ident">cpu_count</span>();
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">iter</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="kw">while</span> <span class="ident">num_known_cores</span> <span class="op">&lt;</span> <span class="ident">expected_cores</span> {
+    <span class="kw">while</span> <span class="ident">num_known_cpus</span> <span class="op">&lt;</span> <span class="ident">expected_cpus</span> {
         <span class="ident">spin_loop_hint</span>();
-        <span class="ident">num_known_cores</span> <span class="op">=</span> <span class="ident">get_lapics</span>().<span class="ident">iter</span>().<span class="ident">count</span>();
+        <span class="ident">num_known_cpus</span> <span class="op">=</span> <span class="ident">cpu_count</span>();
         <span class="kw">if</span> <span class="ident">iter</span> <span class="op">==</span> <span class="number">100000</span> {
-            <span class="macro">trace!</span>(<span class="string">&quot;BSP is waiting for APs to boot ({} of {})&quot;</span>, <span class="ident">num_known_cores</span>, <span class="ident">expected_cores</span>);
+            <span class="macro">trace!</span>(<span class="string">&quot;BSP is waiting for APs to boot ({} of {})&quot;</span>, <span class="ident">num_known_cpus</span>, <span class="ident">expected_cpus</span>);
             <span class="ident">iter</span> <span class="op">=</span> <span class="number">0</span>;
         }
         <span class="ident">iter</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
