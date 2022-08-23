@@ -1335,7 +1335,6 @@
 <span id="1329">1329</span>
 <span id="1330">1330</span>
 <span id="1331">1331</span>
-<span id="1332">1332</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, </span>
 <span class="doccomment">//! and the associated code for dealing with tasks.</span>
 <span class="doccomment">//! </span>
@@ -1995,8 +1994,7 @@
     <span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state in order to mutate it.    </span>
     <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">alias</span>(<span class="string">&quot;reap&quot;</span>))]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_exit_value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExitValue</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">runstate</span>() <span class="op">==</span> <span class="ident">RunState::Exited</span> {
-            <span class="self">self</span>.<span class="ident">runstate</span>.<span class="ident">store</span>(<span class="ident">RunState::Reaped</span>);
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">runstate</span>.<span class="ident">compare_exchange</span>(<span class="ident">RunState::Exited</span>, <span class="ident">RunState::Reaped</span>).<span class="ident">is_ok</span>() {
             <span class="ident">TASKLIST</span>.<span class="ident">lock</span>().<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">id</span>);
             <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">exit_value</span>.<span class="ident">take</span>()
         } <span class="kw">else</span> {
