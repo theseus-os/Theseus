@@ -35,14 +35,13 @@ impl TscTicks {
         let checked_add = self.0.checked_add(other.0);
         checked_add.map( |tt| TscTicks(tt) )
     }
-
-    /// Get the inner value, the number of ticks.
-    pub fn into(self) -> u128 {
-        self.0
-    }
 }
 
-
+impl From<TscTicks> for u128 {
+    fn from(ticks: TscTicks) -> Self {
+        ticks.0
+    }
+}
 
 /// Returns the current number of ticks from the TSC, i.e., `rdtscp`. 
 pub fn tsc_ticks() -> TscTicks {
@@ -71,7 +70,7 @@ pub fn get_tsc_frequency() -> Result<u128, &'static str> {
         let end = tsc_ticks(); 
 
         let diff = end.sub(&start).ok_or("couldn't subtract end-start TSC tick values")?;
-        let tsc_freq = diff.into() * 100; // multiplied by 100 because we measured a 10ms interval
+        let tsc_freq = u128::from(diff) * 100; // multiplied by 100 because we measured a 10ms interval
         info!("TSC frequency calculated by PIT is: {}", tsc_freq);
         TSC_FREQUENCY.store(tsc_freq as usize, Ordering::Release);
         Ok(tsc_freq)
