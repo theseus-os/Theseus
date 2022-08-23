@@ -298,7 +298,7 @@
     
     <span class="comment">// boot up the other cores (APs)</span>
     <span class="kw">let</span> <span class="ident">ap_count</span> <span class="op">=</span> <span class="ident">multicore_bringup::handle_ap_cores</span>(
-        <span class="ident">kernel_mmi_ref</span>.<span class="ident">clone</span>(),
+        <span class="kw-2">&amp;</span><span class="ident">kernel_mmi_ref</span>,
         <span class="ident">ap_start_realmode_begin</span>,
         <span class="ident">ap_start_realmode_end</span>,
         <span class="prelude-val">Some</span>(<span class="ident">kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION</span>),

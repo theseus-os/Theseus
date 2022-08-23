@@ -449,7 +449,7 @@
 <span class="doccomment">///    that an AP should request from the BIOS when it boots up in 16-bit real mode.</span>
 <span class="doccomment">///    If `None`, there will be no maximum.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_ap_cores</span>(
-    <span class="ident">kernel_mmi_ref</span>: <span class="ident">MmiRef</span>,
+    <span class="ident">kernel_mmi_ref</span>: <span class="kw-2">&amp;</span><span class="ident">MmiRef</span>,
     <span class="ident">ap_start_realmode_begin</span>: <span class="ident">VirtualAddress</span>,
     <span class="ident">ap_start_realmode_end</span>: <span class="ident">VirtualAddress</span>,
     <span class="ident">max_framebuffer_resolution</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">u16</span>, <span class="ident">u16</span>)<span class="op">&gt;</span>,
