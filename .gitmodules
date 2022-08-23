@@ -26,3 +26,6 @@
 	path = libs/core2
 	url = https://github.com/theseus-os/core2.git
 	shallow = true
+[submodule "tools/builder"]
+	path = tools/builder
+	url = https://github.com/theseus-os/theseus-builder
