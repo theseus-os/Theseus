@@ -657,8 +657,7 @@ impl Task {
     /// Obtains the lock on this `Task`'s inner state in order to mutate it.    
     #[doc(alias("reap"))]
     pub fn take_exit_value(&self) -> Option<ExitValue> {
-        if self.runstate() == RunState::Exited {
-            self.runstate.store(RunState::Reaped);
+        if self.runstate.compare_exchange(RunState::Exited, RunState::Reaped).is_ok() {
             TASKLIST.lock().remove(&self.id);
             self.inner.lock().exit_value.take()
         } else {
