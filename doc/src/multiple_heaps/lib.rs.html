@@ -650,10 +650,6 @@
 <span id="644">644</span>
 <span id="645">645</span>
 <span id="646">646</span>
-<span id="647">647</span>
-<span id="648">648</span>
-<span id="649">649</span>
-<span id="650">650</span>
 </pre><pre class="rust"><code><span class="doccomment">//! An implementation of an allocator that uses multiple heaps. The heap that will be used on each allocation is determined by a key.</span>
 <span class="doccomment">//! Right now we use the apic id as the key, so that we have per-core heaps.</span>
 <span class="doccomment">//! </span>
@@ -782,17 +778,13 @@
     <span class="ident">size_in_bytes</span>: <span class="ident">usize</span>
 ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">MappedPages</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">kernel_mmi_ref</span> <span class="op">=</span> <span class="ident">get_kernel_mmi_ref</span>().<span class="ident">ok_or</span>(<span class="string">&quot;create_heap_mapping(): KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kernel_mmi</span> <span class="op">=</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>();
-
     <span class="kw">let</span> (<span class="ident">pages</span>, <span class="ident">action</span>) <span class="op">=</span> <span class="ident">allocate_pages_by_bytes_deferred</span>(<span class="prelude-val">Some</span>(<span class="ident">starting_address</span>), <span class="ident">size_in_bytes</span>)
         .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;create_heap_mapping(): failed to allocate pages at the starting address&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">if</span> <span class="ident">pages</span>.<span class="ident">start_address</span>().<span class="ident">value</span>() <span class="op">%</span> <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_BYTES</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;multiple_heaps: the allocated pages for the heap wasn&#39;t properly aligned&quot;</span>);
     }
-    <span class="kw">let</span> <span class="ident">mp</span> <span class="op">=</span> <span class="ident">kernel_mmi</span>.<span class="ident">page_table</span>.<span class="ident">map_allocated_pages</span>(<span class="ident">pages</span>, <span class="ident">HEAP_FLAGS</span>)<span class="question-mark">?</span>;
-
+    <span class="kw">let</span> <span class="ident">mp</span> <span class="op">=</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>().<span class="ident">page_table</span>.<span class="ident">map_allocated_pages</span>(<span class="ident">pages</span>, <span class="ident">HEAP_FLAGS</span>)<span class="question-mark">?</span>;
     <span class="comment">// trace!(&quot;Allocated heap pages at: {:#X}&quot;, starting_address);</span>
-
     <span class="prelude-val">Ok</span>((<span class="ident">mp</span>, <span class="ident">action</span>))
 }
 

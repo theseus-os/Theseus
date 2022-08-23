@@ -274,7 +274,6 @@
 <span id="268">268</span>
 <span id="269">269</span>
 <span id="270">270</span>
-<span id="271">271</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem for Theseus,</span>
 <span class="doccomment">//! which is fairly robust and provides a unification between </span>
 <span class="doccomment">//! arbitrarily mapped sections of memory and Rust&#39;s lifetime system. </span>
@@ -335,10 +334,10 @@
 <span class="doccomment">/// A shareable reference to a `MemoryManagementInfo` struct wrapper in a lock.</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">MmiRef</span> <span class="op">=</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">MemoryManagementInfo</span><span class="op">&gt;</span><span class="op">&gt;</span>;
 
-<span class="doccomment">/// Returns a cloned reference to the kernel&#39;s `MemoryManagementInfo`, if initialized.</span>
-<span class="doccomment">/// If not, it returns None.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_kernel_mmi_ref</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MmiRef</span><span class="op">&gt;</span> {
-    <span class="ident">KERNEL_MMI</span>.<span class="ident">get</span>().<span class="ident">cloned</span>()
+<span class="doccomment">/// Returns a reference to the kernel&#39;s `MemoryManagementInfo`, if initialized.</span>
+<span class="doccomment">/// If not, it returns `None`.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_kernel_mmi_ref</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MmiRef</span><span class="op">&gt;</span> {
+    <span class="ident">KERNEL_MMI</span>.<span class="ident">get</span>()
 }
 
 
@@ -364,14 +363,11 @@
 <span class="doccomment">/// Currently, this function acquires the lock on the frame allocator and the kernel&#39;s `MemoryManagementInfo` instance.</span>
 <span class="doccomment">/// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_contiguous_mapping</span>(<span class="ident">size_in_bytes</span>: <span class="ident">usize</span>, <span class="ident">flags</span>: <span class="ident">EntryFlags</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">MappedPages</span>, <span class="ident">PhysicalAddress</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">kernel_mmi_ref</span> <span class="op">=</span> <span class="ident">get_kernel_mmi_ref</span>().<span class="ident">ok_or</span>(<span class="string">&quot;create_contiguous_mapping(): KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="ident">allocated_pages</span> <span class="op">=</span> <span class="ident">allocate_pages_by_bytes</span>(<span class="ident">size_in_bytes</span>).<span class="ident">ok_or</span>(<span class="string">&quot;memory::create_contiguous_mapping(): couldn&#39;t allocate contiguous pages!&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="ident">allocated_frames</span> <span class="op">=</span> <span class="ident">allocate_frames_by_bytes</span>(<span class="ident">size_in_bytes</span>).<span class="ident">ok_or</span>(<span class="string">&quot;memory::create_contiguous_mapping(): couldn&#39;t allocate contiguous frames!&quot;</span>)<span class="question-mark">?</span>;
-
-    <span class="kw">let</span> <span class="ident">kernel_mmi_ref</span> <span class="op">=</span> <span class="ident">get_kernel_mmi_ref</span>().<span class="ident">ok_or</span>(<span class="string">&quot;create_contiguous_mapping(): KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kernel_mmi</span> <span class="op">=</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>();
-
     <span class="kw">let</span> <span class="ident">starting_phys_addr</span> <span class="op">=</span> <span class="ident">allocated_frames</span>.<span class="ident">start_address</span>();
-    <span class="kw">let</span> <span class="ident">mp</span> <span class="op">=</span> <span class="ident">kernel_mmi</span>.<span class="ident">page_table</span>.<span class="ident">map_allocated_pages_to</span>(<span class="ident">allocated_pages</span>, <span class="ident">allocated_frames</span>, <span class="ident">flags</span>)<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">mp</span> <span class="op">=</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>().<span class="ident">page_table</span>.<span class="ident">map_allocated_pages_to</span>(<span class="ident">allocated_pages</span>, <span class="ident">allocated_frames</span>, <span class="ident">flags</span>)<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>((<span class="ident">mp</span>, <span class="ident">starting_phys_addr</span>))
 }
 
@@ -385,10 +381,9 @@
 <span class="doccomment">/// Currently, this function acquires the lock on the kernel&#39;s `MemoryManagementInfo` instance.</span>
 <span class="doccomment">/// Thus, the caller should ensure that lock is not held when invoking this function.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_mapping</span>(<span class="ident">size_in_bytes</span>: <span class="ident">usize</span>, <span class="ident">flags</span>: <span class="ident">EntryFlags</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">allocated_pages</span> <span class="op">=</span> <span class="ident">allocate_pages_by_bytes</span>(<span class="ident">size_in_bytes</span>).<span class="ident">ok_or</span>(<span class="string">&quot;memory::create_mapping(): couldn&#39;t allocate pages!&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="ident">kernel_mmi_ref</span> <span class="op">=</span> <span class="ident">get_kernel_mmi_ref</span>().<span class="ident">ok_or</span>(<span class="string">&quot;create_contiguous_mapping(): KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kernel_mmi</span> <span class="op">=</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>();
-    <span class="ident">kernel_mmi</span>.<span class="ident">page_table</span>.<span class="ident">map_allocated_pages</span>(<span class="ident">allocated_pages</span>, <span class="ident">flags</span>)
+    <span class="kw">let</span> <span class="ident">allocated_pages</span> <span class="op">=</span> <span class="ident">allocate_pages_by_bytes</span>(<span class="ident">size_in_bytes</span>).<span class="ident">ok_or</span>(<span class="string">&quot;memory::create_mapping(): couldn&#39;t allocate pages!&quot;</span>)<span class="question-mark">?</span>;
+    <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>().<span class="ident">page_table</span>.<span class="ident">map_allocated_pages</span>(<span class="ident">allocated_pages</span>, <span class="ident">flags</span>)
 }
 
 
@@ -520,9 +515,12 @@
 <span class="doccomment">/// Returns the following tuple, if successful:</span>
 <span class="doccomment">///  * The kernel&#39;s new MemoryManagementInfo</span>
 <span class="doccomment">///  * The kernel&#39;s list of identity-mapped MappedPages which should be dropped before starting the first userspace program. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_post_heap</span>(<span class="ident">page_table</span>: <span class="ident">PageTable</span>, <span class="kw-2">mut</span> <span class="ident">higher_half_mapped_pages</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>; <span class="number">32</span>], <span class="kw-2">mut</span> <span class="ident">identity_mapped_pages</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>; <span class="number">32</span>], <span class="ident">heap_mapped_pages</span>: <span class="ident">MappedPages</span>) 
--&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">MemoryManagementInfo</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> 
-{
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_post_heap</span>(
+    <span class="ident">page_table</span>: <span class="ident">PageTable</span>,
+    <span class="kw-2">mut</span> <span class="ident">higher_half_mapped_pages</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>; <span class="number">32</span>],
+    <span class="kw-2">mut</span> <span class="ident">identity_mapped_pages</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>; <span class="number">32</span>],
+    <span class="ident">heap_mapped_pages</span>: <span class="ident">MappedPages</span>
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">MmiRef</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="comment">// HERE: heap is initialized! Can now use alloc types.</span>
     <span class="comment">// After this point, we must &quot;forget&quot; all of the above mapped_pages instances if an error occurs,</span>
     <span class="comment">// because they will be auto-unmapped from the new page table upon return, causing all execution to stop.  </span>

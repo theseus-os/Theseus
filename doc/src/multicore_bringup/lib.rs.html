@@ -369,9 +369,6 @@
 <span id="363">363</span>
 <span id="364">364</span>
 <span id="365">365</span>
-<span id="366">366</span>
-<span id="367">367</span>
-<span id="368">368</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Functions for initializing and bringing up other CPU cores. </span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! These functions are intended to be invoked from the main core</span>
@@ -384,7 +381,6 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">volatile</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">zerocopy</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pit_clock_basic</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">stack</span>;
@@ -400,12 +396,10 @@
     <span class="ident">ops::DerefMut</span>,
     <span class="ident">sync::atomic::Ordering</span>,
 };
-<span class="kw">use</span> <span class="ident">alloc::sync::Arc</span>;
 <span class="kw">use</span> <span class="ident">spin::Mutex</span>;
 <span class="kw">use</span> <span class="ident">volatile::Volatile</span>;
 <span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
-<span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>, <span class="ident">MappedPages</span>, <span class="ident">EntryFlags</span>, <span class="ident">MemoryManagementInfo</span>};
+<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>, <span class="ident">MappedPages</span>, <span class="ident">EntryFlags</span>, <span class="ident">MmiRef</span>};
 <span class="kw">use</span> <span class="ident">kernel_config::memory</span>::{<span class="ident">PAGE_SIZE</span>, <span class="ident">PAGE_SHIFT</span>, <span class="ident">KERNEL_STACK_SIZE_IN_PAGES</span>};
 <span class="kw">use</span> <span class="ident">apic</span>::{<span class="ident">LocalApic</span>, <span class="ident">get_lapics</span>, <span class="ident">get_my_apic_id</span>, <span class="ident">has_x2apic</span>, <span class="ident">get_bsp_id</span>};
 <span class="kw">use</span> <span class="ident">ap_start</span>::{<span class="ident">kstart_ap</span>, <span class="ident">AP_READY_FLAG</span>};
@@ -448,14 +442,14 @@
 <span class="doccomment">/// (specifically the MADT (APIC) table).</span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// # Arguments: </span>
-<span class="doccomment">/// * `kernel_mmi_ref`: A reference to the locked MMI structure for the kernel.</span>
+<span class="doccomment">/// * `kernel_mmi_ref`: A reference to the MMI structure with the kernel&#39;s page table.</span>
 <span class="doccomment">/// * `ap_start_realmode_begin`: the starting virtual address of where the ap_start realmode code is.</span>
 <span class="doccomment">/// * `ap_start_realmode_end`: the ending virtual address of where the ap_start realmode code is.</span>
 <span class="doccomment">/// * `max_framebuffer_resolution`: the maximum resolution `(width, height)` of the graphical framebuffer</span>
 <span class="doccomment">///    that an AP should request from the BIOS when it boots up in 16-bit real mode.</span>
 <span class="doccomment">///    If `None`, there will be no maximum.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_ap_cores</span>(
-    <span class="ident">kernel_mmi_ref</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">MemoryManagementInfo</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">kernel_mmi_ref</span>: <span class="ident">MmiRef</span>,
     <span class="ident">ap_start_realmode_begin</span>: <span class="ident">VirtualAddress</span>,
     <span class="ident">ap_start_realmode_end</span>: <span class="ident">VirtualAddress</span>,
     <span class="ident">max_framebuffer_resolution</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">u16</span>, <span class="ident">u16</span>)<span class="op">&gt;</span>,

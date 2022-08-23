@@ -182,7 +182,6 @@
 <span id="176">176</span>
 <span id="177">177</span>
 <span id="178">178</span>
-<span id="179">179</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. </span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! The `captain` steers the ship of Theseus, meaning that it contains basic logic </span>
@@ -234,12 +233,11 @@
 
 
 
-<span class="kw">use</span> <span class="ident">alloc::sync::Arc</span>;
 <span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
 <span class="kw">use</span> <span class="ident">core::ops::DerefMut</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">VirtualAddress</span>, <span class="ident">MemoryManagementInfo</span>, <span class="ident">MappedPages</span>};
+<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">VirtualAddress</span>, <span class="ident">MappedPages</span>, <span class="ident">MmiRef</span>};
 <span class="kw">use</span> <span class="ident">kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES</span>;
-<span class="kw">use</span> <span class="ident">irq_safety</span>::{<span class="ident">MutexIrqSafe</span>, <span class="ident">enable_interrupts</span>};
+<span class="kw">use</span> <span class="ident">irq_safety::enable_interrupts</span>;
 <span class="kw">use</span> <span class="ident">stack::Stack</span>;
 
 
@@ -256,7 +254,7 @@
 <span class="doccomment">/// This does all the rest of the module loading and initialization so that the OS </span>
 <span class="doccomment">/// can continue running and do actual useful work.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(
-    <span class="ident">kernel_mmi_ref</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">MemoryManagementInfo</span><span class="op">&gt;</span><span class="op">&gt;</span>, 
+    <span class="ident">kernel_mmi_ref</span>: <span class="ident">MmiRef</span>,
     <span class="ident">identity_mapped_pages</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>,
     <span class="ident">bsp_initial_stack</span>: <span class="ident">Stack</span>,
     <span class="ident">ap_start_realmode_begin</span>: <span class="ident">VirtualAddress</span>,

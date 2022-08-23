@@ -1146,7 +1146,7 @@
     <span class="comment">// Load the new application crate</span>
     <span class="kw">let</span> <span class="ident">app_crate_ref</span> <span class="op">=</span> {
         <span class="kw">let</span> <span class="ident">kernel_mmi_ref</span> <span class="op">=</span> <span class="ident">get_kernel_mmi_ref</span>().<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t get_kernel_mmi_ref&quot;</span>)<span class="question-mark">?</span>;
-        <span class="ident">CrateNamespace::load_crate_as_application</span>(<span class="kw-2">&amp;</span><span class="ident">namespace</span>, <span class="kw-2">&amp;</span><span class="ident">crate_object_file</span>, <span class="kw-2">&amp;</span><span class="ident">kernel_mmi_ref</span>, <span class="bool-val">false</span>)<span class="question-mark">?</span>
+        <span class="ident">CrateNamespace::load_crate_as_application</span>(<span class="kw-2">&amp;</span><span class="ident">namespace</span>, <span class="kw-2">&amp;</span><span class="ident">crate_object_file</span>, <span class="ident">kernel_mmi_ref</span>, <span class="bool-val">false</span>)<span class="question-mark">?</span>
     };
 
     <span class="comment">// Find the &quot;main&quot; entry point function in the new app crate</span>

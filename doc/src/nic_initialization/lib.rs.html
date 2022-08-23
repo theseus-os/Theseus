@@ -190,7 +190,6 @@
 <span id="184">184</span>
 <span id="185">185</span>
 <span id="186">186</span>
-<span id="187">187</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Functions that are used in a NIC initialization procedure.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! They include allocating memory space for the device&#39;s registers, and initializing its receive and transmit queues.</span>
@@ -255,8 +254,7 @@
     <span class="comment">// debug!(&quot;NicInit: memory base: {:#X}, memory size: {}&quot;, mem_base, mem_size_in_bytes);</span>
 
     <span class="kw">let</span> <span class="ident">kernel_mmi_ref</span> <span class="op">=</span> <span class="ident">get_kernel_mmi_ref</span>().<span class="ident">ok_or</span>(<span class="string">&quot;NicInit::mem_map(): KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kernel_mmi</span> <span class="op">=</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>();
-    <span class="kw">let</span> <span class="ident">nic_mapped_page</span> <span class="op">=</span> <span class="ident">kernel_mmi</span>.<span class="ident">page_table</span>.<span class="ident">map_allocated_pages_to</span>(<span class="ident">pages_nic</span>, <span class="ident">frames_nic</span>, <span class="ident">NIC_MAPPING_FLAGS</span>)<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">nic_mapped_page</span> <span class="op">=</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>().<span class="ident">page_table</span>.<span class="ident">map_allocated_pages_to</span>(<span class="ident">pages_nic</span>, <span class="ident">frames_nic</span>, <span class="ident">NIC_MAPPING_FLAGS</span>)<span class="question-mark">?</span>;
 
     <span class="prelude-val">Ok</span>(<span class="ident">nic_mapped_page</span>)
 }

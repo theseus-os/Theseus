@@ -166,7 +166,6 @@
 <span id="160">160</span>
 <span id="161">161</span>
 <span id="162">162</span>
-<span id="163">163</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="doccomment">//! This crate contains an implementation of an in-memory filesystem backed by MappedPages from the memory crate</span>
@@ -271,9 +270,8 @@
             };
             
             <span class="kw">let</span> <span class="ident">kernel_mmi_ref</span> <span class="op">=</span> <span class="ident">get_kernel_mmi_ref</span>().<span class="ident">ok_or</span>(<span class="string">&quot;KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
-			<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kernel_mmi</span> <span class="op">=</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>();
             <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="ident">allocate_pages_by_bytes</span>(<span class="ident">end</span>).<span class="ident">ok_or</span>(<span class="string">&quot;could not allocate pages&quot;</span>)<span class="question-mark">?</span>;
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_mapped_pages</span> <span class="op">=</span> <span class="ident">kernel_mmi</span>.<span class="ident">page_table</span>.<span class="ident">map_allocated_pages</span>(<span class="ident">pages</span>, <span class="ident">prev_flags</span>)<span class="question-mark">?</span>;            
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_mapped_pages</span> <span class="op">=</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>().<span class="ident">page_table</span>.<span class="ident">map_allocated_pages</span>(<span class="ident">pages</span>, <span class="ident">prev_flags</span>)<span class="question-mark">?</span>;
             
             <span class="comment">// first, we need to copy over the bytes from the previous mapped pages</span>
             {
