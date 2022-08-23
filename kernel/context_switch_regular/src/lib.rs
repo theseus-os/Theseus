@@ -46,7 +46,9 @@ impl ContextRegular {
 #[macro_export]
 macro_rules! save_registers_regular {
     () => (
-        // save all general purpose registers into the previous task
+        // Save all general purpose registers into the previous task.
+        // `rip` has been implicitly pushed onto the stack by the `call
+        // <context_switch_regular>` instruction executed by the caller.
         r#"
             push rbx
             push rbp
@@ -86,7 +88,8 @@ macro_rules! switch_stacks {
 #[macro_export]
 macro_rules! restore_registers_regular {
     () => (
-        // restore the next task's general purpose registers
+        // Restore the next task's general purpose registers.
+        // `ret` is essentialy `pop rip`, bar optimisations.
         r#" 
             pop r15
             pop r14
