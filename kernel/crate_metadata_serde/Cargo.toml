@@ -1,0 +1,16 @@
+[package]
+name = "crate_metadata_serde"
+version = "0.1.0"
+description = "Standalone types that represent (de)serializable crate metadata structures"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+edition = "2018"
+
+[dependencies.hashbrown]
+version = "0.11.2"
+features = ["nightly", "serde"]
+
+[dependencies.serde]
+version = "1.0.137"
+default-features = false
+features = ["derive"]
+

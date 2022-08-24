@@ -596,6 +596,7 @@ name = "crate_metadata"
 version = "0.1.0"
 dependencies = [
  "cow_arc",
+ "crate_metadata_serde",
  "fs_node",
  "goblin",
  "hashbrown",
@@ -606,6 +607,14 @@ dependencies = [
  "spin 0.9.0",
  "str_ref",
  "xmas-elf",
+]
+
+[[package]]
+name = "crate_metadata_serde"
+version = "0.1.0"
+dependencies = [
+ "hashbrown",
+ "serde",
 ]
 
 [[package]]
@@ -1877,6 +1886,7 @@ dependencies = [
  "cow_arc",
  "cpio_reader",
  "crate_metadata",
+ "crate_metadata_serde",
  "crate_name_utils",
  "cstr_core",
  "fs_node",

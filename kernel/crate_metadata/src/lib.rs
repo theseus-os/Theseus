@@ -64,7 +64,20 @@ use cow_arc::{CowArc, CowWeak};
 use fs_node::{FileRef, WeakFileRef};
 use hashbrown::HashMap;
 use goblin::elf::reloc::*;
+
 pub use str_ref::StrRef;
+pub use crate_metadata_serde::{
+    SectionType,
+    Shndx,
+    TEXT_SECTION_NAME,
+    RODATA_SECTION_NAME,
+    DATA_SECTION_NAME,
+    BSS_SECTION_NAME,
+    TLS_DATA_SECTION_NAME,
+    TLS_BSS_SECTION_NAME,
+    GCC_EXCEPT_TABLE_SECTION_NAME,
+    EH_FRAME_SECTION_NAME,
+};
 
 
 /// A Strong reference to a [`LoadedCrate`].
@@ -75,10 +88,6 @@ pub type WeakCrateRef = CowWeak<LoadedCrate>;
 pub type StrongSectionRef  = Arc<LoadedSection>;
 /// A Weak reference ([`Weak`]) to a [`LoadedSection`].
 pub type WeakSectionRef = Weak<LoadedSection>;
-/// A Section Header iNDeX (SHNDX), as specified by the ELF format. 
-/// Even though this is typically encoded as a `u16`, its decoded form can exceed the max size of `u16`.
-pub type Shndx = usize;
-
 
 /// `.text` sections are read-only and executable.
 pub const TEXT_SECTION_FLAGS:     EntryFlags = EntryFlags::PRESENT;
@@ -572,105 +581,34 @@ impl LoadedCrate {
 }
 
 
-pub const TEXT_SECTION_NAME            : &str = ".text";
-pub const RODATA_SECTION_NAME          : &str = ".rodata";
-pub const DATA_SECTION_NAME            : &str = ".data";
-pub const BSS_SECTION_NAME             : &str = ".bss";
-pub const TLS_DATA_SECTION_NAME        : &str = ".tdata";
-pub const TLS_BSS_SECTION_NAME         : &str = ".tbss";
-pub const GCC_EXCEPT_TABLE_SECTION_NAME: &str = ".gcc_except_table";
-pub const EH_FRAME_SECTION_NAME        : &str = ".eh_frame";
+/// Returns the default name for the given `SectionType` as a [`StrRef`].
+/// 
+/// This is useful for deduplicating section name strings in memory,
+/// as the returned `StrRef` will point back to a single instance 
+/// of that section name string that can be shared across the system.
+pub fn section_name_str_ref(section_type: &SectionType) -> StrRef {
+    static TEXT             : Once<StrRef> = Once::new();
+    static RODATA           : Once<StrRef> = Once::new();
+    static DATA             : Once<StrRef> = Once::new();
+    static BSS              : Once<StrRef> = Once::new();
+    static TLS_DATA         : Once<StrRef> = Once::new();
+    static TLS_BSS          : Once<StrRef> = Once::new();
+    static GCC_EXCEPT_TABLE : Once<StrRef> = Once::new();
+    static EH_FRAME         : Once<StrRef> = Once::new();
 
-
-/// The possible types of sections that can be loaded from a crate object file.
-#[derive(Debug, Copy, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum SectionType {
-    /// A `text` section contains executable code, i.e., functions. 
-    Text,
-    /// An `rodata` section contains read-only data, i.e., constants.
-    Rodata,
-    /// A `data` section contains data that is both readable and writable, i.e., static variables. 
-    Data,
-    /// A `bss` section is just like a data section, but is automatically initialized to all zeroes at load time.
-    Bss,
-    /// A `.tdata` section is a read-only section that holds the initial data "image" 
-    /// for a thread-local storage (TLS) area.
-    TlsData,
-    /// A `.tbss` section is a read-only section that holds all-zero data for a thread-local storage (TLS) area.
-    /// This is is effectively an empty placeholder: the all-zero data section doesn't actually exist in memory.
-    TlsBss,
-    /// A `.gcc_except_table` section contains landing pads for exception handling,
-    /// comprising the LSDA (Language Specific Data Area),
-    /// which is effectively used to determine when we should stop the stack unwinding process
-    /// (e.g., "catching" an exception). 
-    /// 
-    /// Blog post from author of gold linker: <https://www.airs.com/blog/archives/464>
-    /// 
-    /// Mailing list discussion here: <https://gcc.gnu.org/ml/gcc-help/2010-09/msg00116.html>
-    /// 
-    /// Here is a sample repository parsing this section: <https://github.com/nest-leonlee/gcc_except_table>
-    /// 
-    GccExceptTable,
-    /// The `.eh_frame` section contains information about stack unwinding and destructor functions
-    /// that should be called when traversing up the stack for cleanup. 
-    /// 
-    /// Blog post from author of gold linker: <https://www.airs.com/blog/archives/460>
-    /// Some documentation here: <https://gcc.gnu.org/wiki/Dwarf2EHNewbiesHowto>
-    /// 
-    EhFrame,
+    let instance = match section_type {
+        SectionType::Text           => &TEXT,
+        SectionType::Rodata         => &RODATA,
+        SectionType::Data           => &DATA,
+        SectionType::Bss            => &BSS,
+        SectionType::TlsData        => &TLS_DATA,
+        SectionType::TlsBss         => &TLS_BSS,
+        SectionType::GccExceptTable => &GCC_EXCEPT_TABLE,
+        SectionType::EhFrame        => &EH_FRAME,
+    };
+    instance.call_once(|| StrRef::from(section_type.name())).clone()
 }
-impl SectionType {
-    /// Returns the name of this `SectionType` as a [`StrRef`].
-    /// 
-    /// This is useful for deduplicating section name strings in memory,
-    /// as the returned `StrRef` will point back to a single instance 
-    /// of that section name string that can be shared across the system.
-    pub fn name_str_ref(&self) -> StrRef {
-        static TEXT             : Once<StrRef> = Once::new();
-        static RODATA           : Once<StrRef> = Once::new();
-        static DATA             : Once<StrRef> = Once::new();
-        static BSS              : Once<StrRef> = Once::new();
-        static TLS_DATA         : Once<StrRef> = Once::new();
-        static TLS_BSS          : Once<StrRef> = Once::new();
-        static GCC_EXCEPT_TABLE : Once<StrRef> = Once::new();
-        static EH_FRAME         : Once<StrRef> = Once::new();
 
-        let init = || StrRef::from(self.name());
-
-        match self {
-            Self::Text           => TEXT.call_once(|| init()).clone(),
-            Self::Rodata         => RODATA.call_once(|| init()).clone(),
-            Self::Data           => DATA.call_once(|| init()).clone(),
-            Self::Bss            => BSS.call_once(|| init()).clone(),
-            Self::TlsData        => TLS_DATA.call_once(|| init()).clone(),
-            Self::TlsBss         => TLS_BSS.call_once(|| init()).clone(),
-            Self::GccExceptTable => GCC_EXCEPT_TABLE.call_once(|| init()).clone(),
-            Self::EhFrame        => EH_FRAME.call_once(|| init()).clone(),
-        }
-    }
-    
-    /// Returns the const `&str` name of this `SectionType`.
-    pub const fn name(&self) -> &'static str {
-        match self {
-            Self::Text           => TEXT_SECTION_NAME,
-            Self::Rodata         => RODATA_SECTION_NAME,
-            Self::Data           => DATA_SECTION_NAME, 
-            Self::Bss            => BSS_SECTION_NAME,
-            Self::TlsData        => TLS_DATA_SECTION_NAME,
-            Self::TlsBss         => TLS_BSS_SECTION_NAME,
-            Self::GccExceptTable => GCC_EXCEPT_TABLE_SECTION_NAME,
-            Self::EhFrame        => EH_FRAME_SECTION_NAME,
-        }
-    } 
-
-    /// Returns `true` if `Data` or `Bss`, otherwise `false`.
-    pub fn is_data_or_bss(&self) -> bool {
-        match self {
-            Self::Data | Self::Bss => true,
-            _ => false,
-        }
-    }
-}
 
 /// The parts of a `LoadedSection` that may be mutable, i.e., 
 /// only the parts that could change after a section is initially loaded and linked.

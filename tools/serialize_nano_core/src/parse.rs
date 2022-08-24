@@ -1,6 +1,5 @@
-use crate_metadata::{SectionType, Shndx};
+use crate_metadata_serde::{SectionType, SerializedSection, Shndx};
 use hashbrown::HashMap;
-use mod_mgmt::serde::SerializedSection;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Parses the nano_core symbol file that represents the sections and symbols

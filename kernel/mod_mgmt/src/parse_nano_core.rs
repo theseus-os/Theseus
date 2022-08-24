@@ -3,7 +3,7 @@
 //! As such, it performs no loading, but rather just creates metadata that represents
 //! the existing kernel code that was loaded by the bootloader, and adds those functions to the system map.
 
-use crate::{CrateNamespace, mp_range, serde::SerializedCrate};
+use crate::{CrateNamespace, mp_range};
 use alloc::{collections::{BTreeMap, BTreeSet}, string::{String, ToString}, sync::Arc};
 use fs_node::FileRef;
 use path::Path;
@@ -23,7 +23,7 @@ const NANO_CORE_FILENAME_PREFIX: &str = "nano_core.";
 const NANO_CORE_CRATE_NAME: &str = "nano_core";
 
 
-/// Deserializes the file containing the [`SerializedCrate`] representation of the already loaded
+/// Parses and/or deserializes the file containing details about the already loaded
 /// (and currently running) `nano_core` code.
 ///
 /// Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata.
@@ -109,16 +109,15 @@ pub fn parse_nano_core(
             )
         }
         Some("serde") => {
-            let (deserialized, _): (SerializedCrate, _) = try_mp!(
-                bincode::serde::decode_from_slice(bytes, bincode::config::standard()).map_err(
-                    |e| {
-                        error!("parse_nano_core(): error deserializing nano_core: {e}");
-                        "parse_nano_core(): error deserializing nano_core"
-                    }
-                )
+            let (deserialized, _): (crate_metadata_serde::SerializedCrate, _) = try_mp!(
+                bincode::serde::decode_from_slice(bytes, bincode::config::standard()).map_err(|e| {
+                    error!("parse_nano_core(): error deserializing nano_core: {e}");
+                    "parse_nano_core(): error deserializing nano_core"
+                })
             );
             drop(nano_core_file_locked);
-            deserialized.into_loaded_crate(
+            crate::serde::into_loaded_crate(
+                deserialized,
                 nano_core_file,
                 real_namespace,
                 &text_pages,
@@ -313,7 +312,7 @@ fn parse_nano_core_symbol_file(
                 section_counter,
                 Arc::new(LoadedSection::new(
                     typ,
-                    typ.name_str_ref(),
+                    section_name_str_ref(&typ),
                     Arc::clone(rodata_pages),
                     mapped_pages_offset,
                     sec_vaddr,
@@ -334,7 +333,7 @@ fn parse_nano_core_symbol_file(
                 section_counter,
                 Arc::new(LoadedSection::new(
                     typ,
-                    typ.name_str_ref(),
+                    section_name_str_ref(&typ),
                     Arc::clone(rodata_pages),
                     mapped_pages_offset,
                     sec_vaddr,
@@ -555,7 +554,7 @@ fn parse_nano_core_binary(
                     section_counter,
                     Arc::new(LoadedSection::new(
                         typ,
-                        typ.name_str_ref(),
+                        section_name_str_ref(&typ),
                         Arc::clone(&rodata_pages),
                         mapped_pages_offset,
                         sec_vaddr,
@@ -576,7 +575,7 @@ fn parse_nano_core_binary(
                     section_counter,
                     Arc::new(LoadedSection::new(
                         typ,
-                        typ.name_str_ref(),
+                        section_name_str_ref(&typ),
                         Arc::clone(&rodata_pages),
                         mapped_pages_offset,
                         sec_vaddr,

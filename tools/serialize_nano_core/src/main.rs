@@ -2,7 +2,7 @@
 
 mod parse;
 
-use mod_mgmt::serde::SerializedCrate;
+use crate_metadata_serde::SerializedCrate;
 use std::io::Write;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

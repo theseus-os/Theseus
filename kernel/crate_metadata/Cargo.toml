@@ -35,10 +35,10 @@ path = "../memory"
 [dependencies.fs_node]
 path = "../fs_node"
 
+[dependencies.crate_metadata_serde]
+path = "../crate_metadata_serde"
+
 [dependencies.serde]
 version = "1.0.137"
 default-features = false
 features = ["derive"]
-
-[lib]
-crate-type = ["rlib"]
