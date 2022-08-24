@@ -344,9 +344,7 @@ name = "crate_metadata_serde"
 version = "0.1.0"
 dependencies = [
  "hashbrown",
- "log",
  "serde",
- "str_ref",
 ]
 
 [[package]]
