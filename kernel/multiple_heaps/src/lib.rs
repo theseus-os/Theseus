@@ -477,7 +477,6 @@ unsafe impl GlobalAlloc for MultipleHeaps {
 
     /// Allocates the given `layout` from the heap of the core the task is currently running on.
     /// If the per-core heap is not initialized, then an error is returned.
-    #[inline(always)]    
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         // allocate a large object by directly obtaining mapped pages from the OS
         if layout.size() > ZoneAllocator::MAX_ALLOC_SIZE {
@@ -508,7 +507,6 @@ unsafe impl GlobalAlloc for MultipleHeaps {
 
     /// Deallocates the memory at the address given by `ptr`.
     /// Memory is returned to the per-core heap it was allocated from.
-    #[inline(always)]    
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {   
         // deallocate a large object by directly returning mapped pages to the OS
         if layout.size() > ZoneAllocator::MAX_ALLOC_SIZE {
