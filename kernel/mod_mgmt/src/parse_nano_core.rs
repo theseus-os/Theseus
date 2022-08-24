@@ -23,7 +23,7 @@ const NANO_CORE_FILENAME_PREFIX: &str = "nano_core.";
 const NANO_CORE_CRATE_NAME: &str = "nano_core";
 
 
-/// Deserializes the file containing the [`SerializedCrate`] representation of the already loaded
+/// Parses and/or deserializes the file containing details about the already loaded
 /// (and currently running) `nano_core` code.
 ///
 /// Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata.

@@ -8,7 +8,7 @@
 //!
 //! This is currently only used to parse and serialize the `nano_core` binary at compile time.
 //! The `nano_core`'s [`SerializedCrate`] is then included as a boot module
-//! so it can be deserialized into a [`LoadedCrate`] at runtime.
+//! so it can be deserialized into a LoadedCrate at runtime by `mod_mgmt`.
 //! 
 //! Some other types have been moved from `crate_metadata` into this crate because
 //! they are required for (de)serialization, e.g., [`SectionType`].
@@ -68,9 +68,9 @@ pub struct SerializedSection {
     pub ty: SectionType,
     /// Whether or not the section is global.
     pub global: bool,
-    /// The starting [`VirtualAddress`] of the range covered by this section.
+    /// The starting virtual address of the range covered by this section.
     pub virtual_address: usize,
-    /// The offset into the [`MappedPages`] where this section starts.
+    /// The offset into this section's containing `MappedPages` where this section starts.
     pub offset: usize,
     /// The size of the section.
     pub size: usize,
