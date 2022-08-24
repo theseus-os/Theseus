@@ -23,6 +23,7 @@ sourcesIndex["context_switch_regular"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["context_switch_sse"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["cow_arc"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["crate_metadata"] = {"name":"","files":["lib.rs"]};
+sourcesIndex["crate_metadata_serde"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["crate_name_utils"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["crate_swap"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["debug_info"] = {"name":"","files":["lib.rs"]};

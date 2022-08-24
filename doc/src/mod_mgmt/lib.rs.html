@@ -3301,8 +3301,6 @@
 <span id="3295">3295</span>
 <span id="3296">3296</span>
 <span id="3297">3297</span>
-<span id="3298">3298</span>
-<span id="3299">3299</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
@@ -3324,14 +3322,12 @@
 <span class="kw">use</span> <span class="ident">memfs::MemFile</span>;
 <span class="kw">use</span> <span class="ident">hashbrown::HashMap</span>;
 <span class="kw">use</span> <span class="ident">rangemap::RangeMap</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">crate_name_utils</span>::{<span class="ident">get_containing_crate_name</span>, <span class="ident">replace_containing_crate_name</span>, <span class="ident">crate_name_from_path</span>};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">crate_name_utils</span>::<span class="kw-2">*</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">crate_metadata</span>::<span class="kw-2">*</span>;
-
 
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">parse_nano_core</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">replace_nano_core_crates</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">serde</span>;
-
+<span class="kw">mod</span> <span class="ident">serde</span>;
 
 <span class="doccomment">/// The name of the directory that contains all of the CrateNamespace files.</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NAMESPACES_DIRECTORY_NAME</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;namespaces&quot;</span>;
@@ -4650,7 +4646,7 @@
             <span class="comment">// Create a new `LoadedSection` to represent this section.</span>
             <span class="kw">let</span> <span class="ident">new_section</span> <span class="op">=</span> <span class="ident">LoadedSection::new</span>(
                 <span class="ident">typ</span>,
-                <span class="ident">typ</span>.<span class="ident">name_str_ref</span>(),
+                <span class="ident">section_name_str_ref</span>(<span class="kw-2">&amp;</span><span class="ident">typ</span>),
                 <span class="ident">Arc::clone</span>(<span class="ident">mapped_pages_ref</span>),
                 <span class="ident">mapped_pages_offset</span>,
                 <span class="ident">virt_addr</span>,
@@ -5286,7 +5282,7 @@
                         <span class="ident">shndx</span>, 
                         <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
                             <span class="ident">typ</span>,
-                            <span class="ident">typ</span>.<span class="ident">name_str_ref</span>(),
+                            <span class="ident">section_name_str_ref</span>(<span class="kw-2">&amp;</span><span class="ident">typ</span>),
                             <span class="ident">Arc::clone</span>(<span class="ident">rp_ref</span>),
                             <span class="ident">rodata_offset</span>,
                             <span class="ident">dest_vaddr</span>,
@@ -5325,7 +5321,7 @@
                         <span class="ident">shndx</span>, 
                         <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
                             <span class="ident">typ</span>,
-                            <span class="ident">typ</span>.<span class="ident">name_str_ref</span>(),
+                            <span class="ident">section_name_str_ref</span>(<span class="kw-2">&amp;</span><span class="ident">typ</span>),
                             <span class="ident">Arc::clone</span>(<span class="ident">rp_ref</span>),
                             <span class="ident">rodata_offset</span>,
                             <span class="ident">dest_vaddr</span>,
