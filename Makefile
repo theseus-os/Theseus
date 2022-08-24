@@ -58,7 +58,6 @@ else
 	USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
 endif
 
-GRUB_MKRESCUE = "grub-mkrescue"
 ### Handle multiple bootloader options and ensure the corresponding tools are installed.
 ifeq ($(bootloader),grub)
 	## Look for `grub-mkrescue` (Debian-like distros) or `grub2-mkrescue` (Fedora)
