@@ -39,7 +39,7 @@ use serde::{Deserialize, Serialize};
 
 /// A (de)serializable representation of a loaded crate that is `serde`-compatible.
 ///
-/// See [`LoadedCrate`] for more detail on the fields of this struct.
+/// See `LoadedCrate` for more detail on the fields of this struct.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SerializedCrate {
     /// The name of the crate.
@@ -59,7 +59,7 @@ pub struct SerializedCrate {
 
 /// A (de)serializable representation of a loaded section that is `serde`-compatible.
 ///
-/// See [`LoadedSection`] for more detail on the fields of this struct.
+/// See `LoadedSection` for more detail on the fields of this struct.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SerializedSection {
     /// The full name of the section.
