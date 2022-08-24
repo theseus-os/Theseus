@@ -19,14 +19,12 @@ use path::Path;
 use memfs::MemFile;
 use hashbrown::HashMap;
 use rangemap::RangeMap;
-pub use crate_name_utils::{get_containing_crate_name, replace_containing_crate_name, crate_name_from_path};
+pub use crate_name_utils::*;
 pub use crate_metadata::*;
-
 
 pub mod parse_nano_core;
 pub mod replace_nano_core_crates;
-pub mod serde;
-
+mod serde;
 
 /// The name of the directory that contains all of the CrateNamespace files.
 pub const NAMESPACES_DIRECTORY_NAME: &'static str = "namespaces";
@@ -1345,7 +1343,7 @@ impl CrateNamespace {
             // Create a new `LoadedSection` to represent this section.
             let new_section = LoadedSection::new(
                 typ,
-                typ.name_str_ref(),
+                section_name_str_ref(&typ),
                 Arc::clone(mapped_pages_ref),
                 mapped_pages_offset,
                 virt_addr,
@@ -1981,7 +1979,7 @@ impl CrateNamespace {
                         shndx, 
                         Arc::new(LoadedSection::new(
                             typ,
-                            typ.name_str_ref(),
+                            section_name_str_ref(&typ),
                             Arc::clone(rp_ref),
                             rodata_offset,
                             dest_vaddr,
@@ -2020,7 +2018,7 @@ impl CrateNamespace {
                         shndx, 
                         Arc::new(LoadedSection::new(
                             typ,
-                            typ.name_str_ref(),
+                            section_name_str_ref(&typ),
                             Arc::clone(rp_ref),
                             rodata_offset,
                             dest_vaddr,

@@ -40,6 +40,9 @@ path = "../crate_name_utils"
 [dependencies.crate_metadata]
 path = "../crate_metadata"
 
+[dependencies.crate_metadata_serde]
+path = "../crate_metadata_serde"
+
 [dependencies.memory]
 path = "../memory"
 
@@ -54,7 +57,7 @@ path = "../fs_node"
 
 [dependencies.hashbrown]
 version = "0.11.2"
-features = ["nightly", "serde"]
+features = ["nightly"]
 
 [dependencies.vfs_node]
 path = "../vfs_node"
