@@ -48,7 +48,6 @@ impl Bitfield for [AtomicU64] {
     ///
     /// # Notes
     /// * We pass size here to be able to calculate the resulting address within `data`.
-    #[inline(always)]
     fn first_fit(
         &self,
         base_addr: usize,
@@ -127,7 +126,6 @@ impl Bitfield for [AtomicU64] {
     ///
     /// This is called `all_free` rather than `is_emtpy` because
     /// we already have an is_empty fn as part of the slice.
-    #[inline(always)]
     fn all_free(&self, relevant_bits: usize) -> bool {
         for (idx, bitmap) in self.iter().enumerate() {
             let checking_bit_range = (idx * 64, (idx + 1) * 64);
