@@ -381,8 +381,6 @@
 <span id="375">375</span>
 <span id="376">376</span>
 <span id="377">377</span>
-<span id="378">378</span>
-<span id="379">379</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">crate</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">core::sync::atomic</span>::{<span class="ident">AtomicU64</span>, <span class="ident">Ordering</span>};
 
@@ -433,7 +431,6 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// # Notes</span>
     <span class="doccomment">/// * We pass size here to be able to calculate the resulting address within `data`.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">first_fit</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">base_addr</span>: <span class="ident">usize</span>,
@@ -512,7 +509,6 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// This is called `all_free` rather than `is_emtpy` because</span>
     <span class="doccomment">/// we already have an is_empty fn as part of the slice.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">all_free</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">relevant_bits</span>: <span class="ident">usize</span>) -&gt; <span class="ident">bool</span> {
         <span class="kw">for</span> (<span class="ident">idx</span>, <span class="ident">bitmap</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
             <span class="kw">let</span> <span class="ident">checking_bit_range</span> <span class="op">=</span> (<span class="ident">idx</span> <span class="op">*</span> <span class="number">64</span>, (<span class="ident">idx</span> <span class="op">+</span> <span class="number">1</span>) <span class="op">*</span> <span class="number">64</span>);

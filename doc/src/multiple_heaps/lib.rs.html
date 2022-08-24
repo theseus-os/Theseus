@@ -648,8 +648,6 @@
 <span id="642">642</span>
 <span id="643">643</span>
 <span id="644">644</span>
-<span id="645">645</span>
-<span id="646">646</span>
 </pre><pre class="rust"><code><span class="doccomment">//! An implementation of an allocator that uses multiple heaps. The heap that will be used on each allocation is determined by a key.</span>
 <span class="doccomment">//! Right now we use the apic id as the key, so that we have per-core heaps.</span>
 <span class="doccomment">//! </span>
@@ -1129,7 +1127,6 @@
 
     <span class="doccomment">/// Allocates the given `layout` from the heap of the core the task is currently running on.</span>
     <span class="doccomment">/// If the per-core heap is not initialized, then an error is returned.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>    
     <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">alloc</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) -&gt; <span class="kw-2">*mut</span> <span class="ident">u8</span> {
         <span class="comment">// allocate a large object by directly obtaining mapped pages from the OS</span>
         <span class="kw">if</span> <span class="ident">layout</span>.<span class="ident">size</span>() <span class="op">&gt;</span> <span class="ident">ZoneAllocator::MAX_ALLOC_SIZE</span> {
@@ -1160,7 +1157,6 @@
 
     <span class="doccomment">/// Deallocates the memory at the address given by `ptr`.</span>
     <span class="doccomment">/// Memory is returned to the per-core heap it was allocated from.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>    
     <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">dealloc</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ptr</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) {   
         <span class="comment">// deallocate a large object by directly returning mapped pages to the OS</span>
         <span class="kw">if</span> <span class="ident">layout</span>.<span class="ident">size</span>() <span class="op">&gt;</span> <span class="ident">ZoneAllocator::MAX_ALLOC_SIZE</span> {
