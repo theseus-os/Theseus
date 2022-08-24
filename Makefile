@@ -10,6 +10,7 @@ SHELL := /bin/bash
 
 ## most of the variables used below are defined in Config.mk
 include cfg/Config.mk
+include cfg/builder.mk
 
 ## By default, we just build the standard OS image via the `iso` target.
 .DEFAULT_GOAL := iso
@@ -18,7 +19,7 @@ include cfg/Config.mk
 debug ?= none
 net ?= none
 merge_sections ?= yes
-export bootloader ?= grub
+bootloader ?= grub
 
 ## test for Windows Subsystem for Linux (Linux on Windows)
 IS_WSL = $(shell grep -is 'microsoft' /proc/version)
@@ -27,26 +28,25 @@ IS_WSL = $(shell grep -is 'microsoft' /proc/version)
 ###################################################################################################
 ### Basic directory/file path definitions used throughout the makefile.
 ###################################################################################################
-export BUILD_DIR               := $(ROOT_DIR)/build
-export NANO_CORE_BUILD_DIR     := $(BUILD_DIR)/nano_core
-export iso                     := $(BUILD_DIR)/theseus-$(ARCH).iso
-export ISOFILES                := $(BUILD_DIR)/isofiles
-export OBJECT_FILES_BUILD_DIR  := $(ISOFILES)/modules
-export DEBUG_SYMBOLS_DIR       := $(BUILD_DIR)/debug_symbols
-export TARGET_DEPS_DIR         := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/deps
-export DEPS_BUILD_DIR          := $(BUILD_DIR)/deps
-export HOST_DEPS_DIR           := $(DEPS_BUILD_DIR)/host_deps
-export DEPS_SYSROOT_DIR        := $(DEPS_BUILD_DIR)/sysroot
-export THESEUS_BUILD_TOML      := $(DEPS_BUILD_DIR)/TheseusBuild.toml
-export THESEUS_CARGO           := $(ROOT_DIR)/tools/theseus_cargo
-export THESEUS_CARGO_BIN       := $(THESEUS_CARGO)/bin/theseus_cargo
-export EXTRA_FILES             := $(ROOT_DIR)/extra_files
+BUILD_DIR               := $(ROOT_DIR)/build
+NANO_CORE_BUILD_DIR     := $(BUILD_DIR)/nano_core
+iso                     := $(BUILD_DIR)/theseus-$(ARCH).iso
+ISOFILES                := $(BUILD_DIR)/isofiles
+OBJECT_FILES_BUILD_DIR  := $(ISOFILES)/modules
+DEBUG_SYMBOLS_DIR       := $(BUILD_DIR)/debug_symbols
+TARGET_DEPS_DIR         := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/deps
+DEPS_BUILD_DIR          := $(BUILD_DIR)/deps
+HOST_DEPS_DIR           := $(DEPS_BUILD_DIR)/host_deps
+DEPS_SYSROOT_DIR        := $(DEPS_BUILD_DIR)/sysroot
+THESEUS_BUILD_TOML      := $(DEPS_BUILD_DIR)/TheseusBuild.toml
+THESEUS_CARGO           := $(ROOT_DIR)/tools/theseus_cargo
+THESEUS_CARGO_BIN       := $(THESEUS_CARGO)/bin/theseus_cargo
+EXTRA_FILES             := $(ROOT_DIR)/extra_files
 
-export CROSS =
 ### Set up tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
 UNAME = $(shell uname -s)
 ifeq ($(UNAME),Darwin)
-	export CROSS = x86_64-elf-
+	CROSS = x86_64-elf-
 	## The GRUB_CROSS variable must match the build output of "scripts/mac_os_build_setup.sh"
 	GRUB_CROSS = "$(HOME)"/theseus_tools_opt/bin/
 	## macOS uses a different unmounting utility
@@ -63,9 +63,9 @@ export GRUB_MKRESCUE = "grub-mkrescue"
 ifeq ($(bootloader),grub)
 	## Look for `grub-mkrescue` (Debian-like distros) or `grub2-mkrescue` (Fedora)
 	ifneq (,$(shell command -v $(GRUB_CROSS)grub-mkrescue))
-		export GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
+		GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 	else ifneq (,$(shell command -v $(GRUB_CROSS)grub2-mkrescue))
-		export GRUB_MKRESCUE = $(GRUB_CROSS)grub2-mkrescue
+		GRUB_MKRESCUE = $(GRUB_CROSS)grub2-mkrescue
 	else
 $(error Error: could not find 'grub-mkrescue' or 'grub2-mkrescue', please install 'grub' or 'grub2')
 	endif
@@ -102,15 +102,15 @@ check-rustc:
 ###################################################################################################
 
 ## The linker script applied to each output file in $(OBJECT_FILES_BUILD_DIR).
-export partial_relinking_script := $(ROOT_DIR)/cfg/partial_linking_combine_sections.ld
+partial_relinking_script := $(ROOT_DIR)/cfg/partial_linking_combine_sections.ld
 ## This is the default output path defined by cargo.
-export nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
+nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 ## The directory where the nano_core source files are
-export NANO_CORE_SRC_DIR := $(ROOT_DIR)/kernel/nano_core/src
+NANO_CORE_SRC_DIR := $(ROOT_DIR)/kernel/nano_core/src
 ## The output directory of where the nano_core binary should go
-export nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
+nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
 ## The linker script for linking the nano_core_binary to the assembly files
-export linker_script := $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/linker_higher_half.ld
+linker_script := $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/linker_higher_half.ld
 assembly_source_files := $(wildcard $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/*.asm)
 assembly_object_files := $(patsubst $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm, \
 	$(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o, $(assembly_source_files))
@@ -194,17 +194,17 @@ build: $(nano_core_binary)
 ## and combine them into one object file using partial linking (`ld -r ...`), overwriting the rustc-emitted .o file.
 ## Note: we skip "normal" .rlib archives that have 2 members: a single .o object file and a single .rmeta file.
 ## Note: the below line with `cut` simply removes the `lib` prefix and the `.rlib` suffix from the file name.
-	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -c cfg/builder.toml -s relink-rlibs
+	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -n -s relink-rlibs $(BUILDER_ARGS)
 
 ## Second, copy all object files into the main build directory and prepend the kernel or app prefix appropriately.
 	@EXTRA_APP_CRATE_NAMES="$(EXTRA_APP_CRATE_NAMES) libtheseus" \
-	cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -c cfg/builder.toml -s copy-crate-objects
+	cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -n -s copy-crate-objects $(BUILDER_ARGS)
 
 ## Third, perform partial linking on each object file, which shrinks their size 
 ## and most importantly, accelerates their loading and linking at runtime.
 ## We also remove the unnecessary GCC_except_table* symbols from the symbol tables.
 ifeq ($(merge_sections),yes)
-	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -c cfg/builder.toml -s relink-objects
+	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -n -s relink-objects $(BUILDER_ARGS)
 else ifeq ($(merge_sections),no)
 # do nothing, leave the object files as is, with separate function/data sections
 else
@@ -230,11 +230,11 @@ ifeq ($(debug),full)
 # don't strip any files
 else ifeq ($(debug),none)
 # strip all files
-	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -c cfg/builder.toml -s strip-objects
+	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -n -s strip-objects $(BUILDER_ARGS)
 else ifeq ($(debug),base)
 # strip all object files but the base kernel
 	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- \
-		-q -c cfg/builder.toml -s strip-objects strip-objects.strip-nanocore=false
+		-q -n -s strip-objects strip-objects.strip-nanocore=false $(BUILDER_ARGS)
 else
 $(error Error: unsupported option "debug=$(debug)". Options are 'full', 'none', or 'base')
 endif
@@ -256,14 +256,14 @@ cargo: check-rustc
 
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
 $(nano_core_binary): cargo $(nano_core_static_lib) $(linker_script)
-	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -c cfg/builder.toml -s directories
-	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -c cfg/builder.toml -s link-nanocore
-	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -c cfg/builder.toml -s serialize-nanocore-syms
+	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -n -s directories $(BUILDER_ARGS)
+	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -n -s link-nanocore $(BUILDER_ARGS)
+	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -n -s serialize-nanocore-syms $(BUILDER_ARGS)
 
 ### This target auto-generates a new grub.cfg file and uses grub to build a bootable ISO.
 ### This target should be invoked when all of contents of `ISOFILES` are ready to be packaged into an ISO.
 $(bootloader):
-	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -s directories,add-bootloader -c cfg/builder.toml
+	@cargo run --manifest-path=tools/builder/Cargo.toml -r -- -q -n -s directories,add-bootloader $(BUILDER_ARGS)
 
 ### This target copies all extra files into the `ISOFILES` directory,
 ### collapsing their directory structure into a single file name with `?` as the directory delimiter.
