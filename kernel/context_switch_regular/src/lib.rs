@@ -21,11 +21,18 @@ pub struct ContextRegular {
     r12: usize,
     rbp: usize,
     rbx: usize,
+    /// The instruction pointer.
+    ///
+    /// `rip` is implicitly pushed onto the stack when a function is called, and
+    /// popped off when returning. When a task's stack is set to an instance of
+    /// [`ContextRegular`], [`context_switch_regular`] will execute `ret` when
+    /// the stack pointer is pointing to the value of `rip`. Hence, the program
+    /// will "return" to that address and continue executing.
     rip: usize,
 }
 
 impl ContextRegular {
-    /// Creates a new ContextRegular struct that will cause the
+    /// Creates a new [`ContextRegular`] struct that will cause the
     /// Task containing it to begin its execution at the given `rip`.
     pub fn new(rip: usize) -> ContextRegular {
         ContextRegular {
@@ -47,8 +54,6 @@ impl ContextRegular {
 macro_rules! save_registers_regular {
     () => (
         // Save all general purpose registers into the previous task.
-        // `rip` has been implicitly pushed onto the stack by the `call
-        // <context_switch_regular>` instruction executed by the caller.
         r#"
             push rbx
             push rbp
@@ -89,7 +94,6 @@ macro_rules! switch_stacks {
 macro_rules! restore_registers_regular {
     () => (
         // Restore the next task's general purpose registers.
-        // `ret` is essentialy `pop rip`, bar optimisations.
         r#" 
             pop r15
             pop r14
