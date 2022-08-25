@@ -16,8 +16,8 @@ version = "0.4.8"
 features = ["spin_no_std"]
 version = "1.4.0"
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+[dependencies.mutex_preemption]
+path = "../mutex_preemption"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"

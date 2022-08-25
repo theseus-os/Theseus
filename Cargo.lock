@@ -2646,9 +2646,9 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "cfg-if 1.0.0",
- "irq_safety",
  "lazy_static",
  "log",
+ "mutex_preemption",
  "runqueue_priority",
  "runqueue_realtime",
  "runqueue_round_robin",
@@ -2661,8 +2661,8 @@ name = "runqueue_priority"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety",
  "log",
+ "mutex_preemption",
  "single_simd_task_optimization",
  "task",
 ]
@@ -2672,8 +2672,8 @@ name = "runqueue_realtime"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety",
  "log",
+ "mutex_preemption",
  "task",
 ]
 
@@ -2682,8 +2682,8 @@ name = "runqueue_round_robin"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety",
  "log",
+ "mutex_preemption",
  "single_simd_task_optimization",
  "task",
 ]
@@ -3201,6 +3201,7 @@ checksum = "d9bffcddbc2458fa3e6058414599e3c838a022abae82e5c67b4f7f80298d5bff"
 name = "task"
 version = "0.1.0"
 dependencies = [
+ "apic",
  "context_switch",
  "crossbeam-utils",
  "environment",

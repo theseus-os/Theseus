@@ -661,6 +661,7 @@ impl Task {
             TASKLIST.lock().remove(&self.id);
             self.inner.lock().exit_value.take()
         } else {
+            error!("[CPU {}] take_exit_value() failed for {:?}", apic::get_my_apic_id(), self);
             None
         }
     }
@@ -962,7 +963,7 @@ impl Task {
 impl Drop for Task {
     fn drop(&mut self) {
         #[cfg(not(any(rq_eval, downtime_eval)))]
-        trace!("Task::drop(): {}", self);
+        trace!("[CPU {}] [curr {:?}] Task::drop(): {}", apic::get_my_apic_id(), get_my_current_task(), self);
 
         // We must consume/drop the Task's kill handler BEFORE a Task can possibly be dropped.
         // This is because if an application task sets a kill handler that is a closure/function in the text section of the app crate itself,

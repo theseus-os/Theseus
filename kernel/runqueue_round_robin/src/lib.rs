@@ -7,7 +7,7 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
-extern crate irq_safety;
+extern crate mutex_preemption;
 extern crate atomic_linked_list;
 extern crate task;
 
@@ -15,7 +15,7 @@ extern crate task;
 extern crate single_simd_task_optimization;
 
 use alloc::collections::VecDeque;
-use irq_safety::RwLockIrqSafe;
+use mutex_preemption::RwLockPreempt;
 use atomic_linked_list::atomic_map::AtomicMap;
 use task::TaskRef;
 use core::ops::{Deref, DerefMut};
@@ -77,7 +77,7 @@ impl RoundRobinTaskRef {
 
 /// There is one runqueue per core, each core only accesses its own private runqueue
 /// and allows the scheduler to select a task from that runqueue to schedule in.
-pub static RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
+pub static RUNQUEUES: AtomicMap<u8, RwLockPreempt<RunQueue>> = AtomicMap::new();
 
 /// A list of references to `Task`s (`RoundRobinTaskRef`s). 
 /// This is used to store the `Task`s (and associated scheduler related data) 
@@ -123,7 +123,7 @@ impl RunQueue {
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`.
     pub fn init(which_core: u8) -> Result<(), &'static str> {
         trace!("Created runqueue (round robin) for core {}", which_core);
-        let new_rq = RwLockIrqSafe::new(RunQueue {
+        let new_rq = RwLockPreempt::new(RunQueue {
             core: which_core,
             queue: VecDeque::new(),
         });
@@ -144,7 +144,7 @@ impl RunQueue {
     }
 
     /// Returns the `RunQueue` for the given core, which is an `apic_id`.
-    pub fn get_runqueue(which_core: u8) -> Option<&'static RwLockIrqSafe<RunQueue>> {
+    pub fn get_runqueue(which_core: u8) -> Option<&'static RwLockPreempt<RunQueue>> {
         RUNQUEUES.get(&which_core)
     }
 
@@ -157,8 +157,8 @@ impl RunQueue {
 
     /// Returns the `RunQueue` for the "least busy" core.
     /// See [`get_least_busy_core()`](#method.get_least_busy_core)
-    fn get_least_busy_runqueue() -> Option<&'static RwLockIrqSafe<RunQueue>> {
-        let mut min_rq: Option<(&'static RwLockIrqSafe<RunQueue>, usize)> = None;
+    fn get_least_busy_runqueue() -> Option<&'static RwLockPreempt<RunQueue>> {
+        let mut min_rq: Option<(&'static RwLockPreempt<RunQueue>, usize)> = None;
 
         for (_, rq) in RUNQUEUES.iter() {
             let rq_size = rq.read().queue.len();
@@ -223,8 +223,15 @@ impl RunQueue {
     fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
         #[cfg(not(any(rq_eval, downtime_eval)))]
         debug!("Removing task from runqueue_round_robin {}, {:?}", self.core, task);
+        let start_len = self.len();
         self.retain(|x| &x.taskref != task);
+        let end_len = self.len();
 
+        if end_len == start_len + 1 {
+            warn!("Removed task {:?} from runqueue_round_robin {}", task, self.core);
+        } else {
+            warn!("Failed to remove task {:?} from runqueue_round_robin {}", task, self.core);
+        }
         #[cfg(single_simd_task_optimization)] {   
             warn!("USING SINGLE_SIMD_TASK_OPTIMIZATION VERSION OF RUNQUEUE::REMOVE_TASK");
             // notify simd_personality crate about runqueue change, but only for SIMD tasks
