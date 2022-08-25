@@ -2122,10 +2122,12 @@ impl CrateNamespace {
                         trace!("      Rela64 offset: {:#X}, addend: {:#X}, symtab_index: {}, type: {:#X}", 
                             rela_entry.get_offset(), rela_entry.get_addend(), rela_entry.get_symbol_table_index(), rela_entry.get_type());
                     }
+                    // trace!("      Rela64 offset: {:#X}, addend: {:#X}, symtab_index: {}, type: {:#X}", 
+                    //     rela_entry.get_offset(), rela_entry.get_addend(), rela_entry.get_symbol_table_index(), rela_entry.get_type());
 
                     use xmas_elf::symbol_table::Entry;
                     let source_sec_entry = &symtab[rela_entry.get_symbol_table_index() as usize];
-                    let source_sec_shndx = source_sec_entry.shndx() as usize; 
+                    let mut source_sec_shndx = source_sec_entry.shndx() as usize; 
                     let source_sec_value = source_sec_entry.value() as usize;
                     if verbose_log { 
                         let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
@@ -2136,7 +2138,7 @@ impl CrateNamespace {
                         //     source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
                         //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
                     }
-                    
+
                     let mut source_and_target_in_same_crate = false;
 
                     // We first try to get the source section from loaded_sections, which works if the section is in the crate currently being loaded.
@@ -2158,6 +2160,9 @@ impl CrateNamespace {
                                     source_sec_name
                                 };
                                 let demangled = demangle(source_sec_name).to_string();
+                                if source_sec_name == "__rustc_debug_gdb_scripts_section__" {
+                                    continue;
+                                }
 
                                 // search for the symbol's demangled name in the kernel's symbol map
                                 self.get_symbol_or_load(&demangled, temp_backup_namespace, kernel_mmi_ref, verbose_log)

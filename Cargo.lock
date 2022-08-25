@@ -3264,6 +3264,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_bin"
+version = "0.1.0"
+
+[[package]]
 name = "test_block_io"
 version = "0.1.0"
 dependencies = [
@@ -3528,6 +3532,7 @@ dependencies = [
  "shell",
  "swap",
  "test_backtrace",
+ "test_bin",
  "test_block_io",
  "test_channel",
  "test_downtime",
