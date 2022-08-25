@@ -130,13 +130,9 @@ fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
         tasks.push(taskref);
     }
 
-    info!("run_whole: all tasks: {:?}", tasks);
-
     for t in &tasks {
         t.join()?;
-        info!("run_whole: joined task {:?}", t);
-        let _val = t.take_exit_value();
-        info!("run_whole: reaped task {:?}, exit val: {:?}", t, _val);
+        let _ = t.take_exit_value();
     }
 
     let end = hpet.get_counter();

@@ -223,15 +223,8 @@ impl RunQueue {
     fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
         #[cfg(not(any(rq_eval, downtime_eval)))]
         debug!("Removing task from runqueue_round_robin {}, {:?}", self.core, task);
-        let start_len = self.len();
         self.retain(|x| &x.taskref != task);
-        let end_len = self.len();
 
-        if end_len == start_len + 1 {
-            warn!("Removed task {:?} from runqueue_round_robin {}", task, self.core);
-        } else {
-            warn!("Failed to remove task {:?} from runqueue_round_robin {}", task, self.core);
-        }
         #[cfg(single_simd_task_optimization)] {   
             warn!("USING SINGLE_SIMD_TASK_OPTIMIZATION VERSION OF RUNQUEUE::REMOVE_TASK");
             // notify simd_personality crate about runqueue change, but only for SIMD tasks
