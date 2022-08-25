@@ -1955,6 +1955,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mutex_preemption"
+version = "0.1.0"
+dependencies = [
+ "lockable",
+ "owning_ref",
+ "preemption",
+ "spin 0.9.0",
+ "stable_deref_trait",
+]
+
+[[package]]
 name = "mutex_sleep"
 version = "0.1.0"
 dependencies = [
