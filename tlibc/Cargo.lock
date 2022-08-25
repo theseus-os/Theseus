@@ -1038,6 +1038,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mutex_preemption"
+version = "0.1.0"
+dependencies = [
+ "lockable",
+ "owning_ref",
+ "preemption",
+ "spin 0.9.0",
+ "stable_deref_trait",
+]
+
+[[package]]
 name = "new_debug_unreachable"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1273,9 +1284,9 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "cfg-if 1.0.0",
- "irq_safety",
  "lazy_static",
  "log",
+ "mutex_preemption",
  "runqueue_priority",
  "runqueue_realtime",
  "runqueue_round_robin",
@@ -1288,8 +1299,8 @@ name = "runqueue_priority"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety",
  "log",
+ "mutex_preemption",
  "single_simd_task_optimization",
  "task",
 ]
@@ -1299,8 +1310,8 @@ name = "runqueue_realtime"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety",
  "log",
+ "mutex_preemption",
  "task",
 ]
 
@@ -1309,8 +1320,8 @@ name = "runqueue_round_robin"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety",
  "log",
+ "mutex_preemption",
  "single_simd_task_optimization",
  "task",
 ]
@@ -1600,6 +1611,7 @@ dependencies = [
 name = "task"
 version = "0.1.0"
 dependencies = [
+ "apic",
  "context_switch",
  "crossbeam-utils",
  "environment",

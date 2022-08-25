@@ -109,15 +109,4 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
             }
         }
     }
-    
-    // if !is_idle_task {
-    //     // kill the offending task (the current task)
-    //     error!("Killing panicked task \"{}\"", curr_task.lock().name);
-    //     curr_task.kill(KillReason::Panic(PanicInfoOwned::from(panic_info)))?;
-    //     runqueue::remove_task_from_all(curr_task)?;
-    //     Ok(())
-    // }
-    // else {
-    //     Err("")
-    // }
 }
