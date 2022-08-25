@@ -294,7 +294,7 @@
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mutex_preemption</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">atomic_linked_list</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
 
@@ -302,7 +302,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">single_simd_task_optimization</span>;
 
 <span class="kw">use</span> <span class="ident">alloc::collections::VecDeque</span>;
-<span class="kw">use</span> <span class="ident">irq_safety::RwLockIrqSafe</span>;
+<span class="kw">use</span> <span class="ident">mutex_preemption::RwLockPreempt</span>;
 <span class="kw">use</span> <span class="ident">atomic_linked_list::atomic_map::AtomicMap</span>;
 <span class="kw">use</span> <span class="ident">task::TaskRef</span>;
 <span class="kw">use</span> <span class="ident">core::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
@@ -364,7 +364,7 @@
 
 <span class="doccomment">/// There is one runqueue per core, each core only accesses its own private runqueue</span>
 <span class="doccomment">/// and allows the scheduler to select a task from that runqueue to schedule in.</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">RUNQUEUES</span>: <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">RwLockIrqSafe</span><span class="op">&lt;</span><span class="ident">RunQueue</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicMap::new</span>();
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">RUNQUEUES</span>: <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">RwLockPreempt</span><span class="op">&lt;</span><span class="ident">RunQueue</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicMap::new</span>();
 
 <span class="doccomment">/// A list of references to `Task`s (`RoundRobinTaskRef`s). </span>
 <span class="doccomment">/// This is used to store the `Task`s (and associated scheduler related data) </span>
@@ -410,7 +410,7 @@
     <span class="doccomment">/// Creates a new `RunQueue` for the given core, which is an `apic_id`.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">which_core</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="macro">trace!</span>(<span class="string">&quot;Created runqueue (round robin) for core {}&quot;</span>, <span class="ident">which_core</span>);
-        <span class="kw">let</span> <span class="ident">new_rq</span> <span class="op">=</span> <span class="ident">RwLockIrqSafe::new</span>(<span class="ident">RunQueue</span> {
+        <span class="kw">let</span> <span class="ident">new_rq</span> <span class="op">=</span> <span class="ident">RwLockPreempt::new</span>(<span class="ident">RunQueue</span> {
             <span class="ident">core</span>: <span class="ident">which_core</span>,
             <span class="ident">queue</span>: <span class="ident">VecDeque::new</span>(),
         });
@@ -431,7 +431,7 @@
     }
 
     <span class="doccomment">/// Returns the `RunQueue` for the given core, which is an `apic_id`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_runqueue</span>(<span class="ident">which_core</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">RwLockIrqSafe</span><span class="op">&lt;</span><span class="ident">RunQueue</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_runqueue</span>(<span class="ident">which_core</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">RwLockPreempt</span><span class="op">&lt;</span><span class="ident">RunQueue</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="ident">RUNQUEUES</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">which_core</span>)
     }
 
@@ -444,8 +444,8 @@
 
     <span class="doccomment">/// Returns the `RunQueue` for the &quot;least busy&quot; core.</span>
     <span class="doccomment">/// See [`get_least_busy_core()`](#method.get_least_busy_core)</span>
-    <span class="kw">fn</span> <span class="ident">get_least_busy_runqueue</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">RwLockIrqSafe</span><span class="op">&lt;</span><span class="ident">RunQueue</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">min_rq</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">RwLockIrqSafe</span><span class="op">&lt;</span><span class="ident">RunQueue</span><span class="op">&gt;</span>, <span class="ident">usize</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">fn</span> <span class="ident">get_least_busy_runqueue</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">RwLockPreempt</span><span class="op">&lt;</span><span class="ident">RunQueue</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">min_rq</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">RwLockPreempt</span><span class="op">&lt;</span><span class="ident">RunQueue</span><span class="op">&gt;</span>, <span class="ident">usize</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
 
         <span class="kw">for</span> (<span class="kw">_</span>, <span class="ident">rq</span>) <span class="kw">in</span> <span class="ident">RUNQUEUES</span>.<span class="ident">iter</span>() {
             <span class="kw">let</span> <span class="ident">rq_size</span> <span class="op">=</span> <span class="ident">rq</span>.<span class="ident">read</span>().<span class="ident">queue</span>.<span class="ident">len</span>();

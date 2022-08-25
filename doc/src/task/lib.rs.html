@@ -2299,7 +2299,7 @@
 <span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">Task</span> {
     <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">any</span>(<span class="ident">rq_eval</span>, <span class="ident">downtime_eval</span>)))]</span>
-        <span class="macro">trace!</span>(<span class="string">&quot;Task::drop(): {}&quot;</span>, <span class="self">self</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;[CPU {}] Task::drop(): {}&quot;</span>, <span class="ident">apic::get_my_apic_id</span>(), <span class="self">self</span>);
 
         <span class="comment">// We must consume/drop the Task&#39;s kill handler BEFORE a Task can possibly be dropped.</span>
         <span class="comment">// This is because if an application task sets a kill handler that is a closure/function in the text section of the app crate itself,</span>
