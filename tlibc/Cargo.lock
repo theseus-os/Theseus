@@ -1611,6 +1611,7 @@ dependencies = [
 name = "task"
 version = "0.1.0"
 dependencies = [
+ "apic",
  "context_switch",
  "crossbeam-utils",
  "environment",
