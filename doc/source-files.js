@@ -82,6 +82,7 @@ sourcesIndex["mouse"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["mouse_data"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["multicore_bringup"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["multiple_heaps"] = {"name":"","files":["lib.rs"]};
+sourcesIndex["mutex_preemption"] = {"name":"","files":["lib.rs","mutex_preempt.rs","rwlock_preempt.rs"]};
 sourcesIndex["mutex_sleep"] = {"name":"","files":["lib.rs","mutex.rs","rwlock.rs"]};
 sourcesIndex["nano_core"] = {"name":"","files":["lib.rs","libm.rs","stack_smash_protection.rs"]};
 sourcesIndex["network_interface_card"] = {"name":"","files":["lib.rs"]};
