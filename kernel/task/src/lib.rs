@@ -739,7 +739,7 @@ impl Task {
     /// the given `next` `Task`'s inner state in order to mutate them.
     pub fn task_switch(
         &self,
-        next: &Task,
+        next: TaskRef,
         apic_id: u8,
         preemption_guard: PreemptionGuard,
     ) -> (bool, PreemptionGuard) {
@@ -842,10 +842,13 @@ impl Task {
         };
         // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", prev_task_saved_sp as usize, next_task_saved_sp);
 
-        /// A private macro that actually calls the given context switch routine.
+        /// A macro that drops the `next` TaskRef and then calls the given context switch routine.
         macro_rules! call_context_switch {
-            ($func:expr) => ( unsafe {
-                $func(prev_task_saved_sp, next_task_saved_sp);
+            ($func:expr) => ({
+                drop(next);
+                unsafe {
+                    $func(prev_task_saved_sp, next_task_saved_sp);
+                }
             });
         }
 
@@ -913,7 +916,9 @@ impl Task {
         // Here, after the actual context switch operation above,
         // `self` (curr) is now `next` because the stacks have been switched, 
         // and `next` has become another random task based on a previous task switch.
-        // We cannot make any assumptions about what `next` is now, since it's unknown. 
+        // 
+        // We cannot make any assumptions about what `next` is now, since it's unknown.
+        // Hence why we dropped the local `TaskRef` for `next` right before the context switch.
         //
         // If this is **NOT** the first time the newly-current task (`self`) has run,
         // then it will resume execution below as normal because this is where it left off
