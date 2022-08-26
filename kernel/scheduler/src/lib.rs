@@ -12,7 +12,6 @@ cfg_if::cfg_if! {
     }
 }
 
-use core::ops::Deref;
 use apic::get_my_apic_id;
 use task::{get_my_current_task, TaskRef};
 
@@ -51,7 +50,7 @@ pub fn schedule() -> bool {
     };
 
     let (did_switch, recovered_preemption_guard) = curr_task.task_switch(
-        next_task.deref(),
+        next_task,
         apic_id,
         preemption_guard,
     ); 
