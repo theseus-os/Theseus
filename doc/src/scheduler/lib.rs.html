@@ -98,7 +98,6 @@
 <span id="92">92</span>
 <span id="93">93</span>
 <span id="94">94</span>
-<span id="95">95</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
@@ -113,7 +112,6 @@
     }
 }
 
-<span class="kw">use</span> <span class="ident">core::ops::Deref</span>;
 <span class="kw">use</span> <span class="ident">apic::get_my_apic_id</span>;
 <span class="kw">use</span> <span class="ident">task</span>::{<span class="ident">get_my_current_task</span>, <span class="ident">TaskRef</span>};
 
@@ -152,7 +150,7 @@
     };
 
     <span class="kw">let</span> (<span class="ident">did_switch</span>, <span class="ident">recovered_preemption_guard</span>) <span class="op">=</span> <span class="ident">curr_task</span>.<span class="ident">task_switch</span>(
-        <span class="ident">next_task</span>.<span class="ident">deref</span>(),
+        <span class="ident">next_task</span>,
         <span class="ident">apic_id</span>,
         <span class="ident">preemption_guard</span>,
     ); 

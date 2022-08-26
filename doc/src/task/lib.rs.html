@@ -1335,6 +1335,11 @@
 <span id="1329">1329</span>
 <span id="1330">1330</span>
 <span id="1331">1331</span>
+<span id="1332">1332</span>
+<span id="1333">1333</span>
+<span id="1334">1334</span>
+<span id="1335">1335</span>
+<span id="1336">1336</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, </span>
 <span class="doccomment">//! and the associated code for dealing with tasks.</span>
 <span class="doccomment">//! </span>
@@ -2076,7 +2081,7 @@
     <span class="doccomment">/// the given `next` `Task`&#39;s inner state in order to mutate them.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">task_switch</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">next</span>: <span class="kw-2">&amp;</span><span class="ident">Task</span>,
+        <span class="ident">next</span>: <span class="ident">TaskRef</span>,
         <span class="ident">apic_id</span>: <span class="ident">u8</span>,
         <span class="ident">preemption_guard</span>: <span class="ident">PreemptionGuard</span>,
     ) -&gt; (<span class="ident">bool</span>, <span class="ident">PreemptionGuard</span>) {
@@ -2179,10 +2184,13 @@
         };
         <span class="comment">// debug!(&quot;task_switch [4]: prev sp: {:#X}, next sp: {:#X}&quot;, prev_task_saved_sp as usize, next_task_saved_sp);</span>
 
-        <span class="doccomment">/// A private macro that actually calls the given context switch routine.</span>
+        <span class="doccomment">/// A macro that drops the `next` TaskRef and then calls the given context switch routine.</span>
         <span class="macro">macro_rules!</span> <span class="ident">call_context_switch</span> {
-            (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">func</span>:<span class="ident">expr</span>) =&gt; ( <span class="kw">unsafe</span> {
-                <span class="macro-nonterminal">$</span><span class="macro-nonterminal">func</span>(<span class="ident">prev_task_saved_sp</span>, <span class="ident">next_task_saved_sp</span>);
+            (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">func</span>:<span class="ident">expr</span>) =&gt; ({
+                <span class="ident">drop</span>(<span class="ident">next</span>);
+                <span class="kw">unsafe</span> {
+                    <span class="macro-nonterminal">$</span><span class="macro-nonterminal">func</span>(<span class="ident">prev_task_saved_sp</span>, <span class="ident">next_task_saved_sp</span>);
+                }
             });
         }
 
@@ -2250,7 +2258,9 @@
         <span class="comment">// Here, after the actual context switch operation above,</span>
         <span class="comment">// `self` (curr) is now `next` because the stacks have been switched, </span>
         <span class="comment">// and `next` has become another random task based on a previous task switch.</span>
-        <span class="comment">// We cannot make any assumptions about what `next` is now, since it&#39;s unknown. </span>
+        <span class="comment">// </span>
+        <span class="comment">// We cannot make any assumptions about what `next` is now, since it&#39;s unknown.</span>
+        <span class="comment">// Hence why we dropped the local `TaskRef` for `next` right before the context switch.</span>
         <span class="comment">//</span>
         <span class="comment">// If this is **NOT** the first time the newly-current task (`self`) has run,</span>
         <span class="comment">// then it will resume execution below as normal because this is where it left off</span>
