@@ -53,7 +53,7 @@ use core::{
     hash::{Hash, Hasher},
     ops::Deref,
     panic::PanicInfo,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering}, num::NonZeroUsize,
 };
 use alloc::{
     boxed::Box,
@@ -490,7 +490,6 @@ impl Task {
             id: task_id,
             runstate: AtomicCell::new(RunState::Initing),
             running_on_cpu: AtomicCell::new(None.into()),
-            runstate: AtomicCell::new(RunState::Initing),
             // Tasks are not considered "joinable" until passed to `TaskRef::new()`
             joinable: AtomicBool::new(false),
             mmi,

@@ -11,6 +11,7 @@ extern crate heap;
 extern crate io;
 extern crate kernel_config;
 extern crate memory;
+extern crate random;
 extern crate scheduler;
 extern crate spawn;
 extern crate spin;
@@ -60,7 +61,11 @@ pub mod task {
     pub use scheduler::schedule as yield_now;
     pub use spawn::new_task_builder;
     pub use stack::alloc_stack_by_bytes;
-    pub use theseus_task::{get_my_current_task, get_my_current_task_id, TaskRef};
+    pub use theseus_task::{get_my_current_task, get_my_current_task_id, JoinableTaskRef};
+}
+
+pub mod rand {
+    pub use random::next_u64;
 }
 
 pub mod fs {
@@ -110,7 +115,8 @@ pub mod fs {
 
     // /// See the above documentation for [`OpenFileRef`].
     // pub type LockableFileRef =
-    //     LockableIo<'static, dyn FileTrait + Send, Mutex<dyn FileTrait + Send>, FileRef>;
-    
+    //     LockableIo<'static, dyn FileTrait + Send, Mutex<dyn FileTrait +
+    // Send>, FileRef>;
+
     // pub use fs_node::DirRef;
 }

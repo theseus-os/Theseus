@@ -343,6 +343,7 @@ dependencies = [
  "network_manager",
  "ota_update_client",
  "print",
+ "random",
  "scheduler",
  "simd_personality",
  "spawn",

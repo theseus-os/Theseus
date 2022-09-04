@@ -46,6 +46,7 @@ extern crate window_manager;
 extern crate multiple_heaps;
 extern crate console;
 #[cfg(simd_personality)] extern crate simd_personality;
+extern crate random;
 
 
 
@@ -125,6 +126,10 @@ pub fn init(
     // //initialize the per core heaps
     multiple_heaps::switch_to_multiple_heaps()?;
     info!("Initialized per-core heaps");
+
+    // This is a workaround to ensure random is included in --no-default-features builds.
+    // It also initializes the CSPRNG, making future calls fast.
+    random::next_u64();
 
     // initialize window manager.
     let (key_producer, mouse_producer) = window_manager::init()?;

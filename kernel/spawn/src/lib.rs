@@ -615,7 +615,7 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
 
         #[cfg(not(any(rq_eval, downtime_eval)))]
         debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
-            curr_task.name(), debugit!(func), core::any::type_name::<F>(), debugit!(task_arg)
+            curr_task.name(), debugit!(task_entry_func), core::any::type_name::<F>(), debugit!(task_arg)
         );
     };
 
