@@ -2514,7 +2514,7 @@ dependencies = [
 [[package]]
 name = "rangemap"
 version = "1.0.3"
-source = "git+https://github.com/theseus-os/rangemap?branch=const_fn_constructor#be8b0ee4cfe51d587d4317f37a2db7c75f2d2647"
+source = "git+https://github.com/jeffparsons/rangemap#0885c58aca1bbe124a03f2b74c3a792fef8611fa"
 
 [[package]]
 name = "raw-cpuid"
