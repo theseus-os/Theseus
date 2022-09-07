@@ -37,8 +37,14 @@ const FIRST_APPLICATION_CRATE_NAME: &'static str = "shell-";
 /// but in the future it could spawn a fuller desktop environment. 
 /// 
 /// Kernel initialization routines should be complete before invoking this. 
-pub fn start() -> Result<(), &'static str> {
+pub fn start((buffer_width, buffer_height, vesa_display_phys_start): &mut Framebuffer<AlphaPixel>, key_consumer: Queue<KeyEvent>, mouse_consumer: Queue<MouseEvent>) -> Result<(), &'static str> {
     let new_app_ns = mod_mgmt::create_application_namespace(None)?;
+
+     // create and return the final framebuffer
+    let framebuffer = Framebuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
+
+    // initialize window manager.
+    //window_manager::init(framebuffer, key_consumer, mouse_consumer)?;
 
     // NOTE: see crate-level docs and note in this crate's `Cargo.toml`.
     let (app_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(

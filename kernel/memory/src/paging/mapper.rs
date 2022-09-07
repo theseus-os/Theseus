@@ -434,9 +434,9 @@ impl MappedPages {
 
     //     // we must temporarily map the new pages as Writable, since we're about to copy data into them
     //     let new_flags = new_flags.unwrap_or(self.flags);
-    //     let needs_remapping = new_flags.is_writable(); 
+    //     let needs_remapping = new_flags.is_writable();
     //     let mut new_mapped_pages = active_table_mapper.map_allocated_pages(
-    //         new_pages, 
+    //         new_pages,
     //         new_flags | EntryFlags::WRITABLE, // force writable
     //     )?;
 

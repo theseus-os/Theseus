@@ -8,7 +8,7 @@ extern crate shapes;
 use keycodes_ascii::KeyEvent;
 use mouse_data::MouseEvent;
 use alloc::string::String;
-use shapes::{Coord, Rectangle};
+use shapes::Coord;
 
 /// An event describing mouse position rather than movement differential from last event.
 /// It contains two position, `coodinate` for the relative position in each window, and `gcoordinate` for global absolute position of the screen.
@@ -55,13 +55,6 @@ pub enum Event {
     MouseMovementEvent(MouseEvent),
     /// An event indicating that another entity wants to print the given `String`.
     OutputEvent(String),
-    /// Tells an application that the window manager has resized or moved its window
-    /// so that it knows to refresh its display and perform any necessary tasks, such as text reflow.
-    /// 
-    /// The new position and size of the window is given by the `Rectangle` within,
-    /// and represents the content area within the window that is accessible to the application,
-    /// which excludes the window title bar, borders, etc. 
-    WindowResizeEvent(Rectangle),
     /// The event tells application about mouse's position currently (including relative to a window and relative to a screen)
     MousePositionEvent(MousePositionEvent),
     ExitEvent,
@@ -76,11 +69,6 @@ impl Event {
     /// Create a new output event
     pub fn new_output_event<S>(s: S) -> Event where S: Into<String> {
         Event::OutputEvent(s.into())
-    }
-
-    /// Create a new window resize event
-    pub fn new_window_resize_event(new_position: Rectangle) -> Event {
-        Event::WindowResizeEvent(new_position)
     }
 }
 

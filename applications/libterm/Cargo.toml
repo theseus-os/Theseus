@@ -1,0 +1,59 @@
+[package]
+name = "libterm"
+version = "0.1.0"
+authors = ["Andrew Pham <apham727@gmail.com>", "Zhiyao Ma <zm16@pku.edu.cn>"]
+build = "../../build.rs"
+
+[dependencies]
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.dfqueue]
+path = "../../libs/dfqueue"
+version = "0.1.0"
+
+[dependencies.environment]
+path = "../../kernel/environment"
+
+[dependencies.root]
+path = "../../kernel/root"
+
+[dependencies.print]
+path = "../../kernel/print"
+
+[dependencies.color]
+path = "../../kernel/color"
+
+[dependencies.event_types]
+path = "../../kernel/event_types"
+
+[dependencies.text_display]
+path = "../displayable/text_display"
+
+[dependencies.displayable]
+path = "../displayable"
+
+[dependencies.framebuffer]
+path = "../../kernel/framebuffer"
+
+[dependencies.shapes]
+path = "../../kernel/shapes"
+
+[dependencies.framebuffer_drawer]
+path = "../framebuffer_drawer"
+
+[dependencies.framebuffer_printer]
+path = "../framebuffer_printer"
+
+[dependencies.window]
+path = "../window"
+
+[dependencies.tsc]
+path = "../../kernel/tsc"
+
+[dependencies.font]
+path = "../../kernel/font"
+
+[lib]
+crate-type = ["rlib"]

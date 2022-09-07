@@ -46,6 +46,7 @@ extern crate window_manager;
 extern crate multiple_heaps;
 extern crate console;
 #[cfg(simd_personality)] extern crate simd_personality;
+extern crate framebuffer;
 
 
 
@@ -130,8 +131,34 @@ pub fn init(
     multiple_heaps::switch_to_multiple_heaps()?;
     info!("Initialized per-core heaps");
 
-    // initialize window manager.
-    let (key_producer, mouse_producer) = window_manager::init()?;
+    // Initializes the final framebuffer based on VESA graphics mode information obtained during boot.
+    //
+    // The final framebuffer represents the actual pixel content displayed on screen
+    // because its memory is directly mapped to the VESA display device's underlying physical memory.
+use memory::PhysicalAddress;
+    // get the graphic mode information
+    let vesa_display_phys_start: PhysicalAddress;
+    let buffer_width: usize;
+    let buffer_height: usize;
+    {
+        let graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
+        info!("Using graphical framebuffer, {} x {}, at paddr {:#X}", graphic_info.width, graphic_info.height, graphic_info.physical_address);
+        if graphic_info.physical_address == 0 {
+            return Err("Failed to get graphic mode information!");
+        }
+        vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address as usize)
+            .ok_or("Graphic mode physical address was invalid")?;
+        buffer_width = graphic_info.width as usize;
+        buffer_height = graphic_info.height as usize;
+    };
+
+    // keyinput queue initialization
+    let key_consumer: Queue<Event> = Queue::with_capacity(100);
+    let key_producer = key_consumer.clone();
+
+    // mouse input queue initialization
+    let mouse_consumer: Queue<Event> = Queue::with_capacity(100);
+    let mouse_producer = mouse_consumer.clone();
 
     // initialize the rest of our drivers
     device_manager::init(key_producer, mouse_producer)?;
@@ -157,7 +184,8 @@ pub fn init(
     // Now that initialization is complete, we can spawn various system tasks/daemons
     // and then the first application(s).
     console::start_connection_detection()?;
-    first_application::start()?;
+
+    first_application::start((buffer_width, buffer_height, vesa_display_phys_start), key_consumer, mouse_consumer)?;
 
     info!("captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...", bsp_apic_id);
     spawn::create_idle_task(Some(bsp_apic_id))?;

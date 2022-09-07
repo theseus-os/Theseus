@@ -40,7 +40,7 @@ version = "1.4.0"
 # for WM
 
 [dependencies.window]
-path = "../../kernel/window"
+path = "../window"
 
 [dependencies.shapes]
 path = "../../kernel/shapes"
@@ -52,7 +52,7 @@ path = "../../kernel/color"
 path = "../../kernel/framebuffer"
 
 [dependencies.framebuffer_drawer]
-path = "../../kernel/framebuffer_drawer"
+path = "../framebuffer_drawer"
 
 [dependencies.runqueue]
 path = "../../kernel/runqueue"

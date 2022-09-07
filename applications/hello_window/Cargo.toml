@@ -1,0 +1,33 @@
+[package]
+name = "hello-window"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+
+
+[dependencies.log]
+version = "0.4.8"
+
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+[dependencies.window]
+path = "../window"
+
+[dependencies.shapes]
+path = "../../kernel/shapes"
+
+[dependencies.color]
+path = "../../kernel/color"
+
+[dependencies.sleep]
+path = "../../kernel/sleep"
+
+[dependencies.event_types]
+path = "../../kernel/event_types"
+
+# [dependencies.application_main_fn]
+# path = "../../compiler_plugins"

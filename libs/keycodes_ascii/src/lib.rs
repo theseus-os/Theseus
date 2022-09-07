@@ -145,7 +145,7 @@ pub fn scancode_to_ascii(modifiers: KeyboardModifiers, scan_code: u8) -> Option<
 }
 
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, PartialOrd, Eq, Ord)]
 pub enum Keycode {
     OverflowError = 0,
     Escape,

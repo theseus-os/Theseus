@@ -12,7 +12,6 @@ extern crate spawn;
 extern crate task;
 extern crate runqueue;
 extern crate event_types; 
-extern crate window_manager;
 extern crate path;
 extern crate root;
 extern crate scheduler;
@@ -172,7 +171,7 @@ struct Shell {
 impl Shell {
     /// Create a new shell. Currently the shell will bind to the default terminal instance provided
     /// by the `app_io` crate.
-    fn new() -> Result<Shell, &'static str> {
+    fn new(final_framebuffer: Framebuffer<AlphaPixel>, key_consumer: Queue<KeyEvent>, mouse_consumer: Queue<MouseEvent>) -> Result<Shell, &'static str> {
         // Initialize a dfqueue for the terminal object to handle printing from applications.
         // Note that this is only to support legacy output. Newly developed applications should
         // turn to use `stdio` provided by the `stdio` crate together with the support of `app_io`.
@@ -1322,6 +1321,7 @@ impl Shell {
 
                     // Handles ordinary keypresses
                     Event::KeyboardEvent(ref input_event) => {
+                        debug!("received input");
                         self.key_event_producer.write_one(input_event.key_event);
                     }
 

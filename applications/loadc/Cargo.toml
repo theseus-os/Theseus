@@ -13,7 +13,7 @@ rustc-demangle = "0.1.19"
 libc = { version = "0.2.107", default-features = false }
 
 [dependencies.app_io]
-path = "../../kernel/app_io"
+path = "../app_io"
 
 [dependencies.path]
 path = "../../kernel/path"

@@ -136,7 +136,6 @@ dependencies = [
  "spin 0.9.0",
  "stdio",
  "task",
- "window_manager",
 ]
 
 [[package]]
@@ -335,6 +334,7 @@ dependencies = [
  "e1000",
  "exceptions_full",
  "first_application",
+ "framebuffer",
  "interrupts",
  "irq_safety",
  "kernel_config",
@@ -354,7 +354,6 @@ dependencies = [
  "task",
  "task_fs",
  "tsc",
- "window_manager",
 ]
 
 [[package]]
@@ -863,7 +862,9 @@ version = "0.1.0"
 dependencies = [
  "keycodes_ascii",
  "mouse_data",
+ "mpmc",
  "shapes",
+ "spin 0.9.0",
 ]
 
 [[package]]
@@ -986,6 +987,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "fizzbuzz"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "terminal_print",
+]
+
+[[package]]
 name = "font"
 version = "0.1.0"
 dependencies = [
@@ -1012,7 +1021,6 @@ dependencies = [
  "color",
  "log",
  "memory",
- "multicore_bringup",
  "owning_ref",
  "shapes",
  "zerocopy",
@@ -1173,6 +1181,19 @@ version = "0.1.0"
 dependencies = [
  "log",
  "terminal_print",
+]
+
+[[package]]
+name = "hello-window"
+version = "0.1.0"
+dependencies = [
+ "color",
+ "event_types",
+ "log",
+ "shapes",
+ "sleep",
+ "terminal_print",
+ "window",
 ]
 
 [[package]]
@@ -1481,7 +1502,6 @@ dependencies = [
  "text_display",
  "tsc",
  "window",
- "window_manager",
 ]
 
 [[package]]
@@ -2743,7 +2763,6 @@ dependencies = [
  "stdio",
  "task",
  "terminal_print",
- "window_manager",
 ]
 
 [[package]]
@@ -3711,21 +3730,36 @@ dependencies = [
  "mpmc",
  "owning_ref",
  "path",
+ "scheduler",
  "shapes",
  "spawn",
  "spin 0.9.0",
- "window_inner",
- "window_manager",
+ "window_events",
 ]
 
 [[package]]
-name = "window_inner"
+name = "window_events"
 version = "0.1.0"
 dependencies = [
+ "color",
+ "compositor",
  "event_types",
+ "font",
  "framebuffer",
+ "framebuffer_compositor",
+ "framebuffer_drawer",
+ "keycodes_ascii",
+ "lazy_static",
+ "log",
+ "memory",
+ "mod_mgmt",
+ "mouse_data",
  "mpmc",
+ "path",
+ "scheduler",
  "shapes",
+ "spawn",
+ "spin 0.9.0",
 ]
 
 [[package]]
@@ -3742,6 +3776,7 @@ dependencies = [
  "keycodes_ascii",
  "lazy_static",
  "log",
+ "memory",
  "mod_mgmt",
  "mouse_data",
  "mpmc",
@@ -3750,7 +3785,7 @@ dependencies = [
  "shapes",
  "spawn",
  "spin 0.9.0",
- "window_inner",
+ "window_events",
 ]
 
 [[package]]

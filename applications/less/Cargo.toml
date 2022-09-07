@@ -22,10 +22,10 @@ path = "../../kernel/fs_node"
 path = "../../libs/keycodes_ascii"
 
 [dependencies.libterm]
-path = "../../kernel/libterm"
+path = "../libterm"
 
 [dependencies.app_io]
-path = "../../kernel/app_io"
+path = "../app_io"
 
 [dependencies.stdio]
 path = "../../libs/stdio"

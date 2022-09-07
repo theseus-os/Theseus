@@ -1,0 +1,65 @@
+[package]
+name = "window_events"
+version = "0.1.0"
+authors = ["Hugo Martinet <mailhugo34@gmail.com>"]
+description = "register new inner windows, access them and close them"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.9.0"
+mpmc = "0.1.6"
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.memory]
+path = "../../kernel/memory"
+
+[dependencies.framebuffer_drawer]
+path = "../framebuffer_drawer"
+
+[dependencies.compositor]
+path = "../compositor"
+
+[dependencies.framebuffer_compositor]
+path = "../framebuffer_compositor"
+
+[dependencies.shapes]
+path = "../../kernel/shapes"
+
+[dependencies.framebuffer]
+path = "../../kernel/framebuffer"
+
+[dependencies.color]
+path = "../../kernel/color"
+
+[dependencies.event_types]
+path = "../../kernel/event_types"
+
+[dependencies.font]
+path = "../../kernel/font"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "1.4.0"
+
+[dependencies.mod_mgmt]
+path = "../../kernel/mod_mgmt"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"
+
+[dependencies.mouse_data]
+path = "../../libs/mouse_data"
+
+[dependencies.path]
+path = "../../kernel/path"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies.keycodes_ascii]
+path = "../../libs/keycodes_ascii"
+
+[dependencies.scheduler]
+path = "../../kernel/scheduler"

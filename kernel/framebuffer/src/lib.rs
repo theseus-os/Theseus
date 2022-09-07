@@ -6,7 +6,6 @@
 #[macro_use] extern crate log;
 extern crate alloc;
 extern crate memory;
-extern crate multicore_bringup;
 extern crate owning_ref;
 extern crate shapes;
 extern crate color;
@@ -20,32 +19,6 @@ use memory::{EntryFlags, MappedPages, PhysicalAddress};
 use owning_ref::BoxRefMut;
 use shapes::Coord;
 pub use pixel::*;
-
-/// Initializes the final framebuffer based on VESA graphics mode information obtained during boot.
-/// 
-/// The final framebuffer represents the actual pixel content displayed on screen 
-/// because its memory is directly mapped to the VESA display device's underlying physical memory.
-pub fn init<P: Pixel>() -> Result<Framebuffer<P>, &'static str> {
-    // get the graphic mode information
-    let vesa_display_phys_start: PhysicalAddress;
-    let buffer_width: usize;
-    let buffer_height: usize;
-    {
-        let graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
-        info!("Using graphical framebuffer, {} x {}, at paddr {:#X}", graphic_info.width, graphic_info.height, graphic_info.physical_address);
-        if graphic_info.physical_address == 0 {
-            return Err("Failed to get graphic mode information!");
-        }
-        vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address as usize)
-            .ok_or("Graphic mode physical address was invalid")?;
-        buffer_width = graphic_info.width as usize;
-        buffer_height = graphic_info.height as usize;
-    };
-
-    // create and return the final framebuffer
-    let framebuffer = Framebuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
-    Ok(framebuffer)
-}
 
 /// A framebuffer is a region of memory interpreted as a 2-D array of pixels.
 /// The memory buffer is a rectangular region with a width and height.

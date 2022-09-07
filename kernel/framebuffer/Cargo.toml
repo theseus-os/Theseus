@@ -13,9 +13,6 @@ zerocopy = "0.5.0"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.multicore_bringup]
-path = "../multicore_bringup"
-
 [dependencies.shapes]
 path = "../shapes"
 

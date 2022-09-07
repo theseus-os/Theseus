@@ -5,14 +5,18 @@ description = "Types of input and output events that flow throughout the system"
 version = "0.1.0"
 build = "../../build.rs"
 
+[dependencies]
+spin = "0.9.0"
+mpmc = "0.1.6"
+
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-[dependencies.shapes]
-path = "../shapes"
-
 [dependencies.mouse_data]
 path = "../../libs/mouse_data"
+
+[dependencies.shapes]
+path = "../shapes"
 
 [lib]
 crate-type = ["rlib"]

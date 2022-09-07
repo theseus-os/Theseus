@@ -11,7 +11,7 @@ core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nig
 path = "../../libs/stdio"
 
 [dependencies.app_io]
-path = "../../kernel/app_io"
+path = "../app_io"
 
 [dependencies.log]
 version = "0.4.8"

@@ -1,0 +1,18 @@
+[package]
+name = "fizzbuzz"
+version = "0.1.0"
+authors = ["Hugo Martinet <mailhugo34@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+
+
+[dependencies.log]
+version = "0.4.8"
+
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+# [dependencies.application_main_fn]
+# path = "../../compiler_plugins"
