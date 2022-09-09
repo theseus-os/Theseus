@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "page_table_entry"
 description = "Defines the structure of page table entries on x86_64"
 version = "0.1.0"
+edition = "2018"
 
 [dependencies]
 bit_field = "0.7.0"
@@ -14,6 +15,8 @@ path = "../kernel_config"
 [dependencies.memory_structs]
 path = "../memory_structs"
 
+[dependencies.frame_allocator]
+path = "../frame_allocator"
 
 [lib]
 crate-type = ["rlib"]

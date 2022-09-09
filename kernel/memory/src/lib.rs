@@ -111,7 +111,7 @@ pub fn create_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<MappedP
 }
 
 
-pub static BROADCAST_TLB_SHOOTDOWN_FUNC: Once<fn(PageRange)> = Once::new();
+static BROADCAST_TLB_SHOOTDOWN_FUNC: Once<fn(PageRange)> = Once::new();
 
 /// Set the function callback that will be invoked every time a TLB shootdown is necessary,
 /// i.e., during page table remapping and unmapping operations.
@@ -200,7 +200,7 @@ pub fn init(
         }
     }
 
-    frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())?;
+    let into_alloc_frames_fn = frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())?;
     debug!("Initialized new frame allocator!");
     frame_allocator::dump_frame_allocator_state();
 
@@ -218,7 +218,10 @@ pub fn init(
         boot_info_pages,
         higher_half_mapped_pages,
         identity_mapped_pages
-    ) = paging::init(boot_info)?;
+    ) = paging::init(
+        boot_info,
+        into_alloc_frames_fn,
+    )?;
 
     debug!("Done with paging::init(). new page_table: {:?}", page_table);
     Ok((

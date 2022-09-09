@@ -198,6 +198,7 @@ pub fn get_current_p4() -> Frame {
 /// Otherwise, it returns a str error message. 
 pub fn init(
     boot_info: &multiboot2::BootInformation,
+    into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames,
 ) -> Result<(
         PageTable,
         MappedPages,
@@ -209,6 +210,10 @@ pub fn init(
         [Option<MappedPages>; 32]
     ), &'static str>
 {
+    // Store the callback from `frame_allocator::init()` that allows the `Mapper` to convert
+    // `page_table_entry::UnmappedFrames` back into `AllocatedFrames`.
+    mapper::INTO_ALLOCATED_FRAMES_FUNC.call_once(|| into_alloc_frames_fn);
+
     let (aggregated_section_memory_bounds, _sections_memory_bounds) = find_section_memory_bounds(boot_info)?;
     debug!("{:X?}\n{:X?}", aggregated_section_memory_bounds, _sections_memory_bounds);
     

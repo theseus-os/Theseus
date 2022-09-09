@@ -62,8 +62,11 @@ bitflags! {
     }
 }
 
+/// A mask for the bits of a page table entry that contain the physical frame address.
+pub const PAGE_TABLE_ENTRY_FRAME_MASK: u64 = 0x000_FFFFFFFFFF_000;
+
 // Ensure that we never expose reserved bits [12:51] as part of the `EntryFlags` interface.
-const_assert_eq!(EntryFlags::all().bits() & 0x000_FFFFFFFFFF_000, 0);
+const_assert_eq!(EntryFlags::all().bits() & PAGE_TABLE_ENTRY_FRAME_MASK, 0);
 
 impl EntryFlags {
     /// Returns a new, all-zero `EntryFlags` with no bits enabled.

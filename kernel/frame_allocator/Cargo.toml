@@ -18,8 +18,5 @@ path = "../kernel_config"
 [dependencies.memory_structs]
 path = "../memory_structs"
 
-[dependencies.page_table_entry]
-path = "../page_table_entry"
-
 [lib]
 crate-type = ["rlib"]

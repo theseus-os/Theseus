@@ -20,10 +20,30 @@ use paging::{
     PageRange,
     table::{P4, Table, Level4},
 };
+use spin::Once;
 use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
 use super::{EntryFlags, tlb_flush_virt_addr};
 use zerocopy::FromBytes;
 use page_table_entry::UnmapResult;
+
+/// This is a private callback used to convert `UnmappedFrames` into `AllocatedFrames`.
+/// 
+/// This exists to break the cyclic dependency cycle between `page_table_entry` and
+/// `frame_allocator`, which depend on each other as such:
+/// * `frame_allocator` needs to `impl Into<AllocatedPages> for UnmappedFrames`
+///    in order to allow unmapped exclusive frames to be safely deallocated
+/// * `page_table_entry` needs to use the `AllocatedFrames` type in order to allow
+///   page table entry values to be set safely to a real physical frame that is owned and exists.
+/// 
+/// To get around that, the `frame_allocator::init()` function returns a callback
+/// to its function that allows converting a range of unmapped frames back into `AllocatedFrames`,
+/// which then allows them to be dropped and thus deallocated.
+/// 
+/// This is safe because the frame allocator can only be initialized once, and also because
+/// only this crate has access to that function callback and can thus guarantee
+/// that it is only invoked for `UnmappedFrames`.
+pub(super) static INTO_ALLOCATED_FRAMES_FUNC: Once<fn(FrameRange) -> AllocatedFrames> = Once::new();
+
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -480,8 +500,7 @@ impl MappedPages {
                 .and_then(|p2| p2.next_table_mut(page.p2_index()))
                 .ok_or("mapping code does not support huge pages")?;
             
-            let frame = p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped")?;
-            p1[page.p1_index()].set_entry(frame, new_flags | EntryFlags::PRESENT);
+            p1[page.p1_index()].set_flags(new_flags | EntryFlags::PRESENT);
 
             tlb_flush_virt_addr(page.start_address());
         }
@@ -568,7 +587,10 @@ impl MappedPages {
             // freed from the newly-unmapped P1 PTE entry above.
             match unmapped_frames {
                 UnmapResult::Exclusive(newly_unmapped_frames) => {
-                    let newly_unmapped_frames: AllocatedFrames = newly_unmapped_frames.into();
+                    let newly_unmapped_frames = INTO_ALLOCATED_FRAMES_FUNC.get()
+                        .ok_or("BUG: Mapper::unmap(): the `INTO_ALLOCATED_FRAMES_FUNC` callback was not initialized")
+                        .map(|into_func| into_func(newly_unmapped_frames.deref().clone()))?;
+
                     if let Some(mut curr_frames) = current_frame_range.take() {
                         match curr_frames.merge(newly_unmapped_frames) {
                             Ok(()) => {

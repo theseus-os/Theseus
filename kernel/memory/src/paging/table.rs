@@ -36,7 +36,7 @@ pub struct Table<L: TableLevel> {
 
 impl<L: TableLevel> Table<L> {
     /// Zero out (clear) all entries in this page table frame. 
-    pub fn zero(&mut self) {
+    pub(crate) fn zero(&mut self) {
         for entry in self.entries.iter_mut() {
             entry.zero();
         }

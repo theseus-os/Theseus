@@ -16,7 +16,7 @@ extern crate entryflags_x86_64;
 extern crate x86_64;
 
 pub use multiboot2::BootInformation;
-pub use entryflags_x86_64::EntryFlags;
+pub use entryflags_x86_64::{EntryFlags, PAGE_TABLE_ENTRY_FRAME_MASK};
 
 use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{
