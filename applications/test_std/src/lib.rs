@@ -27,5 +27,12 @@ pub fn main(__args: Vec<String>) -> isize {
 
     println!("cwd test successful");
 
+    let current_exe = std::env::current_exe().unwrap();
+    assert!(current_exe.starts_with("/namespaces/_applications"));
+    assert!(current_exe.file_name().unwrap().to_str().unwrap().starts_with("test_std-"));
+    assert_eq!(current_exe.extension().unwrap(), "o");
+
+    println!("current exe test succesful");
+
     0
 }

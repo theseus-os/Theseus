@@ -300,7 +300,7 @@ else ifdef local_rust_recursive
 	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) --target $(TARGET)
 else
 	$(eval override RUSTFLAGS += -L $(local_rust)/build/x86_64-unknown-linux-gnu/stage0-std/$(TARGET)/release/deps -L $(ROOT_DIR)/target/$(TARGET)/release/deps -L $(ROOT_DIR)/target/release/deps)
-	cd $(local_rust) && RUST_TARGET_PATH=/home/klim/Projects/Theseus/cfg RUSTFLAGS='$(RUSTFLAGS)' ./x.py build library/alloc --stage 0 --target $(TARGET)
+	cd $(local_rust) && RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' ./x.py build library/alloc --stage 0 --target $(TARGET)
 
 # TODO: This assumes all of libtheseus' dependencies are covered by --no-default-features.
 	RUSTFLAGS='$(RUSTFLAGS)' make build FEATURES=--no-default-features local_rust=$(local_rust) local_rust_recursive=yes
