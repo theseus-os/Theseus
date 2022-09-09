@@ -1021,7 +1021,6 @@ dependencies = [
  "kernel_config",
  "log",
  "memory_structs",
- "page_table_entry",
  "spin 0.9.0",
  "static_assertions",
 ]
@@ -2200,6 +2199,7 @@ name = "page_table_entry"
 version = "0.1.0"
 dependencies = [
  "bit_field 0.7.0",
+ "frame_allocator",
  "kernel_config",
  "memory_structs",
  "zerocopy",

@@ -23,7 +23,7 @@ use core::{
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 #[cfg(target_arch = "x86_64")]
-pub use entryflags_x86_64::EntryFlags;
+pub use entryflags_x86_64::{EntryFlags, PAGE_TABLE_ENTRY_FRAME_MASK};
 use zerocopy::FromBytes;
 use paste::paste;
 

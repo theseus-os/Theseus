@@ -25,7 +25,6 @@ extern crate alloc;
 extern crate kernel_config;
 extern crate memory_structs;
 extern crate spin;
-extern crate page_table_entry;
 #[macro_use] extern crate static_assertions;
 extern crate intrusive_collections;
 
@@ -41,7 +40,6 @@ use kernel_config::memory::*;
 use memory_structs::{PhysicalAddress, Frame, FrameRange};
 use spin::Mutex;
 use intrusive_collections::Bound;
-use page_table_entry::UnmappedFrames;
 use static_array_rb_tree::*;
 
 const FRAME_SIZE: usize = PAGE_SIZE;
@@ -73,10 +71,15 @@ static RESERVED_REGIONS: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArra
 /// 
 /// The iterator (`R`) over reserved physical memory regions must be cloneable, 
 /// as this runs before heap allocation is available, and we may need to iterate over it multiple times. 
+/// 
+/// ## Return
+/// Upon success, this function returns a callback function that allows the caller
+/// (the memory subsystem init function) to convert a range of unmapped frames 
+/// back into an [`AllocatedFrames`] object.
 pub fn init<F, R, P>(
     free_physical_memory_areas: F,
     reserved_physical_memory_areas: R,
-) -> Result<(), &'static str> 
+) -> Result<fn(FrameRange) -> AllocatedFrames, &'static str> 
     where P: Borrow<PhysicalMemoryRegion>,
           F: IntoIterator<Item = P>,
           R: IntoIterator<Item = P> + Clone,
@@ -150,7 +153,8 @@ pub fn init<F, R, P>(
     *FREE_RESERVED_FRAMES_LIST.lock() = StaticArrayRBTree::new(reserved_list.clone());
     *GENERAL_REGIONS.lock()           = StaticArrayRBTree::new(free_list);
     *RESERVED_REGIONS.lock()          = StaticArrayRBTree::new(reserved_list);
-    Ok(())
+
+    Ok(into_allocated_frames)
 }
 
 
@@ -416,18 +420,16 @@ impl AllocatedFrames {
     }
 }
 
-// The `UnmappedFrames` type represents frames that have been unmapped
-// from a page that had exclusively mapped them,
-// meaning that no other pages have been mapped to those same frames.
-//
-// Therefore, they can be safely converted into `AllocatedFrames`
-// which can then be dropped and subsequently deallocated.
-impl Into<AllocatedFrames> for UnmappedFrames {
-    fn into(self) -> AllocatedFrames {
-        AllocatedFrames {
-            frames: self.deref().clone(),
-        }
-    }
+/// This function is a callback used to convert `UnmappedFrames` into `AllocatedFrames`.
+/// `UnmappedFrames` represents frames that have been unmapped from a page that had
+/// exclusively mapped them, indicating that no others pages have been mapped 
+/// to those same frames, and thus, they can be safely deallocated.
+/// 
+/// This exists to break the cyclic dependency cycle between this crate and
+/// the `page_table_entry` crate, since `page_table_entry` must depend on types
+/// from this crate in order to enforce safety when modifying page table entries.
+fn into_allocated_frames(frames: FrameRange) -> AllocatedFrames {
+    AllocatedFrames { frames }
 }
 
 impl Drop for AllocatedFrames {
