@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["EntryFlags","Page table entry flags on the x86_64 architecture. "]]};
+window.SIDEBAR_ITEMS = {"constant":[["PAGE_TABLE_ENTRY_FRAME_MASK","A mask for the bits of a page table entry that contain the physical frame address."]],"struct":[["EntryFlags","Page table entry flags on the x86_64 architecture. "]]};

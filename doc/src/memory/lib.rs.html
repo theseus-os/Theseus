@@ -274,6 +274,9 @@
 <span id="268">268</span>
 <span id="269">269</span>
 <span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem for Theseus,</span>
 <span class="doccomment">//! which is fairly robust and provides a unification between </span>
 <span class="doccomment">//! arbitrarily mapped sections of memory and Rust&#39;s lifetime system. </span>
@@ -387,7 +390,7 @@
 }
 
 
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">BROADCAST_TLB_SHOOTDOWN_FUNC</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="kw">fn</span>(<span class="ident">PageRange</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+<span class="kw">static</span> <span class="ident">BROADCAST_TLB_SHOOTDOWN_FUNC</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="kw">fn</span>(<span class="ident">PageRange</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
 
 <span class="doccomment">/// Set the function callback that will be invoked every time a TLB shootdown is necessary,</span>
 <span class="doccomment">/// i.e., during page table remapping and unmapping operations.</span>
@@ -476,7 +479,7 @@
         }
     }
 
-    <span class="ident">frame_allocator::init</span>(<span class="ident">free_regions</span>.<span class="ident">iter</span>().<span class="ident">flatten</span>(), <span class="ident">reserved_regions</span>.<span class="ident">iter</span>().<span class="ident">flatten</span>())<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">into_alloc_frames_fn</span> <span class="op">=</span> <span class="ident">frame_allocator::init</span>(<span class="ident">free_regions</span>.<span class="ident">iter</span>().<span class="ident">flatten</span>(), <span class="ident">reserved_regions</span>.<span class="ident">iter</span>().<span class="ident">flatten</span>())<span class="question-mark">?</span>;
     <span class="macro">debug!</span>(<span class="string">&quot;Initialized new frame allocator!&quot;</span>);
     <span class="ident">frame_allocator::dump_frame_allocator_state</span>();
 
@@ -494,7 +497,10 @@
         <span class="ident">boot_info_pages</span>,
         <span class="ident">higher_half_mapped_pages</span>,
         <span class="ident">identity_mapped_pages</span>
-    ) <span class="op">=</span> <span class="ident">paging::init</span>(<span class="ident">boot_info</span>)<span class="question-mark">?</span>;
+    ) <span class="op">=</span> <span class="ident">paging::init</span>(
+        <span class="ident">boot_info</span>,
+        <span class="ident">into_alloc_frames_fn</span>,
+    )<span class="question-mark">?</span>;
 
     <span class="macro">debug!</span>(<span class="string">&quot;Done with paging::init(). new page_table: {:?}&quot;</span>, <span class="ident">page_table</span>);
     <span class="prelude-val">Ok</span>((

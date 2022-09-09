@@ -186,7 +186,7 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">L</span>: <span class="ident">TableLevel</span><span class="op">&gt;</span> <span class="ident">Table</span><span class="op">&lt;</span><span class="ident">L</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Zero out (clear) all entries in this page table frame. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">zero</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">zero</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="kw">for</span> <span class="ident">entry</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">entries</span>.<span class="ident">iter_mut</span>() {
             <span class="ident">entry</span>.<span class="ident">zero</span>();
         }

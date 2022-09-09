@@ -496,7 +496,7 @@
 };
 <span class="kw">use</span> <span class="ident">kernel_config::memory</span>::{<span class="ident">MAX_PAGE_NUMBER</span>, <span class="ident">PAGE_SIZE</span>};
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86_64&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">entryflags_x86_64::EntryFlags</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">entryflags_x86_64</span>::{<span class="ident">EntryFlags</span>, <span class="ident">PAGE_TABLE_ENTRY_FRAME_MASK</span>};
 <span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
 <span class="kw">use</span> <span class="ident">paste::paste</span>;
 

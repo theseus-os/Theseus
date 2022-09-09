@@ -828,6 +828,28 @@
 <span id="822">822</span>
 <span id="823">823</span>
 <span id="824">824</span>
+<span id="825">825</span>
+<span id="826">826</span>
+<span id="827">827</span>
+<span id="828">828</span>
+<span id="829">829</span>
+<span id="830">830</span>
+<span id="831">831</span>
+<span id="832">832</span>
+<span id="833">833</span>
+<span id="834">834</span>
+<span id="835">835</span>
+<span id="836">836</span>
+<span id="837">837</span>
+<span id="838">838</span>
+<span id="839">839</span>
+<span id="840">840</span>
+<span id="841">841</span>
+<span id="842">842</span>
+<span id="843">843</span>
+<span id="844">844</span>
+<span id="845">845</span>
+<span id="846">846</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md</span>
 <span class="comment">// file at the top-level directory of this distribution.</span>
 <span class="comment">//</span>
@@ -850,10 +872,30 @@
     <span class="ident">PageRange</span>,
     <span class="ident">table</span>::{<span class="ident">P4</span>, <span class="ident">Table</span>, <span class="ident">Level4</span>},
 };
+<span class="kw">use</span> <span class="ident">spin::Once</span>;
 <span class="kw">use</span> <span class="ident">kernel_config::memory</span>::{<span class="ident">PAGE_SIZE</span>, <span class="ident">ENTRIES_PER_PAGE_TABLE</span>};
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">EntryFlags</span>, <span class="ident">tlb_flush_virt_addr</span>};
 <span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
 <span class="kw">use</span> <span class="ident">page_table_entry::UnmapResult</span>;
+
+<span class="doccomment">/// This is a private callback used to convert `UnmappedFrames` into `AllocatedFrames`.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// This exists to break the cyclic dependency cycle between `page_table_entry` and</span>
+<span class="doccomment">/// `frame_allocator`, which depend on each other as such:</span>
+<span class="doccomment">/// * `frame_allocator` needs to `impl Into&lt;AllocatedPages&gt; for UnmappedFrames`</span>
+<span class="doccomment">///    in order to allow unmapped exclusive frames to be safely deallocated</span>
+<span class="doccomment">/// * `page_table_entry` needs to use the `AllocatedFrames` type in order to allow</span>
+<span class="doccomment">///   page table entry values to be set safely to a real physical frame that is owned and exists.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// To get around that, the `frame_allocator::init()` function returns a callback</span>
+<span class="doccomment">/// to its function that allows converting a range of unmapped frames back into `AllocatedFrames`,</span>
+<span class="doccomment">/// which then allows them to be dropped and thus deallocated.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// This is safe because the frame allocator can only be initialized once, and also because</span>
+<span class="doccomment">/// only this crate has access to that function callback and can thus guarantee</span>
+<span class="doccomment">/// that it is only invoked for `UnmappedFrames`.</span>
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">static</span> <span class="ident">INTO_ALLOCATED_FRAMES_FUNC</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="kw">fn</span>(<span class="ident">FrameRange</span>) -&gt; <span class="ident">AllocatedFrames</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Mapper</span> {
     <span class="ident">p4</span>: <span class="ident">Unique</span><span class="op">&lt;</span><span class="ident">Table</span><span class="op">&lt;</span><span class="ident">Level4</span><span class="op">&gt;</span><span class="op">&gt;</span>,
@@ -1310,8 +1352,7 @@
                 .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">p2</span><span class="op">|</span> <span class="ident">p2</span>.<span class="ident">next_table_mut</span>(<span class="ident">page</span>.<span class="ident">p2_index</span>()))
                 .<span class="ident">ok_or</span>(<span class="string">&quot;mapping code does not support huge pages&quot;</span>)<span class="question-mark">?</span>;
             
-            <span class="kw">let</span> <span class="ident">frame</span> <span class="op">=</span> <span class="ident">p1</span>[<span class="ident">page</span>.<span class="ident">p1_index</span>()].<span class="ident">pointed_frame</span>().<span class="ident">ok_or</span>(<span class="string">&quot;remap(): page not mapped&quot;</span>)<span class="question-mark">?</span>;
-            <span class="ident">p1</span>[<span class="ident">page</span>.<span class="ident">p1_index</span>()].<span class="ident">set_entry</span>(<span class="ident">frame</span>, <span class="ident">new_flags</span> <span class="op">|</span> <span class="ident">EntryFlags::PRESENT</span>);
+            <span class="ident">p1</span>[<span class="ident">page</span>.<span class="ident">p1_index</span>()].<span class="ident">set_flags</span>(<span class="ident">new_flags</span> <span class="op">|</span> <span class="ident">EntryFlags::PRESENT</span>);
 
             <span class="ident">tlb_flush_virt_addr</span>(<span class="ident">page</span>.<span class="ident">start_address</span>());
         }
@@ -1398,7 +1439,10 @@
             <span class="comment">// freed from the newly-unmapped P1 PTE entry above.</span>
             <span class="kw">match</span> <span class="ident">unmapped_frames</span> {
                 <span class="ident">UnmapResult::Exclusive</span>(<span class="ident">newly_unmapped_frames</span>) =&gt; {
-                    <span class="kw">let</span> <span class="ident">newly_unmapped_frames</span>: <span class="ident">AllocatedFrames</span> <span class="op">=</span> <span class="ident">newly_unmapped_frames</span>.<span class="ident">into</span>();
+                    <span class="kw">let</span> <span class="ident">newly_unmapped_frames</span> <span class="op">=</span> <span class="ident">INTO_ALLOCATED_FRAMES_FUNC</span>.<span class="ident">get</span>()
+                        .<span class="ident">ok_or</span>(<span class="string">&quot;BUG: Mapper::unmap(): the `INTO_ALLOCATED_FRAMES_FUNC` callback was not initialized&quot;</span>)
+                        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">into_func</span><span class="op">|</span> <span class="ident">into_func</span>(<span class="ident">newly_unmapped_frames</span>.<span class="ident">deref</span>().<span class="ident">clone</span>()))<span class="question-mark">?</span>;
+
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">mut</span> <span class="ident">curr_frames</span>) <span class="op">=</span> <span class="ident">current_frame_range</span>.<span class="ident">take</span>() {
                         <span class="kw">match</span> <span class="ident">curr_frames</span>.<span class="ident">merge</span>(<span class="ident">newly_unmapped_frames</span>) {
                             <span class="prelude-val">Ok</span>(()) =&gt; {

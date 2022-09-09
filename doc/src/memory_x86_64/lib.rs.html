@@ -359,7 +359,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">x86_64</span>;
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">multiboot2::BootInformation</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">entryflags_x86_64::EntryFlags</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">entryflags_x86_64</span>::{<span class="ident">EntryFlags</span>, <span class="ident">PAGE_TABLE_ENTRY_FRAME_MASK</span>};
 
 <span class="kw">use</span> <span class="ident">kernel_config::memory::KERNEL_OFFSET</span>;
 <span class="kw">use</span> <span class="ident">memory_structs</span>::{
