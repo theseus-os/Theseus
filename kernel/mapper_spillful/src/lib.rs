@@ -107,8 +107,7 @@ impl MapperSpillful {
 
         {
             for page in PageRange::from_virt_addr(vaddr, size).clone() {
-                let af = memory::allocate_frames(1).ok_or("MapperSpillful::map() -- out of memory trying to alloc frame")?;
-                let frame = *af.start();
+                let frame = memory::allocate_frames(1).ok_or("MapperSpillful::map() -- out of memory trying to alloc frame")?;
                 let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags);
                 let p2 = p3.next_table_create(page.p3_index(), top_level_flags);
                 let p1 = p2.next_table_create(page.p2_index(), top_level_flags);
@@ -117,7 +116,7 @@ impl MapperSpillful {
                     error!("MapperSpillful::map() page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
                     return Err("page was already mapped");
                 }
-                p1[page.p1_index()].set_entry(frame, flags | EntryFlags::PRESENT | EntryFlags::EXCLUSIVE);
+                p1[page.p1_index()].set_entry(frame.as_allocated_frame(), flags | EntryFlags::PRESENT | EntryFlags::EXCLUSIVE);
             }
         }
 

@@ -89,11 +89,9 @@ impl<L: HierarchicalLevel> Table<L> {
         if self.next_table(index).is_none() {
             assert!(!self[index].flags().is_huge(), "mapping code does not support huge pages");
             let af = frame_allocator::allocate_frames(1).expect("next_table_create(): no frames available");
-            let new_page_table_frame = *af.start();
-            core::mem::forget(af); // we currently forget frames allocated as page table frames since we don't yet have a way to track them.
-
-            self[index].set_entry(new_page_table_frame, flags.into_writable() | EntryFlags::PRESENT); // must be PRESENT | WRITABLE for x86_64
+            self[index].set_entry(af.as_allocated_frame(), flags.into_writable() | EntryFlags::PRESENT); // must be PRESENT | WRITABLE for x86_64
             self.next_table_mut(index).unwrap().zero();
+            core::mem::forget(af); // we currently forget frames allocated as page table frames since we don't yet have a way to track them.
         }
         self.next_table_mut(index).unwrap()
     }

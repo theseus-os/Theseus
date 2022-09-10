@@ -39,10 +39,14 @@ impl TemporaryPage {
     /// Returns a reference to the now mapped table.
     /// 
     /// # Arguments
-    /// * `frame`: the single frame containing the page table that we want to modify, which will be mapped to this [`TemporaryPage`].
-    /// * `page_table`: the currently active [`PageTable`]. 
-    /// 
-    pub fn map_table_frame(&mut self, frame: AllocatedFrames, page_table: &mut PageTable) -> Result<&mut Table<Level1>, &'static str> {
+    /// * `frame`: the single frame containing the page table that we want to modify,
+    ///    which will be mapped to this [`TemporaryPage`].
+    /// * `page_table`: the currently active [`PageTable`].
+    pub fn map_table_frame(
+        &mut self,
+        frame: AllocatedFrames,
+        page_table: &mut PageTable,
+    ) -> Result<&mut Table<Level1>, &'static str> {
         if self.mapped_page.is_none() {
             let mut vaddr = VirtualAddress::new_canonical(TEMPORARY_PAGE_VIRT_ADDR);
             let mut page = None;
