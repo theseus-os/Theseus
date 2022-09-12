@@ -1,99 +1,99 @@
 # Complexity
 bind-instead-of-map
 bool-comparison
-# borrowed-box
-# bytes-count-to-len
+borrowed-box
+bytes-count-to-len
 # char-lit-as-u8
 # clone-on-copy
-# crosspointer-transmute
-# deprecated-cfg-attr
-# deref-addrof
+crosspointer-transmute
+deprecated-cfg-attr
+deref-addrof
 # derivable-impls
-# diverging-sub-expression
-# double-comparisons
-# double-parens
-# duration-subsec
+diverging-sub-expression
+double-comparisons
+double-parens
+duration-subsec
 # explicit-counter-loop
-# explicit-write
-# extra-unused-lifetimes
-# filter-map-identity
+explicit-write
+extra-unused-lifetimes
+filter-map-identity
 filter-next
-# flat-map-identity
-# get-last-with-len
+flat-map-identity
+get-last-with-len
 # identity-op
-# inspect-for-each
+inspect-for-each
 # int-plus-one
-# iter-count
-# manual-filter-map
-# manual-find-map
+iter-count
+manual-filter-map
+manual-find-map
 # manual-flatten
-# manual-split-once
-# manual-strip
-# manual-swap
+manual-split-once
+manual-strip
+manual-swap
 manual-unwrap-or
-# map-flatten
-# map-identity
-# match-as-ref
-# match-single-binding
-# needless-arbitrary-self-type
-# needless-bool
-# needless-borrowed-reference
+map-flatten
+map-identity
+match-as-ref
+match-single-binding
+needless-arbitrary-self-type
+needless-bool
+needless-borrowed-reference
 # needless-lifetimes
-# needless-match
-# needless-option-as-deref
-# needless-option-take
+needless-match
+needless-option-as-deref
+needless-option-take
 # needless-question-mark
-# needless-splitn
-# needless-update
-# neg-cmp-op-on-partial-ord
-# no-effect
+needless-splitn
+needless-update
+neg-cmp-op-on-partial-ord
+no-effect
 nonminimal-bool
-# option-as-ref-deref
-# option-filter-map
-# option-map-unit-fn
-# or-then-unwrap
-# overflow-check-conditional
-# partialeq-ne-impl
-# precedence
+option-as-ref-deref
+option-filter-map
+option-map-unit-fn
+or-then-unwrap
+overflow-check-conditional
+partialeq-ne-impl
+precedence
 # ptr-offset-with-cast
-# range-zip-with-len
-# redundant-closure-call
-# redundant-slicing
-# repeat-once
-# result-map-unit-fn
-# search-is-some
-# short-circuit-statement
-# single-element-loop
-# skip-while-next
-# string-from-utf8-as-bytes
-# strlen-on-c-strings
-# temporary-assignment
+range-zip-with-len
+redundant-closure-call
+redundant-slicing
+repeat-once
+result-map-unit-fn
+search-is-some
+short-circuit-statement
+single-element-loop
+skip-while-next
+string-from-utf8-as-bytes
+strlen-on-c-strings
+temporary-assignment
 # too-many-arguments
-# transmute-bytes-to-str
-# transmute-float-to-int
-# transmute-int-to-bool
-# transmute-int-to-char
-# transmute-int-to-float
-# transmute-num-to-bytes
-# transmute-ptr-to-ref
-# transmutes-expressible-as-ptr-casts
+transmute-bytes-to-str
+transmute-float-to-int
+transmute-int-to-bool
+transmute-int-to-char
+transmute-int-to-float
+transmute-num-to-bytes
+transmute-ptr-to-ref
+transmutes-expressible-as-ptr-casts
 # type-complexity
-# unit-arg
+unit-arg
 # unnecessary-cast
-# unnecessary-filter-map
-# unnecessary-find-map
-# unnecessary-operation
-# unnecessary-sort-by
-# unnecessary-unwrap
-# unneeded-wildcard-pattern
+unnecessary-filter-map
+unnecessary-find-map
+unnecessary-operation
+unnecessary-sort-by
+unnecessary-unwrap
+unneeded-wildcard-pattern
 useless-asref
 # useless-conversion
 # useless-format
-# vec-box
+vec-box
 while-let-loop
-# wildcard-in-or-patterns
-# zero-divided-by-zero
-# zero-prefixed-literal
+wildcard-in-or-patterns
+zero-divided-by-zero
+zero-prefixed-literal
 # Correctness
 absurd-extreme-comparisons
 # almost-swapped
