@@ -331,7 +331,7 @@ float-equality-without-abs
 for-loops-over-fallibles
 forget-non-drop
 misrefactored-assign-op
-mixed_read_write_in_expression
+mixed-read-write-in-expression
 mut-range-bound
 mutable-key-type
 octal-escapes
