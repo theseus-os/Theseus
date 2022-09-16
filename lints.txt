@@ -96,249 +96,249 @@ zero-divided-by-zero
 zero-prefixed-literal
 # Correctness
 absurd-extreme-comparisons
-# almost-swapped
-# approx-constant
-# async-yields-async
-# bad-bit-mask
-# cast-ref-to-mut
-# cast-slice-different-sizes
-# clone-double-ref
-# cmp-nan
-# deprecated-semver
+almost-swapped
+approx-constant
+async-yields-async
+bad-bit-mask
+cast-ref-to-mut
+cast-slice-different-sizes
+clone-double-ref
+cmp-nan
+deprecated-semver
 derive-hash-xor-eq
 derive-ord-xor-partial-ord
-# drop-copy
-# drop-ref
+drop-copy
+drop-ref
 enum-clike-unportable-variant
-# eq-op
-# erasing-op
-# fn-address-comparisons
-# forget-copy
-# forget-ref
-# if-let-mutex
-# if-same-then-else
-# ifs-same-cond
-# ineffective-bit-mask
-# infinite-iter
-# inherent-to-string-shadow-display
-# inline-fn-without-body
-# invalid-null-ptr-usage
-# invalid-regex
-# invisible-characters
-# iter-next-loop
-# iterator-step-by-zero
-# let-underscore-lock
-# logic-bug
-# match-str-case-mismatch
-# mem-replace-with-uninit
-# min-max
-# mismatched-target-os
-# mistyped-literal-suffixes
-# modulo-one
-# mut-from-ref
-# never-loop
-# non-octal-unix-permissions
-# nonsensical-open-options
-# not-unsafe-ptr-arg-deref
-# option-env-unwrap
-# out-of-bounds-indexing
-# panicking-unwrap
-# possible-missing-comma
-# recursive-format-impl
-# reversed-empty-ranges
-# self-assignment
-# serde-api-misuse
-# size-of-in-element-count
-# suspicious-splitn
-# transmuting-null
-# undropped-manually-drops
-# uninit-assumed-init
-# uninit-vec
-# unit-cmp
-# unit-hash
-# unit-return-expecting-ord
-# unsound-collection-transmute
-# unused-io-amount
-# useless-attribute
-# vec-resize-to-zero
-# vtable-address-comparisons
-# while-immutable-condition
-# wrong-transmute
-# zst-offset
+eq-op
+erasing-op
+fn-address-comparisons
+forget-copy
+forget-ref
+if-let-mutex
+if-same-then-else
+ifs-same-cond
+ineffective-bit-mask
+infinite-iter
+inherent-to-string-shadow-display
+inline-fn-without-body
+invalid-null-ptr-usage
+invalid-regex
+invisible-characters
+iter-next-loop
+iterator-step-by-zero
+let-underscore-lock
+logic-bug
+match-str-case-mismatch
+mem-replace-with-uninit
+min-max
+mismatched-target-os
+mistyped-literal-suffixes
+modulo-one
+mut-from-ref
+never-loop
+non-octal-unix-permissions
+nonsensical-open-options
+not-unsafe-ptr-arg-deref
+option-env-unwrap
+out-of-bounds-indexing
+panicking-unwrap
+possible-missing-comma
+recursive-format-impl
+reversed-empty-ranges
+self-assignment
+serde-api-misuse
+size-of-in-element-count
+suspicious-splitn
+transmuting-null
+undropped-manually-drops
+uninit-assumed-init
+uninit-vec
+unit-cmp
+unit-hash
+unit-return-expecting-ord
+unsound-collection-transmute
+unused-io-amount
+useless-attribute
+vec-resize-to-zero
+vtable-address-comparisons
+while-immutable-condition
+wrong-transmute
+zst-offset
 # Style
-# assertions-on-constants
+assertions-on-constants
 # assign-op-pattern
-# blacklisted-name
+blacklisted-name
 # blocks-in-if-conditions
-# bool-assert-comparison
-# borrow-interior-mutable-const
-# builtin-type-shadow
-# bytes-nth
-# chars-last-cmp
-# chars-next-cmp
-# cmp-null
+bool-assert-comparison
+borrow-interior-mutable-const
+builtin-type-shadow
+bytes-nth
+chars-last-cmp
+chars-next-cmp
+cmp-null
 # collapsible-else-if
 # collapsible-if
 # collapsible-match
 # comparison-chain
 # comparison-to-empty
 # declare-interior-mutable-const
-# disallowed-methods
-# disallowed-types
-# double-must-use
-# double-neg
-# duplicate-underscore-argument
-# enum-variant-names
-# err-expect
-# excessive-precision
-# field-reassign-with-default
+disallowed-methods
+disallowed-types
+double-must-use
+double-neg
+duplicate-underscore-argument
+enum-variant-names
+err-expect
+excessive-precision
+field-reassign-with-default
 # fn-to-numeric-cast
-# fn-to-numeric-cast-with-truncation
-# for-kv-map
+fn-to-numeric-cast-with-truncation
+for-kv-map
 # from-over-into
-# from-str-radix-10
+from-str-radix-10
 # inconsistent-digit-grouping
-# infallible-destructuring-match
-# inherent-to-string
-# init-numbered-fields
+infallible-destructuring-match
+inherent-to-string
+init-numbered-fields
 # into-iter-on-ref
-# is-digit-ascii-radix
-# iter-cloned-collect
-# iter-next-slice
+is-digit-ascii-radix
+iter-cloned-collect
+iter-next-slice
 # iter-nth-zero
 # iter-skip-next
-# just-underscores-and-digits
+just-underscores-and-digits
 # len-without-is-empty
 # len-zero
 # let-and-return
-# let-unit-value
-# main-recursion
-# manual-async-fn
-# manual-bits
-# manual-map
-# manual-non-exhaustive
+let-unit-value
+main-recursion
+manual-async-fn
+manual-bits
+manual-map
+manual-non-exhaustive
 # manual-range-contains
-# manual-saturating-arithmetic
+manual-saturating-arithmetic
 # map-clone
-# map-collect-result-unit
+map-collect-result-unit
 # match-like-matches-macro
-# match-overlapping-arm
+match-overlapping-arm
 # match-ref-pats
-# match-result-ok
-# mem-replace-option-with-none
+match-result-ok
+mem-replace-option-with-none
 # mem-replace-with-default
 # missing-safety-doc
-# mixed-case-hex-literals
-# module-inception
-# must-use-unit
-# mut-mutex-lock
+mixed-case-hex-literals
+module-inception
+must-use-unit
+mut-mutex-lock
 # needless-borrow
 # needless-doctest-main
 # needless-late-init
 # needless-range-loop
 # needless-return
-# neg-multiply
+neg-multiply
 # new-ret-no-self
 # new-without-default
-# ok-expect
+ok-expect
 # op-ref
-# option-map-or-none
+option-map-or-none
 # print-literal
-# print-with-newline
+print-with-newline
 # println-empty-string
 # ptr-arg
 # ptr-eq
 # question-mark
 # redundant-closure
 # redundant-field-names
-# redundant-pattern
+redundant-pattern
 # redundant-pattern-matching
 # redundant-static-lifetimes
-# result-map-or-into-option
+result-map-or-into-option
 # result-unit-err
-# same-item-push
-# self-named-constructors
-# should-implement-trait
-# single-char-add-str
-# single-component-path-imports
+same-item-push
+self-named-constructors
+should-implement-trait
+single-char-add-str
+single-component-path-imports
 # single-match
-# string-extend-chars
+string-extend-chars
 # tabs-in-doc-comments
-# to-digit-is-some
+to-digit-is-some
 # toplevel-ref-arg
-# trim-split-whitespace
-# unnecessary-fold
+trim-split-whitespace
+unnecessary-fold
 # unnecessary-lazy-evaluations
 # unnecessary-mut-passed
-# unnecessary-owned-empty-strings
-# unsafe-removed-from-name
+unnecessary-owned-empty-strings
+unsafe-removed-from-name
 # unused-unit
 # unusual-byte-groupings
-# unwrap-or-else-default
+unwrap-or-else-default
 # upper-case-acronyms
 # while-let-on-iterator
-# write-literal
-# write-with-newline
-# writeln-empty-string
-# wrong-self-convention ¶
-# zero-ptr
+write-literal
+write-with-newline
+writeln-empty-string
+# wrong-self-convention
+zero-ptr
 # Nursery
-# empty-line-after-outer-attr
-# fallible-impl-from
-# mutex-integer
+empty-line-after-outer-attr
+fallible-impl-from
+mutex-integer
 # needless-borrow
-# panicking-unwrap
+panicking-unwrap
 # range-plus-one
-# unnecessary-unwrap
+unnecessary-unwrap
 # Perf
-# box-collection
-# boxed-local
+box-collection
+boxed-local
 cmp-owned
 expect-fun-call
-# extend-with-drain
-# format-in-format-args
+extend-with-drain
+format-in-format-args
 # format-push-string
-# iter-nth
-# iter-overeager-cloned
-# large-const-arrays
+iter-nth
+iter-overeager-cloned
+large-const-arrays
 # large-enum-variant
-# manual-memcpy
-# manual-str-repeat
-# map-entry
-# missing-spin-loop
-# needless-collect
+manual-memcpy
+manual-str-repeat
+map-entry
+missing-spin-loop
+needless-collect
 or-fun-call
-# redundant-allocation
+redundant-allocation
 redundant-clone
 single-char-pattern
-# slow-vector-initialization
+slow-vector-initialization
 to-string-in-format-args
-# unnecessary-to-owned
-# useless-vec
+unnecessary-to-owned
+useless-vec
 vec-init-then-push
 # Suspicious
-# await-holding-invalid-type
-# await-holding-lock
-# await-holding-refcell-ref
-# blanket-clippy-restriction-lints
-# cast-abs-to-unsigned
-# cast-enum-constructor
-# cast-enum-truncation
-# crate-in-macro-def
-# drop-non-drop
+await-holding-invalid-type
+await-holding-lock
+await-holding-refcell-ref
+blanket-clippy-restriction-lints
+cast-abs-to-unsigned
+cast-enum-constructor
+cast-enum-truncation
+crate-in-macro-def
+drop-non-drop
 # empty-loop
-# eval-order-dependence
-# float-equality-without-abs
-# for-loops-over-fallibles
-# forget-non-drop
-# misrefactored-assign-op
-# mut-range-bound
-# mutable-key-type
-# octal-escapes
-# print-in-format-impl
-# suspicious-arithmetic-impl
-# suspicious-assignment-formatting
-# suspicious-else-formatting
-# suspicious-map
-# suspicious-op-assign-impl
-# suspicious-unary-op-formatting
+float-equality-without-abs
+for-loops-over-fallibles
+forget-non-drop
+misrefactored-assign-op
+mixed-read-write-in-expression
+mut-range-bound
+mutable-key-type
+octal-escapes
+print-in-format-impl
+suspicious-arithmetic-impl
+suspicious-assignment-formatting
+suspicious-else-formatting
+suspicious-map
+suspicious-op-assign-impl
+suspicious-unary-op-formatting
