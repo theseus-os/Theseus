@@ -1,0 +1,8 @@
+[package]
+name = "vfs"
+version = "0.1.0"
+description = "File system abstractions"
+edition = "2021"
+
+[dependencies]
+spin = "0.9.0"
