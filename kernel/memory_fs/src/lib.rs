@@ -69,7 +69,7 @@ impl Directory for MemoryDirectory {
             .map(|node| node.into_node())
     }
 
-    fn insert_file_entry(self: Arc<Self>, name: &str) -> Result<Arc<dyn File>, &'static str> {
+    fn create_file_entry(self: Arc<Self>, name: &str) -> Result<Arc<dyn File>, &'static str> {
         let file = Arc::new(MemoryFile {
             name: spin::Mutex::new(name.to_owned()),
             parent: Arc::downgrade(&self),
@@ -85,7 +85,7 @@ impl Directory for MemoryDirectory {
         Ok(file)
     }
 
-    fn insert_directory_entry(
+    fn create_directory_entry(
         self: Arc<Self>,
         name: &str,
     ) -> Result<Arc<dyn Directory>, &'static str> {
@@ -217,9 +217,9 @@ mod tests {
     fn test_fs_path_resolution() {
         let fs = MemoryFileSystem::new();
 
-        let temp_dir = fs.root().insert_directory("temp".into()).unwrap();
-        let foo_file = Arc::clone(&temp_dir).insert_file("foo".into()).unwrap();
-        let bar_file = fs.root().insert_file("bar".into()).unwrap();
+        let temp_dir = fs.root().create_directory("temp".into()).unwrap();
+        let foo_file = Arc::clone(&temp_dir).create_file("foo".into()).unwrap();
+        let bar_file = fs.root().create_file("bar".into()).unwrap();
 
         // We only compare the data pointers of the dynamic object.
         // https://rust-lang.github.io/rust-clippy/master/index.html#vtable_address_comparisons
@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn test_files() {
         let fs = MemoryFileSystem::new();
-        let foo_file = fs.root().insert_file("foo".into()).unwrap();
+        let foo_file = fs.root().create_file("foo".into()).unwrap();
 
         assert_eq!(foo_file.write(&[0, 1, 2, 3, 4, 5]), Ok(6));
 

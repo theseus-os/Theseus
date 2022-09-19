@@ -35,15 +35,15 @@ pub trait Directory: Node {
         }
     }
 
-    /// Inserts a file with the specified name, returning it.
+    /// Creates a file with the specified name.
     ///
     /// `name` must not contain slashes.
-    fn insert_file_entry(self: Arc<Self>, name: &str) -> Result<Arc<dyn File>, &'static str>;
+    fn create_file_entry(self: Arc<Self>, name: &str) -> Result<Arc<dyn File>, &'static str>;
 
-    /// Inserts a directory with the specified name, returning it.
+    /// Creates a directory with the specified name.
     ///
     /// `name` must not contain slashes.
-    fn insert_directory_entry(
+    fn create_directory_entry(
         self: Arc<Self>,
         name: &str,
     ) -> Result<Arc<dyn Directory>, &'static str>;
@@ -92,26 +92,26 @@ impl dyn Directory {
         }
     }
 
-    /// Inserts a file at the specified path, returning it.
+    /// Creates a file at the specified path.
     ///
     /// The path is relative to `self`.
-    pub fn insert_file(self: Arc<Self>, path: Path) -> Result<Arc<dyn File>, &'static str> {
+    pub fn create_file(self: Arc<Self>, path: Path) -> Result<Arc<dyn File>, &'static str> {
         let (dir_path, entry_name) = path.split_final_component();
         let dir = traverse_relative_path(self, dir_path).ok_or("directory doesn't exist")?;
-        dir.insert_file_entry(entry_name)
+        dir.create_file_entry(entry_name)
     }
 
-    /// Inserts a directory at the specified path, returning it.
+    /// Creates a directory at the specified path.
     ///
     /// The path is relative to `self`.
-    pub fn insert_directory(
+    pub fn create_directory(
         self: Arc<Self>,
         path: Path,
     ) -> Result<Arc<dyn Directory>, &'static str> {
         let (dir_path, entry_name) = path.split_final_component();
-        // TODO: Add option to recursively insert directories?
+        // TODO: Add option to recursively create directories?
         let dir = traverse_relative_path(self, dir_path).ok_or("directory doesn't exist")?;
-        dir.insert_directory_entry(entry_name)
+        dir.create_directory_entry(entry_name)
     }
 
     /// Removes the node at the specified path, returning it.
