@@ -70,5 +70,5 @@ pub fn mount_file_system(id: String, fs: Arc<dyn FileSystem>) -> Result<(), ()> 
 pub fn unmount_file_system(id: &str) -> Option<Arc<dyn FileSystem>> {
     let mut file_systems = FILE_SYSTEMS.write();
     let index = file_systems.iter().position(|s| s.0 == id)?;
-    Some(file_systems.remove(index).1)
+    Some(file_systems.swap_remove(index).1)
 }
