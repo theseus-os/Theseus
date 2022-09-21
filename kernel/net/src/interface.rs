@@ -1,0 +1,48 @@
+use crate::DeviceWrapper;
+use alloc::collections::BTreeMap;
+use smoltcp::{
+    iface::{self, SocketSet},
+    wire,
+};
+
+pub use smoltcp::socket;
+pub use wire::{IpAddress, IpCidr};
+
+pub struct Interface {
+    inner: iface::Interface<'static>,
+    device: DeviceWrapper,
+}
+
+impl Interface {
+    pub(crate) fn new<T>(device: T, ip: IpCidr, gateway: IpAddress) -> Self
+    where
+        T: 'static + crate::Device,
+    {
+        let hardware_addr = wire::EthernetAddress(device.mac_address()).into();
+
+        // let device = Arc::new(Mutex::new(device)) as Arc<Mutex<dyn crate::Device>>;
+        let mut wrapper = DeviceWrapper::new(device);
+        let mut routes = iface::Routes::new(BTreeMap::new());
+
+        match gateway {
+            IpAddress::Ipv4(addr) => routes.add_default_ipv4_route(addr),
+            IpAddress::Ipv6(addr) => routes.add_default_ipv6_route(addr),
+        }
+        .expect("btree map route storage exhausted");
+
+        let inner = iface::InterfaceBuilder::new()
+            .random_seed(random::next_u64())
+            .hardware_addr(hardware_addr)
+            .ip_addrs([ip])
+            .routes(routes)
+            .neighbor_cache(iface::NeighborCache::new(BTreeMap::new()))
+            .finalize(&mut wrapper);
+
+        Self { inner, device: wrapper }
+    }
+
+    pub fn poll(&mut self, sockets: &mut SocketSet) {
+        // FIXME: Timestamp
+        self.inner.poll(smoltcp::time::Instant::ZERO, &mut self.device, sockets).unwrap();
+    }
+}

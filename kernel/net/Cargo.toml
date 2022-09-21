@@ -1,0 +1,23 @@
+[package]
+name = "net"
+version = "0.1.0"
+description = "Network device abstractions"
+edition = "2021"
+
+[dependencies]
+random = { path = "../random" }
+spin = "0.9"
+
+[dependencies.smoltcp]
+git = "https://github.com/smoltcp-rs/smoltcp"
+default-features = false
+features = [
+    "alloc",
+    "socket-raw",
+    "socket-udp",
+    "socket-tcp",
+    "socket-icmp",
+    "proto-ipv4",
+    "proto-ipv6",
+    "medium-ethernet",
+]
