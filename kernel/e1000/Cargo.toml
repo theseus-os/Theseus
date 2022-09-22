@@ -51,5 +51,8 @@ path = "../nic_queues"
 [dependencies.nic_initialization]
 path = "../nic_initialization"
 
+[dependencies.net]
+path = "../net"
+
 [lib]
 crate-type = ["rlib"]

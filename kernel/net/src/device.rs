@@ -1,11 +1,14 @@
 use alloc::{sync::Arc, vec, vec::Vec};
+use core::any::Any;
 use smoltcp::phy;
+use irq_safety::MutexIrqSafe;
 
 pub use phy::DeviceCapabilities;
-use spin::mutex::Mutex;
 
 /// Standard maximum transition unit for ethernet cards.
 const STANDARD_MTU: usize = 1500;
+
+pub type DeviceRef = Arc<MutexIrqSafe<dyn crate::Device>>;
 
 /// A network device.
 ///
@@ -13,7 +16,7 @@ const STANDARD_MTU: usize = 1500;
 /// [`register_device`].
 ///
 /// [`register_device`]: crate::register_device
-pub trait Device: Send + Sync {
+pub trait Device: Send + Sync + Any {
     fn send(&mut self, buf: &[u8]) -> core::result::Result<(), crate::Error>;
 
     fn receive(&mut self) -> Option<Vec<u8>>;
@@ -38,7 +41,8 @@ pub trait Device: Send + Sync {
 /// ```
 #[derive(Clone)]
 pub(crate) struct DeviceWrapper {
-    inner: Arc<Mutex<dyn crate::Device>>,
+    // pub(crate) inner: Arc<MutexIrqSafe<dyn crate::Device>>,
+    pub(crate) inner: &'static MutexIrqSafe<dyn crate::Device>,
 }
 
 impl DeviceWrapper {
@@ -46,7 +50,7 @@ impl DeviceWrapper {
     where
         T: 'static + crate::Device + Send + Sync,
     {
-        Self { inner: Arc::new(Mutex::new(device)) }
+        Self { inner: Arc::new(MutexIrqSafe::new(device)) }
     }
 }
 

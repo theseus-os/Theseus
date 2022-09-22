@@ -1,16 +1,13 @@
 use crate::DeviceWrapper;
 use alloc::collections::BTreeMap;
-use smoltcp::{
-    iface::{self, SocketSet},
-    wire,
-};
+use smoltcp::{iface, wire};
 
-pub use smoltcp::socket;
+pub use smoltcp::iface::SocketSet;
 pub use wire::{IpAddress, IpCidr};
 
 pub struct Interface {
     inner: iface::Interface<'static>,
-    device: DeviceWrapper,
+    pub(crate) device: DeviceWrapper,
 }
 
 impl Interface {

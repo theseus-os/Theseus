@@ -5,6 +5,7 @@ extern crate alloc;
 use alloc::{sync::Arc, vec::Vec};
 use smoltcp::wire::Ipv4Address;
 use spin::Mutex;
+use irq_safety::MutexIrqSafe;
 
 mod device;
 mod error;
@@ -13,6 +14,7 @@ mod interface;
 pub use device::*;
 pub use error::{Error, Result};
 pub use interface::*;
+pub use smoltcp::{phy, wire, socket, time::Instant};
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
 ///
@@ -24,33 +26,30 @@ const DEFAULT_LOCAL_IP: &str = "10.0.2.15/24";
 /// `10.0.2.2` is the default QEMU user-slirp networking gateway IP.
 const DEFAULT_GATEWAY_IP: IpAddress = IpAddress::Ipv4(Ipv4Address::new(10, 0, 2, 2));
 
-// TODO: Non-spin mutex?
-pub type InterfaceRef = Arc<Mutex<Interface>>;
+pub type InterfaceRef = Arc<MutexIrqSafe<Interface>>;
 
 // TODO: Make outer mutex rwlock?
 static NETWORK_INTERFACES: Mutex<Vec<InterfaceRef>> = Mutex::new(Vec::new());
 
-/// Registers a network device, returning the index.
+/// Registers a network device.
 ///
 /// The function will convert the device to an interface and it will then be
 /// accessible using [`get_interface`].
-pub fn register_device<T>(device: T) -> Result<usize>
+pub fn register_device<T>(device: T) -> Result<DeviceRef>
 where
     T: 'static + Device + Send,
 {
-    let interface = Arc::new(Mutex::new(Interface::new(
+    let interface = Interface::new(
         device,
         // TODO: use DHCP to acquire an IP address and gateway.
         DEFAULT_LOCAL_IP.parse().unwrap(),
         DEFAULT_GATEWAY_IP,
-    )));
+    );
+    let device = interface.device.inner.clone();
 
-    let mut interfaces = NETWORK_INTERFACES.lock();
-    interfaces.push(interface);
-    let index = interfaces.len() - 1;
-    drop(interfaces);
+    NETWORK_INTERFACES.lock().push(Arc::new(MutexIrqSafe::new(interface)));
 
-    Ok(index)
+    Ok(device)
 }
 
 /// Returns a list of available interfaces behind a mutex.

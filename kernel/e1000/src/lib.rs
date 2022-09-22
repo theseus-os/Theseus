@@ -1,8 +1,9 @@
 #![no_std]
 
-#![allow(dead_code)] //  to suppress warnings for unused functions/methods
+#![allow(dead_code, incomplete_features)] //  to suppress warnings for unused functions/methods
 #![feature(rustc_private)]
 #![feature(abi_x86_interrupt)]
+#![feature(trait_upcasting)]
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
@@ -24,13 +25,16 @@ extern crate intel_ethernet;
 extern crate nic_buffers;
 extern crate nic_queues;
 extern crate nic_initialization;
+extern crate net;
 
 pub mod test_e1000_driver;
 mod regs;
 use regs::*;
 
+use core::any::Any;
+use core::ops::DerefMut;
 use spin::Once; 
-use alloc::vec::Vec;
+use alloc::{vec::Vec, sync::Arc};
 use alloc::collections::VecDeque;
 use irq_safety::MutexIrqSafe;
 use alloc::boxed::Box;
@@ -64,13 +68,17 @@ const INT_RX:               u32 = 0x80;
 /// The single instance of the E1000 NIC.
 /// TODO: in the future, we should support multiple NICs all stored elsewhere,
 /// e.g., on the PCI bus or somewhere else.
-static E1000_NIC: Once<MutexIrqSafe<E1000Nic>> = Once::new();
+static E1000_NIC: Once<Arc<MutexIrqSafe<dyn net::Device>>> = Once::new();
 
 /// Returns a reference to the E1000Nic wrapped in a MutexIrqSafe,
 /// if it exists and has been initialized.
-pub fn get_e1000_nic() -> Option<&'static MutexIrqSafe<E1000Nic>> {
-    E1000_NIC.get()
+pub fn get_nic() -> Option<Arc<MutexIrqSafe<dyn net::Device>>> {
+    E1000_NIC.get().cloned()
 }
+
+pub fn set_nic(nic: Arc<MutexIrqSafe<dyn net::Device>>) {
+    E1000_NIC.call_once(|| nic);
+} 
 
 /// How many ReceiveBuffers are preallocated for this driver to use. 
 const RX_BUFFER_POOL_SIZE: usize = 256; 
@@ -172,8 +180,7 @@ impl NetworkInterfaceCard for E1000Nic {
 
 /// Functions that setup the NIC struct and handle the sending and receiving of packets.
 impl E1000Nic {
-    /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
-    pub fn init(e1000_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<E1000Nic>, &'static str> {
+    pub fn new(e1000_pci_dev: &PciDevice) -> Result<Self, &'static str> {
         use interrupts::IRQ_BASE_OFFSET;
 
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
@@ -255,9 +262,17 @@ impl E1000Nic {
             mac_regs: mac_registers
         };
         
-        let nic_ref = E1000_NIC.call_once(|| MutexIrqSafe::new(e1000_nic));
-        Ok(nic_ref)
+        // let _ = E1000_NIC.call_once(|| MutexIrqSafe::new(e1000_nic));
+
+        Ok(e1000_nic)
     }
+    
+    // /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
+    // pub fn init(e1000_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<E1000Nic>, &'static str> {
+    //     let e1000_nic = Self::new(e1000_pci_dev)?;
+    //     let nic_ref = E1000_NIC.call_once(|| MutexIrqSafe::new(e1000_nic));
+    //     Ok(nic_ref)
+    // }
     
     /// Allocates memory for the NIC and maps the E1000 Register struct to that memory area.
     /// Returns a reference to the E1000 Registers, tied to their backing `MappedPages`.
@@ -267,7 +282,7 @@ impl E1000Nic {
     /// * `mem_base`: the physical address where the NIC's memory starts.
     fn map_e1000_regs(
         _device: &PciDevice, 
-        mem_base: PhysicalAddress
+        mem_base: PhysicalAddress,
     ) -> Result<(
         BoxRefMut<MappedPages, E1000Registers>, 
         BoxRefMut<MappedPages, E1000RxRegisters>, 
@@ -421,9 +436,35 @@ impl E1000Nic {
     }
 }
 
+impl net::Device for E1000Nic {
+    fn send(&mut self, buf: &[u8]) -> net::Result<()> {
+        // TODO: This is just a workaround to make the new API work with the old machinery.
+        let mut transmit_buffer = TransmitBuffer::new(buf.len() as u16).unwrap();
+        let transmit_buffer_mut = transmit_buffer.as_slice_mut::<u8>(0, buf.len()).unwrap();
+        transmit_buffer_mut.clone_from_slice(buf);
+        self.send_packet(transmit_buffer).unwrap();
+        Ok(())
+    }
+
+    fn receive(&mut self) -> Option<Vec<u8>> {
+        self.get_received_frame().map(|frame| {
+            let buffers = frame.0;
+            assert_eq!(buffers.len(), 1);
+            let buffer = &buffers[0];
+            buffer.as_slice(0, buffer.length.into()).unwrap().to_vec()
+        })
+    }
+
+    /// Returns the MAC address.
+    fn mac_address(&self) -> [u8; 6] {
+        self.mac_spoofed.unwrap_or(self.mac_hardware)
+    }
+}
+
 extern "x86-interrupt" fn e1000_handler(_stack_frame: InterruptStackFrame) {
     if let Some(ref e1000_nic_ref) = E1000_NIC.get() {
         let mut e1000_nic = e1000_nic_ref.lock();
+        let e1000_nic: &mut E1000Nic = (e1000_nic.deref_mut() as &mut dyn Any).downcast_mut().unwrap();
         if let Err(e) = e1000_nic.handle_interrupt() {
             error!("e1000_handler(): error handling interrupt: {:?}", e);
         }

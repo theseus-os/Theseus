@@ -1,5 +1,6 @@
 pub type Result<T> = core::result::Result<T, Error>;
 
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Error {
     Exhausted,
     Illegal,

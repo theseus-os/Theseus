@@ -24,6 +24,7 @@ ls = { path = "../applications/ls", optional = true }
 mkdir = { path = "../applications/mkdir", optional = true }
 ns = { path = "../applications/ns", optional = true }
 ping = { path = "../applications/ping", optional = true }
+ping_new = { path = "../applications/ping_new", optional = true }
 pmu_sample_start = { path = "../applications/pmu_sample_start", optional = true }
 pmu_sample_stop = { path = "../applications/pmu_sample_stop", optional = true }
 ps = { path = "../applications/ps", optional = true }
@@ -106,6 +107,7 @@ theseus_apps = [
     "mkdir",
     "ns",
     "ping",
+    "ping_new",
     "pmu_sample_start",
     "pmu_sample_stop",
     "ps",

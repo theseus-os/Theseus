@@ -5,6 +5,7 @@ description = "Network device abstractions"
 edition = "2021"
 
 [dependencies]
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 random = { path = "../random" }
 spin = "0.9"
 

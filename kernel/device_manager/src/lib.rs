@@ -25,6 +25,7 @@ extern crate io;
 extern crate core2;
 #[macro_use] extern crate derive_more;
 extern crate mlx5;
+extern crate net;
 
 use core::convert::TryFrom;
 use mpmc::Queue;
@@ -134,9 +135,13 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
         if dev.class == 0x02 && dev.subclass == 0x00 {
             if dev.vendor_id == e1000::INTEL_VEND && dev.device_id == e1000::E1000_DEV {
                 info!("e1000 PCI device found at: {:?}", dev.location);
-                let e1000_nic_ref = e1000::E1000Nic::init(dev)?;
-                let e1000_interface = EthernetNetworkInterface::new_ipv4_interface(e1000_nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
-                add_to_network_interfaces(e1000_interface);
+                // let e1000_nic_ref = e1000::E1000Nic::init(dev)?;
+                // let e1000_interface = EthernetNetworkInterface::new_ipv4_interface(e1000_nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
+                // add_to_network_interfaces(e1000_interface);
+                let nic = e1000::E1000Nic::new(dev)?;
+                let device = net::register_device(nic).unwrap();
+                e1000::set_nic(device);
+                
                 continue;
             }
             if dev.vendor_id == ixgbe::INTEL_VEND && dev.device_id == ixgbe::INTEL_82599 {
