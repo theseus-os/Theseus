@@ -3,9 +3,9 @@
 extern crate alloc;
 
 use alloc::{sync::Arc, vec::Vec};
+use irq_safety::MutexIrqSafe;
 use smoltcp::wire::Ipv4Address;
 use spin::Mutex;
-use irq_safety::MutexIrqSafe;
 
 mod device;
 mod error;
@@ -14,7 +14,7 @@ mod interface;
 pub use device::*;
 pub use error::{Error, Result};
 pub use interface::*;
-pub use smoltcp::{phy, wire, socket, time::Instant};
+pub use smoltcp::{phy, socket, time::Instant, wire};
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
 ///
@@ -35,7 +35,7 @@ static NETWORK_INTERFACES: Mutex<Vec<InterfaceRef>> = Mutex::new(Vec::new());
 ///
 /// The function will convert the device to an interface and it will then be
 /// accessible using [`get_interface`].
-pub fn register_device<T>(device: T) -> Result<DeviceRef>
+pub fn register_device<T>(device: Arc<MutexIrqSafe<T>>)
 where
     T: 'static + Device + Send,
 {
@@ -45,11 +45,8 @@ where
         DEFAULT_LOCAL_IP.parse().unwrap(),
         DEFAULT_GATEWAY_IP,
     );
-    let device = interface.device.inner.clone();
 
     NETWORK_INTERFACES.lock().push(Arc::new(MutexIrqSafe::new(interface)));
-
-    Ok(device)
 }
 
 /// Returns a list of available interfaces behind a mutex.

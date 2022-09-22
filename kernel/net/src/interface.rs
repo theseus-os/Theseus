@@ -1,5 +1,6 @@
 use crate::DeviceWrapper;
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, sync::Arc};
+use irq_safety::MutexIrqSafe;
 use smoltcp::{iface, wire};
 
 pub use smoltcp::iface::SocketSet;
@@ -11,13 +12,12 @@ pub struct Interface {
 }
 
 impl Interface {
-    pub(crate) fn new<T>(device: T, ip: IpCidr, gateway: IpAddress) -> Self
+    pub(crate) fn new<T>(device: Arc<MutexIrqSafe<T>>, ip: IpCidr, gateway: IpAddress) -> Self
     where
         T: 'static + crate::Device,
     {
-        let hardware_addr = wire::EthernetAddress(device.mac_address()).into();
+        let hardware_addr = wire::EthernetAddress(device.lock().mac_address()).into();
 
-        // let device = Arc::new(Mutex::new(device)) as Arc<Mutex<dyn crate::Device>>;
         let mut wrapper = DeviceWrapper::new(device);
         let mut routes = iface::Routes::new(BTreeMap::new());
 

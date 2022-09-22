@@ -31,8 +31,6 @@ pub mod test_e1000_driver;
 mod regs;
 use regs::*;
 
-use core::any::Any;
-use core::ops::DerefMut;
 use spin::Once; 
 use alloc::{vec::Vec, sync::Arc};
 use alloc::collections::VecDeque;
@@ -68,15 +66,15 @@ const INT_RX:               u32 = 0x80;
 /// The single instance of the E1000 NIC.
 /// TODO: in the future, we should support multiple NICs all stored elsewhere,
 /// e.g., on the PCI bus or somewhere else.
-static E1000_NIC: Once<Arc<MutexIrqSafe<dyn net::Device>>> = Once::new();
+static E1000_NIC: Once<Arc<MutexIrqSafe<E1000Nic>>> = Once::new();
 
 /// Returns a reference to the E1000Nic wrapped in a MutexIrqSafe,
 /// if it exists and has been initialized.
-pub fn get_nic() -> Option<Arc<MutexIrqSafe<dyn net::Device>>> {
+pub fn get_nic() -> Option<Arc<MutexIrqSafe<E1000Nic>>> {
     E1000_NIC.get().cloned()
 }
 
-pub fn set_nic(nic: Arc<MutexIrqSafe<dyn net::Device>>) {
+pub fn set_nic(nic: Arc<MutexIrqSafe<E1000Nic>>) {
     E1000_NIC.call_once(|| nic);
 } 
 
@@ -262,17 +260,15 @@ impl E1000Nic {
             mac_regs: mac_registers
         };
         
-        // let _ = E1000_NIC.call_once(|| MutexIrqSafe::new(e1000_nic));
-
         Ok(e1000_nic)
     }
     
-    // /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
-    // pub fn init(e1000_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<E1000Nic>, &'static str> {
-    //     let e1000_nic = Self::new(e1000_pci_dev)?;
-    //     let nic_ref = E1000_NIC.call_once(|| MutexIrqSafe::new(e1000_nic));
-    //     Ok(nic_ref)
-    // }
+    /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
+    pub fn init(pci_device: &PciDevice) -> Result<Arc<MutexIrqSafe<E1000Nic>>, &'static str> {
+        let nic = Self::new(pci_device)?;
+        let arc = Arc::new(MutexIrqSafe::new(nic));
+        Ok(Arc::clone(E1000_NIC.call_once(|| arc)))
+    }
     
     /// Allocates memory for the NIC and maps the E1000 Register struct to that memory area.
     /// Returns a reference to the E1000 Registers, tied to their backing `MappedPages`.
@@ -464,7 +460,6 @@ impl net::Device for E1000Nic {
 extern "x86-interrupt" fn e1000_handler(_stack_frame: InterruptStackFrame) {
     if let Some(ref e1000_nic_ref) = E1000_NIC.get() {
         let mut e1000_nic = e1000_nic_ref.lock();
-        let e1000_nic: &mut E1000Nic = (e1000_nic.deref_mut() as &mut dyn Any).downcast_mut().unwrap();
         if let Err(e) = e1000_nic.handle_interrupt() {
             error!("e1000_handler(): error handling interrupt: {:?}", e);
         }

@@ -1,7 +1,6 @@
 use alloc::{sync::Arc, vec, vec::Vec};
-use core::any::Any;
-use smoltcp::phy;
 use irq_safety::MutexIrqSafe;
+use smoltcp::phy;
 
 pub use phy::DeviceCapabilities;
 
@@ -16,7 +15,7 @@ pub type DeviceRef = Arc<MutexIrqSafe<dyn crate::Device>>;
 /// [`register_device`].
 ///
 /// [`register_device`]: crate::register_device
-pub trait Device: Send + Sync + Any {
+pub trait Device: Send + Sync {
     fn send(&mut self, buf: &[u8]) -> core::result::Result<(), crate::Error>;
 
     fn receive(&mut self) -> Option<Vec<u8>>;
@@ -41,16 +40,15 @@ pub trait Device: Send + Sync + Any {
 /// ```
 #[derive(Clone)]
 pub(crate) struct DeviceWrapper {
-    // pub(crate) inner: Arc<MutexIrqSafe<dyn crate::Device>>,
-    pub(crate) inner: &'static MutexIrqSafe<dyn crate::Device>,
+    pub(crate) inner: Arc<MutexIrqSafe<dyn crate::Device>>,
 }
 
 impl DeviceWrapper {
-    pub(crate) fn new<T>(device: T) -> Self
+    pub(crate) fn new<T>(inner: Arc<MutexIrqSafe<T>>) -> Self
     where
         T: 'static + crate::Device + Send + Sync,
     {
-        Self { inner: Arc::new(MutexIrqSafe::new(device)) }
+        Self { inner }
     }
 }
 
