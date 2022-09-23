@@ -27,8 +27,8 @@ pub fn set_default_print_output(producer: DFQueueProducer<Event>) {
 /// Calls `print!()` with an extra newilne `\n` appended to the end. 
 #[macro_export]
 macro_rules! println {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => ($crate::print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => ($crate::print!(concat!($fmt, "\n"), $($arg)*));
 }
 
 /// The main printing macro, which simply pushes an output event to the event queue. 
