@@ -30,8 +30,8 @@ use spin::Mutex;
 /// Calls `print!()` with an extra newline ('\n') appended to the end. 
 #[macro_export]
 macro_rules! println {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => ($crate::print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => ($crate::print!(concat!($fmt, "\n"), $($arg)*));
 
 }
 
