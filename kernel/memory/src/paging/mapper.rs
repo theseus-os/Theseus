@@ -149,12 +149,17 @@ impl Mapper {
     }
 
 
-    /// Maps the given virtual `AllocatedPages` to the given physical `AllocatedFrames`.
+    /// An internal function that performs the actual mapping of a range of allocated `pages`
+    /// to a range of allocated `frames`.
     /// 
-    /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
-    pub fn map_allocated_pages_to(&mut self, pages: AllocatedPages, frames: AllocatedFrames, flags: EntryFlags)
-        -> Result<MappedPages, &'static str>
-    {
+    /// Returns a tuple of the new `MappedPages` object containing the allocated `pages`
+    /// and the allocated `frames` object.
+    pub(super) fn internal_map_to(
+        &mut self,
+        pages: AllocatedPages,
+        frames: AllocatedFrames,
+        flags: EntryFlags,
+    ) -> Result<(MappedPages, AllocatedFrames), &'static str> {
         let mut top_level_flags = flags.clone() | EntryFlags::PRESENT;
         // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
         // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
@@ -188,17 +193,35 @@ impl Mapper {
             p1[page.p1_index()].set_entry(frame, actual_flags);
         }
 
-        // Currently we forget the actual AllocatedPages object because
+        Ok((
+            MappedPages {
+                page_table_p4: self.target_p4.clone(),
+                pages,
+                flags: actual_flags,
+            },
+            frames,
+        ))
+    }
+    
+
+    /// Maps the given virtual `AllocatedPages` to the given physical `AllocatedFrames`.
+    /// 
+    /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
+    pub fn map_allocated_pages_to(
+        &mut self,
+        pages: AllocatedPages,
+        frames: AllocatedFrames,
+        flags: EntryFlags,
+    ) -> Result<MappedPages, &'static str> {
+        let (mapped_pages, frames) = self.internal_map_to(pages, frames, flags)?;
+        
+        // Currently we forget the actual `AllocatedFrames` object because
         // there is no easy/efficient way to store a dynamic list of non-contiguous frames (would require Vec).
         // This is okay because we will deallocate each of these frames when this MappedPages object is dropped
         // and each of the page table entries for its pages are cleared.
         core::mem::forget(frames);
 
-        Ok(MappedPages {
-            page_table_p4: self.target_p4.clone(),
-            pages,
-            flags: actual_flags,
-        })
+        Ok(mapped_pages)
     }
 
 

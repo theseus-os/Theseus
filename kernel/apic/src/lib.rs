@@ -11,7 +11,7 @@ use spin::Once;
 use raw_cpuid::CpuId;
 use msr::*;
 use irq_safety::RwLockIrqSafe;
-use memory::{PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages, allocate_frames_at};
+use memory::{PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages, allocate_frames_at, AllocatedFrames};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
 use crossbeam_utils::atomic::AtomicCell;
@@ -140,31 +140,32 @@ pub fn init(_page_table: &mut PageTable) -> Result<(), &'static str> {
 }
 
 
-/// return a mapping of APIC memory-mapped I/O registers 
+/// Map the physical frames containing the APIC's MMIO registers into the given `page_table`.
 fn map_apic(page_table: &mut PageTable) -> Result<MappedPages, &'static str> {
-    if has_x2apic() { return Err("map_apic() is only for use in apic/xapic systems, not x2apic."); }
-    
-    let phys_addr = PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)
-        .ok_or("APIC physical address was invalid")?;
-    let new_page = allocate_pages(1).ok_or("out of virtual address space!")?;
-    let flags = EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
-    let apic_mapped_page = if let Ok(allocated_frame) = allocate_frames_at(phys_addr, 1) {
-        page_table.map_allocated_pages_to(new_page, allocated_frame, flags)?
+    static APIC_FRAME: Once<AllocatedFrames> = Once::new();
+
+    let frame = if let Some(apic_frame) = APIC_FRAME.get() {
+        apic_frame
     } else {
-        // The APIC frame is the same actual physical address across all CPU cores,
-        // but they're actually completely independent pieces of hardware that share one address.
-        // Therefore, there's no way to represent that to the Rust language or MappedPages/AllocatedFrames types,
-        // so we must use unsafe code, at least for now.
-        unsafe {
-            memory::Mapper::map_to_non_exclusive(
-                page_table,
-                new_page,
-                memory::FrameRange::from_phys_addr(phys_addr, 1),
-                flags,
-            )?
-        } 
+        let phys_addr = PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)
+            .ok_or("APIC physical address was invalid")?;
+        let apic_frame = allocate_frames_at(phys_addr, 1)?;
+        APIC_FRAME.call_once(|| apic_frame)
     };
-    Ok(apic_mapped_page)
+
+    let new_page = allocate_pages(1).ok_or("out of virtual address space!")?;
+    // The APIC frame is the same actual physical address across all CPU cores,
+    // but they're actually completely independent pieces of hardware that share one address.
+    // Therefore, there's no way to represent that to the Rust language or MappedPages/AllocatedFrames types,
+    // so we must use unsafe code, at least for now.
+    unsafe {
+        memory::Mapper::map_to_non_exclusive(
+            page_table,
+            new_page,
+            frame,
+            EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
+        )
+    }
 }
 
 

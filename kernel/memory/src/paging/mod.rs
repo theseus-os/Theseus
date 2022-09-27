@@ -73,9 +73,11 @@ impl PageTable {
         })
     }
 
-    /// Initializes a brand new top-level P4 `PageTable` whose root is located in the given `new_p4_frame`. 
-    /// It requires using the given `current_active_table` to set up its initial mapping contents,
-    /// for which the given `TemporaryPage` is used to recursively map it (and is auto-unmapped upon return). 
+    /// Initializes a new top-level P4 `PageTable` whose root is located in the given `new_p4_frame`.
+    /// It requires using the given `current_active_table` to set up its initial mapping contents.
+    /// 
+    /// A single allocated page can optionally be provided for use as part of a new `TemporaryPage`
+    /// for the recursive mapping.
     /// 
     /// Returns the new `PageTable` that exists in physical memory at the given `new_p4_frame`. 
     /// Note that this new page table has no current mappings beyond the recursive P4 mapping,
@@ -84,19 +86,19 @@ impl PageTable {
     pub fn new_table(
         current_page_table: &mut PageTable,
         new_p4_frame: AllocatedFrames,
-        mut temporary_page: TemporaryPage,
+        page: Option<AllocatedPages>,
     ) -> Result<PageTable, &'static str> {
         let p4_frame = *new_p4_frame.start();
-        
-        {
-            let table = temporary_page.map_table_frame(new_p4_frame, current_page_table)?;
+
+        let mut temporary_page = TemporaryPage::create_and_map_table_frame(page, new_p4_frame, current_page_table)?;
+        temporary_page.with_table_and_frame(|table, frame| {
             table.zero();
-            table[RECURSIVE_P4_INDEX].set_entry(new_p4_frame.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
-        }
+            table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+        })?;
 
         let (_temp_page, inited_new_p4_frame) = temporary_page.unmap_into_parts(current_page_table)?;
 
-        Ok( PageTable { 
+        Ok(PageTable {
             mapper: Mapper::with_p4_frame(p4_frame),
             p4_table: inited_new_p4_frame.ok_or("BUG: PageTable::new_table(): failed to take back unmapped Frame for p4_table")?,
         })
@@ -111,7 +113,6 @@ impl PageTable {
     pub fn with<F>(
         &mut self,
         other_table: &mut PageTable,
-        mut temporary_page: temporary_page::TemporaryPage,
         f: F,
     ) -> Result<(), &'static str>
         where F: FnOnce(&mut Mapper) -> Result<(), &'static str>
@@ -121,11 +122,10 @@ impl PageTable {
             return Err("PageTable::with(): this PageTable ('self') must be the currently active page table.");
         }
 
-        // Temporarily take ownership of the p4 allocated frame for this page table.
+        // Temporarily take ownership of this page table's p4 allocated frame and
+        // create a new temporary page that maps to that frame.
         let this_p4 = core::mem::replace(&mut self.p4_table, AllocatedFrames::empty());
-
-        // map temporary_page to current p4 table
-        let p4_table = temporary_page.map_table_frame(this_p4, self)?;
+        let mut temporary_page = TemporaryPage::create_and_map_table_frame(None, this_p4, self)?;
 
         // overwrite recursive mapping
         self.p4_mut()[RECURSIVE_P4_INDEX].set_entry(other_table.p4_table.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
@@ -141,7 +141,9 @@ impl PageTable {
         self.mapper.target_p4 = active_p4_frame;
 
         // restore recursive mapping to original p4 table
-        p4_table[RECURSIVE_P4_INDEX].set_entry(self.p4_table.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+        temporary_page.with_table_and_frame(|p4_table, frame| {
+            p4_table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+        })?;
         tlb_flush_all();
 
         // Here, recover the current page table's p4 frame and restore it into this current page table,
@@ -227,7 +229,7 @@ pub fn init(
     debug!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}\n", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
 
     let new_p4_frame = frame_allocator::allocate_frames(1).ok_or("couldn't allocate frame for new page table")?; 
-    let mut new_table = PageTable::new_table(&mut page_table, new_p4_frame, TemporaryPage::new())?;
+    let mut new_table = PageTable::new_table(&mut page_table, new_p4_frame, None)?;
 
     let mut text_mapped_pages:        Option<MappedPages> = None;
     let mut rodata_mapped_pages:      Option<MappedPages> = None;
@@ -238,7 +240,7 @@ pub fn init(
     let mut identity_mapped_pages:    [Option<MappedPages>; 32] = Default::default();
 
     // Create and initialize a new page table with the same contents as the currently-executing kernel code/data sections.
-    page_table.with(&mut new_table, TemporaryPage::new(), |mapper| {
+    page_table.with(&mut new_table, |mapper| {
         
         // Map every section found in the kernel image (given by the boot information above) into our new page table. 
         // To allow the APs to boot up, we must identity map those kernel sections too, i.e., 
