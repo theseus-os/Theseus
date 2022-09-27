@@ -149,12 +149,17 @@ impl Mapper {
     }
 
 
-    /// Maps the given virtual `AllocatedPages` to the given physical `AllocatedFrames`.
+    /// An internal function that performs the actual mapping of a range of allocated `pages`
+    /// to a range of allocated `frames`.
     /// 
-    /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
-    pub fn map_allocated_pages_to(&mut self, pages: AllocatedPages, frames: AllocatedFrames, flags: EntryFlags)
-        -> Result<MappedPages, &'static str>
-    {
+    /// Returns a tuple of the new `MappedPages` object containing the allocated `pages`
+    /// and the allocated `frames` object.
+    pub(super) fn internal_map_to(
+        &mut self,
+        pages: AllocatedPages,
+        frames: AllocatedFrames,
+        flags: EntryFlags,
+    ) -> Result<(MappedPages, AllocatedFrames), &'static str> {
         let mut top_level_flags = flags.clone() | EntryFlags::PRESENT;
         // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
         // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
@@ -175,7 +180,7 @@ impl Mapper {
         }
 
         // iterate over pages and frames in lockstep
-        for (page, frame) in pages.deref().clone().into_iter().zip(frames.deref().clone().into_iter()) {
+        for (page, frame) in pages.deref().clone().into_iter().zip(frames.into_iter()) {
             let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags);
             let p2 = p3.next_table_create(page.p3_index(), top_level_flags);
             let p1 = p2.next_table_create(page.p2_index(), top_level_flags);
@@ -188,17 +193,35 @@ impl Mapper {
             p1[page.p1_index()].set_entry(frame, actual_flags);
         }
 
-        // Currently we forget the actual AllocatedPages object because
+        Ok((
+            MappedPages {
+                page_table_p4: self.target_p4.clone(),
+                pages,
+                flags: actual_flags,
+            },
+            frames,
+        ))
+    }
+    
+
+    /// Maps the given virtual `AllocatedPages` to the given physical `AllocatedFrames`.
+    /// 
+    /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
+    pub fn map_allocated_pages_to(
+        &mut self,
+        pages: AllocatedPages,
+        frames: AllocatedFrames,
+        flags: EntryFlags,
+    ) -> Result<MappedPages, &'static str> {
+        let (mapped_pages, frames) = self.internal_map_to(pages, frames, flags)?;
+        
+        // Currently we forget the actual `AllocatedFrames` object because
         // there is no easy/efficient way to store a dynamic list of non-contiguous frames (would require Vec).
         // This is okay because we will deallocate each of these frames when this MappedPages object is dropped
         // and each of the page table entries for its pages are cleared.
         core::mem::forget(frames);
 
-        Ok(MappedPages {
-            page_table_p4: self.target_p4.clone(),
-            pages,
-            flags: actual_flags,
-        })
+        Ok(mapped_pages)
     }
 
 
@@ -220,8 +243,6 @@ impl Mapper {
 
         for page in pages.deref().clone() {
             let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
-            let frame = *af.start();
-            core::mem::forget(af); // we currently forget frames allocated as page table frames since we don't yet have a way to track them.
 
             let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags);
             let p2 = p3.next_table_create(page.p3_index(), top_level_flags);
@@ -229,12 +250,13 @@ impl Mapper {
 
             if !p1[page.p1_index()].is_unused() {
                 error!("map_allocated_pages(): page {:#X} -> frame {:#X}, page was already in use!",
-                    page.start_address(), frame.start_address()
+                    page.start_address(), af.start_address()
                 );
                 return Err("map_allocated_pages(): page was already in use");
             } 
 
-            p1[page.p1_index()].set_entry(frame, actual_flags);
+            p1[page.p1_index()].set_entry(af.as_allocated_frame(), actual_flags);
+            core::mem::forget(af); // we currently forget frames allocated here since we don't yet have a way to track them.
         }
 
         Ok(MappedPages {
@@ -251,7 +273,8 @@ impl Mapper {
     /// An unsafe escape hatch that allows one to map the given virtual `AllocatedPages` 
     /// to the given range of physical `frames`. 
     ///
-    /// This is unsafe because it violates Theseus's bijective mapping guarantee, 
+    /// This is unsafe because it accepts a reference to an `AllocatedFrames` object.
+    /// This violates Theseus's bijective mapping guarantee, 
     /// in which only one virtual page can map to a given physical frame,
     /// which preserves Rust's knowledge of language-level aliasing and thus its safety checks.
     ///
@@ -259,7 +282,7 @@ impl Mapper {
     /// 
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
     #[doc(hidden)]
-    pub unsafe fn map_to_non_exclusive(mapper: &mut Self, pages: AllocatedPages, frames: FrameRange, flags: EntryFlags)
+    pub unsafe fn map_to_non_exclusive(mapper: &mut Self, pages: AllocatedPages, frames: &AllocatedFrames, flags: EntryFlags)
         -> Result<MappedPages, &'static str>
     {
         let mut top_level_flags = flags.clone() | EntryFlags::PRESENT;
@@ -285,7 +308,7 @@ impl Mapper {
         }
 
         // iterate over pages and frames in lockstep
-        for (page, frame) in pages.deref().clone().into_iter().zip(frames.deref().clone().into_iter()) {
+        for (page, frame) in pages.deref().clone().into_iter().zip(frames.into_iter()) {
             let p3 = mapper.p4_mut().next_table_create(page.p4_index(), top_level_flags);
             let p2 = p3.next_table_create(page.p3_index(), top_level_flags);
             let p1 = p2.next_table_create(page.p2_index(), top_level_flags);

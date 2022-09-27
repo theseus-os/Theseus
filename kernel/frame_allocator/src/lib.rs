@@ -35,7 +35,7 @@ mod static_array_rb_tree;
 // mod static_array_linked_list;
 
 
-use core::{borrow::Borrow, cmp::{Ordering, min, max}, fmt, ops::{Deref, DerefMut}};
+use core::{borrow::Borrow, cmp::{Ordering, min, max}, fmt, ops::{Deref, DerefMut}, marker::PhantomData};
 use kernel_config::memory::*;
 use memory_structs::{PhysicalAddress, Frame, FrameRange};
 use spin::Mutex;
@@ -315,12 +315,14 @@ impl Borrow<Frame> for &'_ Chunk {
 }
 
 
-/// Represents a range of allocated `PhysicalAddress`es, specified in `Frame`s. 
+/// Represents a range of allocated physical memory [`Frame`]s; derefs to [`FrameRange`].
 /// 
-/// These frames are not initially mapped to any physical memory frames, you must do that separately
-/// in order to actually use their memory; see the `MappedFrames` type for more. 
+/// These frames are not immediately accessible because they're not yet mapped
+/// by any virtual memory pages.
+/// You must do that separately in order to create a `MappedPages` type,
+/// which can then be used to access the contents of these frames.
 /// 
-/// This object represents ownership of the allocated physical frames;
+/// This object represents ownership of the range of allocated physical frames;
 /// if this object falls out of scope, its allocated frames will be auto-deallocated upon drop. 
 pub struct AllocatedFrames {
     frames: FrameRange,
@@ -418,6 +420,18 @@ impl AllocatedFrames {
             AllocatedFrames { frames: second },
         ))
     }
+
+    /// Returns an `AllocatedFrame` if this `AllocatedFrames` object contains only one frame.
+    /// 
+    /// ## Panic
+    /// Panics if this `AllocatedFrame` contains multiple frames or zero frames.
+    pub fn as_allocated_frame(&self) -> AllocatedFrame {
+        assert!(self.size_in_frames() == 1);
+        AllocatedFrame {
+            frame: *self.start(),
+            _phantom: PhantomData,
+        }
+    }
 }
 
 /// This function is a callback used to convert `UnmappedFrames` into `AllocatedFrames`.
@@ -462,6 +476,59 @@ impl Drop for AllocatedFrames {
     }
 }
 
+impl<'f> IntoIterator for &'f AllocatedFrames {
+    type IntoIter = AllocatedFramesIter<'f>;
+    type Item = AllocatedFrame<'f>;
+    fn into_iter(self) -> Self::IntoIter {
+        AllocatedFramesIter {
+            _owner: self,
+            range: self.frames.clone(),
+        }
+    }
+}
+
+/// An iterator over each [`AllocatedFrame`] in a range of [`AllocatedFrames`].
+/// 
+/// We must implement our own iterator type here in order to tie the lifetime `'f`
+/// of a returned `AllocatedFrame<'f>` type to the lifetime of its containing `AllocatedFrames`.
+/// This is because the underlying type of `AllocatedFrames` is a [`FrameRange`],
+/// which itself is a [`core::ops::RangeInclusive`] of [`Frame`]s, and unfortunately the
+/// `RangeInclusive` type doesn't implement an immutable iterator.
+/// 
+/// Iterating through a `RangeInclusive` actually modifies its own internal range,
+/// so we must avoid doing that because it would break the semantics of a `FrameRange`.
+/// In fact, this is why [`FrameRange`] only implements `IntoIterator` but
+/// does not implement [`Iterator`] itself.
+pub struct AllocatedFramesIter<'f> {
+    _owner: &'f AllocatedFrames,
+    range: FrameRange,
+}
+impl<'f> Iterator for AllocatedFramesIter<'f> {
+    type Item = AllocatedFrame<'f>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.range.next().map(|frame|
+            AllocatedFrame {
+                frame, _phantom: PhantomData,
+            }
+        )
+    }
+}
+
+/// A reference to a single frame within a range of `AllocatedFrames`.
+/// 
+/// The lifetime of this type is tied to the lifetime of its owning `AllocatedFrames`.
+#[derive(Debug)]
+pub struct AllocatedFrame<'f> {
+    frame: Frame,
+    _phantom: PhantomData<&'f Frame>,
+}
+impl<'f> Deref for AllocatedFrame<'f> {
+    type Target = Frame;
+    fn deref(&self) -> &Self::Target {
+        &self.frame
+    }
+}
+assert_not_impl_any!(AllocatedFrame: DerefMut, Clone);
 
 
 /// A series of pending actions related to frame allocator bookkeeping,

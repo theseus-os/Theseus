@@ -17,6 +17,7 @@ use memory_structs::{Frame, FrameRange, PAGE_TABLE_ENTRY_FRAME_MASK, EntryFlags,
 use bit_field::BitField;
 use kernel_config::memory::PAGE_SHIFT;
 use zerocopy::FromBytes;
+use frame_allocator::AllocatedFrame;
 
 /// A page table entry, which is a `u64` value under the hood.
 ///
@@ -90,7 +91,7 @@ impl PageTableEntry {
     /// This is the actual mapping action that informs the MMU of a new mapping.
     ///
     /// Note: this performs no checks about the current value of this page table entry.
-    pub fn set_entry(&mut self, frame: Frame, flags: EntryFlags) {
+    pub fn set_entry(&mut self, frame: AllocatedFrame, flags: EntryFlags) {
         self.0 = (frame.start_address().value() as u64) | flags.bits();
     }
 
