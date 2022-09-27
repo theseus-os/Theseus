@@ -140,6 +140,7 @@
 <span id="134">134</span>
 <span id="135">135</span>
 <span id="136">136</span>
+<span id="137">137</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines the structure of Page Table Entries (PTEs) on x86_64.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This crate is also useful for frame deallocation, because it can determine</span>
@@ -159,6 +160,7 @@
 <span class="kw">use</span> <span class="ident">bit_field::BitField</span>;
 <span class="kw">use</span> <span class="ident">kernel_config::memory::PAGE_SHIFT</span>;
 <span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
+<span class="kw">use</span> <span class="ident">frame_allocator::AllocatedFrame</span>;
 
 <span class="doccomment">/// A page table entry, which is a `u64` value under the hood.</span>
 <span class="doccomment">///</span>
@@ -232,7 +234,7 @@
     <span class="doccomment">/// This is the actual mapping action that informs the MMU of a new mapping.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Note: this performs no checks about the current value of this page table entry.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_entry</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">frame</span>: <span class="ident">Frame</span>, <span class="ident">flags</span>: <span class="ident">EntryFlags</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_entry</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">frame</span>: <span class="ident">AllocatedFrame</span>, <span class="ident">flags</span>: <span class="ident">EntryFlags</span>) {
         <span class="self">self</span>.<span class="number">0</span> <span class="op">=</span> (<span class="ident">frame</span>.<span class="ident">start_address</span>().<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>) <span class="op">|</span> <span class="ident">flags</span>.<span class="ident">bits</span>();
     }
 

@@ -375,9 +375,6 @@
 <span id="369">369</span>
 <span id="370">370</span>
 <span id="371">371</span>
-<span id="372">372</span>
-<span id="373">373</span>
-<span id="374">374</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md</span>
 <span class="comment">// file at the top-level directory of this distribution.</span>
 <span class="comment">//</span>
@@ -453,9 +450,11 @@
         })
     }
 
-    <span class="doccomment">/// Initializes a brand new top-level P4 `PageTable` whose root is located in the given `new_p4_frame`. </span>
-    <span class="doccomment">/// It requires using the given `current_active_table` to set up its initial mapping contents,</span>
-    <span class="doccomment">/// for which the given `TemporaryPage` is used to recursively map it (and is auto-unmapped upon return). </span>
+    <span class="doccomment">/// Initializes a new top-level P4 `PageTable` whose root is located in the given `new_p4_frame`.</span>
+    <span class="doccomment">/// It requires using the given `current_active_table` to set up its initial mapping contents.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// A single allocated page can optionally be provided for use as part of a new `TemporaryPage`</span>
+    <span class="doccomment">/// for the recursive mapping.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// Returns the new `PageTable` that exists in physical memory at the given `new_p4_frame`. </span>
     <span class="doccomment">/// Note that this new page table has no current mappings beyond the recursive P4 mapping,</span>
@@ -464,20 +463,19 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_table</span>(
         <span class="ident">current_page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>,
         <span class="ident">new_p4_frame</span>: <span class="ident">AllocatedFrames</span>,
-        <span class="kw-2">mut</span> <span class="ident">temporary_page</span>: <span class="ident">TemporaryPage</span>,
+        <span class="ident">page</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AllocatedPages</span><span class="op">&gt;</span>,
     ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PageTable</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="macro">assert!</span>(<span class="ident">new_p4_frame</span>.<span class="ident">size_in_frames</span>() <span class="op">==</span> <span class="number">1</span>);
-        <span class="kw">let</span> <span class="ident">p4_frame</span> <span class="op">=</span> <span class="ident">new_p4_frame</span>.<span class="ident">start</span>().<span class="ident">clone</span>();
-        
-        {
-            <span class="kw">let</span> <span class="ident">table</span> <span class="op">=</span> <span class="ident">temporary_page</span>.<span class="ident">map_table_frame</span>(<span class="ident">new_p4_frame</span>, <span class="ident">current_page_table</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">p4_frame</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">new_p4_frame</span>.<span class="ident">start</span>();
+
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">temporary_page</span> <span class="op">=</span> <span class="ident">TemporaryPage::create_and_map_table_frame</span>(<span class="ident">page</span>, <span class="ident">new_p4_frame</span>, <span class="ident">current_page_table</span>)<span class="question-mark">?</span>;
+        <span class="ident">temporary_page</span>.<span class="ident">with_table_and_frame</span>(<span class="op">|</span><span class="ident">table</span>, <span class="ident">frame</span><span class="op">|</span> {
             <span class="ident">table</span>.<span class="ident">zero</span>();
-            <span class="ident">table</span>[<span class="ident">RECURSIVE_P4_INDEX</span>].<span class="ident">set_entry</span>(<span class="ident">p4_frame</span>, <span class="ident">EntryFlags::PRESENT</span> <span class="op">|</span> <span class="ident">EntryFlags::WRITABLE</span>);
-        }
+            <span class="ident">table</span>[<span class="ident">RECURSIVE_P4_INDEX</span>].<span class="ident">set_entry</span>(<span class="ident">frame</span>.<span class="ident">as_allocated_frame</span>(), <span class="ident">EntryFlags::PRESENT</span> <span class="op">|</span> <span class="ident">EntryFlags::WRITABLE</span>);
+        })<span class="question-mark">?</span>;
 
         <span class="kw">let</span> (<span class="ident">_temp_page</span>, <span class="ident">inited_new_p4_frame</span>) <span class="op">=</span> <span class="ident">temporary_page</span>.<span class="ident">unmap_into_parts</span>(<span class="ident">current_page_table</span>)<span class="question-mark">?</span>;
 
-        <span class="prelude-val">Ok</span>( <span class="ident">PageTable</span> { 
+        <span class="prelude-val">Ok</span>(<span class="ident">PageTable</span> {
             <span class="ident">mapper</span>: <span class="ident">Mapper::with_p4_frame</span>(<span class="ident">p4_frame</span>),
             <span class="ident">p4_table</span>: <span class="ident">inited_new_p4_frame</span>.<span class="ident">ok_or</span>(<span class="string">&quot;BUG: PageTable::new_table(): failed to take back unmapped Frame for p4_table&quot;</span>)<span class="question-mark">?</span>,
         })
@@ -492,7 +490,6 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
         <span class="ident">other_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>,
-        <span class="kw-2">mut</span> <span class="ident">temporary_page</span>: <span class="ident">temporary_page::TemporaryPage</span>,
         <span class="ident">f</span>: <span class="ident">F</span>,
     ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>
         <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="kw-2">&amp;mut</span> <span class="ident">Mapper</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>
@@ -502,14 +499,13 @@
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;PageTable::with(): this PageTable (&#39;self&#39;) must be the currently active page table.&quot;</span>);
         }
 
-        <span class="comment">// Temporarily take ownership of the p4 allocated frame for this page table.</span>
+        <span class="comment">// Temporarily take ownership of this page table&#39;s p4 allocated frame and</span>
+        <span class="comment">// create a new temporary page that maps to that frame.</span>
         <span class="kw">let</span> <span class="ident">this_p4</span> <span class="op">=</span> <span class="ident">core::mem::replace</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">p4_table</span>, <span class="ident">AllocatedFrames::empty</span>());
-
-        <span class="comment">// map temporary_page to current p4 table</span>
-        <span class="kw">let</span> <span class="ident">p4_table</span> <span class="op">=</span> <span class="ident">temporary_page</span>.<span class="ident">map_table_frame</span>(<span class="ident">this_p4</span>, <span class="self">self</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">temporary_page</span> <span class="op">=</span> <span class="ident">TemporaryPage::create_and_map_table_frame</span>(<span class="prelude-val">None</span>, <span class="ident">this_p4</span>, <span class="self">self</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// overwrite recursive mapping</span>
-        <span class="self">self</span>.<span class="ident">p4_mut</span>()[<span class="ident">RECURSIVE_P4_INDEX</span>].<span class="ident">set_entry</span>(<span class="kw-2">*</span><span class="ident">other_table</span>.<span class="ident">p4_table</span>.<span class="ident">start</span>(), <span class="ident">EntryFlags::PRESENT</span> <span class="op">|</span> <span class="ident">EntryFlags::WRITABLE</span>); 
+        <span class="self">self</span>.<span class="ident">p4_mut</span>()[<span class="ident">RECURSIVE_P4_INDEX</span>].<span class="ident">set_entry</span>(<span class="ident">other_table</span>.<span class="ident">p4_table</span>.<span class="ident">as_allocated_frame</span>(), <span class="ident">EntryFlags::PRESENT</span> <span class="op">|</span> <span class="ident">EntryFlags::WRITABLE</span>); 
         <span class="ident">tlb_flush_all</span>();
 
         <span class="comment">// set mapper&#39;s target frame to reflect that future mappings will be mapped into the other_table</span>
@@ -522,7 +518,9 @@
         <span class="self">self</span>.<span class="ident">mapper</span>.<span class="ident">target_p4</span> <span class="op">=</span> <span class="ident">active_p4_frame</span>;
 
         <span class="comment">// restore recursive mapping to original p4 table</span>
-        <span class="ident">p4_table</span>[<span class="ident">RECURSIVE_P4_INDEX</span>].<span class="ident">set_entry</span>(<span class="ident">active_p4_frame</span>, <span class="ident">EntryFlags::PRESENT</span> <span class="op">|</span> <span class="ident">EntryFlags::WRITABLE</span>);
+        <span class="ident">temporary_page</span>.<span class="ident">with_table_and_frame</span>(<span class="op">|</span><span class="ident">p4_table</span>, <span class="ident">frame</span><span class="op">|</span> {
+            <span class="ident">p4_table</span>[<span class="ident">RECURSIVE_P4_INDEX</span>].<span class="ident">set_entry</span>(<span class="ident">frame</span>.<span class="ident">as_allocated_frame</span>(), <span class="ident">EntryFlags::PRESENT</span> <span class="op">|</span> <span class="ident">EntryFlags::WRITABLE</span>);
+        })<span class="question-mark">?</span>;
         <span class="ident">tlb_flush_all</span>();
 
         <span class="comment">// Here, recover the current page table&#39;s p4 frame and restore it into this current page table,</span>
@@ -608,7 +606,7 @@
     <span class="macro">debug!</span>(<span class="string">&quot;multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}\n&quot;</span>, <span class="ident">boot_info_start_vaddr</span>, <span class="ident">boot_info_start_paddr</span>, <span class="ident">boot_info_size</span>);
 
     <span class="kw">let</span> <span class="ident">new_p4_frame</span> <span class="op">=</span> <span class="ident">frame_allocator::allocate_frames</span>(<span class="number">1</span>).<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t allocate frame for new page table&quot;</span>)<span class="question-mark">?</span>; 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_table</span> <span class="op">=</span> <span class="ident">PageTable::new_table</span>(<span class="kw-2">&amp;mut</span> <span class="ident">page_table</span>, <span class="ident">new_p4_frame</span>, <span class="ident">TemporaryPage::new</span>())<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_table</span> <span class="op">=</span> <span class="ident">PageTable::new_table</span>(<span class="kw-2">&amp;mut</span> <span class="ident">page_table</span>, <span class="ident">new_p4_frame</span>, <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
 
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">text_mapped_pages</span>:        <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rodata_mapped_pages</span>:      <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
@@ -619,7 +617,7 @@
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">identity_mapped_pages</span>:    [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>; <span class="number">32</span>] <span class="op">=</span> <span class="ident">Default::default</span>();
 
     <span class="comment">// Create and initialize a new page table with the same contents as the currently-executing kernel code/data sections.</span>
-    <span class="ident">page_table</span>.<span class="ident">with</span>(<span class="kw-2">&amp;mut</span> <span class="ident">new_table</span>, <span class="ident">TemporaryPage::new</span>(), <span class="op">|</span><span class="ident">mapper</span><span class="op">|</span> {
+    <span class="ident">page_table</span>.<span class="ident">with</span>(<span class="kw-2">&amp;mut</span> <span class="ident">new_table</span>, <span class="op">|</span><span class="ident">mapper</span><span class="op">|</span> {
         
         <span class="comment">// Map every section found in the kernel image (given by the boot information above) into our new page table. </span>
         <span class="comment">// To allow the APs to boot up, we must identity map those kernel sections too, i.e., </span>
@@ -651,31 +649,28 @@
         <span class="kw">let</span> <span class="ident">text_pages</span> <span class="op">=</span> <span class="ident">page_allocator::allocate_pages_by_bytes_at</span>(<span class="ident">text_start_virt</span>, <span class="ident">text_end_virt</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">text_start_virt</span>.<span class="ident">value</span>())<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">text_frames</span> <span class="op">=</span> <span class="ident">frame_allocator::allocate_frames_by_bytes_at</span>(<span class="ident">text_start_phys</span>, <span class="ident">text_end_phys</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">text_start_phys</span>.<span class="ident">value</span>())<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">text_pages_identity</span> <span class="op">=</span> <span class="ident">page_allocator::allocate_pages_by_bytes_at</span>(<span class="ident">text_start_virt</span> <span class="op">-</span> <span class="ident">KERNEL_OFFSET</span>, <span class="ident">text_end_virt</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">text_start_virt</span>.<span class="ident">value</span>())<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">text_frames_identity</span> <span class="op">=</span> <span class="ident">text_frames</span>.<span class="ident">deref</span>().<span class="ident">clone</span>();
-        <span class="ident">text_mapped_pages</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">mapper</span>.<span class="ident">map_allocated_pages_to</span>(<span class="ident">text_pages</span>, <span class="ident">text_frames</span>, <span class="ident">text_flags</span>)<span class="question-mark">?</span>);
         <span class="ident">identity_mapped_pages</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>( <span class="kw">unsafe</span> {
-            <span class="ident">Mapper::map_to_non_exclusive</span>(<span class="ident">mapper</span>, <span class="ident">text_pages_identity</span>, <span class="ident">text_frames_identity</span>, <span class="ident">text_flags</span>)<span class="question-mark">?</span>
+            <span class="ident">Mapper::map_to_non_exclusive</span>(<span class="ident">mapper</span>, <span class="ident">text_pages_identity</span>, <span class="kw-2">&amp;</span><span class="ident">text_frames</span>, <span class="ident">text_flags</span>)<span class="question-mark">?</span>
         });
+        <span class="ident">text_mapped_pages</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">mapper</span>.<span class="ident">map_allocated_pages_to</span>(<span class="ident">text_pages</span>, <span class="ident">text_frames</span>, <span class="ident">text_flags</span>)<span class="question-mark">?</span>);
         <span class="ident">index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
 
         <span class="kw">let</span> <span class="ident">rodata_pages</span> <span class="op">=</span> <span class="ident">page_allocator::allocate_pages_by_bytes_at</span>(<span class="ident">rodata_start_virt</span>, <span class="ident">rodata_end_virt</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">rodata_start_virt</span>.<span class="ident">value</span>())<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">rodata_frames</span> <span class="op">=</span> <span class="ident">frame_allocator::allocate_frames_by_bytes_at</span>(<span class="ident">rodata_start_phys</span>, <span class="ident">rodata_end_phys</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">rodata_start_phys</span>.<span class="ident">value</span>())<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">rodata_pages_identity</span> <span class="op">=</span> <span class="ident">page_allocator::allocate_pages_by_bytes_at</span>(<span class="ident">rodata_start_virt</span> <span class="op">-</span> <span class="ident">KERNEL_OFFSET</span>, <span class="ident">rodata_end_virt</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">rodata_start_virt</span>.<span class="ident">value</span>())<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">rodata_frames_identity</span> <span class="op">=</span> <span class="ident">rodata_frames</span>.<span class="ident">deref</span>().<span class="ident">clone</span>();
-        <span class="ident">rodata_mapped_pages</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">mapper</span>.<span class="ident">map_allocated_pages_to</span>(<span class="ident">rodata_pages</span>, <span class="ident">rodata_frames</span>, <span class="ident">rodata_flags</span>)<span class="question-mark">?</span>);
         <span class="ident">identity_mapped_pages</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>( <span class="kw">unsafe</span> {
-            <span class="ident">Mapper::map_to_non_exclusive</span>(<span class="ident">mapper</span>, <span class="ident">rodata_pages_identity</span>, <span class="ident">rodata_frames_identity</span>, <span class="ident">rodata_flags</span>)<span class="question-mark">?</span>
+            <span class="ident">Mapper::map_to_non_exclusive</span>(<span class="ident">mapper</span>, <span class="ident">rodata_pages_identity</span>, <span class="kw-2">&amp;</span><span class="ident">rodata_frames</span>, <span class="ident">rodata_flags</span>)<span class="question-mark">?</span>
         });
+        <span class="ident">rodata_mapped_pages</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">mapper</span>.<span class="ident">map_allocated_pages_to</span>(<span class="ident">rodata_pages</span>, <span class="ident">rodata_frames</span>, <span class="ident">rodata_flags</span>)<span class="question-mark">?</span>);
         <span class="ident">index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
 
         <span class="kw">let</span> <span class="ident">data_pages</span> <span class="op">=</span> <span class="ident">page_allocator::allocate_pages_by_bytes_at</span>(<span class="ident">data_start_virt</span>, <span class="ident">data_end_virt</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">data_start_virt</span>.<span class="ident">value</span>())<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">data_frames</span> <span class="op">=</span> <span class="ident">frame_allocator::allocate_frames_by_bytes_at</span>(<span class="ident">data_start_phys</span>, <span class="ident">data_end_phys</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">data_start_phys</span>.<span class="ident">value</span>())<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">data_pages_identity</span> <span class="op">=</span> <span class="ident">page_allocator::allocate_pages_by_bytes_at</span>(<span class="ident">data_start_virt</span> <span class="op">-</span> <span class="ident">KERNEL_OFFSET</span>, <span class="ident">data_end_virt</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">data_start_virt</span>.<span class="ident">value</span>())<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">data_frames_identity</span> <span class="op">=</span> <span class="ident">data_frames</span>.<span class="ident">deref</span>().<span class="ident">clone</span>();
-        <span class="ident">data_mapped_pages</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">mapper</span>.<span class="ident">map_allocated_pages_to</span>(<span class="ident">data_pages</span>, <span class="ident">data_frames</span>, <span class="ident">data_flags</span>)<span class="question-mark">?</span>);
         <span class="ident">identity_mapped_pages</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>( <span class="kw">unsafe</span> {
-            <span class="ident">Mapper::map_to_non_exclusive</span>(<span class="ident">mapper</span>, <span class="ident">data_pages_identity</span>, <span class="ident">data_frames_identity</span>, <span class="ident">data_flags</span>)<span class="question-mark">?</span>
+            <span class="ident">Mapper::map_to_non_exclusive</span>(<span class="ident">mapper</span>, <span class="ident">data_pages_identity</span>, <span class="kw-2">&amp;</span><span class="ident">data_frames</span>, <span class="ident">data_flags</span>)<span class="question-mark">?</span>
         });
+        <span class="ident">data_mapped_pages</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">mapper</span>.<span class="ident">map_allocated_pages_to</span>(<span class="ident">data_pages</span>, <span class="ident">data_frames</span>, <span class="ident">data_flags</span>)<span class="question-mark">?</span>);
         <span class="ident">index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
 
         <span class="comment">// We don&#39;t need to do any mapping for the initial root (P4) page table stack (a separate data section),</span>
@@ -704,11 +699,10 @@
         <span class="kw">let</span> <span class="ident">vga_display_pages</span> <span class="op">=</span> <span class="ident">page_allocator::allocate_pages_by_bytes_at</span>(<span class="ident">vga_virt_addr_identity</span> <span class="op">+</span> <span class="ident">KERNEL_OFFSET</span>, <span class="ident">vga_size_in_bytes</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">vga_display_frames</span> <span class="op">=</span> <span class="ident">frame_allocator::allocate_frames_by_bytes_at</span>(<span class="ident">vga_phys_addr</span>, <span class="ident">vga_size_in_bytes</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">vga_display_pages_identity</span> <span class="op">=</span> <span class="ident">page_allocator::allocate_pages_by_bytes_at</span>(<span class="ident">vga_virt_addr_identity</span>, <span class="ident">vga_size_in_bytes</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">vga_display_frames_identity</span> <span class="op">=</span> <span class="ident">vga_display_frames</span>.<span class="ident">deref</span>().<span class="ident">clone</span>();
-        <span class="ident">higher_half_mapped_pages</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">mapper</span>.<span class="ident">map_allocated_pages_to</span>(<span class="ident">vga_display_pages</span>, <span class="ident">vga_display_frames</span>, <span class="ident">vga_flags</span>)<span class="question-mark">?</span>);
         <span class="ident">identity_mapped_pages</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>( <span class="kw">unsafe</span> {
-            <span class="ident">Mapper::map_to_non_exclusive</span>(<span class="ident">mapper</span>, <span class="ident">vga_display_pages_identity</span>, <span class="ident">vga_display_frames_identity</span>, <span class="ident">vga_flags</span>)<span class="question-mark">?</span>
+            <span class="ident">Mapper::map_to_non_exclusive</span>(<span class="ident">mapper</span>, <span class="ident">vga_display_pages_identity</span>, <span class="kw-2">&amp;</span><span class="ident">vga_display_frames</span>, <span class="ident">vga_flags</span>)<span class="question-mark">?</span>
         });
+        <span class="ident">higher_half_mapped_pages</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">mapper</span>.<span class="ident">map_allocated_pages_to</span>(<span class="ident">vga_display_pages</span>, <span class="ident">vga_display_frames</span>, <span class="ident">vga_flags</span>)<span class="question-mark">?</span>);
         <span class="ident">index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
 
 

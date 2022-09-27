@@ -779,6 +779,7 @@
 <span id="773">773</span>
 <span id="774">774</span>
 <span id="775">775</span>
+<span id="776">776</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
@@ -792,7 +793,7 @@
 <span class="kw">use</span> <span class="ident">raw_cpuid::CpuId</span>;
 <span class="kw">use</span> <span class="ident">msr</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">irq_safety::RwLockIrqSafe</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PageTable</span>, <span class="ident">PhysicalAddress</span>, <span class="ident">EntryFlags</span>, <span class="ident">MappedPages</span>, <span class="ident">allocate_pages</span>, <span class="ident">allocate_frames_at</span>};
+<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PageTable</span>, <span class="ident">PhysicalAddress</span>, <span class="ident">EntryFlags</span>, <span class="ident">MappedPages</span>, <span class="ident">allocate_pages</span>, <span class="ident">allocate_frames_at</span>, <span class="ident">AllocatedFrames</span>};
 <span class="kw">use</span> <span class="ident">kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS</span>;
 <span class="kw">use</span> <span class="ident">atomic_linked_list::atomic_map::AtomicMap</span>;
 <span class="kw">use</span> <span class="ident">crossbeam_utils::atomic::AtomicCell</span>;
@@ -921,31 +922,32 @@
 }
 
 
-<span class="doccomment">/// return a mapping of APIC memory-mapped I/O registers </span>
+<span class="doccomment">/// Map the physical frames containing the APIC&#39;s MMIO registers into the given `page_table`.</span>
 <span class="kw">fn</span> <span class="ident">map_apic</span>(<span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">if</span> <span class="ident">has_x2apic</span>() { <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;map_apic() is only for use in apic/xapic systems, not x2apic.&quot;</span>); }
-    
-    <span class="kw">let</span> <span class="ident">phys_addr</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(<span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="kw">as</span> <span class="ident">usize</span>)
-        .<span class="ident">ok_or</span>(<span class="string">&quot;APIC physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">new_page</span> <span class="op">=</span> <span class="ident">allocate_pages</span>(<span class="number">1</span>).<span class="ident">ok_or</span>(<span class="string">&quot;out of virtual address space!&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="ident">EntryFlags::WRITABLE</span> <span class="op">|</span> <span class="ident">EntryFlags::NO_CACHE</span> <span class="op">|</span> <span class="ident">EntryFlags::NO_EXECUTE</span>;
-    <span class="kw">let</span> <span class="ident">apic_mapped_page</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">allocated_frame</span>) <span class="op">=</span> <span class="ident">allocate_frames_at</span>(<span class="ident">phys_addr</span>, <span class="number">1</span>) {
-        <span class="ident">page_table</span>.<span class="ident">map_allocated_pages_to</span>(<span class="ident">new_page</span>, <span class="ident">allocated_frame</span>, <span class="ident">flags</span>)<span class="question-mark">?</span>
+    <span class="kw">static</span> <span class="ident">APIC_FRAME</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">AllocatedFrames</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+
+    <span class="kw">let</span> <span class="ident">frame</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">apic_frame</span>) <span class="op">=</span> <span class="ident">APIC_FRAME</span>.<span class="ident">get</span>() {
+        <span class="ident">apic_frame</span>
     } <span class="kw">else</span> {
-        <span class="comment">// The APIC frame is the same actual physical address across all CPU cores,</span>
-        <span class="comment">// but they&#39;re actually completely independent pieces of hardware that share one address.</span>
-        <span class="comment">// Therefore, there&#39;s no way to represent that to the Rust language or MappedPages/AllocatedFrames types,</span>
-        <span class="comment">// so we must use unsafe code, at least for now.</span>
-        <span class="kw">unsafe</span> {
-            <span class="ident">memory::Mapper::map_to_non_exclusive</span>(
-                <span class="ident">page_table</span>,
-                <span class="ident">new_page</span>,
-                <span class="ident">memory::FrameRange::from_phys_addr</span>(<span class="ident">phys_addr</span>, <span class="number">1</span>),
-                <span class="ident">flags</span>,
-            )<span class="question-mark">?</span>
-        } 
+        <span class="kw">let</span> <span class="ident">phys_addr</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(<span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="kw">as</span> <span class="ident">usize</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;APIC physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">apic_frame</span> <span class="op">=</span> <span class="ident">allocate_frames_at</span>(<span class="ident">phys_addr</span>, <span class="number">1</span>)<span class="question-mark">?</span>;
+        <span class="ident">APIC_FRAME</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">apic_frame</span>)
     };
-    <span class="prelude-val">Ok</span>(<span class="ident">apic_mapped_page</span>)
+
+    <span class="kw">let</span> <span class="ident">new_page</span> <span class="op">=</span> <span class="ident">allocate_pages</span>(<span class="number">1</span>).<span class="ident">ok_or</span>(<span class="string">&quot;out of virtual address space!&quot;</span>)<span class="question-mark">?</span>;
+    <span class="comment">// The APIC frame is the same actual physical address across all CPU cores,</span>
+    <span class="comment">// but they&#39;re actually completely independent pieces of hardware that share one address.</span>
+    <span class="comment">// Therefore, there&#39;s no way to represent that to the Rust language or MappedPages/AllocatedFrames types,</span>
+    <span class="comment">// so we must use unsafe code, at least for now.</span>
+    <span class="kw">unsafe</span> {
+        <span class="ident">memory::Mapper::map_to_non_exclusive</span>(
+            <span class="ident">page_table</span>,
+            <span class="ident">new_page</span>,
+            <span class="ident">frame</span>,
+            <span class="ident">EntryFlags::WRITABLE</span> <span class="op">|</span> <span class="ident">EntryFlags::NO_CACHE</span> <span class="op">|</span> <span class="ident">EntryFlags::NO_EXECUTE</span>,
+        )
+    }
 }
 
 

@@ -146,8 +146,6 @@
 <span id="140">140</span>
 <span id="141">141</span>
 <span id="142">142</span>
-<span id="143">143</span>
-<span id="144">144</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md</span>
 <span class="comment">// file at the top-level directory of this distribution.</span>
 <span class="comment">//</span>
@@ -239,11 +237,9 @@
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">next_table</span>(<span class="ident">index</span>).<span class="ident">is_none</span>() {
             <span class="macro">assert!</span>(<span class="op">!</span><span class="self">self</span>[<span class="ident">index</span>].<span class="ident">flags</span>().<span class="ident">is_huge</span>(), <span class="string">&quot;mapping code does not support huge pages&quot;</span>);
             <span class="kw">let</span> <span class="ident">af</span> <span class="op">=</span> <span class="ident">frame_allocator::allocate_frames</span>(<span class="number">1</span>).<span class="ident">expect</span>(<span class="string">&quot;next_table_create(): no frames available&quot;</span>);
-            <span class="kw">let</span> <span class="ident">new_page_table_frame</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">af</span>.<span class="ident">start</span>();
-            <span class="ident">core::mem::forget</span>(<span class="ident">af</span>); <span class="comment">// we currently forget frames allocated as page table frames since we don&#39;t yet have a way to track them.</span>
-
-            <span class="self">self</span>[<span class="ident">index</span>].<span class="ident">set_entry</span>(<span class="ident">new_page_table_frame</span>, <span class="ident">flags</span>.<span class="ident">into_writable</span>() <span class="op">|</span> <span class="ident">EntryFlags::PRESENT</span>); <span class="comment">// must be PRESENT | WRITABLE for x86_64</span>
+            <span class="self">self</span>[<span class="ident">index</span>].<span class="ident">set_entry</span>(<span class="ident">af</span>.<span class="ident">as_allocated_frame</span>(), <span class="ident">flags</span>.<span class="ident">into_writable</span>() <span class="op">|</span> <span class="ident">EntryFlags::PRESENT</span>); <span class="comment">// must be PRESENT | WRITABLE for x86_64</span>
             <span class="self">self</span>.<span class="ident">next_table_mut</span>(<span class="ident">index</span>).<span class="ident">unwrap</span>().<span class="ident">zero</span>();
+            <span class="ident">core::mem::forget</span>(<span class="ident">af</span>); <span class="comment">// we currently forget frames allocated as page table frames since we don&#39;t yet have a way to track them.</span>
         }
         <span class="self">self</span>.<span class="ident">next_table_mut</span>(<span class="ident">index</span>).<span class="ident">unwrap</span>()
     }
