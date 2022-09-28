@@ -203,7 +203,7 @@ pub fn log_panic_entry(panic_info: &PanicInfo) {
         let panic_file = location.file();
         let mut error_crate_iter = panic_file.split('/');
         error_crate_iter.next();
-        let error_crate_name_simple = error_crate_iter.next().unwrap_or_else(|| panic_file);
+        let error_crate_name_simple = error_crate_iter.next().unwrap_or(panic_file);
         debug!("panic file {}",error_crate_name_simple);
         fe.crate_error_occured = Some(error_crate_name_simple.to_string());
     } else {
@@ -247,7 +247,7 @@ pub fn log_handled_fault(fe: FaultEntry){
 
 /// Provides the most recent entry in the log for given crate
 /// Utility function for iterative crate replacement
-pub fn get_the_most_recent_match(error_crate : &str) -> Option<FaultEntry> {
+pub fn get_the_most_recent_match(error_crate: &str) -> Option<FaultEntry> {
 
     #[cfg(not(downtime_eval))]
     debug!("getting the most recent match");
@@ -256,7 +256,7 @@ pub fn get_the_most_recent_match(error_crate : &str) -> Option<FaultEntry> {
     for fault_entry in FAULT_LIST.lock().iter() {
         if let Some(crate_error_occured) = &fault_entry.crate_error_occured {
             let error_crate_name = crate_error_occured.clone();
-            let error_crate_name_simple = error_crate_name.split('-').next().unwrap_or_else(|| &error_crate_name);
+            let error_crate_name_simple = error_crate_name.split('-').next().unwrap_or(&error_crate_name);
             if error_crate_name_simple == error_crate {
                 let item = fault_entry.clone();
                 fe = Some(item);

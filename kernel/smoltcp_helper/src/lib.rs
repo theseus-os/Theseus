@@ -58,7 +58,7 @@ pub fn get_default_iface() -> Result<NetworkInterfaceRef, &'static str> {
         .iter()
         .next()
         .cloned()
-        .ok_or_else(|| "no network interfaces available")
+        .ok_or("no network interfaces available")
 }
 
 /// A convenience function for connecting a socket.

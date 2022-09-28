@@ -88,7 +88,7 @@ impl Path {
     pub fn basename<'a>(&'a self) -> &'a str {
         self.rcomponents()
             .next()
-            .unwrap_or_else(|| &self.path)
+            .unwrap_or(&self.path)
     }
 
     /// Like [`basename()`](#method.basename), but excludes the file extension, if present.
@@ -96,7 +96,7 @@ impl Path {
         self.basename()
             .split(EXTENSION_DELIMITER)
             .find(|&x| x != "")
-            .unwrap_or_else(|| &self.path)
+            .unwrap_or(&self.path)
     }
 
     /// Returns the file extension, if present. 
