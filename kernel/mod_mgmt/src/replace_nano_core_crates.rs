@@ -114,7 +114,7 @@ fn load_crate_using_nano_core_data_sections(
     // (2) Go through the .data/.bss sections in the partially loaded new crate,
     //     and replace them with references to the corresponding data section in the nano_core.
     {
-        let mut new_crate = new_crate_ref.lock_as_mut().ok_or_else(|| "BUG: could not get exclusive mutable access to newly-loaded crate")?;
+        let mut new_crate = new_crate_ref.lock_as_mut().ok_or("BUG: could not get exclusive mutable access to newly-loaded crate")?;
 
         for shndx in new_crate.data_sections.clone() {
             let new_data_sec = new_crate.sections.get_mut(&shndx).ok_or_else(|| {

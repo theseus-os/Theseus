@@ -95,7 +95,7 @@ impl<'p> From<&PanicInfo<'p>> for PanicInfoOwned {
     fn from(info: &PanicInfo) -> PanicInfoOwned {
         let msg = info.message()
             .map(|m| format!("{}", m))
-            .unwrap_or_else(|| String::new());
+            .unwrap_or_default();
         let (file, line, column) = if let Some(loc) = info.location() {
             (String::from(loc.file()), loc.line(), loc.column())
         } else {

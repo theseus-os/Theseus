@@ -966,7 +966,7 @@ impl CrateNamespace {
     ) -> Result<(), &'static str> {
 
         for weak_dep in &old_section.inner.read().sections_dependent_on_me {
-            let target_sec = weak_dep.section.upgrade().ok_or_else(|| "couldn't upgrade WeakDependent.section")?;
+            let target_sec = weak_dep.section.upgrade().ok_or("couldn't upgrade WeakDependent.section")?;
             let relocation_entry = weak_dep.relocation;
 
             debug!("rewrite_section_dependents(): target_sec: {:?}, old_sec: {:?}, new_sec: {:?}", target_sec, old_section, new_section);
@@ -1131,7 +1131,7 @@ impl CrateNamespace {
         // Set up the new_crate's sections, since we couldn't do it when `new_crate` was created.
         {
             let mut new_crate_mut = new_crate.lock_as_mut()
-                .ok_or_else(|| "BUG: load_crate_sections(): couldn't get exclusive mutable access to new_crate")?;
+                .ok_or("BUG: load_crate_sections(): couldn't get exclusive mutable access to new_crate")?;
             new_crate_mut.sections        = loaded_sections;
             new_crate_mut.global_sections = global_sections;
             new_crate_mut.tls_sections    = tls_sections;
@@ -1878,7 +1878,7 @@ impl CrateNamespace {
                 if let Some((ref dp_ref, ref mut dp)) = read_write_pages_locked {
                     // here: we're ready to copy the data/bss section to the proper address
                     let dest_vaddr = dp.address_at_offset(data_offset)
-                        .ok_or_else(|| "BUG: data_offset wasn't within data_pages")?;
+                        .ok_or("BUG: data_offset wasn't within data_pages")?;
                     let dest_slice: &mut [u8] = dp.as_slice_mut(data_offset, sec_size)?;
                     match sec.get_data(&elf_file) {
                         Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
@@ -1919,7 +1919,7 @@ impl CrateNamespace {
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
                     // here: we're ready to copy the rodata section to the proper address
                     let dest_vaddr = rp.address_at_offset(rodata_offset)
-                        .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
+                        .ok_or("BUG: rodata_offset wasn't within rodata_mapped_pages")?;
                     let dest_slice: &mut [u8] = rp.as_slice_mut(rodata_offset, sec_size)?;
                     match sec.get_data(&elf_file) {
                         Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
@@ -1963,7 +1963,7 @@ impl CrateNamespace {
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
                     // here: we're ready to copy the rodata section to the proper address
                     let dest_vaddr = rp.address_at_offset(rodata_offset)
-                        .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
+                        .ok_or("BUG: rodata_offset wasn't within rodata_mapped_pages")?;
                     let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
                     match sec.get_data(&elf_file) {
                         Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
@@ -2002,7 +2002,7 @@ impl CrateNamespace {
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
                     // here: we're ready to copy the rodata section to the proper address
                     let dest_vaddr = rp.address_at_offset(rodata_offset)
-                        .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
+                        .ok_or("BUG: rodata_offset wasn't within rodata_mapped_pages")?;
                     let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
                     match sec.get_data(&elf_file) {
                         Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),

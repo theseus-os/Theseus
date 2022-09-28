@@ -280,7 +280,7 @@ impl Chunk {
     }
 
     /// Returns a new `Chunk` with an empty range of frames. 
-    fn empty() -> Chunk {
+    const fn empty() -> Chunk {
         Chunk {
             typ: MemoryRegionType::Unknown,
             frames: FrameRange::empty(),

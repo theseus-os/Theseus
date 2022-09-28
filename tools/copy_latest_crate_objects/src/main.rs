@@ -134,14 +134,14 @@ fn main() -> Result<(), String> {
         return Ok(());
     }
 
-    let mut kernel_prefix = matches.opt_str("kernel-prefix").unwrap_or("k".to_string());
+    let mut kernel_prefix = matches.opt_str("kernel-prefix").unwrap_or_else(|| "k".to_string());
     if !kernel_prefix.ends_with(MODULE_PREFIX_DELIMITER) {
         kernel_prefix.push_str(MODULE_PREFIX_DELIMITER);
     }
     if kernel_prefix.matches(MODULE_PREFIX_DELIMITER).count() > 1 {
         return Err(format!("kernel-prefix {:?} must only contain one '#' character at the end!", kernel_prefix));
     }
-    let mut app_prefix = matches.opt_str("app-prefix").unwrap_or("a".to_string());
+    let mut app_prefix = matches.opt_str("app-prefix").unwrap_or_else(|| "a".to_string());
     if !app_prefix.ends_with(MODULE_PREFIX_DELIMITER) {
         app_prefix.push_str(MODULE_PREFIX_DELIMITER);
     }
