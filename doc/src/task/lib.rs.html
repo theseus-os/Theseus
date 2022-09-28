@@ -1437,7 +1437,7 @@
     <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">info</span>: <span class="kw-2">&amp;</span><span class="ident">PanicInfo</span>) -&gt; <span class="ident">PanicInfoOwned</span> {
         <span class="kw">let</span> <span class="ident">msg</span> <span class="op">=</span> <span class="ident">info</span>.<span class="ident">message</span>()
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">m</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">m</span>))
-            .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">String::new</span>());
+            .<span class="ident">unwrap_or_default</span>();
         <span class="kw">let</span> (<span class="ident">file</span>, <span class="ident">line</span>, <span class="ident">column</span>) <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">loc</span>) <span class="op">=</span> <span class="ident">info</span>.<span class="ident">location</span>() {
             (<span class="ident">String::from</span>(<span class="ident">loc</span>.<span class="ident">file</span>()), <span class="ident">loc</span>.<span class="ident">line</span>(), <span class="ident">loc</span>.<span class="ident">column</span>())
         } <span class="kw">else</span> {

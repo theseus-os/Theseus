@@ -1402,7 +1402,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crate_name_without_hash</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">str</span> {
         <span class="self">self</span>.<span class="ident">crate_name</span>.<span class="ident">split</span>(<span class="ident">CRATE_HASH_DELIMITER</span>)
             .<span class="ident">next</span>()
-            .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">crate_name</span>)
+            .<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">crate_name</span>)
     }
 
     <span class="doccomment">/// Returns this crate name as a symbol prefix, including a trailing &quot;`::`&quot;.</span>
@@ -1533,7 +1533,7 @@
             <span class="kw">let</span> <span class="ident">new_sec_mapped_pages_offset</span> <span class="op">=</span> <span class="ident">old_sec</span>.<span class="ident">mapped_pages_offset</span>;
             <span class="kw">let</span> (<span class="ident">new_sec_mapped_pages_ref</span>, <span class="ident">new_sec_virt_addr</span>) <span class="op">=</span> <span class="kw">match</span> <span class="ident">old_sec</span>.<span class="ident">typ</span> {
                 <span class="ident">SectionType::Text</span> =&gt; (
-                    <span class="ident">new_text_pages_ref</span>.<span class="ident">clone</span>().<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;BUG: missing text pages in newly-copied crate&quot;</span>)<span class="question-mark">?</span>,
+                    <span class="ident">new_text_pages_ref</span>.<span class="ident">clone</span>().<span class="ident">ok_or</span>(<span class="string">&quot;BUG: missing text pages in newly-copied crate&quot;</span>)<span class="question-mark">?</span>,
                     <span class="ident">new_text_pages_locked</span>.<span class="ident">as_ref</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">tp</span><span class="op">|</span> <span class="ident">tp</span>.<span class="ident">address_at_offset</span>(<span class="ident">new_sec_mapped_pages_offset</span>)),
                 ),
                 <span class="ident">SectionType::Rodata</span>
@@ -1541,16 +1541,16 @@
                 <span class="op">|</span> <span class="ident">SectionType::TlsBss</span>
                 <span class="op">|</span> <span class="ident">SectionType::TlsData</span> 
                 <span class="op">|</span> <span class="ident">SectionType::EhFrame</span> =&gt; (
-                    <span class="ident">new_rodata_pages_ref</span>.<span class="ident">clone</span>().<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;BUG: missing rodata pages in newly-copied crate&quot;</span>)<span class="question-mark">?</span>,
+                    <span class="ident">new_rodata_pages_ref</span>.<span class="ident">clone</span>().<span class="ident">ok_or</span>(<span class="string">&quot;BUG: missing rodata pages in newly-copied crate&quot;</span>)<span class="question-mark">?</span>,
                     <span class="ident">new_rodata_pages_locked</span>.<span class="ident">as_ref</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">rp</span><span class="op">|</span> <span class="ident">rp</span>.<span class="ident">address_at_offset</span>(<span class="ident">new_sec_mapped_pages_offset</span>)),
                 ),
                 <span class="ident">SectionType::Data</span>
                 <span class="op">|</span> <span class="ident">SectionType::Bss</span> =&gt; (
-                    <span class="ident">new_data_pages_ref</span>.<span class="ident">clone</span>().<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;BUG: missing data pages in newly-copied crate&quot;</span>)<span class="question-mark">?</span>,
+                    <span class="ident">new_data_pages_ref</span>.<span class="ident">clone</span>().<span class="ident">ok_or</span>(<span class="string">&quot;BUG: missing data pages in newly-copied crate&quot;</span>)<span class="question-mark">?</span>,
                     <span class="ident">new_data_pages_locked</span>.<span class="ident">as_ref</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">dp</span><span class="op">|</span> <span class="ident">dp</span>.<span class="ident">address_at_offset</span>(<span class="ident">new_sec_mapped_pages_offset</span>)),
                 ),
             };
-            <span class="kw">let</span> <span class="ident">new_sec_virt_addr</span> <span class="op">=</span> <span class="ident">new_sec_virt_addr</span>.<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;BUG: couldn&#39;t get virt_addr for new section&quot;</span>)<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">new_sec_virt_addr</span> <span class="op">=</span> <span class="ident">new_sec_virt_addr</span>.<span class="ident">ok_or</span>(<span class="string">&quot;BUG: couldn&#39;t get virt_addr for new section&quot;</span>)<span class="question-mark">?</span>;
 
             <span class="kw">let</span> <span class="ident">new_sec</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::with_dependencies</span>(
                 <span class="ident">old_sec</span>.<span class="ident">typ</span>,                            <span class="comment">// section type is the same</span>
@@ -1578,18 +1578,18 @@
             <span class="kw">let</span> <span class="ident">new_sec_mapped_pages</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">new_sec</span>.<span class="ident">typ</span> {
                 <span class="ident">SectionType::Text</span> =&gt; <span class="ident">new_text_pages_locked</span>
                     .<span class="ident">as_mut</span>()
-                    .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;BUG: missing text pages in newly-copied crate&quot;</span>)<span class="question-mark">?</span>,
+                    .<span class="ident">ok_or</span>(<span class="string">&quot;BUG: missing text pages in newly-copied crate&quot;</span>)<span class="question-mark">?</span>,
                 <span class="ident">SectionType::Rodata</span>
                 <span class="op">|</span> <span class="ident">SectionType::TlsBss</span>
                 <span class="op">|</span> <span class="ident">SectionType::TlsData</span>
                 <span class="op">|</span> <span class="ident">SectionType::GccExceptTable</span>
                 <span class="op">|</span> <span class="ident">SectionType::EhFrame</span> =&gt; <span class="ident">new_rodata_pages_locked</span>
                     .<span class="ident">as_mut</span>()
-                    .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;BUG: missing rodata pages in newly-copied crate&quot;</span>)<span class="question-mark">?</span>,
+                    .<span class="ident">ok_or</span>(<span class="string">&quot;BUG: missing rodata pages in newly-copied crate&quot;</span>)<span class="question-mark">?</span>,
                 <span class="ident">SectionType::Data</span>
                 <span class="op">|</span> <span class="ident">SectionType::Bss</span> =&gt; <span class="ident">new_data_pages_locked</span>
                     .<span class="ident">as_mut</span>()
-                    .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;BUG: missing data pages in newly-copied crate&quot;</span>)<span class="question-mark">?</span>,
+                    .<span class="ident">ok_or</span>(<span class="string">&quot;BUG: missing data pages in newly-copied crate&quot;</span>)<span class="question-mark">?</span>,
             };
             <span class="kw">let</span> <span class="ident">new_sec_mapped_pages_offset</span> <span class="op">=</span> <span class="ident">new_sec</span>.<span class="ident">mapped_pages_offset</span>;
 
@@ -1625,7 +1625,7 @@
             <span class="comment">// which are completely safe to clone without needing any fix ups. </span>
             <span class="kw">for</span> <span class="ident">internal_dep</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">new_sec</span>.<span class="ident">inner</span>.<span class="ident">read</span>().<span class="ident">internal_dependencies</span> {
                 <span class="kw">let</span> <span class="ident">source_sec</span> <span class="op">=</span> <span class="ident">new_sections</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">internal_dep</span>.<span class="ident">source_sec_shndx</span>)
-                    .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;Couldn&#39;t get new section specified by an internal dependency&#39;s source_sec_shndx&quot;</span>)<span class="question-mark">?</span>;
+                    .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t get new section specified by an internal dependency&#39;s source_sec_shndx&quot;</span>)<span class="question-mark">?</span>;
 
                 <span class="comment">// The source and target (new_sec) sections might be the same, so we need to check first</span>
                 <span class="comment">// to ensure that we don&#39;t cause deadlock by trying to lock the same section twice.</span>
@@ -1658,7 +1658,7 @@
         <span class="comment">// set the new_crate&#39;s `sections` list, since we didn&#39;t do it earlier</span>
         {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_crate_mut</span> <span class="op">=</span> <span class="ident">new_crate</span>.<span class="ident">lock_as_mut</span>()
-                .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;BUG: LoadedCrate::deep_copy(): couldn&#39;t get exclusive mutable access to newly-copied crate&quot;</span>)<span class="question-mark">?</span>;
+                .<span class="ident">ok_or</span>(<span class="string">&quot;BUG: LoadedCrate::deep_copy(): couldn&#39;t get exclusive mutable access to newly-copied crate&quot;</span>)<span class="question-mark">?</span>;
             <span class="ident">new_crate_mut</span>.<span class="ident">sections</span> <span class="op">=</span> <span class="ident">new_sections</span>;
         }
 
@@ -1847,7 +1847,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">section_name_without_hash</span>(<span class="ident">sec_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">str</span> {
         <span class="ident">sec_name</span>.<span class="ident">rfind</span>(<span class="ident">SECTION_HASH_DELIMITER</span>)
             .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">end</span><span class="op">|</span> <span class="ident">sec_name</span>.<span class="ident">get</span>(<span class="number">0</span> .. (<span class="ident">end</span> <span class="op">+</span> <span class="ident">SECTION_HASH_DELIMITER</span>.<span class="ident">len</span>())))
-            .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="ident">sec_name</span>)
+            .<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="ident">sec_name</span>)
     }
 
 

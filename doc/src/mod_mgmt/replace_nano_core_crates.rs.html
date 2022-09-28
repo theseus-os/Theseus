@@ -281,7 +281,7 @@
     <span class="comment">// (2) Go through the .data/.bss sections in the partially loaded new crate,</span>
     <span class="comment">//     and replace them with references to the corresponding data section in the nano_core.</span>
     {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_crate</span> <span class="op">=</span> <span class="ident">new_crate_ref</span>.<span class="ident">lock_as_mut</span>().<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;BUG: could not get exclusive mutable access to newly-loaded crate&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_crate</span> <span class="op">=</span> <span class="ident">new_crate_ref</span>.<span class="ident">lock_as_mut</span>().<span class="ident">ok_or</span>(<span class="string">&quot;BUG: could not get exclusive mutable access to newly-loaded crate&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="kw">for</span> <span class="ident">shndx</span> <span class="kw">in</span> <span class="ident">new_crate</span>.<span class="ident">data_sections</span>.<span class="ident">clone</span>() {
             <span class="kw">let</span> <span class="ident">new_data_sec</span> <span class="op">=</span> <span class="ident">new_crate</span>.<span class="ident">sections</span>.<span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="ident">shndx</span>).<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {

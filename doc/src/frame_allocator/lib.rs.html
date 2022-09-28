@@ -1345,7 +1345,7 @@
     }
 
     <span class="doccomment">/// Returns a new `Chunk` with an empty range of frames. </span>
-    <span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="ident">Chunk</span> {
+    <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="ident">Chunk</span> {
         <span class="ident">Chunk</span> {
             <span class="ident">typ</span>: <span class="ident">MemoryRegionType::Unknown</span>,
             <span class="ident">frames</span>: <span class="ident">FrameRange::empty</span>(),

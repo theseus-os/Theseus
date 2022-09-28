@@ -370,7 +370,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">basename</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span> {
         <span class="self">self</span>.<span class="ident">rcomponents</span>()
             .<span class="ident">next</span>()
-            .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">path</span>)
+            .<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">path</span>)
     }
 
     <span class="doccomment">/// Like [`basename()`](#method.basename), but excludes the file extension, if present.</span>
@@ -378,7 +378,7 @@
         <span class="self">self</span>.<span class="ident">basename</span>()
             .<span class="ident">split</span>(<span class="ident">EXTENSION_DELIMITER</span>)
             .<span class="ident">find</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="op">!</span><span class="op">=</span> <span class="string">&quot;&quot;</span>)
-            .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">path</span>)
+            .<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">path</span>)
     }
 
     <span class="doccomment">/// Returns the file extension, if present. </span>
