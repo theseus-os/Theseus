@@ -1241,13 +1241,11 @@ source = "git+https://github.com/jeffparsons/rangemap#0885c58aca1bbe124a03f2b74c
 
 [[package]]
 name = "raw-cpuid"
-version = "7.0.3"
+version = "10.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4a349ca83373cfa5d6dbb66fd76e58b2cca08da71a5f6400de0a0a6a9bceeaf"
+checksum = "a6823ea29436221176fe662da99998ad3b4db2c7f31e7b6f5fe43adccd6320bb"
 dependencies = [
  "bitflags",
- "cc",
- "rustc_version",
 ]
 
 [[package]]
