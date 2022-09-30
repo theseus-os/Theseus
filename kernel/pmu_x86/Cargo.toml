@@ -35,8 +35,7 @@ path = "../../libs/port_io"
 path = "../../libs/msr"
 
 [dependencies.raw-cpuid]
-version = "7.0.3"
-features = [ "use_arch" ]
+version = "10.6.0"
 
 [dependencies.task]
 path = "../task"
