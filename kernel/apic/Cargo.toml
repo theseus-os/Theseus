@@ -9,7 +9,7 @@ edition = "2018"
 spin = "0.9.0"
 volatile = "0.2.7"
 x86_64 = "0.14.8"
-crossbeam-utils = { version = "0.8.5", default-features = false }
+crossbeam-utils = { version = "0.8.12", default-features = false }
 owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 bit_field = "0.7.0"
 zerocopy = "0.5.0"

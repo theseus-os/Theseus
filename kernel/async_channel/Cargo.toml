@@ -6,7 +6,7 @@ version = "0.1.0"
 
 [dependencies]
 spin = "0.9.0"
-crossbeam-utils = { version = "0.8.5", default-features = false }
+crossbeam-utils = { version = "0.8.12", default-features = false }
 static_assertions = "1.1.0"
 mpmc = "0.1.6"
 
