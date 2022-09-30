@@ -8,7 +8,7 @@ version = "0.1.0"
 spin = "0.9.0"
 x86_64 = "0.14.8"
 static_assertions = "1.1.0"
-crossbeam-utils = { version = "0.8.5", default-features = false }
+crossbeam-utils = { version = "0.8.12", default-features = false }
 log = "0.4.8"
 
 [dependencies.irq_safety]
