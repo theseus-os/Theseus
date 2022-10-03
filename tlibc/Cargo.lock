@@ -1909,10 +1909,6 @@ version = "0.5.0"
 source = "git+https://github.com/m-labs/smoltcp#0fedb1db9aa26712830822dd61f065deaa34d611"
 
 [[patch.unused]]
-name = "thiserror_core2"
-version = "2.0.0"
-
-[[patch.unused]]
 name = "wasmparser"
 version = "0.81.0"
 source = "git+https://github.com/theseus-os/wasm-tools?branch=no-std-wasmparser#7b0eb0d074606c8a49027e60e452862f5fe183b4"
