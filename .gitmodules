@@ -18,10 +18,6 @@
 	path = ports/backtrace
 	url = https://github.com/theseus-os/backtrace-rs.git
 	shallow = true
-[submodule "libs/thiserror-core2"]
-	path = libs/thiserror-core2
-	url = https://github.com/theseus-os/thiserror-core2.git
-	shallow = true
 [submodule "libs/core2"]
 	path = libs/core2
 	url = https://github.com/theseus-os/core2.git

@@ -68,7 +68,6 @@ bincode = { git = "https://github.com/bincode-org/bincode" }
 wasmparser = { git = "https://github.com/theseus-os/wasm-tools", branch = "no-std-wasmparser" }
 backtrace = { path = "../ports/backtrace" }
 region = { path = "../ports/region" }
-thiserror_core2 = { path = "../libs/thiserror-core2" }
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 
 ### That messes up our module loading, which is bad!
