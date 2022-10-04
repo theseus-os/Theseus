@@ -2,30 +2,33 @@
 
 #![no_std]
 
-use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+mod dummy;
 
 pub use core::time::Duration;
 
-static EARLY_SLEEP_FUNCTION: AtomicUsize = AtomicUsize::new(0);
+use core::sync::atomic::{AtomicU64, Ordering};
+use crossbeam::atomic::AtomicCell;
+
+static EARLY_SLEEP_FUNCTION: AtomicCell<fn(Duration)> = AtomicCell::new(dummy::early_sleep);
 static EARLY_SLEEPER_FREQUENCY: AtomicU64 = AtomicU64::new(0);
 
-static MONOTONIC_NOW_FUNCTION: AtomicUsize = AtomicUsize::new(0);
-static INSTANT_TO_DURATION_FUNCTION: AtomicUsize = AtomicUsize::new(0);
-static DURATION_TO_INSTANT_FUNCTION: AtomicUsize = AtomicUsize::new(0);
+static MONOTONIC_NOW_FUNCTION: AtomicCell<fn() -> Instant> = AtomicCell::new(dummy::monotonic_now);
+static INSTANT_TO_DURATION_FUNCTION: AtomicCell<fn(Instant) -> Duration> =
+    AtomicCell::new(dummy::instant_to_duration);
+static DURATION_TO_INSTANT_FUNCTION: AtomicCell<fn(Duration) -> Instant> =
+    AtomicCell::new(dummy::duration_to_instant);
 static MONOTONIC_FREQUENCY: AtomicU64 = AtomicU64::new(0);
 
-static REALTIME_NOW_FUNCTION: AtomicUsize = AtomicUsize::new(0);
+static REALTIME_NOW_FUNCTION: AtomicCell<fn() -> Duration> = AtomicCell::new(dummy::realtime_now);
 static REALTIME_FREQUENCY: AtomicU64 = AtomicU64::new(0);
 
 fn duration_to_instant(duration: Duration) -> Instant {
-    let func_addr = DURATION_TO_INSTANT_FUNCTION.load(Ordering::SeqCst);
-    let f: fn(Duration) -> Instant = unsafe { core::mem::transmute(func_addr) };
+    let f = DURATION_TO_INSTANT_FUNCTION.load();
     f(duration)
 }
 
 fn instant_to_duration(instant: Instant) -> Duration {
-    let func_addr = INSTANT_TO_DURATION_FUNCTION.load(Ordering::SeqCst);
-    let f: fn(Instant) -> Duration = unsafe { core::mem::transmute(func_addr) };
+    let f = INSTANT_TO_DURATION_FUNCTION.load();
     f(instant)
 }
 
@@ -57,9 +60,7 @@ impl core::ops::Add<Duration> for Instant {
 
     fn add(self, rhs: Duration) -> Self::Output {
         let instant = duration_to_instant(rhs);
-        Self {
-            counter: self.counter + instant.counter,
-        }
+        Self { counter: self.counter + instant.counter }
     }
 }
 
@@ -68,9 +69,7 @@ impl core::ops::Sub<Duration> for Instant {
 
     fn sub(self, rhs: Duration) -> Self::Output {
         let instant = duration_to_instant(rhs);
-        Self {
-            counter: self.counter - instant.counter,
-        }
+        Self { counter: self.counter - instant.counter }
     }
 }
 
@@ -108,7 +107,7 @@ where
             T::init()?;
         }
 
-        EARLY_SLEEP_FUNCTION.store(T::sleep as usize, Ordering::SeqCst);
+        EARLY_SLEEP_FUNCTION.store(T::sleep);
         EARLY_SLEEPER_FREQUENCY.store(frequency, Ordering::SeqCst);
 
         Ok(true)
@@ -120,18 +119,9 @@ where
 /// Wait for the given `duration`.
 ///
 /// This function can be used even when interrupts are disabled.
-///
-/// # Panics
-///
-/// This function will panic if called prior to [`register_early_sleeper`].
 pub fn early_sleep(duration: Duration) {
-    let addr = EARLY_SLEEP_FUNCTION.load(Ordering::SeqCst);
-    if addr == 0 {
-        panic!("early sleep function not set");
-    } else {
-        let f: fn(Duration) = unsafe { core::mem::transmute(addr) };
-        f(duration)
-    }
+    let f = EARLY_SLEEP_FUNCTION.load();
+    f(duration)
 }
 
 /// Register a clock source.
@@ -153,11 +143,11 @@ where
     if frequency > old_frequency {
         T::init()?;
 
-        let now_addr = T::ClockType::now_addr();
-        now_addr.store(T::now as usize, Ordering::SeqCst);
+        let now_fn = T::ClockType::now_fn();
+        now_fn.store(T::now);
 
-        T::ClockType::store_instant_to_duration_func(T::unit_to_duration as usize);
-        T::ClockType::store_duration_to_instant_func(T::duration_to_unit as usize);
+        T::ClockType::store_unit_to_duration_func(T::unit_to_duration);
+        T::ClockType::store_duration_to_unit_func(T::duration_to_unit);
 
         T::ClockType::frequency_atomic().store(frequency, Ordering::SeqCst);
 
@@ -182,13 +172,8 @@ pub fn now<T>() -> T::Unit
 where
     T: ClockType,
 {
-    let addr = T::now_addr().load(Ordering::SeqCst);
-    if addr == 0 {
-        panic!("time function not set");
-    } else {
-        let f: fn() -> T::Unit = unsafe { core::mem::transmute(addr) };
-        f()
-    }
+    let f = T::now_fn().load();
+    f()
 }
 
 /// A clock source.
@@ -246,17 +231,17 @@ pub trait EarlySleeper: ClockSource<ClockType = Monotonic> {
 /// This trait is sealed and so cannot be implemented outside of this crate.
 pub trait ClockType: private::Sealed {
     /// The type returned by the [`now`] function.
-    type Unit;
+    type Unit: 'static;
 
     #[doc(hidden)]
-    fn now_addr() -> &'static AtomicUsize;
+    fn now_fn() -> &'static AtomicCell<fn() -> Self::Unit>;
     #[doc(hidden)]
     fn frequency_atomic() -> &'static AtomicU64;
 
     #[doc(hidden)]
-    fn store_instant_to_duration_func(addr: usize);
+    fn store_unit_to_duration_func(f: fn(Self::Unit) -> Duration);
     #[doc(hidden)]
-    fn store_duration_to_instant_func(addr: usize);
+    fn store_duration_to_unit_func(f: fn(Duration) -> Self::Unit);
 }
 
 pub struct Monotonic;
@@ -266,7 +251,7 @@ impl private::Sealed for Monotonic {}
 impl ClockType for Monotonic {
     type Unit = Instant;
 
-    fn now_addr() -> &'static AtomicUsize {
+    fn now_fn() -> &'static AtomicCell<fn() -> Self::Unit> {
         &MONOTONIC_NOW_FUNCTION
     }
 
@@ -274,12 +259,12 @@ impl ClockType for Monotonic {
         &MONOTONIC_FREQUENCY
     }
 
-    fn store_instant_to_duration_func(addr: usize) {
-        INSTANT_TO_DURATION_FUNCTION.store(addr, Ordering::SeqCst);
+    fn store_unit_to_duration_func(f: fn(Self::Unit) -> Duration) {
+        INSTANT_TO_DURATION_FUNCTION.store(f);
     }
 
-    fn store_duration_to_instant_func(addr: usize) {
-        DURATION_TO_INSTANT_FUNCTION.store(addr, Ordering::SeqCst);
+    fn store_duration_to_unit_func(f: fn(Duration) -> Self::Unit) {
+        DURATION_TO_INSTANT_FUNCTION.store(f);
     }
 }
 
@@ -290,7 +275,7 @@ impl private::Sealed for Realtime {}
 impl ClockType for Realtime {
     type Unit = Duration;
 
-    fn now_addr() -> &'static AtomicUsize {
+    fn now_fn() -> &'static AtomicCell<fn() -> Self::Unit> {
         &REALTIME_NOW_FUNCTION
     }
 
@@ -298,11 +283,11 @@ impl ClockType for Realtime {
         &REALTIME_FREQUENCY
     }
 
-    fn store_instant_to_duration_func(_: usize) {
+    fn store_unit_to_duration_func(_: fn(Self::Unit) -> Duration) {
         // We intentionally don't use instant_to_duration for realtime clocks.
     }
 
-    fn store_duration_to_instant_func(_: usize) {
+    fn store_duration_to_unit_func(_: fn(Duration) -> Self::Unit) {
         // We intentionally don't use duration_to_instant for realtime clocks.
     }
 }

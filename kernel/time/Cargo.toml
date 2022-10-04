@@ -4,3 +4,10 @@ version = "0.1.0"
 authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
 description = "Abstraction for hardware timers"
 edition = "2021"
+
+[dependencies]
+static_assertions = "1.1.0"
+
+[dependencies.crossbeam]
+version = "0.8.2"
+default-features = false
