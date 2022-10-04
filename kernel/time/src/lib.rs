@@ -99,14 +99,6 @@ where
 {
     let old_frequency = EARLY_SLEEPER_FREQUENCY.load(Ordering::SeqCst);
     if frequency > old_frequency {
-        if T::INIT_REQUIRED {
-            // FIXME: The source may be double initialised: once here and once in
-            // register_clock_source. This doesn't currently cause issues but needs to be
-            // fixed. This will probably be fixed if we separate interrupts from clocks in a
-            // future PR.
-            T::init()?;
-        }
-
         EARLY_SLEEP_FUNCTION.store(T::sleep);
         EARLY_SLEEPER_FREQUENCY.store(frequency, Ordering::SeqCst);
 
@@ -141,8 +133,6 @@ where
 {
     let old_frequency = T::ClockType::frequency_atomic().load(Ordering::SeqCst);
     if frequency > old_frequency {
-        T::init()?;
-
         let now_fn = T::ClockType::now_fn();
         now_fn.store(T::now);
 
@@ -181,12 +171,6 @@ pub trait ClockSource {
     /// The type of clock (either [`Monotonic`] or [`Realtime`]).
     type ClockType: ClockType;
 
-    /// Whether the clock source exists on the system.
-    fn exists() -> bool;
-
-    /// Initialise the clock source.
-    fn init() -> Result<(), &'static str>;
-
     /// The current time according to the clock.
     ///
     /// For monotonic clocks this is usually the time since boot, and for
@@ -209,10 +193,6 @@ pub trait ClockSource {
 
 /// A hardware clock that can sleep without relying on interrupts.
 pub trait EarlySleeper: ClockSource<ClockType = Monotonic> {
-    /// Whether the clock must be initialised using [`ClockSource::init`] prior
-    /// to [`sleep`](EarlySleeper::sleep) being called.
-    const INIT_REQUIRED: bool;
-
     /// Sleep for the specified duration.
     ///
     /// # Note to Implementors
@@ -284,11 +264,11 @@ impl ClockType for Realtime {
     }
 
     fn store_unit_to_duration_func(_: fn(Self::Unit) -> Duration) {
-        // We intentionally don't use instant_to_duration for realtime clocks.
+        // We intentionally don't store the function for realtime clocks.
     }
 
     fn store_duration_to_unit_func(_: fn(Duration) -> Self::Unit) {
-        // We intentionally don't use duration_to_instant for realtime clocks.
+        // We intentionally don't store the function for realtime clocks.
     }
 }
 
