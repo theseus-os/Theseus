@@ -3585,6 +3585,7 @@ name = "time"
 version = "0.1.0"
 dependencies = [
  "crossbeam",
+ "log",
  "static_assertions",
 ]
 

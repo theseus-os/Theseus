@@ -6,6 +6,7 @@ description = "Abstraction for hardware timers"
 edition = "2021"
 
 [dependencies]
+log = "0.4.8"
 static_assertions = "1.1.0"
 
 [dependencies.crossbeam]
