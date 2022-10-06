@@ -3,10 +3,9 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "tlb_shootdown"
 description = "Routines for handling TLB shootdowns"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+x86_64 = "0.14.8"
 
 
 [dependencies.log]

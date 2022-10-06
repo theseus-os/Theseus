@@ -19,13 +19,12 @@
 //! The cache is basically a rectangular region in the destination framebuffer, and we define the structure `CacheBlock` to represent that cached region.
 
 #![no_std]
+#![feature(const_btree_new)]
 
 extern crate alloc;
 extern crate compositor;
 extern crate framebuffer;
 extern crate spin;
-#[macro_use]
-extern crate lazy_static;
 extern crate hashbrown;
 extern crate shapes;
 
@@ -42,14 +41,12 @@ use core::ops::Range;
 /// The height of a cache block. In every iteration the compositor will deal with groups of 16 rows and cache them.
 pub const CACHE_BLOCK_HEIGHT: usize = 16;
 
-lazy_static! {
-    /// The instance of the framebuffer compositor.
-    pub static ref FRAME_COMPOSITOR: Mutex<FrameCompositor> = Mutex::new(
-        FrameCompositor{
-            caches: BTreeMap::new()
-        }
-    );
-}
+/// The instance of the framebuffer compositor.
+pub static FRAME_COMPOSITOR: Mutex<FrameCompositor> = Mutex::new(
+    FrameCompositor{
+        caches: BTreeMap::new()
+    }
+);
 
 /// A `CacheBlock` represents the cached (previously-composited) content of a range of rows in the source framebuffer. 
 /// It specifies the rectangular region in the destination framebuffer and the hash.

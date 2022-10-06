@@ -1,0 +1,35 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "console"
+description = "Creation and management of virtual consoles/terminals"
+version = "0.1.0"
+
+[dependencies]
+spin = "0.9.0"
+core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
+log = "0.4.8"
+mpmc = "0.1.6"
+
+[dependencies.async_channel]
+path = "../async_channel"
+
+[dependencies.serial_port]
+path = "../serial_port"
+
+[dependencies.io]
+path = "../io"
+
+[dependencies.text_terminal]
+path = "../text_terminal"
+
+[dependencies.task]
+path = "../task"
+
+[dependencies.spawn]
+path = "../spawn"
+
+[dependencies.irq_safety]
+git = "https://github.com/theseus-os/irq_safety"
+
+[lib]
+crate-type = ["rlib"]

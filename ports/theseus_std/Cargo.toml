@@ -1,0 +1,16 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "theseus_std"
+description = "Theseus port of select parts of the Rust standard library `std`"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+lockable = { path = "../../libs/lockable" }
+theseus_task = { path = "../../kernel/task", package = "task" }
+theseus_path = { path = "../../kernel/path", package = "path" }
+theseus_fs_node = { path = "../../kernel/fs_node", package = "fs_node" }
+theseus_io = { path = "../../kernel/io", package = "io" }
+theseus_memfs = { path = "../../kernel/memfs", package = "memfs" }
+spin = "0.9.0"
+core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }

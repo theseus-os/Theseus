@@ -44,7 +44,6 @@ use http_client::{HttpResponse, ConnectedTcpSocket, send_request, check_http_req
 use smoltcp_helper::{STARTING_FREE_PORT, connect, millis_since, poll_iface};
 
 /// The IP address of the update server.
-// const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [168, 7, 138, 84]; // the static IP of `kevin.recg.rice.edu`
 const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [10, 0, 2, 2]; // the IP of the host machine when running on QEMU.
 
 /// The TCP port on the update server that listens for update requests 
@@ -193,14 +192,14 @@ pub fn parse_diff_lines(diffs: &Vec<String>) -> Result<Diff, &'static str> {
     let mut state_transfer_functions: Vec<String> = Vec::new();
     for diff in diffs {
         // addition of new crate
-        if diff.starts_with("+") {
+        if diff.starts_with('+') {
             pairs.push((
                 String::new(), 
                 diff.get(1..).ok_or("error parsing (+) diff line")?.trim().to_string(),
             ));
         } 
         // removal of old crate
-        else if diff.starts_with("-") {
+        else if diff.starts_with('-') {
             pairs.push((
                 diff.get(1..).ok_or("error parsing (-) diff line")?.trim().to_string(), 
                 String::new()
@@ -211,7 +210,7 @@ pub fn parse_diff_lines(diffs: &Vec<String>) -> Result<Diff, &'static str> {
             pairs.push((old.trim().to_string(), new.trim().to_string()));
         }
         // state transfer function
-        else if diff.starts_with("@") {
+        else if diff.starts_with('@') {
             state_transfer_functions.push(
                 diff.get(1..).ok_or("error parsing (@state_transfer) diff line")?.trim().to_string(),
             )

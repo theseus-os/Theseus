@@ -54,11 +54,23 @@ impl<T> CowArc<T> {
 
     /// This acquires the lock on the inner `Mutex` wrapping the data `T`,
     /// and always succeeds because an `CowArc` always allows immutable access to the data,
-    /// whether the data is `Shared` or `Exclusive`.
+    /// regardless of whether the data is `Shared` or `Exclusive`.
     /// 
     /// The returned value derefs to and can be used exactly like `&T`.
     pub fn lock_as_ref(&self) -> MutexGuardRef<T> {
         MutexGuardRef::new(self.arc.inner_arc.lock())
+    }
+
+    /// This attempts to acquire the lock on the inner `Mutex` wrapping the data `T`.
+    /// 
+    /// This returns `None` if the lock is currently held, 
+    /// but will always succeed if the lock is not held
+    /// because an `CowArc` always allows immutable access to the data,
+    /// regardless of whether the data is `Shared` or `Exclusive`.
+    /// 
+    /// The returned value derefs to and can be used exactly like `&T`.
+    pub fn try_lock_as_ref(&self) -> Option<MutexGuardRef<T>> {
+        self.arc.inner_arc.try_lock().map(|guard| MutexGuardRef::new(guard))
     }
 
     /// This acquires the lock on the inner `Mutex` wrapping the data `T` if it succeeds,

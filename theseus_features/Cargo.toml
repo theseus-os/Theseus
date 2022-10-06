@@ -1,0 +1,155 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "theseus_features"
+description = "Set of global features used for configuration and conditional compilation in Theseus builds"
+version = "0.1.0"
+edition = "2021"
+
+## Note: see this crate's top-level documentation (or its `lib.rs` file)
+##       for more information on how this crate works and how Theseus handles features.
+
+[dependencies]
+theseus_std = { path = "../ports/theseus_std", optional = true }
+
+## Regular applications.
+cat = { path = "../applications/cat", optional = true }
+cd = { path = "../applications/cd", optional = true }
+cpu = { path = "../applications/cpu", optional = true }
+date = { path = "../applications/date", optional = true }
+deps = { path = "../applications/deps", optional = true }
+kill = { path = "../applications/kill", optional = true }
+less = { path = "../applications/less", optional = true }
+loadc = { path = "../applications/loadc", optional = true }
+ls = { path = "../applications/ls", optional = true }
+mkdir = { path = "../applications/mkdir", optional = true }
+ns = { path = "../applications/ns", optional = true }
+ping = { path = "../applications/ping", optional = true }
+pmu_sample_start = { path = "../applications/pmu_sample_start", optional = true }
+pmu_sample_stop = { path = "../applications/pmu_sample_stop", optional = true }
+ps = { path = "../applications/ps", optional = true }
+pwd = { path = "../applications/pwd", optional = true }
+rm = { path = "../applications/rm", optional = true }
+shell = { path = "../applications/shell", optional = true }
+swap = { path = "../applications/swap", optional = true }
+upd = { path = "../applications/upd", optional = true }
+wasm = { path = "../applications/wasm", optional = true }
+
+
+## Kernel crates used for only testing purposes.
+libtest = { path = "../kernel/libtest", optional = true } 
+test_thread_local = { path = "../kernel/test_thread_local", optional = true }
+mapper_spillful = { path = "../kernel/mapper_spillful", optional = true }
+unified_channel = { path = "../kernel/unified_channel", optional = true }
+
+
+## Test applications.
+example = { path = "../applications/example", optional = true }
+hello = { path = "../applications/hello", optional = true }
+immediate_input_echo = { path = "../applications/immediate_input_echo", optional = true }
+input_echo = { path = "../applications/input_echo", optional = true }
+keyboard_echo = { path = "../applications/keyboard_echo", optional = true }
+print_fault_log = { path = "../applications/print_fault_log", optional = true }
+test_backtrace = { path = "../applications/test_backtrace", optional = true }
+test_block_io = { path = "../applications/test_block_io", optional = true }
+test_channel = { path = "../applications/test_channel", optional = true }
+test_downtime = { path = "../applications/test_downtime", optional = true }
+test_filerw = { path = "../applications/test_filerw", optional = true }
+test_ixgbe = { path = "../applications/test_ixgbe", optional = true }
+test_libc = { path = "../applications/test_libc", optional = true }
+test_mlx5 = { path = "../applications/test_mlx5", optional = true }
+test_mutex_sleep = { path = "../applications/test_mutex_sleep", optional = true }
+test_panic = { path = "../applications/test_panic", optional = true }
+test_realtime = { path = "../applications/test_realtime", optional = true }
+test_restartable = { path = "../applications/test_restartable", optional = true }
+test_serial_echo = { path = "../applications/test_serial_echo", optional = true }
+test_std_fs = { path = "../applications/test_std_fs", optional = true }
+test_wait_queue = { path = "../applications/test_wait_queue", optional = true }
+test_wasmtime = { path = "../applications/test_wasmtime", optional = true }
+tls_test = { path = "../applications/tls_test", optional = true }
+unwind_test = { path = "../applications/unwind_test", optional = true }
+
+
+## Benchmark crates.
+bm = { path = "../applications/bm", optional = true }
+channel_eval = { path = "../applications/channel_eval", optional = true }
+heap_eval = { path = "../applications/heap_eval", optional = true }
+mm_eval = { path = "../applications/mm_eval", optional = true }
+rq_eval = { path = "../applications/rq_eval",  optional = true }
+scheduler_eval = { path = "../applications/scheduler_eval",  optional = true }
+
+
+
+
+###############################################################################
+### Dependencies go above, Features go below ##################################
+###############################################################################
+
+[features]
+default = [
+    "unwind_test",  ## used for regular testing
+]
+
+## Includes `wasmtime`, the WebAssembly (WASM) runtime, in the build.
+wasmtime = [ "test_wasmtime" ]
+
+## Includes all regular applications (non-test, non-bench) in the build.
+theseus_apps = [
+    "cat",
+    "cd",
+    "cpu",
+    "date",
+    "deps",
+    "kill",
+    "less",
+    "loadc",
+    "ls",
+    "mkdir",
+    "ns",
+    "ping",
+    "pmu_sample_start",
+    "pmu_sample_stop",
+    "ps",
+    "pwd",
+    "rm",
+    "shell",
+    "swap",
+    "upd",
+    "wasm",
+]
+
+## Includes all benchmark application crates in the build.
+theseus_benchmarks = [
+    "bm",
+    "channel_eval",
+    "heap_eval",
+    "mm_eval",
+    "rq_eval",
+    "scheduler_eval",
+]
+
+## Includes all test application crates in the build.
+theseus_tests = [
+    "example",
+    "hello",
+    "immediate_input_echo",
+    "input_echo",
+    "keyboard_echo",
+    "test_backtrace",
+    "test_block_io",
+    "test_channel",
+    "test_downtime",
+    "test_filerw",
+    "test_ixgbe",
+    "test_libc",
+    "test_mlx5",
+    "test_mutex_sleep",
+    "test_panic",
+    "test_realtime",
+    "test_restartable",
+    "test_serial_echo",
+    "test_std_fs",
+    "test_wait_queue",
+    "test_wasmtime",
+    "tls_test",
+    "unwind_test",
+]

@@ -1,0 +1,24 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "block_cache"
+description = "A generic layer for caching block-based streams."
+version = "0.1.0"
+
+[dependencies]
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "1.4.0"
+
+[dependencies.hashbrown]
+version = "0.11.2"
+features = ["nightly"]
+
+[dependencies.storage_device]
+path = "../storage_device"
+
+[lib]
+crate-type = ["rlib"]

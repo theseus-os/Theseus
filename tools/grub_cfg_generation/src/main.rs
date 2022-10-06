@@ -56,7 +56,7 @@ fn create_grub_cfg_string(input_directory: String) -> Result<String, String> {
     // Creates string to write to grub.cfg file by looking through all files in input_directory
     let mut content = String::new();
     
-    let mut path_to_exe = std::env::current_exe().unwrap_or(std::path::PathBuf::new());
+    let mut path_to_exe = std::env::current_exe().unwrap_or_default();
     // go up three directories to remove the "target/<build_mode>/name"
     path_to_exe.pop(); path_to_exe.pop(); path_to_exe.pop();
 
@@ -71,7 +71,7 @@ fn create_grub_cfg_string(input_directory: String) -> Result<String, String> {
     for path in fs::read_dir(input_directory).map_err(|e| e.to_string())? {
         let path = path.map_err(|e| e.to_string())?;
         let p = path.path();
-        let file_name = p.file_name().and_then(|f| f.to_str()).ok_or(format!("Path error in path {:?}", path))?;
+        let file_name = p.file_name().and_then(|f| f.to_str()).ok_or_else(|| format!("Path error in path {:?}", path))?;
         content.push_str(&format!("\tmodule2 /modules/{0:50}\t\t{1:50}\n", file_name, file_name));
     }
 

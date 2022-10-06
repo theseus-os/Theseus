@@ -59,10 +59,12 @@
 //! So, if you run `pmu_x86::init()` and `pmu_x86::start_samples()` on CPU core 2, it will only sample events on core 2.
 
 #![no_std]
+#![feature(const_btree_new)]
 
 extern crate spin;
 #[macro_use] extern crate lazy_static;
 extern crate x86_64;
+extern crate msr;
 extern crate raw_cpuid;
 extern crate task;
 extern crate memory;
@@ -72,12 +74,9 @@ extern crate apic;
 #[macro_use] extern crate log;
 extern crate mod_mgmt;
 extern crate bit_field;
-extern crate atomic;
 
-use x86_64::registers::msr::*;
-use x86_64::VirtualAddress;
-use x86_64::structures::idt::ExceptionStackFrame;
-use x86_64::instructions::rdpmc;
+use msr::*;
+use x86_64::{VirtAddr, registers::model_specific::Msr, structures::idt::InterruptStackFrame};
 use raw_cpuid::*;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
@@ -128,18 +127,19 @@ static CORES_SAMPLING: [AtomicU64; WORDS_IN_BITMAP] = [AtomicU64::new(0), Atomic
 /// Bitmap to store the cores which have sampling results ready to be retrieved. It records information for 256 cores.
 static RESULTS_READY: [AtomicU64; WORDS_IN_BITMAP] = [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)];
 
-lazy_static!{
+lazy_static! {
     /// PMU version supported by the current hardware. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.
-    static ref PMU_VERSION: u8 = CpuId::new().get_performance_monitoring_info().and_then(|pmi| Some(pmi.version_id())).unwrap_or(0);
+    static ref PMU_VERSION: u8 = CpuId::new().get_performance_monitoring_info().map(|pmi| pmi.version_id()).unwrap_or(0);
     /// The number of general purpose PMCs that can be used. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.
-    static ref NUM_PMC: u8 = CpuId::new().get_performance_monitoring_info().and_then(|pmi| Some(pmi.number_of_counters())).unwrap_or(0);
+    static ref NUM_PMC: u8 = CpuId::new().get_performance_monitoring_info().map(|pmi| pmi.number_of_counters()).unwrap_or(0);
     /// The number of fixed function counters. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.
-    static ref NUM_FIXED_FUNC_COUNTERS: u8 = CpuId::new().get_performance_monitoring_info().and_then(|pmi| Some(pmi.fixed_function_counters())).unwrap_or(0);
-    /// Set to store the cores that the PMU has already been initialized on
-    static ref CORES_INITIALIZED: MutexIrqSafe<BTreeSet<u8>> = MutexIrqSafe::new(BTreeSet::new());
-    /// The sampling information for each core
-    static ref SAMPLING_INFO: MutexIrqSafe<BTreeMap<u8, SampledEvents>> =  MutexIrqSafe::new(BTreeMap::new());
+    static ref NUM_FIXED_FUNC_COUNTERS: u8 = CpuId::new().get_performance_monitoring_info().map(|pmi| pmi.fixed_function_counters()).unwrap_or(0);
 }
+
+/// Set to store the cores that the PMU has already been initialized on
+static CORES_INITIALIZED: MutexIrqSafe<BTreeSet<u8>> = MutexIrqSafe::new(BTreeSet::new());
+/// The sampling information for each core
+static SAMPLING_INFO: MutexIrqSafe<BTreeMap<u8, SampledEvents>> =  MutexIrqSafe::new(BTreeMap::new());
 
 /// Used to select the event type to count. Event types are described in the Intel SDM 18.2.1 for PMU Version 1.
 /// The discriminant value for each event type is the value written to the event select register for a general purpose PMC.
@@ -177,11 +177,11 @@ fn num_general_purpose_counters() -> u8 {
 }
 
 fn get_pmcs_available() -> Result<&'static Vec<AtomicU8>, &'static str>{
-    Ok(PMCS_AVAILABLE.try().ok_or("pmu_x86: The variable storing the available counters for each core hasn't been initialized")?)
+    Ok(PMCS_AVAILABLE.get().ok_or("pmu_x86: The variable storing the available counters for each core hasn't been initialized")?)
 }
 
 fn get_pmcs_available_for_core(core_id: u8) -> Result<&'static AtomicU8, &'static str>{
-    let pmc = PMCS_AVAILABLE.try().ok_or("pmu_x86: The variable storing the available counters for each core hasn't been initialized")?;
+    let pmc = PMCS_AVAILABLE.get().ok_or("pmu_x86: The variable storing the available counters for each core hasn't been initialized")?;
     Ok(&pmc[core_id as usize])
 }
 
@@ -271,20 +271,20 @@ pub fn init() -> Result<(), &'static str> {
 fn init_registers() {
     unsafe {
         // disables all the performance counters
-        wrmsr(IA32_PERF_GLOBAL_CTRL, 0);
+        Msr::new(IA32_PERF_GLOBAL_CTRL).write(0);
         // clear the general purpose PMCs
-        wrmsr(IA32_PMC0, 0);
-        wrmsr(IA32_PMC1, 0);
-        wrmsr(IA32_PMC2, 0);
-        wrmsr(IA32_PMC3, 0);
+        Msr::new(IA32_PMC0).write(0);
+        Msr::new(IA32_PMC1).write(0);
+        Msr::new(IA32_PMC2).write(0);
+        Msr::new(IA32_PMC3).write(0);
         // clear the fixed event counters
-        wrmsr(IA32_FIXED_CTR0, 0);
-        wrmsr(IA32_FIXED_CTR1, 0);
-        wrmsr(IA32_FIXED_CTR2, 0);
+        Msr::new(IA32_FIXED_CTR0).write(0);
+        Msr::new(IA32_FIXED_CTR1).write(0);
+        Msr::new(IA32_FIXED_CTR2).write(0);
         // sets fixed function counters to count events at all privilege levels
-        wrmsr(IA32_FIXED_CTR_CTRL, ENABLE_FIXED_COUNTERS_FOR_ALL_PRIVILEGE_LEVELS);
+        Msr::new(IA32_FIXED_CTR_CTRL).write(ENABLE_FIXED_COUNTERS_FOR_ALL_PRIVILEGE_LEVELS);
         // enables all counters: each counter has another enable bit in other MSRs so these should likely never be cleared once first set
-        wrmsr(IA32_PERF_GLOBAL_CTRL, ENABLE_FIXED_PERFORMANCE_COUNTERS | ENABLE_GENERAL_PERFORMANCE_COUNTERS);
+        Msr::new(IA32_PERF_GLOBAL_CTRL).write(ENABLE_FIXED_PERFORMANCE_COUNTERS | ENABLE_GENERAL_PERFORMANCE_COUNTERS);
     }
 }
 
@@ -326,8 +326,10 @@ impl Counter {
         // for a general PMC, it enables the counter to start counting from 0
         else {
             self.start_count = 0;
-            let umask = rdmsr(IA32_PERFEVTSEL0 + self.pmc as u32);
-            unsafe{wrmsr(IA32_PERFEVTSEL0 + self.pmc as u32, umask | PMC_ENABLE);}
+            unsafe { 
+                let umask = Msr::new(IA32_PERFEVTSEL0 + self.pmc as u32).read();
+                Msr::new(IA32_PERFEVTSEL0 + self.pmc as u32).write(umask | PMC_ENABLE);
+            }
         }
         Ok(())
     }
@@ -370,8 +372,8 @@ impl Drop for Counter {
         if self.msr_mask < num_pmc as u32 {
             // clears event counting settings and counter 
             unsafe{
-                wrmsr(IA32_PERFEVTSEL0 + self.msr_mask as u32, 0);
-                wrmsr(IA32_PMC0 + self.msr_mask as u32, 0);
+                Msr::new(IA32_PERFEVTSEL0 + self.msr_mask as u32).write(0);
+                Msr::new(IA32_PMC0 + self.msr_mask as u32).write(0);
             }
             free_counter(self.core, self.msr_mask as u8); 
         }
@@ -569,8 +571,8 @@ fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
         claim_counter(my_core, pmc)?;
 
         unsafe{
-            wrmsr(IA32_PMC0 + (pmc as u32), 0);
-            wrmsr(IA32_PERFEVTSEL0 + (pmc as u32), event_mask);
+            Msr::new(IA32_PMC0 + (pmc as u32)).write(0);
+            Msr::new(IA32_PERFEVTSEL0 + (pmc as u32)).write(event_mask);
         }
         return Ok(Counter {
             start_count: 0, 
@@ -620,7 +622,7 @@ struct SampledEvents{
     start_value: usize,
     task_id: usize,
     sample_count: u32,
-    ip_list: Vec<VirtualAddress>,
+    ip_list: Vec<VirtAddr>,
     task_id_list: Vec<usize>,
 }
 
@@ -690,7 +692,14 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
 
     sampled_events.sample_count = sample_count;
 
-    if event_per_sample > core::u32::MAX || event_per_sample <= core::u32::MIN {
+    if event_per_sample == 0 {
+        return Err("Number of events per sample invalid: must be nonzero");
+    }
+    // This check can never trigger since `event_per_sample` is a `u32`
+    // and is therefore by definition in the range `u32::MIN..=u32::MAX`.
+    // We'll check anyways, just in case `event_per_sample`'s type is changed.
+    #[allow(clippy::absurd_extreme_comparisons)]
+    if event_per_sample > core::u32::MAX || event_per_sample < core::u32::MIN {
         return Err("Number of events per sample invalid: must be within unsigned 32 bit");
     }
 
@@ -705,8 +714,8 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
     let event_mask = event_type as u64;
 
     unsafe{
-        wrmsr(IA32_PMC0, start_value as u64);
-        wrmsr(IA32_PERFEVTSEL0, event_mask | PMC_ENABLE | INTERRUPT_ENABLE);
+        Msr::new(IA32_PMC0).write(start_value as u64);
+        Msr::new(IA32_PERFEVTSEL0).write(event_mask | PMC_ENABLE | INTERRUPT_ENABLE);
     }
 
     return Ok(());
@@ -717,9 +726,9 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
 fn stop_samples(core_id: u8, samples: &mut SampledEvents) -> Result<(), &'static str> {
     // immediately stops counting and clears the counter
     unsafe{
-        wrmsr(IA32_PERFEVTSEL0, 0);
-        wrmsr(IA32_PMC0, 0);
-        wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, CLEAR_PERF_STATUS_MSR);
+        Msr::new(IA32_PERFEVTSEL0).write(0);
+        Msr::new(IA32_PMC0).write(0);
+        Msr::new(IA32_PERF_GLOBAL_OVF_CTRL).write(CLEAR_PERF_STATUS_MSR);
     }
 
     // clears values so that even if exception is somehow triggered, it stops at the next iteration
@@ -739,7 +748,7 @@ fn stop_samples(core_id: u8, samples: &mut SampledEvents) -> Result<(), &'static
 
 /// Stores the instruction pointers and corresponding task IDs from the samples
 pub struct SampleResults {
-    pub instruction_pointers: Vec<VirtualAddress>,
+    pub instruction_pointers: Vec<memory::VirtualAddress>,
     pub task_ids:  Vec<usize>,
 }
 
@@ -758,7 +767,10 @@ pub fn retrieve_samples() -> Result<SampleResults, &'static str> {
     
     sampling_results_have_been_retrieved(my_core_id)?;
 
-    Ok(SampleResults{instruction_pointers: samples.ip_list.clone(), task_ids: samples.task_id_list.clone()})   
+    let mut instruction_pointers = Vec::with_capacity(samples.ip_list.len());
+    instruction_pointers.extend(samples.ip_list.iter().map(|va| memory::VirtualAddress::new_canonical(va.as_u64() as usize)));
+
+    Ok(SampleResults { instruction_pointers, task_ids: samples.task_id_list.clone() })   
 }
 
 /// Simple function to print values from SampleResults in a form that the script "post-mortem pmu analysis.py" can parse. 
@@ -771,7 +783,7 @@ pub fn print_samples(sample_results: &SampleResults) {
 
 /// Finds the corresponding function for each instruction pointer and calculates the percentage amount each function occured in the samples
 pub fn find_function_names_from_samples(sample_results: &SampleResults) -> Result<(), &'static str> {
-    let taskref = task::get_my_current_task() .ok_or("pmu_x86::get_function_names_from_samples: Could not get reference to current task")?;
+    let taskref = task::get_my_current_task().ok_or("pmu_x86::get_function_names_from_samples: Could not get reference to current task")?;
     let namespace = taskref.get_namespace();
     debug!("Analyze Samples:");
 
@@ -779,7 +791,8 @@ pub fn find_function_names_from_samples(sample_results: &SampleResults) -> Resul
     let total_samples = sample_results.instruction_pointers.len();
 
     for ip in sample_results.instruction_pointers.iter() {
-        let (section_ref, _offset) = namespace.get_section_containing_address(memory::VirtualAddress::new(ip.0)?, true).ok_or("Can't find section containing address")?;
+        let (section_ref, _offset) = namespace.get_section_containing_address(*ip, false)
+            .ok_or("Can't find section containing sampled instruction pointer")?;
         let section_name = section_ref.name_without_hash().to_string();
 
         sections.entry(section_name).and_modify(|e| {*e += 1}).or_insert(1);
@@ -793,22 +806,50 @@ pub fn find_function_names_from_samples(sample_results: &SampleResults) -> Resul
     Ok(())
 }
 
-/// Function called in the interrupt handler to store the instruction pointer and task ID. 
-/// The counter is then reset to its starting value or turned off.
-pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) -> Result<(), &'static str> {
-    unsafe { wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, CLEAR_PERF_STATUS_MSR); }
+/// This function is designed to be invoked from an interrupt handler 
+/// when a sampling interrupt has (or may have) occurred. 
+///
+/// It takes a sample by logging the the instruction pointer and task ID at the point
+/// at which the sampling interrupt occurred. 
+/// The counter is then either reset to its starting value 
+/// (if there are more samples that need to be taken)
+/// or disabled entirely if the final sample has been taken. 
+///
+/// # Argument
+/// * `stack_frame`: the stack frame that was pushed onto the stack automatically 
+///    by the CPU and passed into the interrupt/exception handler. 
+///    This is used to determine during which instruction the sampling interrupt occurred.
+///
+/// # Return
+/// * Returns `Ok(true)` if a PMU sample occurred and was handled. 
+/// * Returns `Ok(false)` if PMU isn't supported, or if PMU wasn't yet initialized, 
+///   or if there was not a pending sampling interrupt. 
+/// * Returns an `Err` if PMU is supported and initialized and a sample was pending, 
+///   but an error occurred while logging the sample.
+///
+pub fn handle_sample(stack_frame: &InterruptStackFrame) -> Result<bool, &'static str> {
+    // Check that PMU hardware exists and is supported on this machine.
+    if *PMU_VERSION < MIN_PMU_VERSION {
+        return Ok(false);
+    }
+    // Check that a PMU sampling event is currently pending.
+    if unsafe { Msr::new(IA32_PERF_GLOBAL_STAUS).read() } == 0 {
+        return Ok(false);
+    }
+
+    unsafe { Msr::new(IA32_PERF_GLOBAL_OVF_CTRL).write(CLEAR_PERF_STATUS_MSR); }
 
     let my_core_id = apic::get_my_apic_id();
-    let event_mask = rdmsr(IA32_PERFEVTSEL0);
 
     let mut sampling_info = SAMPLING_INFO.lock();
-    let mut samples = sampling_info.get_mut(&my_core_id).ok_or("pmu_x86::handle_sample: Could not retrieve sampling information for this core")?;
+    let mut samples = sampling_info.get_mut(&my_core_id)
+        .ok_or("pmu_x86::handle_sample: Could not retrieve sampling information for this core")?;
 
     let current_count = samples.sample_count;
     // if all samples have already been taken, calls the function to turn off the counter
     if current_count == 0 {
         stop_samples(my_core_id, &mut samples)?; 
-        return Ok(());
+        return Ok(true);
     }
 
     samples.sample_count = current_count - 1;
@@ -817,7 +858,7 @@ pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) -> Result<(), &'stat
     if let Some(taskref) = task::get_my_current_task() {
         let requested_task_id = samples.task_id;
         
-        let task_id = taskref.lock().id;
+        let task_id = taskref.id;
         if (requested_task_id == 0) | (requested_task_id == task_id) {
             samples.ip_list.push(stack_frame.instruction_pointer);
             samples.task_id_list.push(task_id);
@@ -829,10 +870,10 @@ pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) -> Result<(), &'stat
 
     // stops the counter, resets it, and restarts it
     unsafe {
-        wrmsr(IA32_PERFEVTSEL0, 0);
-        wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, CLEAR_PERF_STATUS_MSR);
-        wrmsr(IA32_PMC0, samples.start_value as u64);
-        wrmsr(IA32_PERFEVTSEL0, event_mask);
+        Msr::new(IA32_PERFEVTSEL0).write(0);
+        Msr::new(IA32_PERF_GLOBAL_OVF_CTRL).write(CLEAR_PERF_STATUS_MSR);
+        Msr::new(IA32_PMC0).write(samples.start_value as u64);
+        Msr::new(IA32_PERFEVTSEL0).write(Msr::new(IA32_PERFEVTSEL0).read());
     }
 
     if let Some(my_apic) = apic::get_my_apic() {
@@ -842,6 +883,20 @@ pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) -> Result<(), &'stat
         error!("Error in Performance Monitoring! Reference to the local APIC could not be retrieved.");
     }
 
-    Ok(())
+    Ok(true)
 }
 
+
+/// Reads the given PMC (performance monitor counter) register.
+fn rdpmc(msr: u32) -> u64 {
+    let (high, low): (u32, u32);
+    unsafe {
+        core::arch::asm!(
+            "rdpmc",
+            in("ecx") msr,
+            out("eax") low, out("edx") high,
+            options(nomem, nostack, preserves_flags),
+        );
+    }
+    ((high as u64) << 32) | (low as u64)
+}

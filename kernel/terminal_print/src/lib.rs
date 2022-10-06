@@ -13,10 +13,10 @@
 //! If an application itself spawns child tasks, those will not be able to properly print through these interfaces.
 
 #![no_std]
+#![feature(const_btree_new)]
 
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate lazy_static;
-extern crate serial_port;
+extern crate logger;
 extern crate task;
 extern crate dfqueue;
 extern crate event_types;
@@ -30,8 +30,8 @@ use spin::Mutex;
 /// Calls `print!()` with an extra newline ('\n') appended to the end. 
 #[macro_export]
 macro_rules! println {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => ($crate::print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => ($crate::print!(concat!($fmt, "\n"), $($arg)*));
 
 }
 
@@ -44,11 +44,9 @@ macro_rules! print {
     });
 }
 
-lazy_static! {
-    /// Maps the child application's task ID to its parent terminal print_producer to track parent-child relationships between
-    /// applications so that applications can print to the correct terminal
-    static ref TERMINAL_PRINT_PRODUCERS: Mutex<BTreeMap<usize, DFQueueProducer<Event>>> = Mutex::new(BTreeMap::new());
-}
+/// Maps the child application's task ID to its parent terminal print_producer to track parent-child relationships between
+/// applications so that applications can print to the correct terminal
+static TERMINAL_PRINT_PRODUCERS: Mutex<BTreeMap<usize, DFQueueProducer<Event>>> = Mutex::new(BTreeMap::new());
 
 /// Adds the (child application's task ID, parent terminal print_producer) key-val pair to the map 
 /// Simulates connecting an output stream to the application
@@ -74,7 +72,7 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
         None => {
             // We cannot use log macros here, because when they're mirrored to the vga, they will cause infinite loops on an error.
             // Instead, we write direclty to the serial port. 
-            let _ = serial_port::write_str("\x1b[31m [E] error in print!/println! macro: failed to get current task id \x1b[0m\n");
+            let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: failed to get current task id \x1b[0m\n");
             return;
         }
     };

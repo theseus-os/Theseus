@@ -1,0 +1,24 @@
+[package]
+name = "test_serial_echo"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "a simple app for testing serial port I/O using higher-level I/O traits"
+
+[dependencies]
+core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
+log = "0.4.8"
+
+[dependencies.irq_safety]
+git = "https://github.com/theseus-os/irq_safety"
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.serial_port]
+path = "../../kernel/serial_port"
+
+[dependencies.io]
+path = "../../kernel/io"

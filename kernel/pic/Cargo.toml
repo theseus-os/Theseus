@@ -3,20 +3,12 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "pic"
 description = "PIC (Programmable Interrupt Controller), support for a legacy device that isn't used much"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-
-
-[dependencies.log]
-version = "0.4.8"
+log = "0.4.8"
 
 [dependencies.port_io]
 path = "../../libs/port_io"
-
-[dependencies.memory]
-path = "../memory"
 
 
 [lib]

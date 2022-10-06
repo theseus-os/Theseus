@@ -7,17 +7,43 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use core::mem;
-use core::ops::Deref;
-use core::ptr::Unique;
-use core::slice;
+use core::{
+    mem,
+    fmt::{self, Write},
+    ops::Deref,
+    ptr::Unique,
+    slice,
+};
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames}; 
-use paging::{PageRange, get_current_p4};
-use paging::table::{P4, Table, Level4};
-use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
+use paging::{
+    get_current_p4,
+    PageRange,
+    table::{P4, Table, Level4},
+};
+use spin::Once;
+use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
 use super::{EntryFlags, tlb_flush_virt_addr};
 use zerocopy::FromBytes;
 use page_table_entry::UnmapResult;
+
+/// This is a private callback used to convert `UnmappedFrames` into `AllocatedFrames`.
+/// 
+/// This exists to break the cyclic dependency cycle between `page_table_entry` and
+/// `frame_allocator`, which depend on each other as such:
+/// * `frame_allocator` needs to `impl Into<AllocatedPages> for UnmappedFrames`
+///    in order to allow unmapped exclusive frames to be safely deallocated
+/// * `page_table_entry` needs to use the `AllocatedFrames` type in order to allow
+///   page table entry values to be set safely to a real physical frame that is owned and exists.
+/// 
+/// To get around that, the `frame_allocator::init()` function returns a callback
+/// to its function that allows converting a range of unmapped frames back into `AllocatedFrames`,
+/// which then allows them to be dropped and thus deallocated.
+/// 
+/// This is safe because the frame allocator can only be initialized once, and also because
+/// only this crate has access to that function callback and can thus guarantee
+/// that it is only invoked for `UnmappedFrames`.
+pub(super) static INTO_ALLOCATED_FRAMES_FUNC: Once<fn(FrameRange) -> AllocatedFrames> = Once::new();
+
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -45,36 +71,33 @@ impl Mapper {
         unsafe { self.p4.as_mut() }
     }
 
-    /// Dumps all page table entries at all four levels for the given `VirtualAddress`, 
+    /// Dumps all page table entries at all four page table levels for the given `VirtualAddress`, 
     /// and also shows their `EntryFlags`.
     /// 
-    /// Useful for debugging page faults. 
-    pub fn dump_pte(&self, virtual_address: VirtualAddress) {
+    /// The page table details are written to the the given `writer`.
+    pub fn dump_pte<W: Write>(&self, writer: &mut W, virtual_address: VirtualAddress) -> fmt::Result {
         let page = Page::containing_address(virtual_address);
-        let p4 = self.p4();
-        let p3 = p4.next_table(page.p4_index());
-        let p2 = p3.and_then(|p3| p3.next_table(page.p3_index()));
-        let p1 = p2.and_then(|p2| p2.next_table(page.p2_index()));
-        if let Some(_pte) = p1.map(|p1| &p1[page.p1_index()]) {
-            debug!("VirtualAddress: {:#X}:
-                    P4 entry:        {:#X}   ({:?})
-                    P3 entry:        {:#X}   ({:?})
-                    P2 entry:        {:#X}   ({:?})
-                    P1 entry: (PTE)  {:#X}   ({:?})",
-                virtual_address, 
-                &p4[page.p4_index()].value(), 
-                &p4[page.p4_index()].flags(),
-                p3.map(|p3| &p3[page.p3_index()]).map(|p3_entry| p3_entry.value()).unwrap_or(0x0), 
-                p3.map(|p3| &p3[page.p3_index()]).map(|p3_entry| p3_entry.flags()),
-                p2.map(|p2| &p2[page.p2_index()]).map(|p2_entry| p2_entry.value()).unwrap_or(0x0), 
-                p2.map(|p2| &p2[page.p2_index()]).map(|p2_entry| p2_entry.flags()),
-                p1.map(|p1| &p1[page.p1_index()]).map(|p1_entry| p1_entry.value()).unwrap_or(0x0),  // _pet.value()
-                p1.map(|p1| &p1[page.p1_index()]).map(|p1_entry| p1_entry.flags()),                 // _pte.flags()
-            );
-        }
-        else {
-            debug!("Error: couldn't get PTE entry for vaddr: {:#X}. Has it been mapped?", virtual_address);
-        }
+        let p4  = self.p4();
+        let p3  = p4.next_table(page.p4_index());
+        let p2  = p3.and_then(|p3| p3.next_table(page.p3_index()));
+        let p1  = p2.and_then(|p2| p2.next_table(page.p2_index()));
+        write!(
+            writer,
+            "VirtualAddress: {:#X}:
+                P4 entry:        {:#X}   ({:?})
+                P3 entry:        {:#X}   ({:?})
+                P2 entry:        {:#X}   ({:?})
+                P1 entry: (PTE)  {:#X}   ({:?})",
+            virtual_address,
+            &p4[page.p4_index()].value(),
+            &p4[page.p4_index()].flags(),
+            p3.map(|p3| &p3[page.p3_index()]).map(|p3_entry| p3_entry.value()).unwrap_or(0x0),
+            p3.map(|p3| &p3[page.p3_index()]).map(|p3_entry| p3_entry.flags()),
+            p2.map(|p2| &p2[page.p2_index()]).map(|p2_entry| p2_entry.value()).unwrap_or(0x0),
+            p2.map(|p2| &p2[page.p2_index()]).map(|p2_entry| p2_entry.flags()),
+            p1.map(|p1| &p1[page.p1_index()]).map(|p1_entry| p1_entry.value()).unwrap_or(0x0),
+            p1.map(|p1| &p1[page.p1_index()]).map(|p1_entry| p1_entry.flags()),
+        )
     }
 
     /// Translates a `VirtualAddress` to a `PhysicalAddress` by walking the page tables.
@@ -96,10 +119,10 @@ impl Mapper {
                 if let Some(start_frame) = p3_entry.pointed_frame() {
                     if p3_entry.flags().is_huge() {
                         // address must be 1GiB aligned
-                        assert!(start_frame.number % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
-                        return Some(Frame {
-                            number: start_frame.number + page.p2_index() * ENTRIES_PER_PAGE_TABLE + page.p1_index(),
-                        });
+                        assert!(start_frame.number() % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
+                        return Some(Frame::containing_address(PhysicalAddress::new_canonical(
+                            PAGE_SIZE * (start_frame.number() + page.p2_index() * ENTRIES_PER_PAGE_TABLE + page.p1_index())
+                        )));
                     }
                 }
                 if let Some(p2) = p3.next_table(page.p3_index()) {
@@ -108,8 +131,10 @@ impl Mapper {
                     if let Some(start_frame) = p2_entry.pointed_frame() {
                         if p2_entry.flags().is_huge() {
                             // address must be 2MiB aligned
-                            assert!(start_frame.number % ENTRIES_PER_PAGE_TABLE == 0);
-                            return Some(Frame { number: start_frame.number + page.p1_index() });
+                            assert!(start_frame.number() % ENTRIES_PER_PAGE_TABLE == 0);
+                            return Some(Frame::containing_address(PhysicalAddress::new_canonical(
+                                PAGE_SIZE * (start_frame.number() + page.p1_index())
+                            )));
                         }
                     }
                 }
@@ -124,12 +149,17 @@ impl Mapper {
     }
 
 
-    /// Maps the given virtual `AllocatedPages` to the given physical `AllocatedFrames`.
+    /// An internal function that performs the actual mapping of a range of allocated `pages`
+    /// to a range of allocated `frames`.
     /// 
-    /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
-    pub fn map_allocated_pages_to(&mut self, pages: AllocatedPages, frames: AllocatedFrames, flags: EntryFlags)
-        -> Result<MappedPages, &'static str>
-    {
+    /// Returns a tuple of the new `MappedPages` object containing the allocated `pages`
+    /// and the allocated `frames` object.
+    pub(super) fn internal_map_to(
+        &mut self,
+        pages: AllocatedPages,
+        frames: AllocatedFrames,
+        flags: EntryFlags,
+    ) -> Result<(MappedPages, AllocatedFrames), &'static str> {
         let mut top_level_flags = flags.clone() | EntryFlags::PRESENT;
         // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
         // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
@@ -150,7 +180,7 @@ impl Mapper {
         }
 
         // iterate over pages and frames in lockstep
-        for (page, frame) in pages.deref().clone().into_iter().zip(frames.deref().clone().into_iter()) {
+        for (page, frame) in pages.deref().clone().into_iter().zip(frames.into_iter()) {
             let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags);
             let p2 = p3.next_table_create(page.p3_index(), top_level_flags);
             let p1 = p2.next_table_create(page.p2_index(), top_level_flags);
@@ -163,17 +193,35 @@ impl Mapper {
             p1[page.p1_index()].set_entry(frame, actual_flags);
         }
 
-        // Currently we forget the actual AllocatedPages object because
+        Ok((
+            MappedPages {
+                page_table_p4: self.target_p4.clone(),
+                pages,
+                flags: actual_flags,
+            },
+            frames,
+        ))
+    }
+    
+
+    /// Maps the given virtual `AllocatedPages` to the given physical `AllocatedFrames`.
+    /// 
+    /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
+    pub fn map_allocated_pages_to(
+        &mut self,
+        pages: AllocatedPages,
+        frames: AllocatedFrames,
+        flags: EntryFlags,
+    ) -> Result<MappedPages, &'static str> {
+        let (mapped_pages, frames) = self.internal_map_to(pages, frames, flags)?;
+        
+        // Currently we forget the actual `AllocatedFrames` object because
         // there is no easy/efficient way to store a dynamic list of non-contiguous frames (would require Vec).
         // This is okay because we will deallocate each of these frames when this MappedPages object is dropped
         // and each of the page table entries for its pages are cleared.
         core::mem::forget(frames);
 
-        Ok(MappedPages {
-            page_table_p4: self.target_p4.clone(),
-            pages,
-            flags: actual_flags,
-        })
+        Ok(mapped_pages)
     }
 
 
@@ -195,8 +243,6 @@ impl Mapper {
 
         for page in pages.deref().clone() {
             let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
-            let frame = *af.start();
-            core::mem::forget(af); // we currently forget frames allocated as page table frames since we don't yet have a way to track them.
 
             let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags);
             let p2 = p3.next_table_create(page.p3_index(), top_level_flags);
@@ -204,12 +250,13 @@ impl Mapper {
 
             if !p1[page.p1_index()].is_unused() {
                 error!("map_allocated_pages(): page {:#X} -> frame {:#X}, page was already in use!",
-                    page.start_address(), frame.start_address()
+                    page.start_address(), af.start_address()
                 );
                 return Err("map_allocated_pages(): page was already in use");
             } 
 
-            p1[page.p1_index()].set_entry(frame, actual_flags);
+            p1[page.p1_index()].set_entry(af.as_allocated_frame(), actual_flags);
+            core::mem::forget(af); // we currently forget frames allocated here since we don't yet have a way to track them.
         }
 
         Ok(MappedPages {
@@ -226,7 +273,8 @@ impl Mapper {
     /// An unsafe escape hatch that allows one to map the given virtual `AllocatedPages` 
     /// to the given range of physical `frames`. 
     ///
-    /// This is unsafe because it violates Theseus's bijective mapping guarantee, 
+    /// This is unsafe because it accepts a reference to an `AllocatedFrames` object.
+    /// This violates Theseus's bijective mapping guarantee, 
     /// in which only one virtual page can map to a given physical frame,
     /// which preserves Rust's knowledge of language-level aliasing and thus its safety checks.
     ///
@@ -234,7 +282,7 @@ impl Mapper {
     /// 
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
     #[doc(hidden)]
-    pub unsafe fn map_to_non_exclusive(mapper: &mut Self, pages: AllocatedPages, frames: FrameRange, flags: EntryFlags)
+    pub unsafe fn map_to_non_exclusive(mapper: &mut Self, pages: AllocatedPages, frames: &AllocatedFrames, flags: EntryFlags)
         -> Result<MappedPages, &'static str>
     {
         let mut top_level_flags = flags.clone() | EntryFlags::PRESENT;
@@ -260,7 +308,7 @@ impl Mapper {
         }
 
         // iterate over pages and frames in lockstep
-        for (page, frame) in pages.deref().clone().into_iter().zip(frames.deref().clone().into_iter()) {
+        for (page, frame) in pages.deref().clone().into_iter().zip(frames.into_iter()) {
             let p3 = mapper.p4_mut().next_table_create(page.p4_index(), top_level_flags);
             let p2 = p3.next_table_create(page.p3_index(), top_level_flags);
             let p1 = p2.next_table_create(page.p2_index(), top_level_flags);
@@ -309,11 +357,11 @@ impl Deref for MappedPages {
 impl MappedPages {
     /// Returns an empty MappedPages object that performs no allocation or mapping actions. 
     /// Can be used as a placeholder, but will not permit any real usage. 
-    pub fn empty() -> MappedPages {
+    pub const fn empty() -> MappedPages {
         MappedPages {
-            page_table_p4: get_current_p4(),
+            page_table_p4: Frame::containing_address(PhysicalAddress::zero()),
             pages: AllocatedPages::empty(),
-            flags: Default::default(),
+            flags: EntryFlags::zero(),
         }
     }
 
@@ -367,53 +415,94 @@ impl MappedPages {
         Ok(())
     }
 
+    /// Splits this `MappedPages` into two separate `MappedPages` objects:
+    /// * `[beginning : at_page - 1]`
+    /// * `[at_page : end]`
+    /// 
+    /// This function follows the behavior of [`core::slice::split_at()`],
+    /// thus, either one of the returned `MappedPages` objects may be empty. 
+    /// * If `at_page == self.pages.start`, the first returned `MappedPages` object will be empty.
+    /// * If `at_page == self.pages.end + 1`, the second returned `MappedPages` object will be empty.
+    /// 
+    /// Returns an `Err` containing this `MappedPages` (`self`) if `at_page` is not within its bounds.
+    /// 
+    /// # Note
+    /// No remapping actions or page reallocations will occur on either a failure or a success.
+    /// 
+    /// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at
+    pub fn split(mut self, at_page: Page) -> Result<(MappedPages, MappedPages), MappedPages> {
+        // Take ownership of the `AllocatedPages` inside of the `MappedPages` so we can split it.
+        let alloc_pages_owned = core::mem::replace(&mut self.pages, AllocatedPages::empty());
 
-    // Removing this function for now since it's unused and untested.
-    // /// Creates a deep copy of this `MappedPages` memory region,
-    // /// by duplicating not only the virtual memory mapping
-    // /// but also the underlying physical memory frames. 
-    // /// 
-    // /// The caller can optionally specify new flags for the duplicated mapping,
-    // /// otherwise, the same flags as the existing `MappedPages` will be used. 
-    // /// This is useful for when you want to modify contents in the new pages,
-    // /// since it avoids extra `remap()` operations.
-    // /// 
-    // /// Returns a new `MappedPages` object with the same in-memory contents
-    // /// as this object, but at a completely new memory region.
-    // pub fn deep_copy(&self, new_flags: Option<EntryFlags>, active_table_mapper: &mut Mapper) -> Result<MappedPages, &'static str> {
-    //     let size_in_pages = self.size_in_pages();
+        match alloc_pages_owned.split(at_page) {
+            Ok((first_ap, second_ap)) => Ok((
+                MappedPages {
+                    page_table_p4: self.page_table_p4,
+                    pages: first_ap,
+                    flags: self.flags,
+                },
+                MappedPages {
+                    page_table_p4: self.page_table_p4,
+                    pages: second_ap,
+                    flags: self.flags,
+                }
+                // When returning here, `self` will be dropped, but it's empty so it has no effect.
+            )),
+            Err(orig_ap) => {
+                // Upon error, restore the `self.pages` (`AllocatedPages`) that we took ownership of.
+                self.pages = orig_ap;
+                Err(self)
+            }
+        }
+    }
 
-    //     use paging::allocate_pages;
-    //     let new_pages = allocate_pages(size_in_pages).ok_or_else(|| "Couldn't allocate_pages()")?;
+    
+    /// Creates a deep copy of this `MappedPages` memory region,
+    /// by duplicating not only the virtual memory mapping
+    /// but also the underlying physical memory frames. 
+    /// 
+    /// The caller can optionally specify new flags for the duplicated mapping,
+    /// otherwise, the same flags as the existing `MappedPages` will be used. 
+    /// This is useful for when you want to modify contents in the new pages,
+    /// since it avoids extra `remap()` operations.
+    /// 
+    /// Returns a new `MappedPages` object with the same in-memory contents
+    /// as this object, but at a completely new memory region.
+    pub fn deep_copy(&self, new_flags: Option<EntryFlags>, active_table_mapper: &mut Mapper) -> Result<MappedPages, &'static str> {
+        warn!("MappedPages::deep_copy() has not been adequately tested yet.");
+        let size_in_pages = self.size_in_pages();
 
-    //     // we must temporarily map the new pages as Writable, since we're about to copy data into them
-    //     let new_flags = new_flags.unwrap_or(self.flags);
-    //     let needs_remapping = new_flags.is_writable(); 
-    //     let mut new_mapped_pages = active_table_mapper.map_allocated_pages(
-    //         new_pages, 
-    //         new_flags | EntryFlags::WRITABLE, // force writable
-    //     )?;
+        use paging::allocate_pages;
+        let new_pages = allocate_pages(size_in_pages).ok_or_else(|| "Couldn't allocate_pages()")?;
 
-    //     // perform the actual copy of in-memory content
-    //     // TODO: there is probably a better way to do this, e.g., `rep stosq/movsq` or something
-    //     {
-    //         type PageContent = [u8; PAGE_SIZE];
-    //         let source: &[PageContent] = self.as_slice(0, size_in_pages)?;
-    //         let dest: &mut [PageContent] = new_mapped_pages.as_slice_mut(0, size_in_pages)?;
-    //         dest.copy_from_slice(source);
-    //     }
+        // we must temporarily map the new pages as Writable, since we're about to copy data into them
+        let new_flags = new_flags.unwrap_or(self.flags);
+        let needs_remapping = !new_flags.is_writable(); 
+        let mut new_mapped_pages = active_table_mapper.map_allocated_pages(
+            new_pages, 
+            new_flags | EntryFlags::WRITABLE, // force writable
+        )?;
 
-    //     if needs_remapping {
-    //         new_mapped_pages.remap(active_table_mapper, new_flags)?;
-    //     }
+        // perform the actual copy of in-memory content
+        // TODO: there is probably a better way to do this, e.g., `rep stosq/movsq` or something
+        {
+            type PageContent = [u8; PAGE_SIZE];
+            let source: &[PageContent] = self.as_slice(0, size_in_pages)?;
+            let dest: &mut [PageContent] = new_mapped_pages.as_slice_mut(0, size_in_pages)?;
+            dest.copy_from_slice(source);
+        }
+
+        if needs_remapping {
+            new_mapped_pages.remap(active_table_mapper, new_flags)?;
+        }
         
-    //     Ok(new_mapped_pages)
-    // }
+        Ok(new_mapped_pages)
+    }
 
     
     /// Change the permissions (`new_flags`) of this `MappedPages`'s page table entries.
     ///
-    /// Note that attempting to change certain flags will have no effect. 
+    /// Note that attempting to change certain "reserved" flags will have no effect. 
     /// For example, arbitrarily setting the `EXCLUSIVE` bit would cause unsafety, so it cannot be changed.
     pub fn remap(&mut self, active_table_mapper: &mut Mapper, new_flags: EntryFlags) -> Result<(), &'static str> {
         if self.size_in_pages() == 0 { return Ok(()); }
@@ -434,13 +523,12 @@ impl MappedPages {
                 .and_then(|p2| p2.next_table_mut(page.p2_index()))
                 .ok_or("mapping code does not support huge pages")?;
             
-            let frame = p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped")?;
-            p1[page.p1_index()].set_entry(frame, new_flags | EntryFlags::PRESENT);
+            p1[page.p1_index()].set_flags(new_flags | EntryFlags::PRESENT);
 
             tlb_flush_virt_addr(page.start_address());
         }
         
-        if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
+        if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.get() {
             func(self.pages.deref().clone());
         }
 
@@ -522,7 +610,10 @@ impl MappedPages {
             // freed from the newly-unmapped P1 PTE entry above.
             match unmapped_frames {
                 UnmapResult::Exclusive(newly_unmapped_frames) => {
-                    let newly_unmapped_frames: AllocatedFrames = newly_unmapped_frames.into();
+                    let newly_unmapped_frames = INTO_ALLOCATED_FRAMES_FUNC.get()
+                        .ok_or("BUG: Mapper::unmap(): the `INTO_ALLOCATED_FRAMES_FUNC` callback was not initialized")
+                        .map(|into_func| into_func(newly_unmapped_frames.deref().clone()))?;
+
                     if let Some(mut curr_frames) = current_frame_range.take() {
                         match curr_frames.merge(newly_unmapped_frames) {
                             Ok(()) => {
@@ -563,7 +654,7 @@ impl MappedPages {
     
         #[cfg(not(bm_map))]
         {
-            if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
+            if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.get() {
                 func(self.pages.deref().clone());
             }
         }
@@ -742,83 +833,6 @@ impl MappedPages {
         };
 
         Ok(slc)
-    }
-
-
-    /// Reinterprets this `MappedPages`'s underlying memory region as an executable function with any signature.
-    /// 
-    /// # Arguments
-    /// * `offset`: the offset (in number of bytes) into the memory region at which the function starts.
-    /// * `space`: a hack to satisfy the borrow checker's lifetime requirements.
-    /// 
-    /// Returns a reference to the function that is formed from the underlying memory region,
-    /// with a lifetime dependent upon the lifetime of the given `space` object. 
-    ///
-    /// TODO FIXME: this isn't really safe as it stands now. 
-    /// Ideally, we need to have an integrated function that checks with the mod_mgmt crate 
-    /// to see if the size of the function can fit (not just the size of the function POINTER, which will basically always fit)
-    /// within the bounds of this `MappedPages` object;
-    /// this integrated function would be based on the given string name of the function, like "task::this::foo",
-    /// and would invoke this as_func() function directly.
-    /// 
-    /// We have to accept space for the function pointer to exist, because it cannot live in this function's stack. 
-    /// It has to live in stack of the function that invokes the actual returned function reference,
-    /// otherwise there would be a lifetime issue and a guaranteed page fault. 
-    /// So, the `space` arg is a hack to ensure lifetimes;
-    /// we don't care about the actual value of `space`, as the value will be overwritten,
-    /// and it doesn't matter both before and after the call to this `as_func()`.
-    /// 
-    /// The generic `F` parameter is the function type signature itself, e.g., `fn(String) -> u8`.
-    /// 
-    /// # Examples
-    /// Here's how you might call this function:
-    /// ```
-    /// type PrintFuncSignature = fn(&str) -> Result<(), &'static str>;
-    /// let mut space = 0; // this must persist throughout the print_func being called
-    /// let print_func: &PrintFuncSignature = mapped_pages.as_func(func_offset, &mut space).unwrap();
-    /// print_func("hi");
-    /// ```
-    /// Because Rust has lexical lifetimes, the `space` variable must have a lifetime at least as long as the  `print_func` variable,
-    /// meaning that `space` must still be in scope in order for `print_func` to be invoked.
-    /// 
-    #[doc(hidden)]
-    pub fn as_func<'a, F>(&self, offset: usize, space: &'a mut usize) -> Result<&'a F, &'static str> {
-        let size = mem::size_of::<F>();
-        if true {
-            #[cfg(not(downtime_eval))]
-            debug!("MappedPages::as_func(): requested {} with size {} at offset {}, MappedPages size {}!",
-                core::any::type_name::<F>(),
-                size, offset, self.size_in_bytes()
-            );
-        }
-
-        // check flags to make sure these pages are executable (otherwise a page fault would occur when this func is called)
-        if !self.flags.is_executable() {
-            error!("MappedPages::as_func(): requested {}, but MappedPages weren't executable (flags: {:?})",
-                core::any::type_name::<F>(),
-                self.flags
-            );
-            return Err("as_func(): MappedPages were not executable");
-        }
-
-        // check that size of the type F fits within the size of the mapping
-        let end = offset + size;
-        if end > self.size_in_bytes() {
-            error!("MappedPages::as_func(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
-                core::any::type_name::<F>(),
-                size, offset, self.size_in_bytes()
-            );
-            return Err("requested type and offset would not fit within the MappedPages bounds");
-        }
-
-        *space = self.pages.start_address().value() + offset; 
-
-        // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
-        let t: &'a F = unsafe {
-            mem::transmute(space)
-        };
-
-        Ok(t)
     }
 }
 

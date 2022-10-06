@@ -3,10 +3,9 @@ name = "heap_eval"
 version = "0.1.0"
 description = "Benchmarks to evaluate Theseus's heap design"
 authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
-qp-trie = "0.7.3"
+qp-trie = "0.8.0"
 getopts = "0.2.21"
 
 [dependencies.terminal_print]
@@ -16,7 +15,7 @@ path = "../../kernel/terminal_print"
 version = "0.4.8"
 
 [dependencies.hpet]
-path = "../../kernel/hpet"
+path = "../../kernel/acpi/hpet"
 
 [dependencies.apic]
 path = "../../kernel/apic"
@@ -25,7 +24,7 @@ path = "../../kernel/apic"
 path = "../../kernel/runqueue"
 
 [dependencies.hashbrown]
-version = "0.1.8"
+version = "0.11.2"
 features = ["nightly"]
 
 [dependencies.libtest]

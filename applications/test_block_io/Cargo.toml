@@ -1,0 +1,26 @@
+[package]
+name = "test_block_io"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "a simple app for testing IO transfers for block devices"
+
+[dependencies]
+core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.io]
+path = "../../kernel/io"
+
+[dependencies.storage_manager]
+path = "../../kernel/storage_manager"
+
+[dependencies.ata]
+path = "../../kernel/ata"

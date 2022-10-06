@@ -7,7 +7,7 @@ extern crate task;
 extern crate getopts;
 extern crate path;
 extern crate fs_node;
-extern crate bare_io;
+extern crate core2;
 
 use core::str;
 use alloc::{
@@ -18,7 +18,7 @@ use alloc::{
 use getopts::Options;
 use path::Path;
 use fs_node::FileOrDir;
-use bare_io::{Read, Write};
+use core2::io::{Read, Write};
 
 
 pub fn main(args: Vec<String>) -> isize {
@@ -53,11 +53,7 @@ pub fn main(args: Vec<String>) -> isize {
     };
 
     // grabs the current working directory pointer; this is scoped so that we drop the lock on the task as soon as we get the working directory pointer
-    let curr_wr = {
-        let locked_task = taskref.lock();
-        let curr_env = locked_task.env.lock();
-        Arc::clone(&curr_env.working_dir)
-    };
+    let curr_wr = Arc::clone(&taskref.get_env().lock().working_dir);
     let path = Path::new(matches.free[0].to_string());
     
     // navigate to the filepath specified by first argument
@@ -69,11 +65,11 @@ pub fn main(args: Vec<String>) -> isize {
                     return -1;
                 }
                 FileOrDir::File(file) => {
-                    let file_locked = file.lock();
-                    let file_size = file_locked.size();
+                    let mut file_locked = file.lock();
+                    let file_size = file_locked.len();
                     let mut string_slice_as_bytes = vec![0; file_size];
                     
-                    let _num_bytes_read = match file_locked.read(&mut string_slice_as_bytes,0) {
+                    let _num_bytes_read = match file_locked.read_at(&mut string_slice_as_bytes,0) {
                         Ok(num) => num,
                         Err(e) => {
                             println!("Failed to read {:?}, error {:?}", file_locked.get_name(), e);

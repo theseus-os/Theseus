@@ -1,0 +1,26 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "mutex_preemption"
+description = "Mutex and RwLock types that auto-disable/enable preemption while lock guards are held"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies.preemption]
+path = "../preemption"
+
+[dependencies.lockable]
+path = "../../libs/lockable"
+
+[dependencies.spin]
+version = "0.9.0"
+default-features = false
+features = ["mutex", "spin_mutex", "rwlock", "once", "barrier"]
+
+[dependencies.stable_deref_trait]
+git = "https://github.com/theseus-os/stable_deref_trait.git"
+branch = "spin"
+default-features = false
+features = [ "alloc", "spin" ]
+
+[dependencies.owning_ref]
+git = "https://github.com/theseus-os/owning-ref-rs.git"

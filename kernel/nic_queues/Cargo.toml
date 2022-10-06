@@ -3,10 +3,10 @@ name = "nic_queues"
 description = "Defines structs that hold all information related to nic receive and transmit queues"
 version = "0.1.0"
 authors = ["Ramla-I <ijazramla@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
+mpmc = "0.1.6"
 
 [dependencies.memory]
 path = "../memory"
@@ -19,9 +19,6 @@ path = "../intel_ethernet"
 
 [dependencies.nic_buffers]
 path = "../nic_buffers"
-
-[dependencies.mpmc]
-path = "../../libs/mpmc"
 
 [lib]
 crate-type = ["rlib"]

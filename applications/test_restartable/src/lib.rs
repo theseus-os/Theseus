@@ -5,7 +5,6 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate terminal_print;
-#[macro_use] extern crate lazy_static;
 extern crate getopts;
 extern crate alloc;
 extern crate spawn;
@@ -30,10 +29,8 @@ impl Drop for DropStruct {
     }
 }
 
-lazy_static! {
-    /// A lock to check and verify releasing of locks
-    static ref STATIC_LOCK: Mutex<Vec<usize>> = Mutex::new(Vec::new());
-}
+/// A lock to check and verify releasing of locks
+static STATIC_LOCK: Mutex<Vec<usize>> = Mutex::new(Vec::new());
 
 /// An enum to hold the methods we plan to exit a task
 #[derive(Clone)]
@@ -178,35 +175,35 @@ pub fn main(args: Vec<String>) -> isize {
     if matches.opt_present("s"){
         let taskref1  = new_task_builder(simple_restartable_loop, exit_method)
             .name(String::from("restartable_loop"))
-            .spawn_restartable()
+            .spawn_restartable(None)
             .expect("Couldn't start the restartable task"); 
 
         taskref1.join().expect("Task 1 join failed");
     } else if matches.opt_present("l"){
         let taskref1  = new_task_builder(restartable_loop_with_lock, exit_method)
             .name(String::from("restartable_loop with lock"))
-            .spawn_restartable()
+            .spawn_restartable(None)
             .expect("Couldn't start the restartable task"); 
 
         taskref1.join().expect("Task 1 join failed");
     } else if matches.opt_present("f"){
         let taskref1  = new_task_builder(restartable_lock_fail, exit_method)
             .name(String::from("restartable_lock_fail"))
-            .spawn_restartable()
+            .spawn_restartable(None)
             .expect("Couldn't start the restartable task"); 
 
         taskref1.join().expect("Task 1 join failed");
     } else if matches.opt_present("m"){
         let taskref1  = new_task_builder(restartable_lock_modified, exit_method)
             .name(String::from("restartable_lock_fail"))
-            .spawn_restartable()
+            .spawn_restartable(None)
             .expect("Couldn't start the restartable task"); 
 
         taskref1.join().expect("Task 1 join failed");
     } else if matches.opt_present("r"){
         let taskref1  = new_task_builder(restartable_lock_recursive, exit_method)
             .name(String::from("restartable_lock_fail"))
-            .spawn_restartable()
+            .spawn_restartable(None)
             .expect("Couldn't start the restartable task"); 
 
         taskref1.join().expect("Task 1 join failed");

@@ -3,12 +3,11 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>", "Wenqiu Yu <yuwenqiuj@gmail.com>
 name = "entryflags_x86_64"
 description = "Defines the structure of page table entry flags on x86_64"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 static_assertions = "1.1.0"
 bitflags = "1.0.4"
-multiboot2 = "0.10.1"
+multiboot2 = "0.14.0"
 xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
 
 [lib]

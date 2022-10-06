@@ -44,16 +44,16 @@ extern crate exceptions_full;
 extern crate network_manager;
 extern crate window_manager;
 extern crate multiple_heaps;
+extern crate console;
 #[cfg(simd_personality)] extern crate simd_personality;
 
 
 
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::ops::DerefMut;
-use memory::{VirtualAddress, MemoryManagementInfo, MappedPages};
+use memory::{VirtualAddress, MappedPages, MmiRef};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use irq_safety::{MutexIrqSafe, enable_interrupts};
+use irq_safety::enable_interrupts;
 use stack::Stack;
 
 
@@ -70,7 +70,7 @@ pub fn mirror_to_vga_cb(args: core::fmt::Arguments) {
 /// This does all the rest of the module loading and initialization so that the OS 
 /// can continue running and do actual useful work.
 pub fn init(
-    kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, 
+    kernel_mmi_ref: MmiRef,
     identity_mapped_pages: Vec<MappedPages>,
     bsp_initial_stack: Stack,
     ap_start_realmode_begin: VirtualAddress,
@@ -102,22 +102,25 @@ pub fn init(
     };
     let idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
     
-    // init other featureful (non-exception) interrupt handlers
-    // interrupts::init_handlers_pic();
-    interrupts::init_handlers_apic();
-    
     // get BSP's apic id
     let bsp_apic_id = apic::get_bsp_id().ok_or("captain::init(): Coudln't get BSP's apic_id!")?;
 
     // create the initial `Task`, which is bootstrapped from this execution context.
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_initial_stack)?;
+    info!("Created initial bootstrap task: {:?}", bootstrap_task);
 
     // after we've initialized the task subsystem, we can use better exception handlers
     exceptions_full::init(idt);
     
     // boot up the other cores (APs)
-    let ap_count = multicore_bringup::handle_ap_cores(kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
-    info!("Finished handling and booting up all {} AP cores.", ap_count);
+    let ap_count = multicore_bringup::handle_ap_cores(
+        &kernel_mmi_ref,
+        ap_start_realmode_begin,
+        ap_start_realmode_end,
+        Some(kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION),
+    )?;
+    let cpu_count = ap_count + 1;
+    info!("Finished handling and booting up all {} AP cores; {} total CPUs are running.", ap_count, cpu_count);
 
     // //initialize the per core heaps
     multiple_heaps::switch_to_multiple_heaps()?;
@@ -136,26 +139,33 @@ pub fn init(
     drop(identity_mapped_pages);
     
     // create a SIMD personality
-    #[cfg(simd_personality)]
-    {
+    #[cfg(simd_personality)] {
+        #[cfg(simd_personality_sse)]
         let simd_ext = task::SimdExt::SSE;
+        #[cfg(simd_personality_avx)]
+        let simd_ext = task::SimdExt::AVX;
         warn!("SIMD_PERSONALITY FEATURE ENABLED, creating a new personality with {:?}!", simd_ext);
-        spawn::spawn::new_task_builder(simd_personality::setup_simd_personality, simd_ext)
-            .name(alloc::string::String::from("setup_simd_personality"))
+        spawn::new_task_builder(simd_personality::setup_simd_personality, simd_ext)
+            .name(alloc::format!("setup_simd_personality_{:?}", simd_ext))
             .spawn()?;
     }
 
-    // Now that initialization is complete, we can spawn the first application(s)
+    // Now that key subsystems are initialized, we can spawn various system tasks/daemons
+    // and then the first application(s).
+    console::start_connection_detection()?;
     first_application::start()?;
 
     info!("captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...", bsp_apic_id);
-    spawn::create_idle_task(Some(bsp_apic_id))?;
-    
-    // Now that we've created a new idle task for this core, we can drop ourself's bootstrapped task.
-    drop(bootstrap_task);
-    // Before we finish initialization, drop any other local stack variables that still exist.
+    // The following final initialization steps are important, and order matters:
+    // 1. Drop any other local stack variables that still exist.
     drop(kernel_mmi_ref);
-
+    // 2. Create the idle task for this CPU.
+    spawn::create_idle_task()?;
+    // 3. Cleanup bootstrap tasks, which handles this one and all other APs' bootstrap tasks.
+    spawn::cleanup_bootstrap_tasks(cpu_count as usize)?;
+    // 4. "Finish" this bootstrap task, indicating it has exited and no longer needs to run.
+    bootstrap_task.finish();
+    // 5. Enable interrupts such that other tasks can be scheduled in.
     enable_interrupts();
     // ****************************************************
     // NOTE: nothing below here is guaranteed to run again!

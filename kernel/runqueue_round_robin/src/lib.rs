@@ -6,9 +6,8 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
-extern crate irq_safety;
+extern crate mutex_preemption;
 extern crate atomic_linked_list;
 extern crate task;
 
@@ -16,7 +15,7 @@ extern crate task;
 extern crate single_simd_task_optimization;
 
 use alloc::collections::VecDeque;
-use irq_safety::RwLockIrqSafe;
+use mutex_preemption::RwLockPreempt;
 use atomic_linked_list::atomic_map::AtomicMap;
 use task::TaskRef;
 use core::ops::{Deref, DerefMut};
@@ -76,11 +75,9 @@ impl RoundRobinTaskRef {
     }
 }
 
-lazy_static! {
-    /// There is one runqueue per core, each core only accesses its own private runqueue
-    /// and allows the scheduler to select a task from that runqueue to schedule in.
-    pub static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
-}
+/// There is one runqueue per core, each core only accesses its own private runqueue
+/// and allows the scheduler to select a task from that runqueue to schedule in.
+pub static RUNQUEUES: AtomicMap<u8, RwLockPreempt<RunQueue>> = AtomicMap::new();
 
 /// A list of references to `Task`s (`RoundRobinTaskRef`s). 
 /// This is used to store the `Task`s (and associated scheduler related data) 
@@ -126,7 +123,7 @@ impl RunQueue {
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`.
     pub fn init(which_core: u8) -> Result<(), &'static str> {
         trace!("Created runqueue (round robin) for core {}", which_core);
-        let new_rq = RwLockIrqSafe::new(RunQueue {
+        let new_rq = RwLockPreempt::new(RunQueue {
             core: which_core,
             queue: VecDeque::new(),
         });
@@ -147,7 +144,7 @@ impl RunQueue {
     }
 
     /// Returns the `RunQueue` for the given core, which is an `apic_id`.
-    pub fn get_runqueue(which_core: u8) -> Option<&'static RwLockIrqSafe<RunQueue>> {
+    pub fn get_runqueue(which_core: u8) -> Option<&'static RwLockPreempt<RunQueue>> {
         RUNQUEUES.get(&which_core)
     }
 
@@ -160,8 +157,8 @@ impl RunQueue {
 
     /// Returns the `RunQueue` for the "least busy" core.
     /// See [`get_least_busy_core()`](#method.get_least_busy_core)
-    fn get_least_busy_runqueue() -> Option<&'static RwLockIrqSafe<RunQueue>> {
-        let mut min_rq: Option<(&'static RwLockIrqSafe<RunQueue>, usize)> = None;
+    fn get_least_busy_runqueue() -> Option<&'static RwLockPreempt<RunQueue>> {
+        let mut min_rq: Option<(&'static RwLockPreempt<RunQueue>, usize)> = None;
 
         for (_, rq) in RUNQUEUES.iter() {
             let rq_size = rq.read().queue.len();
@@ -199,12 +196,8 @@ impl RunQueue {
 
     /// Adds a `TaskRef` to this RunQueue.
     fn add_task(&mut self, task: TaskRef) -> Result<(), &'static str> {        
-        #[cfg(single_simd_task_optimization)]
-        let is_simd = task.lock().simd;
-        
-        #[cfg(runqueue_spillful)]
-        {
-            task.lock_mut().on_runqueue = Some(self.core);
+        #[cfg(runqueue_spillful)] {
+            task.set_on_runqueue(Some(self.core));
         }
 
         #[cfg(not(any(rq_eval, downtime_eval)))]
@@ -217,7 +210,7 @@ impl RunQueue {
         {   
             warn!("USING SINGLE_SIMD_TASK_OPTIMIZATION VERSION OF RUNQUEUE::ADD_TASK");
             // notify simd_personality crate about runqueue change, but only for SIMD tasks
-            if is_simd {
+            if task.simd {
                 single_simd_task_optimization::simd_tasks_added_to_core(self.iter(), self.core);
             }
         }
@@ -232,12 +225,10 @@ impl RunQueue {
         debug!("Removing task from runqueue_round_robin {}, {:?}", self.core, task);
         self.retain(|x| &x.taskref != task);
 
-        #[cfg(single_simd_task_optimization)]
-        {   
-            let is_simd = { task.lock().simd };
+        #[cfg(single_simd_task_optimization)] {   
             warn!("USING SINGLE_SIMD_TASK_OPTIMIZATION VERSION OF RUNQUEUE::REMOVE_TASK");
             // notify simd_personality crate about runqueue change, but only for SIMD tasks
-            if is_simd {
+            if task.simd {
                 single_simd_task_optimization::simd_tasks_removed_from_core(self.iter(), self.core);
             }
         }
@@ -247,16 +238,16 @@ impl RunQueue {
 
 
     /// Removes a `TaskRef` from this RunQueue.
-    pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
-        #[cfg(runqueue_spillful)]
-        {
+    pub fn remove_task(&mut self, _task: &TaskRef) -> Result<(), &'static str> {
+        #[cfg(runqueue_spillful)] {
             // For the runqueue state spill evaluation, we disable this method because we 
             // only want to allow removing a task from a runqueue from within the TaskRef::internal_exit() method.
-            // trace!("skipping remove_task() on core {}, task {:?}", self.core, task);
+            // trace!("skipping remove_task() on core {}, task {:?}", self.core, _task);
             return Ok(());
         }
-
-        self.remove_internal(task)
+        #[cfg(not(runqueue_spillful))] {
+            self.remove_internal(_task)
+        }
     }
 
 
@@ -276,7 +267,7 @@ impl RunQueue {
     pub fn remove_task_from_within_task(task: &TaskRef, core: u8) -> Result<(), &'static str> {
         #[cfg(not(rq_eval))]
         warn!("remove_task_from_within_task(): core {}, task: {:?}", core, task);
-        task.lock_mut().on_runqueue = None;
+        task.set_on_runqueue(None);
         RUNQUEUES.get(&core)
             .ok_or("Couldn't get runqueue for specified core")
             .and_then(|rq| {

@@ -3,13 +3,11 @@ authors = ["Aryan Sefidi <aryansefidi@gmail.com>"]
 name = "pmu_x86"
 description = "Diagnostic tools, specifically provides acccess to performance monitoring unit on x86 Nehalem and above."
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+spin = "0.9.0"
+x86_64 = "0.14.8"
 bit_field = "0.10.0"
-atomic = "0.4.5"
 
 [dependencies.apic]
 path = "../apic"
@@ -18,8 +16,8 @@ path = "../apic"
 git = "https://github.com/theseus-os/irq_safety"
 
 [dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
+features = ["spin_no_std"]
+version = "1.4.0"
 
 [dependencies.log]
 version = "0.4.8"
@@ -33,9 +31,11 @@ path = "../pit_clock"
 [dependencies.port_io]
 path = "../../libs/port_io"
 
+[dependencies.msr]
+path = "../../libs/msr"
+
 [dependencies.raw-cpuid]
-version = "7.0.3"
-features = [ "use_arch" ]
+version = "10.6.0"
 
 [dependencies.task]
 path = "../task"

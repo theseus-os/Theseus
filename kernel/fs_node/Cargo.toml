@@ -6,18 +6,20 @@ description = "defines the traits for File and Directory. These files and direct
 
 
 [dependencies]
-spin = "0.4.5"
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+spin = "0.9.0"
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]
-version = "1.0"
+version = "1.4.0"
 
 [dependencies.log]
 version = "0.4.8"
 
 [dependencies.memory]
 path = "../memory"
+
+[dependencies.io]
+path = "../io"
 
 [lib]
 crate-type = ["rlib"]

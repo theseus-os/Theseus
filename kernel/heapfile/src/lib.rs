@@ -7,6 +7,7 @@ extern crate alloc;
 extern crate spin;
 extern crate memory;
 extern crate fs_node;
+extern crate io;
 
 
 use alloc::{
@@ -14,6 +15,7 @@ use alloc::{
     sync::Arc,
     string::String,
 };
+use io::{ByteReader, ByteWriter, IoError, KnownLength};
 use spin::Mutex;
 use fs_node::{FileOrDir, FileRef, DirRef, WeakDirRef, File, FsNode};
 use memory::MappedPages;
@@ -49,54 +51,45 @@ impl HeapFile {
     }
 }
 
-impl File for HeapFile {
-    fn read(&self, buffer: &mut [u8], offset: usize) -> Result<usize, &'static str> {
-        if offset > self.vec.len() {
-            return Err("read offset exceeds file size");
+impl ByteReader for HeapFile {
+    fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError> {
+        if offset >= self.vec.len() {
+            return Err(IoError::InvalidInput);
         }
         // read from the offset until the end of the file, but not more than the buffer length
         let read_bytes = core::cmp::min(self.vec.len() - offset, buffer.len());
         buffer[..read_bytes].copy_from_slice(&self.vec[offset..read_bytes]); 
         Ok(read_bytes) 
     }
+}
 
-    fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, &'static str> {
-        if offset > self.vec.len() {
-            return Err("offset out of bounds");
+impl ByteWriter for HeapFile {
+    fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError> {
+        let final_len = offset + buffer.len();
+        // Handle the need for reallocation and padding bytes.
+        if final_len > self.vec.len() {
+            self.vec.resize(final_len, 0u8);
         }
 
-        // optimization for first write of an empty HeapFile
-        if self.vec.is_empty() {
-            self.vec = buffer.to_vec();
-            return Ok(buffer.len());
-        }
+        // Now, `self.vec` is long enough to accommodate the entire `buffer`.
+        self.vec[offset..].copy_from_slice(buffer);
         
-        let end_bound = buffer.len() + offset;
-        // first, do a fast memcpy of everything that can fit in the existing vector.
-        let copy_count = core::cmp::min(self.vec.len() - offset, buffer.len());
-        self.vec[offset..(offset + copy_count)].copy_from_slice(&buffer[..copy_count]);
-
-        // second, if necessary, resize capacity and extend the vec with everything beyond its bounds.
-        if end_bound > self.vec.len() {
-            // reallocation is needed, we should do it all at once for better performance
-            let additional_capacity = end_bound - self.vec.len();
-            self.vec.reserve(additional_capacity);
-            self.vec.extend_from_slice(&buffer[copy_count..]);
-        }
-        else {
-            // no reallocation needed
-        }
         Ok(buffer.len())
     }
 
-    fn size(&self) -> usize {
+    fn flush(&mut self) -> Result<(), IoError> { Ok(()) }
+}
+
+impl KnownLength for HeapFile {
+    fn len(&self) -> usize {
         self.vec.len()
     }
+}
 
+impl File for HeapFile {
     fn as_mapping(&self) -> Result<&MappedPages, &'static str> {
         Err("Mapping a HeapFile as a MappedPages object is unimplemented")
     }
-    
 }
 
 impl FsNode for HeapFile {

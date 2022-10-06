@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "single_simd_task_optimization"
 description = "Support for a special optimization that allows a SIMD task to avoid saving SIMD registers when context switching, if it is the only SIMD task on its core"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 cfg-if = "0.1.6"

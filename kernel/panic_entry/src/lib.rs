@@ -32,12 +32,10 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
     let kernel_mmi_ref = memory::get_kernel_mmi_ref();  
     let res = if kernel_mmi_ref.is_some() {
         // proceed with calling the panic_wrapper, but don't shutdown with try_exit() if errors occur here
-        #[cfg(not(loadable))]
-        {
+        #[cfg(not(loadable))] {
             panic_wrapper::panic_wrapper(info)
         }
-        #[cfg(loadable)]
-        {
+        #[cfg(loadable)] {
             // An internal function for calling the panic_wrapper, but returning errors along the way.
             // We must make sure to not hold any locks when invoking the panic_wrapper function.
             fn invoke_panic_wrapper(info: &PanicInfo) -> Result<(), &'static str> {
@@ -48,10 +46,7 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
                         .and_then(|namespace| namespace.get_symbol_starting_with(PANIC_WRAPPER_SYMBOL).upgrade())
                         .ok_or("Couldn't get single symbol matching \"panic_wrapper::panic_wrapper::\"")?
                 };
-                let mut space = 0;
-                let func: &PanicWrapperFunc = {
-                    section.mapped_pages.lock().as_func(section.mapped_pages_offset, &mut space)?
-                };
+                let func: &PanicWrapperFunc = unsafe { section.as_func() }?;
                 func(info)
             }
 
@@ -99,12 +94,10 @@ extern "C" fn rust_eh_personality() -> ! {
 /// but does so dynamically in loadable mode.
 #[no_mangle]
 extern "C" fn _Unwind_Resume(arg: usize) -> ! {
-    #[cfg(not(loadable))]
-    {
+    #[cfg(not(loadable))] {
         unwind::unwind_resume(arg)
     }
-    #[cfg(loadable)]
-    {
+    #[cfg(loadable)] {
         // An internal function for calling the real unwind_resume function, but returning errors along the way.
         // We must make sure to not hold any locks when invoking the function.
         fn invoke_unwind_resume(arg: usize) -> Result<(), &'static str> {
@@ -115,11 +108,7 @@ extern "C" fn _Unwind_Resume(arg: usize) -> ! {
                     .and_then(|namespace| namespace.get_symbol_starting_with(UNWIND_RESUME_SYMBOL).upgrade())
                     .ok_or("Couldn't get single symbol matching \"unwind::unwind_resume::\"")?
             };
-            let mut space = 0;
-            let func: &UnwindResumeFunc = {
-                section.mapped_pages.lock().as_func(section.mapped_pages_offset, &mut space)?
-            };
-
+            let func: &UnwindResumeFunc = unsafe { section.as_func() }?;
             func(arg)
         }
         match invoke_unwind_resume(arg) {

@@ -1,0 +1,23 @@
+[package]
+authors = ["Jacob Earle <earlejacobt@gmail.com>"]
+name = "sleep"
+description = "Provides APIs that allow tasks to be delayed for specified intervals of time"
+version = "0.1.0"
+
+[dependencies]
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "1.2.0"
+
+[dependencies.task]
+path = "../task"
+
+[dependencies.irq_safety]
+git = "https://github.com/theseus-os/irq_safety" 
+
+[dependencies.scheduler]
+path = "../scheduler"
+
+[lib]
+crate-type = ["rlib"]

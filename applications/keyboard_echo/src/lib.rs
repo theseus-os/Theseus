@@ -3,13 +3,13 @@
 #![no_std]
 
 #[macro_use] extern crate alloc;
-extern crate bare_io;
+extern crate core2;
 extern crate scheduler;
 extern crate app_io;
 extern crate keycodes_ascii;
 #[macro_use] extern crate log;
 
-use bare_io::Write;
+use core2::io::Write;
 use alloc::vec::Vec;
 use alloc::string::String;
 use keycodes_ascii::Keycode;

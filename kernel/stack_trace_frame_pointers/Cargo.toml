@@ -3,7 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "stack_trace_frame_pointers"
 description = "Stack trace (backtrace) functionality using frame pointers (non-default choice)"
 version = "0.1.0"
-build = "../../build.rs"
+build = "build.rs"
 
 [dependencies]
 cfg-if = "0.1.6"

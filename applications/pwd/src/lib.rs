@@ -10,10 +10,11 @@ use alloc::string::String;
 
 pub fn main(_args: Vec<String>) -> isize {
     if let Some(taskref) = task::get_my_current_task() {
-        let curr_env = &taskref.lock().env;
-        println!("{} \n", curr_env.lock().get_wd_path());
+        let curr_env = taskref.get_env();
+        println!("{}", curr_env.lock().cwd());
+        0
     } else {
-        println!("failed to get task ref");    
+        println!("failed to get current task");    
+        -1
     }
-    0
 }

@@ -3,11 +3,10 @@
 //! 
 
 #![no_std]
+#![feature(const_btree_new)]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate lazy_static;
-extern crate spin;
 extern crate irq_safety;
 extern crate memory;
 extern crate stack;
@@ -20,11 +19,11 @@ extern crate tlb_shootdown;
 
 use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicBool, Ordering};
-use irq_safety::{enable_interrupts, MutexIrqSafe, RwLockIrqSafe};
+use irq_safety::{enable_interrupts, MutexIrqSafe};
 use memory::{VirtualAddress, get_kernel_mmi_ref};
 use stack::Stack;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use apic::{LocalApic, get_lapics};
+use apic::LocalApic;
 
 
 /// An atomic flag used for synchronizing progress between the BSP 
@@ -32,11 +31,9 @@ use apic::{LocalApic, get_lapics};
 /// False means the AP hasn't started or hasn't yet finished booting.
 pub static AP_READY_FLAG: AtomicBool = AtomicBool::new(false);
 
-lazy_static! {
-    /// Temporary storage for transferring allocated `Stack`s from 
-    /// the main bootstrap processor (BSP) to the AP processor being booted in `kstart_ap()` below.
-    static ref AP_STACKS: MutexIrqSafe<BTreeMap<u8, Stack>> = MutexIrqSafe::new(BTreeMap::new());
-}
+/// Temporary storage for transferring allocated `Stack`s from 
+/// the main bootstrap processor (BSP) to the AP processor being booted in `kstart_ap()` below.
+static AP_STACKS: MutexIrqSafe<BTreeMap<u8, Stack>> = MutexIrqSafe::new(BTreeMap::new());
 
 /// Insert a new stack that was allocated for the AP with the given `apic_id`.
 pub fn insert_ap_stack(apic_id: u8, stack: Stack) {
@@ -59,7 +56,7 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
 
     // get the stack that was allocated for us (this AP) by the BSP.
     let this_ap_stack = AP_STACKS.lock().remove(&apic_id)
-        .expect(&format!("BUG: kstart_ap(): couldn't get stack created for AP with apic_id: {}", apic_id));
+        .unwrap_or_else(|| panic!("BUG: kstart_ap(): couldn't get stack created for AP with apic_id: {}", apic_id));
 
     // initialize interrupts (including TSS/GDT) for this AP
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("kstart_ap(): kernel_mmi ref was None");
@@ -81,22 +78,19 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     // we do this last (after all other initialization) in order to prevent this lapic
     // from prematurely receiving IPIs or being used in other ways,
     // and also to ensure that if this apic fails to init, it's not accidentally used as a functioning apic in the list.
-    let lapic = {
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        LocalApic::new(&mut kernel_mmi.page_table, processor_id, apic_id, false, nmi_lint, nmi_flags)
-            .expect("kstart_ap(): failed to create LocalApic")
-    };
-    get_lapics().insert(apic_id, RwLockIrqSafe::new(lapic));
+    LocalApic::init(&mut kernel_mmi_ref.lock().page_table, processor_id, apic_id, false, nmi_lint, nmi_flags)
+        .expect("kstart_ap(): failed to create LocalApic");
     tlb_shootdown::init();
 
-    info!("Initialization complete on AP core {}. Spawning idle task...", apic_id);
-    spawn::create_idle_task(Some(apic_id)).unwrap();
-
-    // Now that we've created a new idle task for this core, we can drop ourself's bootstrapped task.
-    drop(bootstrap_task);
-    // Before we finish initialization, drop any other local stack variables that still exist.
-    //   (currently none others to drop)    
-
+    info!("Initialization complete on AP core {}. Spawning idle task and enabling interrupts...", apic_id);
+    // The following final initialization steps are important, and order matters:
+    // 1. Drop any other local stack variables that still exist.
+    // (currently nothing else needs to be dropped)
+    // 2. Create the idle task for this CPU.
+    spawn::create_idle_task().unwrap();
+    // 3. "Finish" this bootstrap task, indicating it has exited and no longer needs to run.
+    bootstrap_task.finish();
+    // 4. Enable interrupts such that other tasks can be scheduled in.
     enable_interrupts();
     // ****************************************************
     // NOTE: nothing below here is guaranteed to run again!
@@ -104,6 +98,6 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
 
     scheduler::schedule();
     loop { 
-        error!("BUG: ap_start::kstart_ap(): AP's bootstrap task was rescheduled after being dead!");
+        error!("BUG: ap_start::kstart_ap(): CPU {} bootstrap task was rescheduled after being dead!", apic_id);
     }
 }

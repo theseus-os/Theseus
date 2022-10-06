@@ -2,7 +2,6 @@
 name = "bm"
 version = "0.1.0"
 authors = ["Minhong Yun <mhyun@rice.edu>"]
-build = "../../build.rs"
 
 [features]
 bm_in_us = []
@@ -20,7 +19,7 @@ path = "../../kernel/terminal_print"
 path = "../../kernel/task"
 
 [dependencies.hpet]
-path = "../../kernel/hpet"
+path = "../../kernel/acpi/hpet"
 
 [dependencies.apic]
 path = "../../kernel/apic"

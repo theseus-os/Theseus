@@ -1,0 +1,16 @@
+[package]
+name = "serialize_nano_core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Creates a serialized representation of the symbols in the `nano_core` binary"
+
+[dependencies]
+crate_metadata_serde = { path = "../../kernel/crate_metadata_serde" }
+kernel_config = { path = "../../kernel/kernel_config" }
+hashbrown = "0.11"
+serde = { version = "1.0", features = ["derive"] }
+
+[dependencies.bincode]
+version = "2.0.0-rc.1"
+features = ["serde"]

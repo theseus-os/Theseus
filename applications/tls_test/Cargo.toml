@@ -1,0 +1,20 @@
+[package]
+name = "tls_test"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+
+[dependencies]
+
+
+[dependencies.log]
+version = "0.4.8"
+
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+[dependencies.test_thread_local]
+path = "../../kernel/test_thread_local"
+
+[dependencies.thread_local_macro]
+path = "../../kernel/thread_local_macro"

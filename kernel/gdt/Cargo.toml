@@ -3,20 +3,13 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "gdt"
 description = "GDT (Global Descriptor Table) support (x86 only) for Theseus"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+spin = "0.9.0"
+x86_64 = "0.14.8"
 bit_field = "0.7.0"
 bitflags = "1.1.0"
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
+log = "0.4.8"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"

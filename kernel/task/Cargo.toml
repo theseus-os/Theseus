@@ -3,21 +3,19 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "task"
 description = "Task types and structure definitions"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
+spin = "0.9.0"
+x86_64 = "0.14.8"
+static_assertions = "1.1.0"
+crossbeam-utils = { version = "0.8.12", default-features = false }
+log = "0.4.8"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
+
+[dependencies.apic]
+path = "../apic"
 
 [dependencies.tss]
 path = "../tss"
@@ -36,6 +34,9 @@ path = "../mod_mgmt"
 
 [dependencies.context_switch]
 path = "../context_switch"
+
+[dependencies.preemption]
+path = "../preemption"
 
 [dependencies.environment]
 path = "../environment"

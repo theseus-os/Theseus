@@ -1,27 +1,24 @@
-//! Support for accessing ATA drives (IDE).
+//! Basic driver for accessing ATA drives (IDE) as a storage device.
 //! 
-//! The primary struct of interest is [`AtaDrive`](struct.AtaDrive.html).
+//! The primary struct of interest is [`AtaDrive`].
+//! 
+//! Support for DMA is not yet implemented, but the slower port-based I/O is fully supported.
 
 #![no_std]
+#![feature(abi_x86_interrupt)]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
-extern crate spin;
-extern crate port_io;
-extern crate pci;
-#[macro_use] extern crate bitflags;
-extern crate storage_device;
 
 use core::fmt;
+use bitflags::bitflags;
 use spin::Mutex;
-use alloc::{
-	string::String,
-	boxed::Box,
-	sync::Arc,
-};
+use alloc::{boxed::Box, format, string::String, sync::Arc};
 use port_io::{Port, PortReadOnly, PortWriteOnly};
 use pci::PciDevice;
 use storage_device::{StorageDevice, StorageDeviceRef, StorageController};
+use io::{BlockIo, BlockReader, BlockWriter, IoError, KnownLength};
+use x86_64::structures::idt::InterruptStackFrame;
 
 
 const SECTOR_SIZE_IN_BYTES: usize = 512;
@@ -111,10 +108,10 @@ enum AtaCommand {
 	CacheFlushExt   = 0xEA,
 	/// Sends a packet, for ATAPI devices using the packet interface (PI).
 	Packet          = 0xA0,
-	/// Get identifying details of an ATA drive.
-	IdentifyDevice  = 0xEC,
 	/// Get identifying details of an ATAPI drive.
 	IdentifyPacket  = 0xA1,
+	/// Get identifying details of an ATA drive.
+	IdentifyDevice  = 0xEC,
 }
 
 
@@ -153,9 +150,29 @@ impl AtaDeviceType {
 /// The value is the bitmask used to select either master or slave
 /// in the ATA drive's `drive_select` port.
 #[derive(Copy, Clone, Debug)]
+#[repr(u8)]
 enum BusDriveSelect {
 	Master = 0 << 4,
 	Slave  = 1 << 4,
+}
+
+
+/// TODO: support DMA like so: <https://wiki.osdev.org/ATA/ATAPI_using_DMA#The_Bus_Master_Register>
+/// There is one instance of this struct for each `AtaBus`.
+/// 
+/// Note: TODO: depending on whether BAR4 is a Port I/O address or MMIO address, this could also be mapped into memory.
+///             We need to have an abstraction either above or beneath `Volatile` that allows reads/writes from port I/O and memory addresses similarly.
+#[allow(unused)]
+struct AtaBusMaster {
+	/// For the primary bus, this exists at BAR4 + 0.
+	/// For the secondary,   this exists at BAR4 + 8.
+	command:      Port<u8>,
+	/// For the primary bus, this exists at BAR4 + 2.
+	/// For the secondary,   this exists at BAR4 + 10.
+	status:       Port<u8>,
+	/// For the primary bus, this exists at BAR4 + 4.
+	/// For the secondary,   this exists at BAR4 + 12.
+	prdt_address: Port<u32>,
 }
 
 
@@ -179,7 +196,7 @@ struct AtaBus {
 	error: PortReadOnly<u8>,
 	/// The features port, shared with the `error` port.
 	/// Located at `BAR0 + 1`.
-	features: PortWriteOnly<u8>,
+	_features: PortWriteOnly<u8>,
 	/// The number of sectors to read or write.
 	/// Located at `BAR0 + 2`.
 	sector_count: Port<u8>,
@@ -214,7 +231,7 @@ struct AtaBus {
 	control: PortWriteOnly<u8>,
 	/// `DEVADDRESS`, located at `BAR1 + 3`. 
 	/// Not sure what this is used for.
-	drive_address: Port<u8>,
+	_drive_address: Port<u8>,
 }
 
 impl AtaBus {
@@ -225,7 +242,7 @@ impl AtaBus {
 		AtaBus { 
 			data: Port::new(data_bar + 0),
 			error: PortReadOnly::new(data_bar + 1),
-			features: PortWriteOnly::new(data_bar + 1),
+			_features: PortWriteOnly::new(data_bar + 1),
 			sector_count: Port::new(data_bar + 2),
 			lba_low: Port::new(data_bar + 3),
 			lba_mid: Port::new(data_bar + 4),
@@ -236,7 +253,7 @@ impl AtaBus {
 
 			alternate_status: PortReadOnly::new(control_bar + 2),
 			control: PortWriteOnly::new(control_bar + 2),
-			drive_address: Port::new(control_bar + 3),
+			_drive_address: Port::new(control_bar + 3),
 		}
 	}
 
@@ -583,7 +600,7 @@ impl AtaDrive {
 	/// # Note
 	/// This is slow, as it uses blocking port I/O instead of DMA. 
 	pub fn read_pio(&mut self, buffer: &mut [u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		if offset_in_sectors > self.size_in_bytes() {
+		if offset_in_sectors > self.size_in_blocks() {
 			return Err("offset_in_sectors was out of bounds");
 		}
 		let length_in_bytes = buffer.len();
@@ -619,7 +636,7 @@ impl AtaDrive {
 	/// # Note
 	/// This is slow, as it uses blocking port I/O instead of DMA. 
 	pub fn write_pio(&mut self, buffer: &[u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		if offset_in_sectors > self.size_in_bytes() {
+		if offset_in_sectors > self.size_in_blocks() {
 			return Err("offset_in_sectors was out of bounds");
 		}
 		let length_in_bytes = buffer.len();
@@ -655,29 +672,34 @@ impl AtaDrive {
 }
 
 impl StorageDevice for AtaDrive {
-	fn read_sectors(&mut self, buffer: &mut [u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		self.read_pio(buffer, offset_in_sectors)
-	}
-
-    fn write_sectors(&mut self, buffer: &[u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		self.write_pio(buffer, offset_in_sectors)
-	}
-
-	/// Returns the number of sectors in this drive.
-	fn size_in_sectors(&self) -> usize {
+	fn size_in_blocks(&self) -> usize {
 		if self.identify_data.user_addressable_sectors != 0 {
 			self.identify_data.user_addressable_sectors as usize
 		} else {
 			self.identify_data.max_48_bit_lba as usize
 		}
 	}
-
-    fn sector_size_in_bytes(&self) -> usize {
-		SECTOR_SIZE_IN_BYTES
+}
+impl BlockIo for AtaDrive {
+	fn block_size(&self) -> usize { SECTOR_SIZE_IN_BYTES }
+}
+impl KnownLength for AtaDrive {
+	fn len(&self) -> usize { self.block_size() * self.size_in_blocks() }
+}
+impl BlockReader for AtaDrive {
+	fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError> {
+		// TODO: emit a more specific IoError from the read_pio function itself instead of a blind conversion here
+		self.read_pio(buffer, block_offset).map_err(|_e| IoError::InvalidInput)
+	}
+}
+impl BlockWriter for AtaDrive {
+	fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError> {
+		// TODO: emit a more specific IoError from the read_pio function itself instead of a blind conversion here
+		self.write_pio(buffer, block_offset).map_err(|_e| IoError::InvalidInput)
 	}
 
+	fn flush(&mut self) -> Result<(), IoError> { Ok(()) }
 }
-
 
 pub type AtaDriveRef = Arc<Mutex<AtaDrive>>;
 
@@ -727,6 +749,21 @@ impl IdeController {
 		// TODO: use the BAR4 for DMA in the future
 		let _bus_master_base = pci_device.bars[4]; 
 
+		// Register interrupt handlers for the primary and secondary ATA buses.
+		// They're not yet used for anything but will determine when a DMA transfer has completed.
+		interrupts::register_interrupt(ATA_PRIMARY_IRQ, primary_ata_handler).map_err(|e| {
+			error!("ATA Primary Bus IRQ {:#X} was already in use by handler {:#X}! Sharing IRQs is currently unsupported.", 
+				ATA_PRIMARY_IRQ, e,
+			);
+			"ATA Primary Bus IRQ was already in use! Sharing IRQs is currently unsupported."
+		})?;
+		interrupts::register_interrupt(ATA_SECONDARY_IRQ, secondary_ata_handler).map_err(|e| {
+			error!("ATA Secondary Bus IRQ {:#X} was already in use by handler {:#X}! Sharing IRQs is currently unsupported.", 
+				ATA_SECONDARY_IRQ, e,
+			);
+			"ATA Secondary Bus IRQ was already in use! Sharing IRQs is currently unsupported."
+		})?;
+
 		let primary_bus = Arc::new(Mutex::new(AtaBus::new(primary_bus_data_port, primary_bus_control_port)));
 		let secondary_bus = Arc::new(Mutex::new(AtaBus::new(secondary_bus_data_port, secondary_bus_control_port)));
 
@@ -737,7 +774,7 @@ impl IdeController {
 		
 		let drive_fmt = |drive: &Result<AtaDrive, &str>| -> String {
 			match drive {
-				Ok(d)  => format!("drive initialized, size: {} sectors", d.size_in_sectors()),
+				Ok(d)  => format!("drive initialized, size: {} sectors", d.size_in_blocks()),
 				Err(e) => format!("{}", e),
 			}
 		};
@@ -842,11 +879,31 @@ impl<'c> Iterator for IdeControllerIter<'c> {
 }
 
 
+/// The primary ATA interrupt is connected to IRQ 0xE by default.
+/// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2E.
+const ATA_PRIMARY_IRQ:   u8 = interrupts::IRQ_BASE_OFFSET + 0xE;
+/// The secondary ATA interrupt is connected to IRQ 0xF by default.
+/// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2F.
+const ATA_SECONDARY_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + 0xF;
+
+/// The primary ATA interrupt handler. Not yet used for anything, but useful for DMA.
+extern "x86-interrupt" fn primary_ata_handler(_stack_frame: InterruptStackFrame ) {
+    info!("Primary ATA Interrupt ({:#X})", ATA_PRIMARY_IRQ);
+    interrupts::eoi(Some(ATA_PRIMARY_IRQ));
+}
+
+/// The primary ATA interrupt handler. Not yet used for anything, but useful for DMA.
+extern "x86-interrupt" fn secondary_ata_handler(_stack_frame: InterruptStackFrame ) {
+    info!("Secondary ATA Interrupt ({:#X})", ATA_SECONDARY_IRQ);
+    interrupts::eoi(Some(ATA_SECONDARY_IRQ));
+}
+
+
 /// Information that describes an ATA drive, 
 /// obtained from the response to an identify command.
 /// 
 /// Fuller documentation is available here:
-/// <https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/content/ata/ns-ata-_identify_device_data#members
+/// <https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/content/ata/ns-ata-_identify_device_data#members>
 #[derive(Copy, Clone, Debug, Default)]
 #[repr(packed)]
 pub struct AtaIdentifyData {

@@ -3,24 +3,18 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "apic"
 description = "APIC (Advanced Programmable Interrupt Controller) support for Theseus (x86 only), including apic/xapic and x2apic"
 version = "0.1.0"
-build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
-spin = "0.4.10"
+spin = "0.9.0"
 volatile = "0.2.7"
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-atomic = { version = "0.4.4", features = [ "nightly" ] }
+x86_64 = "0.14.8"
+crossbeam-utils = { version = "0.8.12", default-features = false }
 owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 bit_field = "0.7.0"
-zerocopy = "0.3.0"
+zerocopy = "0.5.0"
 static_assertions = "1.1.0"
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
+log = "0.4.8"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
@@ -28,8 +22,11 @@ git = "https://github.com/theseus-os/irq_safety"
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
 
-[dependencies.pit_clock]
-path = "../pit_clock"
+[dependencies.msr]
+path = "../../libs/msr"
+
+[dependencies.pit_clock_basic]
+path = "../pit_clock_basic"
 
 [dependencies.memory]
 path = "../memory"
@@ -38,8 +35,7 @@ path = "../memory"
 path = "../kernel_config"
 
 [dependencies.raw-cpuid]
-version = "7.0.3"
-features = [ "use_arch" ]
+version = "10.6.0"
 
 [features]
 apic_timer_fixed = []

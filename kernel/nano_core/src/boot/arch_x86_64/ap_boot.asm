@@ -1,19 +1,4 @@
-; This must match the `ApTrampolineData` struct definitions used in `bring_up_ap()`.
-; See that struct definition for an explanation of how these are used.
-; The following are physical addresses.
-TRAMPOLINE          equ 0xF000
-AP_READY            equ TRAMPOLINE
-AP_PROCESSOR_ID     equ TRAMPOLINE + 8
-AP_APIC_ID          equ TRAMPOLINE + 16
-AP_PAGE_TABLE       equ TRAMPOLINE + 24
-AP_STACK_START      equ TRAMPOLINE + 32
-AP_STACK_END        equ TRAMPOLINE + 40
-AP_CODE             equ TRAMPOLINE + 48
-AP_NMI_LINT         equ TRAMPOLINE + 56
-AP_NMI_FLAGS        equ TRAMPOLINE + 64
-
-KERNEL_OFFSET equ 0xFFFFFFFF80000000
-
+%include "defines.asm"
 
 section .init.text32ap progbits alloc exec nowrite
 bits 32 ;We are still in protected mode
@@ -156,6 +141,16 @@ start_high_ap:
 	mov es, ax
 	mov fs, ax
 	mov gs, ax
+
+	; clear out the FS/GS base MSRs
+	xor eax, eax          ; set to 0
+	xor edx, edx          ; set to 0
+	mov ecx, 0xc0000100   ; FS BASE MSR
+	wrmsr
+	mov ecx, 0xc0000101   ; GS BASE MSR
+	wrmsr
+	mov ecx, 0xc0000102   ; GS KERNEL BASE MSR
+	wrmsr
 	
 	; each character is reversed in the dword cuz of little endianness
 	mov dword [0xb8048 + KERNEL_OFFSET], 0x4f2E4f2E ; ".."

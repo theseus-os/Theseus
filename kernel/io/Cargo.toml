@@ -1,0 +1,24 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "io"
+description = "Traits and types for reading and writing IO streams, of both block-wise and byte-wise granularity."
+version = "0.1.0"
+
+[dependencies]
+core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
+delegate = "0.6.0"
+spin = "0.9.0"
+
+[dependencies.log]
+default-features = false
+version = "0.4.8"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "1.4.0"
+
+[dependencies.lockable]
+path = "../../libs/lockable"
+
+[lib]
+crate-type = ["rlib"]

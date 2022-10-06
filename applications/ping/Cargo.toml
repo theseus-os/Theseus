@@ -3,7 +3,6 @@ name = "ping"
 version = "0.1.0"
 description = "pings an IPv4 address and returns ping statistics"
 authors = ["Barry Shiberu <berketshiberu@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 byteorder = { version = "1.0", default-features = false }
@@ -20,10 +19,10 @@ version = "0.4.8"
 path = "../upd"
 
 [dependencies.hpet]
-path = "../../kernel/hpet"
+path = "../../kernel/acpi/hpet"
 
 [dependencies.hashbrown]
-version = "0.1.8"
+version = "0.11.2"
 features = ["nightly"]
 
 [dependencies.network_manager]

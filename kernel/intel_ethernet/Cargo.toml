@@ -3,12 +3,11 @@ name = "intel_ethernet"
 description = "defines structs and traits for DMA descriptors unique to Intel NICs"
 version = "0.1.0"
 authors = ["Ramla-I <ijazramla@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 volatile = "0.2.7"
 bit_field = "0.7.0"
-zerocopy = "0.3.0"
+zerocopy = "0.5.0"
 
 [dependencies.memory]
 path = "../memory"

@@ -6,9 +6,7 @@
 //! We also disable interrupts when using virtualization, since we do not yet have support for allowing applications to register their own interrupt handlers.
 
 #![no_std]
-#![feature(untagged_unions)]
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
-#![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
 #![feature(abi_x86_interrupt)]
 
 #[macro_use] extern crate log;
@@ -20,7 +18,7 @@ extern crate irq_safety;
 extern crate kernel_config;
 extern crate memory;
 extern crate pci; 
-extern crate pit_clock;
+extern crate pit_clock_basic;
 extern crate bit_field;
 extern crate interrupts;
 extern crate x86_64;
@@ -107,11 +105,11 @@ const NUM_L34_5_TUPLE_FILTERS:              usize   = 128;
 /// The number of receive queues that are enabled. 
 /// Do NOT set this greater than 64 since the queues 65-128 don't seem to work, 
 /// most likely because they need additional configuration.
-const IXGBE_NUM_RX_QUEUES_ENABLED:          u8      = 64;
+pub const IXGBE_NUM_RX_QUEUES_ENABLED:          u8      = 64;
 /// The number of transmit queues that are enabled. 
 /// Do NOT set this greater than 64 since the queues 65-128 don't seem to work, 
 /// most likely because they need additional configuration.
-const IXGBE_NUM_TX_QUEUES_ENABLED:          u8      = 64;
+pub const IXGBE_NUM_TX_QUEUES_ENABLED:          u8      = 64;
 
 
 
@@ -122,7 +120,7 @@ pub static IXGBE_NICS: Once<Vec<MutexIrqSafe<IxgbeNic>>> = Once::new();
 /// Returns a reference to the IxgbeNic wrapped in a MutexIrqSafe, if it exists and has been initialized.
 /// Currently we use the pci location of the device as identification since it should not change after initialization.
 pub fn get_ixgbe_nic(id: PciLocation) -> Result<&'static MutexIrqSafe<IxgbeNic>, &'static str> {
-    let nics = IXGBE_NICS.try().ok_or("Ixgbe NICs weren't initialized")?;
+    let nics = IXGBE_NICS.get().ok_or("Ixgbe NICs weren't initialized")?;
     nics.iter()
         .find( |nic| { nic.lock().dev_id == id } )
         .ok_or("Ixgbe NIC with this ID does not exist")
@@ -130,7 +128,7 @@ pub fn get_ixgbe_nic(id: PciLocation) -> Result<&'static MutexIrqSafe<IxgbeNic>,
 
 /// Returns a reference to the list of all initialized ixgbe NICs
 pub fn get_ixgbe_nics_list() -> Option<&'static Vec<MutexIrqSafe<IxgbeNic>>> {
-    IXGBE_NICS.try()
+    IXGBE_NICS.get()
 }
 
 /// How many ReceiveBuffers are preallocated for this driver to use. 
@@ -243,7 +241,6 @@ impl IxgbeNic {
     pub fn init(
         ixgbe_pci_dev: &PciDevice,
         dev_id: PciLocation,
-        link_speed: LinkSpeedMbps,
         enable_virtualization: bool,
         interrupts: Option<Vec<HandlerFunc>>,
         enable_rss: bool,
@@ -252,11 +249,7 @@ impl IxgbeNic {
         num_tx_descriptors: u16
     ) -> Result<MutexIrqSafe<IxgbeNic>, &'static str> {
         // Series of checks to determine if starting parameters are acceptable
-        if (link_speed == LinkSpeedMbps::LSUnknown) || (link_speed == LinkSpeedMbps::LS100) {
-            return Err("Ixgbe driver can only be configured for 1 Gbps or 10 Gbps link speeds");
-        }
-
-        if (enable_virtualization && interrupts.is_some()) || (enable_virtualization && enable_rss) {
+        if enable_virtualization && (interrupts.is_some() || enable_rss) {
             return Err("Cannot enable virtualization when interrupts or RSS are enabled");
         }
 
@@ -295,7 +288,10 @@ impl IxgbeNic {
         }
 
         // 16-byte aligned memory mapped base address
-        let mem_base =  ixgbe_pci_dev.determine_mem_base()?;
+        let mem_base =  ixgbe_pci_dev.determine_mem_base(0)?;
+
+        // set the bus mastering bit for this PciDevice, which allows it to use DMA
+        ixgbe_pci_dev.pci_set_command_bus_master_bit();
 
         // map the IntelIxgbeRegisters structs to the address found from the pci space
         let (mut mapped_registers1, mut mapped_registers2, mut mapped_registers3, mut mapped_registers_mac, 
@@ -305,7 +301,7 @@ impl IxgbeNic {
         let mut vector_table = Self::mem_map_msix(ixgbe_pci_dev)?;
 
         // link initialization
-        Self::start_link(&mut mapped_registers1, &mut mapped_registers2, &mut mapped_registers3, &mut mapped_registers_mac, link_speed)?;
+        Self::start_link(&mut mapped_registers1, &mut mapped_registers2, &mut mapped_registers3, &mut mapped_registers_mac)?;
 
         // clear stats registers
         Self::clear_stats(&mapped_registers2);
@@ -536,7 +532,8 @@ impl IxgbeNic {
         let bar = table_offset & 0x7;
         let offset = table_offset >> 3;
         // find the memory base address and size of the area for the vector table
-        let mem_base = PhysicalAddress::new((dev.bars[bar as usize] + offset) as usize)?;
+        let mem_base = PhysicalAddress::new((dev.bars[bar as usize] + offset) as usize)
+            .ok_or("ixgbe: the mem_base physical address specified in the BAR was invalid")?;
         let mem_size_in_bytes = core::mem::size_of::<MsixVectorEntry>() * IXGBE_MAX_MSIX_VECTORS;
 
         // debug!("msi-x vector table bar: {}, base_address: {:#X} and size: {} bytes", bar, mem_base, mem_size_in_bytes);
@@ -673,7 +670,6 @@ impl IxgbeNic {
         regs2: &mut IntelIxgbeRegisters2, 
         regs3: &mut IntelIxgbeRegisters3, 
         regs_mac: &mut IntelIxgbeMacRegisters,
-        link_speed: LinkSpeedMbps
     ) -> Result<(), &'static str> {
         //disable interrupts: write to EIMC registers, 1 in b30-b0, b31 is reserved
         regs1.eimc.write(DISABLE_INTERRUPTS);
@@ -685,7 +681,7 @@ impl IxgbeNic {
 
         //wait 10 ms
         let wait_time = 10_000;
-        let _ =pit_clock::pit_wait(wait_time);
+        pit_clock_basic::pit_wait(wait_time)?;
 
         //disable flow control.. write 0 TO FCTTV, FCRTL, FCRTH, FCRTV and FCCFG
         for fcttv in regs2.fcttv.iter_mut() {
@@ -704,7 +700,7 @@ impl IxgbeNic {
         regs2.fccfg.write(0);
 
         //disable interrupts
-        regs1.eims.write(DISABLE_INTERRUPTS);
+        regs1.eimc.write(DISABLE_INTERRUPTS);
 
         //wait for eeprom auto read completion
         while !regs3.eec.read().get_bit(EEC_AUTO_RD as u8){}
@@ -722,41 +718,20 @@ impl IxgbeNic {
 
         while Self::acquire_semaphore(regs3)? {
             //wait 10 ms
-            let _ =pit_clock::pit_wait(wait_time);
+            pit_clock_basic::pit_wait(wait_time)?;
         }
 
-        //setup PHY and the link 
-        match link_speed {
-            LinkSpeedMbps::LS1000 => {
-                let mut val = regs2.autoc.read();
-                val = (val & !(AUTOC_LMS_1_GB) & !(AUTOC_1G_PMA_PMD)) | AUTOC_FLU;
-                regs2.autoc.write(val);
-            },
-            LinkSpeedMbps::LS10000 => {
-                let val = regs2.autoc.read() & !(AUTOC_LMS_CLEAR);
-                regs2.autoc.write(val | AUTOC_LMS_10_GBE_S); // value should be 0xC09C_6004 (as seen from Linux driver)
-    
-                let val = regs2.autoc.read() & !(AUTOC_10G_PMA_PMD_CLEAR);
-                regs2.autoc.write(val | AUTOC_10G_PMA_PMD_XAUI); // value should be 0xC09C_6004 (as seen from Linux driver)
-
-                let val = regs2.autoc2.read() & !(AUTOC2_10G_PMA_PMD_S_CLEAR);
-                regs2.autoc2.write(val | AUTOC2_10G_PMA_PMD_S_SFI); // value should be 0xA_0000 (as seen from Linux driver)
-            }
-            _ => {
-                return Err("Invalid link speed");
-            }
-        }
-
-        let val = regs2.autoc.read();
-        regs2.autoc.write(val|AUTOC_RESTART_AN); 
+        // setup PHY and the link 
+        // From looking at other drivers and testing, it seems these registers are set automatically 
+        // and driver doesn't need to configure link speed manually.
 
         Self::release_semaphore(regs3);        
 
-        // debug!("STATUS: {:#X}", regs.status.read()); 
-        // debug!("CTRL: {:#X}", regs.ctrl.read());
-        // debug!("LINKS: {:#X}", regs.links.read()); //b7 and b30 should be 1 for link up 
-        // debug!("AUTOC: {:#X}", regs.autoc.read()); 
-        // debug!("AUTOC2: {:#X}", regs.autoc2.read()); 
+        // debug!("STATUS: {:#X}", regs1.status.read()); 
+        // debug!("CTRL: {:#X}", regs1.ctrl.read());
+        // debug!("LINKS: {:#X}", regs2.links.read()); //b7 and b30 should be 1 for link up 
+        // debug!("AUTOC: {:#X}", regs2.autoc.read()); 
+        // debug!("AUTOC2: {:#X}", regs2.autoc2.read()); 
 
         Ok(())
     }
@@ -781,7 +756,7 @@ impl IxgbeNic {
         let mut tries = 0;
 
         while (regs2.links.read() & LINKS_SPEED_MASK == 0) && (tries < total_tries) {
-            let _ = pit_clock::pit_wait(wait_time);
+            let _ = pit_clock_basic::pit_wait(wait_time); // wait, or try again regardless
             tries += 1;
         }
     }
@@ -1063,7 +1038,7 @@ impl IxgbeNic {
         let enabled_filters = &mut self.l34_5_tuple_filters;
 
         // find a free filter
-        let filter_num = enabled_filters.iter().position(|&r| r == false).ok_or("Ixgbe: No filter available")?;
+        let filter_num = enabled_filters.iter().position(|&r| !r).ok_or("Ixgbe: No filter available")?;
 
         // start off with the filter mask set for all the filters, and clear bits for filters that are enabled
         // bits 29:25 are set to 1.
@@ -1302,7 +1277,7 @@ pub enum FilterProtocol {
 }
 
 /// A helper function to poll the nic receive queues (only for testing purposes).
-fn rx_poll_mq(qid: usize, nic_id: PciLocation) -> Result<ReceivedFrame, &'static str> {
+pub fn rx_poll_mq(qid: usize, nic_id: PciLocation) -> Result<ReceivedFrame, &'static str> {
     let nic_ref = get_ixgbe_nic(nic_id)?;
     let mut nic = nic_ref.lock();      
     nic.rx_queues[qid as usize].poll_queue_and_store_received_packets()?;
@@ -1311,8 +1286,8 @@ fn rx_poll_mq(qid: usize, nic_id: PciLocation) -> Result<ReceivedFrame, &'static
 }
 
 /// A helper function to send a test packet on a nic transmit queue (only for testing purposes).
-fn tx_send_mq(qid: usize, nic_id: PciLocation) -> Result<(), &'static str> {
-    let packet = test_packets::create_dhcp_test_packet()?;
+pub fn tx_send_mq(qid: usize, nic_id: PciLocation, packet: Option<TransmitBuffer>) -> Result<(), &'static str> {
+    let packet = packet.map(Ok).unwrap_or_else(|| test_packets::create_dhcp_test_packet())?;
     let nic_ref = get_ixgbe_nic(nic_id)?;
     let mut nic = nic_ref.lock();  
 
@@ -1327,7 +1302,7 @@ fn rx_interrupt_handler(qid: u8, nic_id: PciLocation) -> Option<u8> {
         Ok(ref ixgbe_nic_ref) => {
             let mut ixgbe_nic = ixgbe_nic_ref.lock();
             let _ = ixgbe_nic.rx_queues[qid as usize].poll_queue_and_store_received_packets();
-            ixgbe_nic.interrupt_num.get(&qid).and_then(|int| Some(*int))
+            ixgbe_nic.interrupt_num.get(&qid).map(|int| *int)
         }
         Err(e) => {
             error!("BUG: ixgbe_handler_{}(): {}", qid, e);

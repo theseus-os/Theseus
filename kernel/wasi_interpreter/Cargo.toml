@@ -1,0 +1,30 @@
+[package]
+name = "wasi_interpreter"
+version = "0.1.0"
+authors = ["Vikram Mullick <vikram1.mullick@gmail.com>"]
+edition = "2018"
+description = "Interpreter for executing WASI-compliant WASM binaries"
+
+[dependencies]
+core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
+hashbrown = { version = "0.11.2", features = ["nightly"] }
+wasi = { git = "https://github.com/bytecodealliance/wasi", rev = "45536ac956a6211e3cff047f36cf19d6da82fd95", default-features = false }
+wasmi = { version = "0.9.0", default-features = false, features = ["core"] }
+
+[dependencies.app_io]
+path = "../../kernel/app_io"
+
+[dependencies.fs_node]
+path = "../../kernel/fs_node"
+
+[dependencies.memfs]
+path = "../../kernel/memfs"
+
+[dependencies.path]
+path = "../../kernel/path"
+
+[dependencies.root]
+path = "../../kernel/root"
+
+[dependencies.task]
+path = "../../kernel/task"

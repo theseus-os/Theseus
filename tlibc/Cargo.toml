@@ -1,0 +1,83 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "tlibc"
+description = "A libc implementation for Theseus."
+version = "0.1.0"
+build = "build.rs"
+
+[dependencies]
+spin = "0.9.0"
+log = "0.4.8"
+libc = { version = "0.2", default-features = false }
+cstr_core = "0.2.3"
+core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
+memchr = { version = "2.2.0", default-features = false }
+cbitset = "0.2.0"
+
+[dependencies.memory]
+path = "../kernel/memory"
+
+[dependencies.task]
+path = "../kernel/task"
+
+[dependencies.app_io]
+path = "../kernel/app_io"
+
+
+## Needed for building tlibc as a "staticlib" crate-type,
+## and for avoiding having to link a C program to the nano_core.
+## Otherwise, it's not strictly requiredif we just want to build
+## tlibc into an .rlib file.
+[dependencies.panic_entry]
+path = "../kernel/panic_entry"
+[dependencies.heap]
+path = "../kernel/heap"
+
+
+[build-dependencies]
+cc = "1.0.25"
+
+[lib]
+crate-type = ["lib", "staticlib"]
+
+
+[patch.crates-io]
+### Patch `spin` to use the `pause` asm instruction in busy-wait loops,
+### because the `core::hint::spin_loop()` only uses it if "sse2" is enabled.
+spin = { git = "https://github.com/theseus-os/spin-rs" }
+### use our own version of volatile which supports zerocopy
+volatile = { git = "https://github.com/theseus-os/volatile" }
+### use our own no_std-compatilbe getopts
+getopts = { git = "https://github.com/theseus-os/getopts" }
+### use the latest version of smoltcp from github; the one on crates.io is out of date
+smoltcp = { git = "https://github.com/m-labs/smoltcp" }
+### Use the latest version of rangemap, which includes our PR that makes constructors const fns.
+### This can be removed once the crates.io version is updated.
+rangemap = { git = "https://github.com/jeffparsons/rangemap" }
+
+### Patch `libc` so we can use libc-specific types when using `cfg(target_os = "theseus")`.
+libc = { git = "https://github.com/theseus-os/libc", branch = "theseus" }
+### Patch `core2` with newer functions from `std::io`, e.g., additional `Seek` trait functions
+core2 = { path = "../libs/core2" }
+### Patch `bincode` because the version on crates.io doesn't handle no_std features correctly.
+bincode = { git = "https://github.com/bincode-org/bincode" }
+
+##############################################################################################
+#################### Below are patches for wasmtime-related crates. ##########################
+##############################################################################################
+wasmparser = { git = "https://github.com/theseus-os/wasm-tools", branch = "no-std-wasmparser" }
+backtrace = { path = "../ports/backtrace" }
+region = { path = "../ports/region" }
+
+### These profiles fix the new rustc behavior of splitting one crate into many object files. 
+### That messes up our module loading, which is bad!
+### See this link about profiles: https://doc.rust-lang.org/cargo/reference/manifest.html
+# workaround rust-lang/rust#47074
+[profile.dev]
+codegen-units = 1
+incremental = false
+
+# workaround rust-lang/rust#47074
+[profile.release]
+codegen-units = 1
+incremental = false

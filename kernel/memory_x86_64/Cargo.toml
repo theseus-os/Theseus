@@ -3,11 +3,10 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "memory_x86_64"
 description = "The memory subsystem interfaces on x86_64."
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
-multiboot2 = "0.10.1"
-x86_64 = { path = "../../libs/x86_64" }
+multiboot2 = "0.14.0"
+x86_64 = "0.14.8"
 
 [dependencies.log]
 version = "0.4.8"

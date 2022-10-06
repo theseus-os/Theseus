@@ -1,6 +1,5 @@
 #![no_std]
 
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate atomic_linked_list;
 extern crate memory;
@@ -17,11 +16,8 @@ use memory::VirtualAddress;
 /// The index of the double fault stack in a TaskStateSegment (TSS)
 pub const DOUBLE_FAULT_IST_INDEX: usize = 0;
 
-
-lazy_static! {
-    /// The TSS list, one per core, indexed by a key of apic_id.
-    static ref TSS: AtomicMap<u8, Mutex<TaskStateSegment>> = AtomicMap::new();
-}
+/// The TSS list, one per core, indexed by a key of apic_id.
+static TSS: AtomicMap<u8, Mutex<TaskStateSegment>> = AtomicMap::new();
 
 
 /// Sets the current core's TSS privilege stack 0 (RSP0) entry, which points to the stack that 
@@ -34,7 +30,7 @@ pub fn tss_set_rsp0(new_privilege_stack_top: VirtualAddress) -> Result<(), &'sta
         error!("tss_set_rsp0(): couldn't find TSS for apic {}", my_apic_id);
         "No TSS for the current core's apid id" 
     })?.lock();
-    tss_entry.privilege_stack_table[0] = x86_64::VirtualAddress(new_privilege_stack_top.value());
+    tss_entry.privilege_stack_table[0] = x86_64::VirtAddr::new(new_privilege_stack_top.value() as u64);
     // trace!("tss_set_rsp0: new TSS {:?}", tss_entry);
     Ok(())
 }
@@ -42,15 +38,15 @@ pub fn tss_set_rsp0(new_privilege_stack_top: VirtualAddress) -> Result<(), &'sta
 
 /// set up TSS entry for the given AP core. 
 /// Returns a reference to a Mutex wrapping the new TSS entry.
-pub fn create_tss(apic_id: u8, 
-                double_fault_stack_top_unusable: VirtualAddress, 
-                privilege_stack_top_unusable: VirtualAddress) 
-                -> &'static Mutex<TaskStateSegment>
-{
+pub fn create_tss(
+    apic_id: u8, 
+    double_fault_stack_top_unusable: VirtualAddress, 
+    privilege_stack_top_unusable: VirtualAddress
+) -> &'static Mutex<TaskStateSegment> {
     let mut tss = TaskStateSegment::new();
     // TSS.RSP0 is used in kernel space after a transition from Ring 3 -> Ring 0
-    tss.privilege_stack_table[0] = x86_64::VirtualAddress(privilege_stack_top_unusable.value());
-    tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = x86_64::VirtualAddress(double_fault_stack_top_unusable.value());
+    tss.privilege_stack_table[0] = x86_64::VirtAddr::new(privilege_stack_top_unusable.value() as u64);
+    tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = x86_64::VirtAddr::new(double_fault_stack_top_unusable.value() as u64);
 
     // insert into TSS list
     TSS.insert(apic_id, Mutex::new(tss));

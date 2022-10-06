@@ -6,12 +6,11 @@ description = "contains functions for navigating the filesystem / getting pointe
 
 
 [dependencies]
-spin = "0.4.5"
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+spin = "0.9.0"
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]
-version = "1.0"
+version = "1.4.0"
 
 [dependencies.fs_node]
 path = "../fs_node"

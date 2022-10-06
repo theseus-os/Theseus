@@ -3,11 +3,10 @@ name = "test_channel"
 version = "0.1.0"
 description = "Tests Theseus's channel implementations with multiple tasks"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 getopts = "0.2.21"
-spin = "0.4.10"
+spin = "0.9.0"
 
 [dependencies.terminal_print]
 path = "../../kernel/terminal_print"

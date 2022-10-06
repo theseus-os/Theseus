@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "first_application"
 description = "Starts the first application in Theseus after kernel initialization is complete"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies.log]
 version = "0.4.8"
@@ -12,10 +11,25 @@ version = "0.4.8"
 path = "../spawn"
 
 [dependencies.mod_mgmt]
-path  = "../mod_mgmt"
+path = "../mod_mgmt"
 
 [dependencies.path]
-path  = "../path"
+path = "../path"
+
+## In general, Theseus kernel crates *cannot* depend on application crates.
+## However, this crate is a special exception in that it directly loads and runs
+## the first application crate.
+## Thus, it's safest to ensure that crate is always included in the build
+## by specifying it as a direct dependency here.
+##
+## Note that this does NOT result in a direct runtime dependency
+## from this kernel crate to the first application crate,
+## but rather only a *build*-time dependency.
+##
+## Note: if another application crate is used, make sure to change
+##       both this dependency and the invocation string in `lib.rs`.
+[dependencies.shell]
+path = "../../applications/shell"
 
 [lib]
 crate-type = ["rlib"]

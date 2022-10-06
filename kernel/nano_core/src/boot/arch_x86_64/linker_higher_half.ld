@@ -10,6 +10,10 @@ KERNEL_OFFSET = 0xFFFFFFFF80000000;
 
 SECTIONS {
 
+	/*
+	 * In general, we align each section up to a 4K page boundary in order for Theseus 
+	 * to be able to map them to separately-owned pages.
+	 */
 	. = 1M;
 
 	.init ALIGN(4K) :
@@ -38,7 +42,18 @@ SECTIONS {
 
 	.gcc_except_table ALIGN(4K) : AT(ADDR(.gcc_except_table) - KERNEL_OFFSET)
 	{
-		*(.gcc_except_table)
+		*(.gcc_except_table .gcc_except_table.*)
+	}
+
+	.tdata ALIGN(4K) : AT(ADDR(.tdata) - KERNEL_OFFSET)
+	{
+		*(.tdata .tdata.* )
+	}
+
+	/* Don't align .tbss up to a page boundary; it wastes space because .tdata and .tbss are merged. */
+	.tbss : AT(ADDR(.tbss) - KERNEL_OFFSET)
+	{
+		*(.tbss .tbss.*)
 	}
 
 	.data ALIGN(4K) : AT(ADDR(.data) - KERNEL_OFFSET)
@@ -57,6 +72,14 @@ SECTIONS {
 		*(.page_table)
 	}
 
+	/* 
+	 * Theseus's boot code uses 2MiB huge pages for its initial mapping,
+	 * so we waste a little bit of address space when setting up stack guard pages
+	 * in order to keep things simple with an easily-compatible 2MiB guard page.
+	 * If we ever use regular 4KiB pages in the boot code, then we can remove/shrink this.
+	 */
+	. = ALIGN(2M);
+	. = . + 2M; /* make space for a 2MiB stack guard page */
 	.stack ALIGN(4K) : AT(ADDR(.stack) - KERNEL_OFFSET)
 	{
 		*(.stack)

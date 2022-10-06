@@ -1,20 +1,18 @@
 //! Defines types that contain metadata about crates loaded in Theseus and their dependencies.
 //! 
-//! #Representing dependencies between sections
-//! Dependencies work as follows:
-//!  
+//! ## Representing dependencies between sections
 //! If one section `A` references or uses another section `B`, 
 //! then we colloquially say that *`A` depends on `B`*. 
 //! 
-//! In this scenario, `A` has a `StrongDependency` on `B`,
-//! and `B` has a `WeakDependent` pointing back to `A`. 
+//! In this scenario, `A` has a [`StrongDependency`] on `B`,
+//! and `B` has a [`WeakDependent`] pointing back to `A`. 
 //! 
-//! Assuming `A` and `B` are both `LoadedSection` objects,
-//! then `B.sections_i_depend_on` includes a `StrongDependency(A)`
-//! and `A.sections_dependent_on_me` includes a `WeakDependent(B)`.
+//! Assuming `A` and `B` are both [`LoadedSection`] objects,
+//! then [`A.sections_i_depend_on`] includes a `StrongDependency(B)`
+//! and [`B.sections_dependent_on_me`] includes a `WeakDependent(A)`.
 //!  
 //! In this way, the dependency graphs are fully associative,
-//! allowing a given `LoadedSection` to easily find 
+//! allowing a given [`LoadedSection`] to easily find 
 //! both its dependencies and its dependents instantly.
 //! 
 //! More importantly, it allows `A` to be dropped before `B`, 
@@ -22,7 +20,7 @@
 //! This correctly avoids dependency violations by ensuring that a section `B`
 //! is never dropped while any other section `A` relies on it.
 //! 
-//! When swapping crates, the `WeakDependent`s are actually more useful. 
+//! When swapping crates, the [`WeakDependent`]s are actually more useful. 
 //! For example, if we want to swap the crate that contains section `B1` with a new one `B2`, 
 //! then we can immediately find all of the section `A`s that depend on `B1` 
 //! by iterating over `B1.sections_dependent_on_me`. 
@@ -38,47 +36,58 @@
 //! }
 //! ```
 //! 
+//! [`A.sections_i_depend_on`]: LoadedSectionInner::sections_i_depend_on
+//! [`B.sections_dependent_on_me`]: LoadedSectionInner::sections_dependent_on_me
+//! 
 
+#![deny(unsafe_op_in_unsafe_fn)]
 #![no_std]
 
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate log;
-extern crate spin; 
-extern crate memory;
-extern crate cow_arc;
-extern crate hashbrown;
-extern crate fs_node;
-extern crate xmas_elf;
-extern crate goblin;
+extern crate alloc;
 
+use core::convert::TryFrom;
 use core::fmt;
 use core::ops::Range;
-use spin::{Mutex, RwLock};
+use log::{error, debug, trace};
+use spin::{Mutex, RwLock, Once};
 use alloc::{
     collections::BTreeSet,
+    format,
     string::String,
     sync::{Arc, Weak},
     vec::Vec,
 };
 use memory::{MappedPages, VirtualAddress, EntryFlags};
-#[cfg(internal_deps)] use memory::PageTable;
+#[cfg(internal_deps)]
+use memory::PageTable;
 use cow_arc::{CowArc, CowWeak};
 use fs_node::{FileRef, WeakFileRef};
 use hashbrown::HashMap;
 use goblin::elf::reloc::*;
 
+pub use str_ref::StrRef;
+pub use crate_metadata_serde::{
+    SectionType,
+    Shndx,
+    TEXT_SECTION_NAME,
+    RODATA_SECTION_NAME,
+    DATA_SECTION_NAME,
+    BSS_SECTION_NAME,
+    TLS_DATA_SECTION_NAME,
+    TLS_BSS_SECTION_NAME,
+    GCC_EXCEPT_TABLE_SECTION_NAME,
+    EH_FRAME_SECTION_NAME,
+};
 
-/// A Strong reference to a `LoadedCrate`.
+
+/// A Strong reference to a [`LoadedCrate`].
 pub type StrongCrateRef  = CowArc<LoadedCrate>;
-/// A Weak reference to a `LoadedCrate`.
+/// A Weak reference to a [`LoadedCrate`].
 pub type WeakCrateRef = CowWeak<LoadedCrate>;
-/// A Strong reference (`Arc`) to a `LoadedSection`.
+/// A Strong reference ([`Arc`]) to a [`LoadedSection`].
 pub type StrongSectionRef  = Arc<LoadedSection>;
-/// A Weak reference (`Weak`) to a `LoadedSection`.
+/// A Weak reference ([`Weak`]) to a [`LoadedSection`].
 pub type WeakSectionRef = Weak<LoadedSection>;
-/// A Section Header iNDeX (SHNDX), as specified by the ELF format. 
-/// Even though this is typically encoded as a `u16`, its decoded form can exceed the max size of `u16`.
-pub type Shndx = usize;
 
 /// `.text` sections are read-only and executable.
 pub const TEXT_SECTION_FLAGS:     EntryFlags = EntryFlags::PRESENT;
@@ -110,6 +119,7 @@ pub enum CrateType {
     Kernel,
     Application,
     Userspace,
+    Executable,
 }
 impl CrateType {
     fn first_char(&self) -> &'static str {
@@ -117,6 +127,7 @@ impl CrateType {
             CrateType::Kernel       => "k",
             CrateType::Application  => "a",
             CrateType::Userspace    => "u",
+            CrateType::Executable   => "e",
         }
     }
     
@@ -127,6 +138,7 @@ impl CrateType {
             CrateType::Kernel       => "_kernel",
             CrateType::Application  => "_applications",
             CrateType::Userspace    => "_userspace",
+            CrateType::Executable   => "_executables",
         }
     }
     
@@ -161,25 +173,13 @@ impl CrateType {
         else if prefix.starts_with(CrateType::Userspace.first_char()) {
             Ok((CrateType::Userspace, namespace_prefix, crate_name))
         }
+        else if prefix.starts_with(CrateType::Executable.first_char()) {
+            Ok((CrateType::Executable, namespace_prefix, crate_name))
+        }
         else {
             error!("module_name {:?} didn't start with a known CrateType prefix", module_name);
             Err("module_name didn't start with a known CrateType prefix")
         }
-    }
-
-    /// Returns `true` if the given `module_name` indicates an application crate.
-    pub fn is_application(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Application.first_char())
-    }
-
-    /// Returns `true` if the given `module_name` indicates a kernel crate.
-    pub fn is_kernel(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Kernel.first_char())
-    }
-
-    /// Returns `true` if the given `module_name` indicates a userspace crate.
-    pub fn is_userspace(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Userspace.first_char())
     }
 }
 
@@ -188,7 +188,7 @@ impl CrateType {
 /// loaded and linked into at least one `CrateNamespace`.
 pub struct LoadedCrate {
     /// The name of this crate.
-    pub crate_name: String,
+    pub crate_name: StrRef,
     /// The object file that this crate was loaded from.
     pub object_file: FileRef,
     /// The file that contains debug symbols for this crate. 
@@ -231,6 +231,10 @@ pub struct LoadedCrate {
     /// The `Shndx` values in this set are the section index (shndx) numbers, 
     /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
     pub global_sections: BTreeSet<Shndx>,
+    /// The set of thread-local storage (TLS) symbols in this crate.
+    /// The `Shndx` values in this set are the section index (shndx) numbers, 
+    /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
+    pub tls_sections: BTreeSet<Shndx>,
     /// The set of `.data` and `.bss` sections in this crate.
     /// The `Shndx` values in this set are the section index (shndx) numbers, 
     /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
@@ -249,7 +253,7 @@ pub struct LoadedCrate {
     /// 
     /// When a crate is first loaded, this will be empty by default, 
     /// because this crate will only have populated its `global_sections` set during loading. 
-    pub reexported_symbols: BTreeSet<String>,
+    pub reexported_symbols: BTreeSet<StrRef>,
 }
 
 impl fmt::Debug for LoadedCrate {
@@ -260,7 +264,7 @@ impl fmt::Debug for LoadedCrate {
                 .map(|f| f.get_absolute_path())
                 .unwrap_or_else(|| format!("<Locked>"))
             )
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -277,7 +281,7 @@ impl LoadedCrate {
     pub fn get_function_section(&self, func_name: &str) -> Option<&StrongSectionRef> {
         self.find_section(|sec| 
             sec.get_type() == SectionType::Text &&
-            sec.name == func_name
+            sec.name.as_str() == func_name
         )
     }
 
@@ -304,8 +308,7 @@ impl LoadedCrate {
         where F: Fn(&LoadedSection) -> bool
     {
         self.sections.values()
-            .filter(|&sec| predicate(sec))
-            .next()
+            .find(|&sec| predicate(sec))
     }
 
     /// Returns the substring of this crate's name that excludes the trailing hash. 
@@ -313,7 +316,7 @@ impl LoadedCrate {
     pub fn crate_name_without_hash(&self) -> &str {
         self.crate_name.split(CRATE_HASH_DELIMITER)
             .next()
-            .unwrap_or_else(|| &self.crate_name)
+            .unwrap_or(&self.crate_name)
     }
 
     /// Returns this crate name as a symbol prefix, including a trailing "`::`".
@@ -424,6 +427,7 @@ impl LoadedCrate {
             rodata_pages:            new_rodata_pages_range,
             data_pages:              new_data_pages_range,
             global_sections:         self.global_sections.clone(),
+            tls_sections:            self.tls_sections.clone(),
             data_sections:           self.data_sections.clone(),
             reexported_symbols:      self.reexported_symbols.clone(),
         });
@@ -443,22 +447,24 @@ impl LoadedCrate {
             let new_sec_mapped_pages_offset = old_sec.mapped_pages_offset;
             let (new_sec_mapped_pages_ref, new_sec_virt_addr) = match old_sec.typ {
                 SectionType::Text => (
-                    new_text_pages_ref.clone().ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
+                    new_text_pages_ref.clone().ok_or("BUG: missing text pages in newly-copied crate")?,
                     new_text_pages_locked.as_ref().and_then(|tp| tp.address_at_offset(new_sec_mapped_pages_offset)),
                 ),
-                SectionType::Rodata |
-                SectionType::GccExceptTable | 
-                SectionType::EhFrame => (
-                    new_rodata_pages_ref.clone().ok_or_else(|| "BUG: missing rodata pages in newly-copied crate")?,
+                SectionType::Rodata
+                | SectionType::GccExceptTable
+                | SectionType::TlsBss
+                | SectionType::TlsData 
+                | SectionType::EhFrame => (
+                    new_rodata_pages_ref.clone().ok_or("BUG: missing rodata pages in newly-copied crate")?,
                     new_rodata_pages_locked.as_ref().and_then(|rp| rp.address_at_offset(new_sec_mapped_pages_offset)),
                 ),
-                SectionType::Data |
-                SectionType::Bss => (
-                    new_data_pages_ref.clone().ok_or_else(|| "BUG: missing data pages in newly-copied crate")?,
+                SectionType::Data
+                | SectionType::Bss => (
+                    new_data_pages_ref.clone().ok_or("BUG: missing data pages in newly-copied crate")?,
                     new_data_pages_locked.as_ref().and_then(|dp| dp.address_at_offset(new_sec_mapped_pages_offset)),
                 ),
             };
-            let new_sec_virt_addr = new_sec_virt_addr.ok_or_else(|| "BUG: couldn't get virt_addr for new section")?;
+            let new_sec_virt_addr = new_sec_virt_addr.ok_or("BUG: couldn't get virt_addr for new section")?;
 
             let new_sec = Arc::new(LoadedSection::with_dependencies(
                 old_sec.typ,                            // section type is the same
@@ -484,12 +490,20 @@ impl LoadedCrate {
         for new_sec in new_sections.values() {
             let mut new_sec_inner = new_sec.inner.write();
             let new_sec_mapped_pages = match new_sec.typ {
-                SectionType::Text    => new_text_pages_locked.as_mut().ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
-                SectionType::Rodata |
-                SectionType::GccExceptTable | 
-                SectionType::EhFrame => new_rodata_pages_locked.as_mut().ok_or_else(|| "BUG: missing rodata pages in newly-copied crate")?,
-                SectionType::Data |
-                SectionType::Bss     => new_data_pages_locked.as_mut().ok_or_else(|| "BUG: missing data pages in newly-copied crate")?,
+                SectionType::Text => new_text_pages_locked
+                    .as_mut()
+                    .ok_or("BUG: missing text pages in newly-copied crate")?,
+                SectionType::Rodata
+                | SectionType::TlsBss
+                | SectionType::TlsData
+                | SectionType::GccExceptTable
+                | SectionType::EhFrame => new_rodata_pages_locked
+                    .as_mut()
+                    .ok_or("BUG: missing rodata pages in newly-copied crate")?,
+                SectionType::Data
+                | SectionType::Bss => new_data_pages_locked
+                    .as_mut()
+                    .ok_or("BUG: missing data pages in newly-copied crate")?,
             };
             let new_sec_mapped_pages_offset = new_sec.mapped_pages_offset;
 
@@ -525,7 +539,7 @@ impl LoadedCrate {
             // which are completely safe to clone without needing any fix ups. 
             for internal_dep in &new_sec.inner.read().internal_dependencies {
                 let source_sec = new_sections.get(&internal_dep.source_sec_shndx)
-                    .ok_or_else(|| "Couldn't get new section specified by an internal dependency's source_sec_shndx")?;
+                    .ok_or("Couldn't get new section specified by an internal dependency's source_sec_shndx")?;
 
                 // The source and target (new_sec) sections might be the same, so we need to check first
                 // to ensure that we don't cause deadlock by trying to lock the same section twice.
@@ -558,7 +572,7 @@ impl LoadedCrate {
         // set the new_crate's `sections` list, since we didn't do it earlier
         {
             let mut new_crate_mut = new_crate.lock_as_mut()
-                .ok_or_else(|| "BUG: LoadedCrate::deep_copy(): couldn't get exclusive mutable access to newly-copied crate")?;
+                .ok_or("BUG: LoadedCrate::deep_copy(): couldn't get exclusive mutable access to newly-copied crate")?;
             new_crate_mut.sections = new_sections;
         }
 
@@ -567,42 +581,34 @@ impl LoadedCrate {
 }
 
 
-/// The possible types of sections that can be loaded from a crate object file.
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum SectionType {
-    Text,
-    Rodata,
-    Data,
-    Bss,
-    /// The ".gcc_except_table" contains landing pads for exception handling,
-    /// comprising the LSDA (Language Specific Data Area),
-    /// which is effectively used to determine when we should stop the stack unwinding process
-    /// (e.g., "catching" an exception). 
-    /// 
-    /// Blog post from author of gold linker: <https://www.airs.com/blog/archives/464>
-    /// 
-    /// Mailing list discussion here: <https://gcc.gnu.org/ml/gcc-help/2010-09/msg00116.html>
-    /// 
-    /// Here is a sample repository parsing this section: <https://github.com/nest-leonlee/gcc_except_table>
-    /// 
-    GccExceptTable,
-    /// The ".eh_frame" contains information about stack unwinding and destructor functions
-    /// that should be called when traversing up the stack for cleanup. 
-    /// 
-    /// Blog post from author of gold linker: <https://www.airs.com/blog/archives/460>
-    /// Some documentation here: <https://gcc.gnu.org/wiki/Dwarf2EHNewbiesHowto>
-    /// 
-    EhFrame,
+/// Returns the default name for the given `SectionType` as a [`StrRef`].
+/// 
+/// This is useful for deduplicating section name strings in memory,
+/// as the returned `StrRef` will point back to a single instance 
+/// of that section name string that can be shared across the system.
+pub fn section_name_str_ref(section_type: &SectionType) -> StrRef {
+    static TEXT             : Once<StrRef> = Once::new();
+    static RODATA           : Once<StrRef> = Once::new();
+    static DATA             : Once<StrRef> = Once::new();
+    static BSS              : Once<StrRef> = Once::new();
+    static TLS_DATA         : Once<StrRef> = Once::new();
+    static TLS_BSS          : Once<StrRef> = Once::new();
+    static GCC_EXCEPT_TABLE : Once<StrRef> = Once::new();
+    static EH_FRAME         : Once<StrRef> = Once::new();
+
+    let instance = match section_type {
+        SectionType::Text           => &TEXT,
+        SectionType::Rodata         => &RODATA,
+        SectionType::Data           => &DATA,
+        SectionType::Bss            => &BSS,
+        SectionType::TlsData        => &TLS_DATA,
+        SectionType::TlsBss         => &TLS_BSS,
+        SectionType::GccExceptTable => &GCC_EXCEPT_TABLE,
+        SectionType::EhFrame        => &EH_FRAME,
+    };
+    instance.call_once(|| StrRef::from(section_type.name())).clone()
 }
-impl SectionType {
-    /// Returns `true` if `Data` or `Bss`, otherwise `false`.
-    pub fn is_data_or_bss(&self) -> bool {
-        match self {
-            Self::Data | Self::Bss => true,
-            _ => false,
-        }
-    }
-}
+
 
 /// The parts of a `LoadedSection` that may be mutable, i.e., 
 /// only the parts that could change after a section is initially loaded and linked.
@@ -629,7 +635,7 @@ pub struct LoadedSectionInner {
 /// Represents a section that has been loaded and is part of a `LoadedCrate`.
 /// The containing `SectionType` enum determines which type of section it is.
 pub struct LoadedSection {
-    /// The full String name of this section, a fully-qualified symbol, 
+    /// The full string name of this section, a fully-qualified symbol, 
     /// with the format `<crate>::[<module>::][<struct>::]<fn_name>::<hash>`.
     /// The unique hash is generated for each section by the Rust compiler,
     /// which can be used as a version identifier. 
@@ -638,7 +644,7 @@ pub struct LoadedSection {
     /// # Examples
     /// * `test_lib::MyStruct::new::h843a613894da0c24`
     /// * `my_crate::my_function::hbce878984534ceda`   
-    pub name: String,
+    pub name: StrRef,
     /// The type of this section, e.g., `.text`, `.rodata`, `.data`, `.bss`, etc.
     pub typ: SectionType,
     /// Whether or not this section's symbol was exported globally (is public)
@@ -652,6 +658,9 @@ pub struct LoadedSection {
     /// This can be used to calculate size, but is primarily a performance optimization
     /// so we can avoid locking this section's `MappedPages` and avoid recalculating 
     /// its bounds based on its offset and size. 
+    /// 
+    /// For TLS sections, this `address_range.start` holds the offset (from the TLS base)
+    /// into the TLS area where this section's data exists.
     pub address_range: Range<VirtualAddress>, 
     /// The `LoadedCrate` object that contains/owns this section
     pub parent_crate: WeakCrateRef,
@@ -663,7 +672,7 @@ impl LoadedSection {
     /// Create a new `LoadedSection`, with an empty `dependencies` list.
     pub fn new(
         typ: SectionType, 
-        name: String, 
+        name: StrRef, 
         mapped_pages: Arc<Mutex<MappedPages>>,
         mapped_pages_offset: usize,
         virt_addr: VirtualAddress,
@@ -690,7 +699,7 @@ impl LoadedSection {
     /// Same as [new()`](#method.new), but uses the given `dependencies` instead of the default empty list.
     pub fn with_dependencies(
         typ: SectionType, 
-        name: String, 
+        name: StrRef, 
         mapped_pages: Arc<Mutex<MappedPages>>,
         mapped_pages_offset: usize,
         virt_addr: VirtualAddress,
@@ -738,7 +747,7 @@ impl LoadedSection {
     /// 
     /// See the identical associated function [`section_name_without_hash()`](#fn.section_name_without_hash.html) for more. 
     pub fn name_without_hash(&self) -> &str {
-        Self::section_name_without_hash(&self.name)
+        Self::section_name_without_hash(self.name.as_str())
     }
 
 
@@ -752,7 +761,7 @@ impl LoadedSection {
     pub fn section_name_without_hash(sec_name: &str) -> &str {
         sec_name.rfind(SECTION_HASH_DELIMITER)
             .and_then(|end| sec_name.get(0 .. (end + SECTION_HASH_DELIMITER.len())))
-            .unwrap_or_else(|| &sec_name)
+            .unwrap_or(&sec_name)
     }
 
 
@@ -795,11 +804,108 @@ impl LoadedSection {
             Err("this source section has a different length than the destination section")
         }
     }
+
+    /// Reinterprets this section's underlying `MappedPages` memory region as an executable function.
+    ///
+    /// The generic `F` parameter is the function type signature itself, e.g., `fn(String) -> u8`.
+    /// 
+    /// Returns a reference to the function that is formed from the underlying memory region,
+    /// with a lifetime dependent upon the lifetime of this section.
+    ///
+    /// # Safety
+    /// The type signature of `F` must match the type signature of the function.
+    ///
+    /// # Locking
+    /// Obtains the lock on this section's `MappedPages` object.
+    ///
+    /// # Note
+    /// Ideally, we would use debug information to know the size of the entire function
+    /// and test whether that fits within the bounds of the memory region, rather than just checking
+    /// the size of `F`, the function pointer/signature.
+    /// Without debug information, checking the size is restricted to in-bounds memory safety 
+    /// rather than actual functional correctness. 
+    ///
+    /// # Examples
+    /// Here's how you might call this function:
+    /// ```
+    /// type MyPrintFuncSignature = fn(&str) -> Result<(), &'static str>;
+    /// let section = mod_mgmt::get_symbol_starting_with("my_crate::print::").upgrade().unwrap();
+    /// let print_func: &MyPrintFuncSignature = unsafe { section.as_func() }.unwrap();
+    /// print_func("hello there");
+    /// ```
+    /// 
+    pub unsafe fn as_func<F>(&self) -> Result<&F, &'static str> {
+        if false {
+            debug!("Requested LoadedSection {:#X?} as function {:?}", self, core::any::type_name::<F>());
+        }
+
+        let mp = self.mapped_pages.lock();
+        // Check flags to make sure these pages are executable (otherwise a page fault would occur when this func is called)
+        if self.typ != SectionType::Text || !mp.flags().is_executable() {
+            error!("Requested LoadedSection as function {:?}, but was not an executable text section! (flags: {:?})",
+                core::any::type_name::<F>(), mp.flags()
+            );
+            return Err("as_func(): section was not an executable text section");
+        }
+
+        // Check that the bounds of this entire section fit within its MappedPages
+        let end = self.mapped_pages_offset + self.size();
+        if end > mp.size_in_bytes() {
+            error!("Requested LoadedSection as function {:?}, but section's end offset ({:X?}) was beyond its MappedPages ({:X?})",
+                core::any::type_name::<F>(), end, mp.size_in_bytes()
+            );
+            return Err("requested type and offset would not fit within the MappedPages bounds");
+        }
+
+        // SAFETY: We checked the section type, executability, and size bounds of the
+        // underlying MappedPages above. The lifetime of the returned function
+        // reference is tied to this section's lifetime. The caller guarantees
+        // that the function signature matches.
+        Ok(unsafe { 
+            core::mem::transmute(
+                &(mp.start_address().value() + self.mapped_pages_offset)
+            )
+        })
+    }
+}
+
+impl fmt::Display for LoadedSection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "LoadedSection({:?}, typ: {:?}, vaddr: {:#X}, size: {})", 
+            self.name,
+            self.typ,
+            self.start_address(),
+            self.size(),
+        )
+    }
 }
 
 impl fmt::Debug for LoadedSection {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "LoadedSection(name: {:?}, vaddr: {:#X}, size: {})", self.name, self.start_address(), self.size())
+        let mut dbg = f.debug_struct("LoadedSection");
+        dbg.field("name", &self.name);
+        dbg.field("typ", &self.typ);
+
+        // Try to get the parent_crate's name
+        if let Some(parent_crate_name) = self.parent_crate
+            .upgrade()
+            .and_then(|cref| 
+                cref.try_lock_as_ref()
+                    .map(|c| c.crate_name.clone())
+            )
+        {
+            dbg.field("parent", &parent_crate_name);
+        }
+        else {
+            dbg.field("parent", &"<locked>");
+        }
+
+        // Add the rest of the typical fields
+        dbg.field("vaddr", &self.start_address())
+            .field("size", &self.size())
+            .finish_non_exhaustive()
     }
 }
 
@@ -953,6 +1059,13 @@ pub fn write_relocation(
             let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
             if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u64;
+        }
+        R_X86_64_TPOFF32 => {
+            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
+            let source_val = u32::try_from(source_sec_vaddr.value())
+                .map_err(|_| "BUG: TLS relocation (R_X86_64_TPOFF32) source section value (TLS offset) cannot fit in a `u32`")?;
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
+            *target_ref = source_val;
         }
         // R_X86_64_GOTPCREL => { 
         //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table

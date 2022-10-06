@@ -6,8 +6,7 @@ description = "contains the MappedPages-backed implementation of the fs_node tra
 
 
 [dependencies]
-spin = "0.4.5"
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+spin = "0.9.0"
 
 [dependencies.fs_node]
 path = "../fs_node"
@@ -17,6 +16,9 @@ path = "../memory"
 
 [dependencies.log]
 version = "0.4.8"
+
+[dependencies.io]
+path = "../io"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"

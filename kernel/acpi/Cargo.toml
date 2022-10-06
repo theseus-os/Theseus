@@ -3,67 +3,40 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "acpi"
 description = "ACPI (Advanced Configuration and Power Interface) support for Theseus"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
-volatile = "0.2.7"
-
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
-
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+spin = "0.9.0"
+log = "0.4.8"
 
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.kernel_config]
-path = "../kernel_config"
-
-[dependencies.ioapic]
-path = "../ioapic"
-
-[dependencies.apic]
-path = "../apic"
-
-[dependencies.pit_clock]
-path = "../pit_clock"
-
-[dependencies.pic]
-path = "../pic"
-
-[dependencies.ap_start]
-path = "../ap_start"
-
 [dependencies.acpi_table]
-path = "../acpi_table"
+path = "acpi_table"
 
 [dependencies.acpi_table_handler]
-path = "../acpi_table_handler"
+path = "acpi_table_handler"
 
 [dependencies.rsdp]
-path = "../rsdp"
+path = "rsdp"
 
 [dependencies.rsdt]
-path = "../rsdt"
+path = "rsdt"
 
 [dependencies.fadt]
-path = "../fadt"
+path = "fadt"
 
 [dependencies.madt]
-path = "../madt"
+path = "madt"
 
 [dependencies.hpet]
-path = "../hpet"
+path = "hpet"
 
-[dependencies.pause]
-path = "../pause"
+[dependencies.dmar]
+path = "dmar"
+
+[dependencies.iommu]
+path = "../iommu"
 
 [lib]
 crate-type = ["rlib"]

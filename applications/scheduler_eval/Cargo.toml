@@ -2,7 +2,6 @@
 name = "scheduler_eval"
 version = "0.1.0"
 authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 

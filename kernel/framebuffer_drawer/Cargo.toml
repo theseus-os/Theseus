@@ -3,7 +3,6 @@ name = "framebuffer_drawer"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
 description = "basic draw interfaces"
-build = "../../build.rs"
 
 [dependencies.framebuffer]
 path = "../framebuffer"

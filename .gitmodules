@@ -1,12 +1,24 @@
 [submodule "libs/dfqueue"]
 	path = libs/dfqueue
-	url = https://github.com/kevinaboos/dfqueue
-	ignore = dirty
-[submodule "libs/x86_64"]
-	path = libs/x86_64
-	url = https://github.com/kevinaboos/x86_64
-	branch = master
-	ignore = dirty
-[submodule "libs/mpmc"]
-	path = libs/mpmc
-	url = https://github.com/theseus-os/mpmc
+	url = https://github.com/theseus-os/DFQueue
+	shallow = true
+[submodule "ports/wasmtime"]
+	path = ports/wasmtime
+	url = https://github.com/theseus-os/wasmtime.git
+	shallow = true
+[submodule "libs/indexmap"]
+	path = libs/indexmap
+	url = https://github.com/theseus-os/indexmap
+	shallow = true
+[submodule "ports/region"]
+	path = ports/region
+	url = https://github.com/theseus-os/region-rs
+	shallow = true
+[submodule "ports/backtrace"]
+	path = ports/backtrace
+	url = https://github.com/theseus-os/backtrace-rs.git
+	shallow = true
+[submodule "libs/core2"]
+	path = libs/core2
+	url = https://github.com/theseus-os/core2.git
+	shallow = true

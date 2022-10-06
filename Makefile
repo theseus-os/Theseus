@@ -1,24 +1,50 @@
 ### This makefile is the top-level build script that builds all the crates in subdirectories 
 ### and combines them into the final OS .iso image.
 ### It also provides convenient targets for running and debugging Theseus and using GDB on your host computer.
-.DEFAULT_GOAL := all
 SHELL := /bin/bash
+
+## Disable parallelism for this Makefile since it breaks the build,
+## as our dependencies aren't perfectly specified for each target.
+## Cargo already handles build parallelism for us anyway.
+.NOTPARALLEL:
 
 ## most of the variables used below are defined in Config.mk
 include cfg/Config.mk
 
-all: iso
+## By default, we just build the standard OS image via the `iso` target.
+.DEFAULT_GOAL := iso
 
 ## Default values for various configuration options.
 debug ?= none
 net ?= none
+merge_sections ?= yes
+bootloader ?= grub
 
 ## test for Windows Subsystem for Linux (Linux on Windows)
-IS_WSL = $(shell grep -s 'Microsoft' /proc/version)
+IS_WSL = $(shell grep -is 'microsoft' /proc/version)
 
 
+###################################################################################################
+### Basic directory/file path definitions used throughout the makefile.
+###################################################################################################
+BUILD_DIR               := $(ROOT_DIR)/build
+NANO_CORE_BUILD_DIR     := $(BUILD_DIR)/nano_core
+iso                     := $(BUILD_DIR)/theseus-$(ARCH).iso
+ISOFILES                := $(BUILD_DIR)/isofiles
+OBJECT_FILES_BUILD_DIR  := $(ISOFILES)/modules
+DEBUG_SYMBOLS_DIR       := $(BUILD_DIR)/debug_symbols
+TARGET_DEPS_DIR         := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/deps
+DEPS_BUILD_DIR          := $(BUILD_DIR)/deps
+HOST_DEPS_DIR           := $(DEPS_BUILD_DIR)/host_deps
+DEPS_SYSROOT_DIR        := $(DEPS_BUILD_DIR)/sysroot
+THESEUS_BUILD_TOML      := $(DEPS_BUILD_DIR)/TheseusBuild.toml
+THESEUS_CARGO           := $(ROOT_DIR)/tools/theseus_cargo
+THESEUS_CARGO_BIN       := $(THESEUS_CARGO)/bin/theseus_cargo
+EXTRA_FILES             := $(ROOT_DIR)/extra_files
+LIMINE_DIR              := $(ROOT_DIR)/limine-prebuilt
 
-## Tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
+
+### Set up tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
 UNAME = $(shell uname -s)
 ifeq ($(UNAME),Darwin)
 	CROSS = x86_64-elf-
@@ -32,25 +58,42 @@ else
 	UNMOUNT = umount
 	USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
 endif
-GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 
+### Handle multiple bootloader options and ensure the corresponding tools are installed.
+ifeq ($(bootloader),grub)
+	## Look for `grub-mkrescue` (Debian-like distros) or `grub2-mkrescue` (Fedora)
+	ifneq (,$(shell command -v $(GRUB_CROSS)grub-mkrescue))
+		GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
+	else ifneq (,$(shell command -v $(GRUB_CROSS)grub2-mkrescue))
+		GRUB_MKRESCUE = $(GRUB_CROSS)grub2-mkrescue
+	else
+$(error Error: could not find 'grub-mkrescue' or 'grub2-mkrescue', please install 'grub' or 'grub2')
+	endif
+else ifeq ($(bootloader),limine)
+	## Check if the limine directory exists. 
+	ifneq (,$(wildcard $(LIMINE_DIR)/.))
+		export override FEATURES += --features extract_boot_modules
+	else
+$(error Error: missing '$(LIMINE_DIR)' directory! Please follow the limine instructions in the README)
+	endif
+else
+$(error Error: unsupported option "bootloader=$(bootloader)". Options are 'grub' or 'limine')
+endif
 
 
 ###################################################################################################
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 RUSTC_VERSION := $(shell cat rust-toolchain)
-check_rustc:
-ifdef RUSTUP_TOOLCHAIN
-	@echo -e 'Warning: You are overriding the Rust toolchain manually via RUSTUP_TOOLCHAIN.'
-	@echo -e 'This may lead to unwanted warnings and errors during compilation.\n'
-endif
+check-rustc:
 ## Building Theseus requires the 'rust-src' component. If we can't install that, install the required rust toolchain and retry.
 ## If it still doesn't work, issue an error, since 'rustup' is probably missing.
-	@rustup component add rust-src || (rustup toolchain install $(RUSTC_VERSION) && rustup component add rust-src) || (\
-	echo -e "\nError: 'rustup' isn't installed.";\
-	echo -e "Please install rustup and try again.\n";\
-	exit 1)
+	@rustup component add rust-src || (rustup toolchain install $(RUSTC_VERSION) && rustup component add rust-src) || \
+	(\
+		echo -e "\nError: 'rustup' isn't installed.";\
+		echo -e "Please install rustup and try again.\n";\
+		exit 1 \
+	)
 
 
 
@@ -58,20 +101,8 @@ endif
 ### This section contains targets to actually build Theseus components and create an iso file.
 ###################################################################################################
 
-BUILD_DIR := $(ROOT_DIR)/build
-NANO_CORE_BUILD_DIR := $(BUILD_DIR)/nano_core
-iso := $(BUILD_DIR)/theseus-$(ARCH).iso
-GRUB_ISOFILES := $(BUILD_DIR)/grub-isofiles
-OBJECT_FILES_BUILD_DIR := $(GRUB_ISOFILES)/modules
-DEBUG_SYMBOLS_DIR := $(BUILD_DIR)/debug_symbols
-DEPS_DIR := $(BUILD_DIR)/deps
-HOST_DEPS_DIR := $(DEPS_DIR)/host_deps
-DEPS_SYSROOT_DIR := $(DEPS_DIR)/sysroot
-THESEUS_BUILD_TOML := $(DEPS_DIR)/TheseusBuild.toml
-THESEUS_CARGO := $(ROOT_DIR)/tools/theseus_cargo
-THESEUS_CARGO_BIN := $(THESEUS_CARGO)/bin/theseus_cargo
-
-
+## The linker script applied to each output file in $(OBJECT_FILES_BUILD_DIR).
+partial_relinking_script := cfg/partial_linking_combine_sections.ld
 ## This is the default output path defined by cargo.
 nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 ## The directory where the nano_core source files are
@@ -103,69 +134,89 @@ APP_CRATE_NAMES := $(filter-out build/. target/., $(APP_CRATE_NAMES))
 APP_CRATE_NAMES := $(filter-out .*/, $(APP_CRATE_NAMES))
 # remove the trailing /. on each name
 APP_CRATE_NAMES := $(patsubst %/., %, $(APP_CRATE_NAMES))
-APP_CRATE_NAMES += EXTRA_APP_CRATE_NAMES
+APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 
 
 ### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
-.PHONY: all \
-		check_rustc \
-		clean run run_pause iso build cargo \
+.PHONY: all full \
+		check-rustc check-usb \
+		clean clean-doc clean-old-build \
+		run run_pause iso build cargo copy_kernel $(bootloader) extra_files \
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
-		gdb doc docs view-doc view-docs
+		gdb \
+		doc docs view-doc view-docs book view-book
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
 ### then we need to define a preprocessor variable 
 ### that will cause the AVX flag to be enabled in the boot-up assembly code. 
-ifneq (,$(findstring avx, $(TARGET)))
-$(eval CFLAGS += -DENABLE_AVX)
+ifneq (,$(findstring avx,$(TARGET)))
+export override CFLAGS+=-DENABLE_AVX
 endif
 
 
+### Convert `THESEUS_CONFIG` values into `RUSTFLAGS` by prepending "--cfg " to each one.
+### Note: this change to RUSTFLAGS is exported as an external shell environment variable
+###       in order to make it easy to pass to sub-make invocations.
+###       However, this means we must not explicitly not use it for `cargo run` tool invocations,
+###       because those should be built as normal for the host OS environment.
+export override RUSTFLAGS += $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 
-### Demo/test target for building libtheseus
-libtheseus: $(THESEUS_CARGO_BIN) $(ROOT_DIR)/libtheseus/Cargo.* $(ROOT_DIR)/libtheseus/src/*
-	@( \
-		cd $(ROOT_DIR)/libtheseus && \
-		$(THESEUS_CARGO_BIN) --input $(DEPS_DIR) build; \
-	)
+
+### Convenience targets for building the entire Theseus workspace
+### with all optional features enabled. 
+### See `theseus_features/src/lib.rs` for more details on what this includes.
+all: full
+full : export override FEATURES += --workspace --all-features
+full: iso
 
 
-### This target builds the `theseus_cargo` tool as a dedicated binary.
-$(THESEUS_CARGO_BIN): $(THESEUS_CARGO)/Cargo.* $(THESEUS_CARGO)/src/*
-	@echo -e "\n=================== Building the theseus_cargo tool ==================="
-	cargo install --force --path=$(THESEUS_CARGO) --root=$(THESEUS_CARGO)
-
+### Convenience target for building the ISO using the below $(iso) target
+iso: $(iso)
 
 ### This target builds an .iso OS image from all of the compiled crates.
-$(iso): build
-# after building kernel and application modules, copy the kernel boot image files
-	@mkdir -p $(GRUB_ISOFILES)/boot/grub
-	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
-# autogenerate the grub.cfg file
-	cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+$(iso): clean-old-build build extra_files copy_kernel $(bootloader)
 
 
-### Convenience target for building the ISO	using the above target
-iso: $(iso)
+## Copy the kernel boot image into the proper ISOFILES directory.
+## Should be invoked after building all Theseus kernel/application crates.
+copy_kernel:
+	@mkdir -p $(ISOFILES)/boot/
+	@cp $(nano_core_binary) $(ISOFILES)/boot/kernel.bin
 
 
 ## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir.
 ## This also classifies crate object files into either "application" or "kernel" crates:
 ## -- an application crate is any executable application in the `applications/` directory, or a library crate that is ONLY used by other applications,
-## -- a kernel crate is any crate in the `kernel/` directory, or any other crates that are used 
+## -- a kernel crate is any crate in the `kernel/` directory, or any other crates that are used by kernel crates.
 ## Obviously, if a crate is used by both other application crates and by kernel crates, it is still a kernel crate. 
 ## Then, we give all kernel crate object files the KERNEL_PREFIX and all application crate object files the APP_PREFIX.
 build: $(nano_core_binary)
-## Copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
-	@cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
-		-i ./target/$(TARGET)/$(BUILD_MODE)/deps \
+## Here, the main Rust build has just occurred.
+##
+## First, if an .rlib archive contains multiple object files, we need to extract them all out of the archive
+## and combine them into one object file using partial linking (`ld -r ...`), overwriting the rustc-emitted .o file.
+## Note: we skip "normal" .rlib archives that have 2 members: a single .o object file and a single .rmeta file.
+## Note: the below line with `cut` simply removes the `lib` prefix and the `.rlib` suffix from the file name.
+	@for f in $(shell find $(TARGET_DEPS_DIR)/ -name "*.rlib"); do                                          \
+		if [ "`$(CROSS)ar -t $${f} | wc -l`" != "2" ]; then                                                 \
+			echo -e "\033[1;34mUnarchiving multi-file rlib: \033[0m $${f}"                                  \
+				&& mkdir -p "$(BUILD_DIR)/extracted_rlibs/`basename $${f}`-unpacked/"                       \
+				&& $(CROSS)ar -xo --output "$(BUILD_DIR)/extracted_rlibs/`basename $${f}`-unpacked/" $${f}  \
+				&& $(CROSS)ld -r                                                                            \
+					--output "$(TARGET_DEPS_DIR)/`basename $${f} | cut -c 4- | rev | cut -c 6- | rev`.o"    \
+					$$(find $(BUILD_DIR)/extracted_rlibs/$$(basename $${f})-unpacked/ -name "*.o")        ; \
+		fi  &                                                                                               \
+	done; wait
+
+## Second, copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
+	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
+		-i "$(TARGET_DEPS_DIR)" \
 		--output-objects $(OBJECT_FILES_BUILD_DIR) \
-		--output-deps $(DEPS_DIR) \
+		--output-deps $(DEPS_BUILD_DIR) \
 		--output-sysroot $(DEPS_SYSROOT_DIR)/lib/rustlib/$(TARGET)/lib \
 		-k ./kernel \
 		-a ./applications \
@@ -173,41 +224,57 @@ build: $(nano_core_binary)
 		--app-prefix $(APP_PREFIX) \
 		-e "$(EXTRA_APP_CRATE_NAMES) libtheseus"
 
-## Create the items needed for future out-of-tree builds that depend upon the parameters of this current build. 
+## Third, perform partial linking on each object file, which shrinks their size 
+## and most importantly, accelerates their loading and linking at runtime.
+## We also remove the unnecessary GCC_except_table* symbols from the symbol tables.
+ifeq ($(merge_sections),yes)
+	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o ; do                                  \
+		$(CROSS)ld -r -T $(partial_relinking_script) $${f} -o $${f}_relinked      \
+			&& mv $${f}_relinked $${f}                                            \
+			&& $(CROSS)strip --wildcard --strip-symbol=GCC_except_table* $${f}  & \
+	done; wait
+else ifeq ($(merge_sections),no)
+# do nothing, leave the object files as is, with separate function/data sections
+else
+$(error Error: unsupported option "merge_sections=$(merge_sections)". Options are 'yes' or 'no')
+endif
+
+## Fourth, create the items needed for future out-of-tree builds that depend upon the parameters of this current build. 
 ## This includes the target file, host OS dependencies (proc macros, etc)., 
 ## and most importantly, a TOML file to describe these and other config variables.
 	@rm -rf $(THESEUS_BUILD_TOML)
-	@cp -vf $(CFG_DIR)/$(TARGET).json  $(DEPS_DIR)/
+	@cp -f $(CFG_DIR)/$(TARGET).json  $(DEPS_BUILD_DIR)/
 	@mkdir -p $(HOST_DEPS_DIR)
 	@cp -f ./target/$(BUILD_MODE)/deps/*  $(HOST_DEPS_DIR)/
 	@echo -e 'target = "$(TARGET)"' >> $(THESEUS_BUILD_TOML)
 	@echo -e 'sysroot = "./sysroot"' >> $(THESEUS_BUILD_TOML)
 	@echo -e 'rustflags = "$(RUSTFLAGS)"' >> $(THESEUS_BUILD_TOML)
 	@echo -e 'cargoflags = "$(CARGOFLAGS)"' >> $(THESEUS_BUILD_TOML)
+	@echo -e 'features = "$(FEATURES)"' >> $(THESEUS_BUILD_TOML)
 	@echo -e 'host_deps = "./host_deps"' >> $(THESEUS_BUILD_TOML)
 
-## Strip debug information if requested. This reduces object file size, improving load times and reducing memory usage.
+## Fifth, strip debug information if requested. This reduces object file size, improving load times and reducing memory usage.
 	@mkdir -p $(DEBUG_SYMBOLS_DIR)
 ifeq ($(debug),full)
 # don't strip any files
 else ifeq ($(debug),none)
 # strip all files
-	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o $(nano_core_binary); do \
-		dbg_file=$(DEBUG_SYMBOLS_DIR)/`basename $${f}`.dbg ; \
-		cp $${f} $${dbg_file} ; \
-		$(CROSS)strip  --only-keep-debug  $${dbg_file} ; \
-		$(CROSS)strip  --strip-debug      $${f} ; \
-	done
+	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o $(nano_core_binary) ; do \
+		dbg_file=$(DEBUG_SYMBOLS_DIR)/`basename $${f}`.dbg           \
+			&& cp $${f} $${dbg_file}                                 \
+			&& $(CROSS)strip  --only-keep-debug  $${dbg_file}        \
+			&& $(CROSS)strip  --strip-debug      $${f}             & \
+	done; wait
 else ifeq ($(debug),base)
 # strip all object files but the base kernel
-	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o ; do \
-		dbg_file=$(DEBUG_SYMBOLS_DIR)/`basename $${f}`.dbg ; \
-		cp $${f} $${dbg_file} ; \
-		$(CROSS)strip  --only-keep-debug  $${dbg_file} ; \
-		$(CROSS)strip  --strip-debug      $${f} ; \
-	done
+	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o ; do                     \
+		dbg_file=$(DEBUG_SYMBOLS_DIR)/`basename $${f}`.dbg           \
+			&& cp $${f} $${dbg_file}                                 \
+			&& $(CROSS)strip  --only-keep-debug  $${dbg_file}        \
+			&& $(CROSS)strip  --strip-debug      $${f}             & \
+	done; wait
 else
-$(error Error: unsupported option "debug=$(debug)")
+$(error Error: unsupported option "debug=$(debug)". Options are 'full', 'none', or 'base')
 endif
 
 #############################
@@ -216,14 +283,14 @@ endif
 
 
 
-## This target invokes the actual Rust build process
-cargo: check_rustc 
+## This target invokes the actual Rust build process via `cargo`.
+cargo: check-rustc 
 	@echo -e "\n=================== BUILDING ALL CRATES ==================="
 	@echo -e "\t TARGET: \"$(TARGET)\""
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" cargo build  $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) --all --target $(TARGET)
+	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) $(BUILD_STD_CARGOFLAGS) --target $(TARGET)
 
 ## We tried using the "cargo rustc" command here instead of "cargo build" to avoid cargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of cargo rebuilding everything).
@@ -232,7 +299,7 @@ cargo: check_rustc
 # 	for kd in $(KERNEL_CRATE_NAMES) ; do  \
 # 		cd $${kd} ; \
 # 		echo -e "\n========= BUILDING KERNEL CRATE $${kd} ==========\n" ; \
-# 		RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
+# 		RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' \
 # 			cargo rustc \
 # 			$(CARGOFLAGS) \
 # 			$(RUST_FEATURES) \
@@ -241,7 +308,7 @@ cargo: check_rustc
 # 	done
 # for app in $(APP_CRATE_NAMES) ; do  \
 # 	cd $${app} ; \
-# 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
+# 	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' \
 # 		cargo rustc \
 # 		$(CARGOFLAGS) \
 # 		--target $(TARGET) \
@@ -255,24 +322,152 @@ cargo: check_rustc
 $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
-	@rm -rf $(OBJECT_FILES_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
-	@mkdir -p $(DEPS_DIR)
+	@mkdir -p $(DEPS_BUILD_DIR)
 
-	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
-## run "readelf" on the nano_core binary, remove irrelevant LOCAL or WEAK symbols from the ELF file, and then demangle it, and then output to a sym file
-	@cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
-		<($(CROSS)readelf -S -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;/WEAK   /d') \
-		>  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
-	@echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
-
+	@$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
+## Dump readelf output for verification. See pull request #542 for more details:
+##	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
+##		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
+## 		>  $(ROOT_DIR)/readelf_output
+## run "readelf" on the nano_core binary, remove irrelevant LOCAL symbols from the ELF file, demangle it, serialize it, and then output to a serde file
+	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/serialize_nano_core/Cargo.toml \
+		<(RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
+		<($(CROSS)readelf -S -s -W $(nano_core_binary) \
+		| sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;')) \
+		> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.serde
+## `.sym`: this doesn't parse the object file at compile time, instead including the modified output of "readelf" as a boot module so it can then
+## be parsed during boot. See pull request #542 for more details.
+##	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
+##		<($(CROSS)readelf -S -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
+##		>  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
+##	@echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
+## `.bin`: this doesn't parse the object file at compile time, instead including the nano_core binary as a boot module so it can then be parsed during
+## boot. See pull request #542 for more details. 
+##	@cp $(nano_core_binary) $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.bin
 
 ### This compiles the assembly files in the nano_core. 
 ### This target is currently rebuilt every time to accommodate changing CFLAGS.
 $(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm
 	@mkdir -p $(shell dirname $@)
-	@nasm -felf64 $< -o $@ $(CFLAGS)
+    ## If the user chose to enable VGA text mode by means of setting `THESEUS_CONFIG`,
+    ## then we need to set CFLAGS such that the assembly code can know about it.
+    ## TODO: move this whole part about invoking `nasm` into a dedicated build.rs script in the nano_core.
+ifneq (,$(findstring vga_text_mode, $(THESEUS_CONFIG)))
+	$(eval CFLAGS += -DVGA_TEXT_MODE)
+endif
+	@nasm -f elf64 \
+		-i "$(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/" \
+		$< \
+		-o $@ \
+		$(CFLAGS)
 
+
+
+### This target auto-generates a new grub.cfg file and uses grub to build a bootable ISO.
+### This target should be invoked when all of contents of `ISOFILES` are ready to be packaged into an ISO.
+grub:
+	@mkdir -p $(ISOFILES)/boot/grub
+	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(ISOFILES)/modules/ -o $(ISOFILES)/boot/grub/grub.cfg
+	@$(GRUB_MKRESCUE) -o $(iso) $(ISOFILES)  2> /dev/null
+
+
+### This target uses limine to build a bootable ISO.
+### This target should be invoked when all of contents of `ISOFILES` are ready to be packaged into an ISO.
+limine:
+	@cd $(OBJECT_FILES_BUILD_DIR)/ && ls | cpio --no-absolute-filenames -o > $(ISOFILES)/modules.cpio
+	@RUSTFLAGS="" cargo run -r --manifest-path $(ROOT_DIR)/tools/limine_compress_modules/Cargo.toml -- -i $(ISOFILES)/modules.cpio -o $(ISOFILES)/modules.cpio.lz4
+	@rm $(ISOFILES)/modules.cpio
+	@cp cfg/limine.cfg $(LIMINE_DIR)/limine-cd.bin $(LIMINE_DIR)/limine-cd-efi.bin $(LIMINE_DIR)/limine.sys $(ISOFILES)/
+	@rm -f $(iso)
+	@xorriso -as mkisofs \
+		-b limine-cd.bin -no-emul-boot -boot-load-size 4 \
+		-boot-info-table --efi-boot limine-cd-efi.bin \
+		-efi-boot-part --efi-boot-image --protective-msdos-label \
+		$(ISOFILES)/ -o $(iso)
+	@$(MAKE) -C $(LIMINE_DIR)
+	@$(LIMINE_DIR)/limine-deploy $(iso)
+
+
+### This target copies all extra files into the `ISOFILES` directory,
+### collapsing their directory structure into a single file name with `?` as the directory delimiter.
+### The contents of the EXTRA_FILES directory will be available at runtime within Theseus's root fs, too.
+### See the `README.md` in the `extra_files` directory for more info.
+extra_files:
+	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
+	@for f in $(shell cd $(EXTRA_FILES) && find * -type f); do \
+		ln -f  $(EXTRA_FILES)/$${f}  $(OBJECT_FILES_BUILD_DIR)/`echo -n $${f} | sed 's/\//?/g'`  & \
+	done; wait
+
+
+### Target for building tlibc, Theseus's libc.
+### This should be run after `make iso` has completed.
+### It builds a new .iso that includes tlibc, which can be run using `make orun`.
+### Currently we can manually load tlibc within Theseus for testing purposes by running `ns --load path/to/tlibc_file`.
+.PHONY: tlibc
+TLIBC_OBJ_FILE := tlibc/target/$(TARGET)/$(BUILD_MODE)/tlibc.o
+tlibc:
+# $(MAKE) -C tlibc
+	( cd ./tlibc; sh build.sh )
+
+	@for f in $(TLIBC_OBJ_FILE); do \
+		$(CROSS)strip  --strip-debug  $${f} ; \
+		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(APP_PREFIX)\1/p'`   2> /dev/null ; \
+	done
+	$(MAKE) bootloader=$(bootloader) $(bootloader)
+	@echo -e "\n\033[1;32m The build of tlibc finished successfully and was packaged into the Theseus ISO.\033[0m"
+	@echo -e "    --> Use 'make orun' to run it now (don't use 'make run', that will overwrite tlibc)"
+	@echo -e "    --> In Theseus, run 'ns --load /namespaces/_applications/tlibc.o' to load tlibc."
+
+
+
+### Target for building a test C language executable.
+### This should be run after `make iso` and then `make tlibc` have both completed.
+.PHONY: c_test
+# C_TEST_TARGET := dummy_works
+C_TEST_TARGET := print_test
+c_test:
+	$(MAKE) -C c_test $(C_TEST_TARGET)
+	@for f in c_test/$(C_TEST_TARGET); do \
+		$(CROSS)strip  --strip-debug  $${f} ; \
+		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(EXECUTABLE_PREFIX)\1/p'`   2> /dev/null ; \
+	done
+	$(MAKE) bootloader=$(bootloader) $(bootloader)
+	@echo -e "\n\033[1;32m The build of $(C_TEST_TARGET) finished successfully and was packaged into the Theseus ISO.\033[0m"
+	@echo -e "    --> Use 'make orun' to run it now (don't use 'make run')"
+	@echo -e "    --> In Theseus, run 'loadc /namespaces/_executables/$(C_TEST_TARGET)' to load and run the C program."
+
+
+
+### Demo/test target for building libtheseus
+libtheseus: theseus_cargo $(ROOT_DIR)/libtheseus/Cargo.* $(ROOT_DIR)/libtheseus/src/*
+	@( \
+		cd $(ROOT_DIR)/libtheseus && \
+		$(THESEUS_CARGO_BIN) --input $(DEPS_BUILD_DIR) build; \
+	)
+
+
+### This target builds the `theseus_cargo` tool as a dedicated binary.
+theseus_cargo: $(wildcard $(THESEUS_CARGO)/Cargo.*)  $(wildcard$(THESEUS_CARGO)/src/*)
+	@echo -e "\n=================== Building the theseus_cargo tool ==================="
+	cargo install --locked --force --path=$(THESEUS_CARGO) --root=$(THESEUS_CARGO)
+
+
+
+### Removes the build directory and all compiled Rust objects.
+clean:
+	@rm -rf $(BUILD_DIR)
+	cargo clean
+	
+
+### Removes only the old files that were copied into the build directory from a previous build.
+### This is necessary to avoid lingering build files that aren't relevant to a new build,
+### and would thus cause incremental re-builds to not work correctly.
+### All other build files are left intact.
+clean-old-build:
+	@rm -rf $(OBJECT_FILES_BUILD_DIR)
+	@rm -rf $(DEPS_BUILD_DIR)
+	@rm -rf $(DEBUG_SYMBOLS_DIR)
 
 
 # ## (This is currently not used in Theseus, since we don't run anything in userspace)
@@ -281,9 +476,9 @@ $(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/
 # 	@echo -e "\n======== BUILDING USERSPACE ========"
 # 	@$(MAKE) -C old_crates/userspace all
 # ## copy userspace binary files and add the __u_ prefix
-# 	@mkdir -p $(GRUB_ISOFILES)/modules
+# 	@mkdir -p $(ISOFILES)/modules
 # 	@for f in `find $(ROOT_DIR)/old_crates/userspace/build -type f` ; do \
-# 		cp -vf $${f}  $(GRUB_ISOFILES)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__u_\1/p'` 2> /dev/null ; \
+# 		cp -vf $${f}  $(ISOFILES)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__u_\1/p'` 2> /dev/null ; \
 # 	done
 
 
@@ -311,15 +506,11 @@ $(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/
 ## The "normal" target must come last ('build_sse', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
 simd_personality_sse : export TARGET := x86_64-theseus
 simd_personality_sse : export BUILD_MODE = release
-simd_personality_sse : export override THESEUS_CONFIG += simd_personality
-simd_personality_sse: build_sse build
+simd_personality_sse : export override THESEUS_CONFIG += simd_personality simd_personality_sse
+simd_personality_sse: clean-old-build build_sse build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
-	@mkdir -p $(GRUB_ISOFILES)/boot/grub
-	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
-## autogenerate the grub.cfg file
-	@cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	$(MAKE) bootloader=$(bootloader) copy_kernel $(bootloader)
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
@@ -331,16 +522,12 @@ simd_personality_sse: build_sse build
 ## The "normal" target must come last ('build_avx', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
 simd_personality_avx : export TARGET := x86_64-theseus
 simd_personality_avx : export BUILD_MODE = release
-simd_personality_avx : export override THESEUS_CONFIG += simd_personality
+simd_personality_avx : export override THESEUS_CONFIG += simd_personality simd_personality_avx
 simd_personality_avx : export override CFLAGS += -DENABLE_AVX
-simd_personality_avx: build_avx build
+simd_personality_avx: clean-old-build build_avx build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
-	@mkdir -p $(GRUB_ISOFILES)/boot/grub
-	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
-## autogenerate the grub.cfg file
-	cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	$(MAKE) bootloader=$(bootloader) copy_kernel $(bootloader)
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
@@ -348,25 +535,24 @@ simd_personality_avx: build_avx build
 
 ### build_sse builds the kernel and applications with the x86_64-theseus-sse target.
 ### It can serve as part of the simd_personality_sse target.
-build_sse : export TARGET := x86_64-theseus-sse
+build_sse : export override TARGET := x86_64-theseus-sse
 build_sse : export override RUSTFLAGS += -C no-vectorize-loops
 build_sse : export override RUSTFLAGS += -C no-vectorize-slp
 build_sse : export KERNEL_PREFIX := ksse\#
 build_sse : export APP_PREFIX := asse\#
 build_sse:
-	@$(MAKE) build
+	$(MAKE) build
 
 
 ### build_avx builds the kernel and applications with the x86_64-theseus-avx target.
 ### It can serve as part of the simd_personality_avx target.
-build_avx : export TARGET := x86_64-theseus-avx
+build_avx : export override TARGET := x86_64-theseus-avx
 build_avx : export override RUSTFLAGS += -C no-vectorize-loops
 build_avx : export override RUSTFLAGS += -C no-vectorize-slp
 build_avx : export KERNEL_PREFIX := kavx\#
 build_avx : export APP_PREFIX := aavx\#
 build_avx:
-	@$(MAKE) build
-
+	$(MAKE) build
 
 
 ### build_server is a target that builds Theseus into a regular ISO
@@ -384,19 +570,40 @@ preserve_old_modules:
 
 
 
-## The top-level (root) documentation file
-DOC_ROOT := $(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html
 
-## Builds Theseus's documentation.
-## The entire project is built as normal using the "cargo doc" command.
+###################################################################################################
+############################ Targets for building documentation ###################################
+###################################################################################################
+
+## The output directory for source-level documentation.
+RUSTDOC_OUT      := $(BUILD_DIR)/doc
+RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
+
+## Builds Theseus's source-level documentation for all Rust crates except applications.
+## The entire project is built as normal using the `cargo doc` command (`rustdoc` under the hood).
 docs: doc
-doc: check_rustc
-	@cargo doc --all --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
+doc: export override RUSTDOCFLAGS += -A rustdoc::private_intra_doc_links
+doc: check-rustc
+## Build the docs for select library crates, namely those not hosted online.
+## We do this first such that the main `cargo doc` invocation below can see and link to these library docs.
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/atomic_linked_list/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/cow_arc/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/debugit/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/dfqueue/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/keycodes_ascii/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/lockable/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/mouse_data/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/percent_encoding/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/port_io/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/stdio/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/util/Cargo.toml
+## Now, build the docs for all of Theseus's main kernel crates.
+	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
-	@mkdir -p build
-	@rm -rf build/doc
-	@cp -rf target/doc ./build/
-	@echo -e "\nDocumentation is now available at: \"$(DOC_ROOT)\"."
+	@rm -rf $(RUSTDOC_OUT)
+	@mkdir -p $(RUSTDOC_OUT)
+	@cp -rf target/doc/. $(RUSTDOC_OUT)
+	@echo -e "\nTheseus source docs are now available at: \"$(RUSTDOC_OUT_FILE)\"."
 
 
 ## Opens the documentation root in the system's default browser. 
@@ -405,49 +612,60 @@ view-docs: view-doc
 view-doc: doc
 	@echo -e "Opening documentation index file in your browser..."
 ifneq ($(IS_WSL), )
-## building on WSL
-	@cmd.exe /C start "$(shell wslpath -w $(DOC_ROOT))" &
+	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(RUSTDOC_OUT_FILE)")" &
 else
-## building on regular Linux or macOS
-	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || open $(DOC_ROOT) &
+	@xdg-open $(RUSTDOC_OUT_FILE) > /dev/null 2>&1 || open $(RUSTDOC_OUT_FILE) &
 endif
 
 
-## The top-level book file.
-BOOK_ROOT := $(ROOT_DIR)/book/book/index.html
+### The locations of Theseus's book-style documentation.
+BOOK_SRC      := $(ROOT_DIR)/book
+BOOK_OUT      := $(BUILD_DIR)/book
+BOOK_OUT_FILE := $(BOOK_OUT)/html/index.html
 
-## Builds the Theseus book in the `book` directory.
-book: $(wildcard book/src/*)
+### Builds the Theseus book-style documentation using `mdbook`.
+book: $(wildcard $(BOOK_SRC)/src/*) $(BOOK_SRC)/book.toml
 ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
 	@echo -e "\nError: please install mdbook:"
-	@echo -e "  cargo +stable install mdbook"
+	@echo -e "    cargo +stable install mdbook --force"
+	@echo -e "You can optionally install linkcheck too:"
+	@echo -e "    cargo +stable install mdbook-linkcheck --force"
 	@exit 1
 endif
-	@cd book && mdbook build
-	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_ROOT)\"."
+	@mdbook build $(BOOK_SRC) -d $(BOOK_OUT)
+	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_OUT_FILE)\"."
 
 
-## Opens the top-level file of the Theseus book.
+### Opens the Theseus book.
 view-book: book
+	@echo -e "Opening the Theseus book in your browser..."
+	@mdbook build --open $(BOOK_SRC) -d $(BOOK_OUT)
 
 
-## Removes all build files
-clean:
-	cargo clean
-	@rm -rf build
+### Removes all built documentation
+clean-doc:
+	@cargo clean --doc
+	@rm -rf $(RUSTDOC_OUT) $(BOOK_OUT)
 	
 
-
+### The primary documentation for this makefile itself.
 help: 
 	@echo -e "\nThe following make targets are available:"
 	@echo -e "   iso:"
-	@echo -e "\t The default and most basic target. Builds the full Theseus OS and creates a bootable ISO image."
+	@echo -e "\t The default and most basic target. Builds Theseus OS with the default feature set and creates a bootable ISO image."
+
+	@echo -e "   all:"
+	@echo -e "   full:"
+	@echo -e "\t Same as 'iso', but builds all Theseus OS crates by enabling all Cargo features ('--all-features')."
 
 	@echo -e "   run:"
-	@echo -e "\t Builds Theseus (like the 'iso' target) and runs it using QEMU."
+	@echo -e "\t Builds Theseus (via the 'iso' target) and runs it using QEMU."
 
 	@echo -e "   loadable:"
 	@echo -e "\t Same as 'run', but enables the 'loadable' configuration so that all crates are dynamically loaded."
+
+	@echo -e "   wasmtime:"
+	@echo -e "\t Same as 'run', but includes the 'wasmtime' crates in the build."
 
 	@echo -e "   run_pause:"
 	@echo -e "\t Same as 'run', but pauses QEMU at its GDB stub entry point,"
@@ -460,9 +678,9 @@ help:
 	@echo -e "   bochs:"
 	@echo -e "\t Same as 'make run', but runs Theseus in the Bochs emulator instead of QEMU."
 
-	@echo -e "   boot:"
+	@echo -e "   usb:"
 	@echo -e "\t Builds Theseus as a bootable .iso and writes it to the specified USB drive."
-	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make boot usb=sdc',"
+	@echo -e "\t The USB drive is specified as drive=<dev-name>, e.g., 'make usb drive=sdc',"
 	@echo -e "\t in which the USB drive is connected as /dev/sdc. This target requires sudo."
 
 	@echo -e "   pxe:"
@@ -483,7 +701,18 @@ help:
 	@echo -e "\t then checkout version 2 (or otherwise make some changes) and run 'make build_server'."
 	@echo -e "\t Then, a running instance of Theseus version 1 can contact this machine's build_server to update itself to version 2."
 	
+	@echo -e "\nThe following key-value options are available to select a bootloader:"
+	@echo -e "   bootloader=grub|limine"
+	@echo -e "\t Configure which bootloader to pack into the final \".iso\" file."
+	@echo -e "\t    'grub':    Use the GRUB bootloader. Default value."
+	@echo -e "\t    'limine':  Use the Limine bootloader. See setup instructions in the README."
+
 	@echo -e "\nThe following key-value options are available to customize the build process:"
+	@echo -e "   merge_sections=yes|no"
+	@echo -e "\t Choose whether sections in crate object files are merged together."
+	@echo -e "\t This *significantly* improves crate load times and reduces memory usage,"
+	@echo -e "\t though it may present problems for crate swapping for evolution and fault recovery."
+	@echo -e "\t This is strictly a post-compilation action, it doesn't affect how code is compiled."
 	@echo -e "   debug=full|base|none"
 	@echo -e "\t Configure which debug symbols are stripped from the build artifacts."
 	@echo -e "\t Stripped symbols are placed into files ending with \".dbg\" in \"$(DEBUG_SYMBOLS_DIR)\"."
@@ -505,7 +734,20 @@ help:
 	@echo -e "\t Enable KVM and use the host CPU model. This is required for using certain x86 hardware not supported by QEMU, e.g., PMU, AVX."
 	@echo -e "   int=yes:"
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int). This is VERY verbose and slow."
+	@echo -e "   vfio=<pci_device_slot>:"
+	@echo -e "\t Use VFIO-based PCI device assignment (passthrough) in QEMU for the given device slot, e.g 'vfio=59:00.0'"
+	@echo -e "   SERIAL<N>=<backend>":
+	@echo -e "\t Connect a guest OS serial port (e.g., 'SERIAL1' or 'SERIAL2') to a QEMU-supported backend."
+	@echo -e "\t For example, 'SERIAL2=pty' will connect the second serial port for the given architecture"
+	@echo -e "\t ('COM2 on x86) to a newly-allocated pseudo-terminal on Linux, e.g., '/dev/pts/6'."
+	@echo -e "\t For the 'pty' option, QEMU will print a statement like so:"
+	@echo -e "\t     char device redirected to /dev/pts/6 (label serial1)"
+	@echo -e "\t Note that QEMU uses 0-based indexing for serial ports, so its 'serial1' label refers to the second serial port, our 'SERIAL2'."
+	@echo -e "\t You can then connect to this using something like 'screen /dev/pts/6' or 'picocom /dev/pts/6'."
+	@echo -e "\t Other options include 'stdio' (the default for 'SERIAL1'), 'file', 'pipe', etc."
+	@echo -e "\t For more details, search the QEMU manual for '-serial dev'."
 
+    
 	@echo -e "\nThe following make targets exist for building documentation:"
 	@echo -e "   doc:"
 	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
@@ -515,20 +757,59 @@ help:
 	@echo -e "\t Builds the Theseus book using the mdbook Markdown tool."
 	@echo -e "   view-book:"
 	@echo -e "\t Builds the Theseus book and then opens it in your default browser."
+	@echo -e "\t If the book doesn't open in your browser, install the latest version of mdbook."
+	@echo -e "   clean-doc:"
+	@echo -e "\t Remove all generated documentation files."
 	@echo ""
 
 
 
 
-
-
 ###################################################################################################
-### This section has QEMU arguments and configuration
+##################### This section has QEMU arguments and configuration ###########################
 ###################################################################################################
+
+QEMU_FLAGS ?= 
+QEMU_EXTRA ?= 
+SERIAL1 ?= stdio
+SERIAL2 ?= pty
+
+ifdef IOMMU
+## Currently only the `q35` machine model supports a virtual IOMMU: <https://wiki.qemu.org/Features/VT-d>
+	QEMU_FLAGS += -machine q35,kernel-irqchip=split
+	QEMU_FLAGS += -device intel-iommu,intremap=on,caching-mode=on
+endif
+
+## Boot from the cd-rom drive
+QEMU_FLAGS += -cdrom $(iso) -boot d
+## Don't reboot or shutdown upon failure or a triple reset
+QEMU_FLAGS += -no-reboot -no-shutdown
+## Enable a GDB stub so we can connect GDB to the QEMU instance 
+QEMU_FLAGS += -s
+
+## Enable the first serial port (the default log) to be redirected to the host terminal's stdio.
+## Optionally, use the below `mon:` prefix to have the host terminal forward escape/control sequences to this serial port.
+# QEMU_FLAGS += -serial $(SERIAL1)
+QEMU_FLAGS += -serial mon:$(SERIAL1)
+
+## Attach a second serial port to QEMU, which can be used for a separate headless shell/terminal.
+## For example, if this is `pty`, and QEMU chooses to allocate a new pseudo-terminal at /dev/pts/6,
+## then you can connect to this serial port by running a tty connector application in a new window:
+## -- `screen /dev/pts/6`
+## -- `picocom /dev/pts/6`
+QEMU_FLAGS += -serial mon:$(SERIAL2)
+
+## Disable the graphical display (for testing headless server functionality)
+## `-vga none`:      removes the VGA card
+## `-display none`:  disables QEMU's graphical display
+## `-nographic`:     disables QEMU's graphical display and redirects VGA text mode output to serial.
+# QEMU_FLAGS += -display none -vga none
+
+## Set the amount of system memory (RAM) provided to the QEMU guest OS
 QEMU_MEMORY ?= 512M
-QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
+QEMU_FLAGS += -m $(QEMU_MEMORY) 
 
-## multicore 
+## Enable multicore CPUs, i.e., SMP (Symmetric Multi-Processor)
 QEMU_CPUS ?= 4
 QEMU_FLAGS += -smp $(QEMU_CPUS)
 
@@ -536,9 +817,13 @@ QEMU_FLAGS += -smp $(QEMU_CPUS)
 MAC_ADDR ?= 52:54:00:d1:55:01
 
 ## Add a disk drive, a PATA drive over an IDE controller interface.
-# QEMU_FLAGS += -drive format=raw,file=DISK_IMAGE.img,if=ide
-## Add a disk drive, a SATA drive over the AHCI interface.
-# QEMU_FLAGS += -drive id=my_disk,file=DISK_IMAGE.img,if=none  -device ahci,id=ahci  -device ide-drive,drive=my_disk,bus=ahci.0
+DISK_IMAGE ?= fat32.img
+ifneq ($(wildcard $(DISK_IMAGE)),) 
+	QEMU_FLAGS += -drive format=raw,file=fat32.img,if=ide
+endif
+
+## We don't yet support SATA in Theseus, but this is how to add a SATA drive over the AHCI interface.
+# QEMU_FLAGS += -drive id=my_disk,file=$(DISK_IMAGE),if=none  -device ahci,id=ahci  -device ide-drive,drive=my_disk,bus=ahci.0
 
 ## Read about QEMU networking options here: https://www.qemu.org/2018/05/31/nic-parameter/
 ifeq ($(net),user)
@@ -575,26 +860,38 @@ $(error Error: the 'kvm=yes' option is currently broken. Use 'host=yes' instead"
 	# QEMU_FLAGS += -accel kvm
 endif
 
+## Enable passthrough of a PCI device in QEMU by passing its slot information to VFIO.
+## Slot information is its bus, device, and function number assigned by the host OS, e.g., 'vfio=59:00.0'.
+ifdef vfio
+	QEMU_FLAGS += -device vfio-pci,host=$(vfio)
+endif
+
+QEMU_FLAGS += $(QEMU_EXTRA)
+
 
 
 ###################################################################################################
-### This section has targets for running and debugging 
+########################## Targets for running and debugging Theseus ##############################
 ###################################################################################################
 
 ### Old Run: runs the most recent build without rebuilding
 orun:
-	@qemu-system-x86_64 $(QEMU_FLAGS)
+	qemu-system-x86_64 $(QEMU_FLAGS)
 
 
 ### Old Run Pause: runs the most recent build without rebuilding but waits for a GDB connection.
 orun_pause:
-	@qemu-system-x86_64 $(QEMU_FLAGS) -S
+	qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
-### Currently, loadable module mode requires release build mode
+### builds and runs Theseus in loadable mode, where all crates are dynamically loaded.
 loadable : export override THESEUS_CONFIG += loadable
-loadable : export BUILD_MODE = release
 loadable: run
+
+
+### builds and runs Theseus with wasmtime enabled.
+wasmtime : export override FEATURES += --features wasmtime
+wasmtime: run
 
 
 ### builds and runs Theseus in QEMU
@@ -604,7 +901,7 @@ run: $(iso)
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
 run_pause: $(iso)
-	@qemu-system-x86_64 $(QEMU_FLAGS) -S
+	qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
 ### Runs a gdb instance on the host machine. 
@@ -626,32 +923,32 @@ bochs: $(iso)
 
 ### Checks that the supplied usb device (for usage with the boot/pxe targets).
 ### Note: this is bypassed on WSL, because WSL doesn't support raw device files yet.
-check_usb:
+check-usb:
 ## on WSL, we bypass the check for USB, because burning the ISO to USB must be done with a Windows app.
 ifeq ($(IS_WSL), ) ## if we're not on WSL...
 ## now we need to check that the user has specified a USB drive that actually exists, not a partition of a USB drive.
-ifeq (,$(findstring $(usb),$(USB_DRIVES)))
+ifeq (,$(findstring $(drive),$(USB_DRIVES)))
 	@echo -e "\nError: please specify a USB drive that exists, e.g., \"sdc\" (not a partition like \"sdc1\")."
 	@echo -e "For example, run the following command:"
-	@echo -e "   make boot usb=sdc\n"
+	@echo -e "   make boot drive=sdc\n"
 	@echo -e "The following USB drives are currently attached to this system:\n$(USB_DRIVES)"
 	@echo ""
 	@exit 1
-endif  ## end of checking that the 'usb' variable is a USB drive that exists
+endif  ## end of checking that the 'drive' variable is a USB drive that exists
 endif  ## end of checking for WSL
 
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
-boot : export override THESEUS_CONFIG += mirror_log_to_vga
-boot: check_usb $(iso)
+usb : export override THESEUS_CONFIG += mirror_log_to_vga
+usb: check-usb $(iso)
 ifneq ($(IS_WSL), )
 ## building on WSL
 	@echo -e "\n\033[1;32mThe build finished successfully\033[0m, but WSL is unable to access raw USB devices. Instead, you must burn the ISO to a USB drive yourself."
 	@echo -e "The ISO file is available at \"$(iso)\"."
 else
 ## building on Linux or macOS
-	@$(UNMOUNT) /dev/$(usb)* 2> /dev/null  |  true  ## force it to return true
-	@sudo dd bs=4194304 if=$(iso) of=/dev/$(usb)    ## use 4194304 instead of 4M because macOS doesn't support 4M
+	@$(UNMOUNT) /dev/$(drive)* 2> /dev/null  |  true  ## force it to return true
+	@sudo dd bs=4194304 if=$(iso) of=/dev/$(drive)    ## use 4194304 instead of 4M because macOS doesn't support 4M
 	@sync
 endif
 	

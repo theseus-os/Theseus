@@ -24,7 +24,6 @@
 //! Lastly, it provides a default `AllocablePage` implementations `ObjectPage8k` that is 8 KiB in size 
 //! and contains allocated objects and associated meta-data
 
-#![cfg_attr(feature = "unstable", feature(const_fn))]
 #![feature(const_mut_refs)]
 #![no_std]
 
@@ -37,7 +36,6 @@ mod sc;
 mod zone;
 
 pub use pages::*;
-pub use sc::*;
 pub use zone::*;
 
 use core::alloc::Layout;

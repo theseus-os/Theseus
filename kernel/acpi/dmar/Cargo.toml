@@ -1,0 +1,20 @@
+[package]
+name = "dmar"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "Support for ACPI DMAR"
+
+[dependencies]
+zerocopy = "0.5.0"
+static_assertions = "1.1.0"
+log = "0.4.8"
+
+[dependencies.memory]
+path = "../../memory"
+
+[dependencies.sdt]
+path = "../sdt"
+
+[dependencies.acpi_table]
+path = "../acpi_table"
+

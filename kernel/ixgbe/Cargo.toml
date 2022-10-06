@@ -5,16 +5,17 @@ description = "Driver for the 10 GbE Intel 82599 NIC"
 authors = ["Ramla <ijazramla@gmail.com>"]
 
 [dependencies]
-spin = "0.4.5"
+spin = "0.9.0"
 volatile = "0.2.4"
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+x86_64 = "0.14.8"
 bit_field = "0.7.0"
 owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
-zerocopy = "0.3.0"
+zerocopy = "0.5.0"
 static_assertions = "1.1.0"
+mpmc = "0.1.6"
 
 [dependencies.hashbrown]
-version = "0.1.8"
+version = "0.11.2"
 features = ["nightly"]
 
 [dependencies.log]
@@ -23,7 +24,7 @@ version = "0.4.8"
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]
-version = "1.0"
+version = "1.4.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
@@ -46,22 +47,19 @@ path = "../pci"
 [dependencies.acpi]
 path = "../acpi"
 
-[dependencies.pit_clock]
-path = "../pit_clock"
+[dependencies.pit_clock_basic]
+path = "../pit_clock_basic"
 
 [dependencies.interrupts]
 path = "../interrupts"
 
-[dependencies.mpmc]
-path = "../../libs/mpmc"
-
 [dependencies.rand]
-version = "0.6"
+version = "0.8"
 default-features = false 
-features = [ "alloc" ]
+features = [ "alloc", "small_rng" ]
 
 [dependencies.hpet]
-path = "../hpet"
+path = "../acpi/hpet"
 
 [dependencies.runqueue]
 path = "../runqueue"

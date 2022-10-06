@@ -116,7 +116,7 @@ impl Window {
         height: usize,
         initial_background: Color,
     ) -> Result<Window, &'static str> {
-        let wm_ref = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
+        let wm_ref = window_manager::WINDOW_MANAGER.get().ok_or("The window manager is not initialized")?;
 
         // Create a new virtual framebuffer to hold this window's contents only,
         // and fill it with the initial background color.
@@ -180,7 +180,7 @@ impl Window {
         let mut need_to_set_active = false;
         let mut need_refresh_three_button = false;
 
-        let wm_ref = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
+        let wm_ref = window_manager::WINDOW_MANAGER.get().ok_or("The window manager is not initialized")?;
         
         let is_active = {
             let wm = wm_ref.lock();
@@ -199,12 +199,8 @@ impl Window {
         // we simply return that event from this function such that the application can handle it. 
         let mut unhandled_event: Option<Event> = None;
 
-        loop {
-            let event = match self.event_consumer.pop() {
-                Some(ev) => ev,
-                None => break,
-            };
-            
+        
+        while let Some(event) = self.event_consumer.pop() {
             // TODO FIXME: for a performant design, the goal is to AVOID holding the lock on `inner` as much as possible. 
             //             That means that most of the drawing logic should be moved into the `window_inner` crate itself.
             let mut inner = self.inner.lock();
@@ -337,7 +333,7 @@ impl Window {
             }
         }
 
-        let wm_ref = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?;
+        let wm_ref = WINDOW_MANAGER.get().ok_or("The static window manager was not yet initialized")?;
 
         // Convert the given relative `bounding_box` to an absolute one (relative to the screen, not the window).
         let coordinate = {
@@ -372,7 +368,7 @@ impl Window {
     /// 
     /// Obtains the lock on the window manager instance. 
     pub fn is_active(&self) -> bool {
-        WINDOW_MANAGER.try()
+        WINDOW_MANAGER.get()
             .map(|wm| wm.lock().is_active(&self.inner))
             .unwrap_or(false)
     }
@@ -500,7 +496,7 @@ impl Window {
 
 impl Drop for Window{
     fn drop(&mut self){
-        if let Some(wm) = WINDOW_MANAGER.try() {
+        if let Some(wm) = WINDOW_MANAGER.get() {
             if let Err(err) = wm.lock().delete_window(&self.inner) {
                 error!("Failed to delete_window upon drop: {:?}", err);
             }

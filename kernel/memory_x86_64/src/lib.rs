@@ -16,13 +16,13 @@ extern crate entryflags_x86_64;
 extern crate x86_64;
 
 pub use multiboot2::BootInformation;
-pub use entryflags_x86_64::EntryFlags;
+pub use entryflags_x86_64::{EntryFlags, PAGE_TABLE_ENTRY_FRAME_MASK};
 
 use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{
     PhysicalAddress, VirtualAddress, SectionMemoryBounds, AggregatedSectionMemoryBounds,
 };
-use x86_64::{registers::control_regs, instructions::tlb};
+use x86_64::{registers::control::Cr3, instructions::tlb};
 
 
 /// Finds and returns the relevant addresses for the kernel image loaded into memory by the bootloader.
@@ -49,7 +49,7 @@ pub fn get_kernel_address(
             .map(|s| s.start_address())
             .min()
             .ok_or("Couldn't find kernel start (phys) address")? as usize,
-    )?;
+    ).ok_or("kernel start physical address was invalid")?;
     let kernel_virt_end = VirtualAddress::new(
         elf_sections_tag
             .sections()
@@ -57,8 +57,9 @@ pub fn get_kernel_address(
             .map(|s| s.end_address())
             .max()
             .ok_or("Couldn't find kernel end (virt) address")? as usize,
-    )?;
-    let kernel_phys_end = PhysicalAddress::new(kernel_virt_end.value() - KERNEL_OFFSET)?;
+    ).ok_or("kernel virtual end address was invalid")?;
+    let kernel_phys_end = PhysicalAddress::new(kernel_virt_end.value() - KERNEL_OFFSET)
+        .ok_or("kernel end physical address was invalid")?;
 
     Ok((kernel_phys_start, kernel_phys_end, kernel_virt_end))
 }
@@ -84,8 +85,10 @@ pub fn get_boot_info_mem_area(
     boot_info: &BootInformation,
 ) -> Result<(PhysicalAddress, PhysicalAddress), &'static str> {
     Ok((
-        PhysicalAddress::new(boot_info.start_address() - KERNEL_OFFSET)?,
-        PhysicalAddress::new(boot_info.end_address() - KERNEL_OFFSET)?,
+        PhysicalAddress::new(boot_info.start_address() - KERNEL_OFFSET)
+            .ok_or("boot info start physical address was invalid")?,
+        PhysicalAddress::new(boot_info.end_address() - KERNEL_OFFSET)
+            .ok_or("boot info end physical address was invalid")?,
     ))
 }
 
@@ -93,10 +96,10 @@ pub fn get_boot_info_mem_area(
 /// Finds the addresses in memory of the main kernel sections, as specified by the given boot information. 
 /// 
 /// Returns the following tuple, if successful:
-///  * The combined size and address bounds of specifically .text, .rodata, .data, and the stack.
-///    Each of the these section bounds is aggregated to cover the bounds and sizes of *all* sections that share the same flags,
-///    except for the stack which is kept separate.
-///  * The list of individual sections found. 
+///  * The combined size and address bounds of key sections, e.g., .text, .rodata, .data.
+///    Each of the these section bounds is aggregated to cover the bounds and sizes of *all* sections 
+///    that share the same page table mapping flags and can thus be logically combined.
+///  * The list of all individual sections found. 
 pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(AggregatedSectionMemoryBounds, [Option<SectionMemoryBounds>; 32]), &'static str> {
     let elf_sections_tag = boot_info.elf_sections_tag().ok_or("no Elf sections tag present!")?;
 
@@ -112,9 +115,9 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
     let mut page_table_start:  Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut page_table_end:    Option<(VirtualAddress, PhysicalAddress)> = None;
 
-    let mut text_flags:   Option<EntryFlags> = None;
-    let mut rodata_flags: Option<EntryFlags> = None;
-    let mut data_flags:   Option<EntryFlags> = None;
+    let mut text_flags:        Option<EntryFlags> = None;
+    let mut rodata_flags:      Option<EntryFlags> = None;
+    let mut data_flags:        Option<EntryFlags> = None;
 
     let mut sections_memory_bounds: [Option<SectionMemoryBounds>; 32] = Default::default();
 
@@ -147,33 +150,33 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
             start_virt_addr += KERNEL_OFFSET;
         }
 
-        let start_phys_addr = PhysicalAddress::new(start_phys_addr)?;
-        let start_virt_addr = VirtualAddress::new(start_virt_addr)?;
+        let start_phys_addr = PhysicalAddress::new(start_phys_addr).ok_or("section had invalid starting physical address")?;
+        let start_virt_addr = VirtualAddress::new(start_virt_addr).ok_or("section had invalid ending physical address")?;
         let end_virt_addr = start_virt_addr + (section.size() as usize);
         let end_phys_addr = start_phys_addr + (section.size() as usize);
 
-        // Currently, we require that the linker script specify that each section should be page-aligned.
-        // This isn't truly necessary, but it simplifies the logic here quite a bit. 
-        if start_phys_addr.frame_offset() != 0 {
-            error!("Section {} at {:#X}, size {:#X} was not page-aligned!", section.name(), section.start_address(), section.size());
-            return Err("Kernel ELF Section was not page-aligned");
-        }
-
         // The linker script (linker_higher_half.ld) defines the following order of sections:
-        // |-----|-------------------|------------------------------|
-        // | Sec |    Sec Name       |    Description / purpose     |
-        // | Num |                   |                              |
-        // |-----|--------------------------------------------------|
-        // | (1) | .init             | start of executable pages    |
-        // | (2) | .text             | end of executable pages      |
-        // | (3) | .rodata           | start of read-only pages     |
-        // | (4) | .eh_frame         | part of read-only pages      |
-        // | (5) | .gcc_except_table | end of read-only pages       |
-        // | (6) | .data             | start of read-write pages    | 
-        // | (7) | .bss              | end of read-write pages      |
-        // | (8) | .page_table       | separate .data-like section  |
-        // | (9) | .stack            | separate .data-like section  |
-        // |-----|-------------------|------------------------------|
+        // |------|-------------------|-------------------------------|
+        // | Sec  |    Sec Name       |    Description / purpose      |
+        // | Num  |                   |                               |
+        // |------|---------------------------------------------------|
+        // | (1)  | .init             | start of executable pages     |
+        // | (2)  | .text             | end of executable pages       |
+        // | (3)  | .rodata           | start of read-only pages      |
+        // | (4)  | .eh_frame         | part of read-only pages       |
+        // | (5)  | .gcc_except_table | part/end of read-only pages   |
+        // | (6)  | .tdata            | part/end of read-only pages   |
+        // | (7)  | .tbss             | part/end of read-only pages   |
+        // | (8)  | .data             | start of read-write pages     | 
+        // | (9)  | .bss              | end of read-write pages       |
+        // | (10) | .page_table       | separate .data-like section   |
+        // | (11) | .stack            | separate .data-like section   |
+        // |------|-------------------|-------------------------------|
+        //
+        // Note that we combine the TLS data sections (.tdata and .tbss) into the read-only pages,
+        // because they contain read-only initializer data "images" for each TLS area.
+        // In fact, .tbss can be completedly ignored because it represents a read-only data image of all zeroes,
+        // so there's no point in keeping it around.
         //
         // Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).
         let static_str_name = match section.name() {
@@ -198,13 +201,25 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
                 rodata_flags = Some(flags);
                 "nano_core .gcc_except_table"
             }
+            // The following four sections are optional: .tdata, .tbss, .data, .bss.
+            ".tdata" => {
+                rodata_end = Some((end_virt_addr, end_phys_addr));
+                "nano_core .tdata"
+            }
+            ".tbss" => {
+                // Ignore .tbss (see above) because it is a read-only section of all zeroes.
+                continue;
+            }
             ".data" => {
-                data_start = Some((start_virt_addr, start_phys_addr));
+                data_start.get_or_insert((start_virt_addr, start_phys_addr));
+                data_end = Some((end_virt_addr, end_phys_addr));
                 data_flags = Some(flags);
                 "nano_core .data"
             }
             ".bss" => {
+                data_start.get_or_insert((start_virt_addr, start_phys_addr));
                 data_end = Some((end_virt_addr, end_phys_addr));
+                data_flags = Some(flags);
                 "nano_core .bss"
             }
             ".page_table" => {
@@ -228,7 +243,7 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
         sections_memory_bounds[index] = Some(SectionMemoryBounds {
             start: (start_virt_addr, start_phys_addr),
             end: (end_virt_addr, end_phys_addr),
-            flags: flags,
+            flags,
         });
 
         index += 1;
@@ -298,7 +313,7 @@ pub fn get_vga_mem_addr(
         EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
 
     Ok((
-        PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?,
+        PhysicalAddress::new(VGA_DISPLAY_PHYS_START).ok_or("invalid VGA starting physical address")?,
         vga_size_in_bytes,
         vga_display_flags,
     ))
@@ -306,7 +321,7 @@ pub fn get_vga_mem_addr(
 
 /// Flushes the specific virtual address in TLB. 
 pub fn tlb_flush_virt_addr(vaddr: VirtualAddress) {
-    tlb::flush(x86_64::VirtualAddress(vaddr.value()));
+    tlb::flush(x86_64::VirtAddr::new(vaddr.value() as u64));
 }
 
 /// Flushes the whole TLB. 
@@ -316,5 +331,7 @@ pub fn tlb_flush_all() {
 
 /// Returns the current top-level page table address.
 pub fn get_p4() -> PhysicalAddress {
-    PhysicalAddress::new_canonical(control_regs::cr3().0 as usize)
+    PhysicalAddress::new_canonical(
+        Cr3::read_raw().0.start_address().as_u64() as usize
+    )
 }

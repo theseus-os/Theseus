@@ -52,6 +52,10 @@ pub const PCI_MAX_LATENCY:           u16 = 0x3F;
 pub const MSI_CAPABILITY:           u16 = 0x05;
 pub const MSIX_CAPABILITY:          u16 = 0x11;
 
+/// If a BAR's bits [2:1] equal this value, that BAR describes a 64-bit address.
+/// If not, that BAR describes a 32-bit address.
+const BAR_ADDRESS_IS_64_BIT: u32 = 2;
+
 /// The maximum number of PCI buses.
 const MAX_NUM_PCI_BUSES: u16 = 256;
 /// The maximum number of PCI slots on one PCI bus.
@@ -326,16 +330,19 @@ impl fmt::Debug for PciLocation {
 
 /// Contains information common to every type of PCI Device,
 /// and offers functions for reading/writing to the PCI configuration space.
+///
+/// For more, see [this partial table](http://wiki.osdev.org/PCI#Class_Codes)
+/// of `class`, `subclass`, and `prog_if` codes, 
 #[derive(Debug)]
 pub struct PciDevice {
     /// the bus, slot, and function number that locates this PCI device in the bus tree.
     pub location: PciLocation,
 
-    /// The class code, used to determine device type: http://wiki.osdev.org/PCI#Class_Codes 
+    /// The class code, used to determine device type.
     pub class: u8,
-    /// The subclass code, used to determine device type: http://wiki.osdev.org/PCI#Class_Codes 
+    /// The subclass code, used to determine device type.
     pub subclass: u8,
-    /// The programming interface of this PCI device
+    /// The programming interface of this PCI device, also used to determine device type.
     pub prog_if: u8,
     /// The six Base Address Registers (BARs)
     pub bars: [u32; 6],
@@ -353,48 +360,70 @@ pub struct PciDevice {
 }
 
 impl PciDevice {
-    /// Returns the base address of the memory mapped registers of the PCI device from BAR0 if 32-bit
-    /// or BAR1:BAR0 if 64-bit
-    pub fn determine_mem_base(&self) -> Result<PhysicalAddress, &'static str> {
-        // value in the BAR which means a 64-bit address space
-        const ADDRESS_64_BIT: u32 = 2;
-        let mut bar0 = self.bars[0];
+    /// Returns the base address of the memory region specified by the given `BAR` 
+    /// (Base Address Register) for this PCI device. 
+    ///
+    /// # Argument
+    /// * `bar_index` must be between `0` and `5` inclusively, as each PCI device 
+    ///   can only have 6 BARs at the most.  
+    ///
+    /// Note that if the given `BAR` actually indicates it is part of a 64-bit address,
+    /// it will be used together with the BAR right above it (`bar + 1`), e.g., `BAR1:BAR0`.
+    /// If it is a 32-bit address, then only the given `BAR` will be accessed.
+    ///
+    /// TODO: currently we assume the BAR represents a memory space (memory mapped I/O) 
+    ///       rather than I/O space like Port I/O. Obviously, this is not always the case.
+    ///       Instead, we should return an enum specifying which kind of memory space the calculated base address is.
+    pub fn determine_mem_base(&self, bar_index: usize) -> Result<PhysicalAddress, &'static str> {
+        let mut bar = if let Some(bar_value) = self.bars.get(bar_index) {
+            *bar_value
+        } else {
+            return Err("BAR index must be between 0 and 5 inclusive");
+        };
 
-        // memory mapped base address
-        let mem_base = 
-            // retrieve bits 1-2 to determine address space size
-            if bar0.get_bits(1..3) == ADDRESS_64_BIT { 
-                // a 64-bit address so need to access BAR1 for the upper 32 bits
-                let bar1 = self.bars[1];
-                // clear out the bottom 4 bits because it's a 16-byte aligned address
-                PhysicalAddress::new(*bar0.set_bits(0..4, 0) as usize | ((bar1 as usize) << 32))?
-            }
-            else {
-                // clear out the bottom 4 bits because it's a 16-byte aligned address
-                PhysicalAddress::new(*bar0.set_bits(0..4, 0) as usize)?
-            };  
+        // Check bits [2:1] of the bar to determine address length (64-bit or 32-bit)
+        let mem_base = if bar.get_bits(1..3) == BAR_ADDRESS_IS_64_BIT { 
+            // Here: this BAR is the lower 32-bit part of a 64-bit address, 
+            // so we need to access the next highest BAR to get the address's upper 32 bits.
+            let next_bar = *self.bars.get(bar_index + 1).ok_or("next highest BAR index is out of range")?;
+            // Clear the bottom 4 bits because it's a 16-byte aligned address
+            PhysicalAddress::new(*bar.set_bits(0..4, 0) as usize | ((next_bar as usize) << 32))
+                .ok_or("determine_mem_base(): [64-bit] BAR physical address was invalid")?
+        } else {
+            // Here: this BAR is the lower 32-bit part of a 64-bit address, 
+            // so we need to access the next highest BAR to get the address's upper 32 bits.
+            // Also, clear the bottom 4 bits because it's a 16-byte aligned address.
+            PhysicalAddress::new(*bar.set_bits(0..4, 0) as usize)
+                .ok_or("determine_mem_base(): [32-bit] BAR physical address was invalid")?
+        };  
         Ok(mem_base)
     }
 
-    /// Returns the amount of space needed for a PCI device's registers.
-    pub fn determine_mem_size(&self) -> u32 {
+    /// Returns the size in bytes of the memory region specified by the given `BAR` 
+    /// (Base Address Register) for this PCI device.
+    ///
+    /// # Argument
+    /// * `bar_index` must be between `0` and `5` inclusively, as each PCI device 
+    /// can only have 6 BARs at the most. 
+    ///
+    pub fn determine_mem_size(&self, bar_index: usize) -> u32 {
+        assert!(bar_index < 6);
         // Here's what we do: 
-        // 1) Write all 1s to the BAR0 reg
-        // 2) read BAR0 and mask info bits(bits 0-3)
-        // 3) bitwise not and add 1 
-        // 4) restore original value to BAR0
-        self.pci_write(PCI_BAR0, 0xFFFF_FFFF);
-        let mut mem_size = self.pci_read_32(PCI_BAR0);
-        //debug!("mem_size_read: {:x}", mem_size);
-        mem_size = *mem_size.set_bits(0..4, 0); //mask info bits (the last 4 bits)
-        mem_size = !(mem_size); //bitwise not
-        // debug!("mem_size_read_not: {:x}", mem_size);
-        mem_size = mem_size + 1; // add 1
-        //debug!("mem_size: {}", mem_size);
-        self.pci_write(PCI_BAR0, self.bars[0]); //restore original value
-        //check that value is restored
-        // let bar0 = self.pci_read_32(PCI_BAR0);
-        // debug!("original bar0: {:#X}", bar0);
+        // (1) Write all `1`s to the specified BAR
+        // (2) Read that BAR value again
+        // (3) Mask the info bits (bits [3:0]) of the BAR value read in Step 2
+        // (4) Bitwise "not" (negate) that value, then add 1.
+        //     The resulting value is the size of that BAR's memory region.
+        // (5) Restore the original value to that BAR
+        let bar_offset = PCI_BAR0 + (bar_index as u16 * 0x4);
+        let original_value = self.bars[bar_index];
+
+        self.pci_write(bar_offset, 0xFFFF_FFFF);          // Step 1
+        let mut mem_size = self.pci_read_32(bar_offset);  // Step 2
+        mem_size.set_bits(0..4, 0);                       // Step 3
+        mem_size = !(mem_size);                           // Step 4
+        mem_size += 1;                                    // Step 4
+        self.pci_write(bar_offset, original_value);       // Step 5
         mem_size
     }
 

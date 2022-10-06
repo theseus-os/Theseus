@@ -21,13 +21,13 @@
 extern crate alloc;
 extern crate spin;
 extern crate multiboot2;
-extern crate x86_64;
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
 extern crate stack;
+extern crate serial_port_basic;
 extern crate mod_mgmt;
 extern crate exceptions_early;
 #[macro_use] extern crate vga_buffer;
@@ -37,14 +37,14 @@ extern crate memory_initialization;
 
 
 use core::ops::DerefMut;
-use x86_64::structures::idt::LockedIdt;
 use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
+use serial_port_basic::{take_serial_port, SerialPortAddress};
 
-/// An initial interrupt descriptor table for catching very simple exceptions only.
-/// This is no longer used after interrupts are set up properly, it's just a failsafe.
-static EARLY_IDT: LockedIdt = LockedIdt::new();
-
+/// Used to obtain information about this build of Theseus.
+mod build_info {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}
 
 /// Just like Rust's `try!()` macro, but instead of performing an early return upon an error,
 /// it invokes the `shutdown()` function upon an error in order to cleanly exit Theseus OS.
@@ -91,27 +91,43 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
 /// then change the [`captain::init`](../captain/fn.init.html) routine.
 /// 
 #[no_mangle]
-pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) {
-    println_raw!("Entered nano_core_start()."); 
-	
-	// start the kernel with interrupts disabled
+pub extern "C" fn nano_core_start(
+    multiboot_information_virtual_address: usize,
+    early_double_fault_stack_top: usize,
+) {
+    // start the kernel with interrupts disabled
 	irq_safety::disable_interrupts();
+    println_raw!("Entered nano_core_start(). Interrupts disabled.");
 
-    // first, bring up the logger so we can debug
-    try_exit!(logger::init().map_err(|_| "couldn't init logger!"));
+    // Initialize the logger up front so we can see early log messages for debugging.
+    let logger_ports = [take_serial_port(SerialPortAddress::COM1)]; // some servers use COM2 instead. 
+    try_exit!(logger::early_init(None, IntoIterator::into_iter(logger_ports).flatten()).map_err(|_a| "logger::early_init() failed."));
     info!("Logger initialized.");
     println_raw!("nano_core_start(): initialized logger."); 
 
+    // Dump basic information about this build of Theseus.
+    info!("\n    \
+        ===================== Theseus build info: =====================\n    \
+        CUSTOM CFGs: {} \n    \
+        ===============================================================",
+        build_info::CUSTOM_CFG_STR,
+    );
+
     // initialize basic exception handlers
-    exceptions_early::init(&EARLY_IDT);
+    exceptions_early::init(Some(VirtualAddress::new_canonical(early_double_fault_stack_top)));
     println_raw!("nano_core_start(): initialized early IDT with exception handlers."); 
 
     // safety-wise, we have to trust the multiboot address we get from the boot-up asm code, but we can check its validity
-    if VirtualAddress::new(multiboot_information_virtual_address).is_err() {
+    if VirtualAddress::new(multiboot_information_virtual_address).is_none() {
         try_exit!(Err("multiboot info virtual address was invalid! Ensure that nano_core_start() is being invoked properly from boot.asm!"));
     }
-    let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
-    println_raw!("nano_core_start(): booted via multiboot2."); 
+    let boot_info = try_exit!(
+        unsafe { multiboot2::load(multiboot_information_virtual_address) }.map_err(|e| {
+            error!("Error loading multiboot2 info: {:?}", e);
+            "Error loading multiboot2 info"
+        })
+    );
+    println_raw!("nano_core_start(): booted via multiboot2 with boot info at {:#X}.", multiboot_information_virtual_address); 
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     let (
@@ -157,15 +173,13 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
             // They will be present in the ".init" sections, i.e., in the `init_symbols` list. 
             let ap_realmode_begin = try_exit!(
                 init_symbols.get("ap_start_realmode")
-                    .ok_or("Missing expected symbol from assembly code \"ap_start_realmode\"")
-                    .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)
-                )
+                    .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET))
+                    .ok_or("Missing/invalid symbol expected from assembly code \"ap_start_realmode\"")
             );
             let ap_realmode_end   = try_exit!(
                 init_symbols.get("ap_start_realmode_end")
-                    .ok_or("Missing expected symbol from assembly code \"ap_start_realmode_end\"")
-                    .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)
-                )
+                    .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET))
+                    .ok_or("Missing/invalid symbol expected from assembly code \"ap_start_realmode_end\"")
             );
             // debug!("ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}", ap_realmode_begin, ap_realmode_end);
             (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end)
@@ -179,18 +193,19 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     };
     println_raw!("nano_core_start(): finished parsing the nano_core crate."); 
 
-    // If in loadable mode, load each of the nano_core's constituent crates such that other crates loaded in the future
-    // can depend on those dynamically-loaded instances rather than on the statically-linked sections in the nano_core's base kernel image.
     #[cfg(loadable)] {
-        try_exit!(mod_mgmt::replace_nano_core_crates::replace_nano_core_crates(&default_namespace, nano_core_crate_ref, &kernel_mmi_ref));
+        // This isn't currently necessary; we can always add it in back later if/when needed.
+        // // If in loadable mode, load each of the nano_core's constituent crates such that other crates loaded in the future
+        // // can depend on those dynamically-loaded instances rather than on the statically-linked sections in the nano_core's base kernel image.
+        // try_exit!(mod_mgmt::replace_nano_core_crates::replace_nano_core_crates(&default_namespace, nano_core_crate_ref, &kernel_mmi_ref));
+        drop(nano_core_crate_ref);
     }
     #[cfg(not(loadable))] {
         drop(nano_core_crate_ref);
     }
     
     // if in loadable mode, parse the crates we always need: the core library (Rust no_std lib), the panic handlers, and the captain
-    #[cfg(loadable)] 
-    {
+    #[cfg(loadable)] {
         use mod_mgmt::CrateNamespace;
         println_raw!("nano_core_start(): loading the \"captain\" crate...");     
         let (captain_file, _ns) = try_exit!(CrateNamespace::get_crate_object_file_starting_with(default_namespace, "captain-").ok_or("couldn't find the singular \"captain\" crate object file"));
@@ -204,14 +219,12 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // at this point, we load and jump directly to the Captain, which will take it from here. 
     // That's it, the nano_core is done! That's really all it does! 
     println_raw!("nano_core_start(): invoking the captain...");     
-    #[cfg(not(loadable))]
-    {
+    #[cfg(not(loadable))] {
         try_exit!(
             captain::init(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end)
         );
     }
-    #[cfg(loadable)]
-    {
+    #[cfg(loadable)] {
         use alloc::vec::Vec;
         use memory::{MmiRef, MappedPages};
 
@@ -223,16 +236,12 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section.name);
 
         type CaptainInitFunc = fn(MmiRef, Vec<MappedPages>, stack::Stack, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
-        let mut space = 0;
-        let func: &CaptainInitFunc = {
-            try_exit!(section.mapped_pages.lock().as_func(section.mapped_pages_offset, &mut space))
-        };
+        let func: &CaptainInitFunc = try_exit!(unsafe { section.as_func() });
 
         try_exit!(
             func(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end)
         );
     }
-
 
     // the captain shouldn't return ...
     try_exit!(Err("captain::init returned unexpectedly... it should be an infinite loop (diverging function)"));
@@ -253,6 +262,13 @@ extern {
 }
 
 
-/// This module is a hack to get around the lack of the 
-/// `__truncdfsf2` function in the `compiler_builtins` crate.
-mod truncate;
+/// This module is a hack to get around the issue of no_mangle symbols
+/// not being exported properly from the `libm` crate in no_std environments.
+mod libm;
+
+/// Implements OS support for GCC's stack smashing protection.
+/// This isn't used at the moment, but we make it available in case 
+/// any foreign code (e.g., C code) wishes to use it.
+/// 
+/// You can disable the need for this via the `-fno-stack-protection` GCC option.
+mod stack_smash_protection;

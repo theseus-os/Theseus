@@ -52,7 +52,7 @@ use gimli::{
         DebugStr,
         Reader,
         // Section,
-    },
+    }, RawRngListEntry,
 };
 use rustc_demangle::demangle;
 use hashbrown::{HashMap, HashSet};
@@ -180,15 +180,22 @@ impl DebugSections {
             // A lexical block's address range can exist in two forms: a low_pc and high_pc attribute pair, or a list of ranges
             let (starting_vaddr, ending_vaddr) = {
                 if let Some(gimli::AttributeValue::RangeListsRef(ranges_offset)) = entry.attr_value(gimli::DW_AT_ranges)? {
-                    let mut ranges_list = context.dwarf.ranges(&context.unit, ranges_offset)?;
+                    let range_lists_offset = context.dwarf.ranges_offset_from_raw(&context.unit, ranges_offset);
+                    let mut raw_ranges = context.dwarf.raw_ranges(&context.unit, range_lists_offset)?;
                     debug!("{:indent$}--Lexical Block range list:", "", indent = ((depth) * 2));
                     // we only care about the first range, since the additional ranges will be for unwinding routines
                     let mut first_range = None;
-                    while let Some(r) = ranges_list.next()? {
-                        debug!("{:indent$} --> {:#X} to {:#X}", "", r.begin, r.end, indent = ((depth+1) * 2));
-                        if first_range.is_none() { first_range = Some(r); }
+                    while let Some(r) = raw_ranges.next()? {
+                        let (begin, end) = match r { 
+                            RawRngListEntry::AddressOrOffsetPair { begin, end } |
+                            RawRngListEntry::OffsetPair { begin, end } |
+                            RawRngListEntry::StartEnd { begin, end } => (begin, end),
+                            other => todo!("unsupported RawRngListEntry {:?}", other),
+                        };
+                        debug!("{:indent$} --> {:#X} to {:#X}", "", begin, end, indent = ((depth+1) * 2));
+                        if first_range.is_none() { first_range = Some((begin, end)); }
                     }
-                    first_range.map(|range| (range.begin as usize, range.end as usize)).expect("range list iter was empty")
+                    first_range.map(|(begin, end)| (begin as usize, end as usize)).expect("range list iter was empty")
                 }
                 else if let (Some(low_pc), Some(high_pc)) = (entry.attr_value(gimli::DW_AT_low_pc)?, entry.attr_value(gimli::DW_AT_high_pc)?) {
                     let starting_vaddr = match low_pc {
@@ -499,10 +506,7 @@ impl DebugSections {
             };
             Ok(gimli::EndianSlice::new(slice_opt.unwrap_or_default(), NativeEndian))
         };
-        let load_supplementary = |_section_id| {
-            Ok(gimli::EndianSlice::new(&[][..], NativeEndian))
-        };
-        let dwarf = gimli::Dwarf::load(load_section, load_supplementary)?;
+        let dwarf = gimli::Dwarf::load(load_section)?;
         
         let debug_info_sec = self.debug_info();
         let debug_abbrev_sec = self.debug_abbrev();
@@ -574,12 +578,12 @@ impl DebugSymbols {
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("couldn't get kernel MMI")?;
         let file_ref = weak_file.upgrade().ok_or("No debug symbol file found")?;
         let file = file_ref.lock();
-        let file_bytes: &[u8] = file.as_mapping()?.as_slice(0, file.size())?;
+        let file_bytes: &[u8] = file.as_mapping()?.as_slice(0, file.len())?;
         let elf_file = ElfFile::new(file_bytes)?;
         let symtab = find_symbol_table(&elf_file)?;
 
         // Allocate a memory region large enough to hold all debug sections.
-        let (mut debug_sections_mp, _debug_sections_vaddr_range) = allocate_debug_section_pages(&elf_file, &kernel_mmi_ref)?;
+        let (mut debug_sections_mp, _debug_sections_vaddr_range) = allocate_debug_section_pages(&elf_file, kernel_mmi_ref)?;
         debug!("debug sections spans {:#X} to {:#X}  (size: {:#X} bytes)",
             _debug_sections_vaddr_range.start, 
             _debug_sections_vaddr_range.end,
@@ -754,7 +758,7 @@ impl DebugSymbols {
                             warn!("Looking for foreign relocation source section {:?}", demangled);
 
                             // search for the symbol's demangled name in the kernel's symbol map
-                            namespace.get_symbol_or_load(&demangled, None, &kernel_mmi_ref, false)
+                            namespace.get_symbol_or_load(&demangled, None, kernel_mmi_ref, false)
                                 .upgrade()
                                 .ok_or("Couldn't get symbol for .debug section's foreign relocation entry, nor load its containing crate")
                                 .map(|sec| (sec.address_range.start, Some(sec)))

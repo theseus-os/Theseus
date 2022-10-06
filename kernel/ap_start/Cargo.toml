@@ -3,17 +3,9 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "ap_start"
 description = "High-level initialization code that runs on each AP (core) after it has booted up"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
-
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
-
-[dependencies.log]
-version = "0.4.8"
+log = "0.4.8"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"

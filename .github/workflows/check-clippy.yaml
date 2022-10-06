@@ -1,0 +1,24 @@
+name: Clippy Checks
+on:
+  pull_request:
+    types: [edited, synchronize, opened, reopened]
+jobs:
+  run-clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: "Initialize git submodules"
+        run: |
+          git submodule update --init --recursive
+      - name: "Install Rust toolchain"
+        run: |
+          (echo "rustup toolchain install "; cat rust-toolchain; printf -- "-x86_64-unknown-linux-gnu;"; echo "rustup component add clippy rust-src --toolchain "; cat rust-toolchain; printf -- "-x86_64-unknown-linux-gnu;") | tr -d "\r" | tr -d "\n" > cmd.txt
+          bash cmd.txt;
+      - name: "Run Clippy"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: .
+        run: |
+          printf "cargo clippy -q -Z build-std=core,alloc -Z build-std-features=compiler-builtins-mem --target cfg/x86_64-theseus.json --workspace --all-features -- -A clippy::all " > cmd.txt;
+          grep -v "#" lints.txt | sed 's/^/-D clippy::/g' | tr -d '\r' | tr '\n' ' ' >> cmd.txt
+          bash cmd.txt;

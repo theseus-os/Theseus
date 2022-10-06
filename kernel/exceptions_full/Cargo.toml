@@ -3,18 +3,12 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "exceptions_full"
 description = "Exception handlers that are fully-featured, i.e., aware of the apic/task subsystems, and kill tasks on an exception"
 version = "0.1.0"
-build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.gimli]
-version = "0.19.0"
-default-features = false
-features = [ "read", "alloc" ]
+x86_64 = "0.14.8"
+log = "0.4.8"
+locked_idt = { path = "../../libs/locked_idt" }
 
 [dependencies.vga_buffer]
 path = "../vga_buffer"
@@ -49,8 +43,14 @@ path = "../memory"
 [dependencies.stack_trace]
 path = "../stack_trace"
 
+[dependencies.tss]
+path = "../tss"
+
 [dependencies.debug_info]
 path = "../debug_info"
+
+[dependencies.signal_handler]
+path = "../signal_handler"
 
 [lib]
 crate-type = ["rlib"]

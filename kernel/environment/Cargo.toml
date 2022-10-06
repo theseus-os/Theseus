@@ -2,11 +2,10 @@
 name = "environment"
 version = "0.1.0"
 authors = ["christinewang5 <chrissywang54@gmail.com>"]
+edition = "2021"
 
 [dependencies]
-
-[dependencies.fs_node]
-path = "../fs_node"
-
-[dependencies.root]
-path = "../root"
+fs_node = { path = "../fs_node" }
+hashbrown = "0.11.2"
+path = { path = "../path" }
+root = { path = "../root" }

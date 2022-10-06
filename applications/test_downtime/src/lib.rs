@@ -2,7 +2,6 @@
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate terminal_print;
 extern crate getopts;
 extern crate spin;
@@ -49,12 +48,9 @@ macro_rules! CPU_ID {
 
 // ------------------------- Window fault injection section -------------------------------------------
 
-lazy_static! {
-
-    /// The structure to hold the list of all faults so far occured in the system
-    pub static ref DOWNTIME_SEND_LOCK: Mutex<PassStruct> = Mutex::new(PassStruct{count : 0, user : 0});
-    pub static ref DOWNTIME_RECEIVE_LOCK: Mutex<PassStruct> = Mutex::new(PassStruct{count : 0, user : 0});
-}
+/// The structure to hold the list of all faults so far occured in the system
+pub static DOWNTIME_SEND_LOCK: Mutex<PassStruct> = Mutex::new(PassStruct{count : 0, user : 0});
+pub static DOWNTIME_RECEIVE_LOCK: Mutex<PassStruct> = Mutex::new(PassStruct{count : 0, user : 0});
 
 /// Setup two tasks to send cordinates and receive a response
 pub fn set_graphics_measuring_task() -> (){
@@ -64,14 +60,14 @@ pub fn set_graphics_measuring_task() -> (){
     let _taskref1  = new_task_builder(graphics_measuring_task, arg_val)
         .name(String::from("watch task"))
         .pin_on_core(pick_child_core())
-        .spawn_restartable()
+        .spawn_restartable(None)
         .expect("Couldn't start the watch task");
 
     // setup a task to receive responses
     let _taskref2  = new_task_builder(graphics_send_task, arg_val)
         .name(String::from("send task"))
         .pin_on_core(pick_child_core())
-        .spawn_restartable()
+        .spawn_restartable(None)
         .expect("Couldn't start the send task");
 
 }
@@ -364,7 +360,7 @@ pub fn pick_child_core() -> u8 {
 	if nr_tasks_in_rq(child_core) == Some(1) {return child_core;}
 
 	// if failed, try from the last to the first
-	for child_core in (0..apic::core_count() as u8).rev() {
+	for child_core in (0..apic::cpu_count()).rev() {
 		if nr_tasks_in_rq(child_core) == Some(1) {return child_core;}
 	}
 	debug!("WARNING : Cannot pick a child core because cores are busy");
@@ -419,7 +415,7 @@ pub fn main(args: Vec<String>) -> isize {
         let taskref1  = new_task_builder(fault_graphics_task, arg_val)
             .name(String::from("fault_graphics_task"))
             .pin_on_core(2)
-            .spawn_restartable()
+            .spawn_restartable(None)
             .expect("Couldn't start the fault_graphics_task");
 
         taskref1.join().expect("Task 1 join failed");
@@ -437,7 +433,7 @@ pub fn main(args: Vec<String>) -> isize {
             let taskref1  = new_task_builder(ipc_fault_task, (sender_reply, receiver))
                 .name(String::from("fault_task"))
                 .pin_on_core(pick_child_core())
-                .spawn_restartable()
+                .spawn_restartable(None)
                 .expect("Couldn't start the restartable task"); 
 
             taskref1.join().expect("Task 1 join failed");
@@ -459,7 +455,7 @@ pub fn main(args: Vec<String>) -> isize {
             let taskref1  = new_task_builder(ipc_fault_task, (sender_reply, receiver))
                 .name(String::from("fault_task"))
                 .pin_on_core(pick_child_core())
-                .spawn_restartable()
+                .spawn_restartable(None)
                 .expect("Couldn't start the restartable task"); 
 
             taskref1.join().expect("Task 1 join failed");

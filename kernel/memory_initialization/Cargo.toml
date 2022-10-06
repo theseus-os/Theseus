@@ -5,7 +5,7 @@ description = "Initialization routine for the virtual memory subsystem."
 version = "0.1.0"
 
 [dependencies]
-multiboot2 = "0.10.1"
+multiboot2 = "0.14.0"
 
 [dependencies.memory]
 path = "../memory"
@@ -15,6 +15,9 @@ path = "../stack"
 
 [dependencies.kernel_config]
 path = "../kernel_config"
+
+[dependencies.bootloader_modules]
+path = "../bootloader_modules"
 
 [dependencies.log]
 version = "0.4.8"

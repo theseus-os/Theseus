@@ -1,0 +1,11 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "thread_local_macro"
+description = "Implementation of the thread_local!() macro, similar to Rust libstd"
+version = "0.1.0"
+
+[dependencies]
+static_assertions = "1.1.0"
+
+[lib]
+crate-type = ["rlib"]

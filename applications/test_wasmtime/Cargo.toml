@@ -1,0 +1,24 @@
+[package]
+name = "test_wasmtime"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "Basic test cases for running `wasmtime` on Theseus"
+edition = "2018"
+
+[dependencies]
+log = "0.4.8"
+anyhow = { version = "1.0", default-features = false }
+getopts = "0.2.21"
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+[dependencies.path]
+path = "../../kernel/path"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.wasmtime]
+path = "../../ports/wasmtime/crates/wasmtime"
+default-features = false

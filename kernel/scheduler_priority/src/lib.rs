@@ -46,7 +46,7 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
         // A task has been selected
         Some(task) => {
             // If the selected task is idle task we begin a new scheduling epoch
-            if task.idle_task == true {
+            if task.idle_task {
                 assign_tokens(apic_id);
                 select_next_task_priority(apic_id).and_then(|m| m.taskref)
             }
@@ -82,9 +82,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
     let mut chosen_task_index: Option<usize> = None;
     let mut idle_task = true;
 
-    for (i, priority_taskref) in runqueue_locked.iter().enumerate() {
-        let t = priority_taskref.lock();
-
+    for (i, t) in runqueue_locked.iter().enumerate() {
         // we skip the idle task, and only choose it if no other tasks are runnable
         if t.is_an_idle_task {
             idle_task_index = Some(i);
@@ -97,23 +95,23 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
         }
 
         // if this task is pinned, it must not be pinned to a different core
-        if let Some(pinned) = t.pinned_core {
+        if let Some(pinned) = t.pinned_core() {
             if pinned != apic_id {
                 // with per-core runqueues, this should never happen!
-                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
+                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, &*t);
                 return None;
             }
         }
 
         // if the task has no remaining tokens we ignore the task
-        if priority_taskref.tokens_remaining == 0{
+        if t.tokens_remaining == 0 {
             continue;
         }
             
         // found a runnable task!
         chosen_task_index = Some(i);
         idle_task = false;
-        // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
+        // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, &*t);
         break; 
     }
 
@@ -155,9 +153,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
     let mut total_priorities :usize = 1;
 
     // This loop calculates the total priorities of the runqueue
-    for (_i, priority_taskref) in runqueue_locked.iter().enumerate() {
-        let t = priority_taskref.lock();
-
+    for (_i, t) in runqueue_locked.iter().enumerate() {
         // we skip the idle task, it contains zero tokens as it is picked last
         if t.is_an_idle_task {
             continue;
@@ -169,22 +165,22 @@ fn assign_tokens(apic_id: u8) -> bool  {
         }
 
         // if this task is pinned, it must not be pinned to a different core
-        if let Some(pinned) = t.pinned_core {
+        if let Some(pinned) = t.pinned_core() {
             if pinned != apic_id {
                 // with per-core runqueues, this should never happen!
-                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
+                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, &*t);
                 return false;
             }
         }
             
         // found a runnable task!
         // We add its priority
-        // debug!("assign_tokens(): AP {} Task {:?} priority {}", apic_id, *t, priority_taskref.priority);
-        total_priorities = total_priorities.saturating_add(1).saturating_add(priority_taskref.priority as usize);
+        // debug!("assign_tokens(): AP {} Task {:?} priority {}", apic_id, &*t, t.priority);
+        total_priorities = total_priorities.saturating_add(1).saturating_add(t.priority as usize);
         
         
         
-        // debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, *t);
+        // debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, &*t);
         // break; 
     }
 
@@ -196,40 +192,32 @@ fn assign_tokens(apic_id: u8) -> bool  {
 
     // We iterate through each task in runqueue
     // We dont use iterator as items are modified in the process
-    for (_i, priority_taskref) in runqueue_locked.iter_mut().enumerate() { 
+    for (_i, t) in runqueue_locked.iter_mut().enumerate() { 
         let task_tokens;
-        {
 
-            //let priority_taskref = match runqueue_locked.get_priority_task_ref(_i){ Some(x) => x, None => { continue;},};
-
-            let t = priority_taskref.lock();
-
-            // we give zero tokens to the idle tasks
-            if t.is_an_idle_task {
-                continue;
-            }
-
-            // we give zero tokens to none runnable tasks
-            if !t.is_runnable() {
-                continue;
-            }
-
-            // if this task is pinned, it must not be pinned to a different core
-            if let Some(pinned) = t.pinned_core {
-                if pinned != apic_id {
-                    // with per-core runqueues, this should never happen!
-                    error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
-                    return false;
-                }
-            }
-            // task_tokens = epoch * (taskref + 1) / total_priorities;
-            task_tokens = epoch.saturating_mul((priority_taskref.priority as usize).saturating_add(1)).wrapping_div(total_priorities);
+        // we give zero tokens to the idle tasks
+        if t.is_an_idle_task {
+            continue;
         }
-        
-        {
-            priority_taskref.tokens_remaining = task_tokens;
+
+        // we give zero tokens to none runnable tasks
+        if !t.is_runnable() {
+            continue;
         }
-        // debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, *t);
+
+        // if this task is pinned, it must not be pinned to a different core
+        if let Some(pinned) = t.pinned_core() {
+            if pinned != apic_id {
+                // with per-core runqueues, this should never happen!
+                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, &*t);
+                return false;
+            }
+        }
+        // task_tokens = epoch * (taskref + 1) / total_priorities;
+        task_tokens = epoch.saturating_mul((t.priority as usize).saturating_add(1)).wrapping_div(total_priorities);
+
+        t.tokens_remaining = task_tokens;
+        // debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, &*t);
         // break; 
     }
 

@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "captain"
 description = "The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates."
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 
@@ -71,8 +70,8 @@ path = "../task"
 [dependencies.scheduler]
 path = "../scheduler"
 
-[dependencies.keycodes_ascii]
-path = "../../libs/keycodes_ascii"
+[dependencies.console]
+path = "../console"
 
 [dependencies.print]
 path = "../print"

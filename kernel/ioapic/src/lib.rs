@@ -3,7 +3,6 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate lazy_static;
 extern crate spin;
 extern crate memory;
 extern crate volatile;
@@ -21,11 +20,9 @@ use atomic_linked_list::atomic_map::AtomicMap;
 use owning_ref::BoxRefMut;
 
 
-lazy_static! {
-    /// The system-wide list of all `IoApic`s, of which there is usually one, 
-    /// but larger systems can have multiple IoApic chips.
-    static ref IOAPICS: AtomicMap<u8, Mutex<IoApic>> = AtomicMap::new();
-}
+/// The system-wide list of all `IoApic`s, of which there is usually one, 
+/// but larger systems can have multiple IoApic chips.
+static IOAPICS: AtomicMap<u8, Mutex<IoApic>> = AtomicMap::new();
 
 
 /// Returns a reference to the list of IoApics.
@@ -146,12 +143,14 @@ impl IoApic {
     }
 
     /// Set IRQ to an interrupt vector.
+    ///
     /// # Arguments
-    /// ioapic_irq: the IRQ number that this interrupt will trigger on this IoApic.
-    /// lapic_id: the id of the LocalApic that should handle this interrupt.
-    /// irq_vector: the system-wide (PIC-based) IRQ vector number,
-    /// which after remapping is 0x20 to 0x2F  (0x20 is timer, 0x21 is keyboard, etc).
-    /// See interrupts::PIC_MASTER_OFFSET.
+    /// * `ioapic_irq`: the IRQ number that this interrupt will trigger on this IoApic.
+    /// * `lapic_id`: the id of the LocalApic that should handle this interrupt.
+    /// * `irq_vector`: the system-wide IRQ vector number,
+    ///    which after remapping is from 0x20 to 0x2F 
+    ///    (see [`interrupts::IRQ_BASE_OFFSET`](../interrupts/constant.IRQ_BASE_OFFSET.html)).
+    ///    For example, 0x20 is the PIT timer, 0x21 is the PS2 keyboard, etc.
     pub fn set_irq(&mut self, ioapic_irq: u8, lapic_id: u8, irq_vector: u8) {
         let vector = irq_vector as u8;
 

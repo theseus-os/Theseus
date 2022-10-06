@@ -20,7 +20,8 @@ pub const PATH_DELIMITER: &str = "/";
 pub const EXTENSION_DELIMITER: &str = ".";
 
 
-/// A structure that represents a file  
+/// A structure that represents a relative or absolute path
+/// to a file or directory.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Path {
     path: String
@@ -48,7 +49,7 @@ impl fmt::Display for Path {
 impl From<String> for Path {
     #[inline]
     fn from(path: String) -> Self {
-        Path {path: path}
+        Path { path }
     }
 }
 
@@ -87,16 +88,15 @@ impl Path {
     pub fn basename<'a>(&'a self) -> &'a str {
         self.rcomponents()
             .next()
-            .unwrap_or_else(|| &self.path)
+            .unwrap_or(&self.path)
     }
 
     /// Like [`basename()`](#method.basename), but excludes the file extension, if present.
     pub fn file_stem<'a>(&'a self) -> &'a str {
         self.basename()
             .split(EXTENSION_DELIMITER)
-            .filter(|&x| x != "")
-            .next()
-            .unwrap_or_else(|| &self.path)
+            .find(|&x| x != "")
+            .unwrap_or(&self.path)
     }
 
     /// Returns the file extension, if present. 
@@ -105,8 +105,7 @@ impl Path {
     pub fn extension<'a>(&'a self) -> Option<&'a str> {
         self.basename()
             .rsplit(EXTENSION_DELIMITER)
-            .filter(|&x| x != "")
-            .next()
+            .find(|&x| x != "")
     }
 
     /// Returns a canonical and absolute form of the current path (i.e. the path of the working directory)
@@ -118,9 +117,9 @@ impl Path {
         new_components.extend(current_path.components());
         // Push components of the path to the components of the new path
         for component in self.components() {
-            if component == String::from(".") {
+            if component == "." {
                 continue;
-            } else if component == String::from("..") {
+            } else if component == ".." {
                 new_components.pop();
             } else {
                 new_components.push(component);
@@ -141,8 +140,9 @@ impl Path {
         Path::new(new_path)
     }
     
-    /// Expresses the current Path, self, relative to another Path, other
-    /// https://docs.rs/pathdiff/0.1.0/src/pathdiff/lib.rs.html#32-74
+    /// Returns a `Path` that expresses a relative path from this `Path` (`self`)
+    /// to the given `other` `Path`.
+    // An example algorithm: https://docs.rs/pathdiff/0.1.0/src/pathdiff/lib.rs.html#32-74
     pub fn relative(&self, other: &Path) -> Option<Path> {
         let mut ita_iter = self.components();
         let mut itb_iter = other.components();

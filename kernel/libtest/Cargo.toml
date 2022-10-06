@@ -3,13 +3,10 @@ authors = ["Ramla Ijaz <ijazramla.com>"]
 name = "libtest"
 description = "A set of convenience functions that can be used for benchmarking within Theseus."
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+spin = "0.9.0"
 bit_field = "0.10.0"
-atomic = "0.4.5"
 libm = "0.2.1"
 
 [dependencies.apic]
@@ -28,13 +25,13 @@ path = "../task"
 path = "../runqueue"
 
 [dependencies.hpet]
-path = "../hpet"
+path = "../acpi/hpet"
 
 [dependencies.pmu_x86]
 path = "../pmu_x86"
 
 [dependencies.hashbrown]
-version = "0.1.8"
+version = "0.11.2"
 features = ["nightly"]
 
 [lib]

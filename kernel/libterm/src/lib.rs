@@ -45,7 +45,7 @@ pub mod cursor;
 
 pub const FONT_FOREGROUND_COLOR: Color = color::LIGHT_GREEN;
 pub const FONT_BACKGROUND_COLOR: Color = color::BLACK;
-const DEFAULT_CURSOR_FREQ: u64 = 400000000;
+const DEFAULT_CURSOR_FREQ: u128 = 400000000;
 
 /// Error type for tracking different scroll errors that a terminal
 /// application could encounter.
@@ -286,8 +286,9 @@ impl Terminal {
         let buffer_width = self.get_text_dimensions().0;
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
-        if self.is_scroll_end == true {
-            return;} 
+        if self.is_scroll_end {
+            return;
+        } 
         prev_start_idx = self.scroll_start_idx;
         let result = self.calc_end_idx(prev_start_idx);
         let mut end_idx = match result {
@@ -422,7 +423,7 @@ impl Terminal {
 impl Terminal {
     /// Creates a new terminal and adds it to the window manager `wm_mutex`
     pub fn new() -> Result<Terminal, &'static str> {
-        let wm_ref = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
+        let wm_ref = window_manager::WINDOW_MANAGER.get().ok_or("The window manager is not initialized")?;
         let (window_width, window_height) = {
             let wm = wm_ref.lock();
             wm.get_screen_size()

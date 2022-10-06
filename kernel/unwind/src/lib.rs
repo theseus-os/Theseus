@@ -1,6 +1,6 @@
 //! Support for unwinding the call stack and cleaning up stack frames.
 //! 
-//! Uses DWARF debugging information (`.eh_frame` and `.gcc_except_table`) from object files.
+//! Uses DWARF debugging information (`.eh_frame` and `.gcc_except_table` sections) from object files.
 //! It can also be used to generate stack traces (backtrace) using only that debug information
 //! without using frame pointer registers.
 //! 
@@ -34,8 +34,7 @@
 
 #![no_std]
 #![feature(panic_info_message)]
-#![feature(llvm_asm, naked_functions)]
-#![feature(unwind_attributes)]
+#![feature(naked_functions)]
 #![feature(trait_alias)]
 
 extern crate alloc;
@@ -45,19 +44,18 @@ extern crate mod_mgmt;
 extern crate task;
 extern crate gimli;
 extern crate fallible_iterator;
-extern crate scheduler;
-extern crate apic;
-extern crate runqueue;
 extern crate interrupts;
+extern crate external_unwind_info;
 
 mod registers;
 mod lsda;
 
-use core::fmt;
+use core::{arch::asm, fmt};
 use alloc::{
     sync::Arc,
     boxed::Box,
 };
+use external_unwind_info::ExternalUnwindInfo;
 use gimli::{
     UnwindSection, 
     UnwindTableRow, 
@@ -135,7 +133,7 @@ impl StackFrame {
     /// The address of the Language-Specific Data Area (LSDA)
     /// that is needed to discover the unwinding cleanup routines (landing pads)
     /// for this stack frame. 
-    /// Typically, this points to an area within the `.gcc_except_table` section,
+    /// Typically, this points to an area within a `.gcc_except_table` section,
     /// which then needs to be parsed.
     pub fn lsda(&self) -> Option<u64> {
         self.lsda
@@ -187,7 +185,7 @@ pub struct StackFrameIter {
     /// If `Some`, the latest stack frame produced by this iterator was an exception handler stack frame.
     cfa_adjustment: Option<i64>,
     /// This is set to true when the previous stack frame was an exception/interrupt handler,
-    /// which is useful in the case of taking into account the CPU pushing an `ExceptionStackFrame` onto the stack.
+    /// which is useful in the case of taking into account the CPU pushing an `InterruptStackFrame` onto the stack.
     /// The DWARF debugging/unwinding info cannot account for this because an interrupt or exception happening 
     /// is not the same as a regular function "call" happening.
     last_frame_was_exception_handler: bool,
@@ -282,7 +280,7 @@ impl FallibleIterator for StackFrameIter {
                     }
 
                     // If this stack frame is an exception handler, the return address wouldn't have been pushed onto the stack as with normal call instructions.
-                    // Instead, it would've been pushed onto the stack by the CPU as part of the ExceptionStackFrame, so we have to look for it there.
+                    // Instead, it would've been pushed onto the stack by the CPU as part of the InterruptStackFrame, so we have to look for it there.
                     //
                     // We know that the stack currently looks like this:
                     // |-- address --|------------  Item on the stack -------------|
@@ -347,15 +345,33 @@ impl FallibleIterator for StackFrameIter {
         let caller = return_address - 1;
         // TODO FIXME: only subtract 1 for non-"fault" exceptions, e.g., page faults should NOT subtract 1
         // trace!("call_site_address: {:#X}", caller);
+        let caller_virt_addr = VirtualAddress::new(caller as usize)
+            .ok_or("caller wasn't a valid virtual address")?;
 
-        // Get unwind info for the call site address
-        let crate_ref = self.namespace.get_crate_containing_address(VirtualAddress::new_canonical(caller as usize), false).ok_or_else(|| {
-            #[cfg(not(downtime_eval))]
-            error!("StackTraceIter::next(): couldn't get crate containing call site address: {:#X}", caller);
-            "couldn't get crate containing call site address"
-        })?;
-        let (eh_frame_sec, base_addrs) = get_eh_frame_info(&crate_ref)
-            .ok_or("couldn't get eh_frame section in caller's containing crate")?;
+        // Get unwind info for the call site ("caller") address.
+        let (eh_frame_sec, base_addrs) = self.namespace
+            // First: search the current namespace's crates to see if any of them contain the caller address.
+            .get_crate_containing_address(caller_virt_addr, false)
+            .and_then(|crate_ref| get_eh_frame_info(&crate_ref)
+                .map(|(eh_frame_sec, base_addrs)| 
+                    (EhFrameReference::Section(eh_frame_sec), base_addrs)
+                )
+            )
+            // Second: search externally-registered unwind info for the caller address.
+            .or_else(|| external_unwind_info::get_unwind_info(caller_virt_addr)
+                .map(|uw_info| {
+                    let base_addrs = BaseAddresses::default()
+                        .set_eh_frame(uw_info.unwind_info.start.value() as u64)
+                        .set_text(uw_info.text_section.start.value() as u64);
+                    (EhFrameReference::External(uw_info), base_addrs)
+                })
+            )
+            // Otherwise, the caller address isn't known to the system, so return an error.
+            .ok_or_else(|| {
+                #[cfg(not(downtime_eval))]
+                error!("StackTraceIter::next(): couldn't get unwind info for call site address: {:#X}", caller);
+                "couldn't get unwind info for call site address"
+            })?;
 
         let mut cfa_adjustment: Option<i64> = None;
         let mut this_frame_is_exception_handler = false;
@@ -382,7 +398,7 @@ impl FallibleIterator for StackFrameIter {
             
             // trace!("initial_address: {:#X}", fde.initial_address());
 
-            // If the next stack frame is an exception handler, then the CPU pushed an `ExceptionStackFrame`
+            // If the next stack frame is an exception handler, then the CPU pushed an `InterruptStackFrame`
             // onto the stack, completely unbeknownst to the DWARF debug info. 
             // Thus, we need to adjust this next frame's stack pointer (i.e., `cfa` which becomes the stack pointer)
             // to account for the change in stack contents. 
@@ -437,8 +453,8 @@ unsafe fn deref_ptr(ptr: Pointer) -> u64 {
 }
 
 
-pub trait FuncWithRegisters = Fn(Registers) -> Result<(), &'static str>;
-type RefFuncWithRegisters<'a> = &'a dyn FuncWithRegisters;
+pub trait FuncWithRegisters = FnMut(Registers) -> Result<(), &'static str>;
+type FuncWithRegistersRefMut<'a> = &'a mut dyn FuncWithRegisters;
 
 
 /// This function saves the current CPU register values onto the stack (to preserve them)
@@ -448,12 +464,12 @@ type RefFuncWithRegisters<'a> = &'a dyn FuncWithRegisters;
 /// since we have to start from the current call frame and work backwards up the call stack 
 /// while applying the rules for register value changes in each call frame
 /// in order to arrive at the proper register values for a prior call frame.
-pub fn invoke_with_current_registers<F>(f: F) -> Result<(), &'static str> 
+pub fn invoke_with_current_registers<F>(f: &mut F) -> Result<(), &'static str> 
     where F: FuncWithRegisters 
 {
-    let f: RefFuncWithRegisters = &f;
+    let mut f: FuncWithRegistersRefMut = f; // cast to a &mut trait object
     let result = unsafe { 
-        let res_ptr = unwind_trampoline(&f);
+        let res_ptr = unwind_trampoline(&mut f);
         let res_boxed = Box::from_raw(res_ptr);
         *res_boxed
     };
@@ -469,13 +485,13 @@ pub fn invoke_with_current_registers<F>(f: F) -> Result<(), &'static str>
     /// 
     /// The argument is a pointer to a function reference, so effectively a pointer to a pointer. 
     #[naked]
-    #[inline(never)]
-    unsafe extern "C" fn unwind_trampoline(_func: *const RefFuncWithRegisters) -> *mut Result<(), &'static str> {
+    unsafe extern "C" fn unwind_trampoline(_func: *mut FuncWithRegistersRefMut) -> *mut Result<(), &'static str> {
         // This is a naked function, so you CANNOT place anything here before the asm block, not even log statements.
         // This is because we rely on the value of registers to stay the same as whatever the caller set them to.
         // DO NOT touch RDI register, which has the `_func` function; it needs to be passed into unwind_recorder.
-        llvm_asm!("
-            # copy the stack pointer to RSI
+        asm!(
+            // copy the stack pointer to RSI
+            "
             movq %rsp, %rsi
             pushq %rbp
             pushq %rbx
@@ -483,13 +499,17 @@ pub fn invoke_with_current_registers<F>(f: F) -> Result<(), &'static str>
             pushq %r13
             pushq %r14
             pushq %r15
-            # To invoke `unwind_recorder`, we need to put: 
-            # (1) the func in RDI (it's already there, just don't overwrite it),
-            # (2) the stack in RSI,
-            # (3) a pointer to the saved registers in RDX.
+            ",
+            // To invoke `unwind_recorder`, we need to put: 
+            // (1) the func in RDI (it's already there, just don't overwrite it),
+            // (2) the stack in RSI,
+            // (3) a pointer to the saved registers in RDX.
+            "
             movq %rsp, %rdx   # pointer to saved regs (on the stack)
             call unwind_recorder
-            # restore saved registers
+            ",
+            // Finally, restore saved registers
+            "
             popq %r15
             popq %r14
             popq %r13
@@ -497,8 +517,9 @@ pub fn invoke_with_current_registers<F>(f: F) -> Result<(), &'static str>
             popq %rbx
             popq %rbp
             ret
-        ");
-        core::hint::unreachable_unchecked();
+            ",
+            options(att_syntax, noreturn)
+        );
     }
 
 
@@ -509,11 +530,11 @@ pub fn invoke_with_current_registers<F>(f: F) -> Result<(), &'static str>
     ///   after we change the register values during unwinding,
     #[no_mangle]
     unsafe extern "C" fn unwind_recorder(
-        func: *const RefFuncWithRegisters,
+        func: *mut FuncWithRegistersRefMut,
         stack: u64,
         saved_regs: *mut SavedRegs,
     ) -> *mut Result<(), &'static str> {
-        let func = &*func;
+        let func = &mut *func;
         let saved_regs = &*saved_regs;
 
         let mut registers = Registers::default();
@@ -578,9 +599,8 @@ unsafe fn land(regs: &Registers, landing_pad_address: u64) -> Result<(), &'stati
     /// It is marked as divergent (returning `!`) because it doesn't return to the caller,
     /// instead it returns (jumps to) that landing pad address.
     #[naked]
-    #[inline(never)]
-    unsafe extern fn unwind_lander(_regs: *const LandingRegisters) -> !{
-        llvm_asm!("
+    unsafe extern "C" fn unwind_lander(_regs: *const LandingRegisters) -> ! {
+        asm!("
             movq %rdi, %rsp
             popq %rax
             popq %rbx
@@ -598,10 +618,10 @@ unsafe fn land(regs: &Registers, landing_pad_address: u64) -> Result<(), &'stati
             popq %r14
             popq %r15
             movq 0(%rsp), %rsp
-            # now we jump to the actual landing pad function
-            ret
-        ");
-        core::hint::unreachable_unchecked();
+            ret  # jump to the actual landing pad function
+            ",
+            options(att_syntax, noreturn)
+        );
     }
 }
 
@@ -609,12 +629,21 @@ unsafe fn land(regs: &Registers, landing_pad_address: u64) -> Result<(), &'stati
 type NativeEndianSliceReader<'i> = EndianSlice<'i, NativeEndian>;
 
 
+/// An abstraction of a reference to the contents of an `.eh_frame` section. 
+#[derive(Debug)]
+enum EhFrameReference {
+    /// A reference to a "native" (Theseus-owned) `.eh_frame` [`mod_mgmt::LoadedSection`].
+    Section(StrongSectionRef),
+    /// A reference to an externally-registered `.eh_frame` section's bounds in memory.
+    External(ExternalUnwindInfo),
+}
+
 /// Due to lifetime and locking issues, we cannot store a direct reference to an unwind table row. 
 /// Instead, here we store references to the objects needed to calculate/obtain an unwind table row.
 #[derive(Debug)]
 struct UnwindRowReference {
     caller: u64,
-    eh_frame_sec: StrongSectionRef,
+    eh_frame_sec: EhFrameReference,
     base_addrs: BaseAddresses,
 }
 impl UnwindRowReference {
@@ -623,53 +652,65 @@ impl UnwindRowReference {
     fn with_unwind_info<O, F>(&self, mut f: F) -> Result<O, &'static str>
         where F: FnMut(&FrameDescriptionEntry<NativeEndianSliceReader, usize>, &UnwindTableRow<NativeEndianSliceReader>) -> Result<O, &'static str>
     {
-        let sec = &self.eh_frame_sec;
-        let size_in_bytes = sec.size();
-        let sec_pages = sec.mapped_pages.lock();
-        let eh_frame_slice: &[u8] = sec_pages.as_slice(sec.mapped_pages_offset, size_in_bytes)?;
-        let eh_frame = EhFrame::new(eh_frame_slice, NativeEndian);
-        let mut unwind_ctx = UninitializedUnwindContext::new();
-        let fde = eh_frame.fde_for_address(&self.base_addrs, self.caller, EhFrame::cie_from_offset).map_err(|_e| {
-            error!("gimli error: {:?}", _e);
-            "gimli error while finding FDE for address"
-        })?;
-        let unwind_table_row = fde.unwind_info_for_address(&eh_frame, &self.base_addrs, &mut unwind_ctx, self.caller).map_err(|_e| {
-            error!("gimli error: {:?}", _e);
-            "gimli error while finding unwind info for address"
-        })?;
-        
-        // debug!("FDE: {:?} ", fde);
-        // let mut instructions = fde.instructions(&eh_frame, &self.base_addrs);
-        // while let Some(instr) = instructions.next().map_err(|_e| {
-        //     error!("FDE instructions gimli error: {:?}", _e);
-        //     "gimli error while iterating through eh_frame FDE instructions list"
-        // })? {
-        //     debug!("    FDE instr: {:?}", instr);
-        // }
+        // an inner closure that invokes the passed-in closure `f`.
+        let mut invoke_f_with_eh_frame_slice = |eh_frame_slice: &[u8]| {
+            let eh_frame = EhFrame::new(eh_frame_slice, NativeEndian);
+            let mut unwind_ctx = UninitializedUnwindContext::new();
+            let fde = eh_frame.fde_for_address(&self.base_addrs, self.caller, EhFrame::cie_from_offset).map_err(|_e| {
+                error!("gimli error: {:?}", _e);
+                "gimli error while finding FDE for address"
+            })?;
+            let unwind_table_row = fde.unwind_info_for_address(&eh_frame, &self.base_addrs, &mut unwind_ctx, self.caller).map_err(|_e| {
+                error!("gimli error: {:?}", _e);
+                "gimli error while finding unwind info for address"
+            })?;
+            
+            // debug!("FDE: {:?} ", fde);
+            // let mut instructions = fde.instructions(&eh_frame, &self.base_addrs);
+            // while let Some(instr) = instructions.next().map_err(|_e| {
+            //     error!("FDE instructions gimli error: {:?}", _e);
+            //     "gimli error while iterating through eh_frame FDE instructions list"
+            // })? {
+            //     debug!("    FDE instr: {:?}", instr);
+            // }
 
-        f(&fde, &unwind_table_row)
+            f(&fde, &unwind_table_row)
+        };
+
+        // The actual logic of this function that handles the `EhFrameReference` abstraction.
+        match &self.eh_frame_sec {
+            EhFrameReference::Section(sec) => {
+                let sec_pages = sec.mapped_pages.lock();
+                let eh_frame_slice: &[u8] = sec_pages.as_slice(sec.mapped_pages_offset, sec.size())?;
+                invoke_f_with_eh_frame_slice(eh_frame_slice)
+            }
+            EhFrameReference::External(uw_info) => {
+                let eh_frame_ptr = uw_info.unwind_info.start.value() as *const u8;
+                let eh_frame_size = uw_info.unwind_info.end.value() - uw_info.unwind_info.start.value();
+                let eh_frame_slice = unsafe {
+                    core::slice::from_raw_parts(eh_frame_ptr, eh_frame_size)
+                };
+                invoke_f_with_eh_frame_slice(eh_frame_slice)
+            }
+        }
     }
 }
 
 
-/// Returns a tuple of .eh_frame section for the given `crate_ref`
-/// and the base addresses (its .text section address and .eh_frame section address).
+/// Returns a tuple of:
+/// 1. The `.eh_frame` section for the given `crate_ref`
+/// 2. The base addresses of that crate's main `.text` section and `.eh_frame` section.
 /// 
 /// # Locking / Deadlock
-/// Obtains the lock on the given `crate_ref` 
-/// and the lock on all of its sections while iterating through them.
-/// 
-/// The latter lock on the crate's `rodata_pages` object will be held
-/// for the entire lifetime of the returned object. 
+/// Obtains the lock on the given `crate_ref`.
 fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, BaseAddresses)> {
-    let parent_crate = crate_ref.lock_as_ref();
+    let krate = crate_ref.lock_as_ref();
 
-    let eh_frame_sec = parent_crate.sections.values()
-        .filter(|s| s.typ == SectionType::EhFrame)
-        .next()?;
+    let eh_frame_sec = krate.sections.values()
+        .find(|s| s.typ == SectionType::EhFrame)?;
     
     let eh_frame_vaddr = eh_frame_sec.start_address().value();
-    let text_pages_vaddr = parent_crate.text_pages.as_ref()?.1.start.value();
+    let text_pages_vaddr = krate.text_pages.as_ref()?.1.start.value();
     let base_addrs = BaseAddresses::default()
         .set_eh_frame(eh_frame_vaddr as u64)
         .set_text(text_pages_vaddr as u64);
@@ -683,8 +724,13 @@ fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, Ba
 /// 
 /// # Arguments
 /// * `reason`: the reason why the current task is being killed, e.g., due to a panic, exception, etc.
-/// * `stack_frames_to_skip`: the number of stack frames that should be skipped in order to avoid unwinding them.
+/// * `stack_frames_to_skip`: the number of stack frames that can be skipped in order to avoid unwinding them.
+///   Those frames should have nothing that needs to be unwound, e.g., no landing pads that invoke drop handlers.
 ///   For example, for a panic, the first `5` frames in the call stack can be ignored.
+/// 
+/// ## Note: Skipping frames
+/// If you are unsure how many frames you could possibly skip, then it's always safe to pass `0`
+/// such that all function frames on the stack are unwound.
 /// 
 #[doc(hidden)]
 pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Result<(), &'static str> {
@@ -696,7 +742,7 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
         Box::into_raw(Box::new(
             UnwindingContext {
                 stack_frame_iter: StackFrameIter::new(
-                    namespace,
+                    Arc::clone(&namespace),
                     // we will set the real register values later, in the `invoke_with_current_registers()` closure.
                     Registers::default()
                 ), 
@@ -711,8 +757,8 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
 
 
     // We pass a pointer to the unwinding context to this closure. 
-    let res = invoke_with_current_registers(|registers| {
-        // set the proper register values before we used the 
+    let res = invoke_with_current_registers(&mut |registers| {
+        // set the proper register values before start the actual unwinding procedure.
         {  
             // SAFE: we just created this pointer above
             let unwinding_context = unsafe { &mut *unwinding_context_ptr };
@@ -903,11 +949,8 @@ fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! 
     let (stack_frame_iter, cause, current_task) = unwinding_context.into();
     drop(stack_frame_iter);
 
-    let failure_cleanup_function = {
-        let t = current_task.lock();
-        t.failure_cleanup_function.clone()
-    };
     #[cfg(not(downtime_eval))]
     warn!("cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}", current_task);
-    failure_cleanup_function(current_task, cause)
+    
+    (current_task.failure_cleanup_function)(current_task, cause)
 }

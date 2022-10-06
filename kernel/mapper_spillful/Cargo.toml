@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "mapper_spillful"
 description = "A spillful version of the mapper for the virtual memory subsystem."
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 cfg-if = "0.1.6"
@@ -12,8 +11,8 @@ cfg-if = "0.1.6"
 version = "0.4.8"
 
 [dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
+features = ["spin_no_std"]
+version = "1.4.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"

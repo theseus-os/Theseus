@@ -1,7 +1,6 @@
 #![no_std]
 
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
-#![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
 #![feature(rustc_private)]
 #![feature(abi_x86_interrupt)]
 
@@ -18,11 +17,9 @@ extern crate memory;
 extern crate pci; 
 extern crate owning_ref;
 extern crate interrupts;
-extern crate pic;
 extern crate x86_64;
 extern crate mpmc;
 extern crate network_interface_card;
-extern crate apic;
 extern crate intel_ethernet;
 extern crate nic_buffers;
 extern crate nic_queues;
@@ -41,8 +38,8 @@ use memory::{PhysicalAddress, MappedPages};
 use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
-use interrupts::{eoi,register_interrupt};
-use x86_64::structures::idt::{ExceptionStackFrame};
+use interrupts::{eoi, register_interrupt};
+use x86_64::structures::idt::InterruptStackFrame;
 use network_interface_card:: NetworkInterfaceCard;
 use nic_initialization::{allocate_memory, init_rx_buf_pool, init_rx_queue, init_tx_queue};
 use intel_ethernet::descriptors::{LegacyRxDescriptor, LegacyTxDescriptor};
@@ -72,7 +69,7 @@ static E1000_NIC: Once<MutexIrqSafe<E1000Nic>> = Once::new();
 /// Returns a reference to the E1000Nic wrapped in a MutexIrqSafe,
 /// if it exists and has been initialized.
 pub fn get_e1000_nic() -> Option<&'static MutexIrqSafe<E1000Nic>> {
-    E1000_NIC.try()
+    E1000_NIC.get()
 }
 
 /// How many ReceiveBuffers are preallocated for this driver to use. 
@@ -177,12 +174,12 @@ impl NetworkInterfaceCard for E1000Nic {
 impl E1000Nic {
     /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
     pub fn init(e1000_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<E1000Nic>, &'static str> {
-        use pic::PIC_MASTER_OFFSET;
+        use interrupts::IRQ_BASE_OFFSET;
 
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
         // Get interrupt number
-        let interrupt_num = e1000_pci_dev.pci_read_8(PCI_INTERRUPT_LINE) + PIC_MASTER_OFFSET;
+        let interrupt_num = e1000_pci_dev.pci_read_8(PCI_INTERRUPT_LINE) + IRQ_BASE_OFFSET;
         // debug!("e1000 IRQ number: {}", interrupt_num);
 
         let bar0 = e1000_pci_dev.bars[0];
@@ -196,7 +193,7 @@ impl E1000Nic {
         }
   
         // memory mapped base address
-        let mem_base = e1000_pci_dev.determine_mem_base()?;
+        let mem_base = e1000_pci_dev.determine_mem_base(0)?;
 
         // set the bus mastering bit for this PciDevice, which allows it to use DMA
         e1000_pci_dev.pci_set_command_bus_master_bit();
@@ -212,7 +209,10 @@ impl E1000Nic {
         //e1000_nc.clear_statistics();
         
         Self::enable_interrupts(&mut mapped_registers);
-        register_interrupt(interrupt_num, e1000_handler)?;
+        register_interrupt(interrupt_num, e1000_handler).map_err(|_handler_addr| {
+            error!("e1000 IRQ {:#X} was already in use by handler {:#X}! Sharing IRQs is currently unsupported.", interrupt_num, _handler_addr);
+            "e1000 interrupt number was already in use! Sharing IRQs is currently unsupported."
+        })?;
 
         // initialize the buffer pool
         init_rx_buf_pool(RX_BUFFER_POOL_SIZE, E1000_RX_BUFFER_SIZE_IN_BYTES, &RX_BUFFER_POOL)?;
@@ -421,8 +421,8 @@ impl E1000Nic {
     }
 }
 
-extern "x86-interrupt" fn e1000_handler(_stack_frame: &mut ExceptionStackFrame) {
-    if let Some(ref e1000_nic_ref) = E1000_NIC.try() {
+extern "x86-interrupt" fn e1000_handler(_stack_frame: InterruptStackFrame) {
+    if let Some(ref e1000_nic_ref) = E1000_NIC.get() {
         let mut e1000_nic = e1000_nic_ref.lock();
         if let Err(e) = e1000_nic.handle_interrupt() {
             error!("e1000_handler(): error handling interrupt: {:?}", e);

@@ -91,7 +91,7 @@ fn load_crate(output: &mut String, crate_file_ref: FileRef, namespace: &Arc<Crat
     let (_new_crate_ref, _new_syms) = namespace.load_crate(
         &crate_file_ref,
         None,
-        &kernel_mmi_ref,
+        kernel_mmi_ref,
         false
     ).map_err(|e| String::from(e))?;
     writeln!(output, "Loaded crate with {} new symbols from {}", _new_syms, crate_file_ref.lock().get_absolute_path()).unwrap();

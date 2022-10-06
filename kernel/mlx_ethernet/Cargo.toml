@@ -1,0 +1,37 @@
+[package]
+name = "mlx_ethernet"
+description = "defines structs and traits for SW objects unique to Mellanox NICs"
+version = "0.1.0"
+authors = ["Ramla-I <ijazramla@gmail.com>"]
+
+[dependencies]
+volatile = "0.2.7"
+bit_field = "0.7.0"
+zerocopy = "0.5.0"
+static_assertions = "1.1.0"
+owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
+byteorder = { version = "1.4.3", default-features = false }
+libm = "0.2.1"
+mpmc = "0.1.6"
+
+[dependencies.num_enum]
+version = "0.5.2"
+default-features = false
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.nic_initialization]
+path = "../nic_initialization"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[dependencies.nic_buffers]
+path = "../nic_buffers"
+
+[dependencies.log]
+version = "0.4.8"
+
+[lib]
+crate-type = ["rlib"]

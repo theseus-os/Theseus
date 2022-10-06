@@ -12,7 +12,7 @@ extern crate libterm;
 extern crate spin;
 extern crate app_io;
 extern crate stdio;
-extern crate bare_io;
+extern crate core2;
 #[macro_use] extern crate log;
 
 use keycodes_ascii::{Keycode, KeyAction};
@@ -29,7 +29,7 @@ use alloc::collections::BTreeMap;
 use libterm::Terminal;
 use spin::Mutex;
 use stdio::{StdioWriter, KeyEventQueueReader};
-use bare_io::Write;
+use core2::io::Write;
 
 /// The metadata for each line in the file.
 struct LineSlice {
@@ -49,11 +49,7 @@ fn get_content_string(file_path: String) -> Result<String, String> {
     };
 
     // grabs the current working directory pointer; this is scoped so that we drop the lock on the task as soon as we get the working directory pointer
-    let curr_wr = {
-        let locked_task = taskref.lock();
-        let curr_env = locked_task.env.lock();
-        Arc::clone(&curr_env.working_dir)
-    };
+    let curr_wr = Arc::clone(&taskref.get_env().lock().working_dir);
     let path = Path::new(file_path);
     
     // navigate to the filepath specified by first argument
@@ -64,22 +60,22 @@ fn get_content_string(file_path: String) -> Result<String, String> {
                     Err(format!("{:?} is a directory, cannot 'less' non-files.", directory.lock().get_name()))
                 }
                 FileOrDir::File(file) => {
-                    let file_locked = file.lock();
-                    let file_size = file_locked.size();
+                    let mut file_locked = file.lock();
+                    let file_size = file_locked.len();
                     let mut string_slice_as_bytes = vec![0; file_size];
                     
-                    let _num_bytes_read = match file_locked.read(&mut string_slice_as_bytes,0) {
+                    let _num_bytes_read = match file_locked.read_at(&mut string_slice_as_bytes, 0) {
                         Ok(num) => num,
                         Err(e) => {
                             return Err(format!("Failed to read {:?}, error {:?}",
-                                               file_locked.get_name(), e).to_string())
+                                               file_locked.get_name(), e))
                         }
                     };
                     let read_string = match str::from_utf8(&string_slice_as_bytes) {
                         Ok(string_slice) => string_slice,
                         Err(utf8_err) => {
                             return Err(format!("File {:?} was not a printable UTF-8 text file: {}",
-                                               file_locked.get_name(), utf8_err).to_string())
+                                               file_locked.get_name(), utf8_err))
                         }
                     };
                     Ok(read_string.to_string())
@@ -87,7 +83,7 @@ fn get_content_string(file_path: String) -> Result<String, String> {
             }
         },
         _ => {
-            Err(format!("Couldn't find file at path {}", path).to_string())
+            Err(format!("Couldn't find file at path {}", path))
         }
     }
 }

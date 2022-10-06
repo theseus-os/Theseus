@@ -88,11 +88,6 @@ impl<'a, P: AllocablePage> SCAllocator<'a, P> {
         new_sc_allocator!(size)
     }
 
-    /// Returns the maximum supported object size of this allocator.
-    pub fn size(&self) -> usize {
-        self.size
-    }
-
     /// Add page to partial list.
     fn insert_partial_slab(&mut self, new_head: &'a mut P) {
         self.slabs.insert_front(new_head);
@@ -308,7 +303,11 @@ impl<'a, P: AllocablePage> SCAllocator<'a, P> {
     /// May return an error in case an invalid `layout` is provided.
     /// The function may also move internal slab pages between lists partial -> empty
     /// or full -> partial lists.
-    pub fn deallocate(&mut self, ptr: NonNull<u8>, layout: Layout) -> Result<(), &'static str> {
+    ///
+    /// # Safety
+    /// The caller must ensure that `ptr` argument is returned from [`Self::allocate()`]
+    /// and `layout` argument is correct.
+    pub unsafe fn deallocate(&mut self, ptr: NonNull<u8>, layout: Layout) -> Result<(), &'static str> {
         assert!(layout.size() <= self.size);
         assert!(self.size <= (P::SIZE - CACHE_LINE_SIZE));
         // trace!(
@@ -323,8 +322,8 @@ impl<'a, P: AllocablePage> SCAllocator<'a, P> {
 
         // Figure out which page we are on and construct a reference to it
         // TODO: The linked list will have another &mut reference
-        let slab_page = unsafe { mem::transmute::<VAddr, &'a mut P>(page) };
-        let new_layout = unsafe { Layout::from_size_align_unchecked(self.size, layout.align()) };
+        let slab_page = mem::transmute::<VAddr, &'a mut P>(page);
+        let new_layout = Layout::from_size_align_unchecked(self.size, layout.align());
 
         let slab_page_was_full = slab_page.is_full();
         let ret = slab_page.deallocate(ptr, new_layout);

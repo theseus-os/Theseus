@@ -1,71 +1,64 @@
 #![no_std]
 
-extern crate alloc;
-// #[macro_use] extern crate log;
-extern crate irq_safety;
-extern crate apic;
-extern crate task;
-extern crate runqueue;
-#[cfg(priority_scheduler)] extern crate scheduler_priority;
-#[cfg(not(priority_scheduler))] extern crate scheduler_round_robin;
+#[macro_use] extern crate log;
 
+cfg_if::cfg_if! {
+    if #[cfg(priority_scheduler)] {
+        extern crate scheduler_priority as scheduler;
+    } else if #[cfg(realtime_scheduler)] {
+        extern crate scheduler_realtime as scheduler;
+    } else {
+        extern crate scheduler_round_robin as scheduler;
+    }
+}
 
-use core::ops::Deref;
-use irq_safety::hold_interrupts;
 use apic::get_my_apic_id;
-use task::{Task, get_my_current_task, TaskRef};
-#[cfg(priority_scheduler)] use scheduler_priority::select_next_task;
-#[cfg(not(priority_scheduler))] use scheduler_round_robin::select_next_task;
+use task::{get_my_current_task, TaskRef};
 
 /// Yields the current CPU by selecting a new `Task` to run 
-/// and then performs a task switch to that new `Task`.
+/// and then switching to that new `Task`.
 ///
-/// Interrupts will be disabled while this function runs.
+/// Preemption will be disabled while this function runs,
+/// but interrupts are not disabled because it is not necessary.
+///
+/// ## Return
+/// * `true` if a new task was selected and switched to.
+/// * `false` if no new task was selected,
+///    meaning the current task will continue running.
 pub fn schedule() -> bool {
-    let _held_interrupts = hold_interrupts(); // auto-reenables interrupts on early return
+    let preemption_guard = preemption::hold_preemption();
+    // If preemption was not previously enabled (before we disabled it above),
+    // then we shouldn't perform a task switch here.
+    if !preemption_guard.preemption_was_enabled() {
+        // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", get_my_apic_id());
+        return false;
+    }
 
-    let current_task: *mut Task;
-    let next_task: *mut Task; 
     let apic_id = get_my_apic_id();
 
-    {
-        if let Some(selected_next_task) = select_next_task(apic_id) {
-            next_task = selected_next_task.lock().deref() as *const Task as *mut Task;
-        }
-        else {
-            // keep running the same current task
-            return false;
-        }
-    }
+    let curr_task = if let Some(curr) = get_my_current_task() {
+        curr
+    } else {
+        error!("BUG: schedule(): could not get current task.");
+        return false; // keep running the same current task
+    };
 
-    if next_task as usize == 0 {
-        // keep the same current task
-        return false;
-    }
-    
-    // same scoping reasons as above: to release the lock around current_task
-    {
-        current_task = get_my_current_task().expect("schedule(): get_my_current_task() failed")
-            .lock().deref() as *const Task as *mut Task; 
-    }
+    let next_task = if let Some(next) = scheduler::select_next_task(apic_id) {
+        next
+    } else {
+        return false; // keep running the same current task
+    };
 
-    if current_task == next_task {
-        // no need to switch if the chosen task is the same as the current task
-        return false;
-    }
+    let (did_switch, recovered_preemption_guard) = curr_task.task_switch(
+        next_task,
+        apic_id,
+        preemption_guard,
+    ); 
 
-    // we want mutable task references without the locks, and we use unsafe code to obtain those references
-    // because the scope-based lock guard won't drop properly after the actual task_switch occurs.
-    let (curr, next) = unsafe { (&mut *current_task, &mut *next_task) };
+    // trace!("AFTER TASK_SWITCH CALL (AP {}) new current: {:?}, interrupts are {}", apic_id, get_my_current_task(), irq_safety::interrupts_enabled());
 
-    // trace!("BEFORE TASK_SWITCH CALL (AP {}), current={}, next={}, interrupts are {}", apic_id, curr, next, irq_safety::interrupts_enabled());
-
-    curr.task_switch(next, apic_id); 
-
-    // let new_current: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
-    // trace!("AFTER TASK_SWITCH CALL (current={}), interrupts are {}", new_current, ::interrupts::interrupts_enabled());
- 
-    true
+    drop(recovered_preemption_guard);
+    did_switch
 }
 
 /// Changes the priority of the given task with the given priority level.
@@ -87,9 +80,15 @@ pub fn get_priority(_task: &TaskRef) -> Option<u8> {
         scheduler_priority::get_priority(_task)
     }
     #[cfg(not(priority_scheduler))] {
-        //Err("no scheduler that uses task priority is currently loaded")
         None
     }
 }
 
-
+pub fn set_periodicity(_task: &TaskRef, _period: usize) -> Result<(), &'static str> {
+    #[cfg(realtime_scheduler)] {
+        scheduler_realtime::set_periodicity(_task, _period)
+    }
+    #[cfg(not(realtime_scheduler))] {
+        Err("no scheduler that supports periodic tasks is currently loaded")
+    }
+}

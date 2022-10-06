@@ -55,7 +55,7 @@ use ota_update_client::DIFF_FILE_NAME;
 
 static VERBOSE: Once<bool> = Once::new();
 macro_rules! verbose {
-    () => (VERBOSE.try() == Some(&true));
+    () => (VERBOSE.get() == Some(&true));
 }
 
 
@@ -204,7 +204,7 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
     // if downloaded, save the diff file into the base directory
     if let Some(diffs) = diff_file_lines {
         let cfile = MemFile::new(String::from(DIFF_FILE_NAME), &new_namespace_dir)?;
-        cfile.lock().write(diffs.join("\n").as_bytes(), 0)?;
+        cfile.lock().write_at(diffs.join("\n").as_bytes(), 0)?;
     }
 
     Ok(())
@@ -228,8 +228,8 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
         Some(FileOrDir::File(f)) => f,
         _ => return Err(format!("cannot find diff file expected at {}/{}", base_dir_path, DIFF_FILE_NAME)),
     };
-    let mut diff_content: Vec<u8> = alloc::vec::from_elem(0, diff_file.lock().size()); 
-    let _bytes_read = diff_file.lock().read(&mut diff_content, 0)?;
+    let mut diff_content: Vec<u8> = alloc::vec::from_elem(0, diff_file.lock().len()); 
+    let _bytes_read = diff_file.lock().read_at(&mut diff_content, 0)?;
     let diffs = ota_update_client::as_lines(&diff_content).map_err(|e| e.to_string())
         .and_then(|diff_lines| ota_update_client::parse_diff_lines(&diff_lines).map_err(|e| e.to_string()))?;
 
@@ -281,7 +281,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
         swap_requests, 
         Some(new_namespace_dir), 
         diffs.state_transfer_functions, 
-        &kernel_mmi_ref, 
+        kernel_mmi_ref,
         false, // verbose logging
         false, // enable_crate_cache
     ).map_err(|e| format!("crate swapping failed, error: {}", e))?;
@@ -291,9 +291,10 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
 
 
 fn get_my_current_namespace() -> Arc<CrateNamespace> {
-    task::get_my_current_task().map(|t| t.get_namespace()).unwrap_or_else(|| 
-        mod_mgmt::get_initial_kernel_namespace().expect("BUG: initial kernel namespace wasn't initialized").clone()
-    )
+    task::get_my_current_task()
+        .map(|t| t.get_namespace().clone())
+        .or_else(|| mod_mgmt::get_initial_kernel_namespace().cloned())
+        .expect("BUG: initial kernel namespace wasn't initialized")
 }
 
 

@@ -3,7 +3,6 @@ name = "example"
 version = "0.1.0"
 description = "An example application that shows how to write a basic application for Theseus."
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 getopts = "0.2.21"

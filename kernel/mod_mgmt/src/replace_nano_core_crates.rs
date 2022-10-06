@@ -50,7 +50,7 @@ pub fn replace_nano_core_crates(
 
     let mut constituent_crates = BTreeSet::new();
     for sec in nano_core_crate.global_sections_iter() {
-        for n in super::get_containing_crate_name(&sec.name) {
+        for n in super::get_containing_crate_name(sec.name.as_str()) {
             constituent_crates.insert(String::from(n));
         }
     }
@@ -107,14 +107,14 @@ fn load_crate_using_nano_core_data_sections(
     // (1) Load the crate's sections. We won't end up using the newly-loaded .data/.bss sections, but that's fine.
     let (new_crate_ref, elf_file) = namespace.load_crate_sections(&*cf, kernel_mmi_ref, verbose_log)?;
 
-    let new_crate_name: String; 
+    let new_crate_name; 
     let _num_new_syms: usize;
     let _num_new_sections: usize;
 
     // (2) Go through the .data/.bss sections in the partially loaded new crate,
     //     and replace them with references to the corresponding data section in the nano_core.
     {
-        let mut new_crate = new_crate_ref.lock_as_mut().ok_or_else(|| "BUG: could not get exclusive mutable access to newly-loaded crate")?;
+        let mut new_crate = new_crate_ref.lock_as_mut().ok_or("BUG: could not get exclusive mutable access to newly-loaded crate")?;
 
         for shndx in new_crate.data_sections.clone() {
             let new_data_sec = new_crate.sections.get_mut(&shndx).ok_or_else(|| {
@@ -156,6 +156,6 @@ fn load_crate_using_nano_core_data_sections(
         new_crate_name, _num_new_sections, _num_new_syms
     );
     // (6) Add the newly-loaded crate to the namespace.
-    namespace.crate_tree.lock().insert(new_crate_name.into(), new_crate_ref.clone_shallow());
+    namespace.crate_tree.lock().insert(new_crate_name, new_crate_ref.clone_shallow());
     Ok(new_crate_ref)
 }

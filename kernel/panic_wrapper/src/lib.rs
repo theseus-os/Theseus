@@ -39,7 +39,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
         #[cfg(not(frame_pointers))] {
             error!("------------------ Stack Trace (DWARF) ---------------------------");
             stack_trace::stack_trace(
-                &|stack_frame, stack_frame_iter| {
+                &mut |stack_frame, stack_frame_iter| {
                     let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
                         VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
                         false
@@ -58,16 +58,15 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
             error!("------------------ Stack Trace (frame pointers) ------------------");
             let namespace = task::get_my_current_task()
                 .map(|t| t.get_namespace())
-                .or_else(|| mod_mgmt::get_initial_kernel_namespace().cloned())
+                .or_else(|| mod_mgmt::get_initial_kernel_namespace())
                 .ok_or("couldn't get current task's or default namespace")?;
             let mmi_ref = task::get_my_current_task()
-                .map(|t| t.lock().mmi.clone())
+                .map(|t| &t.mmi)
                 .or_else(|| memory::get_kernel_mmi_ref())
                 .ok_or("couldn't get current task's or default kernel MMI")?;
-            let mmi = mmi_ref.lock();
 
             stack_trace_frame_pointers::stack_trace_using_frame_pointers(
-                &mmi.page_table,
+                &mmi_ref.lock().page_table,
                 &mut |_frame_pointer, instruction_pointer: VirtualAddress| {
                     let symbol_offset = namespace.get_section_containing_address(instruction_pointer, false)
                         .map(|(sec, offset)| (sec.name.clone(), offset));
@@ -89,15 +88,11 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     error!("------------------------------------------------------------------");
 
     // Call this task's kill handler, if it has one.
-    {
-        let kill_handler = task::get_my_current_task().and_then(|t| t.take_kill_handler());
-        if let Some(ref kh_func) = kill_handler {
-            debug!("Found kill handler callback to invoke in Task {:?}", task::get_my_current_task());
-            kh_func(&KillReason::Panic(PanicInfoOwned::from(panic_info)));
-        }
-        else {
-            debug!("No kill handler callback in Task {:?}", task::get_my_current_task());
-        }
+    if let Some(ref kh_func) = task::take_kill_handler() {
+        debug!("Found kill handler callback to invoke in Task {:?}", task::get_my_current_task());
+        kh_func(&KillReason::Panic(PanicInfoOwned::from(panic_info)));
+    } else {
+        debug!("No kill handler callback in Task {:?}", task::get_my_current_task());
     }
 
     // Start the unwinding process
@@ -114,15 +109,4 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
             }
         }
     }
-    
-    // if !is_idle_task {
-    //     // kill the offending task (the current task)
-    //     error!("Killing panicked task \"{}\"", curr_task.lock().name);
-    //     curr_task.kill(KillReason::Panic(PanicInfoOwned::from(panic_info)))?;
-    //     runqueue::remove_task_from_all(curr_task)?;
-    //     Ok(())
-    // }
-    // else {
-    //     Err("")
-    // }
 }

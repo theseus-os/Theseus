@@ -33,7 +33,7 @@ extern crate memory;
 extern crate task;
 extern crate path;
 extern crate root;
-
+extern crate io;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -41,8 +41,9 @@ use spin::Mutex;
 use alloc::sync::Arc;
 use fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, File, FileRef, FsNode};
 use memory::MappedPages;
-use task::{TaskRef, TASKLIST, RunState};
+use task::{TaskRef, TASKLIST};
 use path::Path;
+use io::{ByteReader, ByteWriter, KnownLength, IoError};
 
 
 /// The name of the VFS directory that exposes task info in the root. 
@@ -79,9 +80,9 @@ impl TaskFs {
         let id = node.parse::<usize>().map_err(|_e| "could not parse Task id as usize")?;
         let task_ref = task::get_task(id).ok_or("could not get taskref from TASKLIST")?;
         let parent_dir = self.get_self_pointer().ok_or("BUG: tasks directory wasn't in root")?;
-        let dir_name = task_ref.lock().id.to_string(); 
+        let dir_name = task_ref.id.to_string(); 
         // lazily compute a new TaskDir everytime the caller wants to get a TaskDir
-        let task_dir = TaskDir::new(dir_name, &parent_dir, task_ref.clone())?;        
+        let task_dir = TaskDir::new(dir_name, &parent_dir, task_ref)?;        
         let boxed_task_dir = Arc::new(Mutex::new(task_dir)) as DirRef;
         Ok(FileOrDir::Dir(boxed_task_dir))
     }
@@ -154,7 +155,7 @@ pub struct TaskDir {
 impl TaskDir {
     /// Creates a new directory and passes a pointer to the new directory created as output
     pub fn new(name: String, parent: &DirRef, taskref: TaskRef)  -> Result<TaskDir, &'static str> {
-        let task_id = taskref.lock().id.clone();
+        let task_id = taskref.id;
         let directory = TaskDir {
             name: name,
             path: Path::new(format!("{}/{}", TASKS_DIRECTORY_PATH, task_id)),
@@ -186,9 +187,7 @@ impl Directory for TaskDir {
 
     /// Returns a string listing all the children in the directory
     fn list(&self) -> Vec<String> {
-        let mut children = Vec::new();
-        children.push("mmi".to_string());
-        children.push("taskInfo".to_string());
+        let children = vec!["mmi".to_string(), "taskInfo".to_string()];
         children
     }
 
@@ -227,7 +226,7 @@ pub struct TaskFile {
 
 impl TaskFile {
     pub fn new(taskref: TaskRef) -> TaskFile {
-        let task_id = taskref.lock().id.clone();
+        let task_id = taskref.id;
         TaskFile {
             taskref,
             task_id,
@@ -238,28 +237,20 @@ impl TaskFile {
     /// Generates the task info string.
     fn generate(&self) -> String {
         // Print all tasks
-        let name = &self.taskref.lock().name.clone();
-        let runstate = match &self.taskref.lock().runstate {
-            RunState::Initing    => "Initing",
-            RunState::Runnable   => "Runnable",
-            RunState::Blocked    => "Blocked",
-            RunState::Exited(_)  => "Exited",
-            RunState::Reaped     => "Reaped",
-        };
-        let cpu = self.taskref.lock().running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
-        let pinned = &self.taskref.lock().pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
-        let task_type = if self.taskref.lock().is_an_idle_task {
+        let cpu = self.taskref.running_on_cpu().map(|cpu| format!("{}", cpu)).unwrap_or_else(|| String::from("-"));
+        let pinned = &self.taskref.pinned_core().map(|pin| format!("{}", pin)).unwrap_or_else(|| String::from("-"));
+        let task_type = if self.taskref.is_an_idle_task {
             "I"
-        } else if self.taskref.lock().is_application() {
+        } else if self.taskref.is_application() {
             "A"
         } else {
             " "
         };  
 
-        format!("{0:<10} {1}\n{2:<10} {3}\n{4:<10} {5}\n{6:<10} {7}\n{8:<10} {9}\n{10:<10} {11:<10}", 
-            "name", name,
-            "task id", self.taskref.lock().id,
-            "runstate", runstate,
+        format!("{0:<10} {1}\n{2:<10} {3}\n{4:<10} {5:?}\n{6:<10} {7}\n{8:<10} {9}\n{10:<10} {11:<10}", 
+            "name", self.taskref.name,
+            "task id", self.taskref.id,
+            "runstate", self.taskref.runstate(),
             "cpu", cpu,
             "pinned", pinned,
             "task type", task_type
@@ -273,7 +264,7 @@ impl FsNode for TaskFile {
     }
 
     fn get_name(&self) -> String {
-        self.taskref.lock().name.clone()
+        self.taskref.name.clone()
     }
 
     fn get_parent_dir(&self) -> Option<DirRef> {
@@ -289,25 +280,32 @@ impl FsNode for TaskFile {
     }
 }
 
-impl File for TaskFile {
-    fn read(&self, buf: &mut [u8], offset: usize) -> Result<usize, &'static str> { 
+impl ByteReader for TaskFile {
+    fn read_at(&mut self, buf: &mut [u8], offset: usize) -> Result<usize, IoError> {
         let output = self.generate();
         if offset > output.len() {
-            return Err("read offset exceeds file size");
+            return Err(IoError::InvalidInput);
         }
         let count = core::cmp::min(buf.len(), output.len() - offset);
         buf[..count].copy_from_slice(&output.as_bytes()[offset..(offset + count)]);
         Ok(count)
     }
+}
 
-    fn write(&mut self, _buf: &[u8], _offset: usize) -> Result<usize, &'static str> { 
-        Err("not permitted to write task contents through the task VFS") 
+impl ByteWriter for TaskFile {
+    fn write_at(&mut self, _buffer: &[u8], _offset: usize) -> Result<usize, IoError> {
+        Err(IoError::from("not permitted to write task contents through the task VFS"))
     } 
+    fn flush(&mut self) -> Result<(), IoError> { Ok(()) }
+}
 
-    fn size(&self) -> usize { 
+impl KnownLength for TaskFile {
+    fn len(&self) -> usize {
         self.generate().len() 
     }
+}
 
+impl File for TaskFile {
     fn as_mapping(&self) -> Result<&MappedPages, &'static str> {
         Err("task files are autogenerated, cannot be memory mapped")
     }
@@ -329,7 +327,7 @@ pub struct MmiDir {
 impl MmiDir {
     /// Creates a new directory and passes a pointer to the new directory created as output
     pub fn new(taskref: TaskRef) -> MmiDir {
-        let task_id = taskref.lock().id.clone();
+        let task_id = taskref.id;
         MmiDir {
             taskref,
             task_id,
@@ -355,8 +353,7 @@ impl Directory for MmiDir {
 
     /// Returns a string listing all the children in the directory
     fn list(&self) -> Vec<String> {
-        let mut children = Vec::new();
-        children.push("MmiInfo".to_string());
+        let children = vec!["MmiInfo".to_string()];
         children
     }
 
@@ -399,7 +396,7 @@ pub struct MmiFile {
 
 impl MmiFile {
     pub fn new(taskref: TaskRef) -> MmiFile {
-        let task_id = taskref.lock().id;
+        let task_id = taskref.id;
         MmiFile {
             taskref,
             task_id,
@@ -409,9 +406,7 @@ impl MmiFile {
 
     /// Generates the mmi info string.
     fn generate(&self) -> String {
-        let task = self.taskref.lock();
-        let mmi = task.mmi.lock();
-        format!("Page table: {:?}\n", mmi.page_table)
+        format!("Page table: {:?}\n", self.taskref.mmi.lock().page_table)
     }
 }
 
@@ -437,25 +432,32 @@ impl FsNode for MmiFile {
     }
 }
 
-impl File for MmiFile {
-    fn read(&self, buf: &mut [u8], offset: usize) -> Result<usize, &'static str> { 
+impl ByteReader for MmiFile {
+    fn read_at(&mut self, buf: &mut [u8], offset: usize) -> Result<usize, IoError> {
         let output = self.generate();
         if offset > output.len() {
-            return Err("read offset exceeds file size");
+            return Err(IoError::InvalidInput);
         }
         let count = core::cmp::min(buf.len(), output.len() - offset);
         buf[..count].copy_from_slice(&output.as_bytes()[offset..(offset + count)]);
         Ok(count)
     }
+}
 
-    fn write(&mut self, _buf: &[u8], _offset: usize) -> Result<usize, &'static str> { 
-        Err("not permitted to write task contents through the task VFS") 
+impl ByteWriter for MmiFile {
+    fn write_at(&mut self, _buffer: &[u8], _offset: usize) -> Result<usize, IoError> {
+        Err(IoError::from("not permitted to write task contents through the task VFS"))
     } 
+    fn flush(&mut self) -> Result<(), IoError> { Ok(()) }
+}
 
-    fn size(&self) -> usize { 
+impl KnownLength for MmiFile {
+    fn len(&self) -> usize {
         self.generate().len() 
     }
+}
 
+impl File for MmiFile {
     fn as_mapping(&self) -> Result<&MappedPages, &'static str> {
         Err("task files are autogenerated, cannot be memory mapped")
     }

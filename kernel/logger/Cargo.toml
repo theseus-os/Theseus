@@ -2,17 +2,16 @@
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "logger"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
+spin = "0.9.0"
+log = "0.4.8"
 
-[dependencies.serial_port]
-path = "../serial_port"
+[dependencies.irq_safety]
+git = "https://github.com/theseus-os/irq_safety"
 
-[dependencies.log]
-version = "0.4.8"
-
+[dependencies.serial_port_basic]
+path = "../serial_port_basic"
 
 [lib]
 crate-type = ["rlib"]

@@ -263,9 +263,9 @@ impl WindowManager {
                 src_framebuffer: window.framebuffer(),
                 coordinate_in_dest_framebuffer: window.get_position(),
             }
-        }).collect::<Vec<_>>();
+        });
         
-        let buffer_iter = Some(bottom_fb_area).into_iter().chain(window_bufferlist.into_iter());
+        let buffer_iter = Some(bottom_fb_area).into_iter().chain(window_bufferlist);
         FRAME_COMPOSITOR.lock().composite(buffer_iter, &mut self.final_fb, bounding_box)?;
         
         Ok(())
@@ -314,9 +314,9 @@ impl WindowManager {
                 src_framebuffer: window.framebuffer(),
                 coordinate_in_dest_framebuffer: window.get_position(),
             }
-        }).collect::<Vec<_>>();
+        });
 
-        FRAME_COMPOSITOR.lock().composite(bufferlist.into_iter(), &mut self.final_fb, bounding_box)
+        FRAME_COMPOSITOR.lock().composite(bufferlist, &mut self.final_fb, bounding_box)
     }
 
 
@@ -689,13 +689,8 @@ fn window_manager_loop(
                     let mut x = (mouse_displacement.x as i8) as isize;
                     let mut y = (mouse_displacement.y as i8) as isize;
                     // need to combine mouse events if there pending a lot
-                    loop {
-                        let next_event = match mouse_consumer.pop() {
-                            Some(ev) => ev,
-                            _ => {
-                                break;
-                            }
-                        };
+
+                    while let Some(next_event) = mouse_consumer.pop() {
                         match next_event {
                             Event::MouseMovementEvent(ref next_mouse_event) => {
                                 if next_mouse_event.mousemove.scrolling_up
@@ -723,7 +718,7 @@ fn window_manager_loop(
                     }
                     if x != 0 || y != 0 {
                         let mut wm = WINDOW_MANAGER
-                            .try()
+                            .get()
                             .ok_or("The static window manager was not yet initialized")?
                             .lock();
                         wm.move_mouse(
@@ -742,7 +737,7 @@ fn window_manager_loop(
 
 /// handle keyboard event, push it to the active window if one exists
 fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> {
-    let win_mgr = WINDOW_MANAGER.try().ok_or("The window manager was not yet initialized")?;
+    let win_mgr = WINDOW_MANAGER.get().ok_or("The window manager was not yet initialized")?;
     
     // First, we handle keyboard shortcuts understood by the window manager.
     
@@ -818,7 +813,7 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
 
 /// handle mouse event, push it to related window or anyone asked for it
 fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str> {
-    let wm = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
+    let wm = WINDOW_MANAGER.get().ok_or("The static window manager was not yet initialized")?.lock();
     if let Err(_) = wm.pass_mouse_event_to_window(mouse_event) {
         // the mouse event should be passed to the window that satisfies:
         // 1. the mouse position is currently in the window area

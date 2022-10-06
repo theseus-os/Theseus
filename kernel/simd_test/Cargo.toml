@@ -3,21 +3,14 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "simd_test"
 description = "Test code for SIMD instructions"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 cfg-if = "0.1.6"
+log = "0.4.8"
 
 ## Only include the SIMD crates when any SIMD extensions are enabled
-[target.'cfg(target_feature = "sse2")'.dependencies.packed_simd]
-version = "0.3.4"
-package = "packed_simd_2"
-
-[dependencies.pit_clock]
-path = "../pit_clock"
-
-[dependencies.log]
-version = "0.4.8"
+[target.'cfg(target_feature = "sse2")'.dependencies.core_simd]
+git = "https://github.com/rust-lang/stdsimd"
 
 
 [lib]
