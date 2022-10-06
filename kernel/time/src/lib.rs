@@ -62,7 +62,9 @@ impl core::ops::Add<Duration> for Instant {
 
     fn add(self, rhs: Duration) -> Self::Output {
         let instant = duration_to_instant(rhs);
-        Self { counter: self.counter + instant.counter }
+        Self {
+            counter: self.counter + instant.counter,
+        }
     }
 }
 
@@ -71,7 +73,9 @@ impl core::ops::Sub<Duration> for Instant {
 
     fn sub(self, rhs: Duration) -> Self::Output {
         let instant = duration_to_instant(rhs);
-        Self { counter: self.counter - instant.counter }
+        Self {
+            counter: self.counter - instant.counter,
+        }
     }
 }
 
@@ -90,12 +94,7 @@ impl core::ops::Sub<Instant> for Instant {
 /// larger than the frequency of the current early sleeper.
 ///
 /// Returns whether the early sleeper was overwritten.
-///
-/// # Errors
-///
-/// Returns an error if [`INIT_REQUIRED`](EarlySleeper::INIT_REQUIRED) is `true`
-/// and [`ClockSource::init`] returned an error.
-pub fn register_early_sleeper<T>(frequency: u64) -> Result<bool, &'static str>
+pub fn register_early_sleeper<T>(frequency: u64) -> bool
 where
     T: EarlySleeper,
 {
@@ -103,16 +102,19 @@ where
     if frequency > old_frequency {
         EARLY_SLEEP_FUNCTION.store(T::sleep);
         EARLY_SLEEPER_FREQUENCY.store(frequency, Ordering::SeqCst);
-
-        Ok(true)
+        true
     } else {
-        Ok(false)
+        false
     }
 }
 
 /// Wait for the given `duration`.
 ///
-/// This function can be used even when interrupts are disabled.
+/// This function spins the current task rather than sleeping it and so, when
+/// possible, the `sleep` crate should be used.
+///
+/// However, unlike the `sleep` crate, this function doesn't rely on interrupts,
+/// and can be used prior to the scheduler being initiated.
 pub fn early_sleep(duration: Duration) {
     let f = EARLY_SLEEP_FUNCTION.load();
     f(duration)
@@ -124,12 +126,7 @@ pub fn early_sleep(duration: Duration) {
 /// is larger than that of the previous source.
 ///
 /// Returns whether the previous source was overwritten.
-///
-/// # Errors
-///
-/// Returns an error if the source doesn't exist or if
-/// [`init`](ClockSource::init) returns an error.
-pub fn register_clock_source<T>(frequency: u64) -> Result<bool, &'static str>
+pub fn register_clock_source<T>(frequency: u64) -> bool
 where
     T: ClockSource,
 {
@@ -143,9 +140,9 @@ where
 
         T::ClockType::frequency_atomic().store(frequency, Ordering::SeqCst);
 
-        Ok(true)
+        true
     } else {
-        Ok(false)
+        false
     }
 }
 
@@ -178,8 +175,6 @@ pub trait ClockSource {
     /// For monotonic clocks this is usually the time since boot, and for
     /// realtime clocks it's the time since 12:00am January 1st 1970 (i.e.
     /// Unix time).
-    ///
-    /// This function must only be called after [`init`](ClockSource::init).
     fn now() -> <Self::ClockType as ClockType>::Unit;
 
     /// Converts a [`ClockType::Unit`] into a [`Duration`].
@@ -195,7 +190,13 @@ pub trait ClockSource {
 
 /// A hardware clock that can sleep without relying on interrupts.
 pub trait EarlySleeper: ClockSource<ClockType = Monotonic> {
-    /// Sleep for the specified duration.
+    /// Wait for the given `duration`.
+    ///
+    /// This function spins the current task rather than sleeping it and so,
+    /// when possible, the `sleep` crate should be used.
+    ///
+    /// However, unlike the `sleep` crate, this function doesn't rely on
+    /// interrupts, and can be used prior to the scheduler being initiated.
     ///
     /// # Note to Implementors
     ///
