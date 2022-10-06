@@ -2,6 +2,7 @@
 
 pub extern crate app_io;
 pub extern crate core2;
+pub extern crate irq_safety;
 pub extern crate panic_entry_inner;
 pub extern crate path;
 
@@ -61,7 +62,7 @@ pub mod task {
     pub use scheduler::schedule as yield_now;
     pub use spawn::new_task_builder;
     pub use stack::alloc_stack_by_bytes;
-    pub use theseus_task::{get_my_current_task, get_my_current_task_id, JoinableTaskRef};
+    pub use theseus_task::{get_my_current_task, get_my_current_task_id, JoinableTaskRef, TaskRef};
 }
 
 pub mod rand {
