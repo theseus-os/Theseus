@@ -147,8 +147,8 @@ pub fn handle(
 }
 
 /// The structure of the HPET ACPI table.
-#[derive(FromBytes)]
-#[repr(packed)]
+#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(C, packed)]
 pub struct HpetAcpiTable {
     header: Sdt,
     _hardware_revision_id: u8,

@@ -17,6 +17,7 @@ pub(crate) struct Drhd {
     // so we cannot include them here in the static struct definition.
 }
 const_assert_eq!(core::mem::size_of::<Drhd>(), 16);
+const_assert_eq!(core::mem::align_of::<Drhd>(), 1);
 
 
 /// DRHD: DMAR Hardware Unit Definition Structure.
