@@ -869,8 +869,9 @@ pub fn mapper_from_current() -> Mapper {
 }
 
 
-/// TODO: add documentation for these types
-
+/// An immutably borrowed [`MappedPages`] object that derefs to `&T`.
+///
+/// When dropped, the borrow ends and the contained `MappedPages` is dropped and unmapped.
 pub struct BorrowedMappedPages<T: FromBytes> {
     ptr: NonNull<T>,
     mp: MappedPages,
@@ -888,7 +889,17 @@ impl<T: FromBytes> Deref for BorrowedMappedPages<T> {
     }
 }
 impl<T: FromBytes> BorrowedMappedPages<T> {
-    pub fn try_into_borrowed(mp: MappedPages, offset: usize) -> Result<BorrowedMappedPages<T>, (MappedPages, &'static str)> {
+    /// Immutably borrows the given `MappedPages` as an instance of type `&T` 
+    /// starting at the given `offset` into the `MappedPages`.
+    ///
+    /// See [`MappedPages::as_type()`] for more info.
+    ///
+    /// Returns an error containing the unmodified `MappedPages` and a string
+    /// describing the error.
+    pub fn try_into_borrowed(
+        mp: MappedPages,
+        offset: usize,
+    ) -> Result<BorrowedMappedPages<T>, (MappedPages, &'static str)> {
         let mut borrowed_mp = BorrowedMappedPages {
             ptr: NonNull::<T>::dangling(),
             mp,
@@ -900,11 +911,15 @@ impl<T: FromBytes> BorrowedMappedPages<T> {
         Ok(borrowed_mp)
     }
 
+    /// Consumes this `BorrowedMappedPages` and returns the inner `MappedPages`.
     pub fn into_inner(self) -> MappedPages {
         self.mp
     }
 }
 
+/// A mutably borrowed `MappedPages` object that derefs to `&T` and `&mut T`.
+///
+/// When dropped, the borrow ends and the contained `MappedPages` is dropped and unmapped.
 pub struct BorrowedMutMappedPages<T: FromBytes> {
     ptr: NonNull<T>,
     mp: MappedPages,
@@ -925,8 +940,14 @@ impl<T: FromBytes> core::ops::DerefMut for BorrowedMutMappedPages<T> {
         unsafe { self.ptr.as_mut() }
     }
 }
-
 impl<T: FromBytes> BorrowedMutMappedPages<T> {
+    /// Mutably borrows the given `MappedPages` as an instance of type `&mut T` 
+    /// starting at the given `offset` into the `MappedPages`.
+    /// 
+    /// See [`MappedPages::as_type_mut()`] for more info.
+    /// 
+    /// Returns an error containing the unmodified `MappedPages` and a string
+    /// describing the error.
     pub fn try_into_borrowed_mut(
         mp: MappedPages,
         offset: usize,
@@ -942,6 +963,7 @@ impl<T: FromBytes> BorrowedMutMappedPages<T> {
         Ok(borrowed_mp)
     }
 
+    /// Consumes this `BorrowedMutMappedPages` and returns the inner `MappedPages`.
     pub fn into_inner(self) -> MappedPages {
         self.mp
     }
