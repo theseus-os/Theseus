@@ -948,7 +948,7 @@ impl<T: FromBytes> BorrowedMutMappedPages<T> {
     /// Returns an error containing the unmodified `MappedPages` and a string
     /// describing the error.
     pub fn try_into_borrowed_mut(
-        mp: MappedPages,
+        mut mp: MappedPages,
         offset: usize,
     ) -> Result<BorrowedMutMappedPages<T>, (MappedPages, &'static str)> {
         let borrowed_mp = BorrowedMutMappedPages {
