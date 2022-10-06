@@ -13,7 +13,7 @@ pub const SDT_SIZE_IN_BYTES: usize = core::mem::size_of::<Sdt>();
 /// An ACPI System Descriptor Table.
 /// This is the header (the first part) of every ACPI table.
 #[derive(Copy, Clone, Debug, FromBytes)]
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct Sdt {
   pub signature: [u8; 4],
   pub length: u32,
@@ -26,11 +26,12 @@ pub struct Sdt {
   pub creator_revision: u32
 }
 const_assert_eq!(core::mem::size_of::<Sdt>(), 36);
+const_assert_eq!(core::mem::align_of::<Sdt>(), 1);
 
 /// A struct used to describe the position and layout of registers
 /// related to ACPI tables.
 #[derive(Clone, Copy, Debug, FromBytes)]
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct GenericAddressStructure {
     pub address_space: u8,
     pub bit_width: u8,
@@ -39,3 +40,4 @@ pub struct GenericAddressStructure {
     pub phys_addr: u64,
 }
 const_assert_eq!(core::mem::size_of::<GenericAddressStructure>(), 12);
+const_assert_eq!(core::mem::align_of::<GenericAddressStructure>(), 1);
