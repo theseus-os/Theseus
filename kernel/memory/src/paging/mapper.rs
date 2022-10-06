@@ -900,13 +900,12 @@ impl<T: FromBytes> BorrowedMappedPages<T> {
         mp: MappedPages,
         offset: usize,
     ) -> Result<BorrowedMappedPages<T>, (MappedPages, &'static str)> {
-        let mut borrowed_mp = BorrowedMappedPages {
-            ptr: NonNull::<T>::dangling(),
+        let borrowed_mp = BorrowedMappedPages {
+            ptr: match mp.as_type::<T>(offset) {
+                Ok(r) => r.into(),
+                Err(e_str) => return Err((mp, e_str)),
+            },
             mp,
-        };
-        borrowed_mp.ptr = match borrowed_mp.mp.as_type::<T>(offset) {
-            Ok(r) => r.into(),
-            Err(e_str) => return Err((borrowed_mp.mp, e_str)),
         };
         Ok(borrowed_mp)
     }
@@ -952,13 +951,12 @@ impl<T: FromBytes> BorrowedMutMappedPages<T> {
         mp: MappedPages,
         offset: usize,
     ) -> Result<BorrowedMutMappedPages<T>, (MappedPages, &'static str)> {
-        let mut borrowed_mp = BorrowedMutMappedPages {
-            ptr: NonNull::<T>::dangling(),
+        let borrowed_mp = BorrowedMutMappedPages {
+            ptr: match mp.as_type_mut::<T>(offset) {
+                Ok(r) => r.into(),
+                Err(e_str) => return Err((mp, e_str)),
+            },
             mp,
-        };
-        borrowed_mp.ptr = match borrowed_mp.mp.as_type_mut::<T>(offset) {
-            Ok(r) => r.into(),
-            Err(e_str) => return Err((borrowed_mp.mp, e_str)),
         };
         Ok(borrowed_mp)
     }
