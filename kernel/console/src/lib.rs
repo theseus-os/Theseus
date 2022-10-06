@@ -15,6 +15,7 @@ extern crate async_channel;
 extern crate serial_port;
 extern crate io;
 extern crate text_terminal;
+extern crate tty;
 
 use core::{marker::PhantomData, sync::atomic::{AtomicU16, Ordering}};
 use alloc::string::String;
@@ -117,18 +118,36 @@ fn console_connection_detector(connection_listener: Receiver<SerialPortAddress>)
 			continue;
 		}
 
-		let new_console = new_serial_console(
-			alloc::format!("console_{:?}", serial_port_address),
-			LockableIo::<_, MutexIrqSafe<SerialPort>, _>::from(serial_port.clone()),
-			LockableIo::<_, MutexIrqSafe<SerialPort>, _>::from(serial_port.clone()),
-		);
+		// let new_console = new_serial_console(
+		// 	alloc::format!("console_{:?}", serial_port_address),
+		// 	LockableIo::<_, MutexIrqSafe<SerialPort>, _>::from(serial_port.clone()),
+		// 	LockableIo::<_, MutexIrqSafe<SerialPort>, _>::from(serial_port.clone()),
+		// );
 
-		let _taskref = spawn::new_task_builder(console_entry, (new_console, receiver))
+		let _taskref = spawn::new_task_builder(_console_entry_tty, (serial_port, receiver))
 			.name(alloc::format!("console_loop_{:?}", serial_port_address))
 			.spawn()?;
 	}
 
 	// Err("console_connection_detector task returned unexpectedly")
+}
+
+fn _console_entry_tty((port, receiver): (alloc::sync::Arc<MutexIrqSafe<SerialPort>>, Receiver<DataChunk>)) {
+    use core2::io::{Read, Write};
+
+	let (mut master, _) = tty::tty();
+	loop {
+		let DataChunk { data, len } = receiver.receive().unwrap();
+        error!("read data: {data:?}");
+		master.write(&data[..len as usize]).unwrap();
+
+        error!("wrote read data");
+
+		let mut data = alloc::vec![];
+		master.read_to_end(&mut data).unwrap();
+        error!("wrote data: {data:?}");
+		port.lock().write(&data).unwrap();
+	}
 }
 
 

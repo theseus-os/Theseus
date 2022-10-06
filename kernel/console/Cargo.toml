@@ -28,6 +28,9 @@ path = "../task"
 [dependencies.spawn]
 path = "../spawn"
 
+[dependencies.tty]
+path = "../tty"
+
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
 
