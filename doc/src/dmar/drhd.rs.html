@@ -128,6 +128,7 @@
 <span id="122">122</span>
 <span id="123">123</span>
 <span id="124">124</span>
+<span id="125">125</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the DRHD: DMAR Hardware Unit Definition Structure.</span>
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
@@ -147,6 +148,7 @@
     <span class="comment">// so we cannot include them here in the static struct definition.</span>
 }
 <span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">Drhd</span><span class="op">&gt;</span>(), <span class="number">16</span>);
+<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">Drhd</span><span class="op">&gt;</span>(), <span class="number">1</span>);
 
 
 <span class="doccomment">/// DRHD: DMAR Hardware Unit Definition Structure.</span>

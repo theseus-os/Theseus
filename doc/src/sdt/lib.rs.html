@@ -45,6 +45,8 @@
 <span id="39">39</span>
 <span id="40">40</span>
 <span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
 </pre><pre class="rust"><code><span class="doccomment">//! ACPI table definitions and basic SDT structures.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
@@ -60,7 +62,7 @@
 <span class="doccomment">/// An ACPI System Descriptor Table.</span>
 <span class="doccomment">/// This is the header (the first part) of every ACPI table.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Sdt</span> {
   <span class="kw">pub</span> <span class="ident">signature</span>: [<span class="ident">u8</span>; <span class="number">4</span>],
   <span class="kw">pub</span> <span class="ident">length</span>: <span class="ident">u32</span>,
@@ -73,11 +75,12 @@
   <span class="kw">pub</span> <span class="ident">creator_revision</span>: <span class="ident">u32</span>
 }
 <span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">Sdt</span><span class="op">&gt;</span>(), <span class="number">36</span>);
+<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">Sdt</span><span class="op">&gt;</span>(), <span class="number">1</span>);
 
 <span class="doccomment">/// A struct used to describe the position and layout of registers</span>
 <span class="doccomment">/// related to ACPI tables.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GenericAddressStructure</span> {
     <span class="kw">pub</span> <span class="ident">address_space</span>: <span class="ident">u8</span>,
     <span class="kw">pub</span> <span class="ident">bit_width</span>: <span class="ident">u8</span>,
@@ -86,6 +89,7 @@
     <span class="kw">pub</span> <span class="ident">phys_addr</span>: <span class="ident">u64</span>,
 }
 <span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">GenericAddressStructure</span><span class="op">&gt;</span>(), <span class="number">12</span>);
+<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">GenericAddressStructure</span><span class="op">&gt;</span>(), <span class="number">1</span>);
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="sdt" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
 </body></html>

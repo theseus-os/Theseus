@@ -444,8 +444,8 @@
 <span class="doccomment">/// Note that this is only the fixed-size part of the MADT table.</span>
 <span class="doccomment">/// At the end, there is an unknown number of table entries, each of variable size. </span>
 <span class="doccomment">/// Thus, we cannot pre-define them here, but only discover/define them in the iterator.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
 <span class="kw">struct</span> <span class="ident">MadtAcpiTable</span> {
     <span class="ident">header</span>: <span class="ident">Sdt</span>,
     <span class="ident">local_apic_phys_addr</span>: <span class="ident">u32</span>,

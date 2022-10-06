@@ -351,8 +351,8 @@
 }
 
 <span class="doccomment">/// The structure of the HPET ACPI table.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">HpetAcpiTable</span> {
     <span class="ident">header</span>: <span class="ident">Sdt</span>,
     <span class="ident">_hardware_revision_id</span>: <span class="ident">u8</span>,

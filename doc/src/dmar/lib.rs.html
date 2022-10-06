@@ -304,6 +304,13 @@
 <span id="298">298</span>
 <span id="299">299</span>
 <span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Definitions for the DMAR, the Direct Memory Access (DMA) Remapping ACPI table.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The structures defined herein are based on Section 8 of Intel&#39;s VT Directed I/O Spec:</span>
@@ -364,8 +371,8 @@
 <span class="doccomment">/// (also called a DMA Remapping Description table).</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// This table is described in Section 8.1 of the VT Directed I/O Spec.</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
 <span class="kw">struct</span> <span class="ident">DmarReporting</span> {
     <span class="ident">header</span>: <span class="ident">Sdt</span>,
     <span class="ident">host_address_width</span>: <span class="ident">u8</span>,
@@ -375,6 +382,7 @@
     <span class="comment">// so we cannot include them here in the static struct definition.</span>
 }
 <span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DmarReporting</span><span class="op">&gt;</span>(), <span class="number">48</span>);
+<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DmarReporting</span><span class="op">&gt;</span>(), <span class="number">1</span>);
 
 
 <span class="doccomment">/// A wrapper around the DMAR ACPI table ([`DmarReporting`]),</span>
@@ -479,7 +487,7 @@
 <span class="doccomment">/// Represents the &quot;header&quot; of each dynamic table entry </span>
 <span class="doccomment">/// in the [`DmarReporting`] table.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DmarEntryRecord</span> {
     <span class="doccomment">/// The type of a DMAR entry.</span>
     <span class="ident">typ</span>: <span class="ident">u16</span>,
@@ -487,6 +495,7 @@
     <span class="ident">length</span>: <span class="ident">u16</span>,
 }
 <span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DmarEntryRecord</span><span class="op">&gt;</span>(), <span class="number">4</span>);
+<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DmarEntryRecord</span><span class="op">&gt;</span>(), <span class="number">1</span>);
 
 
 <span class="doccomment">/// The set of possible sub-tables that can exist in the top-level DMAR table.</span>
@@ -531,7 +540,7 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// An instance of this struct describes a memory region</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DmarRmrr</span> {
     <span class="ident">header</span>: <span class="ident">DmarEntryRecord</span>,
@@ -545,11 +554,12 @@
     <span class="comment">// so we cannot include them here in the static struct definition.</span>
 }
 <span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DmarRmrr</span><span class="op">&gt;</span>(), <span class="number">24</span>);
+<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DmarRmrr</span><span class="op">&gt;</span>(), <span class="number">1</span>);
 
 
 <span class="doccomment">/// ATSR: DMAR Root Port ATS (Address Translation Services) Capability Reporting Structure. </span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DmarAtsr</span> {
     <span class="ident">header</span>: <span class="ident">DmarEntryRecord</span>,
@@ -560,11 +570,12 @@
     <span class="comment">// so we cannot include them here in the static struct definition.</span>
 }
 <span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DmarAtsr</span><span class="op">&gt;</span>(), <span class="number">8</span>);
+<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DmarAtsr</span><span class="op">&gt;</span>(), <span class="number">1</span>);
 
 
 <span class="doccomment">/// RHSA: DMAR Remapping Hardware Static Affinity Structure. </span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DmarRhsa</span> {
     <span class="ident">header</span>: <span class="ident">DmarEntryRecord</span>,
@@ -573,11 +584,12 @@
     <span class="ident">proximity_domain</span>: <span class="ident">u32</span>,
 }
 <span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DmarRhsa</span><span class="op">&gt;</span>(), <span class="number">20</span>);
+<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DmarRhsa</span><span class="op">&gt;</span>(), <span class="number">1</span>);
 
 
 <span class="doccomment">/// ANDD: DMAR ACPI Name-space Device Declaration Structure. </span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DmarAndd</span> {
     <span class="ident">header</span>: <span class="ident">DmarEntryRecord</span>,
@@ -589,11 +601,12 @@
     <span class="comment">// acpi_object_name: [u8],</span>
 }
 <span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DmarAndd</span><span class="op">&gt;</span>(), <span class="number">8</span>);
+<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DmarAndd</span><span class="op">&gt;</span>(), <span class="number">1</span>);
 
 
 <span class="doccomment">/// SATC: DMAR SoC Integrated Address Translation Cache Reorting Structure. </span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DmarSatc</span> {
     <span class="ident">header</span>: <span class="ident">DmarEntryRecord</span>,
@@ -604,6 +617,7 @@
     <span class="comment">// so we cannot include them here in the static struct definition.</span>
 }
 <span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DmarSatc</span><span class="op">&gt;</span>(), <span class="number">8</span>);
+<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DmarSatc</span><span class="op">&gt;</span>(), <span class="number">1</span>);
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="dmar" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
 </body></html>

@@ -118,6 +118,8 @@
 <span id="112">112</span>
 <span id="113">113</span>
 <span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the DMAR Device Scope Structure.</span>
 
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
@@ -139,6 +141,7 @@
     <span class="comment">// path: [u16],</span>
 }
 <span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DeviceScope</span><span class="op">&gt;</span>(), <span class="number">6</span>);
+<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DeviceScope</span><span class="op">&gt;</span>(), <span class="number">1</span>);
 
 
 <span class="doccomment">/// DMAR Device Scope Structure.</span>
@@ -232,6 +235,7 @@
     <span class="kw">pub</span> <span class="ident">function</span>: <span class="ident">u8</span>,
 }
 <span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DeviceScopePath</span><span class="op">&gt;</span>(), <span class="number">2</span>);
+<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DeviceScopePath</span><span class="op">&gt;</span>(), <span class="number">1</span>);
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="dmar" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
 </body></html>
