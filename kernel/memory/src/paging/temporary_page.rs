@@ -91,12 +91,3 @@ impl TemporaryPage {
         })
     }
 }
-
-impl Drop for TemporaryPage {
-    fn drop(&mut self) {
-        error!("LIKELY BUG: TemporaryPage was dropped, should use `unmap_into_parts()` instead. \
-            Contained {:?}, {:?}",
-            self.mapped_page, self.frame.deref(),
-        );
-    }
-}
