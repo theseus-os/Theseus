@@ -20,68 +20,120 @@ extern crate alloc;
 
 mod discipline;
 
-use core2::io::{Read, Write};
-use discipline::{MasterDiscipline, SlaveDiscipline};
-use stdio::{Stdio, StdioReader as Reader, StdioWriter as Writer};
+use core::ops::DerefMut;
 
-pub struct Master {
-    /// Writes to master reader and slave reader.
-    writer: MasterDiscipline,
-    /// Reads from master writer and slaver writer.
-    reader: Reader,
+pub use discipline::LineDiscipline;
+
+use alloc::{collections::VecDeque, sync::Arc};
+use core2::io::{Read, Write};
+use mutex_sleep::MutexSleep as Mutex;
+
+#[derive(Clone, Default)]
+pub struct Tty {
+    master_in: Arc<Mutex<VecDeque<u8>>>,
+    slave_in: Arc<Mutex<VecDeque<u8>>>,
+    discipline: Arc<Mutex<LineDiscipline>>,
 }
 
-impl Write for Master {
-    fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
-        self.writer.write(buf)
+impl Tty {
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    fn flush(&mut self) -> core2::io::Result<()> {
-        self.writer.flush()
+    pub fn master(&self) -> Master {
+        Master {
+            master_in: self.master_in.clone(),
+            slave_in: self.slave_in.clone(),
+            discipline: self.discipline.clone(),
+        }
+    }
+
+    pub fn slave(&self) -> Slave {
+        Slave {
+            master_in: self.master_in.clone(),
+            slave_in: self.slave_in.clone(),
+            discipline: self.discipline.clone(),
+        }
+    }
+}
+
+pub struct Master {
+    master_in: Arc<Mutex<VecDeque<u8>>>,
+    slave_in: Arc<Mutex<VecDeque<u8>>>,
+    discipline: Arc<Mutex<LineDiscipline>>,
+}
+
+impl Master {
+    pub fn discipline(&self) -> impl DerefMut<Target = LineDiscipline> + '_ {
+        self.discipline.lock().unwrap()
     }
 }
 
 impl Read for Master {
     fn read(&mut self, buf: &mut [u8]) -> core2::io::Result<usize> {
-        self.reader.lock().read(buf)
+        let mut master_in = self.master_in.lock().unwrap();
+        let (s_1, s_2) = master_in.as_slices();
+
+        let mut n = core::cmp::min(buf.len(), s_1.len());
+        buf[..n].copy_from_slice(&s_1[..n]);
+
+        let u = core::cmp::min(buf.len() - n, s_2.len());
+        buf[n..(n + u)].copy_from_slice(&s_2[..u]);
+        n += u;
+
+        master_in.drain(..n);
+        Ok(n)
+    }
+}
+
+impl Write for Master {
+    fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
+        let mut discipline = self.discipline.lock().unwrap();
+        discipline.process_slave_in(buf, &self.master_in, &self.slave_in);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> core2::io::Result<()> {
+        todo!("do we flush canonical buffer?");
     }
 }
 
 pub struct Slave {
-    /// Writes to master reader.
-    writer: Writer,
-    /// Reads from master writer.
-    reader: SlaveDiscipline,
+    master_in: Arc<Mutex<VecDeque<u8>>>,
+    slave_in: Arc<Mutex<VecDeque<u8>>>,
+    discipline: Arc<Mutex<LineDiscipline>>,
 }
 
-impl Write for Slave {
-    fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
-        self.writer.lock().write(buf)
-    }
-
-    fn flush(&mut self) -> core2::io::Result<()> {
-        self.writer.lock().flush()
+impl Slave {
+    pub fn discipline(&self) -> impl DerefMut<Target = LineDiscipline> + '_ {
+        self.discipline.lock().unwrap()
     }
 }
 
 impl Read for Slave {
     fn read(&mut self, buf: &mut [u8]) -> core2::io::Result<usize> {
-        self.reader.read(buf)
+        let mut slave_in = self.slave_in.lock().unwrap();
+        let (s_1, s_2) = slave_in.as_slices();
+
+        let mut n = core::cmp::min(buf.len(), s_1.len());
+        buf[..n].copy_from_slice(&s_1[..n]);
+
+        let u = core::cmp::min(buf.len() - n, s_2.len());
+        buf[n..(n + u)].copy_from_slice(&s_2[..u]);
+        n += u;
+
+        slave_in.drain(..n);
+        Ok(n)
     }
 }
 
-pub fn tty() -> (Master, Slave) {
-    let master_stdio = Stdio::new();
-    let (master_reader, master_writer) = (master_stdio.get_reader(), master_stdio.get_writer());
+impl Write for Slave {
+    fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
+        self.master_in.lock().unwrap().extend(buf);
+        Ok(buf.len())
+    }
 
-    let slave_stdio = Stdio::new();
-    let (slave_reader, slave_writer) = (slave_stdio.get_reader(), slave_stdio.get_writer());
-
-    (
-        Master {
-            writer: MasterDiscipline { master: master_writer.clone(), slave: slave_writer },
-            reader: master_reader,
-        },
-        Slave { writer: master_writer, reader: SlaveDiscipline::new(slave_reader) },
-    )
+    fn flush(&mut self) -> core2::io::Result<()> {
+        Ok(())
+    }
 }

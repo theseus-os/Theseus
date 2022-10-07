@@ -1,80 +1,135 @@
-//! Structs for line discipline functionality.
-//!
-//! Line discipline functionality is split into two structs: `MasterDiscipline`
-//! and `SlaveDiscipline`. This is done so that buffering can be done on the
-//! slave side, which allows applications (using the slave) to toggle line
-//! buffering without modifying the master.
+use alloc::{collections::VecDeque, sync::Arc, vec::Vec};
+use mutex_sleep::{MutexSleep as Mutex, MutexSleepGuard as MutexGuard};
+use vte::Parser;
 
-use crate::{Reader, Writer};
-use alloc::vec::Vec;
-use core2::io::{Read, Write};
-
-/// A line discipline used by the master.
+/// The TTY line discipline.
 ///
-/// Performs the following actions:
-/// - Handles line feed characters
-pub(crate) struct MasterDiscipline {
-    pub(crate) master: Writer,
-    pub(crate) slave: Writer,
+/// The line discipline always converts carriage returns to newlines, equivalent
+/// to ICRNL on Linux.
+#[derive(Default)]
+pub struct LineDiscipline {
+    echo: bool,
+    /// The input buffer for canonical mode.
+    ///
+    /// If `None`, canonical mode is disabled
+    canonical: Option<Vec<u8>>,
+    parser: Parser,
 }
 
-impl Write for MasterDiscipline {
-    fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
-        let mut master_buf = Vec::with_capacity(buf.len());
-        let mut slave_buf = Vec::with_capacity(buf.len());
+impl LineDiscipline {
+    /// Sets the echo flag.
+    ///
+    /// This is equivalent to ECHO + ECHOCTL on Linux.
+    pub fn echo(&mut self, echo: bool) {
+        self.echo = echo;
+    }
 
-        // TODO: We could keep track of indexes where a carriage return occurs to avoid
-        // allocating two extra vecs.
+    /// Sets the canonical flag.
+    ///
+    /// This is equivalent to ICANON + IEXTEN.
+    pub fn canonical(&mut self, canonical: bool) {
+        if canonical {
+            self.canonical = Some(Vec::new());
+        } else {
+            // TODO: Flush buffer?
+            self.canonical = None;
+        }
+    }
 
-        for c in buf {
-            if char::from(*c) == '\r' {
-                master_buf.extend(b"\r\n");
-                slave_buf.push(b'\n');
+    pub(crate) fn process_slave_in(
+        &mut self,
+        buf: &[u8],
+        master_in: &Arc<Mutex<VecDeque<u8>>>,
+        slave_in: &Arc<Mutex<VecDeque<u8>>>,
+    ) {
+        let master_in = master_in.lock().unwrap();
+        let slave_in = slave_in.lock().unwrap();
+        let discipline = LineDisciplineSettings {
+            echo: self.echo,
+            canonical: &mut self.canonical,
+        };
+
+        let mut performer = Performer {
+            master_in,
+            slave_in,
+            discipline,
+        };
+
+        for byte in buf {
+            self.parser.advance(&mut performer, *byte);
+        }
+    }
+}
+
+struct Performer<'a, 'b, 'c> {
+    master_in: MutexGuard<'a, VecDeque<u8>>,
+    slave_in: MutexGuard<'b, VecDeque<u8>>,
+    discipline: LineDisciplineSettings<'c>,
+}
+
+struct LineDisciplineSettings<'a> {
+    echo: bool,
+    canonical: &'a mut Option<Vec<u8>>,
+}
+
+impl<'a, 'b, 'c> vte::Perform for Performer<'a, 'b, 'c> {
+    fn print(&mut self, c: char) {
+        let mut bytes = [0; 4];
+        let str = c.encode_utf8(&mut bytes);
+        let c_bytes = str.as_bytes();
+
+        if self.discipline.echo {
+            if let '\r' | '\n' = c {
+                self.master_in.push_back(b'\n');
             } else {
-                master_buf.push(*c);
-                slave_buf.push(*c);
+                self.master_in.extend(c_bytes);
             }
         }
 
-        self.master.lock().write(&master_buf)?;
-        self.slave.lock().write(&slave_buf)?;
-
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> core2::io::Result<()> {
-        Ok(())
-    }
-}
-
-/// A line discipline used by the slave.
-///
-/// Performs the following:
-/// - Buffers input till a line feed character
-/// - Executes special characters on the internal buffer (e.g. backspace)
-pub(crate) struct SlaveDiscipline {
-    reader: Reader,
-    buf: Vec<u8>,
-}
-
-impl SlaveDiscipline {
-    pub(crate) fn new(reader: Reader) -> Self {
-        Self { reader, buf: Vec::new() }
-    }
-}
-
-impl Read for SlaveDiscipline {
-    fn read(&mut self, buf: &mut [u8]) -> core2::io::Result<usize> {
-        self.reader.lock().read_to_end(&mut self.buf)?;
-        // TODO: We could cache whether or not a self.buf contains a newline to avoid
-        // searching every time.
-        if let Some(pos) = self.buf.iter().rposition(|c| *c == b'\n') {
-            let read_len = core::cmp::min(buf.len(), pos + 1);
-            // Drain 0..read_len of self.buf into buf
-            buf[0..read_len].clone_from_slice(self.buf.drain(0..read_len).as_slice());
-            Ok(read_len)
+        if let Some(ref mut input_buf) = self.discipline.canonical {
+            // TODO: EOF
+            if let '\r' | '\n' = c {
+                self.slave_in.extend(core::mem::take(input_buf));
+                self.slave_in.push_back(b'\n');
+            } else {
+                input_buf.extend(c_bytes);
+            }
         } else {
-            Ok(0)
+            self.slave_in.extend(c_bytes);
         }
+    }
+
+    fn execute(&mut self, _byte: u8) {
+        panic!("execute");
+    }
+
+    fn hook(&mut self, _params: &vte::Params, _intermediates: &[u8], _ignore: bool, _action: char) {
+        panic!("hook");
+    }
+
+    fn put(&mut self, _byte: u8) {
+        panic!("put");
+    }
+
+    fn unhook(&mut self) {
+        panic!("unhook");
+    }
+
+    fn osc_dispatch(&mut self, _params: &[&[u8]], _bell_terminated: bool) {
+        panic!("osc_dispatch");
+    }
+
+    fn csi_dispatch(
+        &mut self,
+        _params: &vte::Params,
+        _intermediates: &[u8],
+        _ignore: bool,
+        _action: char,
+    ) {
+        panic!("csi_dispatch")
+    }
+
+    fn esc_dispatch(&mut self, _intermediates: &[u8], _ignore: bool, _byte: u8) {
+        panic!("esc_dispatch");
     }
 }
