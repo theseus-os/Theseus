@@ -1,8 +1,9 @@
 //! ```text
 //!       +--- terminal <---+
 //!       |                 |
+//!       |             master.read()
 //!       V                 |
-//! master.writer --> master.reader
+//! master.write() --> master.reader
 //!       |                 ^
 //!       |                 |
 //!       V                 |

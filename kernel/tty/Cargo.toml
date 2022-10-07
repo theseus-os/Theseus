@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 mutex_sleep = { path = "../mutex_sleep" }
-vte = "0.11.0"
 
 [dependencies.core2]
 version = "0.4.0"

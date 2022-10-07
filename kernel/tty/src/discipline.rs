@@ -1,32 +1,38 @@
 use alloc::{collections::VecDeque, sync::Arc, vec::Vec};
-use mutex_sleep::{MutexSleep as Mutex, MutexSleepGuard as MutexGuard};
-use vte::Parser;
+use mutex_sleep::MutexSleep as Mutex;
 
 /// The TTY line discipline.
 ///
 /// The line discipline always converts carriage returns to newlines, equivalent
 /// to ICRNL on Linux.
-#[derive(Default)]
 pub struct LineDiscipline {
     echo: bool,
     /// The input buffer for canonical mode.
     ///
     /// If `None`, canonical mode is disabled
     canonical: Option<Vec<u8>>,
-    parser: Parser,
+}
+
+impl Default for LineDiscipline {
+    fn default() -> Self {
+        Self {
+            echo: true,
+            canonical: Some(Vec::new()),
+        }
+    }
 }
 
 impl LineDiscipline {
     /// Sets the echo flag.
     ///
-    /// This is equivalent to ECHO + ECHOCTL on Linux.
+    /// This is equivalent to ECHO + ECHOE + ECHOCTL on Linux.
     pub fn echo(&mut self, echo: bool) {
         self.echo = echo;
     }
 
     /// Sets the canonical flag.
     ///
-    /// This is equivalent to ICANON + IEXTEN.
+    /// This is equivalent to ICANON.
     pub fn canonical(&mut self, canonical: bool) {
         if canonical {
             self.canonical = Some(Vec::new());
@@ -42,94 +48,85 @@ impl LineDiscipline {
         master_in: &Arc<Mutex<VecDeque<u8>>>,
         slave_in: &Arc<Mutex<VecDeque<u8>>>,
     ) {
-        let master_in = master_in.lock().unwrap();
-        let slave_in = slave_in.lock().unwrap();
-        let discipline = LineDisciplineSettings {
-            echo: self.echo,
-            canonical: &mut self.canonical,
-        };
+        const ERASE: u8 = 0x7f; // DEL (backspace key)
+        const WERASE: u8 = 0x17; // ^W
 
-        let mut performer = Performer {
-            master_in,
-            slave_in,
-            discipline,
-        };
+        let mut master_in = master_in.lock().unwrap();
+        let mut slave_in = slave_in.lock().unwrap();
 
         for byte in buf {
-            self.parser.advance(&mut performer, *byte);
+            // TODO: UTF-8?
+            if self.echo {
+                match (*byte, &self.canonical) {
+                    (b'\r', _) => master_in.extend([b'\r', b'\n']),
+                    // TODO: Also pass-through START and STOP characters
+                    (b'\t' | b'\n', _) => master_in.push_back(*byte),
+                    (ERASE, Some(input_buf)) => {
+                        if !input_buf.is_empty() {
+                            master_in.extend([0x8, b' ', 0x8])
+                        }
+                    }
+                    (WERASE, Some(input_buf)) => {
+                        if !input_buf.is_empty() {
+                            // TODO: Cache offset. Currently we're calculating it twice.
+                            let offset = werase(&input_buf);
+                            for _ in 0..offset {
+                                master_in.extend([0x8, b' ', 0x8])
+                            }
+                        }
+                    }
+                    (0..=0x1f, _) => master_in.extend([b'^', byte + 0x40]),
+                    _ => master_in.push_back(*byte),
+                }
+            }
+
+            if let Some(ref mut input_buf) = self.canonical {
+                match *byte {
+                    b'\r' | b'\n' => {
+                        slave_in.extend(core::mem::take(input_buf));
+                        slave_in.push_back(b'\n');
+                    }
+                    ERASE => {
+                        input_buf.pop();
+                    }
+                    WERASE => {
+                        for _ in 0..werase(input_buf) {
+                            input_buf.pop();
+                        }
+                    }
+                    _ => input_buf.push(*byte),
+                }
+            } else {
+                slave_in.push_back(*byte);
+            }
         }
     }
 }
 
-struct Performer<'a, 'b, 'c> {
-    master_in: MutexGuard<'a, VecDeque<u8>>,
-    slave_in: MutexGuard<'b, VecDeque<u8>>,
-    discipline: LineDisciplineSettings<'c>,
-}
+/// Returns how many characters need to be removed to erase a word.
+fn werase(buf: &[u8]) -> usize {
+    let len = buf.len();
+    let mut offset = 0;
 
-struct LineDisciplineSettings<'a> {
-    echo: bool,
-    canonical: &'a mut Option<Vec<u8>>,
-}
+    let mut initial_whitespace = true;
 
-impl<'a, 'b, 'c> vte::Perform for Performer<'a, 'b, 'c> {
-    fn print(&mut self, c: char) {
-        let mut bytes = [0; 4];
-        let str = c.encode_utf8(&mut bytes);
-        let c_bytes = str.as_bytes();
+    // TODO: Tabs?
 
-        if self.discipline.echo {
-            if let '\r' | '\n' = c {
-                self.master_in.push_back(b'\n');
-            } else {
-                self.master_in.extend(c_bytes);
-            }
+    loop {
+        if offset == len {
+            return offset;
         }
 
-        if let Some(ref mut input_buf) = self.discipline.canonical {
-            // TODO: EOF
-            if let '\r' | '\n' = c {
-                self.slave_in.extend(core::mem::take(input_buf));
-                self.slave_in.push_back(b'\n');
-            } else {
-                input_buf.extend(c_bytes);
+        offset += 1;
+
+        if initial_whitespace {
+            if buf[len - offset] != b' ' {
+                initial_whitespace = false;
             }
         } else {
-            self.slave_in.extend(c_bytes);
+            if buf[len - offset] == b' ' {
+                return offset - 1;
+            }
         }
-    }
-
-    fn execute(&mut self, _byte: u8) {
-        panic!("execute");
-    }
-
-    fn hook(&mut self, _params: &vte::Params, _intermediates: &[u8], _ignore: bool, _action: char) {
-        panic!("hook");
-    }
-
-    fn put(&mut self, _byte: u8) {
-        panic!("put");
-    }
-
-    fn unhook(&mut self) {
-        panic!("unhook");
-    }
-
-    fn osc_dispatch(&mut self, _params: &[&[u8]], _bell_terminated: bool) {
-        panic!("osc_dispatch");
-    }
-
-    fn csi_dispatch(
-        &mut self,
-        _params: &vte::Params,
-        _intermediates: &[u8],
-        _ignore: bool,
-        _action: char,
-    ) {
-        panic!("csi_dispatch")
-    }
-
-    fn esc_dispatch(&mut self, _intermediates: &[u8], _ignore: bool, _byte: u8) {
-        panic!("esc_dispatch");
     }
 }
