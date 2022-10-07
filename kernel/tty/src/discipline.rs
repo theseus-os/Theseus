@@ -1,5 +1,5 @@
-use alloc::{collections::VecDeque, sync::Arc, vec::Vec};
-use mutex_sleep::MutexSleep as Mutex;
+use crate::Channel;
+use alloc::vec::Vec;
 
 /// The TTY line discipline.
 ///
@@ -42,49 +42,41 @@ impl LineDiscipline {
         }
     }
 
-    pub(crate) fn process_slave_in(
-        &mut self,
-        buf: &[u8],
-        master_in: &Arc<Mutex<VecDeque<u8>>>,
-        slave_in: &Arc<Mutex<VecDeque<u8>>>,
-    ) {
+    pub(crate) fn process_slave_in(&mut self, buf: &[u8], master: &Channel, slave: &Channel) {
         const ERASE: u8 = 0x7f; // DEL (backspace key)
         const WERASE: u8 = 0x17; // ^W
-
-        let mut master_in = master_in.lock().unwrap();
-        let mut slave_in = slave_in.lock().unwrap();
 
         for byte in buf {
             // TODO: UTF-8?
             if self.echo {
                 match (*byte, &self.canonical) {
-                    (b'\r', _) => master_in.extend([b'\r', b'\n']),
+                    (b'\r', _) => master.send_buf([b'\r', b'\n']),
                     // TODO: Also pass-through START and STOP characters
-                    (b'\t' | b'\n', _) => master_in.push_back(*byte),
+                    (b'\t' | b'\n', _) => master.send(*byte),
                     (ERASE, Some(input_buf)) => {
                         if !input_buf.is_empty() {
-                            master_in.extend([0x8, b' ', 0x8])
+                            master.send_buf([0x8, b' ', 0x8])
                         }
                     }
                     (WERASE, Some(input_buf)) => {
                         if !input_buf.is_empty() {
                             // TODO: Cache offset. Currently we're calculating it twice.
-                            let offset = werase(&input_buf);
+                            let offset = werase(input_buf);
                             for _ in 0..offset {
-                                master_in.extend([0x8, b' ', 0x8])
+                                master.send_buf([0x8, b' ', 0x8])
                             }
                         }
                     }
-                    (0..=0x1f, _) => master_in.extend([b'^', byte + 0x40]),
-                    _ => master_in.push_back(*byte),
+                    (0..=0x1f, _) => master.send_buf([b'^', byte + 0x40]),
+                    _ => master.send(*byte),
                 }
             }
 
             if let Some(ref mut input_buf) = self.canonical {
                 match *byte {
                     b'\r' | b'\n' => {
-                        slave_in.extend(core::mem::take(input_buf));
-                        slave_in.push_back(b'\n');
+                        slave.send_buf(core::mem::take(input_buf));
+                        slave.send(b'\n');
                     }
                     ERASE => {
                         input_buf.pop();
@@ -97,7 +89,7 @@ impl LineDiscipline {
                     _ => input_buf.push(*byte),
                 }
             } else {
-                slave_in.push_back(*byte);
+                slave.send(*byte);
             }
         }
     }
@@ -123,10 +115,8 @@ fn werase(buf: &[u8]) -> usize {
             if buf[len - offset] != b' ' {
                 initial_whitespace = false;
             }
-        } else {
-            if buf[len - offset] == b' ' {
-                return offset - 1;
-            }
+        } else if buf[len - offset] == b' ' {
+            return offset - 1;
         }
     }
 }

@@ -19,48 +19,60 @@
 
 extern crate alloc;
 
+mod channel;
 mod discipline;
 
 use core::ops::DerefMut;
 
 pub use discipline::LineDiscipline;
 
-use alloc::{collections::VecDeque, sync::Arc};
+use alloc::sync::Arc;
+use channel::Channel;
 use core2::io::{Read, Write};
 use mutex_sleep::MutexSleep as Mutex;
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Tty {
-    master_in: Arc<Mutex<VecDeque<u8>>>,
-    slave_in: Arc<Mutex<VecDeque<u8>>>,
+    master: Channel,
+    slave: Channel,
     discipline: Arc<Mutex<LineDiscipline>>,
+}
+
+impl Default for Tty {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Tty {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            master: Channel::new(),
+            slave: Channel::new(),
+            discipline: Default::default(),
+        }
     }
 
     pub fn master(&self) -> Master {
         Master {
-            master_in: self.master_in.clone(),
-            slave_in: self.slave_in.clone(),
+            master: self.master.clone(),
+            slave: self.slave.clone(),
             discipline: self.discipline.clone(),
         }
     }
 
     pub fn slave(&self) -> Slave {
         Slave {
-            master_in: self.master_in.clone(),
-            slave_in: self.slave_in.clone(),
+            master: self.master.clone(),
+            slave: self.slave.clone(),
             discipline: self.discipline.clone(),
         }
     }
 }
 
 pub struct Master {
-    master_in: Arc<Mutex<VecDeque<u8>>>,
-    slave_in: Arc<Mutex<VecDeque<u8>>>,
+    master: Channel,
+    slave: Channel,
     discipline: Arc<Mutex<LineDiscipline>>,
 }
 
@@ -68,30 +80,35 @@ impl Master {
     pub fn discipline(&self) -> impl DerefMut<Target = LineDiscipline> + '_ {
         self.discipline.lock().unwrap()
     }
+
+    pub fn read(&self, buf: &mut [u8]) -> usize {
+        self.master.receive_buf(buf)       
+    }
+
+    pub fn read_byte(&self) -> u8 {
+        self.master.receive()
+    }
+
+    pub fn write(&self, buf: &[u8]) -> usize {
+        let mut discipline = self.discipline.lock().unwrap();
+        discipline.process_slave_in(buf, &self.master, &self.slave);
+        buf.len()
+    }
+
+    pub fn write_byte(&self, byte: u8) {
+        self.write(&[byte]);
+    }
 }
 
 impl Read for Master {
     fn read(&mut self, buf: &mut [u8]) -> core2::io::Result<usize> {
-        let mut master_in = self.master_in.lock().unwrap();
-        let (s_1, s_2) = master_in.as_slices();
-
-        let mut n = core::cmp::min(buf.len(), s_1.len());
-        buf[..n].copy_from_slice(&s_1[..n]);
-
-        let u = core::cmp::min(buf.len() - n, s_2.len());
-        buf[n..(n + u)].copy_from_slice(&s_2[..u]);
-        n += u;
-
-        master_in.drain(..n);
-        Ok(n)
+        Ok(Self::read(self, buf))
     }
 }
 
 impl Write for Master {
     fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
-        let mut discipline = self.discipline.lock().unwrap();
-        discipline.process_slave_in(buf, &self.master_in, &self.slave_in);
-        Ok(buf.len())
+        Ok(Self::write(self, buf))
     }
 
     fn flush(&mut self) -> core2::io::Result<()> {
@@ -100,8 +117,8 @@ impl Write for Master {
 }
 
 pub struct Slave {
-    master_in: Arc<Mutex<VecDeque<u8>>>,
-    slave_in: Arc<Mutex<VecDeque<u8>>>,
+    master: Channel,
+    slave: Channel,
     discipline: Arc<Mutex<LineDiscipline>>,
 }
 
@@ -109,29 +126,34 @@ impl Slave {
     pub fn discipline(&self) -> impl DerefMut<Target = LineDiscipline> + '_ {
         self.discipline.lock().unwrap()
     }
+
+    pub fn read(&self, buf: &mut [u8]) -> usize {
+        self.slave.receive_buf(buf)       
+    }
+
+    pub fn read_byte(&self) -> u8 {
+        self.slave.receive()
+    }
+
+    pub fn write(&self, buf: &[u8]) -> usize {
+        self.slave.send_buf(buf);
+        buf.len()
+    }
+
+    pub fn write_byte(&self, byte: u8) {
+        self.master.send(byte);
+    }
 }
 
 impl Read for Slave {
     fn read(&mut self, buf: &mut [u8]) -> core2::io::Result<usize> {
-        let mut slave_in = self.slave_in.lock().unwrap();
-        let (s_1, s_2) = slave_in.as_slices();
-
-        let mut n = core::cmp::min(buf.len(), s_1.len());
-        buf[..n].copy_from_slice(&s_1[..n]);
-
-        let u = core::cmp::min(buf.len() - n, s_2.len());
-        buf[n..(n + u)].copy_from_slice(&s_2[..u]);
-        n += u;
-
-        slave_in.drain(..n);
-        Ok(n)
+        Ok(Self::read(self, buf))
     }
 }
 
 impl Write for Slave {
     fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
-        self.master_in.lock().unwrap().extend(buf);
-        Ok(buf.len())
+        Ok(Self::write(self, buf))
     }
 
     fn flush(&mut self) -> core2::io::Result<()> {

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+async_channel = { path = "../async_channel" }
 mutex_sleep = { path = "../mutex_sleep" }
 
 [dependencies.core2]
