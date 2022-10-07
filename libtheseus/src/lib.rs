@@ -5,6 +5,7 @@ pub extern crate core2;
 pub extern crate irq_safety;
 pub extern crate panic_entry_inner;
 pub extern crate path;
+pub extern crate spin;
 
 extern crate environment;
 extern crate fs_node;
@@ -12,10 +13,10 @@ extern crate heap;
 extern crate io;
 extern crate kernel_config;
 extern crate memory;
+extern crate preemption;
 extern crate random;
 extern crate scheduler;
 extern crate spawn;
-extern crate spin;
 extern crate stack;
 extern crate task as theseus_task;
 extern crate thread_local_macro;
@@ -59,6 +60,7 @@ pub mod env {
 }
 
 pub mod task {
+    pub use preemption::hold_preemption;
     pub use scheduler::schedule as yield_now;
     pub use spawn::new_task_builder;
     pub use stack::alloc_stack_by_bytes;
