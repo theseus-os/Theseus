@@ -975,16 +975,17 @@ impl CrateNamespace {
             // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
             {
                 let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
+                let target_sec_mapped_pages_size = target_sec_mapped_pages.size_in_bytes();
                 let target_sec_initial_flags = target_sec_mapped_pages.flags();
                 if !target_sec_initial_flags.is_writable() {
                     target_sec_mapped_pages.remap(&mut kernel_mmi_ref.lock().page_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
                 }
 
                 write_relocation(
-                    relocation_entry, 
-                    &mut target_sec_mapped_pages, 
-                    target_sec.mapped_pages_offset, 
-                    new_section.start_address(), 
+                    relocation_entry,
+                    target_sec_mapped_pages.as_slice_mut(0, target_sec_mapped_pages_size)?,
+                    target_sec.mapped_pages_offset,
+                    new_section.start_address(),
                     false
                 )?;
 
@@ -2114,6 +2115,8 @@ impl CrateNamespace {
             let mut target_sec_internal_dependencies: Vec<InternalDependency> = Vec::new();
             {
                 let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
+                let target_sec_mapped_pages_size = target_sec_mapped_pages.size_in_bytes();
+                let target_sec_slice: &mut [u8] = target_sec_mapped_pages.as_slice_mut(0, target_sec_mapped_pages_size)?;
 
                 // iterate through each relocation entry in the relocation array for the target_sec
                 for rela_entry in rela_array {
@@ -2176,7 +2179,7 @@ impl CrateNamespace {
                     let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
                     write_relocation(
                         relocation_entry,
-                        &mut target_sec_mapped_pages,
+                        target_sec_slice,
                         target_sec.mapped_pages_offset,
                         source_sec.start_address() + source_sec_value,
                         verbose_log

@@ -453,7 +453,10 @@ fn overwrite_relocations(
                 }
                 write_relocation(
                     relocation_entry,
-                    &mut target_segment.mp,
+                    target_segment.mp.as_slice_mut(
+                        0,
+                        target_segment.bounds.end.value() - target_segment.bounds.start.value(),
+                    )?,
                     offset_into_target_segment,
                     existing_source_sec.start_address(),
                     verbose_log

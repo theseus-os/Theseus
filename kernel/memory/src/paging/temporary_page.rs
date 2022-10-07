@@ -7,7 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use core::{mem::ManuallyDrop, ops::Deref};
+use core::mem::ManuallyDrop;
 use super::{
     AllocatedPages, AllocatedFrames, PageTable, MappedPages, VirtualAddress,
     table::{Table, Level1},
