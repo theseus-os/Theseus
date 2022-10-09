@@ -678,13 +678,59 @@ impl Task {
     }
 
     /// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].
-    pub fn block(&self) {
-        self.runstate.store(RunState::Blocked);
+    ///
+    /// Returns the previous runstate. Trying to block an exited or reaped task
+    /// will return an error.
+    pub fn block(&self) -> Result<RunState, ()> {
+        if self
+            .runstate
+            .compare_exchange(RunState::Initing, RunState::Blocked)
+            .is_ok()
+        {
+            Ok(RunState::Initing)
+        } else if self
+            .runstate
+            .compare_exchange(RunState::Runnable, RunState::Blocked)
+            .is_ok()
+        {
+            Ok(RunState::Runnable)
+        } else if self
+            .runstate
+            .compare_exchange(RunState::Blocked, RunState::Blocked)
+            .is_ok()
+        {
+            Ok(RunState::Blocked)
+        } else {
+            Err(())
+        }
     }
 
     /// Unblocks this `Task` by setting its runstate to [`RunState::Runnable`].
-    pub fn unblock(&self) {
-        self.runstate.store(RunState::Runnable);
+    ///
+    /// Returns the previous runstate. Trying to unblock an exited or reaped
+    /// task will return an error.
+    pub fn unblock(&self) -> Result<RunState, ()> {
+        if self
+            .runstate
+            .compare_exchange(RunState::Initing, RunState::Runnable)
+            .is_ok()
+        {
+            Ok(RunState::Initing)
+        } else if self
+            .runstate
+            .compare_exchange(RunState::Runnable, RunState::Runnable)
+            .is_ok()
+        {
+            Ok(RunState::Runnable)
+        } else if self
+            .runstate
+            .compare_exchange(RunState::Blocked, RunState::Runnable)
+            .is_ok()
+        {
+            Ok(RunState::Blocked)
+        } else {
+            Err(())
+        }
     }
 
     /// Sets this `Task` as this core's current task.

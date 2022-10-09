@@ -28,7 +28,7 @@ extern crate libterm;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 
-use event_types::{Event};
+use event_types::Event;
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -109,7 +109,7 @@ pub fn main(_args: Vec<String>) -> isize {
     loop {
         // block this task, because it never needs to actually run again
         if let Some(my_task) = task::get_my_current_task() {
-            my_task.block();
+            my_task.block().unwrap();
         }
     }
 
@@ -462,8 +462,9 @@ impl Shell {
                 app_io::lock_and_execute(&|_flags_guard, _streams_guard| {
                     // Stop all tasks in the job.
                     for task_ref in task_refs {
-                        if task_ref.has_exited() { continue; }
-                        task_ref.block();
+                        if task_ref.block().is_err() {
+                            continue;
+                        }
 
                         // Here we must wait for the running application to stop before releasing the lock,
                         // because the previous `block` method will NOT stop the application immediately.
@@ -770,7 +771,7 @@ impl Shell {
 
                 // All IO streams have been set up for the new tasks. Safe to unblock them now.
                 for task_ref in &new_job.tasks {
-                    task_ref.unblock();
+                    task_ref.unblock().unwrap();
                 }
 
                 // Allocate a job number for the new job. It will start from 1 and choose the smallest number
@@ -1418,9 +1419,8 @@ impl Shell {
             if let Ok(job_num) = job_num.parse::<isize>() {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
                     for task_ref in &job.tasks {
-                        if !task_ref.has_exited() {
-                            task_ref.unblock();
-                        }
+                        let _ = task_ref.unblock();
+                        // TODO: Do we want to set the job status of an exited task to running?
                         job.status = JobStatus::Running;
                     }
                     self.clear_cmdline(false)?;
@@ -1451,9 +1451,8 @@ impl Shell {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
                     self.fg_job_num = Some(job_num);
                     for task_ref in &job.tasks {
-                        if !task_ref.has_exited() {
-                            task_ref.unblock();
-                        }
+                        let _ = task_ref.unblock();
+                        // TODO: Do we want to set the job status of an exited task to running?
                         job.status = JobStatus::Running;
                     }
                     return Ok(());

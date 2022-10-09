@@ -21,16 +21,16 @@ impl WaitGuard {
     /// Blocks the given `Task` and returns a new `WaitGuard` object
     /// that will automatically unblock that Task when it is dropped. 
     pub fn new(task: TaskRef) -> WaitGuard {
-        task.block();
+        task.block().unwrap();
         WaitGuard {
-            task: task,
+            task,
         }
     }
 
     /// Blocks the task guarded by this waitguard,
     /// which is useful to re-block a task after it spuriously woke up. 
     pub fn block_again(&self) {
-        self.task.block();
+        self.task.block().unwrap();
     }
 
     /// Returns a reference to the `Task` being blocked in this `WaitGuard`.
@@ -40,7 +40,7 @@ impl WaitGuard {
 }
 impl Drop for WaitGuard {
     fn drop(&mut self) {
-        self.task.unblock();
+        self.task.unblock().unwrap();
     }
 }
 
@@ -52,6 +52,7 @@ pub enum WaitError {
     Interrupted,
     Timeout,
     SpuriousWakeup,
+    CantBlockCurrentTask,
 }
 
 /// A queue in which multiple `Task`s can wait for other `Task`s to notify them.
@@ -128,7 +129,7 @@ impl WaitQueue {
                     warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
                 }
                 // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
-                curr_task.block();
+                curr_task.block().map_err(|_| WaitError::CantBlockCurrentTask)?;
             }
             scheduler::schedule();
 
@@ -160,7 +161,7 @@ impl WaitQueue {
                     warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
                 }
                 // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
-                curr_task.block();
+                curr_task.block().map_err(|_| WaitError::CantBlockCurrentTask)?;
             }
             scheduler::schedule();
 
@@ -198,23 +199,27 @@ impl WaitQueue {
         // (4) Release the lock on the waitqueue.
 
         let mut wq_locked = self.0.lock();
-        let tref = if let Some(ttw) = task_to_wakeup {
-            // find a specific task to wake up
-            let index = wq_locked.iter().position(|t| t == ttw);
-            index.and_then(|i| wq_locked.remove(i))
-        } else {
-            // just wake up the first task
-            wq_locked.pop_front()
-        };
+        
+        loop {
+            let tref = if let Some(ttw) = task_to_wakeup {
+                // find a specific task to wake up
+                let index = wq_locked.iter().position(|t| t == ttw);
+                index.and_then(|i| wq_locked.remove(i))
+            } else {
+                // just wake up the first task
+                wq_locked.pop_front()
+            };
 
-        // trace!("  notify: chose task to wakeup: {:?}", tref);
-        if let Some(t) = tref {
-            // trace!("WaitQueue::notify():  unblocked task on waitqueue\n    --> WQ: {:?}", &*wq_locked);
-            t.unblock();
-            true
-        } else {
-            // trace!("WaitQueue::notify():  did nothing");
-            false
+            // trace!("  notify: chose task to wakeup: {:?}", tref);
+            if let Some(t) = tref {
+                // trace!("WaitQueue::notify():  unblocked task on waitqueue\n    --> WQ: {:?}", &*wq_locked);
+                if t.unblock().is_ok() {
+                    return true;
+                }
+            } else {
+                // trace!("WaitQueue::notify():  did nothing");
+                return false;
+            }
         }
     }
 }

@@ -42,7 +42,7 @@ pub fn main(_args: Vec<String>) -> isize {
         scheduler::set_periodicity(&periodic_task_1, 1000).unwrap();
 
         // start the tasks
-        periodic_task_1.unblock();
+        periodic_task_1.unblock().unwrap();
 
         0
     }
