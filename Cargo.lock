@@ -423,12 +423,10 @@ dependencies = [
  "io",
  "irq_safety",
  "log",
- "mpmc",
  "serial_port",
  "shell_2",
  "spawn",
  "task",
- "text_terminal",
  "tty",
 ]
 
