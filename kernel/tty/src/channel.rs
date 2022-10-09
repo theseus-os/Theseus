@@ -15,7 +15,7 @@ pub(crate) struct Channel {
 
 impl Channel {
     pub(crate) fn new() -> Self {
-        let (sender, receiver) = async_channel::new_channel(1024);
+        let (sender, receiver) = async_channel::new_channel(256);
         Self { sender, receiver }
     }
 
@@ -69,5 +69,27 @@ impl Channel {
 
     pub(crate) fn try_receive(&self) -> Result<u8> {
         self.receiver.try_receive().map_err(|e| e.into())
+    }
+
+    pub(crate) fn try_receive_buf(&self, buf: &mut [u8]) -> Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+
+        buf[0] = self.try_receive()?;
+
+        if buf.len() == 1 {
+            return Ok(1);
+        }
+
+        for idx in 1..buf.len() {
+            buf[idx] = match self.try_receive() {
+                Ok(byte) => byte,
+                Err(e) if e.kind() == ErrorKind::WouldBlock => return Ok(idx),
+                Err(e) => return Err(e),
+            };
+        }
+
+        Ok(buf.len())
     }
 }

@@ -4,7 +4,7 @@
 
 extern crate alloc;
 
-use alloc::format;
+use alloc::{format, sync::Arc};
 use async_channel::Receiver;
 use core::sync::atomic::{AtomicU16, Ordering};
 use core2::io::{Read, Write};
@@ -12,7 +12,7 @@ use irq_safety::MutexIrqSafe;
 use log::{error, warn};
 use serial_port::{get_serial_port, DataChunk, SerialPort, SerialPortAddress};
 use shell::Shell;
-use task::JoinableTaskRef;
+use task::{JoinableTaskRef, KillReason};
 
 /// The serial port being used for the default system logger can optionally
 /// ignore inputs.
@@ -79,34 +79,56 @@ fn console_connection_detector(
             continue;
         }
 
-        let tty = tty::Tty::new();
-        let shell = Shell::new(tty.slave());
-
-        let _ = spawn::new_task_builder(tty_reader, (serial_port, tty.master()))
+        let _ = spawn::new_task_builder(shell_loop, (serial_port, serial_port_address, receiver))
             .name(format!("tty_reader_loop_{:?}", serial_port_address))
-            .spawn()
-            .unwrap();
-        let _ = spawn::new_task_builder(tty_writer, (receiver, tty.master()))
-            .name(format!("tty_writer_loop_{:?}", serial_port_address))
-            .spawn()
-            .unwrap();
-        let _ = spawn::new_task_builder(Shell::run, shell)
-            .name(format!("shell_loop_{:?}", serial_port_address))
             .spawn()
             .unwrap();
     }
 }
 
-fn tty_reader((port, mut master): (alloc::sync::Arc<MutexIrqSafe<SerialPort>>, tty::Master)) {
+// TODO: Remove unwraps
+
+fn shell_loop(
+    (port, address, receiver): (
+        Arc<MutexIrqSafe<SerialPort>>,
+        SerialPortAddress,
+        Receiver<DataChunk>,
+    ),
+) {
+    let tty = tty::Tty::new();
+
+    let reader_task = spawn::new_task_builder(tty_reader_loop, (port.clone(), tty.master()))
+        .name(format!("tty_reader_loop_{:?}", address))
+        .spawn()
+        .unwrap();
+    let writer_task = spawn::new_task_builder(tty_writer_loop, (receiver, tty.master()))
+        .name(format!("tty_writer_loop_{:?}", address))
+        .spawn()
+        .unwrap();
+
+    let _ = Shell::new(tty.slave()).run();
+
+    reader_task.kill(KillReason::Requested).unwrap();
+    writer_task.kill(KillReason::Requested).unwrap();
+
+    // Flush the tty in case the reader task didn't run between the last time the
+    // shell wrote something to the slave end and us killing the task.
+    let mut data = [0; 256];
+    if let Ok(len) = tty.master().try_read(&mut data) {
+        port.lock().write(&data[..len]).unwrap();
+    };
+}
+
+fn tty_reader_loop((port, mut master): (Arc<MutexIrqSafe<SerialPort>>, tty::Master)) {
     loop {
-        let mut data = [0; 1024];
+        let mut data = [0; 256];
         let len = master.read(&mut data).unwrap();
         // log::trace!("writing data to serial port: {:?}", &data[..len]);
         port.lock().write(&data[..len]).unwrap();
     }
 }
 
-fn tty_writer((receiver, mut master): (Receiver<DataChunk>, tty::Master)) {
+fn tty_writer_loop((receiver, mut master): (Receiver<DataChunk>, tty::Master)) {
     loop {
         let DataChunk { data, len } = receiver.receive().unwrap();
         // log::trace!("read data from serial port: {:?}", &data[..len.into()]);

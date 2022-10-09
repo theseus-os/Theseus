@@ -10,8 +10,7 @@ pub use discipline::LineDiscipline;
 use alloc::sync::Arc;
 use channel::Channel;
 use core::ops::DerefMut;
-use core2::io::{Error, Result};
-use core2::io::{Read, Write};
+use core2::io::{Read, Result, Write};
 use mutex_sleep::MutexSleep as Mutex;
 
 /// A terminal device driver.
@@ -85,6 +84,10 @@ impl Master {
         self.master.receive()
     }
 
+    pub fn try_read(&self, buf: &mut [u8]) -> Result<usize> {
+        self.master.try_receive_buf(buf)
+    }
+
     pub fn write_byte(&self, byte: u8) -> Result<()> {
         let mut discipline = self.discipline.lock().unwrap();
         discipline.process_byte(byte, &self.master, &self.slave)?;
@@ -129,6 +132,10 @@ impl Slave {
 
     pub fn read_byte(&self) -> Result<u8> {
         self.slave.receive()
+    }
+
+    pub fn try_read(&self, buf: &mut [u8]) -> Result<usize> {
+        self.slave.try_receive_buf(buf)
     }
 
     pub fn write_byte(&self, byte: u8) -> Result<()> {
