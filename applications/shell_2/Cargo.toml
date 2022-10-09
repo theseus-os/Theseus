@@ -5,8 +5,12 @@ edition = "2021"
 
 [dependencies]
 embedded-hal = "0.2.7"
+hashbrown = "0.12.3"
 nb = "1.0"
 noline = { version = "0.2.0", features = ["alloc", "embedded"] }
+path = { path = "../../kernel/path" }
+spawn = { path = "../../kernel/spawn" }
+task = { path = "../../kernel/task" }
 tty = { path = "../../kernel/tty" }
 
 [dependencies.core2]

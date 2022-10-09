@@ -106,7 +106,7 @@ fn shell_loop(
         .spawn()
         .unwrap();
 
-    let _ = Shell::new(tty.slave()).run();
+    let _ = Shell::new(&tty.slave()).run();
 
     reader_task.kill(KillReason::Requested).unwrap();
     writer_task.kill(KillReason::Requested).unwrap();
@@ -117,6 +117,8 @@ fn shell_loop(
     if let Ok(len) = tty.master().try_read(&mut data) {
         port.lock().write(&data[..len]).unwrap();
     };
+
+    // TODO: Close port
 }
 
 fn tty_reader_loop((port, mut master): (Arc<MutexIrqSafe<SerialPort>>, tty::Master)) {

@@ -252,7 +252,7 @@ dependencies = [
 name = "block_cache"
 version = "0.1.0"
 dependencies = [
- "hashbrown",
+ "hashbrown 0.11.2",
  "lazy_static",
  "log",
  "storage_device",
@@ -554,7 +554,7 @@ dependencies = [
  "crate_metadata_serde",
  "fs_node",
  "goblin",
- "hashbrown",
+ "hashbrown 0.11.2",
  "log",
  "memory",
  "qp-trie",
@@ -568,7 +568,7 @@ dependencies = [
 name = "crate_metadata_serde"
 version = "0.1.0"
 dependencies = [
- "hashbrown",
+ "hashbrown 0.11.2",
  "serde",
 ]
 
@@ -587,7 +587,7 @@ version = "0.1.0"
 dependencies = [
  "by_address",
  "fs_node",
- "hashbrown",
+ "hashbrown 0.11.2",
  "hpet",
  "lazy_static",
  "log",
@@ -659,7 +659,7 @@ dependencies = [
  "fs_node",
  "gimli",
  "goblin",
- "hashbrown",
+ "hashbrown 0.11.2",
  "log",
  "memory",
  "mod_mgmt",
@@ -852,7 +852,7 @@ name = "environment"
 version = "0.1.0"
 dependencies = [
  "fs_node",
- "hashbrown",
+ "hashbrown 0.11.2",
  "path",
  "root",
 ]
@@ -1036,7 +1036,7 @@ version = "0.1.0"
 dependencies = [
  "compositor",
  "framebuffer",
- "hashbrown",
+ "hashbrown 0.11.2",
  "shapes",
  "spin 0.9.0",
 ]
@@ -1139,6 +1139,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashbrown"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
+dependencies = [
+ "ahash",
+]
+
+[[package]]
 name = "heap"
 version = "0.1.0"
 dependencies = [
@@ -1156,7 +1165,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "getopts",
- "hashbrown",
+ "hashbrown 0.11.2",
  "heap",
  "hpet",
  "libtest",
@@ -1238,7 +1247,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc633605454125dec4b66843673f01c7df2b89479b32e0ed634e43a91cff62a5"
 dependencies = [
  "autocfg",
- "hashbrown",
+ "hashbrown 0.11.2",
  "serde",
 ]
 
@@ -1356,7 +1365,7 @@ dependencies = [
  "acpi",
  "apic",
  "bit_field 0.7.0",
- "hashbrown",
+ "hashbrown 0.11.2",
  "hpet",
  "intel_ethernet",
  "interrupts",
@@ -1504,7 +1513,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "bit_field 0.10.1",
- "hashbrown",
+ "hashbrown 0.11.2",
  "hpet",
  "libm",
  "log",
@@ -1844,7 +1853,7 @@ dependencies = [
  "crate_name_utils",
  "cstr_core",
  "fs_node",
- "hashbrown",
+ "hashbrown 0.11.2",
  "kernel_config",
  "log",
  "lz4_flex",
@@ -1931,7 +1940,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "cfg-if 0.1.10",
- "hashbrown",
+ "hashbrown 0.11.2",
  "heap",
  "intrusive-collections",
  "irq_safety",
@@ -2152,7 +2161,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e42c982f2d955fac81dd7e1d0e1426a7d702acd9c98d19ab01083a6a0328c424"
 dependencies = [
  "crc32fast",
- "hashbrown",
+ "hashbrown 0.11.2",
  "indexmap",
  "memchr",
 ]
@@ -2309,7 +2318,7 @@ version = "0.1.0"
 dependencies = [
  "byteorder",
  "getopts",
- "hashbrown",
+ "hashbrown 0.11.2",
  "hpet",
  "log",
  "network_manager",
@@ -2907,8 +2916,12 @@ version = "0.1.0"
 dependencies = [
  "core2",
  "embedded-hal",
+ "hashbrown 0.12.3",
  "nb 1.0.0",
  "noline",
+ "path",
+ "spawn",
+ "task",
  "tty",
 ]
 
@@ -3647,6 +3660,7 @@ dependencies = [
  "async_channel",
  "core2",
  "mutex_sleep",
+ "task",
 ]
 
 [[package]]
@@ -3867,7 +3881,7 @@ dependencies = [
  "app_io",
  "core2",
  "fs_node",
- "hashbrown",
+ "hashbrown 0.11.2",
  "memfs",
  "path",
  "root",
@@ -3917,7 +3931,7 @@ name = "wasmparser"
 version = "0.81.0"
 source = "git+https://github.com/theseus-os/wasm-tools?branch=no-std-wasmparser#7b0eb0d074606c8a49027e60e452862f5fe183b4"
 dependencies = [
- "hashbrown",
+ "hashbrown 0.11.2",
 ]
 
 [[package]]
@@ -3931,7 +3945,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "core2",
  "cpp_demangle",
- "hashbrown",
+ "hashbrown 0.11.2",
  "indexmap",
  "lazy_static",
  "libc",
@@ -3961,7 +3975,7 @@ dependencies = [
  "core2",
  "cranelift-entity",
  "gimli",
- "hashbrown",
+ "hashbrown 0.11.2",
  "indexmap",
  "log",
  "more-asserts",
@@ -4008,7 +4022,7 @@ dependencies = [
  "cc",
  "cfg-if 1.0.0",
  "core2",
- "hashbrown",
+ "hashbrown 0.11.2",
  "indexmap",
  "lazy_static",
  "libc",

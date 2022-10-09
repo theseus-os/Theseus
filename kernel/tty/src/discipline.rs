@@ -1,6 +1,7 @@
 use crate::Channel;
 use alloc::vec::Vec;
 use core2::io::Result;
+use task::{KillReason, TaskRef};
 
 // FIXME: Ctrl+C, Ctrl+Z, etc.
 
@@ -29,6 +30,7 @@ pub struct LineDiscipline {
     ///
     /// If `None`, canonical mode is disabled
     canonical: Option<Vec<u8>>,
+    foreground: Option<TaskRef>,
 }
 
 impl Default for LineDiscipline {
@@ -44,6 +46,7 @@ impl LineDiscipline {
         Self {
             echo: true,
             canonical: Some(Vec::new()),
+            foreground: None,
         }
     }
 
@@ -80,6 +83,10 @@ impl LineDiscipline {
         self.echo = echo;
     }
 
+    pub fn foreground(&mut self, foreground: Option<TaskRef>) {
+        self.foreground = foreground;
+    }
+
     /// Sets the canonical flag.
     ///
     /// This is equivalent to `ICANON` on Linux.
@@ -92,6 +99,12 @@ impl LineDiscipline {
         }
     }
 
+    fn clear_input_buf(&mut self) {
+        if let Some(ref mut input_buf) = self.canonical {
+            *input_buf = Vec::new();
+        }
+    }
+
     pub(crate) fn process_byte(
         &mut self,
         byte: u8,
@@ -100,6 +113,25 @@ impl LineDiscipline {
     ) -> Result<()> {
         const ERASE: u8 = 0x7f; // DEL (backspace key)
         const WERASE: u8 = 0x17; // ^W
+
+        const INTERRUPT: u8 = 0x3;
+        const SUSPEND: u8 = 0x1a;
+
+        if let Some(ref foreground) = self.foreground {
+            match byte {
+                INTERRUPT => {
+                    let _ = foreground.kill(KillReason::Requested);
+                    self.clear_input_buf();
+                    return Ok(());
+                }
+                SUSPEND => {
+                    foreground.suspend();
+                    self.clear_input_buf();
+                    return Ok(());
+                }
+                _ => {}
+            }
+        }
 
         // TODO: EOF and EOL
         // TODO: UTF-8?

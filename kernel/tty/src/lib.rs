@@ -69,6 +69,7 @@ impl Tty {
 }
 
 /// The master (i.e. terminal) end of a [`Tty`].
+#[derive(Clone)]
 pub struct Master {
     master: Channel,
     slave: Channel,
@@ -119,6 +120,7 @@ impl Write for Master {
 }
 
 /// The slave (i.e. application) end of a [`Tty`].
+#[derive(Clone)]
 pub struct Slave {
     master: Channel,
     slave: Channel,

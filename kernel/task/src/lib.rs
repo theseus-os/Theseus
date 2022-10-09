@@ -206,6 +206,10 @@ pub enum RunState {
     Runnable,
     /// blocked on something, like I/O or a wait event
     Blocked,
+    /// The `Task` has been suspended from proceding further.
+    ///
+    /// Currently, this is only triggered by a Ctrl + Z in the terminal.
+    Suspended,
     /// The `Task` has exited and can no longer be run,
     /// either by running to completion or being killed. 
     Exited,
@@ -685,6 +689,10 @@ impl Task {
     /// Unblocks this `Task` by setting its runstate to [`RunState::Runnable`].
     pub fn unblock(&self) {
         self.runstate.store(RunState::Runnable);
+    }
+    
+    pub fn suspend(&self) {
+        self.runstate.store(RunState::Suspended);
     }
 
     /// Sets this `Task` as this core's current task.
