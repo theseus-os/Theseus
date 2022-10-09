@@ -1,0 +1,10 @@
+[package]
+name = "shell_2"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+embedded-hal = "0.2.7"
+nb = "1.0"
+noline = { version = "0.2.0", features = ["alloc", "embedded"] }
+tty = { path = "../../kernel/tty" }

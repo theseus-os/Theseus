@@ -425,8 +425,8 @@ dependencies = [
  "log",
  "mpmc",
  "serial_port",
+ "shell_2",
  "spawn",
- "spin 0.9.0",
  "task",
  "text_terminal",
  "tty",
@@ -714,17 +714,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "derivative"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "derive_more"
 version = "0.99.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -838,6 +827,16 @@ name = "either"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3be565ca5c557d7f59e7cfcf1844f9e3033650c929c6566f511e8005f205c1d0"
+
+[[package]]
+name = "embedded-hal"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35949884794ad573cf46071e41c9b60efb0cb311e3ca01f7af807af1debc66ff"
+dependencies = [
+ "nb 0.1.3",
+ "void",
+]
 
 [[package]]
 name = "entryflags_x86_64"
@@ -1996,6 +1995,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "nb"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "801d31da0513b6ec5214e9bf433a77966320625a37860f910be265be6e18d06f"
+dependencies = [
+ "nb 1.0.0",
+]
+
+[[package]]
+name = "nb"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "546c37ac5d9e56f55e73b677106873d9d9f5190605e41a856503623648488cae"
+
+[[package]]
 name = "network_interface_card"
 version = "0.1.0"
 dependencies = [
@@ -2060,6 +2074,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "noline"
+version = "0.2.0"
+source = "git+https://github.com/tsoutsman/noline?branch=history-dedup#f5b6e4e1be89d1c13f5443b1bdc1fb6e1d17ccc7"
+dependencies = [
+ "embedded-hal",
+ "nb 1.0.0",
+ "num_enum",
+]
+
+[[package]]
 name = "ns"
 version = "0.1.0"
 dependencies = [
@@ -2104,19 +2128,18 @@ dependencies = [
 
 [[package]]
 name = "num_enum"
-version = "0.5.2"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5adf0198d427ee515335639f275e806ca01acf9f07d7cf14bb36a10532a6169"
+checksum = "cf5395665662ef45796a4ff5486c5d41d29e0c09640af4c5f17fd94ee2c119c9"
 dependencies = [
- "derivative",
  "num_enum_derive",
 ]
 
 [[package]]
 name = "num_enum_derive"
-version = "0.5.2"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1def5a3f69d4707d8a040b12785b98029a39e8c610ae685c7f6265669767482"
+checksum = "3b0498641e53dd6ac1a4f22547548caa6864cc4933784319cd1775271c5a46ce"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2880,6 +2903,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "shell_2"
+version = "0.1.0"
+dependencies = [
+ "embedded-hal",
+ "nb 1.0.0",
+ "noline",
+ "tty",
+]
+
+[[package]]
 name = "signal_handler"
 version = "0.1.0"
 dependencies = [
@@ -3611,7 +3644,9 @@ dependencies = [
 name = "tty"
 version = "0.1.0"
 dependencies = [
+ "async_channel",
  "core2",
+ "log",
  "mutex_sleep",
 ]
 

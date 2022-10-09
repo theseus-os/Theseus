@@ -53,7 +53,7 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>)
     });
     (
         Sender   { channel: channel.clone() },
-        Receiver { channel: channel }
+        Receiver { channel }
     )
 }
 
@@ -356,7 +356,8 @@ impl <T: Send> Receiver<T> {
 impl<T: Send> Drop for Receiver<T> {
     fn drop(&mut self) {
         // trace!("Dropping the receiver");
-        self.channel.channel_status.store(ChannelStatus::ReceiverDisconnected);
+        // FIXME
+        // self.channel.channel_status.store(ChannelStatus::ReceiverDisconnected);
         self.channel.waiting_senders.notify_one();
     }
 }
@@ -365,7 +366,8 @@ impl<T: Send> Drop for Receiver<T> {
 impl<T: Send> Drop for Sender<T> {
     fn drop(&mut self) {
         // trace!("Dropping the sender");
-        self.channel.channel_status.store(ChannelStatus::SenderDisconnected);
+        // FIXME
+        // self.channel.channel_status.store(ChannelStatus::SenderDisconnected);
         self.channel.waiting_receivers.notify_one();
     }
 }

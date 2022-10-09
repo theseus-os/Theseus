@@ -53,8 +53,8 @@ impl Channel {
         let mut read = 0;
 
         loop {
-            read += 1;
             buf[read] = byte;
+            read += 1;
 
             if read == buf.len() {
                 return read;

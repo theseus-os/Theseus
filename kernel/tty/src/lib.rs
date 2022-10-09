@@ -90,6 +90,12 @@ impl Master {
     }
 
     pub fn write(&self, buf: &[u8]) -> usize {
+        if buf.len() == 0 {
+            return 0;
+        }
+        
+        log::debug!("writing");
+
         let mut discipline = self.discipline.lock().unwrap();
         discipline.process_slave_in(buf, &self.master, &self.slave);
         buf.len()
