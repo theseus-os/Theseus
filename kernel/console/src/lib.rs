@@ -7,10 +7,11 @@ extern crate alloc;
 use alloc::format;
 use async_channel::Receiver;
 use core::sync::atomic::{AtomicU16, Ordering};
-use core2::io::Write;
+use core2::io::{Read, Write};
 use irq_safety::MutexIrqSafe;
 use log::{error, warn};
 use serial_port::{get_serial_port, DataChunk, SerialPort, SerialPortAddress};
+use shell::Shell;
 use task::JoinableTaskRef;
 
 /// The serial port being used for the default system logger can optionally
@@ -79,6 +80,8 @@ fn console_connection_detector(
         }
 
         let tty = tty::Tty::new();
+        let shell = Shell::new(tty.slave());
+
         let _ = spawn::new_task_builder(tty_reader, (serial_port, tty.master()))
             .name(format!("tty_reader_loop_{:?}", serial_port_address))
             .spawn()
@@ -87,26 +90,26 @@ fn console_connection_detector(
             .name(format!("tty_writer_loop_{:?}", serial_port_address))
             .spawn()
             .unwrap();
-        let _ = spawn::new_task_builder(shell::temp, tty.slave())
+        let _ = spawn::new_task_builder(Shell::run, shell)
             .name(format!("shell_loop_{:?}", serial_port_address))
             .spawn()
             .unwrap();
     }
 }
 
-fn tty_reader((port, master): (alloc::sync::Arc<MutexIrqSafe<SerialPort>>, tty::Master)) {
+fn tty_reader((port, mut master): (alloc::sync::Arc<MutexIrqSafe<SerialPort>>, tty::Master)) {
     loop {
         let mut data = [0; 1024];
-        let len = master.read(&mut data);
+        let len = master.read(&mut data).unwrap();
         // log::trace!("writing data to serial port: {:?}", &data[..len]);
         port.lock().write(&data[..len]).unwrap();
     }
 }
 
-fn tty_writer((receiver, master): (Receiver<DataChunk>, tty::Master)) {
+fn tty_writer((receiver, mut master): (Receiver<DataChunk>, tty::Master)) {
     loop {
         let DataChunk { data, len } = receiver.receive().unwrap();
         // log::trace!("read data from serial port: {:?}", &data[..len.into()]);
-        master.write(&data[..len as usize]);
+        master.write(&data[..len as usize]).unwrap();
     }
 }

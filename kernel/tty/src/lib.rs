@@ -5,12 +5,12 @@ extern crate alloc;
 mod channel;
 mod discipline;
 
-use core::ops::DerefMut;
-
 pub use discipline::LineDiscipline;
 
 use alloc::sync::Arc;
 use channel::Channel;
+use core::ops::DerefMut;
+use core2::io::{Error, Result};
 use core2::io::{Read, Write};
 use mutex_sleep::MutexSleep as Mutex;
 
@@ -81,38 +81,33 @@ impl Master {
         self.discipline.lock().unwrap()
     }
 
-    pub fn read(&self, buf: &mut [u8]) -> usize {
-        self.master.receive_buf(buf)
-    }
-
-    pub fn read_byte(&self) -> u8 {
+    pub fn read_byte(&self) -> Result<u8> {
         self.master.receive()
     }
 
-    pub fn write(&self, buf: &[u8]) -> usize {
-        if buf.is_empty() {
-            return 0;
-        }
-
+    pub fn write_byte(&self, byte: u8) -> Result<()> {
         let mut discipline = self.discipline.lock().unwrap();
-        discipline.process_slave_in(buf, &self.master, &self.slave);
-        buf.len()
-    }
-
-    pub fn write_byte(&self, byte: u8) {
-        self.write(&[byte]);
+        discipline.process_byte(byte, &self.master, &self.slave)?;
+        Ok(())
     }
 }
 
 impl Read for Master {
-    fn read(&mut self, buf: &mut [u8]) -> core2::io::Result<usize> {
-        Ok(Self::read(self, buf))
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        self.master.receive_buf(buf)
     }
 }
 
 impl Write for Master {
-    fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
-        Ok(Self::write(self, buf))
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        // TODO: Don't fail if we can't send entire buf.
+        if buf.is_empty() {
+            return Ok(0);
+        }
+
+        let mut discipline = self.discipline.lock().unwrap();
+        discipline.process_buf(buf, &self.master, &self.slave)?;
+        Ok(buf.len())
     }
 
     fn flush(&mut self) -> core2::io::Result<()> {
@@ -132,36 +127,29 @@ impl Slave {
         self.discipline.lock().unwrap()
     }
 
-    pub fn read(&self, buf: &mut [u8]) -> usize {
-        self.slave.receive_buf(buf)
-    }
-
-    pub fn read_byte(&self) -> u8 {
+    pub fn read_byte(&self) -> Result<u8> {
         self.slave.receive()
     }
 
-    pub fn write(&self, buf: &[u8]) -> usize {
-        self.slave.send_buf(buf);
-        buf.len()
-    }
-
-    pub fn write_byte(&self, byte: u8) {
-        self.master.send(byte);
+    pub fn write_byte(&self, byte: u8) -> Result<()> {
+        self.master.send(byte)
     }
 }
 
 impl Read for Slave {
-    fn read(&mut self, buf: &mut [u8]) -> core2::io::Result<usize> {
-        Ok(Self::read(self, buf))
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        self.slave.receive_buf(buf)
     }
 }
 
 impl Write for Slave {
-    fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
-        Ok(Self::write(self, buf))
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        // TODO: Don't fail if we can't send entire buf.
+        self.slave.send_buf(buf)?;
+        Ok(buf.len())
     }
 
-    fn flush(&mut self) -> core2::io::Result<()> {
+    fn flush(&mut self) -> Result<()> {
         Ok(())
     }
 }

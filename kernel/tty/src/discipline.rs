@@ -1,5 +1,6 @@
 use crate::Channel;
 use alloc::vec::Vec;
+use core2::io::Result;
 
 // FIXME: Ctrl+C, Ctrl+Z, etc.
 
@@ -91,57 +92,82 @@ impl LineDiscipline {
         }
     }
 
-    pub(crate) fn process_slave_in(&mut self, buf: &[u8], master: &Channel, slave: &Channel) {
+    pub(crate) fn process_byte(
+        &mut self,
+        byte: u8,
+        master: &Channel,
+        slave: &Channel,
+    ) -> Result<()> {
         const ERASE: u8 = 0x7f; // DEL (backspace key)
         const WERASE: u8 = 0x17; // ^W
 
-        for byte in buf {
-            // TODO: UTF-8?
-            if self.echo {
-                match (*byte, &self.canonical) {
-                    (b'\r', _) => master.send_buf([b'\r', b'\n']),
-                    // TODO: Also pass-through START and STOP characters
-                    (b'\t' | b'\n', _) => master.send(*byte),
-                    (ERASE, Some(input_buf)) => {
-                        if !input_buf.is_empty() {
-                            master.send_buf([0x8, b' ', 0x8])
-                        }
-                    }
-                    (WERASE, Some(input_buf)) => {
-                        if !input_buf.is_empty() {
-                            // TODO: Cache offset. Currently we're calculating it twice: once here,
-                            // and once if canonical mode is enabled.
-                            let offset = werase(input_buf);
-                            for _ in 0..offset {
-                                master.send_buf([0x8, b' ', 0x8])
-                            }
-                        }
-                    }
-                    (0..=0x1f, _) => master.send_buf([b'^', byte + 0x40]),
-                    _ => master.send(*byte),
+        // TODO: EOF and EOL
+        // TODO: UTF-8?
+        if self.echo {
+            match (byte, &self.canonical) {
+                (b'\r', _) => {
+                    master.send_buf([b'\r', b'\n'])?;
                 }
-            }
-
-            if let Some(ref mut input_buf) = self.canonical {
-                match *byte {
-                    b'\r' | b'\n' => {
-                        slave.send_buf(core::mem::take(input_buf));
-                        slave.send(b'\n');
+                // TODO: Also pass-through START and STOP characters
+                (b'\t' | b'\n', _) => {
+                    master.send(byte)?;
+                }
+                (ERASE, Some(input_buf)) => {
+                    if !input_buf.is_empty() {
+                        master.send_buf([0x8, b' ', 0x8])?
                     }
-                    ERASE => {
-                        input_buf.pop();
-                    }
-                    WERASE => {
-                        for _ in 0..werase(input_buf) {
-                            input_buf.pop();
+                }
+                (WERASE, Some(input_buf)) => {
+                    if !input_buf.is_empty() {
+                        // TODO: Cache offset. Currently we're calculating it twice: once here,
+                        // and once if canonical mode is enabled.
+                        let offset = werase(input_buf);
+                        for _ in 0..offset {
+                            master.send_buf([0x8, b' ', 0x8])?;
                         }
                     }
-                    _ => input_buf.push(*byte),
                 }
-            } else {
-                slave.send(*byte);
+                (0..=0x1f, _) => {
+                    master.send_buf([b'^', byte + 0x40])?;
+                }
+                _ => {
+                    master.send(byte)?;
+                }
             }
         }
+
+        if let Some(ref mut input_buf) = self.canonical {
+            match byte {
+                b'\r' | b'\n' => {
+                    slave.send_buf(core::mem::take(input_buf))?;
+                    slave.send(b'\n')?;
+                }
+                ERASE => {
+                    input_buf.pop();
+                }
+                WERASE => {
+                    for _ in 0..werase(input_buf) {
+                        input_buf.pop();
+                    }
+                }
+                _ => input_buf.push(byte),
+            }
+        } else {
+            slave.send(byte)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn process_buf(
+        &mut self,
+        buf: &[u8],
+        master: &Channel,
+        slave: &Channel,
+    ) -> Result<()> {
+        for byte in buf {
+            self.process_byte(*byte, master, slave)?;
+        }
+        Ok(())
     }
 }
 

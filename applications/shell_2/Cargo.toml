@@ -8,3 +8,8 @@ embedded-hal = "0.2.7"
 nb = "1.0"
 noline = { version = "0.2.0", features = ["alloc", "embedded"] }
 tty = { path = "../../kernel/tty" }
+
+[dependencies.core2]
+version = "0.4.0"
+default-features = false
+features = ["alloc", "nightly"]

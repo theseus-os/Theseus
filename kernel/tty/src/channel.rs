@@ -4,7 +4,8 @@
 // FIXME: async_channel is not a proper mpmc
 // FIXME: Error handling
 
-use async_channel::{ChannelError, Receiver, Sender};
+use async_channel::{Receiver, Sender};
+use core2::io::{ErrorKind, Result};
 
 #[derive(Clone)]
 pub(crate) struct Channel {
@@ -18,38 +19,36 @@ impl Channel {
         Self { sender, receiver }
     }
 
-    pub(crate) fn send(&self, byte: u8) {
-        self.sender.send(byte).unwrap();
+    pub(crate) fn send(&self, byte: u8) -> Result<()> {
+        self.sender.send(byte).map_err(|e| e.into())
     }
 
-    pub(crate) fn send_buf<B>(&self, buf: B)
+    pub(crate) fn send_buf<B>(&self, buf: B) -> Result<()>
     where
         B: AsRef<[u8]>,
     {
+        // TODO: Don't fail if we can't send entire buf.
         for byte in buf.as_ref() {
-            self.send(*byte);
+            self.send(*byte)?;
         }
+        Ok(())
     }
 
     #[allow(dead_code)]
-    pub(crate) fn try_send(&self, byte: u8) -> bool {
-        match self.sender.try_send(byte) {
-            Ok(_) => true,
-            Err((_, ChannelError::ChannelFull)) => false,
-            Err(_) => panic!(),
-        }
+    pub(crate) fn try_send(&self, byte: u8) -> Result<()> {
+        self.sender.try_send(byte).map_err(|(_, e)| e.into())
     }
 
-    pub(crate) fn receive(&self) -> u8 {
-        self.receiver.receive().unwrap()
+    pub(crate) fn receive(&self) -> Result<u8> {
+        self.receiver.receive().map_err(|e| e.into())
     }
 
-    pub(crate) fn receive_buf(&self, buf: &mut [u8]) -> usize {
+    pub(crate) fn receive_buf(&self, buf: &mut [u8]) -> Result<usize> {
         if buf.is_empty() {
-            return 0;
+            return Ok(0);
         }
 
-        let mut byte = self.receive();
+        let mut byte = self.receive()?;
         let mut read = 0;
 
         loop {
@@ -57,21 +56,18 @@ impl Channel {
             read += 1;
 
             if read == buf.len() {
-                return read;
+                return Ok(read);
             }
 
-            byte = match self.try_receive() {
-                Some(b) => b,
-                None => return read,
+            byte = match self.try_receive().into() {
+                Ok(b) => b,
+                Err(e) if e.kind() == ErrorKind::WouldBlock => return Ok(read),
+                Err(e) => return Err(e),
             };
         }
     }
 
-    pub(crate) fn try_receive(&self) -> Option<u8> {
-        match self.receiver.try_receive() {
-            Ok(byte) => Some(byte),
-            Err(ChannelError::ChannelEmpty) => None,
-            Err(_) => panic!(),
-        }
+    pub(crate) fn try_receive(&self) -> Result<u8> {
+        self.receiver.try_receive().map_err(|e| e.into())
     }
 }

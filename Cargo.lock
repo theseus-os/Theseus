@@ -141,6 +141,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 name = "async_channel"
 version = "0.1.0"
 dependencies = [
+ "core2",
  "crossbeam-utils",
  "debugit",
  "hpet",
@@ -2904,6 +2905,7 @@ dependencies = [
 name = "shell_2"
 version = "0.1.0"
 dependencies = [
+ "core2",
  "embedded-hal",
  "nb 1.0.0",
  "noline",
