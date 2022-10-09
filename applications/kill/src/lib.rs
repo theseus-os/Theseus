@@ -77,23 +77,21 @@ fn kill_task(task_id: usize, reap: bool) -> Result<(), String> {
                 Ok(())
             }
         }
-        else {
-            if reap {
-                // if we failed to kill the task, but it was a reap request, then reap it anyway.
-                match task_ref.take_exit_value() {
-                    Some(exit_val) => { 
-                        println!("Reaped task {}, got exit value {}", task_id, debugit!(exit_val));
-                        Ok(())
-                    }
-                    _ => {
-                        Err(format!("Failed to reap task {}", task_id))
-                    }
+        else if reap {
+            // if we failed to kill the task, but it was a reap request, then reap it anyway.
+            match task_ref.take_exit_value() {
+                Some(exit_val) => {
+                    println!("Reaped task {}, got exit value {}", task_id, debugit!(exit_val));
+                    Ok(())
+                }
+                _ => {
+                    Err(format!("Failed to reap task {}", task_id))
                 }
             }
-            else {
-                // failed to kill the task, no reap request, so return failure.
-                Err(format!("Failed to kill task {}, it was already exited.", task_id))
-            }
+        }
+        else {
+            // failed to kill the task, no reap request, so return failure.
+            Err(format!("Failed to kill task {}, it was already exited.", task_id))
         }
     }
     else {

@@ -289,7 +289,7 @@ pub fn constant_offset_fix(
             }
         }
 
-        x = x + 8;
+        x += 8;
         if x > top {
             break;
         }

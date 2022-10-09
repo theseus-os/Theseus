@@ -167,7 +167,7 @@ wrong-transmute
 zst-offset
 # Style
 assertions-on-constants
-# assign-op-pattern
+assign-op-pattern
 blacklisted-name
 # blocks-in-if-conditions
 bool-assert-comparison
@@ -177,7 +177,7 @@ bytes-nth
 chars-last-cmp
 chars-next-cmp
 cmp-null
-# collapsible-else-if
+collapsible-else-if
 # collapsible-if
 # collapsible-match
 # comparison-chain
