@@ -178,10 +178,10 @@ chars-last-cmp
 chars-next-cmp
 cmp-null
 collapsible-else-if
-# collapsible-if
+collapsible-if
 # collapsible-match
 # comparison-chain
-# comparison-to-empty
+comparison-to-empty
 # declare-interior-mutable-const
 disallowed-methods
 disallowed-types
