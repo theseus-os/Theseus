@@ -1,20 +1,3 @@
-//! ```text
-//!       +--- terminal <---+
-//!       |                 |
-//!       |             master.read()
-//!       V                 |
-//! master.write() --> master.reader
-//!       |                 ^
-//!       |                 |
-//!       V                 |
-//! slave.reader       slave.writer
-//!       |                 ^
-//!       |                 |
-//!       +-----> app ------+
-//! ```
-//! The line discipline functionality is split between `master.writer` and
-//! `slave.reader`.
-
 #![no_std]
 
 extern crate alloc;
@@ -31,6 +14,22 @@ use channel::Channel;
 use core2::io::{Read, Write};
 use mutex_sleep::MutexSleep as Mutex;
 
+/// A terminal device driver.
+///
+/// The design is based on the Unix TTY/PTY subsystem. Unlike Unix, Theseus does
+/// not distinguish between teletypes and pseudo-teletypes. Each `Tty` consists
+/// of two ends: a [`Master`] and a [`Slave`]. The terminal holds the master and
+/// the application holds the slave. The TTY's [`LineDiscipline`] dictates how
+/// the two interact.
+///
+/// In the context of Theseus, there are two terminals:
+/// - `terminal_emulator`, which is the graphical terminal emulator implemented
+///   in Theseus.
+/// - `console`, which connects to an external terminal emulator through a
+///   serial port.
+///
+/// When started, both terminals launch the `shell`, which contains the logic to
+/// launch applications, store command history, autocomplete input, etc.
 #[derive(Clone)]
 pub struct Tty {
     master: Channel,
@@ -70,6 +69,7 @@ impl Tty {
     }
 }
 
+/// The master (i.e. terminal) end of a [`Tty`].
 pub struct Master {
     master: Channel,
     slave: Channel,
@@ -82,7 +82,7 @@ impl Master {
     }
 
     pub fn read(&self, buf: &mut [u8]) -> usize {
-        self.master.receive_buf(buf)       
+        self.master.receive_buf(buf)
     }
 
     pub fn read_byte(&self) -> u8 {
@@ -90,11 +90,9 @@ impl Master {
     }
 
     pub fn write(&self, buf: &[u8]) -> usize {
-        if buf.len() == 0 {
+        if buf.is_empty() {
             return 0;
         }
-        
-        log::debug!("writing");
 
         let mut discipline = self.discipline.lock().unwrap();
         discipline.process_slave_in(buf, &self.master, &self.slave);
@@ -122,6 +120,7 @@ impl Write for Master {
     }
 }
 
+/// The slave (i.e. application) end of a [`Tty`].
 pub struct Slave {
     master: Channel,
     slave: Channel,
@@ -134,7 +133,7 @@ impl Slave {
     }
 
     pub fn read(&self, buf: &mut [u8]) -> usize {
-        self.slave.receive_buf(buf)       
+        self.slave.receive_buf(buf)
     }
 
     pub fn read_byte(&self) -> u8 {
