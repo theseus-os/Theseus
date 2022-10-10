@@ -29,7 +29,7 @@ pmu_sample_stop = { path = "../applications/pmu_sample_stop", optional = true }
 ps = { path = "../applications/ps", optional = true }
 pwd = { path = "../applications/pwd", optional = true }
 rm = { path = "../applications/rm", optional = true }
-shell = { path = "../applications/shell", optional = true }
+shell = { package = "shell_2", path = "../applications/shell_2", optional = true }
 swap = { path = "../applications/swap", optional = true }
 upd = { path = "../applications/upd", optional = true }
 wasm = { path = "../applications/wasm", optional = true }
