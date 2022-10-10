@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+app_io = { path = "../../kernel/app_io" }
 embedded-hal = "0.2.7"
 hashbrown = "0.12.3"
 nb = "1.0"

@@ -22,6 +22,9 @@ path = "../../kernel/logger"
 [dependencies.mutex_sleep]
 path = "../../kernel/mutex_sleep"
 
+[dependencies.tty]
+path = "../../kernel/tty"
+
 [dependencies.lazy_static]
 features = ["spin_no_std"]
 version = "1.4.0"

@@ -125,6 +125,7 @@ dependencies = [
  "mutex_sleep",
  "stdio",
  "task",
+ "tty",
 ]
 
 [[package]]
@@ -415,6 +416,7 @@ dependencies = [
 name = "console"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "async_channel",
  "core2",
  "io",
@@ -2883,6 +2885,7 @@ version = "0.1.0"
 name = "shell_2"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "core2",
  "embedded-hal",
  "hashbrown 0.12.3",

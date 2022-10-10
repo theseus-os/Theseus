@@ -1,6 +1,9 @@
+use core::sync::atomic::{AtomicBool, Ordering};
+
 use crate::Channel;
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
 use core2::io::Result;
+use mutex_sleep::MutexSleep as Mutex;
 use task::{KillReason, TaskRef};
 
 // FIXME: Ctrl+C, Ctrl+Z, etc.
@@ -23,14 +26,25 @@ use task::{KillReason, TaskRef};
 /// a line feed (hence flushing the input buffer). This behaviour is equivalent
 /// to `ICRNL` on Linux.
 ///
+/// Modifying a cloned `LineDiscipline` will modify the original:
+/// ```rust
+/// # use tty::LineDiscipline;
+/// let discipline_1 = LineDiscipline::new();
+/// assert!(discipline_1.canonical());
+/// let discipline_2 = discipline_1.clone();
+/// discipline_2.set_canonical(false);
+/// assert!(!discipline_1.canonical());
+/// ```
+///
 /// [cfmakeraw]: https://linux.die.net/man/3/cfmakeraw
+#[derive(Clone, Debug)]
 pub struct LineDiscipline {
-    echo: bool,
+    echo: Arc<AtomicBool>,
     /// The input buffer for canonical mode.
     ///
     /// If `None`, canonical mode is disabled
-    canonical: Option<Vec<u8>>,
-    foreground: Option<TaskRef>,
+    canonical: Arc<Mutex<Option<Vec<u8>>>>,
+    foreground: Arc<Mutex<Option<TaskRef>>>,
 }
 
 impl Default for LineDiscipline {
@@ -44,9 +58,9 @@ impl LineDiscipline {
     /// Creates a new line discipline with sane defaults.
     pub fn new() -> Self {
         Self {
-            echo: true,
-            canonical: Some(Vec::new()),
-            foreground: None,
+            echo: Arc::new(AtomicBool::new(true)),
+            canonical: Arc::new(Mutex::new(Some(Vec::new()))),
+            foreground: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -54,59 +68,71 @@ impl LineDiscipline {
     ///
     /// This is equivalent to:
     /// ```rust
-    /// # let discipline = Self::default();
-    /// discipline.echo(true);
-    /// discipline.canonical(true);
+    /// # let discipline = tty::LineDiscipline::default();
+    /// discipline.set_echo(true);
+    /// discipline.set_canonical(true);
     /// ```
-    pub fn sane(&mut self) {
-        self.echo(true);
-        self.canonical(true);
+    pub fn set_sane(&self) {
+        self.set_echo(true);
+        self.set_canonical(true);
     }
 
     /// Sets the line discipline to raw mode.
     ///
     /// This is equivalent to:
     /// ```rust
-    /// # let discipline = Self::default();
-    /// discipline.echo(false);
-    /// discipline.canonical(false);
+    /// # let discipline = tty::LineDiscipline::default();
+    /// discipline.set_echo(false);
+    /// discipline.set_canonical(false);
     /// ```
-    pub fn raw(&mut self) {
-        self.echo(false);
-        self.canonical(false);
+    pub fn set_raw(&self) {
+        self.set_echo(false);
+        self.set_canonical(false);
+    }
+
+    pub fn echo(&self) -> bool {
+        self.echo.load(Ordering::SeqCst)
     }
 
     /// Sets the echo flag.
     ///
     /// This is equivalent to `ECHO | ECHOE | ECHOCTL` on Linux.
-    pub fn echo(&mut self, echo: bool) {
-        self.echo = echo;
+    pub fn set_echo(&self, echo: bool) {
+        self.echo.store(echo, Ordering::SeqCst);
+    }
+    
+    pub fn foreground(&self) -> Option<TaskRef> {
+        self.foreground.lock().unwrap().clone()
     }
 
-    pub fn foreground(&mut self, foreground: Option<TaskRef>) {
-        self.foreground = foreground;
+    pub fn set_foreground(&self, foreground: Option<TaskRef>) {
+        *self.foreground.lock().unwrap() = foreground;
+    }
+
+    pub fn canonical(&self) -> bool {
+        self.canonical.lock().unwrap().is_some()
     }
 
     /// Sets the canonical flag.
     ///
     /// This is equivalent to `ICANON` on Linux.
-    pub fn canonical(&mut self, canonical: bool) {
+    pub fn set_canonical(&self, canonical: bool) {
         if canonical {
-            self.canonical = Some(Vec::new());
+            *self.canonical.lock().unwrap() = Some(Vec::new());
         } else {
             // TODO: Flush buffer?
-            self.canonical = None;
+            *self.canonical.lock().unwrap() = None;
         }
     }
 
-    fn clear_input_buf(&mut self) {
-        if let Some(ref mut input_buf) = self.canonical {
+    fn clear_input_buf(&self) {
+        if let Some(ref mut input_buf) = *self.canonical.lock().unwrap() {
             *input_buf = Vec::new();
         }
     }
 
     pub(crate) fn process_byte(
-        &mut self,
+        &self,
         byte: u8,
         master: &Channel,
         slave: &Channel,
@@ -117,7 +143,7 @@ impl LineDiscipline {
         const INTERRUPT: u8 = 0x3;
         const SUSPEND: u8 = 0x1a;
 
-        if let Some(ref foreground) = self.foreground {
+        if let Some(ref foreground) = *self.foreground.lock().unwrap() {
             match byte {
                 INTERRUPT => {
                     let _ = foreground.kill(KillReason::Requested);
@@ -135,8 +161,8 @@ impl LineDiscipline {
 
         // TODO: EOF and EOL
         // TODO: UTF-8?
-        if self.echo {
-            match (byte, &self.canonical) {
+        if self.echo.load(Ordering::SeqCst) {
+            match (byte, &*self.canonical.lock().unwrap()) {
                 (b'\r', _) => {
                     master.send_buf([b'\r', b'\n'])?;
                 }
@@ -168,7 +194,7 @@ impl LineDiscipline {
             }
         }
 
-        if let Some(ref mut input_buf) = self.canonical {
+        if let Some(ref mut input_buf) = *self.canonical.lock().unwrap() {
             match byte {
                 b'\r' | b'\n' => {
                     slave.send_buf(core::mem::take(input_buf))?;
@@ -191,12 +217,13 @@ impl LineDiscipline {
     }
 
     pub(crate) fn process_buf(
-        &mut self,
+        &self,
         buf: &[u8],
         master: &Channel,
         slave: &Channel,
     ) -> Result<()> {
         for byte in buf {
+            // TODO: This locks internal fields on every byte.
             self.process_byte(*byte, master, slave)?;
         }
         Ok(())
@@ -204,7 +231,7 @@ impl LineDiscipline {
 }
 
 /// Returns how many characters need to be removed to erase a word.
-fn werase(buf: &[u8]) -> usize {
+const fn werase(buf: &[u8]) -> usize {
     let len = buf.len();
     let mut offset = 0;
 

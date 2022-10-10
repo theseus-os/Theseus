@@ -5,17 +5,18 @@ extern crate alloc;
 mod internal;
 mod wrapper;
 
-use alloc::{borrow::ToOwned, format, vec::Vec};
+use alloc::{borrow::ToOwned, format, sync::Arc, vec::Vec};
 use core::fmt::Write;
 use hashbrown::HashMap;
 use noline::{builder::EditorBuilder, sync::embedded::IO as Io};
 use task::{ExitValue, JoinableTaskRef, RunState, TaskRef};
-use tty::Slave;
+use tty::LineDiscipline;
 
 // FIXME: export main function rather than shell struct
 
-pub struct Shell<'a> {
-    slave: &'a Slave,
+pub struct Shell {
+    // TODO: Make LineDiscipline interior mutable?
+    discipline: LineDiscipline,
     // TODO: Could use a vec-based data structure like Vec<Option<JoinableTaskRef>
     // Adding a job would iterate over the vec trying to find a None and if it can't, push to the
     // end. Removing a job would replace the job with None.
@@ -23,11 +24,11 @@ pub struct Shell<'a> {
     stop_order: Vec<usize>,
 }
 
-impl<'a> Shell<'a> {
+impl Shell {
     /// Creates a new shell.
-    pub fn new(slave: &'a Slave) -> Self {
+    pub fn new() -> Self {
         Self {
-            slave,
+            discipline: app_io::line_discipline().unwrap(),
             jobs: HashMap::new(),
             stop_order: Vec::new(),
         }
@@ -41,24 +42,25 @@ impl<'a> Shell<'a> {
     }
 }
 
-impl Shell<'_> {
+impl Shell {
     /// Configures the line discipline for use by the shell.
     fn set_shell_discipline(&self) {
-        let mut discipline = self.slave.discipline();
-        discipline.raw();
+        self.discipline.set_raw();
     }
 
     /// Configures the line discipline for use by applications.
     fn set_app_discipline(&self) {
-        let mut discipline = self.slave.discipline();
-        discipline.sane();
+        self.discipline.set_sane();
     }
 
     fn _run(&mut self) -> Result<()> {
         self.set_shell_discipline();
 
         // TODO: Ideally don't clone
-        let wrapper = wrapper::Wrapper(self.slave);
+        let wrapper = wrapper::Wrapper {
+            stdin: app_io::stdin().unwrap(),
+            stdout: app_io::stdout().unwrap(),
+        };
         let mut io = Io::new(wrapper);
         let mut editor = EditorBuilder::new_unbounded()
             .with_unbounded_history()
@@ -78,7 +80,7 @@ impl Shell<'_> {
     fn execute(&mut self, line: &str) -> Result<isize> {
         // TODO | and &
 
-        let (cmd, args) = if let Some((cmd, args_str)) = line.split_once(" ") {
+        let (cmd, args) = if let Some((cmd, args_str)) = line.split_once(' ') {
             let args = args_str.split(" ").collect::<Vec<_>>();
             (cmd, args)
         } else {
@@ -122,23 +124,21 @@ impl Shell<'_> {
         }
         // TODO: Don't clone?
         self.jobs.insert(num, task.clone());
-        self.slave.discipline().foreground(Some(task.clone()));
+        self.discipline.set_foreground(Some(task.clone()));
         task.unblock();
 
         loop {
             match task.runstate() {
                 RunState::Suspended => {
-                    self.slave.discipline().foreground(None);
+                    self.discipline.set_foreground(None);
                     self.stop_order.push(num);
                     return Ok(0);
                 }
                 RunState::Exited => {
-                    self.slave.discipline().foreground(None);
+                    self.discipline.set_foreground(None);
                     self.jobs.remove(&num).unwrap();
                     return Ok(match task.take_exit_value().unwrap() {
-                        ExitValue::Completed(status) => {
-                            status.downcast_ref::<isize>().unwrap().clone()
-                        }
+                        ExitValue::Completed(status) => *status.downcast_ref::<isize>().unwrap(),
                         ExitValue::Killed(_) => {
                             // TODO: Should we check that it was KillReason::Requested?
                             // TODO: Decide on a value. Bash uses 130.
@@ -171,10 +171,7 @@ impl Shell<'_> {
             panic!("multiple matching files found");
         }
 
-        // TODO: set environment
-        // TODO: set io
-
-        Ok(spawn::new_application_task_builder(app_path, None)
+        let task = spawn::new_application_task_builder(app_path, None)
             .unwrap()
             .argument(
                 args.into_iter()
@@ -183,7 +180,14 @@ impl Shell<'_> {
             )
             .block()
             .spawn()
-            .unwrap())
+            .unwrap();
+
+        let id = task.id;
+        // TODO: Double arc :(
+        app_io::insert_child_streams(id, app_io::streams().unwrap());
+        // TODO: set environment
+
+        Ok(task)
     }
 }
 

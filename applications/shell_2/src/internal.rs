@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 
 // TODO: Decide which internal commands we don't need.
 
-impl Shell<'_> {
+impl Shell {
     pub(crate) fn alias(&self, args: Vec<&str>) -> Result<isize> {
         todo!();
     }

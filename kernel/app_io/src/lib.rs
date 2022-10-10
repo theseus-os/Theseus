@@ -25,6 +25,7 @@ extern crate alloc;
 use alloc::{format, sync::Arc};
 use core2::io::{self, Error, ErrorKind, Read, Write};
 use stdio::{StdioReader, StdioWriter};
+use tty::{LineDiscipline, Slave};
 
 pub trait ImmutableRead: Send + Sync + 'static {
     fn read(&self, buf: &mut [u8]) -> io::Result<usize>;
@@ -63,32 +64,31 @@ impl ImmutableWrite for StdioWriter {
     }
 }
 
+impl ImmutableRead for Slave {
+    fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.read(buf)
+    }
+}
+
+impl ImmutableWrite for Slave {
+    fn write(&self, buf: &[u8]) -> io::Result<usize> {
+        self.write(buf)
+    }
+}
+
 /// Stores the stdio queues, key event queue and the pointer to the terminal
 /// for applications. This structure is provided for application's use and only
 /// contains necessary one-end readers/writers to queues. On the shell side, we
 /// have full control to queues.
+#[derive(Clone)]
 pub struct IoStreams {
     /// The reader to stdin.
-    stdin: Arc<dyn ImmutableRead>,
+    pub stdin: Arc<dyn ImmutableRead>,
     /// The writer to stdout.
-    stdout: Arc<dyn ImmutableWrite>,
+    pub stdout: Arc<dyn ImmutableWrite>,
     /// The writer to stderr.
-    stderr: Arc<dyn ImmutableWrite>,
-}
-
-impl IoStreams {
-    pub fn new<In, Out, Err>(stdin: Arc<In>, stdout: Arc<Out>, stderr: Arc<Err>) -> IoStreams
-    where
-        In: ImmutableRead,
-        Out: ImmutableWrite,
-        Err: ImmutableWrite,
-    {
-        IoStreams {
-            stdin,
-            stdout,
-            stderr,
-        }
-    }
+    pub stderr: Arc<dyn ImmutableWrite>,
+    pub discipline: Option<LineDiscipline>,
 }
 
 mod shared_maps {
@@ -126,6 +126,15 @@ pub fn insert_child_streams(task_id: usize, streams: IoStreams) -> Option<IoStre
 /// matches, otherwise returns None.
 pub fn remove_child_streams(task_id: usize) -> Option<IoStreams> {
     shared_maps::lock_stream_map().remove(&task_id)
+}
+
+pub fn streams() -> Result<IoStreams, &'static str> {
+    let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to get stdin")?;
+    let locked_streams = shared_maps::lock_stream_map();
+    match locked_streams.get(&task_id) {
+        Some(streams) => Ok(streams.clone()),
+        None => Err("no stdin for this task"),
+    }
 }
 
 /// Applications call this function to acquire a reader to its stdin queue.
@@ -173,6 +182,18 @@ pub fn stderr() -> Result<Arc<dyn ImmutableWrite>, &'static str> {
     }
 }
 
+pub fn line_discipline() -> Result<LineDiscipline, &'static str> {
+    let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to get stderr")?;
+    let locked_streams = shared_maps::lock_stream_map();
+    match locked_streams.get(&task_id) {
+        Some(IoStreams {
+            discipline: Some(discipline),
+            ..
+        }) => Ok(discipline.clone()),
+        _ => Err("no line discipline for this task"),
+    }
+}
+
 /// Calls `print!()` with an extra newline ('\n') appended to the end.
 #[macro_export]
 macro_rules! println {
@@ -209,6 +230,9 @@ pub fn print_to_stdout_args(fmt_args: core::fmt::Arguments) {
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => {
+            logger::write_str("THINGY").unwrap();
+            logger::write_fmt(fmt_args).unwrap();
+            logger::write_str("\n").unwrap();
             if queues
                 .stdout
                 .write_all(format!("{}", fmt_args).as_bytes())
@@ -216,6 +240,7 @@ pub fn print_to_stdout_args(fmt_args: core::fmt::Arguments) {
             {
                 let _ = logger::write_str("\x1b[31m [E] failed to write to stdout \x1b[0m\n");
             }
+            let _ = logger::write_str("\x1b[31m [E] wrote to stdout \x1b[0m\n");
         }
         None => {
             let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: no stdout queue for current task \x1b[0m\n");

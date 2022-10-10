@@ -7,11 +7,8 @@ mod discipline;
 
 pub use discipline::LineDiscipline;
 
-use alloc::sync::Arc;
 use channel::Channel;
-use core::ops::DerefMut;
 use core2::io::{Read, Result, Write};
-use mutex_sleep::MutexSleep as Mutex;
 
 /// A terminal device driver.
 ///
@@ -33,7 +30,7 @@ use mutex_sleep::MutexSleep as Mutex;
 pub struct Tty {
     master: Channel,
     slave: Channel,
-    discipline: Arc<Mutex<LineDiscipline>>,
+    discipline: LineDiscipline,
 }
 
 impl Default for Tty {
@@ -73,16 +70,20 @@ impl Tty {
 pub struct Master {
     master: Channel,
     slave: Channel,
-    discipline: Arc<Mutex<LineDiscipline>>,
+    discipline: LineDiscipline,
 }
 
 impl Master {
-    pub fn discipline(&self) -> impl DerefMut<Target = LineDiscipline> + '_ {
-        self.discipline.lock().unwrap()
+    pub fn discipline(&self) -> LineDiscipline {
+        self.discipline.clone()
     }
 
     pub fn read_byte(&self) -> Result<u8> {
         self.master.receive()
+    }
+
+    pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
+        self.master.receive_buf(buf)
     }
 
     pub fn try_read(&self, buf: &mut [u8]) -> Result<usize> {
@@ -90,28 +91,34 @@ impl Master {
     }
 
     pub fn write_byte(&self, byte: u8) -> Result<()> {
-        let mut discipline = self.discipline.lock().unwrap();
-        discipline.process_byte(byte, &self.master, &self.slave)?;
+        self.discipline
+            .process_byte(byte, &self.master, &self.slave)?;
         Ok(())
     }
-}
 
-impl Read for Master {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        self.master.receive_buf(buf)
-    }
-}
-
-impl Write for Master {
-    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+    pub fn write(&self, buf: &[u8]) -> Result<usize> {
         // TODO: Don't fail if we can't send entire buf.
         if buf.is_empty() {
             return Ok(0);
         }
 
-        let mut discipline = self.discipline.lock().unwrap();
-        discipline.process_buf(buf, &self.master, &self.slave)?;
+        self.discipline
+            .process_buf(buf, &self.master, &self.slave)?;
         Ok(buf.len())
+    }
+}
+
+impl Read for Master {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        let immutable: &Self = self;
+        immutable.read(buf)
+    }
+}
+
+impl Write for Master {
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        let immutable: &Self = self;
+        immutable.write(buf)
     }
 
     fn flush(&mut self) -> core2::io::Result<()> {
@@ -124,16 +131,20 @@ impl Write for Master {
 pub struct Slave {
     master: Channel,
     slave: Channel,
-    discipline: Arc<Mutex<LineDiscipline>>,
+    discipline: LineDiscipline,
 }
 
 impl Slave {
-    pub fn discipline(&self) -> impl DerefMut<Target = LineDiscipline> + '_ {
-        self.discipline.lock().unwrap()
+    pub fn discipline(&self) -> LineDiscipline {
+        self.discipline.clone()
     }
 
     pub fn read_byte(&self) -> Result<u8> {
         self.slave.receive()
+    }
+
+    pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
+        self.slave.receive_buf(buf)
     }
 
     pub fn try_read(&self, buf: &mut [u8]) -> Result<usize> {
@@ -143,19 +154,25 @@ impl Slave {
     pub fn write_byte(&self, byte: u8) -> Result<()> {
         self.master.send(byte)
     }
+
+    pub fn write(&self, buf: &[u8]) -> Result<usize> {
+        // TODO: Don't fail if we can't send entire buf.
+        self.master.send_buf(buf)?;
+        Ok(buf.len())
+    }
 }
 
 impl Read for Slave {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        self.slave.receive_buf(buf)
+        let immutable: &Self = self;
+        immutable.read(buf)
     }
 }
 
 impl Write for Slave {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
-        // TODO: Don't fail if we can't send entire buf.
-        self.slave.send_buf(buf)?;
-        Ok(buf.len())
+        let immutable: &Self = self;
+        immutable.write(buf)
     }
 
     fn flush(&mut self) -> Result<()> {

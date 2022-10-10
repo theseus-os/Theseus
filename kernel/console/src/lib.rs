@@ -97,6 +97,18 @@ fn shell_loop(
 ) {
     let tty = tty::Tty::new();
 
+    let id = task::get_my_current_task_id().expect("couldn't get id??");
+    let stream = Arc::new(tty.slave());
+    app_io::insert_child_streams(
+        id,
+        app_io::IoStreams {
+            discipline: Some(stream.discipline()),
+            stdin: stream.clone(),
+            stdout: stream.clone(),
+            stderr: stream,
+        },
+    );
+
     let reader_task = spawn::new_task_builder(tty_reader_loop, (port.clone(), tty.master()))
         .name(format!("tty_reader_loop_{:?}", address))
         .spawn()
@@ -106,7 +118,7 @@ fn shell_loop(
         .spawn()
         .unwrap();
 
-    let _ = Shell::new(&tty.slave()).run();
+    let _ = Shell::new().run();
 
     reader_task.kill(KillReason::Requested).unwrap();
     writer_task.kill(KillReason::Requested).unwrap();
@@ -121,19 +133,19 @@ fn shell_loop(
     // TODO: Close port
 }
 
-fn tty_reader_loop((port, mut master): (Arc<MutexIrqSafe<SerialPort>>, tty::Master)) {
+fn tty_reader_loop((port, master): (Arc<MutexIrqSafe<SerialPort>>, tty::Master)) {
     loop {
         let mut data = [0; 256];
         let len = master.read(&mut data).unwrap();
-        // log::trace!("writing data to serial port: {:?}", &data[..len]);
+        log::trace!("writing data to serial port: {:?}", &data[..len]);
         port.lock().write(&data[..len]).unwrap();
     }
 }
 
-fn tty_writer_loop((receiver, mut master): (Receiver<DataChunk>, tty::Master)) {
+fn tty_writer_loop((receiver, master): (Receiver<DataChunk>, tty::Master)) {
     loop {
         let DataChunk { data, len } = receiver.receive().unwrap();
-        // log::trace!("read data from serial port: {:?}", &data[..len.into()]);
+        log::trace!("read data from serial port: {:?}", &data[..len.into()]);
         master.write(&data[..len as usize]).unwrap();
     }
 }

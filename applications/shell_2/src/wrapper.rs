@@ -1,21 +1,28 @@
+use alloc::sync::Arc;
+use app_io::{ImmutableRead, ImmutableWrite};
 use embedded_hal::serial;
-use tty::Slave;
 
-pub(crate) struct Wrapper<'a>(pub(crate) &'a Slave);
+pub(crate) struct Wrapper {
+    pub(crate) stdin: Arc<dyn ImmutableRead>,
+    pub(crate) stdout: Arc<dyn ImmutableWrite>,
+}
 
-impl<'a> serial::Read<u8> for Wrapper<'a> {
+impl<'a> serial::Read<u8> for Wrapper {
     type Error = core2::io::Error;
 
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
-        self.0.read_byte().map_err(|e| e.into())
+        let mut buf = [0; 1];
+        assert_eq!(self.stdin.read(&mut buf)?, 1);
+        Ok(buf[0])
     }
 }
 
-impl<'a> serial::Write<u8> for Wrapper<'a> {
+impl<'a> serial::Write<u8> for Wrapper {
     type Error = core2::io::Error;
 
     fn write(&mut self, byte: u8) -> nb::Result<(), Self::Error> {
-        self.0.write_byte(byte).map_err(|e| e.into())
+        assert_eq!(self.stdout.write(&[byte])?, 1);
+        Ok(())
     }
 
     fn flush(&mut self) -> nb::Result<(), Self::Error> {

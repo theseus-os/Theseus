@@ -38,20 +38,22 @@ const FIRST_APPLICATION_CRATE_NAME: &'static str = "shell_2-";
 /// 
 /// Kernel initialization routines should be complete before invoking this. 
 pub fn start() -> Result<(), &'static str> {
-    let new_app_ns = mod_mgmt::create_application_namespace(None)?;
+    // FIXME
+    spawn::new_task_builder(|_| loop {}, ()).spawn().map(|_| ())
+    // let new_app_ns = mod_mgmt::create_application_namespace(None)?;
 
-    // NOTE: see crate-level docs and note in this crate's `Cargo.toml`.
-    let (app_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(
-        &new_app_ns, 
-        FIRST_APPLICATION_CRATE_NAME,
-    ).ok_or("Couldn't find first application in default app namespace")?;
+    // // NOTE: see crate-level docs and note in this crate's `Cargo.toml`.
+    // let (app_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(
+    //     &new_app_ns, 
+    //     FIRST_APPLICATION_CRATE_NAME,
+    // ).ok_or("Couldn't find first application in default app namespace")?;
 
-    let path = Path::new(app_file.lock().get_absolute_path());
-    info!("Starting first application: crate at {:?}", path);
-    // Spawn the default shell
-    spawn::new_application_task_builder(path, Some(new_app_ns))?
-        .name("default_shell".to_string())
-        .spawn()?;
+    // let path = Path::new(app_file.lock().get_absolute_path());
+    // info!("Starting first application: crate at {:?}", path);
+    // // Spawn the default shell
+    // spawn::new_application_task_builder(path, Some(new_app_ns))?
+    //     .name("default_shell".to_string())
+    //     .spawn()?;
 
-    Ok(())
+    // Ok(())
 }
