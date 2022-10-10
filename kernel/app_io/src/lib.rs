@@ -24,8 +24,7 @@ extern crate alloc;
 
 use alloc::{format, sync::Arc};
 use core2::io::{self, Error, ErrorKind, Read, Write};
-use libterm::Terminal;
-use stdio::{KeyEventQueueReader, KeyEventReadGuard, StdioReader, StdioWriter};
+use stdio::{StdioReader, StdioWriter};
 
 pub trait ImmutableRead: Send + Sync + 'static {
     fn read(&self, buf: &mut [u8]) -> io::Result<usize>;
@@ -49,6 +48,18 @@ pub trait ImmutableWrite: Send + Sync + 'static {
             }
         }
         Ok(())
+    }
+}
+
+impl ImmutableRead for StdioReader {
+    fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.lock().read(buf)
+    }
+}
+
+impl ImmutableWrite for StdioWriter {
+    fn write(&self, buf: &[u8]) -> io::Result<usize> {
+        self.lock().write(buf)
     }
 }
 
@@ -181,6 +192,7 @@ macro_rules! print {
 
 /// Converts the given `core::fmt::Arguments` to a `String` and enqueues the
 /// string into the correct terminal print-producer
+#[allow(clippy::needless_return)]
 pub fn print_to_stdout_args(fmt_args: core::fmt::Arguments) {
     let task_id = match task::get_my_current_task_id() {
         Some(task_id) => task_id,
@@ -189,6 +201,7 @@ pub fn print_to_stdout_args(fmt_args: core::fmt::Arguments) {
             // will cause infinite loops on an error. Instead, we write directly
             // to the logger's output streams.
             let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: failed to get current task id \x1b[0m\n");
+            return;
         }
     };
 
@@ -196,7 +209,11 @@ pub fn print_to_stdout_args(fmt_args: core::fmt::Arguments) {
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => {
-            if queues.stdout.write_all(format!("{}", fmt_args).as_bytes()).is_err() {
+            if queues
+                .stdout
+                .write_all(format!("{}", fmt_args).as_bytes())
+                .is_err()
+            {
                 let _ = logger::write_str("\x1b[31m [E] failed to write to stdout \x1b[0m\n");
             }
         }

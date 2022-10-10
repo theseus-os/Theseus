@@ -121,10 +121,8 @@ dependencies = [
  "core2",
  "hashbrown 0.12.3",
  "lazy_static",
- "libterm",
  "logger",
  "mutex_sleep",
- "print",
  "stdio",
  "task",
 ]
@@ -2194,7 +2192,7 @@ dependencies = [
 [[package]]
 name = "owning_ref"
 version = "0.4.1"
-source = "git+https://github.com/theseus-os/owning-ref-rs#0d2dcdcffd75b80157d0e72fb82593a8696a9c49"
+source = "git+https://github.com/theseus-os/owning-ref-rs.git#0d2dcdcffd75b80157d0e72fb82593a8696a9c49"
 dependencies = [
  "spin 0.9.0",
  "stable_deref_trait",

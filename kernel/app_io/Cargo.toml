@@ -13,12 +13,6 @@ core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nig
 [dependencies.task]
 path = "../../kernel/task"
 
-[dependencies.print]
-path = "../../kernel/print"
-
-[dependencies.libterm]
-path = "../../kernel/libterm"
-
 [dependencies.stdio]
 path = "../../libs/stdio"
 
