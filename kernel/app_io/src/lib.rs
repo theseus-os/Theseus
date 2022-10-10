@@ -20,22 +20,11 @@
 #![no_std]
 #![feature(const_btree_new)]
 
-#[macro_use]
-extern crate log;
-extern crate spin;
-extern crate stdio;
-#[macro_use]
 extern crate alloc;
-extern crate core2;
-extern crate keycodes_ascii;
-extern crate libterm;
-extern crate logger;
-extern crate window_manager;
 
-use alloc::sync::Arc;
+use alloc::{format, sync::Arc};
 use core2::io::{self, Error, ErrorKind, Read, Write};
 use libterm::Terminal;
-use spin::{Mutex, MutexGuard};
 use stdio::{KeyEventQueueReader, KeyEventReadGuard, StdioReader, StdioWriter};
 
 pub trait ImmutableRead: Send + Sync + 'static {
@@ -92,22 +81,24 @@ impl IoStreams {
 }
 
 mod shared_maps {
-    use alloc::collections::BTreeMap;
-    use spin::{Mutex, MutexGuard};
-    use IoStreams;
+    use super::IoStreams;
+    use hashbrown::HashMap;
+    use mutex_sleep::{MutexSleep as Mutex, MutexSleepGuard as MutexGuard};
 
-    /// Map a task id to its IoStreams structure.
-    /// Shells should call `insert_child_streams` when spawning a new app,
-    /// which effectively stores a new key value pair to this map.
-    /// After a shell's child app exits, the shell should call
-    /// `remove_child_streams` to clean it up.
-    static APP_IO_STREAMS: Mutex<BTreeMap<usize, IoStreams>> = Mutex::new(BTreeMap::new());
+    lazy_static::lazy_static! {
+        /// Map a task id to its IoStreams structure.
+        /// Shells should call `insert_child_streams` when spawning a new app,
+        /// which effectively stores a new key value pair to this map.
+        /// After a shell's child app exits, the shell should call
+        /// `remove_child_streams` to clean it up.
+        static ref APP_IO_STREAMS: Mutex<HashMap<usize, IoStreams>> = Mutex::new(HashMap::new());
+    }
 
     /// Lock and returns the `MutexGuard` of `APP_IO_STREAMS`. Use
     /// `lock_all_maps()` if you want to lock both of the maps to avoid
     /// deadlock.
-    pub fn lock_stream_map() -> MutexGuard<'static, BTreeMap<usize, IoStreams>> {
-        APP_IO_STREAMS.lock()
+    pub fn lock_stream_map() -> MutexGuard<'static, HashMap<usize, IoStreams>> {
+        APP_IO_STREAMS.lock().unwrap()
     }
 }
 

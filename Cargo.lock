@@ -119,16 +119,14 @@ name = "app_io"
 version = "0.1.0"
 dependencies = [
  "core2",
- "event_types",
- "keycodes_ascii",
+ "hashbrown 0.12.3",
+ "lazy_static",
  "libterm",
- "log",
  "logger",
+ "mutex_sleep",
  "print",
- "spin 0.9.0",
  "stdio",
  "task",
- "window_manager",
 ]
 
 [[package]]
