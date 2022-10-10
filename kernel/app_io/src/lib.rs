@@ -189,7 +189,6 @@ pub fn print_to_stdout_args(fmt_args: core::fmt::Arguments) {
             // will cause infinite loops on an error. Instead, we write directly
             // to the logger's output streams.
             let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: failed to get current task id \x1b[0m\n");
-            return;
         }
     };
 
@@ -197,7 +196,7 @@ pub fn print_to_stdout_args(fmt_args: core::fmt::Arguments) {
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => {
-            if let Err(_) = queues.stdout.write_all(format!("{}", fmt_args).as_bytes()) {
+            if queues.stdout.write_all(format!("{}", fmt_args).as_bytes()).is_err() {
                 let _ = logger::write_str("\x1b[31m [E] failed to write to stdout \x1b[0m\n");
             }
         }
