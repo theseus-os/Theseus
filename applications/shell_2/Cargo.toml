@@ -7,8 +7,10 @@ edition = "2021"
 app_io = { path = "../../kernel/app_io" }
 embedded-hal = "0.2.7"
 hashbrown = "0.12.3"
+mod_mgmt = { path = "../../kernel/mod_mgmt" }
 nb = "1.0"
 path = { path = "../../kernel/path" }
+root = { path = "../../kernel/root" }
 spawn = { path = "../../kernel/spawn" }
 task = { path = "../../kernel/task" }
 tty = { path = "../../kernel/tty" }

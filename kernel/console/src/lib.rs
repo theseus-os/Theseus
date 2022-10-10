@@ -4,7 +4,7 @@
 
 extern crate alloc;
 
-use alloc::{format, sync::Arc};
+use alloc::{format, string::ToString, sync::Arc};
 use async_channel::Receiver;
 use core::sync::atomic::{AtomicU16, Ordering};
 use core2::io::{Read, Write};
@@ -97,7 +97,34 @@ fn shell_loop(
 ) {
     let tty = tty::Tty::new();
 
-    let id = task::get_my_current_task_id().expect("couldn't get id??");
+    let reader_task = spawn::new_task_builder(tty_reader_loop, (port.clone(), tty.master()))
+        .name(format!("tty_reader_loop_{:?}", address))
+        .spawn()
+        .unwrap();
+    let writer_task = spawn::new_task_builder(tty_writer_loop, (receiver, tty.master()))
+        .name(format!("tty_writer_loop_{:?}", address))
+        .spawn()
+        .unwrap();
+
+    let new_app_ns = mod_mgmt::create_application_namespace(None).unwrap();
+
+    // NOTE: see crate-level docs and note in this crate's `Cargo.toml`.
+    let (app_file, _ns) =
+        mod_mgmt::CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "shell_2-")
+            .ok_or("Couldn't find first application in default app namespace")
+            .unwrap();
+
+    let path = path::Path::new(app_file.lock().get_absolute_path());
+    log::info!("Starting first application: crate at {:?}", path);
+    // Spawn the default shell
+    let task = spawn::new_application_task_builder(path, Some(new_app_ns))
+        .unwrap()
+        .name("default_shell".to_string())
+        .block()
+        .spawn()
+        .unwrap();
+
+    let id = task.id;
     let stream = Arc::new(tty.slave());
     app_io::insert_child_streams(
         id,
@@ -109,16 +136,8 @@ fn shell_loop(
         },
     );
 
-    let reader_task = spawn::new_task_builder(tty_reader_loop, (port.clone(), tty.master()))
-        .name(format!("tty_reader_loop_{:?}", address))
-        .spawn()
-        .unwrap();
-    let writer_task = spawn::new_task_builder(tty_writer_loop, (receiver, tty.master()))
-        .name(format!("tty_writer_loop_{:?}", address))
-        .spawn()
-        .unwrap();
-
-    let _ = Shell::new().run();
+    task.unblock();
+    task.join().unwrap();
 
     reader_task.kill(KillReason::Requested).unwrap();
     writer_task.kill(KillReason::Requested).unwrap();

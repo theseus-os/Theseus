@@ -5,14 +5,21 @@ extern crate alloc;
 mod internal;
 mod wrapper;
 
-use alloc::{borrow::ToOwned, format, sync::Arc, vec::Vec};
+use alloc::{borrow::ToOwned, format, sync::Arc, vec::Vec, string::String};
+use app_io::println;
 use core::fmt::Write;
 use hashbrown::HashMap;
 use noline::{builder::EditorBuilder, sync::embedded::IO as Io};
+use path::Path;
 use task::{ExitValue, JoinableTaskRef, RunState, TaskRef};
 use tty::LineDiscipline;
 
 // FIXME: export main function rather than shell struct
+
+pub fn main(_: Vec<String>) -> isize {
+    Shell::new().run().unwrap();
+    0
+}
 
 pub struct Shell {
     // TODO: Make LineDiscipline interior mutable?
@@ -154,9 +161,16 @@ impl Shell {
     }
 
     fn resolve_external(&self, cmd: &str, args: Vec<&str>) -> Result<JoinableTaskRef> {
+        // FIXME: Console spawns the shell in kernel namespace
         let namespace_dir = task::get_my_current_task()
             .map(|t| t.get_namespace().dir().clone())
-            .unwrap();
+            .expect("couldn't get namespace dir");
+        // let namespace_dir = mod_mgmt::NamespaceDir::new(
+        //     Path::new("/namespaces/_applications".to_owned())
+        //         .get_dir(root::get_root())
+        //         .unwrap(),
+        // );
+
         let crate_name = format!("{}-", cmd);
         let mut matching_files = namespace_dir
             .get_files_starting_with(&crate_name)
@@ -164,8 +178,8 @@ impl Shell {
 
         let app_path = matching_files
             .next()
-            .map(|f| path::Path::new(f.lock().get_absolute_path()))
-            .unwrap();
+            .map(|f| Path::new(f.lock().get_absolute_path()))
+            .expect("couldn't find file");
 
         if matching_files.next().is_some() {
             panic!("multiple matching files found");
@@ -193,6 +207,7 @@ impl Shell {
 
 pub type Result<T> = core::result::Result<T, Error>;
 
+#[derive(Debug)]
 pub enum Error {
     Exit,
 }

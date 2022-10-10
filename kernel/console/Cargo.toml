@@ -34,6 +34,12 @@ path = "../spawn"
 [dependencies.tty]
 path = "../tty"
 
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[dependencies.path]
+path = "../path"
+
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
 
