@@ -506,6 +506,10 @@ impl LoadedCrate {
                     .ok_or("BUG: missing data pages in newly-copied crate")?,
             };
             let new_sec_mapped_pages_offset = new_sec.mapped_pages_offset;
+            let new_sec_slice: &mut [u8] = new_sec_mapped_pages.as_slice_mut(
+                0,
+                new_sec_mapped_pages_offset + new_sec.size(),
+            )?;
 
             // The newly-duplicated crate still depends on the same sections, so we keep those as is, 
             // but we do need to recalculate those relocations.
@@ -517,7 +521,7 @@ impl LoadedCrate {
                     // perform the actual fix by writing the relocation
                     write_relocation(
                         strong_dep.relocation, 
-                        new_sec_mapped_pages, 
+                        new_sec_slice, 
                         new_sec_mapped_pages_offset,
                         source_sec.start_address(),
                         true
@@ -552,7 +556,7 @@ impl LoadedCrate {
                 };
                 write_relocation(
                     internal_dep.relocation, 
-                    new_sec_mapped_pages, 
+                    new_sec_slice, 
                     new_sec_mapped_pages_offset,
                     source_sec_vaddr,
                     true
