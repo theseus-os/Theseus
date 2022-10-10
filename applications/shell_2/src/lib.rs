@@ -2,10 +2,13 @@
 
 extern crate alloc;
 
+mod error;
 mod internal;
 mod wrapper;
 
-use alloc::{borrow::ToOwned, format, sync::Arc, vec::Vec, string::String};
+pub use error::{Error, Result};
+
+use alloc::{borrow::ToOwned, format, string::String, sync::Arc, vec::Vec};
 use app_io::println;
 use core::fmt::Write;
 use hashbrown::HashMap;
@@ -84,7 +87,7 @@ impl Shell {
         }
     }
 
-    fn execute(&mut self, line: &str) -> Result<isize> {
+    fn execute(&mut self, line: &str) -> Result<()> {
         // TODO | and &
 
         let (cmd, args) = if let Some((cmd, args_str)) = line.split_once(' ') {
@@ -94,8 +97,8 @@ impl Shell {
             (line, Vec::new())
         };
 
-        match cmd {
-            "" => Ok(0),
+        let result = match cmd {
+            "" => Ok(()),
             "alias" => self.alias(args),
             "bg" => self.bg(args),
             "cd" => self.cd(args),
@@ -111,18 +114,27 @@ impl Shell {
             "unset" => self.set(args),
             "wait" => self.set(args),
             _ => self.execute_external(cmd, args),
+        };
+        
+        match result {
+            Ok(()) => Ok(()),
+            Err(e) if e.is_fatal() => Err(e),
+            Err(e) => {
+                println!("exit {}", e.exit_code());
+                Ok(())
+            }
         }
     }
 
     // TODO: Use guards?
-    fn execute_external(&mut self, cmd: &str, args: Vec<&str>) -> Result<isize> {
+    fn execute_external(&mut self, cmd: &str, args: Vec<&str>) -> Result<()> {
         self.set_app_discipline();
         let result = self._execute_external(cmd, args);
         self.set_shell_discipline();
         result
     }
 
-    fn _execute_external(&mut self, cmd: &str, args: Vec<&str>) -> Result<isize> {
+    fn _execute_external(&mut self, cmd: &str, args: Vec<&str>) -> Result<()> {
         let task = self.resolve_external(cmd, args)?;
 
         let mut num = 1;
@@ -139,19 +151,24 @@ impl Shell {
                 RunState::Suspended => {
                     self.discipline.set_foreground(None);
                     self.stop_order.push(num);
-                    return Ok(0);
+                    return Ok(());
                 }
                 RunState::Exited => {
                     self.discipline.set_foreground(None);
                     self.jobs.remove(&num).unwrap();
-                    return Ok(match task.take_exit_value().unwrap() {
-                        ExitValue::Completed(status) => *status.downcast_ref::<isize>().unwrap(),
+                    return match task.take_exit_value().unwrap() {
+                        ExitValue::Completed(status) => {
+                            match *status.downcast_ref::<isize>().unwrap() {
+                                0 => Ok(()),
+                                e @ _ => Err(Error::Command(e)),
+                            }
+                        }
                         ExitValue::Killed(_) => {
                             // TODO: Should we check that it was KillReason::Requested?
                             // TODO: Decide on a value. Bash uses 130.
-                            1
+                            Ok(())
                         }
-                    });
+                    };
                 }
                 RunState::Reaped => todo!("task reaped not by shell"),
                 // TODO: Yield?
@@ -203,11 +220,4 @@ impl Shell {
 
         Ok(task)
     }
-}
-
-pub type Result<T> = core::result::Result<T, Error>;
-
-#[derive(Debug)]
-pub enum Error {
-    Exit,
 }
