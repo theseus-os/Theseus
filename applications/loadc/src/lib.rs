@@ -393,6 +393,11 @@ fn overwrite_relocations(
             })?;
         
         let mut target_segment_dependencies: Vec<StrongDependency> = Vec::new();
+        let target_segment_start_addr = target_segment.bounds.start;
+        let target_segment_slice: &mut [u8] = target_segment.mp.as_slice_mut(
+            0,
+            target_segment.bounds.end.value() - target_segment.bounds.start.value(),
+        )?;
 
         // iterate through each relocation entry in the relocation array for the target_sec
         for rela_entry in rela_array {
@@ -436,27 +441,23 @@ fn overwrite_relocations(
                 // rather than an offset from the beginning of the section/segment (I think).
                 // Therefore, we need to adjust that value before we invoke `write_relocation()`, 
                 // which expects a regular `offset` + an offset into the target segment's mapped pages. 
-                let offset_into_target_segment = target_segment.mp.offset_of_address(
-                    VirtualAddress::new(relocation_entry.offset).ok_or_else(|| 
-                        format!("relocation_entry.offset {:#X} was not a valid virtual address", relocation_entry.offset)
-                    )?
-                ).ok_or(format!("target segment {:X?} did not contain relocation_entry.offset {:#X}", target_segment, relocation_entry.offset))?;
+                let relocation_offset_as_vaddr = VirtualAddress::new(relocation_entry.offset).ok_or_else(|| 
+                    format!("relocation_entry.offset {:#X} was not a valid virtual address", relocation_entry.offset)
+                )?;
+                let offset_into_target_segment = relocation_offset_as_vaddr.value() - target_segment_start_addr.value();
                 // Now that we have incorporated the relocation_entry's actual offset into the target_segment offset,
                 // we set it to zero for the duration of this call. 
                 // TODO: this is hacky as hell, we should just create a new `write_relocation()` function instead.
                 relocation_entry.offset = 0;
 
                 if verbose_log { 
-                    debug!("                 Performing relocation target {} + {:#X} <-- source {}", 
-                        target_segment.mp.start_address(), offset_into_target_segment, existing_source_sec.name
+                    debug!("                 Performing relocation target {:#X} + {:#X} <-- source {}", 
+                        target_segment_start_addr, offset_into_target_segment, existing_source_sec.name
                     );
                 }
                 write_relocation(
                     relocation_entry,
-                    target_segment.mp.as_slice_mut(
-                        0,
-                        target_segment.bounds.end.value() - target_segment.bounds.start.value(),
-                    )?,
+                    target_segment_slice,
                     offset_into_target_segment,
                     existing_source_sec.start_address(),
                     verbose_log
