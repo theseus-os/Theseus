@@ -904,8 +904,6 @@
 <span id="898">898</span>
 <span id="899">899</span>
 <span id="900">900</span>
-<span id="901">901</span>
-<span id="902">902</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the Performance Monitoring Unit </span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! We have support for PMU version 2. Each succesive PMU version includes the features provided by the previous versions.</span>
@@ -1247,10 +1245,8 @@
         <span class="kw">let</span> <span class="ident">num_pmc</span> <span class="op">=</span> <span class="ident">num_general_purpose_counters</span>();
 
         <span class="comment">//checks to make sure the counter hasn&#39;t already been released</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">msr_mask</span> <span class="op">&lt;</span> <span class="ident">num_pmc</span> <span class="kw">as</span> <span class="ident">u32</span> {
-            <span class="kw">if</span> <span class="ident">counter_is_available</span>(<span class="self">self</span>.<span class="ident">core</span>, <span class="self">self</span>.<span class="ident">msr_mask</span> <span class="kw">as</span> <span class="ident">u8</span>)<span class="question-mark">?</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Counter used for this event was marked as free, value stored is likely inaccurate.&quot;</span>);
-            } 
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">msr_mask</span> <span class="op">&lt;</span> <span class="ident">num_pmc</span> <span class="kw">as</span> <span class="ident">u32</span> <span class="op">&amp;&amp;</span> <span class="ident">counter_is_available</span>(<span class="self">self</span>.<span class="ident">core</span>, <span class="self">self</span>.<span class="ident">msr_mask</span> <span class="kw">as</span> <span class="ident">u8</span>)<span class="question-mark">?</span> {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Counter used for this event was marked as free, value stored is likely inaccurate.&quot;</span>);
         }
         
         <span class="prelude-val">Ok</span>(<span class="ident">rdpmc</span>(<span class="self">self</span>.<span class="ident">msr_mask</span>) <span class="op">-</span> <span class="self">self</span>.<span class="ident">start_count</span>)

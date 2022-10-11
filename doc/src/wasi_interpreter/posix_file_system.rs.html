@@ -505,8 +505,6 @@
 <span id="499">499</span>
 <span id="500">500</span>
 <span id="501">501</span>
-<span id="502">502</span>
-<span id="503">503</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Types for interacting with Theseus standard I/O and file system via POSIX-style abstraction.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides APIs to:</span>
@@ -922,15 +920,13 @@
                         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_EXIST</span>);
                     } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">fail_if_not_dir</span> {
                         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_NOTDIR</span>);
+                    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">truncate_file_to_size_zero</span> {
+                        <span class="comment">// HACK: Truncate file by overwriting file.</span>
+                        <span class="kw">let</span> <span class="ident">new_file</span>: <span class="ident">FileRef</span> <span class="op">=</span>
+                            <span class="ident">MemFile::new</span>(<span class="ident">String::from</span>(<span class="ident">base_name</span>), <span class="kw-2">&amp;</span><span class="ident">parent_dir</span>).<span class="ident">unwrap</span>();
+                        <span class="ident">FileOrDir::File</span>(<span class="ident">new_file</span>)
                     } <span class="kw">else</span> {
-                        <span class="kw">if</span> <span class="ident">truncate_file_to_size_zero</span> {
-                            <span class="comment">// HACK: Truncate file by overwriting file.</span>
-                            <span class="kw">let</span> <span class="ident">new_file</span>: <span class="ident">FileRef</span> <span class="op">=</span>
-                                <span class="ident">MemFile::new</span>(<span class="ident">String::from</span>(<span class="ident">base_name</span>), <span class="kw-2">&amp;</span><span class="ident">parent_dir</span>).<span class="ident">unwrap</span>();
-                            <span class="ident">FileOrDir::File</span>(<span class="ident">new_file</span>)
-                        } <span class="kw">else</span> {
-                            <span class="ident">file_or_dir</span>
-                        }
+                        <span class="ident">file_or_dir</span>
                     }
                 }
                 <span class="ident">FileOrDir::Dir</span> { .. } =&gt; <span class="ident">file_or_dir</span>,

@@ -1109,8 +1109,6 @@
 <span id="1103">1103</span>
 <span id="1104">1104</span>
 <span id="1105">1105</span>
-<span id="1106">1106</span>
-<span id="1107">1107</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines functions and types for crate swapping, used in live evolution and fault recovery.</span>
 <span class="doccomment">//! </span>
 
@@ -1404,12 +1402,10 @@
                 <span class="comment">// get the section from the new crate that corresponds to the `old_sec`</span>
                 <span class="kw">let</span> <span class="ident">prefix</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">crates_have_same_name</span> {
                     <span class="ident">Cow::from</span>(<span class="ident">old_sec_name_without_hash</span>)
+                } <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">s</span>) <span class="op">=</span> <span class="ident">replace_containing_crate_name</span>(<span class="ident">old_sec_name_without_hash</span>, <span class="kw-2">&amp;</span><span class="ident">old_crate_name_without_hash</span>, <span class="kw-2">&amp;</span><span class="ident">new_crate_name_without_hash</span>) {
+                    <span class="ident">Cow::from</span>(<span class="ident">s</span>)
                 } <span class="kw">else</span> {
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">s</span>) <span class="op">=</span> <span class="ident">replace_containing_crate_name</span>(<span class="ident">old_sec_name_without_hash</span>, <span class="kw-2">&amp;</span><span class="ident">old_crate_name_without_hash</span>, <span class="kw-2">&amp;</span><span class="ident">new_crate_name_without_hash</span>) {
-                        <span class="ident">Cow::from</span>(<span class="ident">s</span>)
-                    } <span class="kw">else</span> {
-                        <span class="ident">Cow::from</span>(<span class="ident">old_sec_name_without_hash</span>)
-                    }
+                    <span class="ident">Cow::from</span>(<span class="ident">old_sec_name_without_hash</span>)
                 };
                 <span class="kw">let</span> <span class="ident">new_dest_sec</span> <span class="op">=</span> {
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">iter</span> <span class="op">=</span> <span class="ident">new_crate</span>.<span class="ident">data_sections_iter</span>().<span class="ident">filter</span>(<span class="op">|</span><span class="ident">sec</span><span class="op">|</span> <span class="ident">sec</span>.<span class="ident">name</span>.<span class="ident">starts_with</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">prefix</span>));

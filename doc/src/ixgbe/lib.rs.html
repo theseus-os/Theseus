@@ -2138,7 +2138,7 @@
             <span class="ident">val</span>.<span class="ident">set_bits</span>(<span class="number">0</span>..<span class="number">4</span>, <span class="ident">rx_buffer_size_kbytes</span> <span class="kw">as</span> <span class="ident">u32</span>);
             <span class="ident">val</span>.<span class="ident">set_bits</span>(<span class="number">8</span>..<span class="number">13</span>, <span class="ident">BSIZEHEADER_0B</span>);
             <span class="ident">val</span>.<span class="ident">set_bits</span>(<span class="number">25</span>..<span class="number">27</span>, <span class="ident">DESCTYPE_ADV_1BUFFER</span>);
-            <span class="ident">val</span> <span class="op">=</span> <span class="ident">val</span> <span class="op">|</span> <span class="ident">DROP_ENABLE</span>;
+            <span class="ident">val</span> <span class="op">|</span><span class="op">=</span> <span class="ident">DROP_ENABLE</span>;
             <span class="ident">rxq</span>.<span class="ident">srrctl</span>.<span class="ident">write</span>(<span class="ident">val</span>);
 
             <span class="comment">//enable the rx queue</span>
@@ -2366,33 +2366,33 @@
         <span class="comment">// set the source ip address for the filter</span>
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span> (<span class="ident">addr</span>) <span class="op">=</span> <span class="ident">source_ip</span> {
             <span class="self">self</span>.<span class="ident">regs3</span>.<span class="ident">saqf</span>[<span class="ident">filter_num</span>].<span class="ident">write</span>(((<span class="ident">addr</span>[<span class="number">3</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">24</span>) <span class="op">|</span> ((<span class="ident">addr</span>[<span class="number">2</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>) <span class="op">|</span> ((<span class="ident">addr</span>[<span class="number">1</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">8</span>) <span class="op">|</span> (<span class="ident">addr</span>[<span class="number">0</span>] <span class="kw">as</span> <span class="ident">u32</span>));
-            <span class="ident">filter_mask</span> <span class="op">=</span> <span class="ident">filter_mask</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">FTQF_SOURCE_ADDRESS_MASK</span>;
+            <span class="ident">filter_mask</span> <span class="op">&amp;=</span> <span class="op">!</span><span class="ident">FTQF_SOURCE_ADDRESS_MASK</span>;
         };
 
         <span class="comment">// set the destination ip address for the filter</span>
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">addr</span>) <span class="op">=</span> <span class="ident">dest_ip</span> {
             <span class="self">self</span>.<span class="ident">regs3</span>.<span class="ident">daqf</span>[<span class="ident">filter_num</span>].<span class="ident">write</span>(((<span class="ident">addr</span>[<span class="number">3</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">24</span>) <span class="op">|</span> ((<span class="ident">addr</span>[<span class="number">2</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>) <span class="op">|</span> ((<span class="ident">addr</span>[<span class="number">1</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">8</span>) <span class="op">|</span> (<span class="ident">addr</span>[<span class="number">0</span>] <span class="kw">as</span> <span class="ident">u32</span>));
-            <span class="ident">filter_mask</span> <span class="op">=</span> <span class="ident">filter_mask</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">FTQF_DEST_ADDRESS_MASK</span>;
+            <span class="ident">filter_mask</span> <span class="op">&amp;=</span> <span class="op">!</span><span class="ident">FTQF_DEST_ADDRESS_MASK</span>;
         };        
 
         <span class="comment">// set the source port for the filter    </span>
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">port</span>) <span class="op">=</span> <span class="ident">source_port</span> {
             <span class="self">self</span>.<span class="ident">regs3</span>.<span class="ident">sdpqf</span>[<span class="ident">filter_num</span>].<span class="ident">write</span>((<span class="ident">port</span> <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">SPDQF_SOURCE_SHIFT</span>);
-            <span class="ident">filter_mask</span> <span class="op">=</span> <span class="ident">filter_mask</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">FTQF_SOURCE_PORT_MASK</span>;
+            <span class="ident">filter_mask</span> <span class="op">&amp;=</span> <span class="op">!</span><span class="ident">FTQF_SOURCE_PORT_MASK</span>;
         };   
 
         <span class="comment">// set the destination port for the filter    </span>
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">port</span>) <span class="op">=</span> <span class="ident">dest_port</span> {
             <span class="kw">let</span> <span class="ident">port_val</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">regs3</span>.<span class="ident">sdpqf</span>[<span class="ident">filter_num</span>].<span class="ident">read</span>();
             <span class="self">self</span>.<span class="ident">regs3</span>.<span class="ident">sdpqf</span>[<span class="ident">filter_num</span>].<span class="ident">write</span>(<span class="ident">port_val</span> <span class="op">|</span> (<span class="ident">port</span> <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">SPDQF_DEST_SHIFT</span>);
-            <span class="ident">filter_mask</span> <span class="op">=</span> <span class="ident">filter_mask</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">FTQF_DEST_PORT_MASK</span>;
+            <span class="ident">filter_mask</span> <span class="op">&amp;=</span> <span class="op">!</span><span class="ident">FTQF_DEST_PORT_MASK</span>;
         };
 
         <span class="comment">// set the filter protocol</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">filter_protocol</span> <span class="op">=</span> <span class="ident">FilterProtocol::Other</span>;
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">protocol</span>) <span class="op">=</span> <span class="ident">protocol</span> {
             <span class="ident">filter_protocol</span> <span class="op">=</span> <span class="ident">protocol</span>;
-            <span class="ident">filter_mask</span> <span class="op">=</span> <span class="ident">filter_mask</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">FTQF_PROTOCOL_MASK</span>;
+            <span class="ident">filter_mask</span> <span class="op">&amp;=</span> <span class="op">!</span><span class="ident">FTQF_PROTOCOL_MASK</span>;
         };
 
         <span class="comment">// write the parameters of the filter</span>
@@ -2460,7 +2460,7 @@
         <span class="comment">// the lower 16 bits are for the 16 receive queue interrupts</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">val</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">num_msi_vec_enabled</span> {
-            <span class="ident">val</span> <span class="op">=</span> <span class="ident">val</span> <span class="op">|</span> (<span class="ident">EIMS_INTERRUPT_ENABLE</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">i</span>);
+            <span class="ident">val</span> <span class="op">|</span><span class="op">=</span> <span class="ident">EIMS_INTERRUPT_ENABLE</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">i</span>;
         }
         <span class="ident">regs</span>.<span class="ident">eims</span>.<span class="ident">write</span>(<span class="ident">val</span>); 
         <span class="comment">// debug!(&quot;EIMS: {:#X}&quot;, regs.eims.read());</span>
