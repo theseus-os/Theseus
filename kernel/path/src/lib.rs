@@ -70,14 +70,14 @@ impl Path {
     /// split by the path delimiter `"/"`.
     pub fn components<'a>(&'a self) -> impl Iterator<Item = &'a str> {
         self.path.split(PATH_DELIMITER)
-            .filter(|&x| x != "")
+            .filter(|&x| !x.is_empty())
     }
 
     /// Returns a reverse iterator over the components of this `Path`,
     /// split by the path delimiter `"/"`.
     pub fn rcomponents<'a>(&'a self) -> impl Iterator<Item = &'a str> {
         self.path.rsplit(PATH_DELIMITER)
-            .filter(|&x| x != "")
+            .filter(|&x| !x.is_empty())
     }
 
     /// Returns just the file name, i.e., the trailling component of the path.
@@ -95,7 +95,7 @@ impl Path {
     pub fn file_stem<'a>(&'a self) -> &'a str {
         self.basename()
             .split(EXTENSION_DELIMITER)
-            .find(|&x| x != "")
+            .find(|&x| !x.is_empty())
             .unwrap_or(&self.path)
     }
 
@@ -105,7 +105,7 @@ impl Path {
     pub fn extension<'a>(&'a self) -> Option<&'a str> {
         self.basename()
             .rsplit(EXTENSION_DELIMITER)
-            .find(|&x| x != "")
+            .find(|&x| !x.is_empty())
     }
 
     /// Returns a canonical and absolute form of the current path (i.e. the path of the working directory)

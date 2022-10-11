@@ -413,15 +413,13 @@ impl FileDescriptorTable {
                         return Err(wasi::ERRNO_EXIST);
                     } else if fail_if_not_dir {
                         return Err(wasi::ERRNO_NOTDIR);
+                    } else if truncate_file_to_size_zero {
+                        // HACK: Truncate file by overwriting file.
+                        let new_file: FileRef =
+                            MemFile::new(String::from(base_name), &parent_dir).unwrap();
+                        FileOrDir::File(new_file)
                     } else {
-                        if truncate_file_to_size_zero {
-                            // HACK: Truncate file by overwriting file.
-                            let new_file: FileRef =
-                                MemFile::new(String::from(base_name), &parent_dir).unwrap();
-                            FileOrDir::File(new_file)
-                        } else {
-                            file_or_dir
-                        }
+                        file_or_dir
                     }
                 }
                 FileOrDir::Dir { .. } => file_or_dir,
