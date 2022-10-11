@@ -696,6 +696,13 @@ impl MappedPages {
             );
         }
 
+        if offset % mem::align_of::<T>() != 0 {
+            error!("MappedPages::as_type(): requested type {} with size {}, but the offset {} is unaligned with type alignment {}!",
+                core::any::type_name::<T>(),
+                size, offset, mem::align_of::<T>()
+            );
+        }
+
         // check that size of the type T fits within the size of the mapping
         let end = offset + size;
         if end > self.size_in_bytes() {
@@ -724,6 +731,13 @@ impl MappedPages {
             debug!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, MappedPages size {}!",
                 core::any::type_name::<T>(),
                 size, offset, self.size_in_bytes()
+            );
+        }
+
+        if offset % mem::align_of::<T>() != 0 {
+            error!("MappedPages::as_type_mut(): requested type {} with size {}, but the offset {} is unaligned with type alignment {}!",
+                core::any::type_name::<T>(),
+                size, offset, mem::align_of::<T>()
             );
         }
 
@@ -776,6 +790,13 @@ impl MappedPages {
                 length, size_in_bytes, byte_offset, self.size_in_bytes()
             );
         }
+
+        if byte_offset % mem::align_of::<T>() != 0 {
+            error!("MappedPages::as_slice(): requested slice of type {} with length {} (total size {}), but the byte_offset {} is unaligned with type alignment {}!",
+                core::any::type_name::<T>(),
+                length, size_in_bytes, byte_offset, mem::align_of::<T>()
+            );
+        }
         
         // check that size of slice fits within the size of the mapping
         let end = byte_offset + (length * mem::size_of::<T>());
@@ -808,6 +829,13 @@ impl MappedPages {
             );
         }
         
+        if byte_offset % mem::align_of::<T>() != 0 {
+            error!("MappedPages::as_slice_mut(): requested slice of type {} with length {} (total size {}), but the byte_offset {} is unaligned with type alignment {}!",
+                core::any::type_name::<T>(),
+                length, size_in_bytes, byte_offset, mem::align_of::<T>()
+            );
+        }
+
         // check flags to make sure mutability is allowed (otherwise a page fault would occur on a write)
         if !self.flags.is_writable() {
             error!("MappedPages::as_slice_mut(): requested mutable slice of type {} with length {} (total size {}) at byte_offset {}, but MappedPages weren't writable (flags: {:?})",
