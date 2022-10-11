@@ -873,6 +873,34 @@
 <span id="867">867</span>
 <span id="868">868</span>
 <span id="869">869</span>
+<span id="870">870</span>
+<span id="871">871</span>
+<span id="872">872</span>
+<span id="873">873</span>
+<span id="874">874</span>
+<span id="875">875</span>
+<span id="876">876</span>
+<span id="877">877</span>
+<span id="878">878</span>
+<span id="879">879</span>
+<span id="880">880</span>
+<span id="881">881</span>
+<span id="882">882</span>
+<span id="883">883</span>
+<span id="884">884</span>
+<span id="885">885</span>
+<span id="886">886</span>
+<span id="887">887</span>
+<span id="888">888</span>
+<span id="889">889</span>
+<span id="890">890</span>
+<span id="891">891</span>
+<span id="892">892</span>
+<span id="893">893</span>
+<span id="894">894</span>
+<span id="895">895</span>
+<span id="896">896</span>
+<span id="897">897</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md</span>
 <span class="comment">// file at the top-level directory of this distribution.</span>
 <span class="comment">//</span>
@@ -1571,6 +1599,13 @@
             );
         }
 
+        <span class="kw">if</span> <span class="ident">offset</span> <span class="op">%</span> <span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>() <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_type(): requested type {} with size {}, but the offset {} is unaligned with type alignment {}!&quot;</span>,
+                <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(),
+                <span class="ident">size</span>, <span class="ident">offset</span>, <span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>()
+            );
+        }
+
         <span class="comment">// check that size of the type T fits within the size of the mapping</span>
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">offset</span> <span class="op">+</span> <span class="ident">size</span>;
         <span class="kw">if</span> <span class="ident">end</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">size_in_bytes</span>() {
@@ -1599,6 +1634,13 @@
             <span class="macro">debug!</span>(<span class="string">&quot;MappedPages::as_type_mut(): requested type {} with size {} at offset {}, MappedPages size {}!&quot;</span>,
                 <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(),
                 <span class="ident">size</span>, <span class="ident">offset</span>, <span class="self">self</span>.<span class="ident">size_in_bytes</span>()
+            );
+        }
+
+        <span class="kw">if</span> <span class="ident">offset</span> <span class="op">%</span> <span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>() <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_type_mut(): requested type {} with size {}, but the offset {} is unaligned with type alignment {}!&quot;</span>,
+                <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(),
+                <span class="ident">size</span>, <span class="ident">offset</span>, <span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>()
             );
         }
 
@@ -1651,6 +1693,13 @@
                 <span class="ident">length</span>, <span class="ident">size_in_bytes</span>, <span class="ident">byte_offset</span>, <span class="self">self</span>.<span class="ident">size_in_bytes</span>()
             );
         }
+
+        <span class="kw">if</span> <span class="ident">byte_offset</span> <span class="op">%</span> <span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>() <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_slice(): requested slice of type {} with length {} (total size {}), but the byte_offset {} is unaligned with type alignment {}!&quot;</span>,
+                <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(),
+                <span class="ident">length</span>, <span class="ident">size_in_bytes</span>, <span class="ident">byte_offset</span>, <span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>()
+            );
+        }
         
         <span class="comment">// check that size of slice fits within the size of the mapping</span>
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">byte_offset</span> <span class="op">+</span> (<span class="ident">length</span> <span class="op">*</span> <span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>());
@@ -1683,6 +1732,13 @@
             );
         }
         
+        <span class="kw">if</span> <span class="ident">byte_offset</span> <span class="op">%</span> <span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>() <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_slice_mut(): requested slice of type {} with length {} (total size {}), but the byte_offset {} is unaligned with type alignment {}!&quot;</span>,
+                <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(),
+                <span class="ident">length</span>, <span class="ident">size_in_bytes</span>, <span class="ident">byte_offset</span>, <span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>()
+            );
+        }
+
         <span class="comment">// check flags to make sure mutability is allowed (otherwise a page fault would occur on a write)</span>
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">flags</span>.<span class="ident">is_writable</span>() {
             <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_slice_mut(): requested mutable slice of type {} with length {} (total size {}) at byte_offset {}, but MappedPages weren&#39;t writable (flags: {:?})&quot;</span>,

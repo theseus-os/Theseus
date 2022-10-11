@@ -1084,6 +1084,19 @@
 <span id="1078">1078</span>
 <span id="1079">1079</span>
 <span id="1080">1080</span>
+<span id="1081">1081</span>
+<span id="1082">1082</span>
+<span id="1083">1083</span>
+<span id="1084">1084</span>
+<span id="1085">1085</span>
+<span id="1086">1086</span>
+<span id="1087">1087</span>
+<span id="1088">1088</span>
+<span id="1089">1089</span>
+<span id="1090">1090</span>
+<span id="1091">1091</span>
+<span id="1092">1092</span>
+<span id="1093">1093</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines types that contain metadata about crates loaded in Theseus and their dependencies.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! ## Representing dependencies between sections</span>
@@ -1131,7 +1144,7 @@
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 
-<span class="kw">use</span> <span class="ident">core::convert::TryFrom</span>;
+<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">convert::TryFrom</span>, <span class="ident">mem::size_of</span>};
 <span class="kw">use</span> <span class="ident">core::fmt</span>;
 <span class="kw">use</span> <span class="ident">core::ops::Range</span>;
 <span class="kw">use</span> <span class="ident">log</span>::{<span class="ident">error</span>, <span class="ident">debug</span>, <span class="ident">trace</span>};
@@ -1592,6 +1605,10 @@
                     .<span class="ident">ok_or</span>(<span class="string">&quot;BUG: missing data pages in newly-copied crate&quot;</span>)<span class="question-mark">?</span>,
             };
             <span class="kw">let</span> <span class="ident">new_sec_mapped_pages_offset</span> <span class="op">=</span> <span class="ident">new_sec</span>.<span class="ident">mapped_pages_offset</span>;
+            <span class="kw">let</span> <span class="ident">new_sec_slice</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">new_sec_mapped_pages</span>.<span class="ident">as_slice_mut</span>(
+                <span class="number">0</span>,
+                <span class="ident">new_sec_mapped_pages_offset</span> <span class="op">+</span> <span class="ident">new_sec</span>.<span class="ident">size</span>(),
+            )<span class="question-mark">?</span>;
 
             <span class="comment">// The newly-duplicated crate still depends on the same sections, so we keep those as is, </span>
             <span class="comment">// but we do need to recalculate those relocations.</span>
@@ -1603,7 +1620,7 @@
                     <span class="comment">// perform the actual fix by writing the relocation</span>
                     <span class="ident">write_relocation</span>(
                         <span class="ident">strong_dep</span>.<span class="ident">relocation</span>, 
-                        <span class="ident">new_sec_mapped_pages</span>, 
+                        <span class="ident">new_sec_slice</span>, 
                         <span class="ident">new_sec_mapped_pages_offset</span>,
                         <span class="ident">source_sec</span>.<span class="ident">start_address</span>(),
                         <span class="bool-val">true</span>
@@ -1638,7 +1655,7 @@
                 };
                 <span class="ident">write_relocation</span>(
                     <span class="ident">internal_dep</span>.<span class="ident">relocation</span>, 
-                    <span class="ident">new_sec_mapped_pages</span>, 
+                    <span class="ident">new_sec_slice</span>, 
                     <span class="ident">new_sec_mapped_pages_offset</span>,
                     <span class="ident">source_sec_vaddr</span>,
                     <span class="bool-val">true</span>
@@ -2100,58 +2117,67 @@
 }
 
 
-<span class="doccomment">/// Write an actual relocation entry.</span>
+<span class="doccomment">/// Actually write the value of a relocation entry.</span>
+<span class="doccomment">/// </span>
 <span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `relocation_entry`: the relocation entry from the ELF file that specifies the details of the relocation action to perform.</span>
-<span class="doccomment">/// * `target_sec_mapped_pages`: the `MappedPages` that covers the target section, i.e., the section where the relocation data will be written to.</span>
-<span class="doccomment">/// * `target_sec_mapped_pages_offset`: the offset into `target_sec_mapped_pages` where the target section is located.</span>
-<span class="doccomment">/// * `source_sec_vaddr`: the `VirtualAddress` of the source section of the relocation, i.e., the section that the `target_sec` depends on and &quot;points&quot; to.</span>
+<span class="doccomment">/// * `relocation_entry`: the relocation entry from the ELF file that specifies the details</span>
+<span class="doccomment">///    of the relocation action to perform.</span>
+<span class="doccomment">/// * `target_sec_slice`: a byte slice holding the entire contents of the target section,</span>
+<span class="doccomment">///    i.e., the section where the relocation data will be written to.</span>
+<span class="doccomment">/// * `target_sec_offset`: the offset into `target_sec_slice` where the target section&#39;s contents begin.</span>
+<span class="doccomment">/// * `source_sec_vaddr`: the `VirtualAddress` of the source section of the relocation, i.e.,</span>
+<span class="doccomment">///    the section that the `target_sec` depends on and &quot;points&quot; to.</span>
 <span class="doccomment">/// * `verbose_log`: whether to output verbose logging information about this relocation action.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_relocation</span>(
     <span class="ident">relocation_entry</span>: <span class="ident">RelocationEntry</span>,
-    <span class="ident">target_sec_mapped_pages</span>: <span class="kw-2">&amp;mut</span> <span class="ident">MappedPages</span>,
-    <span class="ident">target_sec_mapped_pages_offset</span>: <span class="ident">usize</span>,
+    <span class="ident">target_sec_slice</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>],
+    <span class="ident">target_sec_offset</span>: <span class="ident">usize</span>,
     <span class="ident">source_sec_vaddr</span>: <span class="ident">VirtualAddress</span>,
     <span class="ident">verbose_log</span>: <span class="ident">bool</span>
 ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="comment">// Calculate exactly where we should write the relocation data to.</span>
-    <span class="kw">let</span> <span class="ident">target_offset</span> <span class="op">=</span> <span class="ident">target_sec_mapped_pages_offset</span> <span class="op">+</span> <span class="ident">relocation_entry</span>.<span class="ident">offset</span>;
+    <span class="kw">let</span> <span class="ident">target_sec_offset</span> <span class="op">=</span> <span class="ident">target_sec_offset</span> <span class="op">+</span> <span class="ident">relocation_entry</span>.<span class="ident">offset</span>;
 
-    <span class="comment">// Perform the actual relocation data writing here.</span>
-    <span class="comment">// There is a great, succint table of relocation types here</span>
-    <span class="comment">// https://docs.rs/goblin/0.0.24/goblin/elf/reloc/index.html</span>
+    <span class="comment">// Perform the actual writing of relocation data here.</span>
+    <span class="comment">// There is a great, succint table of relocation types here:</span>
+    <span class="comment">// &lt;https://docs.rs/goblin/0.0.24/goblin/elf/reloc/index.html&gt;</span>
     <span class="kw">match</span> <span class="ident">relocation_entry</span>.<span class="ident">typ</span> {
         <span class="ident">R_X86_64_32</span> =&gt; {
-            <span class="kw">let</span> <span class="ident">target_ref</span>: <span class="kw-2">&amp;mut</span> <span class="ident">u32</span> <span class="op">=</span> <span class="ident">target_sec_mapped_pages</span>.<span class="ident">as_type_mut</span>(<span class="ident">target_offset</span>)<span class="question-mark">?</span>;
-            <span class="kw">let</span> <span class="ident">source_val</span> <span class="op">=</span> <span class="ident">source_sec_vaddr</span>.<span class="ident">value</span>().<span class="ident">wrapping_add</span>(<span class="ident">relocation_entry</span>.<span class="ident">addend</span>);
-            <span class="kw">if</span> <span class="ident">verbose_log</span> { <span class="macro">trace!</span>(<span class="string">&quot;                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})&quot;</span>, <span class="ident">target_ref</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">source_val</span>, <span class="ident">source_sec_vaddr</span>); }
-            <span class="kw-2">*</span><span class="ident">target_ref</span> <span class="op">=</span> <span class="ident">source_val</span> <span class="kw">as</span> <span class="ident">u32</span>;
+            <span class="kw">let</span> <span class="ident">target_range</span> <span class="op">=</span> <span class="ident">target_sec_offset</span> .. (<span class="ident">target_sec_offset</span> <span class="op">+</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>());
+            <span class="kw">let</span> <span class="ident">target_ref</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">target_sec_slice</span>[<span class="ident">target_range</span>];
+            <span class="kw">let</span> <span class="ident">source_val</span> <span class="op">=</span> <span class="ident">source_sec_vaddr</span>.<span class="ident">value</span>().<span class="ident">wrapping_add</span>(<span class="ident">relocation_entry</span>.<span class="ident">addend</span>) <span class="kw">as</span> <span class="ident">u32</span>;
+            <span class="kw">if</span> <span class="ident">verbose_log</span> { <span class="macro">trace!</span>(<span class="string">&quot;                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})&quot;</span>, <span class="ident">target_ref</span>.<span class="ident">as_ptr</span>(), <span class="ident">source_val</span>, <span class="ident">source_sec_vaddr</span>); }
+            <span class="ident">target_ref</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">source_val</span>.<span class="ident">to_ne_bytes</span>());
         }
         <span class="ident">R_X86_64_64</span> =&gt; {
-            <span class="kw">let</span> <span class="ident">target_ref</span>: <span class="kw-2">&amp;mut</span> <span class="ident">u64</span> <span class="op">=</span> <span class="ident">target_sec_mapped_pages</span>.<span class="ident">as_type_mut</span>(<span class="ident">target_offset</span>)<span class="question-mark">?</span>;
-            <span class="kw">let</span> <span class="ident">source_val</span> <span class="op">=</span> <span class="ident">source_sec_vaddr</span>.<span class="ident">value</span>().<span class="ident">wrapping_add</span>(<span class="ident">relocation_entry</span>.<span class="ident">addend</span>);
-            <span class="kw">if</span> <span class="ident">verbose_log</span> { <span class="macro">trace!</span>(<span class="string">&quot;                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})&quot;</span>, <span class="ident">target_ref</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">source_val</span>, <span class="ident">source_sec_vaddr</span>); }
-            <span class="kw-2">*</span><span class="ident">target_ref</span> <span class="op">=</span> <span class="ident">source_val</span> <span class="kw">as</span> <span class="ident">u64</span>;
+            <span class="kw">let</span> <span class="ident">target_range</span> <span class="op">=</span> <span class="ident">target_sec_offset</span> .. (<span class="ident">target_sec_offset</span> <span class="op">+</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>());
+            <span class="kw">let</span> <span class="ident">target_ref</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">target_sec_slice</span>[<span class="ident">target_range</span>];
+            <span class="kw">let</span> <span class="ident">source_val</span> <span class="op">=</span> <span class="ident">source_sec_vaddr</span>.<span class="ident">value</span>().<span class="ident">wrapping_add</span>(<span class="ident">relocation_entry</span>.<span class="ident">addend</span>) <span class="kw">as</span> <span class="ident">u64</span>;
+            <span class="kw">if</span> <span class="ident">verbose_log</span> { <span class="macro">trace!</span>(<span class="string">&quot;                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})&quot;</span>, <span class="ident">target_ref</span>.<span class="ident">as_ptr</span>(), <span class="ident">source_val</span>, <span class="ident">source_sec_vaddr</span>); }
+            <span class="ident">target_ref</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">source_val</span>.<span class="ident">to_ne_bytes</span>());
         }
         <span class="ident">R_X86_64_PC32</span> <span class="op">|</span>
         <span class="ident">R_X86_64_PLT32</span> =&gt; {
-            <span class="kw">let</span> <span class="ident">target_ref</span>: <span class="kw-2">&amp;mut</span> <span class="ident">u32</span> <span class="op">=</span> <span class="ident">target_sec_mapped_pages</span>.<span class="ident">as_type_mut</span>(<span class="ident">target_offset</span>)<span class="question-mark">?</span>;
-            <span class="kw">let</span> <span class="ident">source_val</span> <span class="op">=</span> <span class="ident">source_sec_vaddr</span>.<span class="ident">value</span>().<span class="ident">wrapping_add</span>(<span class="ident">relocation_entry</span>.<span class="ident">addend</span>).<span class="ident">wrapping_sub</span>(<span class="ident">target_ref</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span>);
-            <span class="kw">if</span> <span class="ident">verbose_log</span> { <span class="macro">trace!</span>(<span class="string">&quot;                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})&quot;</span>, <span class="ident">target_ref</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">source_val</span>, <span class="ident">source_sec_vaddr</span>); }
-            <span class="kw-2">*</span><span class="ident">target_ref</span> <span class="op">=</span> <span class="ident">source_val</span> <span class="kw">as</span> <span class="ident">u32</span>;
+            <span class="kw">let</span> <span class="ident">target_range</span> <span class="op">=</span> <span class="ident">target_sec_offset</span> .. (<span class="ident">target_sec_offset</span> <span class="op">+</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>());
+            <span class="kw">let</span> <span class="ident">target_ref</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">target_sec_slice</span>[<span class="ident">target_range</span>];
+            <span class="kw">let</span> <span class="ident">source_val</span> <span class="op">=</span> <span class="ident">source_sec_vaddr</span>.<span class="ident">value</span>().<span class="ident">wrapping_add</span>(<span class="ident">relocation_entry</span>.<span class="ident">addend</span>).<span class="ident">wrapping_sub</span>(<span class="ident">target_ref</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="ident">usize</span>) <span class="kw">as</span> <span class="ident">u32</span>;
+            <span class="kw">if</span> <span class="ident">verbose_log</span> { <span class="macro">trace!</span>(<span class="string">&quot;                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})&quot;</span>, <span class="ident">target_ref</span>.<span class="ident">as_ptr</span>(), <span class="ident">source_val</span>, <span class="ident">source_sec_vaddr</span>); }
+            <span class="ident">target_ref</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">source_val</span>.<span class="ident">to_ne_bytes</span>());
         }
         <span class="ident">R_X86_64_PC64</span> =&gt; {
-            <span class="kw">let</span> <span class="ident">target_ref</span>: <span class="kw-2">&amp;mut</span> <span class="ident">u64</span> <span class="op">=</span> <span class="ident">target_sec_mapped_pages</span>.<span class="ident">as_type_mut</span>(<span class="ident">target_offset</span>)<span class="question-mark">?</span>;
-            <span class="kw">let</span> <span class="ident">source_val</span> <span class="op">=</span> <span class="ident">source_sec_vaddr</span>.<span class="ident">value</span>().<span class="ident">wrapping_add</span>(<span class="ident">relocation_entry</span>.<span class="ident">addend</span>).<span class="ident">wrapping_sub</span>(<span class="ident">target_ref</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span>);
-            <span class="kw">if</span> <span class="ident">verbose_log</span> { <span class="macro">trace!</span>(<span class="string">&quot;                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})&quot;</span>, <span class="ident">target_ref</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">source_val</span>, <span class="ident">source_sec_vaddr</span>); }
-            <span class="kw-2">*</span><span class="ident">target_ref</span> <span class="op">=</span> <span class="ident">source_val</span> <span class="kw">as</span> <span class="ident">u64</span>;
+            <span class="kw">let</span> <span class="ident">target_range</span> <span class="op">=</span> <span class="ident">target_sec_offset</span> .. (<span class="ident">target_sec_offset</span> <span class="op">+</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>());
+            <span class="kw">let</span> <span class="ident">target_ref</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">target_sec_slice</span>[<span class="ident">target_range</span>];
+            <span class="kw">let</span> <span class="ident">source_val</span> <span class="op">=</span> <span class="ident">source_sec_vaddr</span>.<span class="ident">value</span>().<span class="ident">wrapping_add</span>(<span class="ident">relocation_entry</span>.<span class="ident">addend</span>).<span class="ident">wrapping_sub</span>(<span class="ident">target_ref</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="ident">usize</span>);
+            <span class="kw">if</span> <span class="ident">verbose_log</span> { <span class="macro">trace!</span>(<span class="string">&quot;                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})&quot;</span>, <span class="ident">target_ref</span>.<span class="ident">as_ptr</span>(), <span class="ident">source_val</span>, <span class="ident">source_sec_vaddr</span>); }
+            <span class="ident">target_ref</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">source_val</span>.<span class="ident">to_ne_bytes</span>());
         }
         <span class="ident">R_X86_64_TPOFF32</span> =&gt; {
-            <span class="kw">let</span> <span class="ident">target_ref</span>: <span class="kw-2">&amp;mut</span> <span class="ident">u32</span> <span class="op">=</span> <span class="ident">target_sec_mapped_pages</span>.<span class="ident">as_type_mut</span>(<span class="ident">target_offset</span>)<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">target_range</span> <span class="op">=</span> <span class="ident">target_sec_offset</span> .. (<span class="ident">target_sec_offset</span> <span class="op">+</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>());
+            <span class="kw">let</span> <span class="ident">target_ref</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">target_sec_slice</span>[<span class="ident">target_range</span>];
             <span class="kw">let</span> <span class="ident">source_val</span> <span class="op">=</span> <span class="ident">u32::try_from</span>(<span class="ident">source_sec_vaddr</span>.<span class="ident">value</span>())
                 .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;BUG: TLS relocation (R_X86_64_TPOFF32) source section value (TLS offset) cannot fit in a `u32`&quot;</span>)<span class="question-mark">?</span>;
-            <span class="kw">if</span> <span class="ident">verbose_log</span> { <span class="macro">trace!</span>(<span class="string">&quot;                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})&quot;</span>, <span class="ident">target_ref</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">source_val</span>, <span class="ident">source_sec_vaddr</span>); }
-            <span class="kw-2">*</span><span class="ident">target_ref</span> <span class="op">=</span> <span class="ident">source_val</span>;
+            <span class="kw">if</span> <span class="ident">verbose_log</span> { <span class="macro">trace!</span>(<span class="string">&quot;                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})&quot;</span>, <span class="ident">target_ref</span>.<span class="ident">as_ptr</span>(), <span class="ident">source_val</span>, <span class="ident">source_sec_vaddr</span>); }
+            <span class="ident">target_ref</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">source_val</span>.<span class="ident">to_ne_bytes</span>());
         }
         <span class="comment">// R_X86_64_GOTPCREL =&gt; { </span>
         <span class="comment">//     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table</span>

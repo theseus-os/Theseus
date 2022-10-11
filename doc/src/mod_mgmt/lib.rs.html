@@ -3301,6 +3301,10 @@
 <span id="3295">3295</span>
 <span id="3296">3296</span>
 <span id="3297">3297</span>
+<span id="3298">3298</span>
+<span id="3299">3299</span>
+<span id="3300">3300</span>
+<span id="3301">3301</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
@@ -4284,10 +4288,10 @@
                 }
 
                 <span class="ident">write_relocation</span>(
-                    <span class="ident">relocation_entry</span>, 
-                    <span class="kw-2">&amp;mut</span> <span class="ident">target_sec_mapped_pages</span>, 
-                    <span class="ident">target_sec</span>.<span class="ident">mapped_pages_offset</span>, 
-                    <span class="ident">new_section</span>.<span class="ident">start_address</span>(), 
+                    <span class="ident">relocation_entry</span>,
+                    <span class="ident">target_sec_mapped_pages</span>.<span class="ident">as_slice_mut</span>(<span class="number">0</span>, <span class="ident">target_sec</span>.<span class="ident">mapped_pages_offset</span> <span class="op">+</span> <span class="ident">target_sec</span>.<span class="ident">size</span>())<span class="question-mark">?</span>,
+                    <span class="ident">target_sec</span>.<span class="ident">mapped_pages_offset</span>,
+                    <span class="ident">new_section</span>.<span class="ident">start_address</span>(),
                     <span class="bool-val">false</span>
                 )<span class="question-mark">?</span>;
 
@@ -5417,6 +5421,10 @@
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">target_sec_internal_dependencies</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">InternalDependency</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
             {
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">target_sec_mapped_pages</span> <span class="op">=</span> <span class="ident">target_sec</span>.<span class="ident">mapped_pages</span>.<span class="ident">lock</span>();
+                <span class="kw">let</span> <span class="ident">target_sec_slice</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">target_sec_mapped_pages</span>.<span class="ident">as_slice_mut</span>(
+                    <span class="number">0</span>,
+                    <span class="ident">target_sec</span>.<span class="ident">mapped_pages_offset</span> <span class="op">+</span> <span class="ident">target_sec</span>.<span class="ident">size</span>(),
+                )<span class="question-mark">?</span>;
 
                 <span class="comment">// iterate through each relocation entry in the relocation array for the target_sec</span>
                 <span class="kw">for</span> <span class="ident">rela_entry</span> <span class="kw">in</span> <span class="ident">rela_array</span> {
@@ -5479,7 +5487,7 @@
                     <span class="kw">let</span> <span class="ident">relocation_entry</span> <span class="op">=</span> <span class="ident">RelocationEntry::from_elf_relocation</span>(<span class="ident">rela_entry</span>);
                     <span class="ident">write_relocation</span>(
                         <span class="ident">relocation_entry</span>,
-                        <span class="kw-2">&amp;mut</span> <span class="ident">target_sec_mapped_pages</span>,
+                        <span class="ident">target_sec_slice</span>,
                         <span class="ident">target_sec</span>.<span class="ident">mapped_pages_offset</span>,
                         <span class="ident">source_sec</span>.<span class="ident">start_address</span>() <span class="op">+</span> <span class="ident">source_sec_value</span>,
                         <span class="ident">verbose_log</span>

@@ -1548,9 +1548,9 @@
 
                         <span class="ident">write_relocation</span>(
                             <span class="ident">relocation_entry</span>, 
-                            <span class="kw-2">&amp;mut</span> <span class="ident">target_sec_mapped_pages</span>, 
+                            <span class="ident">target_sec_mapped_pages</span>.<span class="ident">as_slice_mut</span>(<span class="number">0</span>, <span class="ident">target_sec</span>.<span class="ident">mapped_pages_offset</span> <span class="op">+</span> <span class="ident">target_sec</span>.<span class="ident">size</span>())<span class="question-mark">?</span>,
                             <span class="ident">target_sec</span>.<span class="ident">mapped_pages_offset</span>, 
-                            <span class="ident">new_source_sec</span>.<span class="ident">start_address</span>(), 
+                            <span class="ident">new_source_sec</span>.<span class="ident">start_address</span>(),
                             <span class="ident">verbose_log</span>
                         )<span class="question-mark">?</span>;
 
