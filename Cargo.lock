@@ -943,6 +943,7 @@ dependencies = [
  "acpi_table",
  "memory",
  "sdt",
+ "static_assertions",
  "zerocopy",
 ]
 
@@ -1199,6 +1200,7 @@ dependencies = [
  "owning_ref",
  "sdt",
  "spin 0.9.0",
+ "static_assertions",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -1621,6 +1623,7 @@ dependencies = [
  "memory",
  "pic",
  "sdt",
+ "static_assertions",
  "zerocopy",
 ]
 
@@ -2600,6 +2603,7 @@ version = "0.1.0"
 dependencies = [
  "memory",
  "owning_ref",
+ "static_assertions",
  "zerocopy",
 ]
 

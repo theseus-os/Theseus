@@ -11,6 +11,7 @@ extern crate pic;
 extern crate sdt;
 extern crate acpi_table;
 extern crate zerocopy;
+#[macro_use] extern crate static_assertions;
 
 use core::mem::size_of;
 use memory::{MappedPages, PageTable, PhysicalAddress}; 
@@ -50,6 +51,8 @@ struct MadtAcpiTable {
     // Following this is a variable number of variable-sized table entries,
     // so we cannot include them here.
 }
+const_assert_eq!(core::mem::size_of::<MadtAcpiTable>(), 44);
+const_assert_eq!(core::mem::align_of::<MadtAcpiTable>(), 1);
 
 
 /// A wrapper around the MADT ACPI table (Multiple APIC Descriptor Table),
@@ -194,6 +197,8 @@ struct EntryRecord {
     size: u8,
 }
 const ENTRY_RECORD_SIZE: usize = size_of::<EntryRecord>();
+const_assert_eq!(core::mem::size_of::<EntryRecord>(), 2);
+const_assert_eq!(core::mem::align_of::<EntryRecord>(), 1);
 
 
 // The following list specifies MADT entry type IDs.
@@ -236,6 +241,8 @@ pub struct MadtLocalApic {
     /// Flags. 1 means that the processor is enabled
     pub flags: u32
 }
+const_assert_eq!(core::mem::size_of::<MadtLocalApic>(), 8);
+const_assert_eq!(core::mem::align_of::<MadtLocalApic>(), 1);
 
 /// MADT I/O APIC
 #[derive(Copy, Clone, Debug, FromBytes)]
@@ -250,6 +257,8 @@ pub struct MadtIoApic {
     /// Global system interrupt base
     pub gsi_base: u32
 }
+const_assert_eq!(core::mem::size_of::<MadtIoApic>(), 12);
+const_assert_eq!(core::mem::align_of::<MadtIoApic>(), 1);
 
 /// MADT Interrupt Source Override
 #[derive(Copy, Clone, Debug, FromBytes)]
@@ -265,6 +274,8 @@ pub struct MadtIntSrcOverride {
     /// Flags
     pub flags: u16
 }
+const_assert_eq!(core::mem::size_of::<MadtIntSrcOverride>(), 10);
+const_assert_eq!(core::mem::align_of::<MadtIntSrcOverride>(), 1);
 
 /// MADT Non-maskable Interrupt.
 /// Use these to configure the LINT0 and LINT1 entries in the Local vector table
@@ -280,6 +291,8 @@ pub struct MadtNonMaskableInterrupt {
     /// LINT (either 0 or 1)
     pub lint: u8,
 }
+const_assert_eq!(core::mem::size_of::<MadtNonMaskableInterrupt>(), 6);
+const_assert_eq!(core::mem::align_of::<MadtNonMaskableInterrupt>(), 1);
 
 /// MADT Local APIC Address Override. 
 /// If this struct exists, the contained physical address
@@ -293,7 +306,8 @@ pub struct MadtLocalApicAddressOverride {
     /// Local APIC physical address
     pub phys_addr: u64,
 }
-
+const_assert_eq!(core::mem::size_of::<MadtLocalApicAddressOverride>(), 12);
+const_assert_eq!(core::mem::align_of::<MadtLocalApicAddressOverride>(), 1);
 
 /// Handles the BSP's (bootstrap processor, the first core to boot) entry in the given MADT iterator.
 /// This should be the first function invoked to initialize the BSP information, 

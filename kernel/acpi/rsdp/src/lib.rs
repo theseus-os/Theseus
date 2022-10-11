@@ -6,6 +6,7 @@ extern crate alloc;
 extern crate memory;
 extern crate owning_ref;
 extern crate zerocopy;
+#[macro_use] extern crate static_assertions;
 
 use core::mem;
 use memory::{PageTable, MappedPages, PhysicalAddress, allocate_pages_by_bytes, allocate_frames_by_bytes_at, EntryFlags};
@@ -40,6 +41,8 @@ pub struct Rsdp {
     extended_checksum: u8,
     reserved: [u8; 3]
 }
+const_assert_eq!(core::mem::size_of::<Rsdp>(), 36);
+const_assert_eq!(core::mem::align_of::<Rsdp>(), 1);
 
 impl Rsdp {
     /// Search for the RSDP in the BIOS memory area from 0xE_0000 to 0xF_FFFF.
