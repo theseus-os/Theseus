@@ -41,8 +41,8 @@ pub fn handle(
 /// Note that this is only the fixed-size part of the MADT table.
 /// At the end, there is an unknown number of table entries, each of variable size. 
 /// Thus, we cannot pre-define them here, but only discover/define them in the iterator.
-#[derive(Debug, FromBytes)]
-#[repr(C)]
+#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(C, packed)]
 struct MadtAcpiTable {
     header: Sdt,
     local_apic_phys_addr: u32,

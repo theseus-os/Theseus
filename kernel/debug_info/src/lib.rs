@@ -20,9 +20,9 @@ extern crate hashbrown;
 extern crate by_address;
 extern crate rustc_demangle;
 
-use core::ops::{
-    Deref,
-    Range,
+use core::{
+    ops::{Deref, Range},
+    mem::size_of,
 };
 use alloc::{
     string::{String},
@@ -583,11 +583,12 @@ impl DebugSymbols {
         let symtab = find_symbol_table(&elf_file)?;
 
         // Allocate a memory region large enough to hold all debug sections.
-        let (mut debug_sections_mp, _debug_sections_vaddr_range) = allocate_debug_section_pages(&elf_file, kernel_mmi_ref)?;
+        let (mut debug_sections_mp, debug_sections_vaddr_range) = allocate_debug_section_pages(&elf_file, kernel_mmi_ref)?;
+        let debug_sections_size = debug_sections_vaddr_range.end.value() - debug_sections_vaddr_range.start.value();
         debug!("debug sections spans {:#X} to {:#X}  (size: {:#X} bytes)",
-            _debug_sections_vaddr_range.start, 
-            _debug_sections_vaddr_range.end,
-            _debug_sections_vaddr_range.end.value() - _debug_sections_vaddr_range.start.value(),
+            debug_sections_vaddr_range.start, 
+            debug_sections_vaddr_range.end,
+            debug_sections_size,
         );
         let mut mp_offset = 0;
 
@@ -689,6 +690,8 @@ impl DebugSymbols {
             sections
         };
 
+        let debug_sections_slice = debug_sections_mp.as_slice_mut(0, debug_sections_size)?;
+
         // Now that we've loaded the debug sections into memory, we can perform the relocations for those sections. 
         for sec in elf_file.section_iter().filter(|sec| sec.get_type() == Ok(ShType::Rela)) {
             // The target section is where we write the relocation data to.
@@ -776,7 +779,7 @@ impl DebugSymbols {
                 let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
                 write_relocation_debug(
                     relocation_entry,
-                    &mut debug_sections_mp,
+                    debug_sections_slice,
                     target_sec.mp_offset,
                     source_sec_vaddr,
                     false
@@ -919,33 +922,44 @@ struct DebugSectionSlice(ArcRef<MappedPages, [u8]>);
 /// rather than a direct (full, non-offset) value.
 /// 
 /// # Arguments
-/// * `relocation_entry`: the relocation entry from the ELF file that specifies the details of the relocation action to perform.
-/// * `target_sec_mapped_pages`: the `MappedPages` that covers the target section, i.e., the section where the relocation data will be written to.
-/// * `target_sec_mapped_pages_offset`: the offset into `target_sec_mapped_pages` where the target section is located.
-/// * `source_sec_vaddr`: the `VirtualAddress` of the source section of the relocation, i.e., the section that the `target_sec` depends on and "points" to.
+/// * `relocation_entry`: the relocation entry from the ELF file that specifies the details
+///    of the relocation action to perform.
+/// * `target_sec_slice`: a byte slice holding the entire contents of the target section,
+///    i.e., the section where the relocation data will be written to.
+/// * `target_sec_offset`: the offset into `target_sec_slice` where the target section's contents begin.
+/// * `source_sec_vaddr`: the `VirtualAddress` of the source section of the relocation, i.e.,
+///    the section that the `target_sec` depends on and "points" to.
 /// * `verbose_log`: whether to output verbose logging information about this relocation action.
 fn write_relocation_debug(
     relocation_entry: RelocationEntry,
-    target_sec_mapped_pages: &mut MappedPages,
-    target_sec_mapped_pages_offset: usize,
+    target_sec_slice: &mut [u8],
+    target_sec_offset: usize,
     source_sec_vaddr: VirtualAddress,
     verbose_log: bool
 ) -> Result<(), &'static str> {
     match relocation_entry.typ {
         R_X86_64_32 => {
             // Calculate exactly where we should write the relocation data to.
-            let target_offset = target_sec_mapped_pages_offset + relocation_entry.offset;
-            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
+            let target_sec_offset = target_sec_offset + relocation_entry.offset;
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
+            let target_ref = &mut target_sec_slice[target_range];
+            
             // For this relocation entry type, typically we would use "target = source + addend".
             // But for debug sections, apparently we just want to use "target = addend".
             let source_val = relocation_entry.addend;
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (ignoring source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
-            *target_ref = source_val as u32;
+            if verbose_log { trace!("                    target_ptr: {:#p}, source_val: {:#X} (ignoring source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
             Ok(())
         }
         _ => {
             // Otherwise, we use the standard relocation formulas.
-            write_relocation(relocation_entry, target_sec_mapped_pages, target_sec_mapped_pages_offset, source_sec_vaddr, verbose_log)
+            write_relocation(
+                relocation_entry,
+                target_sec_slice,
+                target_sec_offset,
+                source_sec_vaddr,
+                verbose_log,
+            )
         }
     }
 }

@@ -27,7 +27,7 @@ pub fn handle(
 }
 
 
-#[repr(packed)]
+#[repr(C, packed)]
 #[derive(Clone, Copy, Debug, FromBytes)]
 pub struct Fadt {
     pub header: Sdt,

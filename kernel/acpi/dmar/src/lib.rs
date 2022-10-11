@@ -58,8 +58,8 @@ pub fn handle(
 /// (also called a DMA Remapping Description table).
 ///
 /// This table is described in Section 8.1 of the VT Directed I/O Spec.
-#[repr(packed)]
 #[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(C, packed)]
 struct DmarReporting {
     header: Sdt,
     host_address_width: u8,
@@ -69,6 +69,7 @@ struct DmarReporting {
     // so we cannot include them here in the static struct definition.
 }
 const_assert_eq!(core::mem::size_of::<DmarReporting>(), 48);
+const_assert_eq!(core::mem::align_of::<DmarReporting>(), 1);
 
 
 /// A wrapper around the DMAR ACPI table ([`DmarReporting`]),
@@ -173,7 +174,7 @@ impl<'t> Iterator for DmarIter<'t> {
 /// Represents the "header" of each dynamic table entry 
 /// in the [`DmarReporting`] table.
 #[derive(Clone, Copy, Debug, FromBytes)]
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct DmarEntryRecord {
     /// The type of a DMAR entry.
     typ: u16,
@@ -181,6 +182,7 @@ pub struct DmarEntryRecord {
     length: u16,
 }
 const_assert_eq!(core::mem::size_of::<DmarEntryRecord>(), 4);
+const_assert_eq!(core::mem::align_of::<DmarEntryRecord>(), 1);
 
 
 /// The set of possible sub-tables that can exist in the top-level DMAR table.
@@ -225,7 +227,7 @@ impl<'t> DmarEntry<'t> {
 ///
 /// An instance of this struct describes a memory region
 #[derive(Clone, Copy, Debug, FromBytes)]
-#[repr(packed)]
+#[repr(C, packed)]
 #[allow(dead_code)]
 pub struct DmarRmrr {
     header: DmarEntryRecord,
@@ -239,11 +241,12 @@ pub struct DmarRmrr {
     // so we cannot include them here in the static struct definition.
 }
 const_assert_eq!(core::mem::size_of::<DmarRmrr>(), 24);
+const_assert_eq!(core::mem::align_of::<DmarRmrr>(), 1);
 
 
 /// ATSR: DMAR Root Port ATS (Address Translation Services) Capability Reporting Structure. 
 #[derive(Clone, Copy, Debug, FromBytes)]
-#[repr(packed)]
+#[repr(C, packed)]
 #[allow(dead_code)]
 pub struct DmarAtsr {
     header: DmarEntryRecord,
@@ -254,11 +257,12 @@ pub struct DmarAtsr {
     // so we cannot include them here in the static struct definition.
 }
 const_assert_eq!(core::mem::size_of::<DmarAtsr>(), 8);
+const_assert_eq!(core::mem::align_of::<DmarAtsr>(), 1);
 
 
 /// RHSA: DMAR Remapping Hardware Static Affinity Structure. 
 #[derive(Clone, Copy, Debug, FromBytes)]
-#[repr(packed)]
+#[repr(C, packed)]
 #[allow(dead_code)]
 pub struct DmarRhsa {
     header: DmarEntryRecord,
@@ -267,11 +271,12 @@ pub struct DmarRhsa {
     proximity_domain: u32,
 }
 const_assert_eq!(core::mem::size_of::<DmarRhsa>(), 20);
+const_assert_eq!(core::mem::align_of::<DmarRhsa>(), 1);
 
 
 /// ANDD: DMAR ACPI Name-space Device Declaration Structure. 
 #[derive(Clone, Copy, Debug, FromBytes)]
-#[repr(packed)]
+#[repr(C, packed)]
 #[allow(dead_code)]
 pub struct DmarAndd {
     header: DmarEntryRecord,
@@ -283,11 +288,12 @@ pub struct DmarAndd {
     // acpi_object_name: [u8],
 }
 const_assert_eq!(core::mem::size_of::<DmarAndd>(), 8);
+const_assert_eq!(core::mem::align_of::<DmarAndd>(), 1);
 
 
 /// SATC: DMAR SoC Integrated Address Translation Cache Reorting Structure. 
 #[derive(Clone, Copy, Debug, FromBytes)]
-#[repr(packed)]
+#[repr(C, packed)]
 #[allow(dead_code)]
 pub struct DmarSatc {
     header: DmarEntryRecord,
@@ -298,3 +304,4 @@ pub struct DmarSatc {
     // so we cannot include them here in the static struct definition.
 }
 const_assert_eq!(core::mem::size_of::<DmarSatc>(), 8);
+const_assert_eq!(core::mem::align_of::<DmarSatc>(), 1);
