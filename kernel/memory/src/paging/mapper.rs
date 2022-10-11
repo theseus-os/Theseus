@@ -681,7 +681,10 @@ impl MappedPages {
     /// from "untyped" memory, i.e., an array of bytes.
     /// 
     /// # Arguments
-    /// `offset`: the offset into the memory region at which the struct is located (where it should start).
+    /// * `offset`: the offset into the memory region at which the struct is located
+    ///   (where it should start).
+    ///   This `offset` must be properly aligned with respect to the alignment requirements
+    ///   of type `T`, otherwise an error will be returned.
     /// 
     /// Returns a reference to the new struct (`&T`) that is formed from the underlying memory region,
     /// with a lifetime dependent upon the lifetime of this `MappedPages` object.
@@ -774,11 +777,15 @@ impl MappedPages {
     /// It has similar type requirements as the [`as_type()`](#method.as_type) method.
     /// 
     /// # Arguments
-    /// * `byte_offset`: the offset (in number of bytes) into the memory region at which the slice should start.
-    /// * `length`: the length of the slice, i.e., the number of `T` elements in the slice. 
-    ///   Thus, the slice will go from `offset` to `offset` + (sizeof(`T`) * `length`).
+    /// * `byte_offset`: the offset (in number of bytes) into the memory region
+    ///    at which the slice should start.
+    ///    This `byte_offset` must be properly aligned with respect to the alignment requirements
+    ///    of type `T`, otherwise an error will be returned.
+    /// * `length`: the length of the slice, i.e., the number of elements of type `T` in the slice. 
+    ///    Thus, the slice's address bounds will span from `byte_offset` to
+    ///    `byte_offset + (size_of::<T> * length)`.
     /// 
-    /// Returns a reference to the new slice that is formed from the underlying memory region,
+    /// Returns a reference to the new slice that a reference to the underlying memory region,
     /// with a lifetime dependent upon the lifetime of this `MappedPages` object.
     /// This ensures safety by guaranteeing that the returned slice 
     /// cannot be used after this `MappedPages` object is dropped and unmapped.
@@ -908,7 +915,7 @@ impl<T: FromBytes> Deref for BorrowedMappedPages<T> {
     type Target = T;
     fn deref(&self) -> &T {
         // SAFETY:
-        // ✅ The pointer is properly aligned because we use `NonNull`.
+        // ✅ The pointer is properly aligned, as its alignment has been checked in `MappedPages::as_type()`.
         // ✅ The pointer is dereferenceable, as it has been bounds checked by `MappedPages::as_type()`.
         // ✅ The pointer has been initialized in the constructor `try_into_borrowed()`.
         // ✅ The lifetime of the returned reference `&T` is tied to the lifetime of the `MappedPages`,
