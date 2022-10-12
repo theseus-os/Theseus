@@ -3305,6 +3305,9 @@
 <span id="3299">3299</span>
 <span id="3300">3300</span>
 <span id="3301">3301</span>
+<span id="3302">3302</span>
+<span id="3303">3303</span>
+<span id="3304">3304</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
@@ -4637,13 +4640,16 @@
             }
 
             <span class="comment">// Actually copy the section data from the ELF file to the given destination MappedPages.</span>
-            <span class="kw">let</span> <span class="ident">dest_slice</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">mapped_pages</span>.<span class="ident">as_slice_mut</span>(<span class="ident">mapped_pages_offset</span>, <span class="ident">sec_size</span>)<span class="question-mark">?</span>;
-            <span class="kw">match</span> <span class="ident">sec</span>.<span class="ident">get_data</span>(<span class="kw-2">&amp;</span><span class="ident">elf_file</span>) {
-                <span class="prelude-val">Ok</span>(<span class="ident">SectionData::Undefined</span>(<span class="ident">sec_data</span>)) =&gt; <span class="ident">dest_slice</span>.<span class="ident">copy_from_slice</span>(<span class="ident">sec_data</span>),
-                <span class="prelude-val">Ok</span>(<span class="ident">SectionData::Empty</span>) =&gt; <span class="ident">dest_slice</span>.<span class="ident">fill</span>(<span class="number">0</span>),
-                <span class="ident">_other</span> =&gt; {
-                    <span class="macro">error!</span>(<span class="string">&quot;Couldn&#39;t get section data for merged section: {:?}&quot;</span>, <span class="ident">_other</span>);
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;couldn&#39;t get section data for merged section&quot;</span>);
+            <span class="comment">// Skip TLS BSS (.tbss) sections, which have no data and occupy no space in memory.</span>
+            <span class="kw">if</span> <span class="ident">typ</span> <span class="op">!</span><span class="op">=</span> <span class="ident">SectionType::TlsBss</span> {
+                <span class="kw">let</span> <span class="ident">dest_slice</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">mapped_pages</span>.<span class="ident">as_slice_mut</span>(<span class="ident">mapped_pages_offset</span>, <span class="ident">sec_size</span>)<span class="question-mark">?</span>;
+                <span class="kw">match</span> <span class="ident">sec</span>.<span class="ident">get_data</span>(<span class="kw-2">&amp;</span><span class="ident">elf_file</span>) {
+                    <span class="prelude-val">Ok</span>(<span class="ident">SectionData::Undefined</span>(<span class="ident">sec_data</span>)) =&gt; <span class="ident">dest_slice</span>.<span class="ident">copy_from_slice</span>(<span class="ident">sec_data</span>),
+                    <span class="prelude-val">Ok</span>(<span class="ident">SectionData::Empty</span>) =&gt; <span class="ident">dest_slice</span>.<span class="ident">fill</span>(<span class="number">0</span>),
+                    <span class="ident">_other</span> =&gt; {
+                        <span class="macro">error!</span>(<span class="string">&quot;Couldn&#39;t get section data for merged section: {:?}&quot;</span>, <span class="ident">_other</span>);
+                        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;couldn&#39;t get section data for merged section&quot;</span>);
+                    }
                 }
             }
 
