@@ -4,17 +4,19 @@ extern crate alloc;
 
 mod error;
 mod internal;
+mod job;
 mod wrapper;
 
 pub use error::{Error, Result};
 
-use alloc::{borrow::ToOwned, format, string::String, sync::Arc, vec::Vec};
+use alloc::{borrow::ToOwned, format, string::String, vec::Vec};
 use app_io::println;
 use core::fmt::Write;
 use hashbrown::HashMap;
+use job::Job;
 use noline::{builder::EditorBuilder, sync::embedded::IO as Io};
 use path::Path;
-use task::{ExitValue, JoinableTaskRef, RunState, TaskRef};
+use task::{ExitValue, JoinableTaskRef, RunState};
 use tty::LineDiscipline;
 
 // FIXME: export main function rather than shell struct
@@ -30,7 +32,7 @@ pub struct Shell {
     // TODO: Could use a vec-based data structure like Vec<Option<JoinableTaskRef>
     // Adding a job would iterate over the vec trying to find a None and if it can't, push to the
     // end. Removing a job would replace the job with None.
-    jobs: HashMap<usize, TaskRef>,
+    jobs: HashMap<usize, Job>,
     stop_order: Vec<usize>,
 }
 
@@ -115,7 +117,7 @@ impl Shell {
             "wait" => self.set(args),
             _ => self.execute_external(cmd, args),
         };
-        
+
         match result {
             Ok(()) => Ok(()),
             Err(e) if e.is_fatal() => Err(e),
@@ -142,9 +144,9 @@ impl Shell {
             num += 1;
         }
         // TODO: Don't clone?
-        self.jobs.insert(num, task.clone());
-        self.discipline.set_foreground(Some(task.clone()));
+        // self.discipline.set_foreground(Some(task));
         task.unblock();
+        self.jobs.insert(num, task);
 
         loop {
             match task.runstate() {
@@ -177,7 +179,7 @@ impl Shell {
         }
     }
 
-    fn resolve_external(&self, cmd: &str, args: Vec<&str>) -> Result<JoinableTaskRef> {
+    fn resolve_external(&self, cmd: &str, args: Vec<&str>) -> Result<Job> {
         // FIXME: Console spawns the shell in kernel namespace
         let namespace_dir = task::get_my_current_task()
             .map(|t| t.get_namespace().dir().clone())
