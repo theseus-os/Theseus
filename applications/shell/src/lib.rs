@@ -1419,9 +1419,11 @@ impl Shell {
             if let Ok(job_num) = job_num.parse::<isize>() {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
                     for task_ref in &job.tasks {
-                        let _ = task_ref.unblock();
-                        // TODO: Do we want to set the job status of an exited task to running?
-                        job.status = JobStatus::Running;
+                        if let Err(_) = task_ref.unblock() {
+                            job.status = JobStatus::Stopped;
+                        } else {
+                            job.status = JobStatus::Running;
+                        }
                     }
                     self.clear_cmdline(false)?;
                     self.redisplay_prompt();
@@ -1451,9 +1453,11 @@ impl Shell {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
                     self.fg_job_num = Some(job_num);
                     for task_ref in &job.tasks {
-                        let _ = task_ref.unblock();
-                        // TODO: Do we want to set the job status of an exited task to running?
-                        job.status = JobStatus::Running;
+                        if let Err(_) = task_ref.unblock() {
+                            job.status = JobStatus::Stopped;
+                        } else {
+                            job.status = JobStatus::Running;
+                        }
                     }
                     return Ok(());
                 }
