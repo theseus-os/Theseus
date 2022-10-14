@@ -2,7 +2,7 @@ use crate::Instant;
 use core::time::Duration;
 use log::error;
 
-type _AtomicFn = crossbeam::atomic::AtomicCell<fn()>;
+type _AtomicFn = crossbeam_utils::atomic::AtomicCell<fn()>;
 static_assertions::const_assert!(_AtomicFn::is_lock_free());
 static_assertions::const_assert_eq!(core::mem::size_of::<_AtomicFn>(), 8);
 
@@ -25,7 +25,7 @@ pub(crate) fn duration_to_instant(_: Duration) -> Instant {
     Instant::ZERO
 }
 
-pub(crate) fn realtime_now() -> Duration {
-    error!("called realtime_now dummy function");
+pub(crate) fn wall_time_now() -> Duration {
+    error!("called wall_time_now dummy function");
     Duration::ZERO
 }

@@ -2,13 +2,13 @@
 name = "time"
 version = "0.1.0"
 authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
-description = "Abstraction for hardware timers"
+description = "Abstraction for hardware clocks"
 edition = "2021"
 
 [dependencies]
 log = "0.4.8"
 static_assertions = "1.1.0"
 
-[dependencies.crossbeam]
+[dependencies.crossbeam-utils]
 version = "0.8.2"
 default-features = false

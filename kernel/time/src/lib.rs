@@ -1,4 +1,4 @@
-//! This crate contains abstractions to interact with hardware timers.
+//! This crate contains abstractions to interact with hardware clocks.
 
 #![no_std]
 
@@ -7,7 +7,7 @@ mod dummy;
 pub use core::time::Duration;
 
 use core::sync::atomic::{AtomicU64, Ordering};
-use crossbeam::atomic::AtomicCell;
+use crossbeam_utils::atomic::AtomicCell;
 
 static EARLY_SLEEP_FUNCTION: AtomicCell<fn(Duration)> = AtomicCell::new(dummy::early_sleep);
 static EARLY_SLEEPER_FREQUENCY: AtomicU64 = AtomicU64::new(0);
@@ -19,8 +19,8 @@ static DURATION_TO_INSTANT_FUNCTION: AtomicCell<fn(Duration) -> Instant> =
     AtomicCell::new(dummy::duration_to_instant);
 static MONOTONIC_FREQUENCY: AtomicU64 = AtomicU64::new(0);
 
-static REALTIME_NOW_FUNCTION: AtomicCell<fn() -> Duration> = AtomicCell::new(dummy::realtime_now);
-static REALTIME_FREQUENCY: AtomicU64 = AtomicU64::new(0);
+static WALL_TIME_NOW_FUNCTION: AtomicCell<fn() -> Duration> = AtomicCell::new(dummy::wall_time_now);
+static WALL_TIME_FREQUENCY: AtomicU64 = AtomicU64::new(0);
 
 fn duration_to_instant(duration: Duration) -> Instant {
     let f = DURATION_TO_INSTANT_FUNCTION.load();
@@ -63,7 +63,10 @@ impl core::ops::Add<Duration> for Instant {
     fn add(self, rhs: Duration) -> Self::Output {
         let instant = duration_to_instant(rhs);
         Self {
-            counter: self.counter + instant.counter,
+            counter: self
+                .counter
+                .checked_add(instant.counter)
+                .expect("overflow when adding duration to instant"),
         }
     }
 }
@@ -74,7 +77,10 @@ impl core::ops::Sub<Duration> for Instant {
     fn sub(self, rhs: Duration) -> Self::Output {
         let instant = duration_to_instant(rhs);
         Self {
-            counter: self.counter - instant.counter,
+            counter: self
+                .counter
+                .checked_sub(instant.counter)
+                .expect("overflow when subtracting duration from instant"),
         }
     }
 }
@@ -87,6 +93,31 @@ impl core::ops::Sub<Instant> for Instant {
     }
 }
 
+/// A clock frequency.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct Frequency(u64);
+
+impl Frequency {
+    /// Creates a new frequency with the specified hertz.
+    pub fn new(frequency: u64) -> Self {
+        Self(frequency)
+    }
+}
+
+impl From<Frequency> for u64 {
+    /// Returns the frequency in hertz.
+    fn from(f: Frequency) -> Self {
+        f.0
+    }
+}
+
+impl From<u64> for Frequency {
+    /// Creates a new frequency with the specified hertz.
+    fn from(f: u64) -> Self {
+        Self(f)
+    }
+}
+
 /// Register the clock source that can be used to sleep when interrupts are
 /// disabled.
 ///
@@ -94,14 +125,14 @@ impl core::ops::Sub<Instant> for Instant {
 /// larger than the frequency of the current early sleeper.
 ///
 /// Returns whether the early sleeper was overwritten.
-pub fn register_early_sleeper<T>(frequency: u64) -> bool
+pub fn register_early_sleeper<T>(frequency: Frequency) -> bool
 where
     T: EarlySleeper,
 {
     let old_frequency = EARLY_SLEEPER_FREQUENCY.load(Ordering::SeqCst);
-    if frequency > old_frequency {
+    if frequency > Frequency::new(old_frequency) {
         EARLY_SLEEP_FUNCTION.store(T::sleep);
-        EARLY_SLEEPER_FREQUENCY.store(frequency, Ordering::SeqCst);
+        EARLY_SLEEPER_FREQUENCY.store(frequency.into(), Ordering::SeqCst);
         true
     } else {
         false
@@ -126,11 +157,11 @@ pub fn early_sleep(duration: Duration) {
 /// is larger than that of the previous source.
 ///
 /// Returns whether the previous source was overwritten.
-pub fn register_clock_source<T>(frequency: u64) -> bool
+pub fn register_clock_source<T>(frequency: Frequency) -> bool
 where
     T: ClockSource,
 {
-    let old_frequency = T::ClockType::frequency_atomic().load(Ordering::SeqCst);
+    let old_frequency = Frequency::new(T::ClockType::frequency_atomic().load(Ordering::SeqCst));
     if frequency > old_frequency {
         let now_fn = T::ClockType::now_fn();
         now_fn.store(T::now);
@@ -138,7 +169,7 @@ where
         T::ClockType::store_unit_to_duration_func(T::unit_to_duration);
         T::ClockType::store_duration_to_unit_func(T::duration_to_unit);
 
-        T::ClockType::frequency_atomic().store(frequency, Ordering::SeqCst);
+        T::ClockType::frequency_atomic().store(frequency.into(), Ordering::SeqCst);
 
         true
     } else {
@@ -148,7 +179,7 @@ where
 
 /// Returns the current time.
 ///
-/// Monotonic clocks return an [`Instant`] whereas realtime clocks return a
+/// Monotonic clocks return an [`Instant`] whereas wall time clocks return a
 /// [`Duration`] signifying the time since 12:00am January 1st 1970 (i.e. Unix
 /// time).
 ///
@@ -167,13 +198,13 @@ where
 
 /// A clock source.
 pub trait ClockSource {
-    /// The type of clock (either [`Monotonic`] or [`Realtime`]).
+    /// The type of clock (either [`Monotonic`] or [`WallTime`]).
     type ClockType: ClockType;
 
     /// The current time according to the clock.
     ///
-    /// For monotonic clocks this is usually the time since boot, and for
-    /// realtime clocks it's the time since 12:00am January 1st 1970 (i.e.
+    /// Monotonic clocks return an [`Instant`] whereas wall time clocks return a
+    /// [`Duration`] signifying the time since 12:00am January 1st 1970 (i.e.
     /// Unix time).
     fn now() -> <Self::ClockType as ClockType>::Unit;
 
@@ -209,7 +240,7 @@ pub trait EarlySleeper: ClockSource<ClockType = Monotonic> {
     }
 }
 
-/// Either a [`Monotonic`] or [`Realtime`] clock.
+/// Either a [`Monotonic`] or [`WallTime`] clock.
 ///
 /// This trait is sealed and so cannot be implemented outside of this crate.
 pub trait ClockType: private::Sealed {
@@ -251,27 +282,27 @@ impl ClockType for Monotonic {
     }
 }
 
-pub struct Realtime;
+pub struct WallTime;
 
-impl private::Sealed for Realtime {}
+impl private::Sealed for WallTime {}
 
-impl ClockType for Realtime {
+impl ClockType for WallTime {
     type Unit = Duration;
 
     fn now_fn() -> &'static AtomicCell<fn() -> Self::Unit> {
-        &REALTIME_NOW_FUNCTION
+        &WALL_TIME_NOW_FUNCTION
     }
 
     fn frequency_atomic() -> &'static AtomicU64 {
-        &REALTIME_FREQUENCY
+        &WALL_TIME_FREQUENCY
     }
 
     fn store_unit_to_duration_func(_: fn(Self::Unit) -> Duration) {
-        // We intentionally don't store the function for realtime clocks.
+        // We intentionally don't store the function for wall time clocks.
     }
 
     fn store_duration_to_unit_func(_: fn(Duration) -> Self::Unit) {
-        // We intentionally don't store the function for realtime clocks.
+        // We intentionally don't store the function for wall time clocks.
     }
 }
 
