@@ -56,21 +56,46 @@ pub fn ps2_write_config(value: u8) {
 
 /// initialize the first ps2 data port
 pub fn init_ps2_port1() {
-    //disable PS2 ports first
+    init_ps2_port(PS2Port::One);
+}
+
+/// initialize the second ps2 data port
+pub fn init_ps2_port2() {
+    init_ps2_port(PS2Port::Two);
+}
+
+enum PS2Port {
+    One,
+    Two,
+}
+
+// see https://wiki.osdev.org/%228042%22_PS/2_Controller#Initialising_the_PS.2F2_Controller
+fn init_ps2_port(port: PS2Port) {
+    // Step 3: Disable Devices
     ps2_write_command(0xA7);
     ps2_write_command(0xAD);
 
-    // clean the output buffer of ps2 to avoid conflicts
+    // Step 4: Flush The Output Buffer
     ps2_clean_buffer();
 
-    // read the old configuration
-    let old_config = ps2_read_config();
-    // set the new configuration
-    let new_config = (old_config & 0xEF) | 0x01;
-    ps2_write_config(new_config);
-    
-    //enable PS2 ports again
+    // Step 5: Set the Controller Configuration Byte
+    let mut config = ps2_read_config();
+    match port {
+        PS2Port::One => {
+            config = (config & 0xEF) | 0x01;
+        }
+        PS2Port::Two => {
+            config = (config & 0xDF) | 0x02;
+        }
+    }
+    ps2_write_config(config);
+
+    // Step 9: Enable Devices
     ps2_write_command(0xAE);
+    match port {
+        PS2Port::Two => ps2_write_command(0xA8),
+        PS2Port::One => (),
+    };
 }
 
 /// test the first ps2 data port
@@ -109,27 +134,6 @@ pub fn test_ps2_port1() {
         warn!("first ps2 data port disabled")
     }
     
-}
-
-/// initialize the second ps2 data port
-pub fn init_ps2_port2() {
-    //disable PS2 ports first
-    ps2_write_command(0xA7);
-    ps2_write_command(0xAD);
-    
-    // clean the output buffer of ps2
-    ps2_clean_buffer();
-
-    // read the old configuration
-    let old_config = ps2_read_config();
-
-    // set the new configuration
-    let new_config = (old_config & 0xDF) | 0x02;
-    ps2_write_config(new_config);
-
-    //enable PS2 ports again
-    ps2_write_command(0xAE);
-    ps2_write_command(0xA8);
 }
 
 /// test the second ps2 data port
