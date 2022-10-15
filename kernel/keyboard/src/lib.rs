@@ -147,15 +147,15 @@ fn handle_keyboard_input(scan_code: u8, extended: bool) -> Result<(), &'static s
         // The "*Lock" keys are toggled only upon being pressed, not when released.
         x if x == Keycode::CapsLock as u8 => {
             modifiers.toggle(KeyboardModifiers::CAPS_LOCK);
-            set_keyboard_led(&modifiers);
+            set_keyboard_led(modifiers);
         }
         x if x == Keycode::ScrollLock as u8 => {
             modifiers.toggle(KeyboardModifiers::SCROLL_LOCK);
-            set_keyboard_led(&modifiers);
+            set_keyboard_led(modifiers);
         }
         x if x == Keycode::NumLock as u8 => {
             modifiers.toggle(KeyboardModifiers::NUM_LOCK);
-            set_keyboard_led(&modifiers);
+            set_keyboard_led(modifiers);
         }
 
         _ => { } // do nothing
@@ -171,7 +171,7 @@ fn handle_keyboard_input(scan_code: u8, extended: bool) -> Result<(), &'static s
     };
 
     if let Some(keycode) = Keycode::from_scancode(adjusted_scan_code) {
-        let event = Event::new_keyboard_event(KeyEvent::new(keycode, action, modifiers.clone()));
+        let event = Event::new_keyboard_event(KeyEvent::new(keycode, action, *modifiers));
         if let Some(producer) = KEYBOARD_PRODUCER.get() {
             producer.push(event).map_err(|_e| "keyboard input queue is full")
         } else {
