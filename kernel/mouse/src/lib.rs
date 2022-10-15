@@ -3,8 +3,7 @@
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
-#[macro_use] extern crate log;
-
+use log::{info, error, warn};
 use spin::Once;
 use mpmc::Queue;
 use event_types::Event;
@@ -134,7 +133,6 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
                 error!("Third bit should in the mouse data packet's first byte should be always be 1. Discarding the whole packet since the bit is 0 now.");
             } else {
                 let _mouse_event = handle_mouse_input(readdata);
-                // mouse_to_print(&_mouse_event);
             }
         }
     }
@@ -154,7 +152,6 @@ fn handle_mouse_input(readdata: u32) -> Result<(), &'static str> {
     dis.read_from_data(readdata);
 
     let mouse_event = MouseEvent::new(*action, *mmove, *dis);
-    // mouse_to_print(&mouse_event);  // use this to debug
     let event = Event::MouseMovementEvent(mouse_event);
 
     if let Some(producer) = MOUSE_PRODUCER.get() {

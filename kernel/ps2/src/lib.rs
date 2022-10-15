@@ -1,12 +1,9 @@
 #![no_std]
 
-#[macro_use]
-extern crate log;
 extern crate alloc;
-extern crate port_io;
-extern crate spin;
 
 use alloc::vec::Vec;
+use log::{warn, info};
 use port_io::Port;
 use spin::Mutex;
 
@@ -48,8 +45,7 @@ pub fn ps2_read_data() -> u8 {
 /// read the config of the ps2 port
 pub fn ps2_read_config() -> u8 {
     ps2_write_command(0x20);
-    let config = ps2_read_data();
-    config
+    ps2_read_data()
 }
 
 /// write the new config to the ps2 command port (0x64)
@@ -67,133 +63,116 @@ pub fn init_ps2_port1() {
     // clean the output buffer of ps2 to avoid conflicts
     ps2_clean_buffer();
 
-    // set the configuration
-    {
-        // read the old configuration
-        let old_config = ps2_read_config();
-
-        // set the new configuration
-        let new_config = (old_config & 0xEF) | 0x01;
-        ps2_write_config(new_config);
-    }
-
+    // read the old configuration
+    let old_config = ps2_read_config();
+    // set the new configuration
+    let new_config = (old_config & 0xEF) | 0x01;
+    ps2_write_config(new_config);
+    
+    //enable PS2 ports again
     ps2_write_command(0xAE);
 }
 
 /// test the first ps2 data port
 pub fn test_ps2_port1() {
     // test the ps2 controller
-    {
-        ps2_write_command(0xAA);
-        let test_flag = ps2_read_data();
-        if test_flag == 0xFC {
-            warn!("ps2 controller test failed!!!")
-        } else if test_flag == 0x55 {
-            info!("ps2 controller test pass!!!")
-        }
+    ps2_write_command(0xAA);
+    let test_flag = ps2_read_data();
+    if test_flag == 0xFC {
+        warn!("ps2 controller test failed!!!")
+    } else if test_flag == 0x55 {
+        info!("ps2 controller test pass!!!")
     }
 
     // test the first ps2 data port
-    {
-        ps2_write_command(0xAB);
-        let test_flag = ps2_read_data();
-        match test_flag {
-            0x00 => info!("first ps2 port test pass!!!"),
-            0x01 => warn!("first ps2 port clock line stuck low"),
-            0x02 => warn!("first ps2 port clock line stuck high"),
-            0x03 => warn!("first ps2 port data line stuck low"),
-            0x04 => warn!("first ps2 port data line stuck high"),
-            _ => {}
-        }
+    ps2_write_command(0xAB);
+    let test_flag = ps2_read_data();
+    match test_flag {
+        0x00 => info!("first ps2 port test pass!!!"),
+        0x01 => warn!("first ps2 port clock line stuck low"),
+        0x02 => warn!("first ps2 port clock line stuck high"),
+        0x03 => warn!("first ps2 port data line stuck low"),
+        0x04 => warn!("first ps2 port data line stuck high"),
+        _ => {}
     }
-
+    
     // enable PS2 interrupt and see the new config
-    {
-        let config = ps2_read_config();
-        if config & 0x01 == 0x01 {
-            info!("first ps2 port interrupt enabled")
-        } else {
-            warn!("first ps2 port interrupt disabled")
-        }
-        if config & 0x10 != 0x10 {
-            info!("first ps2 data port enabled")
-        } else {
-            warn!("first ps2 data port disabled")
-        }
+    let config = ps2_read_config();
+    if config & 0x01 == 0x01 {
+        info!("first ps2 port interrupt enabled")
+    } else {
+        warn!("first ps2 port interrupt disabled")
     }
+    if config & 0x10 != 0x10 {
+        info!("first ps2 data port enabled")
+    } else {
+        warn!("first ps2 data port disabled")
+    }
+    
 }
 
 /// initialize the second ps2 data port
 pub fn init_ps2_port2() {
     //disable PS2 ports first
-    {
-        ps2_write_command(0xA7);
-        ps2_write_command(0xAD);
-    }
-
+    ps2_write_command(0xA7);
+    ps2_write_command(0xAD);
+    
     // clean the output buffer of ps2
     ps2_clean_buffer();
-    // set the configuration
-    {
-        // read the old configuration
-        let old_config = ps2_read_config();
 
-        // set the new configuration
-        let new_config = (old_config & 0xDF) | 0x02;
-        ps2_write_config(new_config);
-    }
-    {
-        ps2_write_command(0xAE);
-        ps2_write_command(0xA8);
-    }
+    // read the old configuration
+    let old_config = ps2_read_config();
+
+    // set the new configuration
+    let new_config = (old_config & 0xDF) | 0x02;
+    ps2_write_config(new_config);
+
+    //enable PS2 ports again
+    ps2_write_command(0xAE);
+    ps2_write_command(0xA8);
 }
 
 /// test the second ps2 data port
 pub fn test_ps2_port2() {
     // test the ps2 controller
-    {
-        ps2_write_command(0xAA);
-        let test_flag = ps2_read_data();
-        if test_flag == 0xFC {
-            warn!("ps2 controller test failed!!!")
-        } else if test_flag == 0x55 {
-            info!("ps2 controller test pass!!!")
-        }
+    ps2_write_command(0xAA);
+    let test_flag = ps2_read_data();
+    if test_flag == 0xFC {
+        warn!("ps2 controller test failed!!!")
+    } else if test_flag == 0x55 {
+        info!("ps2 controller test pass!!!")
     }
+
     // test the second ps2 data port
-    {
-        ps2_write_command(0xA9);
-        let test_flag = ps2_read_data();
-        match test_flag {
-            0x00 => info!("second ps2 port test pass!!!"),
-            0x01 => warn!("second ps2 port clock line stuck low"),
-            0x02 => warn!("second ps2 port clock line stuck high"),
-            0x03 => warn!("second ps2 port data line stuck low"),
-            0x04 => warn!("second ps2 port data line stuck high"),
-            _ => {}
-        }
+    ps2_write_command(0xA9);
+    let test_flag = ps2_read_data();
+    match test_flag {
+        0x00 => info!("second ps2 port test pass!!!"),
+        0x01 => warn!("second ps2 port clock line stuck low"),
+        0x02 => warn!("second ps2 port clock line stuck high"),
+        0x03 => warn!("second ps2 port data line stuck low"),
+        0x04 => warn!("second ps2 port data line stuck high"),
+        _ => {}
     }
+
     // enable PS2 interrupt and see the new config
-    {
-        let config = ps2_read_config();
-        if config & 0x02 == 0x02 {
-            info!("second ps2 port interrupt enabled")
-        } else {
-            warn!("second ps2 port interrupt disabled")
-        }
-        if config & 0x20 != 0x20 {
-            info!("second ps2 data port enabled")
-        } else {
-            warn!("second ps2 data port disabled")
-        }
+    let config = ps2_read_config();
+    if config & 0x02 == 0x02 {
+        info!("second ps2 port interrupt enabled")
+    } else {
+        warn!("second ps2 port interrupt disabled")
+    }
+    if config & 0x20 != 0x20 {
+        info!("second ps2 data port enabled")
+    } else {
+        warn!("second ps2 data port disabled")
     }
 }
 
 /// write data to the first ps2 data port and return the response
 pub fn data_to_port1(value: u8) -> u8 {
     unsafe { PS2_PORT.lock().write(value) };
-    let response = ps2_read_data();
-    response
+    ps2_read_data()
 }
 
 /// write data to the second ps2 data port and return the response
@@ -241,14 +220,12 @@ pub fn command_to_mouse(value: u8) -> Result<(), &'static str> {
             let response = ps2_read_data();
 
             if response == 0xFA {
-                //                info!("mouse command is responded !!!!");
                 return Ok(());
             }
         }
         warn!("mouse command to second port is not accepted");
         return Err("mouse command is not responded!!!");
     }
-    //    info!("mouse command is responded !!!!");
     Ok(())
 }
 
@@ -339,9 +316,8 @@ pub fn set_mouse_id(id: u8) -> Result<(), &'static str> {
         }
     }
     if let Err(_e) = mouse_packet_streaming(true) {
-        return Err("set mouse id without re-starting the streaming, please open it manually");
+        Err("set mouse id without re-starting the streaming, please open it manually")
     } else {
-        //        info!("set mouse id properly without error");
         Ok(())
     }
 }
@@ -353,7 +329,7 @@ pub fn check_mouse_id() -> Result<u8, &'static str> {
     match result {
         Err(e) => {
             warn!("check_mouse_id(): please try read the mouse id later, error: {}", e);
-            return Err(e);
+            Err(e)
         }
         Ok(_buffer_data) => {
             let id_num: u8;
@@ -369,7 +345,7 @@ pub fn check_mouse_id() -> Result<u8, &'static str> {
                 warn!("the streaming of mouse is disabled,please open it manually");
                 return Err(e);
             }
-            return Ok(id_num);
+            Ok(id_num)
         }
     }
 }
@@ -409,7 +385,6 @@ pub fn mouse_packet_streaming(enable: bool) -> Result<Vec<u8>, &'static str> {
             warn!("enable streaming failed");
             Err("enable mouse streaming failed")
         } else {
-            // info!("enable streaming succeeded!!");
             Ok(Vec::new())
         }
     }
@@ -443,11 +418,10 @@ pub fn mouse_resolution(value: u8) -> Result<(), &'static str> {
         warn!("command set mouse resolution is not accepted");
         Err("set mouse resolution failed!!!")
     } else if let Err(_e) = command_to_mouse(value) {
-            warn!("the resolution value is not accepted");
-            Err("set mouse resolution failed!!!")
+        warn!("the resolution value is not accepted");
+        Err("set mouse resolution failed!!!")
     } else {
-            // info!("set mouse resolution succeeded!!!");
-            Ok(())
+        Ok(())
     }
 }
 
@@ -482,25 +456,13 @@ pub enum KeyboardType {
 
 ///detect the keyboard's type
 pub fn keyboard_detect() -> Result<KeyboardType, &'static str> {
-    //    let reply = data_to_port1(0xF2);
-    //    info!("{:x}",reply);
-    //    match reply {
-    //        0xAB => Ok("MF2 keyboard with translation enabled in the PS/Controller"),
-    //        0x41 => Ok("MF2 keyboard with translation enabled in the PS/Controller"),
-    //        0xC1 => Ok("MF2 keyboard with translation enabled in the PS/Controller"),
-    //        0x83 => Ok("MF2 keyboard"),
-    //        _=> Err("Ancient AT keyboard with translation enabled in the PS/Controller (not possible for the second PS/2 port)")
-    //    }
-    if let Err(e) = command_to_keyboard(0xF2) {
-        return Err(e);
-    } else {
-        let reply = ps2_read_data();
-        match reply {
-            0xAB => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
-            0x41 => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
-            0xC1 => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
-            0x83 => Ok(KeyboardType::MF2Keyboard),
-            _ => Ok(KeyboardType::AncientATKeyboard),
-        }
+    command_to_keyboard(0xF2)?; 
+    let reply = ps2_read_data();
+    match reply {
+        0xAB => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
+        0x41 => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
+        0xC1 => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
+        0x83 => Ok(KeyboardType::MF2Keyboard),
+        _ => Ok(KeyboardType::AncientATKeyboard),
     }
 }

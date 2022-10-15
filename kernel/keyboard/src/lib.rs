@@ -3,10 +3,9 @@
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
-#[macro_use] extern crate log;
-
 use core::sync::atomic::{AtomicBool, Ordering};
 use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET, KeyAction, KeyEvent};
+use log::{info, error, warn};
 use spin::Once;
 use mpmc::Queue;
 use event_types::Event;
