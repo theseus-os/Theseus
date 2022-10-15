@@ -3,7 +3,7 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use log::{warn, info};
+use log::{warn, info, trace};
 use port_io::Port;
 use spin::Mutex;
 
@@ -12,13 +12,8 @@ static PS2_COMMAND_AND_STATUS_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x64)
 
 /// Clean the [PS2_DATA_PORT] output buffer
 fn ps2_clean_buffer() {
-    loop {
-        // if no more data in the output buffer
-        if ps2_status_register() & 0x01 == 0 {
-            break;
-        } else {
-            ps2_read_data();
-        }
+    while ps2_status_register() & 0x01 != 0 {
+        trace!("{}",ps2_read_data());
     }
 }
 
