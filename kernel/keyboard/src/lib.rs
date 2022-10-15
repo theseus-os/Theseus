@@ -9,7 +9,7 @@ use log::{info, error, warn};
 use spin::Once;
 use mpmc::Queue;
 use event_types::Event;
-use ps2::{init_ps2_port1, test_ps2_port1, keyboard_led, keyboard_detect, KeyboardType, read_scancode, ps2_status_register};
+use ps2::{init_ps2_port1, test_ps2_port1, keyboard_led, keyboard_detect, KeyboardType, read_scancode};
 use x86_64::structures::idt::InterruptStackFrame;
 
 /// The first PS2 port for the keyboard is connected directly to IRQ 1.

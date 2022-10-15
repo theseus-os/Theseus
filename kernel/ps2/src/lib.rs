@@ -10,19 +10,16 @@ use spin::Mutex;
 static PS2_DATA_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
 static PS2_COMMAND_AND_STATUS_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x64));
 
-/// clean the PS2 data port (0x60) output buffer
-/// also return the vec of data previously in the buffer which may be useful
-fn ps2_clean_buffer() -> Vec<u8> {
-    let mut buffer_data = Vec::new();
+/// Clean the [PS2_DATA_PORT] output buffer
+fn ps2_clean_buffer() {
     loop {
         // if no more data in the output buffer
         if ps2_status_register() & 0x01 == 0 {
             break;
         } else {
-            buffer_data.push(ps2_read_data());
+            ps2_read_data();
         }
     }
-    buffer_data
 }
 
 // https://wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Commands
