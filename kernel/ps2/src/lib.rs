@@ -75,7 +75,7 @@ pub fn ps2_status_register() -> u8 {
 }
 
 /// Read data from the PS/2 data port
-pub fn ps2_read_data() -> u8 {
+fn ps2_read_data() -> u8 {
     PS2_DATA_PORT.lock().read()
 }
 
@@ -494,4 +494,8 @@ pub fn keyboard_detect() -> Result<KeyboardType, &'static str> {
         0x83 => Ok(KeyboardType::MF2Keyboard),
         _ => Ok(KeyboardType::AncientATKeyboard),
     }
+}
+
+pub fn read_scancode() -> u8 {
+    ps2_read_data()
 }
