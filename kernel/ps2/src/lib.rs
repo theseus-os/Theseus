@@ -74,9 +74,14 @@ pub fn ps2_status_register() -> u8 {
     PS2_COMMAND_AND_STATUS_PORT.lock().read()
 }
 
-/// read dat from ps2 data port (0x60)
+/// Read data from the PS/2 data port
 pub fn ps2_read_data() -> u8 {
     PS2_DATA_PORT.lock().read()
+}
+
+/// Write data to the PS/2 data port
+fn ps2_write_data(value: u8) {
+    unsafe { PS2_DATA_PORT.lock().write(value) };
 }
 
 /// read the config of the ps2 port
@@ -88,7 +93,7 @@ fn ps2_read_config() -> u8 {
 /// write the new config to the ps2 command port (0x64)
 fn ps2_write_config(value: u8) {
     ps2_write_command(WriteToInternalRAMByte0);
-    unsafe { PS2_DATA_PORT.lock().write(value) };
+    ps2_write_data(value);
 }
 
 /// initialize the first ps2 data port
@@ -195,7 +200,7 @@ fn test_ps2_port(port: PS2Port) {
 
 /// write data to the first ps2 data port and return the response
 fn data_to_port1(value: u8) -> u8 {
-    unsafe { PS2_DATA_PORT.lock().write(value) };
+    ps2_write_data(value);
     ps2_read_data()
 }
 
@@ -256,7 +261,7 @@ fn command_to_mouse(value: u8) -> Result<(), &'static str> {
 /// write data to the second ps2 output buffer
 fn write_to_second_output_buffer(value: u8) {
     ps2_write_command(WriteByteToPort2OutputBuffer);
-    unsafe { PS2_DATA_PORT.lock().write(value) };
+    ps2_write_data(value);
 }
 
 /// read mouse data packet; will work for mouse with ID 3 or 4
