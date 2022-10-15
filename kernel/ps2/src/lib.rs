@@ -10,11 +10,10 @@ use spin::Mutex;
 static PS2_DATA_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
 static PS2_COMMAND_AND_STATUS_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x64));
 
-/// Clean the [PS2_DATA_PORT] output buffer
-fn ps2_clean_buffer() {
-    while ps2_status_register() & 0x01 != 0 {
-        trace!("{}",ps2_read_data());
-    }
+/// Clean the [PS2_DATA_PORT] output buffer, skipping the [ControllerToHostStatus] `output_buffer_full` check
+fn flush_output_buffer() {
+    //NOTE(hecatia): on my end, this is always 250 for port 1 and 65 for port 2, even if read multiple times
+    trace!("{}", ps2_read_data());
 }
 
 // https://wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Commands
@@ -54,16 +53,51 @@ enum HostToControllerCommand {
 }
 use HostToControllerCommand::*;
 
-/// write command to the command ps2 port (0x64)
+/// Write a command to the PS/2 command port/register
 fn ps2_write_command(value: HostToControllerCommand) {
     unsafe {
         PS2_COMMAND_AND_STATUS_PORT.lock().write(value as u8);
     }
 }
 
-/// read the ps2 status register
-pub fn ps2_status_register() -> u8 {
-    PS2_COMMAND_AND_STATUS_PORT.lock().read()
+use modular_bitfield::{specifiers::B1, bitfield};
+#[allow(non_camel_case_types)]
+type u1 = B1;
+#[allow(non_camel_case_types)]
+type bool1 = bool;
+
+// see https://wiki.osdev.org/%228042%22_PS/2_Controller#Status_Register
+// and https://users.utcluj.ro/~baruch/sie/labor/PS2/PS-2_Keyboard_Interface.htm
+// `pub` because of `dead_code` warnings, see https://github.com/Robbepop/modular-bitfield/issues/56
+#[bitfield(bits = 8)]
+pub struct ControllerToHostStatus {
+    /// When using [Polling](https://wiki.osdev.org/%228042%22_PS/2_Controller#Polling), must be `true` before attempting to read data from [PS2_DATA_PORT].
+    /// When using [Interrupts](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts), guaranteed to be `true`, because an interrupt only happens if the buffer is full
+    output_buffer_full: bool1,
+    /// Must be `false` before attempting to write data to [PS2_DATA_PORT] or [PS2_COMMAND_AND_STATUS_PORT]
+    input_buffer_full: bool1,
+    /// Cleared on reset; set when the system passed Power-on self-test
+    system_passed_self_test: bool1,
+    /// Input buffer should be written to: 0 - [PS2_DATA_PORT], 1 - [PS2_COMMAND_AND_STATUS_PORT]
+    input_buffer_is_command: u1,
+    /// Whether or not communication is inhibited (via switch) / Unknown (chipset specific) / (more likely unused on modern systems)
+    keyboard_enabled: bool1,
+    ///// Keyboard didn't generate clock signals within 15 ms of "request-to-send" (exclusive to AT-compatible mode)
+    // transmit_timeout: bool1,
+    ///// Keyboard didn't generate clock signals within 20 ms of command reception (exclusive to AT-compatible mode)
+    // receive_timeout: bool1,
+    /// Similar to `output_buffer_full`, except for mouse
+    mouse_output_buffer_full: bool1,
+    /// Timeout during keyboard command receive or response (Same as [transmit_timeout] + [receive_timeout])
+    timeout_error: bool1,
+    /// Should be odd parity, set to `true` if even parity received
+    parity_error: bool1,
+}
+
+/// Read the PS/2 status port/register
+/// Note: Currently unused, might be used later for error checking
+fn ps2_status_register() -> ControllerToHostStatus {
+    ControllerToHostStatus::from_bytes([PS2_COMMAND_AND_STATUS_PORT.lock().read()])
 }
 
 /// Read data from the PS/2 data port
@@ -108,8 +142,8 @@ fn init_ps2_port(port: PS2Port) {
     ps2_write_command(DisablePort2);
     ps2_write_command(DisablePort1);
 
-    // Step 4: Flush The Output Buffer
-    ps2_clean_buffer();
+    // Step 4
+    flush_output_buffer();
 
     // Step 5: Set the Controller Configuration Byte
     let mut config = ps2_read_config();
