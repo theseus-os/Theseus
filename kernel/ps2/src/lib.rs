@@ -258,19 +258,14 @@ pub fn write_to_second_output_buffer(value: u8) {
     unsafe { PS2_PORT.lock().write(value) };
 }
 
-/// read mouse data packet
+/// read mouse data packet; will work for mouse with ID 3 or 4
 pub fn handle_mouse_packet() -> u32 {
-    // since nowadays almost every mouse has scroll, so there is a 4 byte packet
-    // which means that only mouse with ID 3 or 4 can be applied this function
-    // because the mouse is initialized to have ID 3 or 4, so this function can
-    // handle the mouse data packet
-
-    let byte_1 = ps2_read_data() as u32;
-    let byte_2 = ps2_read_data() as u32;
-    let byte_3 = ps2_read_data() as u32;
-    let byte_4 = ps2_read_data() as u32;
-    let readdata = (byte_4 << 24) | (byte_3 << 16) | (byte_2 << 8) | byte_1;
-    readdata
+    u32::from_le_bytes([
+        ps2_read_data(),
+        ps2_read_data(),
+        ps2_read_data(),
+        ps2_read_data(),
+    ])
 }
 
 /// set ps2 mouse's sampling rate
