@@ -9,7 +9,7 @@ use mpmc::Queue;
 use event_types::Event;
 use x86_64::structures::idt::InterruptStackFrame;
 use mouse_data::{ButtonAction, Displacement, MouseEvent, MouseMovement};
-use ps2::{check_mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2};
+use ps2::{check_mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2, handle_mouse_packet};
 
 /// The first PS2 port for the mouse is connected directly to IRQ 0xC.
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.
@@ -126,7 +126,7 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
     if indicator & 0x01 == 0x01 {
         //whether the data is coming from the mouse
         if indicator & 0x20 == 0x20 {
-            let readdata = ps2::handle_mouse_packet();
+            let readdata = handle_mouse_packet();
             if (readdata & 0x80 == 0x80) || (readdata & 0x40 == 0x40) {
                 error!("The overflow bits in the mouse data packet's first byte are set! Discarding the whole packet.");
             } else if readdata & 0x08 == 0 {

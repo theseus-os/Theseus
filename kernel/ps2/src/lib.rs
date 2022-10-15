@@ -12,7 +12,7 @@ static PS2_COMMAND_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x64));
 
 /// clean the PS2 data port (0x60) output buffer
 /// also return the vec of data previously in the buffer which may be useful
-pub fn ps2_clean_buffer() -> Vec<u8> {
+fn ps2_clean_buffer() -> Vec<u8> {
     let mut buffer_data = Vec::new();
     loop {
         // if no more data in the output buffer
@@ -26,7 +26,7 @@ pub fn ps2_clean_buffer() -> Vec<u8> {
 }
 
 /// write command to the command ps2 port (0x64)
-pub fn ps2_write_command(value: u8) {
+fn ps2_write_command(value: u8) {
     unsafe {
         PS2_COMMAND_PORT.lock().write(value);
     }
@@ -43,13 +43,13 @@ pub fn ps2_read_data() -> u8 {
 }
 
 /// read the config of the ps2 port
-pub fn ps2_read_config() -> u8 {
+fn ps2_read_config() -> u8 {
     ps2_write_command(0x20);
     ps2_read_data()
 }
 
 /// write the new config to the ps2 command port (0x64)
-pub fn ps2_write_config(value: u8) {
+fn ps2_write_config(value: u8) {
     ps2_write_command(0x60);
     unsafe { PS2_PORT.lock().write(value) };
 }
@@ -157,19 +157,19 @@ fn test_ps2_port(port: PS2Port) {
 }
 
 /// write data to the first ps2 data port and return the response
-pub fn data_to_port1(value: u8) -> u8 {
+fn data_to_port1(value: u8) -> u8 {
     unsafe { PS2_PORT.lock().write(value) };
     ps2_read_data()
 }
 
 /// write data to the second ps2 data port and return the response
-pub fn data_to_port2(value: u8) -> u8 {
+fn data_to_port2(value: u8) -> u8 {
     ps2_write_command(0xD4);
     data_to_port1(value)
 }
 
 /// write command to the keyboard and return the result
-pub fn command_to_keyboard(value: u8) -> Result<(), &'static str> {
+fn command_to_keyboard(value: u8) -> Result<(), &'static str> {
     let response = data_to_port1(value);
 
     match response {
@@ -199,7 +199,7 @@ pub fn command_to_keyboard(value: u8) -> Result<(), &'static str> {
 }
 
 /// write command to the mouse and return the result
-pub fn command_to_mouse(value: u8) -> Result<(), &'static str> {
+fn command_to_mouse(value: u8) -> Result<(), &'static str> {
     // if the mouse doesn't acknowledge the command return error
     let response = data_to_port2(value);
     if response != 0xFA {
@@ -217,7 +217,7 @@ pub fn command_to_mouse(value: u8) -> Result<(), &'static str> {
 }
 
 /// write data to the second ps2 output buffer
-pub fn write_to_second_output_buffer(value: u8) {
+fn write_to_second_output_buffer(value: u8) {
     ps2_write_command(0xD3);
     unsafe { PS2_PORT.lock().write(value) };
 }
@@ -233,7 +233,7 @@ pub fn handle_mouse_packet() -> u32 {
 }
 
 /// set ps2 mouse's sampling rate
-pub fn set_sampling_rate(value: u8) -> Result<(), &'static str> {
+fn set_sampling_rate(value: u8) -> Result<(), &'static str> {
     // if command is not acknowledged
     if let Err(_e) = command_to_mouse(0xF3) {
         Err("set mouse sampling rate failled, please try again")
@@ -338,7 +338,7 @@ pub fn check_mouse_id() -> Result<u8, &'static str> {
 }
 
 /// reset the mouse
-pub fn reset_mouse() -> Result<(), &'static str> {
+fn reset_mouse() -> Result<(), &'static str> {
     if let Err(_e) = command_to_mouse(0xFF) {
         Err("reset mouse failled please try again")
     } else {
@@ -355,7 +355,7 @@ pub fn reset_mouse() -> Result<(), &'static str> {
 }
 
 /// resend the most recent packet again
-pub fn mouse_resend() -> Result<(), &'static str> {
+fn mouse_resend() -> Result<(), &'static str> {
     if let Err(_e) = command_to_mouse(0xFE) {
         Err("mouse resend request failled, please request again")
     } else {
@@ -366,7 +366,7 @@ pub fn mouse_resend() -> Result<(), &'static str> {
 
 /// enable or disable the packet streaming
 /// also return the vec of data previously in the buffer which may be useful
-pub fn mouse_packet_streaming(enable: bool) -> Result<Vec<u8>, &'static str> {
+fn mouse_packet_streaming(enable: bool) -> Result<Vec<u8>, &'static str> {
     if enable {
         if let Err(_e) = command_to_mouse(0xf4) {
             warn!("enable streaming failed");
@@ -400,7 +400,7 @@ pub fn mouse_packet_streaming(enable: bool) -> Result<Vec<u8>, &'static str> {
 /// parameter :
 /// 0x00: 1 count/mm; 0x01 2 count/mm;
 /// 0x02 4 count/mm; 0x03 8 count/mm;
-pub fn mouse_resolution(value: u8) -> Result<(), &'static str> {
+fn mouse_resolution(value: u8) -> Result<(), &'static str> {
     if let Err(_e) = command_to_mouse(0xE8) {
         warn!("command set mouse resolution is not accepted");
         Err("set mouse resolution failed!!!")
@@ -426,7 +426,7 @@ pub fn keyboard_led(value: u8) {
 /// set the scancode set of the keyboard
 /// 0: get the current set; 1: set 1
 /// 2: set 2; 3: set 3
-pub fn keyboard_scancode_set(value: u8) -> Result<(), &'static str> {
+fn keyboard_scancode_set(value: u8) -> Result<(), &'static str> {
     if let Err(_e) = command_to_keyboard(0xF0) {
         return Err("failed to set the keyboard scancode set");
     } else if let Err(_e) = command_to_keyboard(value) {

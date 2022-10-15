@@ -9,7 +9,7 @@ use log::{info, error, warn};
 use spin::Once;
 use mpmc::Queue;
 use event_types::Event;
-use ps2::{init_ps2_port1, test_ps2_port1, keyboard_led, keyboard_detect, KeyboardType};
+use ps2::{init_ps2_port1, test_ps2_port1, keyboard_led, keyboard_detect, KeyboardType, ps2_read_data, ps2_status_register};
 use x86_64::structures::idt::InterruptStackFrame;
 
 /// The first PS2 port for the keyboard is connected directly to IRQ 1.
@@ -72,14 +72,14 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame
     // see this: https://forum.osdev.org/viewtopic.php?f=1&t=32655
     static EXTENDED_SCANCODE: AtomicBool = AtomicBool::new(false);
 
-    let indicator = ps2::ps2_status_register();
+    let indicator = ps2_status_register();
 
     // whether there is any data on the port 0x60
     if indicator & 0x01 == 0x01 {
         // Skip this if the PS2 event came from the mouse, not the keyboard
         if indicator & 0x20 != 0x20 {
             // in this interrupt, we must read the PS2_PORT scancode register before acknowledging the interrupt.
-            let scan_code = ps2::ps2_read_data();
+            let scan_code = ps2_read_data();
             // trace!("PS2_PORT interrupt: raw scan_code {:#X}", scan_code);
 
 
