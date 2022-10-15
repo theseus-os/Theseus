@@ -119,22 +119,13 @@ fn mouse_to_print(mouse_event: &MouseEvent) {
 
 /// The interrupt handler for a ps2-connected mouse, registered at IRQ 0x2C.
 extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
-
-    let indicator = ps2::ps2_status_register();
-
-    // whether there is any data on the port 0x60
-    if indicator & 0x01 == 0x01 {
-        //whether the data is coming from the mouse
-        if indicator & 0x20 == 0x20 {
-            let readdata = handle_mouse_packet();
-            if (readdata & 0x80 == 0x80) || (readdata & 0x40 == 0x40) {
-                error!("The overflow bits in the mouse data packet's first byte are set! Discarding the whole packet.");
-            } else if readdata & 0x08 == 0 {
-                error!("Third bit should in the mouse data packet's first byte should be always be 1. Discarding the whole packet since the bit is 0 now.");
-            } else {
-                let _mouse_event = handle_mouse_input(readdata);
-            }
-        }
+    let readdata = handle_mouse_packet();
+    if (readdata & 0x80 == 0x80) || (readdata & 0x40 == 0x40) {
+        error!("The overflow bits in the mouse data packet's first byte are set! Discarding the whole packet.");
+    } else if readdata & 0x08 == 0 {
+        error!("Third bit should in the mouse data packet's first byte should be always be 1. Discarding the whole packet since the bit is 0 now.");
+    } else {
+        let _mouse_event = handle_mouse_input(readdata);
     }
 
     interrupts::eoi(Some(PS2_MOUSE_IRQ));
