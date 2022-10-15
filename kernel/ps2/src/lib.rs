@@ -63,7 +63,6 @@ pub fn init_ps2_port1() {
 pub fn init_ps2_port2() {
     init_ps2_port(PS2Port::Two);
 }
-
 enum PS2Port {
     One,
     Two,
@@ -100,44 +99,16 @@ fn init_ps2_port(port: PS2Port) {
 
 /// test the first ps2 data port
 pub fn test_ps2_port1() {
-    // test the ps2 controller
-    ps2_write_command(0xAA);
-    let test_flag = ps2_read_data();
-    if test_flag == 0xFC {
-        warn!("ps2 controller test failed!!!")
-    } else if test_flag == 0x55 {
-        info!("ps2 controller test pass!!!")
-    }
-
-    // test the first ps2 data port
-    ps2_write_command(0xAB);
-    let test_flag = ps2_read_data();
-    match test_flag {
-        0x00 => info!("first ps2 port test pass!!!"),
-        0x01 => warn!("first ps2 port clock line stuck low"),
-        0x02 => warn!("first ps2 port clock line stuck high"),
-        0x03 => warn!("first ps2 port data line stuck low"),
-        0x04 => warn!("first ps2 port data line stuck high"),
-        _ => {}
-    }
-    
-    // enable PS2 interrupt and see the new config
-    let config = ps2_read_config();
-    if config & 0x01 == 0x01 {
-        info!("first ps2 port interrupt enabled")
-    } else {
-        warn!("first ps2 port interrupt disabled")
-    }
-    if config & 0x10 != 0x10 {
-        info!("first ps2 data port enabled")
-    } else {
-        warn!("first ps2 data port disabled")
-    }
-    
+    test_ps2_port(PS2Port::One);
 }
 
-/// test the second ps2 data port
+// test the second ps2 data port
 pub fn test_ps2_port2() {
+    test_ps2_port(PS2Port::Two);
+}
+
+// see https://wiki.osdev.org/%228042%22_PS/2_Controller#Initialising_the_PS.2F2_Controller
+fn test_ps2_port(port: PS2Port) {
     // test the ps2 controller
     ps2_write_command(0xAA);
     let test_flag = ps2_read_data();
@@ -147,29 +118,41 @@ pub fn test_ps2_port2() {
         info!("ps2 controller test pass!!!")
     }
 
-    // test the second ps2 data port
-    ps2_write_command(0xA9);
+    // test the ps2 data port
+    match port {
+        PS2Port::One => ps2_write_command(0xAB),
+        PS2Port::Two => ps2_write_command(0xA9),
+    }
     let test_flag = ps2_read_data();
     match test_flag {
-        0x00 => info!("second ps2 port test pass!!!"),
-        0x01 => warn!("second ps2 port clock line stuck low"),
-        0x02 => warn!("second ps2 port clock line stuck high"),
-        0x03 => warn!("second ps2 port data line stuck low"),
-        0x04 => warn!("second ps2 port data line stuck high"),
+        0x00 => info!("ps2 port {} test pass!!!", port as u8 + 1),
+        0x01 => warn!("ps2 port {} clock line stuck low", port as u8 + 1),
+        0x02 => warn!("ps2 port {} clock line stuck high", port as u8 + 1),
+        0x03 => warn!("ps2 port {} data line stuck low", port as u8 + 1),
+        0x04 => warn!("ps2 port {} data line stuck high", port as u8 + 1),
         _ => {}
     }
 
     // enable PS2 interrupt and see the new config
     let config = ps2_read_config();
-    if config & 0x02 == 0x02 {
-        info!("second ps2 port interrupt enabled")
+    let port_interrupt_enabled = match port {
+        PS2Port::One => config & 0x01 == 0x01,
+        PS2Port::Two => config & 0x02 == 0x02,
+    };
+    let clock_enabled = match port {
+        PS2Port::One => config & 0x10 != 0x10,
+        PS2Port::Two => config & 0x20 != 0x20,
+    };
+
+    if port_interrupt_enabled {
+        info!("ps2 port {} interrupt enabled", port as u8 + 1)
     } else {
-        warn!("second ps2 port interrupt disabled")
+        warn!("ps2 port {} interrupt disabled", port as u8 + 1)
     }
-    if config & 0x20 != 0x20 {
-        info!("second ps2 data port enabled")
+    if clock_enabled {
+        info!("ps2 port {} enabled", port as u8 + 1)
     } else {
-        warn!("second ps2 data port disabled")
+        warn!("ps2 port {} disabled", port as u8 + 1)
     }
 }
 
