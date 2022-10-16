@@ -4,10 +4,11 @@ use log::{warn, info, trace};
 use num_enum::TryFromPrimitive;
 use port_io::Port;
 use spin::Mutex;
+use modular_bitfield::{specifiers::B1, bitfield};
 
 use HostToControllerCommand::*;
 use HostToKeyboardCommand::*;
-use modular_bitfield::{specifiers::B1, bitfield};
+use KeyboardResponse::*;
 
 /// Port used by PS/2 Controller and devices
 static PS2_DATA_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
@@ -272,14 +273,29 @@ fn read_port_test_result() -> Result<PortTestResult, &'static str> {
     read_data().try_into().map_err(|_| "read_port_test_result called at the wrong time")
 }
 
-/// write data to the first ps2 data port and return the response
-fn data_to_port1(value: u8) -> u8 {
-    write_data(value);
-    read_data()
+// https://wiki.osdev.org/PS/2_Keyboard#Special_Bytes //NOTE: all other bytes sent by the keyboard are scan codes
+// http://users.utcluj.ro/~baruch/sie/labor/PS2/PS-2_Mouse_Interface.htm mouse only returns AA, FC or FA, mouse_id and packet
+#[derive(TryFromPrimitive)]
+#[repr(u8)]
+pub enum KeyboardResponse {
+    KeyDetectionErrorOrInternalBufferOverrun1 = 0x00,
+    SelfTestPassed = 0xAA, //sent after "0xFF (reset)" command or keyboard power up
+    ResponseToEcho = 0xEE,
+    Acknowledge = 0xFA,
+    SelfTestFailed1 = 0xFC, //sent after "0xFF (reset)" command or keyboard power up
+    SelfTestFailed2 = 0xFD, //sent after "0xFF (reset)" command or keyboard power up
+    ResendCommand = 0xFE,
+    KeyDetectionErrorOrInternalBufferOverrun2 = 0xFF,
 }
 
-/// write data to the second ps2 data port and return the response
-fn data_to_port2(value: u8) -> u8 {
+/// write data to the first ps2 data port and return the response
+fn data_to_port1(value: u8) -> KeyboardResponse {
+    write_data(value);
+    read_data().try_into().map_err(|e| warn!("{:?}", e)).unwrap() //FIXME: for testing
+}
+
+/// write data to the second ps2 data port and return the response //TODO: MouseResponse
+fn data_to_port2(value: u8) -> KeyboardResponse {
     write_command(WriteByteToPort2InputBuffer);
     data_to_port1(value)
 }
@@ -345,24 +361,16 @@ fn command_to_keyboard(value: HostToKeyboardCommandOrData) -> Result<(), &'stati
     };
 
     match response {
-        0xFA => {
-            // keyboard acknowledges the command
-            Ok(())
-        }
-
-        0xFE => {
-            // keyboard doesn't acknowledge the command
-            Err("Fail to send the command to the keyboard")
-        }
-
+        Acknowledge => Ok(()),
+        ResendCommand => Err("Fail to send the command to the keyboard"),
         _ => {
             for _x in 0..14 {
                 // wait for response
-                let response = read_data();
-                if response == 0xFA {
-                    return Ok(());
-                } else if response == 0xfe {
-                    return Err("Please resend the command to the keyboard");
+                let response = read_data().try_into();
+                match response {
+                    Ok(Acknowledge) => return Ok(()),
+                    Ok(ResendCommand) => return Err("Please resend the command to the keyboard"),
+                    _ => (),
                 }
             }
             Err("command is not acknowledged")
@@ -374,7 +382,7 @@ fn command_to_keyboard(value: HostToKeyboardCommandOrData) -> Result<(), &'stati
 fn command_to_mouse(value: u8) -> Result<(), &'static str> {
     // if the mouse doesn't acknowledge the command return error
     let response = data_to_port2(value);
-    if response != 0xFA {
+    if response as u8 != 0xFA {
         for _x in 0..14 {
             let response = read_data();
 
@@ -548,7 +556,7 @@ pub fn enable_mouse_packet_streaming() -> Result<(), &'static str> {
 
 /// disable the packet streaming
 pub fn disable_mouse_packet_streaming() -> Result<(), &'static str> {
-    if data_to_port2(0xf5) != 0xfa {
+    if data_to_port2(0xf5) as u8 != 0xfa {
         for x in 0..15 {
             if x == 14 {
                 warn!("disable mouse streaming failed");
