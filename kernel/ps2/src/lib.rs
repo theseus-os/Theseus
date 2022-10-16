@@ -4,7 +4,12 @@ use log::{warn, info, trace};
 use port_io::Port;
 use spin::Mutex;
 
+use HostToControllerCommand::*;
+use modular_bitfield::{specifiers::B1, bitfield};
+
+/// Port used by PS/2 Controller and devices
 static PS2_DATA_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
+/// Port used to send commands to and receive status from the PS/2 Controller
 static PS2_COMMAND_AND_STATUS_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x64));
 
 /// Clean the [PS2_DATA_PORT] output buffer, skipping the [ControllerToHostStatus] `output_buffer_full` check
@@ -48,16 +53,14 @@ enum HostToControllerCommand {
     WriteByteToPort2InputBuffer = 0xD4, //NOTE: only if 2 PS/2 ports supported
     // PulseOutputLineLowFor6ms = 0xF0, //0xF0-0xFF; Bits 0 to 3 correspond to 4 different output lines and are used as a mask (0 = pulse line, 1 = don't pulse line); Bit 0 corresponds to the "reset" line. The other output lines don't have a standard/defined purpose.
 }
-use HostToControllerCommand::*;
 
 /// Write a command to the PS/2 command port/register
-fn ps2_write_command(value: HostToControllerCommand) {
+fn write_command(value: HostToControllerCommand) {
     unsafe {
         PS2_COMMAND_AND_STATUS_PORT.lock().write(value as u8);
     }
 }
 
-use modular_bitfield::{specifiers::B1, bitfield};
 #[allow(non_camel_case_types)]
 type u1 = B1;
 #[allow(non_camel_case_types)]
@@ -109,13 +112,13 @@ fn ps2_write_data(value: u8) {
 
 /// read the config of the ps2 port
 fn ps2_read_config() -> u8 {
-    ps2_write_command(ReadFromInternalRAMByte0);
+    write_command(ReadFromInternalRAMByte0);
     ps2_read_data()
 }
 
 /// write the new config to the ps2 command port (0x64)
 fn ps2_write_config(value: u8) {
-    ps2_write_command(WriteToInternalRAMByte0);
+    write_command(WriteToInternalRAMByte0);
     ps2_write_data(value);
 }
 
@@ -136,8 +139,8 @@ enum PS2Port {
 // see https://wiki.osdev.org/%228042%22_PS/2_Controller#Initialising_the_PS.2F2_Controller
 fn init_ps2_port(port: PS2Port) {
     // Step 3: Disable Devices
-    ps2_write_command(DisablePort2);
-    ps2_write_command(DisablePort1);
+    write_command(DisablePort2);
+    write_command(DisablePort1);
 
     // Step 4
     flush_output_buffer();
@@ -155,9 +158,9 @@ fn init_ps2_port(port: PS2Port) {
     ps2_write_config(config);
 
     // Step 9: Enable Devices
-    ps2_write_command(EnablePort1);
+    write_command(EnablePort1);
     match port {
-        PS2Port::Two => ps2_write_command(EnablePort2),
+        PS2Port::Two => write_command(EnablePort2),
         PS2Port::One => (),
     };
 }
@@ -175,7 +178,7 @@ pub fn test_ps2_port2() {
 // see https://wiki.osdev.org/%228042%22_PS/2_Controller#Initialising_the_PS.2F2_Controller
 fn test_ps2_port(port: PS2Port) {
     // test the ps2 controller
-    ps2_write_command(TestController);
+    write_command(TestController);
     let test_flag = ps2_read_data();
     if test_flag == 0xFC {
         warn!("ps2 controller test failed!!!")
@@ -185,8 +188,8 @@ fn test_ps2_port(port: PS2Port) {
 
     // test the ps2 data port
     match port {
-        PS2Port::One => ps2_write_command(TestPort1),
-        PS2Port::Two => ps2_write_command(TestPort2),
+        PS2Port::One => write_command(TestPort1),
+        PS2Port::Two => write_command(TestPort2),
     }
     let test_flag = ps2_read_data();
     match test_flag {
@@ -229,7 +232,7 @@ fn data_to_port1(value: u8) -> u8 {
 
 /// write data to the second ps2 data port and return the response
 fn data_to_port2(value: u8) -> u8 {
-    ps2_write_command(WriteByteToPort2InputBuffer);
+    write_command(WriteByteToPort2InputBuffer);
     data_to_port1(value)
 }
 
@@ -283,7 +286,7 @@ fn command_to_mouse(value: u8) -> Result<(), &'static str> {
 
 /// write data to the second ps2 output buffer
 fn write_to_second_output_buffer(value: u8) {
-    ps2_write_command(WriteByteToPort2OutputBuffer);
+    write_command(WriteByteToPort2OutputBuffer);
     ps2_write_data(value);
 }
 
