@@ -21,10 +21,10 @@ fn flush_output_buffer() {
 // https://wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Commands
 /// Command types which can be sent to the PS/2 Controller
 enum HostToControllerCommand {
-    /// returns [PS2ControllerConfigurationByte]
+    /// returns [ControllerConfigurationByte]
     ReadFromInternalRAMByte0 = 0x20,
     // ReadFromInternalRAMByteN = 0x21, //0x21-0x3F; N is the command byte & 0x1F; return Unknown/non-standard
-    /// sets [PS2ControllerConfigurationByte]
+    /// sets [ControllerConfigurationByte]
     WriteToInternalRAMByte0 = 0x60,
     // WriteToInternalRAMByteN = 0x61, //0x61-0x7F; N is the command byte & 0x1F
     DisablePort2 = 0xA7, //NOTE: only if 2 PS/2 ports supported
@@ -35,7 +35,8 @@ enum HostToControllerCommand {
     TestController = 0xAA,
     /// returns [TestPortResult]
     TestPort1 = 0xAB,
-    // DiagnosticDump = 0xAC, //read all bytes of internal RAM
+    ///// read all bytes of internal RAM
+    // DiagnosticDump = 0xAC,
     DisablePort1 = 0xAD,
     EnablePort1 = 0xAE,
     // ReadControllerInputPort = 0xC0, //return Unknown/non-standard
@@ -110,16 +111,32 @@ fn write_data(value: u8) {
     unsafe { PS2_DATA_PORT.lock().write(value) };
 }
 
+// wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Configuration_Byte
+/// Used for [HostToControllerCommand::ReadFromInternalRAMByte0] and [HostToControllerCommand::WriteToInternalRAMByte0]
+#[bitfield(bits = 8)]
+#[derive(Debug)]
+pub struct ControllerConfigurationByte {
+    port1_interrupt_enabled: bool1,
+    port2_interrupt_enabled: bool1, //NOTE: only if 2 PS/2 ports supported
+    /// Cleared on reset; set when the system passed Power-on self-test
+    system_passed_self_test: bool1,
+    should_be_zero: u1,
+    port1_clock_disabled: bool1,
+    port2_clock_disabled: bool1, //NOTE: only if 2 PS/2 ports supported
+    port1_translation: bool1,
+    must_be_zero: u1,
+}
+
 /// read the config of the ps2 port
-fn read_config() -> u8 {
+fn read_config() -> ControllerConfigurationByte {
     write_command(ReadFromInternalRAMByte0);
-    read_data()
+    ControllerConfigurationByte::from_bytes([read_data()])
 }
 
 /// write the new config to the ps2 command port (0x64)
-fn write_config(value: u8) {
+fn write_config(value: ControllerConfigurationByte) {
     write_command(WriteToInternalRAMByte0);
-    write_data(value);
+    write_data(value.into_bytes()[0]);
 }
 
 /// initialize the first ps2 data port
@@ -149,10 +166,12 @@ fn init_ps2_port(port: PS2Port) {
     let mut config = read_config();
     match port {
         PS2Port::One => {
-            config = (config & 0xEF) | 0x01;
+            config.set_port1_clock_disabled(false);
+            config.set_port1_interrupt_enabled(true);
         }
         PS2Port::Two => {
-            config = (config & 0xDF) | 0x02;
+            config.set_port2_clock_disabled(false);
+            config.set_port2_interrupt_enabled(true);
         }
     }
     write_config(config);
@@ -204,12 +223,12 @@ fn test_ps2_port(port: PS2Port) {
     // enable PS2 interrupt and see the new config
     let config = read_config();
     let port_interrupt_enabled = match port {
-        PS2Port::One => config & 0x01 == 0x01,
-        PS2Port::Two => config & 0x02 == 0x02,
+        PS2Port::One => config.port1_interrupt_enabled(),
+        PS2Port::Two => config.port2_interrupt_enabled(),
     };
     let clock_enabled = match port {
-        PS2Port::One => config & 0x10 != 0x10,
-        PS2Port::Two => config & 0x20 != 0x20,
+        PS2Port::One => !config.port1_clock_disabled(),
+        PS2Port::Two => !config.port2_clock_disabled(),
     };
 
     if port_interrupt_enabled {
