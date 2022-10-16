@@ -8,7 +8,8 @@ use modular_bitfield::{specifiers::B1, bitfield};
 
 use HostToControllerCommand::*;
 use HostToKeyboardCommand::*;
-use KeyboardResponse::*;
+use HostToMouseCommand::*;
+use DeviceToHostResponse::*;
 
 /// Port used by PS/2 Controller and devices
 static PS2_DATA_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
@@ -277,7 +278,7 @@ fn read_port_test_result() -> Result<PortTestResult, &'static str> {
 // http://users.utcluj.ro/~baruch/sie/labor/PS2/PS-2_Mouse_Interface.htm mouse only returns AA, FC or FA, mouse_id and packet
 #[derive(TryFromPrimitive)]
 #[repr(u8)]
-pub enum KeyboardResponse {
+pub enum DeviceToHostResponse {
     KeyDetectionErrorOrInternalBufferOverrun1 = 0x00,
     SelfTestPassed = 0xAA, //sent after "0xFF (reset)" command or keyboard power up
     ResponseToEcho = 0xEE,
@@ -289,13 +290,13 @@ pub enum KeyboardResponse {
 }
 
 /// write data to the first ps2 data port and return the response
-fn data_to_port1(value: u8) -> KeyboardResponse {
+fn data_to_port1(value: u8) -> DeviceToHostResponse {
     write_data(value);
     read_data().try_into().map_err(|e| warn!("{:?}", e)).unwrap() //FIXME: for testing
 }
 
 /// write data to the second ps2 data port and return the response //TODO: MouseResponse
-fn data_to_port2(value: u8) -> KeyboardResponse {
+fn data_to_port2(value: u8) -> DeviceToHostResponse {
     write_command(WriteByteToPort2InputBuffer);
     data_to_port1(value)
 }
@@ -378,22 +379,56 @@ fn command_to_keyboard(value: HostToKeyboardCommandOrData) -> Result<(), &'stati
     }
 }
 
-/// write command to the mouse and return the result
-fn command_to_mouse(value: u8) -> Result<(), &'static str> {
-    // if the mouse doesn't acknowledge the command return error
-    let response = data_to_port2(value);
-    if response as u8 != 0xFA {
-        for _x in 0..14 {
-            let response = read_data();
+pub enum HostToMouseCommandOrData {
+    MouseCommand(HostToMouseCommand),
+    SampleRate(SampleRate),
+    MouseResolution(MouseResolution),
+}
 
-            if response == 0xFA {
-                return Ok(());
+
+// https://wiki.osdev.org/PS/2_Mouse#Mouse_Device_Over_PS.2F2
+pub enum HostToMouseCommand {
+    SetScaling = 0xE6, //1 or 2
+    SetResolution = 0xE8, //[MouseResolution]
+    StatusRequest = 0xE9,
+    SetStreamMode = 0xEA,
+    ReadData = 0xEB,
+    ResetWrapMode = 0xEC,
+    SetWrapMode = 0xEE,
+    SetRemoteMode = 0xF0, //NOTE: same value as SetScancodeSet
+    GetDeviceID = 0xF2, //NOTE: same value as IdentifyKeyboard; TODO: See Detecting PS/2 Device Types for the response bytes
+    SampleRate = 0xF3,  //NOTE: same value as SetRepeatRateAndDelay; valid values are 10, 20, 40, 60, 80, 100, 200
+    EnableDataReporting = 0xF4, //NOTE: same value as EnableScanning
+    DisableDataReporting = 0xF5, //NOTE: same value as DisableScanning
+    SetDefaults = 0xF6, //NOTE: same
+    ResendByte = 0xFE,  //NOTE: same
+    Reset = 0xFF,       //NOTE: same
+}
+
+/// write command to the mouse and return the result
+fn command_to_mouse(value: HostToMouseCommandOrData) -> Result<(), &'static str> {
+    let response = match value {
+        HostToMouseCommandOrData::MouseCommand(c) => data_to_port2(c as u8),
+        HostToMouseCommandOrData::MouseResolution(r) => data_to_port2(r as u8),
+        HostToMouseCommandOrData::SampleRate(s) => data_to_port2(s as u8),
+    };
+
+    match response {
+        Acknowledge => Ok(()),
+        _ => {
+            for _x in 0..14 {
+                // wait for response
+                let response = read_data().try_into();
+                #[allow(clippy::single_match)]
+                match response {
+                    Ok(Acknowledge) => return Ok(()),
+                    _ => (), //no Ok(Resend) check for mouse
+                }
             }
+            warn!("mouse command to second port is not accepted");
+            Err("mouse command is not responded!!!")
         }
-        warn!("mouse command to second port is not accepted");
-        return Err("mouse command is not responded!!!");
     }
-    Ok(())
 }
 
 /// write data to the second ps2 output buffer
@@ -412,14 +447,24 @@ pub fn handle_mouse_packet() -> u32 {
     ])
 }
 
+pub enum SampleRate {
+    _10 = 10,
+    _20 = 20,
+    _40 = 40,
+    _60 = 60,
+    _80 = 80,
+    _100 = 100,
+    _200 = 200
+}
+
 /// set ps2 mouse's sampling rate
-fn set_sampling_rate(value: u8) -> Result<(), &'static str> {
+fn set_sampling_rate(value: SampleRate) -> Result<(), &'static str> {
     // if command is not acknowledged
-    if let Err(_e) = command_to_mouse(0xF3) {
+    if let Err(_e) = command_to_mouse(HostToMouseCommandOrData::MouseCommand(SampleRate)) {
         Err("set mouse sampling rate failled, please try again")
     } else {
         // if second byte command is not acknowledged
-        if let Err(_e) = command_to_mouse(value) {
+        if let Err(_e) = command_to_mouse(HostToMouseCommandOrData::SampleRate(value)) {
             Err("set mouse sampling rate failled, please try again")
         } else {
             Ok(())
@@ -437,44 +482,45 @@ pub fn set_mouse_id(id: u8) -> Result<(), &'static str> {
         warn!("fail to stop streaming, before trying to read mouse id");
         return Err("fail to set the mouse id!!!");
     } else {
+        use SampleRate::*;
         // set the id to 3
         if id == 3 {
-            if let Err(_e) = set_sampling_rate(200) {
+            if let Err(_e) = set_sampling_rate(_200) {
                 warn!("fail to stop streaming, before trying to read mouse id");
                 return Err("fail to set the mouse id!!!");
             }
-            if let Err(_e) = set_sampling_rate(100) {
+            if let Err(_e) = set_sampling_rate(_100) {
                 warn!("fail to stop streaming, before trying to read mouse id");
                 return Err("fail to set the mouse id!!!");
             }
-            if let Err(_e) = set_sampling_rate(80) {
+            if let Err(_e) = set_sampling_rate(_80) {
                 warn!("fail to stop streaming, before trying to read mouse id");
                 return Err("fail to set the mouse id!!!");
             }
         }
         // set the id to 4
         else if id == 4 {
-            if let Err(_e) = set_sampling_rate(200) {
+            if let Err(_e) = set_sampling_rate(_200) {
                 warn!("fail to stop streaming, before trying to read mouse id");
                 return Err("fail to set the mouse id!!!");
             }
-            if let Err(_e) = set_sampling_rate(100) {
+            if let Err(_e) = set_sampling_rate(_100) {
                 warn!("fail to stop streaming, before trying to read mouse id");
                 return Err("fail to set the mouse id!!!");
             }
-            if let Err(_e) = set_sampling_rate(80) {
+            if let Err(_e) = set_sampling_rate(_80) {
                 warn!("fail to stop streaming, before trying to read mouse id");
                 return Err("fail to set the mouse id!!!");
             }
-            if let Err(_e) = set_sampling_rate(200) {
+            if let Err(_e) = set_sampling_rate(_200) {
                 warn!("fail to stop streaming, before trying to read mouse id");
                 return Err("fail to set the mouse id!!!");
             }
-            if let Err(_e) = set_sampling_rate(200) {
+            if let Err(_e) = set_sampling_rate(_200) {
                 warn!("fail to stop streaming, before trying to read mouse id");
                 return Err("fail to set the mouse id!!!");
             }
-            if let Err(_e) = set_sampling_rate(80) {
+            if let Err(_e) = set_sampling_rate(_80) {
                 warn!("fail to stop streaming, before trying to read mouse id");
                 return Err("fail to set the mouse id!!!");
             }
@@ -501,7 +547,7 @@ pub fn check_mouse_id() -> Result<u8, &'static str> {
         Ok(_buffer_data) => {
             let id_num: u8;
             // check whether the command is acknowledged
-            if let Err(e) = command_to_mouse(0xF2) {
+            if let Err(e) = command_to_mouse(HostToMouseCommandOrData::MouseCommand(GetDeviceID)) {
                 warn!("check_mouse_id(): command not accepted, please try again.");
                 return Err(e);
             } else {
@@ -519,7 +565,7 @@ pub fn check_mouse_id() -> Result<u8, &'static str> {
 
 /// reset the mouse
 fn reset_mouse() -> Result<(), &'static str> {
-    if let Err(_e) = command_to_mouse(0xFF) {
+    if let Err(_e) = command_to_mouse(HostToMouseCommandOrData::MouseCommand(Reset)) {
         Err("reset mouse failled please try again")
     } else {
         for _x in 0..14 {
@@ -536,7 +582,7 @@ fn reset_mouse() -> Result<(), &'static str> {
 
 /// resend the most recent packet again
 fn mouse_resend() -> Result<(), &'static str> {
-    if let Err(_e) = command_to_mouse(0xFE) {
+    if let Err(_e) = command_to_mouse(HostToMouseCommandOrData::MouseCommand(HostToMouseCommand::ResendByte)) {
         Err("mouse resend request failled, please request again")
     } else {
         // mouse resend request succeeded
@@ -546,7 +592,7 @@ fn mouse_resend() -> Result<(), &'static str> {
 
 /// enable the packet streaming
 pub fn enable_mouse_packet_streaming() -> Result<(), &'static str> {
-    if let Err(_e) = command_to_mouse(0xf4) {
+    if let Err(_e) = command_to_mouse(HostToMouseCommandOrData::MouseCommand(EnableDataReporting)) {
         warn!("enable streaming failed");
         Err("enable mouse streaming failed")
     } else {
@@ -574,15 +620,19 @@ pub fn disable_mouse_packet_streaming() -> Result<(), &'static str> {
     Ok(())
 }
 
+pub enum MouseResolution {
+    Count1PerMm = 0,
+    Count2PerMm = 1,
+    Count4PerMm = 2,
+    Count8PerMm = 3
+}
+
 /// set the resolution of the mouse
-/// parameter :
-/// 0x00: 1 count/mm; 0x01 2 count/mm;
-/// 0x02 4 count/mm; 0x03 8 count/mm;
-fn mouse_resolution(value: u8) -> Result<(), &'static str> {
-    if let Err(_e) = command_to_mouse(0xE8) {
+fn mouse_resolution(value: MouseResolution) -> Result<(), &'static str> {
+    if let Err(_e) = command_to_mouse(HostToMouseCommandOrData::MouseCommand(SetResolution)) {
         warn!("command set mouse resolution is not accepted");
         Err("set mouse resolution failed!!!")
-    } else if let Err(_e) = command_to_mouse(value) {
+    } else if let Err(_e) = command_to_mouse(HostToMouseCommandOrData::MouseResolution(value)) {
         warn!("the resolution value is not accepted");
         Err("set mouse resolution failed!!!")
     } else {
