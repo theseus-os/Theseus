@@ -15,7 +15,7 @@ static PS2_COMMAND_AND_STATUS_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x64)
 /// Clean the [PS2_DATA_PORT] output buffer, skipping the [ControllerToHostStatus] `output_buffer_full` check
 fn flush_output_buffer() {
     //NOTE(hecatia): on my end, this is always 250 for port 1 and 65 for port 2, even if read multiple times
-    trace!("{}", ps2_read_data());
+    trace!("{}", read_data());
 }
 
 // https://wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Commands
@@ -96,30 +96,30 @@ pub struct ControllerToHostStatus {
 
 /// Read the PS/2 status port/register
 /// Note: Currently unused, might be used later for error checking
-fn ps2_status_register() -> ControllerToHostStatus {
+fn status_register() -> ControllerToHostStatus {
     ControllerToHostStatus::from_bytes([PS2_COMMAND_AND_STATUS_PORT.lock().read()])
 }
 
 /// Read data from the PS/2 data port
-fn ps2_read_data() -> u8 {
+fn read_data() -> u8 {
     PS2_DATA_PORT.lock().read()
 }
 
 /// Write data to the PS/2 data port
-fn ps2_write_data(value: u8) {
+fn write_data(value: u8) {
     unsafe { PS2_DATA_PORT.lock().write(value) };
 }
 
 /// read the config of the ps2 port
-fn ps2_read_config() -> u8 {
+fn read_config() -> u8 {
     write_command(ReadFromInternalRAMByte0);
-    ps2_read_data()
+    read_data()
 }
 
 /// write the new config to the ps2 command port (0x64)
-fn ps2_write_config(value: u8) {
+fn write_config(value: u8) {
     write_command(WriteToInternalRAMByte0);
-    ps2_write_data(value);
+    write_data(value);
 }
 
 /// initialize the first ps2 data port
@@ -146,7 +146,7 @@ fn init_ps2_port(port: PS2Port) {
     flush_output_buffer();
 
     // Step 5: Set the Controller Configuration Byte
-    let mut config = ps2_read_config();
+    let mut config = read_config();
     match port {
         PS2Port::One => {
             config = (config & 0xEF) | 0x01;
@@ -155,7 +155,7 @@ fn init_ps2_port(port: PS2Port) {
             config = (config & 0xDF) | 0x02;
         }
     }
-    ps2_write_config(config);
+    write_config(config);
 
     // Step 9: Enable Devices
     write_command(EnablePort1);
@@ -179,7 +179,7 @@ pub fn test_ps2_port2() {
 fn test_ps2_port(port: PS2Port) {
     // test the ps2 controller
     write_command(TestController);
-    let test_flag = ps2_read_data();
+    let test_flag = read_data();
     if test_flag == 0xFC {
         warn!("ps2 controller test failed!!!")
     } else if test_flag == 0x55 {
@@ -191,7 +191,7 @@ fn test_ps2_port(port: PS2Port) {
         PS2Port::One => write_command(TestPort1),
         PS2Port::Two => write_command(TestPort2),
     }
-    let test_flag = ps2_read_data();
+    let test_flag = read_data();
     match test_flag {
         0x00 => info!("ps2 port {} test pass!!!", port as u8 + 1),
         0x01 => warn!("ps2 port {} clock line stuck low", port as u8 + 1),
@@ -202,7 +202,7 @@ fn test_ps2_port(port: PS2Port) {
     }
 
     // enable PS2 interrupt and see the new config
-    let config = ps2_read_config();
+    let config = read_config();
     let port_interrupt_enabled = match port {
         PS2Port::One => config & 0x01 == 0x01,
         PS2Port::Two => config & 0x02 == 0x02,
@@ -226,8 +226,8 @@ fn test_ps2_port(port: PS2Port) {
 
 /// write data to the first ps2 data port and return the response
 fn data_to_port1(value: u8) -> u8 {
-    ps2_write_data(value);
-    ps2_read_data()
+    write_data(value);
+    read_data()
 }
 
 /// write data to the second ps2 data port and return the response
@@ -254,7 +254,7 @@ fn command_to_keyboard(value: u8) -> Result<(), &'static str> {
         _ => {
             for _x in 0..14 {
                 // wait for response
-                let response = ps2_read_data();
+                let response = read_data();
                 if response == 0xFA {
                     return Ok(());
                 } else if response == 0xfe {
@@ -272,7 +272,7 @@ fn command_to_mouse(value: u8) -> Result<(), &'static str> {
     let response = data_to_port2(value);
     if response != 0xFA {
         for _x in 0..14 {
-            let response = ps2_read_data();
+            let response = read_data();
 
             if response == 0xFA {
                 return Ok(());
@@ -287,16 +287,16 @@ fn command_to_mouse(value: u8) -> Result<(), &'static str> {
 /// write data to the second ps2 output buffer
 fn write_to_second_output_buffer(value: u8) {
     write_command(WriteByteToPort2OutputBuffer);
-    ps2_write_data(value);
+    write_data(value);
 }
 
 /// read mouse data packet; will work for mouse with ID 3 or 4
 pub fn handle_mouse_packet() -> u32 {
     u32::from_le_bytes([
-        ps2_read_data(),
-        ps2_read_data(),
-        ps2_read_data(),
-        ps2_read_data(),
+        read_data(),
+        read_data(),
+        read_data(),
+        read_data(),
     ])
 }
 
@@ -393,7 +393,7 @@ pub fn check_mouse_id() -> Result<u8, &'static str> {
                 warn!("check_mouse_id(): command not accepted, please try again.");
                 return Err(e);
             } else {
-                id_num = ps2_read_data();
+                id_num = read_data();
             }
             // begin streaming again
             if let Err(e) = enable_mouse_packet_streaming() {
@@ -411,7 +411,7 @@ fn reset_mouse() -> Result<(), &'static str> {
         Err("reset mouse failled please try again")
     } else {
         for _x in 0..14 {
-            let more_bytes = ps2_read_data();
+            let more_bytes = read_data();
             if more_bytes == 0xAA {
                 // command reset mouse succeeded
                 return Ok(());
@@ -450,7 +450,7 @@ pub fn disable_mouse_packet_streaming() -> Result<(), &'static str> {
                 warn!("disable mouse streaming failed");
                 return Err("disable mouse streaming failed");
             }
-            let response = ps2_read_data();
+            let response = read_data();
 
             if response != 0xfa {
                 trace!("{response}");
@@ -510,7 +510,7 @@ pub enum KeyboardType {
 ///detect the keyboard's type
 pub fn keyboard_detect() -> Result<KeyboardType, &'static str> {
     command_to_keyboard(0xF2)?; 
-    let reply = ps2_read_data();
+    let reply = read_data();
     match reply {
         0xAB => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
         0x41 => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
@@ -521,5 +521,5 @@ pub fn keyboard_detect() -> Result<KeyboardType, &'static str> {
 }
 
 pub fn read_scancode() -> u8 {
-    ps2_read_data()
+    read_data()
 }
