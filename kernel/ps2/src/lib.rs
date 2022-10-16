@@ -1,8 +1,5 @@
 #![no_std]
 
-extern crate alloc;
-
-use alloc::vec::Vec;
 use log::{warn, info, trace};
 use port_io::Port;
 use spin::Mutex;
@@ -321,7 +318,7 @@ fn set_sampling_rate(value: u8) -> Result<(), &'static str> {
 pub fn set_mouse_id(id: u8) -> Result<(), &'static str> {
     // stop the mouse's streaming before trying to set the ID
     // if fail to stop the streaming, return error
-    if let Err(_e) = mouse_packet_streaming(false) {
+    if let Err(_e) = disable_mouse_packet_streaming() {
         warn!("fail to stop streaming, before trying to read mouse id");
         return Err("fail to set the mouse id!!!");
     } else {
@@ -370,7 +367,7 @@ pub fn set_mouse_id(id: u8) -> Result<(), &'static str> {
             return Err("invalid id to be set to a mouse, please re-enter the id number");
         }
     }
-    if let Err(_e) = mouse_packet_streaming(true) {
+    if let Err(_e) = enable_mouse_packet_streaming() {
         Err("set mouse id without re-starting the streaming, please open it manually")
     } else {
         Ok(())
@@ -380,7 +377,7 @@ pub fn set_mouse_id(id: u8) -> Result<(), &'static str> {
 /// check the mouse's id
 pub fn check_mouse_id() -> Result<u8, &'static str> {
     // stop the streaming before trying to read the mouse's id
-    let result = mouse_packet_streaming(false);
+    let result = disable_mouse_packet_streaming();
     match result {
         Err(e) => {
             warn!("check_mouse_id(): please try read the mouse id later, error: {}", e);
@@ -396,7 +393,7 @@ pub fn check_mouse_id() -> Result<u8, &'static str> {
                 id_num = ps2_read_data();
             }
             // begin streaming again
-            if let Err(e) = mouse_packet_streaming(true) {
+            if let Err(e) = enable_mouse_packet_streaming() {
                 warn!("the streaming of mouse is disabled,please open it manually");
                 return Err(e);
             }
@@ -432,36 +429,34 @@ fn mouse_resend() -> Result<(), &'static str> {
     }
 }
 
-/// enable or disable the packet streaming
-/// also return the vec of data previously in the buffer which may be useful
-fn mouse_packet_streaming(enable: bool) -> Result<Vec<u8>, &'static str> {
-    if enable {
-        if let Err(_e) = command_to_mouse(0xf4) {
-            warn!("enable streaming failed");
-            Err("enable mouse streaming failed")
-        } else {
-            Ok(Vec::new())
-        }
+/// enable the packet streaming
+pub fn enable_mouse_packet_streaming() -> Result<(), &'static str> {
+    if let Err(_e) = command_to_mouse(0xf4) {
+        warn!("enable streaming failed");
+        Err("enable mouse streaming failed")
+    } else {
+        Ok(())
     }
-    else {
-        let mut buffer_data = Vec::new();
-        if data_to_port2(0xf5) != 0xfa {
-            for x in 0..15 {
-                if x == 14 {
-                    warn!("disable mouse streaming failed");
-                    return Err("disable mouse streaming failed");
-                }
-                let response = ps2_read_data();
+}
 
-                if response != 0xfa {
-                    buffer_data.push(response);
-                } else {
-                    return Ok(buffer_data);
-                }
+/// disable the packet streaming
+pub fn disable_mouse_packet_streaming() -> Result<(), &'static str> {
+    if data_to_port2(0xf5) != 0xfa {
+        for x in 0..15 {
+            if x == 14 {
+                warn!("disable mouse streaming failed");
+                return Err("disable mouse streaming failed");
+            }
+            let response = ps2_read_data();
+
+            if response != 0xfa {
+                trace!("{response}");
+            } else {
+                return Ok(());
             }
         }
-        Ok(buffer_data)
-    } 
+    }
+    Ok(())
 }
 
 /// set the resolution of the mouse
