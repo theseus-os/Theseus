@@ -6,6 +6,7 @@ use port_io::Port;
 use spin::Mutex;
 
 use HostToControllerCommand::*;
+use HostToKeyboardCommand::*;
 use modular_bitfield::{specifiers::B1, bitfield};
 
 /// Port used by PS/2 Controller and devices
@@ -283,9 +284,65 @@ fn data_to_port2(value: u8) -> u8 {
     data_to_port1(value)
 }
 
+// https://wiki.osdev.org/PS/2_Keyboard#Commands
+pub enum HostToKeyboardCommandOrData {
+    KeyboardCommand(HostToKeyboardCommand),
+    LEDState(LEDState),
+    ScancodeSet(ScancodeSet),
+    //TODO: Typematic, Scancode
+}
+
+pub enum HostToKeyboardCommand {
+    SetLEDStatus = 0xED,
+    ///// for diagnostic purposes and useful for device removal detection
+    //Echo = 0xEE,
+    SetScancodeSet = 0xF0,
+    IdentifyKeyboard = 0xF2,
+    /// also called typematic
+    SetRepeatRateAndDelay = 0xF3,
+    EnableScanning = 0xF4,
+    /// might also restore default parameters
+    DisableScanning = 0xF5,
+    //SetDefaultParameters = 0xF6,
+    ///// scancode set 3 only
+    //SetAllKeysToAutorepeat = 0xF7,
+    ///// scancode set 3 only
+    //SetAllKeysToMakeRelease = 0xF8,
+    ///// scancode set 3 only
+    //SetAllKeysToMake = 0xF9,
+    ///// scancode set 3 only
+    //SetAllKeysToAutorepeatMakeRelease = 0xFA, //NOTE: same value as ACK
+    ///// scancode set 3 only
+    //SetKeyToAutorepeat = 0xFB,
+    ///// scancode set 3 only
+    //SetKeyToMakeRelease = 0xFC, //NOTE: same value as Self test failed
+    ///// scancode set 3 only
+    //SetKeyToMake = 0xFD,
+    ResendByte = 0xFE,
+    ResetAndStartSelfTest = 0xFF,
+}
+
+#[bitfield(bits = 3)]
+pub struct LEDState {
+    pub scroll_lock: bool,
+    pub number_lock: bool,
+    pub caps_lock: bool,
+}
+
+pub enum ScancodeSet {
+    GetCurrentSet = 0,
+    Set1 = 1,
+    Set2 = 2,
+    Set3 = 3,
+}
+
 /// write command to the keyboard and return the result
-fn command_to_keyboard(value: u8) -> Result<(), &'static str> {
-    let response = data_to_port1(value);
+fn command_to_keyboard(value: HostToKeyboardCommandOrData) -> Result<(), &'static str> {
+    let response = match value {
+        HostToKeyboardCommandOrData::KeyboardCommand(c) => data_to_port1(c as u8),
+        HostToKeyboardCommandOrData::LEDState(l) => data_to_port1(l.into_bytes()[0]),
+        HostToKeyboardCommandOrData::ScancodeSet(s) => data_to_port1(s as u8),
+    };
 
     match response {
         0xFA => {
@@ -525,24 +582,20 @@ fn mouse_resolution(value: u8) -> Result<(), &'static str> {
     }
 }
 
-///set LED status of the keyboard
-/// parameter :
-/// 0: ScrollLock; 1: NumberLock; 2: CapsLock
-pub fn keyboard_led(value: u8) {
-    if let Err(_e) = command_to_keyboard(0xED) {
+/// set LED status of the keyboard
+pub fn keyboard_led(value: LEDState) {
+    if let Err(_e) = command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetLEDStatus)) {
         warn!("failed to set the keyboard led");
-    } else if let Err(_e) = command_to_keyboard(value) {
+    } else if let Err(_e) = command_to_keyboard(HostToKeyboardCommandOrData::LEDState(value)) {
         warn!("failed to set the keyboard led");
     }
 }
 
 /// set the scancode set of the keyboard
-/// 0: get the current set; 1: set 1
-/// 2: set 2; 3: set 3
-fn keyboard_scancode_set(value: u8) -> Result<(), &'static str> {
-    if let Err(_e) = command_to_keyboard(0xF0) {
+fn keyboard_scancode_set(value: ScancodeSet) -> Result<(), &'static str> {
+    if let Err(_e) = command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetScancodeSet)) {
         return Err("failed to set the keyboard scancode set");
-    } else if let Err(_e) = command_to_keyboard(value) {
+    } else if let Err(_e) = command_to_keyboard(HostToKeyboardCommandOrData::ScancodeSet(value)) {
         return Err("failed to set the keyboard scancode set");
     }
     Ok(())
@@ -556,7 +609,7 @@ pub enum KeyboardType {
 
 ///detect the keyboard's type
 pub fn keyboard_detect() -> Result<KeyboardType, &'static str> {
-    command_to_keyboard(0xF2)?; 
+    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(IdentifyKeyboard))?; 
     let reply = read_data();
     match reply {
         0xAB => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),

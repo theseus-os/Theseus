@@ -9,7 +9,7 @@ use log::{info, error, warn};
 use spin::Once;
 use mpmc::Queue;
 use event_types::Event;
-use ps2::{init_ps2_port1, test_ps2_port1, keyboard_led, keyboard_detect, KeyboardType, read_scancode};
+use ps2::{init_ps2_port1, test_ps2_port1, keyboard_led, keyboard_detect, KeyboardType, read_scancode, LEDState};
 use x86_64::structures::idt::InterruptStackFrame;
 
 /// The first PS2 port for the keyboard is connected directly to IRQ 1.
@@ -19,15 +19,7 @@ const PS2_KEYBOARD_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + 0x1;
 // TODO: avoid unsafe static mut using the following: https://www.reddit.com/r/rust/comments/1wvxcn/lazily_initialized_statics/cf61im5/
 static mut KBD_MODIFIERS: KeyboardModifiers = KeyboardModifiers::new();
 
-
 static KEYBOARD_PRODUCER: Once<Queue<Event>> = Once::new();
-
-/// Bitmask for the Scroll Lock keyboard LED
-const SCROLL_LED: u8 = 0b001;
-/// Bitmask for the Num Lock keyboard LED
-const NUM_LED: u8 = 0b010;
-/// Bitmask for the Caps Lock keyboard LED
-const CAPS_LED: u8 = 0b100;
 
 /// Initialize the PS2 keyboard driver and register its interrupt handler.
 /// 
@@ -177,16 +169,10 @@ fn handle_keyboard_input(scan_code: u8, extended: bool) -> Result<(), &'static s
 
 
 fn set_keyboard_led(modifiers: &KeyboardModifiers) {
-    let mut led_bitmask: u8 = 0; 
-    if modifiers.is_caps_lock() {
-        led_bitmask |= CAPS_LED;
-    }
-    if modifiers.is_num_lock() {
-        led_bitmask |= NUM_LED;
-    }
-    if modifiers.is_scroll_lock() {
-        led_bitmask |= SCROLL_LED;
-    }
-
-    keyboard_led(led_bitmask);
+    keyboard_led(
+        LEDState::new()
+            .with_scroll_lock(modifiers.is_scroll_lock())
+            .with_number_lock(modifiers.is_num_lock())
+            .with_caps_lock(modifiers.is_caps_lock()),
+    );
 }
