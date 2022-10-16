@@ -9,6 +9,10 @@ edition = "2021"
 spin = "0.9.0"
 modular-bitfield = "0.11.2"
 
+[dependencies.num_enum]
+version = "0.5.7"
+default-features = false
+
 [dependencies.log]
 version = "0.4.8"
 

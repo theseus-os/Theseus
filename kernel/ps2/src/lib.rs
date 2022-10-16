@@ -1,6 +1,7 @@
 #![no_std]
 
 use log::{warn, info, trace};
+use num_enum::TryFromPrimitive;
 use port_io::Port;
 use spin::Mutex;
 
@@ -185,24 +186,22 @@ fn init_ps2_port(port: PS2Port) {
 }
 
 /// test the first ps2 data port
-pub fn test_ps2_port1() {
-    test_ps2_port(PS2Port::One);
+pub fn test_ps2_port1() -> Result<(), &'static str> {
+    test_ps2_port(PS2Port::One)
 }
 
 // test the second ps2 data port
-pub fn test_ps2_port2() {
-    test_ps2_port(PS2Port::Two);
+pub fn test_ps2_port2() -> Result<(), &'static str> {
+    test_ps2_port(PS2Port::Two)
 }
 
 // see https://wiki.osdev.org/%228042%22_PS/2_Controller#Initialising_the_PS.2F2_Controller
-fn test_ps2_port(port: PS2Port) {
+fn test_ps2_port(port: PS2Port) -> Result<(), &'static str> {
     // test the ps2 controller
     write_command(TestController);
-    let test_flag = read_data();
-    if test_flag == 0xFC {
-        warn!("ps2 controller test failed!!!")
-    } else if test_flag == 0x55 {
-        info!("ps2 controller test pass!!!")
+    match read_controller_test_result()? {
+        ControllerTestResult::Passed => info!("ps2 controller test pass!!!"),
+        ControllerTestResult::Failed => warn!("ps2 controller test failed!!!"),
     }
 
     // test the ps2 data port
@@ -210,14 +209,13 @@ fn test_ps2_port(port: PS2Port) {
         PS2Port::One => write_command(TestPort1),
         PS2Port::Two => write_command(TestPort2),
     }
-    let test_flag = read_data();
-    match test_flag {
-        0x00 => info!("ps2 port {} test pass!!!", port as u8 + 1),
-        0x01 => warn!("ps2 port {} clock line stuck low", port as u8 + 1),
-        0x02 => warn!("ps2 port {} clock line stuck high", port as u8 + 1),
-        0x03 => warn!("ps2 port {} data line stuck low", port as u8 + 1),
-        0x04 => warn!("ps2 port {} data line stuck high", port as u8 + 1),
-        _ => {}
+    use PortTestResult::*;
+    match read_port_test_result()? {
+        Passed => info!("ps2 port {} test pass!!!", port as u8 + 1),
+        ClockLineStuckLow => warn!("ps2 port {} clock line stuck low", port as u8 + 1),
+        ClockLineStuckHigh => warn!("ps2 port {} clock line stuck high", port as u8 + 1),
+        DataLineStuckLow => warn!("ps2 port {} data line stuck low", port as u8 + 1),
+        DataLineStuckHigh => warn!("ps2 port {} data line stuck high", port as u8 + 1),
     }
 
     // enable PS2 interrupt and see the new config
@@ -241,6 +239,36 @@ fn test_ps2_port(port: PS2Port) {
     } else {
         warn!("ps2 port {} disabled", port as u8 + 1)
     }
+    Ok(())
+}
+
+#[derive(TryFromPrimitive)]
+#[repr(u8)]
+enum ControllerTestResult {
+    Passed = 0x55,
+    Failed = 0xFC,
+}
+
+/// must only be called after writing the [TestController] command
+/// otherwise would read bogus data
+fn read_controller_test_result() -> Result<ControllerTestResult, &'static str> {
+    read_data().try_into().map_err(|_| "read_controller_test_result called at the wrong time")
+}
+
+#[derive(TryFromPrimitive)]
+#[repr(u8)]
+enum PortTestResult {
+    Passed = 0x00,
+    ClockLineStuckLow = 0x01,
+    ClockLineStuckHigh = 0x02,
+    DataLineStuckLow = 0x03,
+    DataLineStuckHigh = 0x04,
+}
+
+/// must only be called after writing the [TestPort1] or [TestPort2] command
+/// otherwise would read bogus data
+fn read_port_test_result() -> Result<PortTestResult, &'static str> {
+    read_data().try_into().map_err(|_| "read_port_test_result called at the wrong time")
 }
 
 /// write data to the first ps2 data port and return the response

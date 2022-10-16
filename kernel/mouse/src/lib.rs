@@ -30,8 +30,7 @@ pub fn init(mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
     // Init the second ps2 port, which is used for the mouse.
     init_ps2_port2();
     // Test the second port.
-    // TODO: return an error if this test fails.
-    test_ps2_port2();
+    test_ps2_port2()?;
 
     // Set Mouse ID to 4, and read it back to check that it worked.
     let _e = set_mouse_id(4);

@@ -38,8 +38,7 @@ pub fn init(keyboard_queue_producer: Queue<Event>) -> Result<(), &'static str> {
     // Init the first ps2 port, which is used for the keyboard.
     init_ps2_port1();
     // Test the first port.
-    // TODO: return an error if this test fails.
-    test_ps2_port1();
+    test_ps2_port1()?;
     // Detect which kind of keyboard is connected.
     // TODO: actually do something with the keyboard type.
     match keyboard_detect() {
