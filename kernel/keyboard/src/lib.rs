@@ -10,7 +10,7 @@ use once_cell::unsync::Lazy;
 use spin::Once;
 use mpmc::Queue;
 use event_types::Event;
-use ps2::{init_ps2_port1, test_ps2_port1, keyboard_detect, KeyboardType, read_scancode, LEDState};
+use ps2::{init_ps2_port1, test_ps2_port1, keyboard_detect, KeyboardType, read_scancode, LEDState, keyboard_scancode_set, ScancodeSet};
 use x86_64::structures::idt::InterruptStackFrame;
 
 /// The first PS2 port for the keyboard is connected directly to IRQ 1.
@@ -44,7 +44,7 @@ pub fn init(keyboard_queue_producer: Queue<Event>) -> Result<(), &'static str> {
         }
     }
 
-    // TODO: set keyboard to scancode set 1, since that's the only one we support (?)
+    keyboard_scancode_set(ScancodeSet::Set2)?;
 
     // Register the interrupt handler
     interrupts::register_interrupt(PS2_KEYBOARD_IRQ, ps2_keyboard_handler).map_err(|e| {

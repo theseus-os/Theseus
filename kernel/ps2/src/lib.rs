@@ -633,7 +633,7 @@ pub fn set_keyboard_led(value: LEDState) -> Result<(), &'static str> {
 }
 
 /// set the scancode set of the keyboard
-fn keyboard_scancode_set(value: ScancodeSet) -> Result<(), &'static str> {
+pub fn keyboard_scancode_set(value: ScancodeSet) -> Result<(), &'static str> {
     command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetScancodeSet))
         .and(command_to_keyboard(HostToKeyboardCommandOrData::ScancodeSet(value)))
         .map_err(|_| "failed to set the keyboard scancode set")
