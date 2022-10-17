@@ -629,34 +629,26 @@ pub enum MouseResolution {
 
 /// set the resolution of the mouse
 fn mouse_resolution(value: MouseResolution) -> Result<(), &'static str> {
-    if let Err(_e) = command_to_mouse(HostToMouseCommandOrData::MouseCommand(SetResolution)) {
-        warn!("command set mouse resolution is not accepted");
-        Err("set mouse resolution failed!!!")
-    } else if let Err(_e) = command_to_mouse(HostToMouseCommandOrData::MouseResolution(value)) {
-        warn!("the resolution value is not accepted");
-        Err("set mouse resolution failed!!!")
-    } else {
-        Ok(())
-    }
+    command_to_mouse(HostToMouseCommandOrData::MouseCommand(SetResolution))
+        .and(command_to_mouse(HostToMouseCommandOrData::MouseResolution(value)))
+        .map_err(|_| {
+            warn!("command set mouse resolution is not accepted");
+            "failed to set the keyboard scancode set"
+        })
 }
 
 /// set LED status of the keyboard
-pub fn keyboard_led(value: LEDState) {
-    if let Err(_e) = command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetLEDStatus)) {
-        warn!("failed to set the keyboard led");
-    } else if let Err(_e) = command_to_keyboard(HostToKeyboardCommandOrData::LEDState(value)) {
-        warn!("failed to set the keyboard led");
-    }
+pub fn set_keyboard_led(value: LEDState) -> Result<(), &'static str> {
+    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetLEDStatus))
+        .and(command_to_keyboard(HostToKeyboardCommandOrData::LEDState(value)))
+        .map_err(|_| "failed to set the keyboard led")
 }
 
 /// set the scancode set of the keyboard
 fn keyboard_scancode_set(value: ScancodeSet) -> Result<(), &'static str> {
-    if let Err(_e) = command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetScancodeSet)) {
-        return Err("failed to set the keyboard scancode set");
-    } else if let Err(_e) = command_to_keyboard(HostToKeyboardCommandOrData::ScancodeSet(value)) {
-        return Err("failed to set the keyboard scancode set");
-    }
-    Ok(())
+    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetScancodeSet))
+        .and(command_to_keyboard(HostToKeyboardCommandOrData::ScancodeSet(value)))
+        .map_err(|_| "failed to set the keyboard scancode set")
 }
 
 pub enum KeyboardType {

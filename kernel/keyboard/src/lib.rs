@@ -9,7 +9,7 @@ use log::{info, error, warn};
 use spin::Once;
 use mpmc::Queue;
 use event_types::Event;
-use ps2::{init_ps2_port1, test_ps2_port1, keyboard_led, keyboard_detect, KeyboardType, read_scancode, LEDState};
+use ps2::{init_ps2_port1, test_ps2_port1, keyboard_detect, KeyboardType, read_scancode, LEDState};
 use x86_64::structures::idt::InterruptStackFrame;
 
 /// The first PS2 port for the keyboard is connected directly to IRQ 1.
@@ -169,10 +169,12 @@ fn handle_keyboard_input(scan_code: u8, extended: bool) -> Result<(), &'static s
 
 
 fn set_keyboard_led(modifiers: &KeyboardModifiers) {
-    keyboard_led(
+    if let Err(e) = ps2::set_keyboard_led(
         LEDState::new()
             .with_scroll_lock(modifiers.is_scroll_lock())
             .with_number_lock(modifiers.is_num_lock())
             .with_caps_lock(modifiers.is_caps_lock()),
-    );
+    ) {
+        error!("{e}");
+    }
 }
