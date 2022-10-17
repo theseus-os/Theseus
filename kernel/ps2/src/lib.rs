@@ -396,8 +396,8 @@ pub enum HostToMouseCommand {
     ResetWrapMode = 0xEC,
     SetWrapMode = 0xEE,
     SetRemoteMode = 0xF0, //NOTE: same value as SetScancodeSet
-    GetDeviceID = 0xF2, //NOTE: same value as IdentifyKeyboard; TODO: See Detecting PS/2 Device Types for the response bytes
-    SampleRate = 0xF3,  //NOTE: same value as SetRepeatRateAndDelay; valid values are 10, 20, 40, 60, 80, 100, 200
+    GetDeviceID = 0xF2, //NOTE: same value as IdentifyKeyboard
+    SampleRate = 0xF3,  //NOTE: same value as SetRepeatRateAndDelay
     EnableDataReporting = 0xF4, //NOTE: same value as EnableScanning
     DisableDataReporting = 0xF5, //NOTE: same value as DisableScanning
     SetDefaults = 0xF6, //NOTE: same
