@@ -8,8 +8,8 @@ use spin::Once;
 use mpmc::Queue;
 use event_types::Event;
 use x86_64::structures::idt::InterruptStackFrame;
-use mouse_data::{ButtonAction, Displacement, MouseEvent, MouseMovement};
-use ps2::{check_mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2, handle_mouse_packet};
+use mouse_data::{ButtonAction, MouseEvent, MouseMovementRelative};
+use ps2::{check_mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2, read_mouse_packet, MousePacketBits4};
 
 /// The first PS2 port for the mouse is connected directly to IRQ 0xC.
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.
@@ -51,76 +51,16 @@ pub fn init(mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
     Ok(())
 }
 
-/// Print details of the given mouse event.
-/// 
-/// TODO: this is silly, just impl `fmt::Debug` for `MouseEvent`
-#[allow(dead_code)]
-fn mouse_to_print(mouse_event: &MouseEvent) {
-    let mouse_movement = &mouse_event.mousemove;
-    let mouse_buttons = &mouse_event.buttonact;
-    let mouse_displacement = &mouse_event.displacement;
-    let x = mouse_displacement.x as i8;
-    let y = mouse_displacement.y as i8;
-
-    {
-        // print direction
-        if mouse_movement.right {
-            if mouse_movement.up {
-                info!("right: {},up: {},\n", x, y);
-            } else if mouse_movement.down {
-                info!("right: {},down: {},\n", x, y);
-            } else {
-                info!("right: {}\n", x);
-            }
-        } else if mouse_movement.left {
-            if mouse_movement.up {
-                info!("left: {},up : {},\n", x, y);
-            } else if mouse_movement.down {
-                info!("left: {},down: {},\n", x, y);
-            } else {
-                info!("left: {}\n", x);
-            }
-        } else if mouse_movement.up {
-            info!("up: {},\n", y);
-        } else if mouse_movement.down {
-            info!("down: {},\n", y);
-        } else if mouse_movement.scrolling_up {
-            info!("scrollingup, \n");
-        } else if mouse_movement.scrolling_down {
-            info!("scrollingdown,\n");
-        }
-    }
-    // print buttons
-    {
-        if mouse_buttons.left_button_hold {
-            info!("left_button_hold");
-        }
-
-        if mouse_buttons.right_button_hold {
-            info!("right_button_hold");
-        }
-
-        if mouse_buttons.fifth_button_hold {
-            info!("right_button_hold");
-        }
-
-        if mouse_buttons.fourth_button_hold {
-            info!("fourth_button_hold");
-        }
-    }
-}
-
-
-
 /// The interrupt handler for a ps2-connected mouse, registered at IRQ 0x2C.
 extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
-    let readdata = handle_mouse_packet();
-    if (readdata & 0x80 == 0x80) || (readdata & 0x40 == 0x40) {
+    let mouse_packet = read_mouse_packet();
+    if mouse_packet.x_overflow() || mouse_packet.y_overflow() {
         error!("The overflow bits in the mouse data packet's first byte are set! Discarding the whole packet.");
-    } else if readdata & 0x08 == 0 {
-        error!("Third bit should in the mouse data packet's first byte should be always be 1. Discarding the whole packet since the bit is 0 now.");
+    } else if mouse_packet.always_one() != 1 {
+        // it's very likely that the PS/2 controller send us an [interrupt](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts)
+        // error!("Third bit in the mouse data packet's first byte should always be 1. Discarding the whole packet since the bit is 0.");
     } else {
-        let _mouse_event = handle_mouse_input(readdata);
+        let _mouse_event = handle_mouse_input(mouse_packet);
     }
 
     interrupts::eoi(Some(PS2_MOUSE_IRQ));
@@ -128,12 +68,11 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
 
 
 /// return a Mouse Event according to the data
-fn handle_mouse_input(readdata: u32) -> Result<(), &'static str> {
-    let mmove = MouseMovement::read_from_data(readdata);
-    let action = ButtonAction::read_from_data(readdata);
-    let dis = Displacement::read_from_data(readdata);
+fn handle_mouse_input(mouse_packet: MousePacketBits4) -> Result<(), &'static str> {
+    let action = button_action_from(&mouse_packet);
+    let mmove = mouse_movement_from(&mouse_packet);
 
-    let mouse_event = MouseEvent::new(action, mmove, dis);
+    let mouse_event = MouseEvent::new(action, mmove);
     let event = Event::MouseMovementEvent(mouse_event);
 
     if let Some(producer) = MOUSE_PRODUCER.get() {
@@ -142,4 +81,25 @@ fn handle_mouse_input(readdata: u32) -> Result<(), &'static str> {
         warn!("handle_mouse_input(): MOUSE_PRODUCER wasn't yet initialized, dropping mouse event {:?}.", event);
         Err("mouse event queue not ready")
     }
+}
+
+
+// NOTE: This crate depends on mouse_data and ps2, so I'm doing this here
+fn mouse_movement_from(mouse_packet: &MousePacketBits4) -> MouseMovementRelative {
+    MouseMovementRelative::new(
+        mouse_packet.x_movement(),
+        mouse_packet.y_movement(),
+        mouse_packet.scroll_movement()
+    )
+}
+
+// NOTE: This crate depends on mouse_data and ps2, so I'm doing this here
+fn button_action_from(mouse_packet: &MousePacketBits4) -> ButtonAction {
+    ButtonAction::new(
+        mouse_packet.button_left(),
+        mouse_packet.button_right(),
+        mouse_packet.button_middle(),
+        mouse_packet.button_4(),
+        mouse_packet.button_5(),
+    )
 }

@@ -4,7 +4,7 @@ use log::{warn, info, trace};
 use num_enum::TryFromPrimitive;
 use port_io::Port;
 use spin::Mutex;
-use modular_bitfield::{specifiers::B1, bitfield};
+use modular_bitfield::{specifiers::{B1, B4, B8}, bitfield};
 
 use HostToControllerCommand::*;
 use HostToKeyboardCommand::*;
@@ -437,14 +437,81 @@ fn write_to_second_output_buffer(value: u8) {
     write_data(value);
 }
 
-/// read mouse data packet; will work for mouse with ID 3 or 4
-pub fn handle_mouse_packet() -> u32 {
-    u32::from_le_bytes([
+//TODO: different MousePacketBits for different MouseId?
+// see https://wiki.osdev.org/PS/2_Mouse#5_buttons
+#[bitfield(bits = 32)]
+#[derive(Debug)]
+pub struct MousePacketBits4 {
+    //1. byte starts here
+    pub button_left: bool1,
+    pub button_right: bool1,
+    pub button_middle: bool1,
+    pub always_one: u1,
+    /// see [x_1st_to_8th_bit]
+    x_9th_bit: bool1,
+    /// see [y_1st_to_8th_bit]
+    y_9th_bit: bool1,
+    pub x_overflow: bool1,
+    pub y_overflow: bool1,
+    //2. byte
+    /// only a part of x_movement, needs to be combined with [x_9th_bit]
+    x_1st_to_8th_bit: B8, //u8 with #[bits = 8] attribute didn't work
+    //3. byte
+    /// only a part of y_movement, needs to be combined with [y_9th_bit]
+    y_1st_to_8th_bit: B8, //u8 with #[bits = 8] attribute didn't work
+    //4. byte starts here
+    /// already stored in two's complement
+    z_movement: B4, //u8 with #[bits = 4] attribute didn't work
+    pub button_4: bool1,
+    pub button_5: bool1,
+    zero1: u1,
+    zero2: u1,
+}
+
+impl MousePacketBits4 {
+    /// `x_1st_to_8th_bit` and `x_9th_bit` should not be accessed directly, because they're part of one signed 9-bit number
+    pub fn x_movement(&self) -> i16 {
+        Self::combine_and_2s_complement(self.x_1st_to_8th_bit(), self.x_9th_bit())
+    }
+
+    /// `y_1st_to_8th_bit` and `y_9th_bit` should not be accessed directly, because they're part of one signed 9-bit number
+    pub fn y_movement(&self) -> i16 {
+        Self::combine_and_2s_complement(self.y_1st_to_8th_bit(), self.y_9th_bit())
+    }
+
+    // implementation from https://wiki.osdev.org/PS/2_Mouse
+    fn combine_and_2s_complement(bit1to8: u8, bit9: bool) -> i16 {
+        // to fit a 9th bit inside; we can't just convert to i16, because it would turn e.g. 255 into -1
+        let unsigned = bit1to8 as u16; // 1111_1111 as u16 = 0000_0000_1111_1111
+
+        // now convert into i16, which always gives us a positive number
+        let signed = unsigned as i16; // 0000_0000_1111_1111 as i16 = 0000_0000_1111_1111
+        
+        if bit9 {
+            // value is negative, produce the two's complement, correctly sign extended no matter its size
+            signed - 0b1_0000_0000 // 0000_0000_1111_1111 - 1_0000_0000 = -1
+        } else {
+            signed
+        }
+    }
+
+    //currently limited to mouse id 4
+    /// often called `z_movement`, renamed to disambiguate
+    pub fn scroll_movement(&self) -> i8 {
+        self.z_movement() as i8 //TODO: see osdev wiki, might be wrong
+    }
+}
+
+/// read mouse data packet; will work for mouse with ID 4 and probably 3
+pub fn read_mouse_packet() -> MousePacketBits4 {
+    let packet = MousePacketBits4::from_bytes([
         read_data(),
         read_data(),
         read_data(),
-        read_data(),
-    ])
+        read_data()
+    ]);
+    info!("read_mouse_packet: {packet:?}");
+    packet
 }
 
 pub enum SampleRate {

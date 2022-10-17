@@ -352,8 +352,8 @@ impl WindowManager {
         let mut event: MousePositionEvent = MousePositionEvent {
             coordinate: Coord::new(0, 0),
             gcoordinate: coordinate.clone(),
-            scrolling_up: mouse_event.mousemove.scrolling_up,
-            scrolling_down: mouse_event.mousemove.scrolling_down,
+            scrolling_up: mouse_event.mousemove.scroll_movement > 0, //TODO: might be more beneficial to save scroll_movement here
+            scrolling_down: mouse_event.mousemove.scroll_movement < 0, //FIXME: also might be the wrong way around
             left_button_hold: mouse_event.buttonact.left_button_hold,
             right_button_hold: mouse_event.buttonact.right_button_hold,
             fourth_button_hold: mouse_event.buttonact.fourth_button_hold,
@@ -682,19 +682,17 @@ fn window_manager_loop(
                     keyboard_handle_application(key_input)?;
                 }
                 Event::MouseMovementEvent(ref mouse_event) => {
-                    // mouse::mouse_to_print(&mouse_event);
-                    let mouse_displacement = &mouse_event.displacement;
-                    let mut x = (mouse_displacement.x as i8) as isize;
-                    let mut y = (mouse_displacement.y as i8) as isize;
-                    // need to combine mouse events if there pending a lot
+                    info!("window_manager_loop: {mouse_event:?}");
+                    //as isize probably because adding up mouse movements will overflow?
+                    let mut x = mouse_event.mousemove.x_movement as isize;
+                    let mut y = mouse_event.mousemove.y_movement as isize;
 
+                    // need to combine mouse events if there pending a lot
                     while let Some(next_event) = mouse_consumer.pop() {
                         match next_event {
                             Event::MouseMovementEvent(ref next_mouse_event) => {
-                                if next_mouse_event.mousemove.scrolling_up
-                                    == mouse_event.mousemove.scrolling_up
-                                    && next_mouse_event.mousemove.scrolling_down
-                                        == mouse_event.mousemove.scrolling_down
+                                if next_mouse_event.mousemove.scroll_movement
+                                    == mouse_event.mousemove.scroll_movement
                                     && next_mouse_event.buttonact.left_button_hold
                                         == mouse_event.buttonact.left_button_hold
                                     && next_mouse_event.buttonact.right_button_hold
@@ -702,10 +700,9 @@ fn window_manager_loop(
                                     && next_mouse_event.buttonact.fourth_button_hold
                                         == mouse_event.buttonact.fourth_button_hold
                                     && next_mouse_event.buttonact.fifth_button_hold
-                                        == mouse_event.buttonact.fifth_button_hold
-                                {
-                                    x += (next_mouse_event.displacement.x as i8) as isize;
-                                    y += (next_mouse_event.displacement.y as i8) as isize;
+                                        == mouse_event.buttonact.fifth_button_hold {
+                                    x += next_mouse_event.mousemove.x_movement as isize;
+                                    y += next_mouse_event.mousemove.y_movement as isize;
                                 }
                             }
                             _ => {
@@ -723,7 +720,7 @@ fn window_manager_loop(
                             Coord::new(x as isize, -(y as isize))
                         )?;
                     }
-                    cursor_handle_application(*mouse_event)?; // tell the event to application, or moving window
+                    cursor_handle_application(mouse_event.clone())?; // tell the event to application, or moving window
                 }
                 _other => {
                     trace!("WINDOW_MANAGER: ignoring unexpected event: {:?}", _other);

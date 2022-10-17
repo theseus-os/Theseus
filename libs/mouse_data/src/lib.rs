@@ -1,126 +1,62 @@
-#![allow(dead_code)]
 #![no_std]
 
-
-
-
-#[derive(Debug, Copy, Clone)]
-pub struct Displacement {
-    pub x: u8,
-    pub y: u8,
+//NOTE: could be reduced to 9+9+4=22-bit, +2-bit padding = 3*8-bit
+#[derive(Debug, Clone)]
+pub struct MouseMovementRelative {
+    pub x_movement: i16,
+    pub y_movement: i16,
+    pub scroll_movement: i8,
 }
 
-impl Displacement {
-    pub fn read_from_data(readdata: u32) -> Self {
+impl MouseMovementRelative {
+    pub fn new(x_movement: i16, y_movement: i16, scroll_movement: i8) -> Self {
         Self {
-            x: ((readdata & 0x0000ff00) >> 8) as u8,
-            y: ((readdata & 0x00ff0000) >> 16) as u8
+            x_movement,
+            y_movement,
+            scroll_movement,
         }
     }
 }
-#[derive(Debug, Copy, Clone)]
+
+//NOTE: could be reduced to 8-bit
+#[derive(Debug, Clone)]
 pub struct ButtonAction {
     pub left_button_hold: bool,
     pub right_button_hold: bool,
+    pub middle_button_hold: bool,
     pub fourth_button_hold: bool,
     pub fifth_button_hold: bool,
 }
 
 impl ButtonAction {
-    pub fn read_from_data(readdata: u32) -> Self {
+    pub fn new(
+        left_button_hold: bool,
+        right_button_hold: bool,
+        middle_button_hold: bool,
+        fourth_button_hold: bool,
+        fifth_button_hold: bool,
+    ) -> Self {
         Self {
-            left_button_hold: readdata & 0x01 == 0x01,
-            right_button_hold: readdata & 0x02 == 0x02,
-            fourth_button_hold: readdata & 0x10000000 == 0x10000000,
-            fifth_button_hold: readdata & 0x20000000 == 0x20000000,
+            left_button_hold,
+            right_button_hold,
+            middle_button_hold,
+            fourth_button_hold,
+            fifth_button_hold,
         }
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct MouseMovement {
-    pub right: bool,
-    pub left: bool,
-    pub down: bool,
-    pub up: bool,
-    pub scrolling_up: bool,
-    pub scrolling_down: bool,
-}
-
-impl MouseMovement {
-    pub fn read_from_data(readdata: u32) -> Self {
-        let first_byte = (readdata & 0xff) as u8;
-        let second_byte = ((readdata & 0xff00) >> 8) as u8;
-        let third_byte = ((readdata & 0xff0000) >> 16) as u8;
-        let fourth_byte = ((readdata & 0xff000000) >> 24) as u8;
-        let mut right = false;
-        let mut left = false;
-        let mut down = false;
-        let mut up = false;
-        let mut scrolling_up = false;
-        let mut scrolling_down = false;
-
-        if third_byte == 0 {
-            down = false;
-            up = false;
-        } else {
-            if first_byte & 0x20 == 0x20 {
-                down = true;
-                up = false;
-            } else {
-                up = true;
-                down = false;
-            }
-        }
-
-        if second_byte == 0 {
-            left = false;
-            right = false;
-        } else {
-            if first_byte & 0x10 == 0x10 {
-                left = true;
-                right = false;
-            } else {
-                right = true;
-                left = false;
-            }
-        }
-        if fourth_byte == 0 {
-            scrolling_up = false;
-            scrolling_down = false;
-        } else {
-            if fourth_byte & 0x0F == 0x0F {
-                scrolling_down = true;
-            } else if fourth_byte & 0x0F != 0x0F {
-                scrolling_down = false;
-                if fourth_byte & 0x01 == 0x01 {
-                    scrolling_up = true;
-                } else if fourth_byte & 0x01 == 0x0 {
-                    scrolling_up = false;
-                }
-            }
-        }
-        return Self { right, left, down, up, scrolling_up, scrolling_down }
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct MouseEvent {
     pub buttonact: ButtonAction,
-    pub mousemove: MouseMovement,
-    pub displacement: Displacement,
+    pub mousemove: MouseMovementRelative,
 }
 
 impl MouseEvent {
-    pub fn new(
-        buttonact: ButtonAction,
-        mousemove: MouseMovement,
-        displacement: Displacement,
-    ) -> MouseEvent {
+    pub fn new(buttonact: ButtonAction, mousemove: MouseMovementRelative) -> MouseEvent {
         MouseEvent {
             buttonact,
             mousemove,
-            displacement,
         }
     }
 }
