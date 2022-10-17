@@ -15,10 +15,6 @@ use ps2::{check_mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2, handle_m
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.
 const PS2_MOUSE_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + 0xC;
 
-static mut MOUSE_MOVE: MouseMovement = MouseMovement::default();
-static mut BUTTON_ACT: ButtonAction = ButtonAction::default();
-static mut DISPLACEMENT: Displacement = Displacement::default();
-
 static MOUSE_PRODUCER: Once<Queue<Event>> = Once::new();
 
 /// Initialize the PS2 mouse driver and register its interrupt handler.
@@ -133,15 +129,11 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
 
 /// return a Mouse Event according to the data
 fn handle_mouse_input(readdata: u32) -> Result<(), &'static str> {
-    let action = unsafe { &mut BUTTON_ACT };
-    let mmove = unsafe { &mut MOUSE_MOVE };
-    let dis = unsafe { &mut DISPLACEMENT };
+    let mmove = MouseMovement::read_from_data(readdata);
+    let action = ButtonAction::read_from_data(readdata);
+    let dis = Displacement::read_from_data(readdata);
 
-    mmove.read_from_data(readdata);
-    action.read_from_data(readdata);
-    dis.read_from_data(readdata);
-
-    let mouse_event = MouseEvent::new(*action, *mmove, *dis);
+    let mouse_event = MouseEvent::new(action, mmove, dis);
     let event = Event::MouseMovementEvent(mouse_event);
 
     if let Some(producer) = MOUSE_PRODUCER.get() {

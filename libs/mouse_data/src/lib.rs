@@ -11,14 +11,11 @@ pub struct Displacement {
 }
 
 impl Displacement {
-    pub const fn default() -> Displacement {
-        Displacement { x: 0, y: 0 }
-    }
-    pub fn read_from_data(&mut self, readdata: u32) {
-        let x_dis: u8 = ((readdata & 0x0000ff00) >> 8) as u8;
-        let y_dis: u8 = ((readdata & 0x00ff0000) >> 16) as u8;
-        self.x = x_dis;
-        self.y = y_dis;
+    pub fn read_from_data(readdata: u32) -> Self {
+        Self {
+            x: ((readdata & 0x0000ff00) >> 8) as u8,
+            y: ((readdata & 0x00ff0000) >> 16) as u8
+        }
     }
 }
 #[derive(Debug, Copy, Clone)]
@@ -30,38 +27,12 @@ pub struct ButtonAction {
 }
 
 impl ButtonAction {
-    pub const fn default() -> ButtonAction {
-        ButtonAction {
-            left_button_hold: false,
-            right_button_hold: false,
-            fourth_button_hold: false,
-            fifth_button_hold: false,
-        }
-    }
-
-    pub fn read_from_data(&mut self, readdata: u32) {
-        if readdata & 0x01 == 0x01 {
-            self.left_button_hold = true;
-        } else {
-            self.left_button_hold = false;
-        }
-
-        if readdata & 0x02 == 0x02 {
-            self.right_button_hold = true;
-        } else {
-            self.right_button_hold = false;
-        }
-
-        if readdata & 0x10000000 == 0x10000000 {
-            self.fourth_button_hold = true;
-        } else {
-            self.fourth_button_hold = false;
-        }
-
-        if readdata & 0x20000000 == 0x20000000 {
-            self.fifth_button_hold = true;
-        } else {
-            self.fifth_button_hold = false;
+    pub fn read_from_data(readdata: u32) -> Self {
+        Self {
+            left_button_hold: readdata & 0x01 == 0x01,
+            right_button_hold: readdata & 0x02 == 0x02,
+            fourth_button_hold: readdata & 0x10000000 == 0x10000000,
+            fifth_button_hold: readdata & 0x20000000 == 0x20000000,
         }
     }
 }
@@ -77,63 +48,59 @@ pub struct MouseMovement {
 }
 
 impl MouseMovement {
-    pub const fn default() -> MouseMovement {
-        MouseMovement {
-            right: false,
-            left: false,
-            down: false,
-            up: false,
-            scrolling_up: false,
-            scrolling_down: false,
-        }
-    }
-
-    pub fn read_from_data(&mut self, readdata: u32) {
+    pub fn read_from_data(readdata: u32) -> Self {
         let first_byte = (readdata & 0xff) as u8;
         let second_byte = ((readdata & 0xff00) >> 8) as u8;
         let third_byte = ((readdata & 0xff0000) >> 16) as u8;
         let fourth_byte = ((readdata & 0xff000000) >> 24) as u8;
+        let mut right = false;
+        let mut left = false;
+        let mut down = false;
+        let mut up = false;
+        let mut scrolling_up = false;
+        let mut scrolling_down = false;
 
         if third_byte == 0 {
-            self.down = false;
-            self.up = false;
+            down = false;
+            up = false;
         } else {
             if first_byte & 0x20 == 0x20 {
-                self.down = true;
-                self.up = false;
+                down = true;
+                up = false;
             } else {
-                self.up = true;
-                self.down = false;
+                up = true;
+                down = false;
             }
         }
 
         if second_byte == 0 {
-            self.left = false;
-            self.right = false;
+            left = false;
+            right = false;
         } else {
             if first_byte & 0x10 == 0x10 {
-                self.left = true;
-                self.right = false;
+                left = true;
+                right = false;
             } else {
-                self.right = true;
-                self.left = false;
+                right = true;
+                left = false;
             }
         }
         if fourth_byte == 0 {
-            self.scrolling_up = false;
-            self.scrolling_down = false;
+            scrolling_up = false;
+            scrolling_down = false;
         } else {
             if fourth_byte & 0x0F == 0x0F {
-                self.scrolling_down = true;
+                scrolling_down = true;
             } else if fourth_byte & 0x0F != 0x0F {
-                self.scrolling_down = false;
+                scrolling_down = false;
                 if fourth_byte & 0x01 == 0x01 {
-                    self.scrolling_up = true;
+                    scrolling_up = true;
                 } else if fourth_byte & 0x01 == 0x0 {
-                    self.scrolling_up = false;
+                    scrolling_up = false;
                 }
             }
         }
+        return Self { right, left, down, up, scrolling_up, scrolling_down }
     }
 }
 
