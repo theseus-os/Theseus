@@ -94,49 +94,44 @@ impl MouseMovement {
         let third_byte = ((readdata & 0xff0000) >> 16) as u8;
         let fourth_byte = ((readdata & 0xff000000) >> 24) as u8;
 
-        if first_byte & 0x80 == 0x80 || first_byte & 0x40 == 0x40 {
-
+        if third_byte == 0 {
+            self.down = false;
+            self.up = false;
         } else {
-            if third_byte == 0 {
-                self.down = false;
+            if first_byte & 0x20 == 0x20 {
+                self.down = true;
                 self.up = false;
             } else {
-                if first_byte & 0x20 == 0x20 {
-                    self.down = true;
-                    self.up = false;
-                } else {
-                    self.up = true;
-                    self.down = false;
-                }
+                self.up = true;
+                self.down = false;
             }
+        }
 
-            if second_byte == 0 {
-                self.left = false;
+        if second_byte == 0 {
+            self.left = false;
+            self.right = false;
+        } else {
+            if first_byte & 0x10 == 0x10 {
+                self.left = true;
                 self.right = false;
             } else {
-                if first_byte & 0x10 == 0x10 {
-                    self.left = true;
-                    self.right = false;
-                } else {
-                    self.right = true;
-                    self.left = false;
-                }
+                self.right = true;
+                self.left = false;
             }
-            if fourth_byte == 0 {
-                self.scrolling_up = false;
+        }
+        if fourth_byte == 0 {
+            self.scrolling_up = false;
+            self.scrolling_down = false;
+        } else {
+            if fourth_byte & 0x0F == 0x0F {
+                self.scrolling_down = true;
+            } else if fourth_byte & 0x0F != 0x0F {
                 self.scrolling_down = false;
-            } else {
-                if fourth_byte & 0x0F == 0x0F {
-                    self.scrolling_down = true;
-                } else if fourth_byte & 0x0F != 0x0F {
-                    self.scrolling_down = false;
-                    if fourth_byte & 0x01 == 0x01 {
-                        self.scrolling_up = true;
-                    } else if fourth_byte & 0x01 == 0x0 {
-                        self.scrolling_up = false;
-                    }
+                if fourth_byte & 0x01 == 0x01 {
+                    self.scrolling_up = true;
+                } else if fourth_byte & 0x01 == 0x0 {
+                    self.scrolling_up = false;
                 }
-
             }
         }
     }
