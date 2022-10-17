@@ -659,15 +659,23 @@ pub enum KeyboardType {
 
 ///detect the keyboard's type
 pub fn keyboard_detect() -> Result<KeyboardType, &'static str> {
+    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(DisableScanning))?;
+
     command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(IdentifyKeyboard))?; 
-    let reply = read_data();
-    match reply {
-        0xAB => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
-        0x41 => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
-        0xC1 => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
+
+    let keyboard_type = match read_data() {
+        //None => Ok(KeyboardType::AncientATKeyboard)
+        0xAB => {
+            match read_data() {
+                0x41 | 0xC1 => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
         0x83 => Ok(KeyboardType::MF2Keyboard),
-        _ => Ok(KeyboardType::AncientATKeyboard),
+                _ => Err("unrecognized keyboard type")
     }
+        }
+        _ => Err("unrecognized keyboard type")
+    };
+    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(EnableScanning))?;
+    keyboard_type
 }
 
 pub fn read_scancode() -> u8 {
