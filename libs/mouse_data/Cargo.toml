@@ -4,7 +4,7 @@ name = "mouse_data"
 version = "0.1.0"
 keywords = ["mouse"]
 categories = ["no-std", "hardware-support"]
-
+edition = "2021"
 
 [dependencies]
 
