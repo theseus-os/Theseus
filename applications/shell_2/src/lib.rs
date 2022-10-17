@@ -9,15 +9,14 @@ mod wrapper;
 
 pub use error::{Error, Result};
 
-use alloc::{borrow::ToOwned, format, string::String, vec::Vec};
+use alloc::{borrow::ToOwned, format, string::String, sync::Arc, vec::Vec};
 use app_io::println;
 use core::fmt::Write;
 use hashbrown::HashMap;
 use job::Job;
 use noline::{builder::EditorBuilder, sync::embedded::IO as Io};
 use path::Path;
-use task::{ExitValue, JoinableTaskRef, RunState};
-use tty::LineDiscipline;
+use tty::{Event, LineDiscipline};
 
 // FIXME: export main function rather than shell struct
 
@@ -27,13 +26,18 @@ pub fn main(_: Vec<String>) -> isize {
 }
 
 pub struct Shell {
-    // TODO: Make LineDiscipline interior mutable?
-    discipline: LineDiscipline,
+    discipline: Arc<LineDiscipline>,
     // TODO: Could use a vec-based data structure like Vec<Option<JoinableTaskRef>
     // Adding a job would iterate over the vec trying to find a None and if it can't, push to the
     // end. Removing a job would replace the job with None.
     jobs: HashMap<usize, Job>,
     stop_order: Vec<usize>,
+}
+
+impl Default for Shell {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Shell {
@@ -93,7 +97,7 @@ impl Shell {
         // TODO | and &
 
         let (cmd, args) = if let Some((cmd, args_str)) = line.split_once(' ') {
-            let args = args_str.split(" ").collect::<Vec<_>>();
+            let args = args_str.split(' ').collect::<Vec<_>>();
             (cmd, args)
         } else {
             (line, Vec::new())
@@ -111,10 +115,12 @@ impl Shell {
             "fg" => self.fg(args),
             "getopts" => self.getopts(args),
             "hash" => self.hash(args),
+            "history" => self.history(args),
+            "jobs" => self.jobs(args),
             "set" => self.set(args),
-            "unalias" => self.set(args),
-            "unset" => self.set(args),
-            "wait" => self.set(args),
+            "unalias" => self.unalias(args),
+            "unset" => self.unset(args),
+            "wait" => self.wait(args),
             _ => self.execute_external(cmd, args),
         };
 
@@ -137,44 +143,35 @@ impl Shell {
     }
 
     fn _execute_external(&mut self, cmd: &str, args: Vec<&str>) -> Result<()> {
-        let task = self.resolve_external(cmd, args)?;
+        let mut job = self.resolve_external(cmd, args)?;
 
         let mut num = 1;
         while self.jobs.contains_key(&num) {
             num += 1;
         }
-        // TODO: Don't clone?
-        // self.discipline.set_foreground(Some(task));
-        task.unblock();
-        self.jobs.insert(num, task);
+
+        job.unsuspend();
+        let job = self.jobs.try_insert(num, job).unwrap();
+        self.discipline.clear_events();
 
         loop {
-            match task.runstate() {
-                RunState::Suspended => {
-                    self.discipline.set_foreground(None);
-                    self.stop_order.push(num);
-                    return Ok(());
-                }
-                RunState::Exited => {
-                    self.discipline.set_foreground(None);
-                    self.jobs.remove(&num).unwrap();
-                    return match task.take_exit_value().unwrap() {
-                        ExitValue::Completed(status) => {
-                            match *status.downcast_ref::<isize>().unwrap() {
-                                0 => Ok(()),
-                                e @ _ => Err(Error::Command(e)),
-                            }
-                        }
-                        ExitValue::Killed(_) => {
-                            // TODO: Should we check that it was KillReason::Requested?
-                            // TODO: Decide on a value. Bash uses 130.
-                            Ok(())
-                        }
-                    };
-                }
-                RunState::Reaped => todo!("task reaped not by shell"),
-                // TODO: Yield?
-                _ => {}
+            if let Ok(event) = self.discipline.event_receiver().try_receive() {
+                return match event {
+                    Event::CtrlC => {
+                        job.kill();
+                        Err(Error::Command(130))
+                    }
+                    Event::CtrlD => todo!(),
+                    Event::CtrlZ => {
+                        job.suspend();
+                        todo!();
+                    }
+                };
+            } else if let Some(exit_value) = job.update() {
+                return match exit_value {
+                    0 => Ok(()),
+                    _ => Err(Error::Command(exit_value)),
+                };
             }
         }
     }
@@ -220,6 +217,7 @@ impl Shell {
         app_io::insert_child_streams(id, app_io::streams().unwrap());
         // TODO: set environment
 
-        Ok(task)
+        todo!();
+        // Ok(Job { tasks: vec![task] })
     }
 }

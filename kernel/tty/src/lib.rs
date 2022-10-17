@@ -5,8 +5,9 @@ extern crate alloc;
 mod channel;
 mod discipline;
 
-pub use discipline::LineDiscipline;
+pub use discipline::{Event, LineDiscipline};
 
+use alloc::sync::Arc;
 use channel::Channel;
 use core2::io::{Read, Result, Write};
 
@@ -30,7 +31,7 @@ use core2::io::{Read, Result, Write};
 pub struct Tty {
     master: Channel,
     slave: Channel,
-    discipline: LineDiscipline,
+    discipline: Arc<LineDiscipline>,
 }
 
 impl Default for Tty {
@@ -70,11 +71,11 @@ impl Tty {
 pub struct Master {
     master: Channel,
     slave: Channel,
-    discipline: LineDiscipline,
+    discipline: Arc<LineDiscipline>,
 }
 
 impl Master {
-    pub fn discipline(&self) -> LineDiscipline {
+    pub fn discipline(&self) -> Arc<LineDiscipline> {
         self.discipline.clone()
     }
 
@@ -131,11 +132,11 @@ impl Write for Master {
 pub struct Slave {
     master: Channel,
     slave: Channel,
-    discipline: LineDiscipline,
+    discipline: Arc<LineDiscipline>,
 }
 
 impl Slave {
-    pub fn discipline(&self) -> LineDiscipline {
+    pub fn discipline(&self) -> Arc<LineDiscipline> {
         self.discipline.clone()
     }
 

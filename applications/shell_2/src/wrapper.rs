@@ -7,7 +7,7 @@ pub(crate) struct Wrapper {
     pub(crate) stdout: Arc<dyn ImmutableWrite>,
 }
 
-impl<'a> serial::Read<u8> for Wrapper {
+impl serial::Read<u8> for Wrapper {
     type Error = core2::io::Error;
 
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
@@ -17,7 +17,7 @@ impl<'a> serial::Read<u8> for Wrapper {
     }
 }
 
-impl<'a> serial::Write<u8> for Wrapper {
+impl serial::Write<u8> for Wrapper {
     type Error = core2::io::Error;
 
     fn write(&mut self, byte: u8) -> nb::Result<(), Self::Error> {

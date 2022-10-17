@@ -88,7 +88,7 @@ pub struct IoStreams {
     pub stdout: Arc<dyn ImmutableWrite>,
     /// The writer to stderr.
     pub stderr: Arc<dyn ImmutableWrite>,
-    pub discipline: Option<LineDiscipline>,
+    pub discipline: Option<Arc<LineDiscipline>>,
 }
 
 mod shared_maps {
@@ -182,7 +182,7 @@ pub fn stderr() -> Result<Arc<dyn ImmutableWrite>, &'static str> {
     }
 }
 
-pub fn line_discipline() -> Result<LineDiscipline, &'static str> {
+pub fn line_discipline() -> Result<Arc<LineDiscipline>, &'static str> {
     let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to get stderr")?;
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {

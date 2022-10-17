@@ -1,10 +1,10 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::Channel;
-use alloc::{sync::Arc, vec::Vec};
+use alloc::vec::Vec;
+use async_channel::{new_channel, Receiver, Sender};
 use core2::io::Result;
 use mutex_sleep::MutexSleep as Mutex;
-use task::{KillReason, TaskRef};
 
 // FIXME: Ctrl+C, Ctrl+Z, etc.
 
@@ -26,25 +26,21 @@ use task::{KillReason, TaskRef};
 /// a line feed (hence flushing the input buffer). This behaviour is equivalent
 /// to `ICRNL` on Linux.
 ///
-/// Modifying a cloned `LineDiscipline` will modify the original:
-/// ```rust
-/// # use tty::LineDiscipline;
-/// let discipline_1 = LineDiscipline::new();
-/// assert!(discipline_1.canonical());
-/// let discipline_2 = discipline_1.clone();
-/// discipline_2.set_canonical(false);
-/// assert!(!discipline_1.canonical());
-/// ```
-///
 /// [cfmakeraw]: https://linux.die.net/man/3/cfmakeraw
-#[derive(Clone, Debug)]
 pub struct LineDiscipline {
-    echo: Arc<AtomicBool>,
+    echo: AtomicBool,
     /// The input buffer for canonical mode.
     ///
     /// If `None`, canonical mode is disabled
-    canonical: Arc<Mutex<Option<Vec<u8>>>>,
-    foreground: Arc<Mutex<Option<TaskRef>>>,
+    canonical: Mutex<Option<Vec<u8>>>,
+    manager: Sender<Event>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Event {
+    CtrlC,
+    CtrlD,
+    CtrlZ,
 }
 
 impl Default for LineDiscipline {
@@ -57,10 +53,11 @@ impl Default for LineDiscipline {
 impl LineDiscipline {
     /// Creates a new line discipline with sane defaults.
     pub fn new() -> Self {
+        let (sender, _) = new_channel(16);
         Self {
-            echo: Arc::new(AtomicBool::new(true)),
-            canonical: Arc::new(Mutex::new(Some(Vec::new()))),
-            foreground: Arc::new(Mutex::new(None)),
+            echo: AtomicBool::new(true),
+            canonical: Mutex::new(Some(Vec::new())),
+            manager: sender,
         }
     }
 
@@ -100,17 +97,18 @@ impl LineDiscipline {
     pub fn set_echo(&self, echo: bool) {
         self.echo.store(echo, Ordering::SeqCst);
     }
-    
-    pub fn foreground(&self) -> Option<TaskRef> {
-        self.foreground.lock().unwrap().clone()
-    }
-
-    pub fn set_foreground(&self, foreground: Option<TaskRef>) {
-        *self.foreground.lock().unwrap() = foreground;
-    }
 
     pub fn canonical(&self) -> bool {
         self.canonical.lock().unwrap().is_some()
+    }
+
+    pub fn event_receiver(&self) -> Receiver<Event> {
+        self.manager.receiver()
+    }
+
+    pub fn clear_events(&self) {
+        let receiver = self.manager.receiver();
+        while receiver.try_receive().is_ok() {}
     }
 
     /// Sets the canonical flag.
@@ -131,32 +129,25 @@ impl LineDiscipline {
         }
     }
 
-    pub(crate) fn process_byte(
-        &self,
-        byte: u8,
-        master: &Channel,
-        slave: &Channel,
-    ) -> Result<()> {
+    pub(crate) fn process_byte(&self, byte: u8, master: &Channel, slave: &Channel) -> Result<()> {
         const ERASE: u8 = 0x7f; // DEL (backspace key)
         const WERASE: u8 = 0x17; // ^W
 
         const INTERRUPT: u8 = 0x3;
         const SUSPEND: u8 = 0x1a;
 
-        if let Some(ref foreground) = *self.foreground.lock().unwrap() {
-            match byte {
-                INTERRUPT => {
-                    let _ = foreground.kill(KillReason::Requested);
-                    self.clear_input_buf();
-                    return Ok(());
-                }
-                SUSPEND => {
-                    foreground.suspend();
-                    self.clear_input_buf();
-                    return Ok(());
-                }
-                _ => {}
+        match byte {
+            INTERRUPT => {
+                let _ = self.manager.send(Event::CtrlC);
+                self.clear_input_buf();
+                return Ok(());
             }
+            SUSPEND => {
+                let _ = self.manager.send(Event::CtrlZ);
+                self.clear_input_buf();
+                return Ok(());
+            }
+            _ => {}
         }
 
         // TODO: EOF and EOL
@@ -216,12 +207,7 @@ impl LineDiscipline {
         Ok(())
     }
 
-    pub(crate) fn process_buf(
-        &self,
-        buf: &[u8],
-        master: &Channel,
-        slave: &Channel,
-    ) -> Result<()> {
+    pub(crate) fn process_buf(&self, buf: &[u8], master: &Channel, slave: &Channel) -> Result<()> {
         for byte in buf {
             // TODO: This locks internal fields on every byte.
             self.process_byte(*byte, master, slave)?;

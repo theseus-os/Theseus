@@ -1,20 +1,19 @@
 use crate::{Error, Result, Shell};
 use alloc::{borrow::ToOwned, vec::Vec};
-use app_io::println;
 use path::Path;
 
 // TODO: Decide which internal commands we don't need.
 
 impl Shell {
-    pub(crate) fn alias(&self, args: Vec<&str>) -> Result<()> {
+    pub(crate) fn alias(&self, _args: Vec<&str>) -> Result<()> {
         todo!();
     }
 
     pub(crate) fn bg(&mut self, args: Vec<&str>) -> Result<()> {
         if args.is_empty() {
             if let Some(num) = self.stop_order.pop() {
-                let task = self.jobs.get(&num).unwrap();
-                task.unblock();
+                let task = self.jobs.get_mut(&num).unwrap();
+                task.unsuspend();
                 // TODO: Print
                 Ok(())
             } else {
@@ -26,8 +25,8 @@ impl Shell {
                     todo!("job not found: {arg}");
                 } else {
                     let num = arg[1..].parse().unwrap();
-                    let task = self.jobs.get(&num).unwrap();
-                    task.unblock();
+                    let task = self.jobs.get_mut(&num).unwrap();
+                    task.unsuspend();
                     // TODO: Print
                     continue;
                 }
@@ -41,7 +40,7 @@ impl Shell {
             return Err(Error::Command(1));
         }
 
-        let path = Path::new(if let Some(arg) = args.get(0) {
+        let path = Path::new(if let Some(arg) = args.first() {
             (*arg).to_owned()
         } else {
             "/".to_owned()
@@ -55,56 +54,56 @@ impl Shell {
         }
     }
 
-    pub(crate) fn exec(&self, args: Vec<&str>) -> Result<()> {
+    pub(crate) fn exec(&self, _args: Vec<&str>) -> Result<()> {
         todo!();
     }
 
-    pub(crate) fn exit(&self, args: Vec<&str>) -> Result<()> {
+    pub(crate) fn exit(&self, _args: Vec<&str>) -> Result<()> {
         // TODO: Clean up background tasks?
         Err(Error::ExitRequested)
     }
 
-    pub(crate) fn export(&self, args: Vec<&str>) -> Result<()> {
+    pub(crate) fn export(&self, _args: Vec<&str>) -> Result<()> {
         todo!();
     }
 
-    pub(crate) fn fc(&self, args: Vec<&str>) -> Result<()> {
+    pub(crate) fn fc(&self, _args: Vec<&str>) -> Result<()> {
         todo!();
     }
 
-    pub(crate) fn fg(&self, args: Vec<&str>) -> Result<()> {
+    pub(crate) fn fg(&self, _args: Vec<&str>) -> Result<()> {
         todo!();
     }
 
-    pub(crate) fn getopts(&self, args: Vec<&str>) -> Result<()> {
+    pub(crate) fn getopts(&self, _args: Vec<&str>) -> Result<()> {
         todo!();
     }
 
-    pub(crate) fn hash(&self, args: Vec<&str>) -> Result<()> {
+    pub(crate) fn hash(&self, _args: Vec<&str>) -> Result<()> {
         todo!();
     }
 
-    pub(crate) fn history(&self, args: Vec<&str>) -> Result<()> {
+    pub(crate) fn history(&self, _args: Vec<&str>) -> Result<()> {
         todo!();
     }
 
-    pub(crate) fn jobs(&self, args: Vec<&str>) -> Result<()> {
+    pub(crate) fn jobs(&self, _args: Vec<&str>) -> Result<()> {
         todo!();
     }
 
-    pub(crate) fn set(&self, args: Vec<&str>) -> Result<()> {
+    pub(crate) fn set(&self, _args: Vec<&str>) -> Result<()> {
         todo!();
     }
 
-    pub(crate) fn unalias(&self, args: Vec<&str>) -> Result<()> {
+    pub(crate) fn unalias(&self, _args: Vec<&str>) -> Result<()> {
         todo!();
     }
 
-    pub(crate) fn unset(&self, args: Vec<&str>) -> Result<()> {
+    pub(crate) fn unset(&self, _args: Vec<&str>) -> Result<()> {
         todo!();
     }
 
-    pub(crate) fn wait(&self, args: Vec<&str>) -> Result<()> {
+    pub(crate) fn wait(&self, _args: Vec<&str>) -> Result<()> {
         todo!();
     }
 }

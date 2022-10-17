@@ -59,7 +59,7 @@ impl Channel {
                 return Ok(read);
             }
 
-            byte = match self.try_receive().into() {
+            byte = match self.try_receive() {
                 Ok(b) => b,
                 Err(e) if e.kind() == ErrorKind::WouldBlock => return Ok(read),
                 Err(e) => return Err(e),
@@ -82,8 +82,8 @@ impl Channel {
             return Ok(1);
         }
 
-        for idx in 1..buf.len() {
-            buf[idx] = match self.try_receive() {
+        for (idx, item) in buf.iter_mut().enumerate().skip(1) {
+            *item = match self.try_receive() {
                 Ok(byte) => byte,
                 Err(e) if e.kind() == ErrorKind::WouldBlock => return Ok(idx),
                 Err(e) => return Err(e),

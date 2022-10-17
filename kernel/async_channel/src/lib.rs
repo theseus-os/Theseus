@@ -262,6 +262,12 @@ impl <T: Send> Sender<T> {
     pub fn is_disconnected(&self) -> bool {
         self.channel.is_disconnected()
     }
+    
+    pub fn receiver(&self) -> Receiver<T> {
+        Receiver {
+            channel: self.channel.clone(),
+        }
+    }
 }
 
 /// The receiver side of a channel.
@@ -363,6 +369,12 @@ impl <T: Send> Receiver<T> {
     /// Returns true if the channel is disconnected.
     pub fn is_disconnected(&self) -> bool {
         self.channel.is_disconnected()
+    }
+    
+    pub fn sender(&self) -> Sender<T> {
+        Sender {
+            channel: self.channel.clone(),
+        }
     }
 }
 

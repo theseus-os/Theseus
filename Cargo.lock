@@ -3636,7 +3636,6 @@ dependencies = [
  "async_channel",
  "core2",
  "mutex_sleep",
- "task",
 ]
 
 [[package]]
