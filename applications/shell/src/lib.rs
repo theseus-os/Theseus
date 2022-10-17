@@ -684,6 +684,12 @@ impl Shell {
         let cmdline = self.cmdline.clone();
         let mut task_refs = Vec::new();
 
+        if cmdline.trim().is_empty(){
+            return Err(AppErr::NotFound((cmdline)))
+        }else if cmdline.starts_with("|"){
+            return Err(AppErr::NotFound((cmdline)))
+        }
+
         for single_task_cmd in cmdline.split('|') {
             let mut args: Vec<String> = single_task_cmd.split_whitespace().map(|s| s.to_string()).collect();
             let command = args.remove(0);
@@ -791,7 +797,14 @@ impl Shell {
             },
             Err(err) => {
                 let err_msg = match err {
-                    AppErr::NotFound(command) => format!("{:?} command not found.\n", command),
+                    AppErr::NotFound(command) => {
+                        if command.trim().is_empty(){
+                            format!("")
+                        }
+                        else{
+                            format!("{:?} command not found.\n",command)
+                        }
+                    },
                     AppErr::NamespaceErr      => format!("Failed to find directory of application executables.\n"),
                     AppErr::SpawnErr(e)       => format!("Failed to spawn new task to run command. Error: {}.\n", e),
                 };
