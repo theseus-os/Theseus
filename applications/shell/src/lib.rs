@@ -684,10 +684,11 @@ impl Shell {
         let cmdline = self.cmdline.clone();
         let mut task_refs = Vec::new();
 
+        // If 'command' is either empty or starts with | we return 'AppErr' early
         if cmdline.trim().is_empty(){
-            return Err(AppErr::NotFound((cmdline)))
+            return Err(AppErr::NotFound(cmdline))
         }else if cmdline.starts_with("|"){
-            return Err(AppErr::NotFound((cmdline)))
+            return Err(AppErr::NotFound(cmdline))
         }
 
         for single_task_cmd in cmdline.split('|') {
@@ -798,6 +799,7 @@ impl Shell {
             Err(err) => {
                 let err_msg = match err {
                     AppErr::NotFound(command) => {
+                        // No need to return err if command is empty
                         if command.trim().is_empty(){
                             format!("")
                         }
