@@ -32,9 +32,9 @@ mod paging;
 #[cfg(mapper_spillful)]
 pub mod paging;
 
-
 pub use self::paging::MappedPages;
 pub use self::paging::PageTable;
+pub use self::paging::Mapper;
 
 pub use memory_structs::Frame;
 pub use memory_structs::Page;
@@ -45,12 +45,16 @@ pub use memory_structs::PhysicalAddress;
 
 pub use page_allocator::AllocatedPages;
 pub use page_allocator::allocate_pages;
+pub use page_allocator::allocate_pages_at;
 pub use page_allocator::allocate_pages_by_bytes;
+pub use page_allocator::allocate_pages_by_bytes_at;
 
 pub use frame_allocator::AllocatedFrames;
 pub use frame_allocator::MemoryRegionType;
 pub use frame_allocator::PhysicalMemoryRegion;
+pub use frame_allocator::allocate_frames_by_bytes_at;
 pub use frame_allocator::allocate_frames_by_bytes;
+pub use frame_allocator::allocate_frames_at;
 
 #[cfg(target_arch = "x86_64")]
 use memory_x86_64::{
