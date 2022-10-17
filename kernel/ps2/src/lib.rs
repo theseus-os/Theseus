@@ -524,17 +524,10 @@ pub enum SampleRate {
 
 /// set ps2 mouse's sampling rate
 fn set_mouse_sampling_rate(value: SampleRate) -> Result<(), &'static str> {
-    // if command is not acknowledged
-    if let Err(_e) = command_to_mouse(HostToMouseCommandOrData::MouseCommand(SampleRate)) {
-        Err("set mouse sampling rate failled, please try again")
-    } else {
-        // if second byte command is not acknowledged
-        if let Err(_e) = command_to_mouse(HostToMouseCommandOrData::SampleRate(value)) {
-            Err("set mouse sampling rate failled, please try again")
-        } else {
-            Ok(())
-        }
-    }
+    command_to_mouse(HostToMouseCommandOrData::MouseCommand(SampleRate))
+        .and(command_to_mouse(HostToMouseCommandOrData::SampleRate(value)))
+        .map_err(|_| "could not set mouse sampling rate")
+    
 }
 
 pub enum MouseId {
