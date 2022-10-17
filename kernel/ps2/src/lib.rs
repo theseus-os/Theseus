@@ -569,32 +569,16 @@ pub fn set_mouse_id(id: MouseId) -> Result<(), &'static str> {
     Ok(())
 }
 
-/// check the mouse's id
-pub fn check_mouse_id() -> Result<u8, &'static str> {
-    // stop the streaming before trying to read the mouse's id
-    let result = disable_mouse_packet_streaming();
-    match result {
-        Err(e) => {
-            warn!("check_mouse_id(): please try read the mouse id later, error: {}", e);
-            Err(e)
-        }
-        Ok(_buffer_data) => {
-            let id_num: u8;
-            // check whether the command is acknowledged
-            if let Err(e) = command_to_mouse(HostToMouseCommandOrData::MouseCommand(GetDeviceID)) {
-                warn!("check_mouse_id(): command not accepted, please try again.");
-                return Err(e);
-            } else {
-                id_num = read_data();
-            }
-            // begin streaming again
-            if let Err(e) = enable_mouse_packet_streaming() {
-                warn!("the streaming of mouse is disabled,please open it manually");
-                return Err(e);
-            }
-            Ok(id_num)
-        }
-    }
+
+pub fn mouse_id() -> Result<u8, &'static str> {
+    disable_mouse_packet_streaming().map_err(|_| "failed to disable mouse streaming")?;
+
+    // check whether the command is acknowledged
+    command_to_mouse(HostToMouseCommandOrData::MouseCommand(GetDeviceID))?;
+    let id_num = read_data();
+
+    enable_mouse_packet_streaming().map_err(|_| "failed to enable mouse streaming after mouse_id")?;
+    Ok(id_num)
 }
 
 /// reset the mouse

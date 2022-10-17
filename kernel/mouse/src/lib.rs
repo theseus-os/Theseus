@@ -9,7 +9,7 @@ use mpmc::Queue;
 use event_types::Event;
 use x86_64::structures::idt::InterruptStackFrame;
 use mouse_data::{ButtonAction, MouseEvent, MouseMovementRelative};
-use ps2::{check_mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2, read_mouse_packet, MousePacketBits4, MouseId};
+use ps2::{mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2, read_mouse_packet, MousePacketBits4, MouseId};
 
 /// The first PS2 port for the mouse is connected directly to IRQ 0xC.
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.
@@ -32,7 +32,7 @@ pub fn init(mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
     if let Err(e) = set_mouse_id(MouseId::Four) {
         error!("{e}");
     }
-    match check_mouse_id() {
+    match mouse_id() {
         Ok(id) => info!("the initial mouse ID is: {}", id),
         Err(e) => {
             error!("Failed to read the initial PS2 mouse ID, error: {:?}", e);
