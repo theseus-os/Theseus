@@ -525,7 +525,7 @@ pub enum SampleRate {
 }
 
 /// set ps2 mouse's sampling rate
-fn set_sampling_rate(value: SampleRate) -> Result<(), &'static str> {
+fn set_mouse_sampling_rate(value: SampleRate) -> Result<(), &'static str> {
     // if command is not acknowledged
     if let Err(_e) = command_to_mouse(HostToMouseCommandOrData::MouseCommand(SampleRate)) {
         Err("set mouse sampling rate failled, please try again")
@@ -539,67 +539,34 @@ fn set_sampling_rate(value: SampleRate) -> Result<(), &'static str> {
     }
 }
 
-/// set the mouse ID (3 or 4 ) by magic sequence
-/// 3 means that the mouse has scroll
-/// 4 means that the mouse has scroll, fourth and fifth buttons
-pub fn set_mouse_id(id: u8) -> Result<(), &'static str> {
-    // stop the mouse's streaming before trying to set the ID
-    // if fail to stop the streaming, return error
-    if let Err(_e) = disable_mouse_packet_streaming() {
-        warn!("fail to stop streaming, before trying to read mouse id");
-        return Err("fail to set the mouse id!!!");
-    } else {
-        use SampleRate::*;
-        // set the id to 3
-        if id == 3 {
-            if let Err(_e) = set_sampling_rate(_200) {
-                warn!("fail to stop streaming, before trying to read mouse id");
-                return Err("fail to set the mouse id!!!");
-            }
-            if let Err(_e) = set_sampling_rate(_100) {
-                warn!("fail to stop streaming, before trying to read mouse id");
-                return Err("fail to set the mouse id!!!");
-            }
-            if let Err(_e) = set_sampling_rate(_80) {
-                warn!("fail to stop streaming, before trying to read mouse id");
-                return Err("fail to set the mouse id!!!");
+pub enum MouseId {
+    /// the mouse has scroll-movement
+    Three,
+    /// the mouse has scroll-movement, fourth and fifth buttons
+    Four,
+}
+
+/// set the [MouseId] by magic sequence
+pub fn set_mouse_id(id: MouseId) -> Result<(), &'static str> {
+    disable_mouse_packet_streaming().map_err(|_| "failed to disable mouse streaming")?;
+
+    use SampleRate::*;
+    match id {
+        MouseId::Three => {
+            for rate in [_200, _100, _80] {
+                set_mouse_sampling_rate(rate)?;
             }
         }
-        // set the id to 4
-        else if id == 4 {
-            if let Err(_e) = set_sampling_rate(_200) {
-                warn!("fail to stop streaming, before trying to read mouse id");
-                return Err("fail to set the mouse id!!!");
+        //(maybe) TODO: apparently this needs to check after the first 80 if mouse_id is 3
+        MouseId::Four => {
+            for rate in [_200, _100, _80, _200, _200, _80] {
+                set_mouse_sampling_rate(rate)?;
             }
-            if let Err(_e) = set_sampling_rate(_100) {
-                warn!("fail to stop streaming, before trying to read mouse id");
-                return Err("fail to set the mouse id!!!");
-            }
-            if let Err(_e) = set_sampling_rate(_80) {
-                warn!("fail to stop streaming, before trying to read mouse id");
-                return Err("fail to set the mouse id!!!");
-            }
-            if let Err(_e) = set_sampling_rate(_200) {
-                warn!("fail to stop streaming, before trying to read mouse id");
-                return Err("fail to set the mouse id!!!");
-            }
-            if let Err(_e) = set_sampling_rate(_200) {
-                warn!("fail to stop streaming, before trying to read mouse id");
-                return Err("fail to set the mouse id!!!");
-            }
-            if let Err(_e) = set_sampling_rate(_80) {
-                warn!("fail to stop streaming, before trying to read mouse id");
-                return Err("fail to set the mouse id!!!");
-            }
-        } else {
-            return Err("invalid id to be set to a mouse, please re-enter the id number");
         }
     }
-    if let Err(_e) = enable_mouse_packet_streaming() {
-        Err("set mouse id without re-starting the streaming, please open it manually")
-    } else {
-        Ok(())
-    }
+
+    enable_mouse_packet_streaming().map_err(|_| "failed to enable mouse streaming after set_mouse_id")?;
+    Ok(())
 }
 
 /// check the mouse's id
