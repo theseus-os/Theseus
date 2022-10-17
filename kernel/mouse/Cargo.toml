@@ -1,5 +1,5 @@
 [package]
-authors = ["Bowen Liu <liubowenbob@hotmail.com>", "Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Bowen Liu <liubowenbob@hotmail.com>", "Kevin Boos <kevinaboos@gmail.com>", "Hecatia Elegua"]
 name = "mouse"
 description = "A basic driver for a mouse connected to the legacy PS2 port"
 version = "0.1.0"

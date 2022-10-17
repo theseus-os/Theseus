@@ -1,5 +1,5 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Kevin Boos <kevinaboos@gmail.com>, Hecatia Elegua"]
 name = "keyboard"
 description = "A basic driver for keyboards connected to the legacy PS2 port"
 version = "0.1.0"

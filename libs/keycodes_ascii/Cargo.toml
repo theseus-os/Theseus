@@ -1,5 +1,5 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Kevin Boos <kevinaboos@gmail.com>, Hecatia Elegua"]
 name = "keycodes_ascii"
 version = "0.1.0"
 keywords = ["keyboard", "ascii", "ps2", "scan codes", "scancode"]

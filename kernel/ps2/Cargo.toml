@@ -2,7 +2,7 @@
 name = "ps2"
 version = "0.1.0"
 description = "Drivers supporting the PS/2 interface, for legacy keyboard/mouse devices"
-authors = ["Bowen Liu <liubowenbob@hotmail.com>"]
+authors = ["Bowen Liu <liubowenbob@hotmail.com>, Hecatia Elegua"]
 edition = "2021"
 
 [dependencies]
