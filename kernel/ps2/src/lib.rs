@@ -600,12 +600,8 @@ fn reset_mouse() -> Result<(), &'static str> {
 
 /// resend the most recent packet again
 fn mouse_resend() -> Result<(), &'static str> {
-    if let Err(_e) = command_to_mouse(HostToMouseCommandOrData::MouseCommand(HostToMouseCommand::ResendByte)) {
-        Err("mouse resend request failled, please request again")
-    } else {
-        // mouse resend request succeeded
-        Ok(())
-    }
+    command_to_mouse(HostToMouseCommandOrData::MouseCommand(HostToMouseCommand::ResendByte))
+        .map_err(|_| "mouse resend request failed, please request again")
 }
 
 /// enable the packet streaming
