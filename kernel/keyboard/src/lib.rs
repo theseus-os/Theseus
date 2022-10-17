@@ -105,40 +105,68 @@ fn handle_keyboard_input(scan_code: u8, extended: bool) -> Result<(), &'static s
     // debug!("KBD_MODIFIERS before {}: {:?}", scan_code, modifiers);
 
     // first, update the modifier keys
-    match scan_code {
-        x if x == Keycode::Control        as u8                       => { 
-            modifiers.insert(if extended { KeyboardModifiers::CONTROL_RIGHT } else { KeyboardModifiers::CONTROL_LEFT});
+    match scan_code.try_into() {
+        Ok(Keycode::Control) => {
+            modifiers.insert(if extended {
+                KeyboardModifiers::CONTROL_RIGHT
+            } else {
+                KeyboardModifiers::CONTROL_LEFT
+            });
         }
-        x if x == Keycode::Alt            as u8                       => { modifiers.insert(KeyboardModifiers::ALT);              }
-        x if x == Keycode::LeftShift      as u8                       => { modifiers.insert(KeyboardModifiers::SHIFT_LEFT);       }
-        x if x == Keycode::RightShift     as u8                       => { modifiers.insert(KeyboardModifiers::SHIFT_RIGHT);      }
-        x if x == Keycode::SuperKeyLeft   as u8                       => { modifiers.insert(KeyboardModifiers::SUPER_KEY_LEFT);   }
-        x if x == Keycode::SuperKeyRight  as u8                       => { modifiers.insert(KeyboardModifiers::SUPER_KEY_RIGHT);  }
+        Ok(Keycode::Alt) => {
+            modifiers.insert(KeyboardModifiers::ALT);
+        }
+        Ok(Keycode::LeftShift) => {
+            modifiers.insert(KeyboardModifiers::SHIFT_LEFT);
+        }
+        Ok(Keycode::RightShift) => {
+            modifiers.insert(KeyboardModifiers::SHIFT_RIGHT);
+        }
+        Ok(Keycode::SuperKeyLeft) => {
+            modifiers.insert(KeyboardModifiers::SUPER_KEY_LEFT);
+        }
+        Ok(Keycode::SuperKeyRight) => {
+            modifiers.insert(KeyboardModifiers::SUPER_KEY_RIGHT);
+        }
 
-        x if x == Keycode::Control        as u8 + KEY_RELEASED_OFFSET => {
-            modifiers.remove(if extended { KeyboardModifiers::CONTROL_RIGHT } else { KeyboardModifiers::CONTROL_LEFT});
+        Ok(Keycode::ControlReleased) => {
+            modifiers.remove(if extended {
+                KeyboardModifiers::CONTROL_RIGHT
+            } else {
+                KeyboardModifiers::CONTROL_LEFT
+            });
         }
-        x if x == Keycode::Alt            as u8 + KEY_RELEASED_OFFSET => { modifiers.remove(KeyboardModifiers::ALT);              }
-        x if x == Keycode::LeftShift      as u8 + KEY_RELEASED_OFFSET => { modifiers.remove(KeyboardModifiers::SHIFT_LEFT);       }
-        x if x == Keycode::RightShift     as u8 + KEY_RELEASED_OFFSET => { modifiers.remove(KeyboardModifiers::SHIFT_RIGHT);      }
-        x if x == Keycode::SuperKeyLeft   as u8 + KEY_RELEASED_OFFSET => { modifiers.remove(KeyboardModifiers::SUPER_KEY_LEFT);   }
-        x if x == Keycode::SuperKeyRight  as u8 + KEY_RELEASED_OFFSET => { modifiers.remove(KeyboardModifiers::SUPER_KEY_RIGHT);  }
+        Ok(Keycode::AltReleased) => {
+            modifiers.remove(KeyboardModifiers::ALT);
+        }
+        Ok(Keycode::LeftShiftReleased) => {
+            modifiers.remove(KeyboardModifiers::SHIFT_LEFT);
+        }
+        Ok(Keycode::RightShiftReleased) => {
+            modifiers.remove(KeyboardModifiers::SHIFT_RIGHT);
+        }
+        Ok(Keycode::SuperKeyLeftReleased) => {
+            modifiers.remove(KeyboardModifiers::SUPER_KEY_LEFT);
+        }
+        Ok(Keycode::SuperKeyRightReleased) => {
+            modifiers.remove(KeyboardModifiers::SUPER_KEY_RIGHT);
+        }
 
         // The "*Lock" keys are toggled only upon being pressed, not when released.
-        x if x == Keycode::CapsLock as u8 => {
+        Ok(Keycode::CapsLock) => {
             modifiers.toggle(KeyboardModifiers::CAPS_LOCK);
             set_keyboard_led(modifiers);
         }
-        x if x == Keycode::ScrollLock as u8 => {
+        Ok(Keycode::ScrollLock) => {
             modifiers.toggle(KeyboardModifiers::SCROLL_LOCK);
             set_keyboard_led(modifiers);
         }
-        x if x == Keycode::NumLock as u8 => {
+        Ok(Keycode::NumLock) => {
             modifiers.toggle(KeyboardModifiers::NUM_LOCK);
             set_keyboard_led(modifiers);
         }
 
-        _ => { } // do nothing
+        _ => {} // do nothing
     }
 
     // debug!("KBD_MODIFIERS after {}: {:?}", scan_code, modifiers);
@@ -150,16 +178,14 @@ fn handle_keyboard_input(scan_code: u8, extended: bool) -> Result<(), &'static s
         (scan_code - KEY_RELEASED_OFFSET, KeyAction::Released) 
     };
 
-    if let Some(keycode) = Keycode::from_scancode(adjusted_scan_code) {
+    if let Ok(keycode) = Keycode::try_from(adjusted_scan_code) {
         let event = Event::new_keyboard_event(KeyEvent::new(keycode, action, **modifiers));
         if let Some(producer) = KEYBOARD_PRODUCER.get() {
-            producer.push(event).map_err(|_e| "keyboard input queue is full")
+            producer.push(event).map_err(|_| "keyboard input queue is full")
         } else {
             warn!("handle_keyboard_input(): KEYBOARD_PRODUCER wasn't yet initialized, dropping keyboard event {:?}.", event);
             Err("keyboard event queue not ready")
         }
-    } else if scan_code == 0xE0 {
-        Ok(()) //ignore 0xE0 prefix
     } else {
         error!("handle_keyboard_input(): Unknown scancode: {:?}, adjusted scancode: {:?}",
             scan_code, adjusted_scan_code
