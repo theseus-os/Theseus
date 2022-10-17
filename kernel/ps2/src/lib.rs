@@ -290,13 +290,13 @@ pub enum DeviceToHostResponse {
 }
 
 /// write data to the first ps2 data port and return the response
-fn data_to_port1(value: u8) -> DeviceToHostResponse {
+fn data_to_port1(value: u8) -> Result<DeviceToHostResponse, &'static str> {
     write_data(value);
-    read_data().try_into().map_err(|e| warn!("{:?}", e)).unwrap() //FIXME: for testing
+    read_data().try_into().map_err(|_| "data_to_port1 response conversion failed")
 }
 
-/// write data to the second ps2 data port and return the response //TODO: MouseResponse
-fn data_to_port2(value: u8) -> DeviceToHostResponse {
+/// write data to the second ps2 data port and return the response
+fn data_to_port2(value: u8) -> Result<DeviceToHostResponse, &'static str> {
     write_command(WriteByteToPort2InputBuffer);
     data_to_port1(value)
 }
@@ -362,10 +362,10 @@ fn command_to_keyboard(value: HostToKeyboardCommandOrData) -> Result<(), &'stati
     };
 
     match response {
-        Acknowledge => Ok(()),
-        ResendCommand => Err("Fail to send the command to the keyboard"),
+        Ok(Acknowledge) => Ok(()),
+        Ok(ResendCommand) => Err("Fail to send the command to the keyboard"),
         _ => {
-            for _x in 0..14 {
+            for _ in 0..14 {
                 // wait for response
                 let response = read_data().try_into();
                 match response {
@@ -414,7 +414,7 @@ fn command_to_mouse(value: HostToMouseCommandOrData) -> Result<(), &'static str>
     };
 
     match response {
-        Acknowledge => Ok(()),
+        Ok(Acknowledge) => Ok(()),
         _ => {
             for _x in 0..14 {
                 // wait for response
