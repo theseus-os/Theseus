@@ -33,14 +33,37 @@ mod paging;
 pub mod paging;
 
 
-pub use self::paging::*;
+pub use self::paging::MappedPages;
+pub use self::paging::PageTable;
 
-pub use memory_structs::*;
-pub use page_allocator::*;
-pub use frame_allocator::*;
+pub use memory_structs::Frame;
+pub use memory_structs::Page;
+pub use memory_structs::FrameRange;
+pub use memory_structs::PageRange;
+pub use memory_structs::VirtualAddress;
+pub use memory_structs::PhysicalAddress;
+
+pub use page_allocator::AllocatedPages;
+pub use page_allocator::allocate_pages;
+pub use page_allocator::allocate_pages_by_bytes;
+
+pub use frame_allocator::AllocatedFrames;
+pub use frame_allocator::MemoryRegionType;
+pub use frame_allocator::PhysicalMemoryRegion;
+pub use frame_allocator::allocate_frames_by_bytes;
 
 #[cfg(target_arch = "x86_64")]
-use memory_x86_64::*;
+use memory_x86_64::{
+    BootInformation,
+    get_kernel_address,
+    get_boot_info_mem_area,
+    find_section_memory_bounds,
+    get_vga_mem_addr,
+    get_modules_address,
+    tlb_flush_virt_addr,
+    tlb_flush_all,
+    get_p4,
+};
 
 #[cfg(target_arch = "x86_64")]
 pub use memory_x86_64::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
