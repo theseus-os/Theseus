@@ -574,19 +574,16 @@ pub fn mouse_id() -> Result<u8, &'static str> {
 
 /// reset the mouse
 fn reset_mouse() -> Result<(), &'static str> {
-    if let Err(_e) = command_to_mouse(HostToMouseCommandOrData::MouseCommand(Reset)) {
-        Err("reset mouse failled please try again")
-    } else {
-        for _x in 0..14 {
-            let more_bytes = read_data();
-            if more_bytes == 0xAA {
+    command_to_mouse(HostToMouseCommandOrData::MouseCommand(Reset))?; 
+    for _ in 0..14 {
+        //BAT = Basic Assurance Test
+        let bat_code = read_data();
+        if bat_code == 0xAA {
                 // command reset mouse succeeded
                 return Ok(());
             }
         }
-        warn!("disable streaming failed");
-        Err("fail to command reset mouse fail!!!")
-    }
+    Err("failed to reset mouse")
 }
 
 /// resend the most recent packet again
