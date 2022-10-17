@@ -10,6 +10,7 @@ spin = "0.9.0"
 x86_64 = "0.14.8"
 mpmc = "0.1.6"
 log = "0.4.8"
+once_cell = { version = "1", default-features = false }
 
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"

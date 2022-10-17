@@ -6,6 +6,7 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET, KeyAction, KeyEvent};
 use log::{info, error, warn};
+use once_cell::unsync::Lazy;
 use spin::Once;
 use mpmc::Queue;
 use event_types::Event;
@@ -16,8 +17,8 @@ use x86_64::structures::idt::InterruptStackFrame;
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x21.
 const PS2_KEYBOARD_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + 0x1;
 
-// TODO: avoid unsafe static mut using the following: https://www.reddit.com/r/rust/comments/1wvxcn/lazily_initialized_statics/cf61im5/
-static mut KBD_MODIFIERS: KeyboardModifiers = KeyboardModifiers::new();
+// TODO: avoid unsafe static mut
+static mut KBD_MODIFIERS: Lazy<KeyboardModifiers> = Lazy::new(KeyboardModifiers::new);
 
 static KEYBOARD_PRODUCER: Once<Queue<Event>> = Once::new();
 
@@ -150,7 +151,7 @@ fn handle_keyboard_input(scan_code: u8, extended: bool) -> Result<(), &'static s
     };
 
     if let Some(keycode) = Keycode::from_scancode(adjusted_scan_code) {
-        let event = Event::new_keyboard_event(KeyEvent::new(keycode, action, *modifiers));
+        let event = Event::new_keyboard_event(KeyEvent::new(keycode, action, **modifiers));
         if let Some(producer) = KEYBOARD_PRODUCER.get() {
             producer.push(event).map_err(|_e| "keyboard input queue is full")
         } else {
