@@ -59,7 +59,9 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
     if mouse_packet.x_overflow() || mouse_packet.y_overflow() {
         error!("The overflow bits in the mouse data packet's first byte are set! Discarding the whole packet.");
     } else if mouse_packet.always_one() != 1 {
-        // it's very likely that the PS/2 controller send us an [interrupt](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts)
+        // it's very likely that the PS/2 controller send us an [interrupt](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts),
+        // if it did, the whole 32 bits of the mouse_packet are zero (at least on my end)
+        // checking the ps/2 controller status register's mouse_output_buffer_full might work, but this current solution does also work
         // error!("Third bit in the mouse data packet's first byte should always be 1. Discarding the whole packet since the bit is 0.");
     } else {
         let _mouse_event = handle_mouse_input(mouse_packet);

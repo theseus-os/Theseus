@@ -682,7 +682,6 @@ fn window_manager_loop(
                     keyboard_handle_application(key_input)?;
                 }
                 Event::MouseMovementEvent(ref mouse_event) => {
-                    info!("window_manager_loop: {mouse_event:?}");
                     //as isize probably because adding up mouse movements will overflow?
                     let mut x = mouse_event.mousemove.x_movement as isize;
                     let mut y = mouse_event.mousemove.y_movement as isize;

@@ -504,14 +504,12 @@ impl MousePacketBits4 {
 
 /// read mouse data packet; will work for mouse with ID 4 and probably 3
 pub fn read_mouse_packet() -> MousePacketBits4 {
-    let packet = MousePacketBits4::from_bytes([
+    MousePacketBits4::from_bytes([
         read_data(),
         read_data(),
         read_data(),
         read_data()
-    ]);
-    info!("read_mouse_packet: {packet:?}");
-    packet
+    ])
 }
 
 pub enum SampleRate {
@@ -668,9 +666,9 @@ pub fn keyboard_detect() -> Result<KeyboardType, &'static str> {
         0xAB => {
             match read_data() {
                 0x41 | 0xC1 => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
-        0x83 => Ok(KeyboardType::MF2Keyboard),
+                0x83 => Ok(KeyboardType::MF2Keyboard),
                 _ => Err("unrecognized keyboard type")
-    }
+            }
         }
         _ => Err("unrecognized keyboard type")
     };
