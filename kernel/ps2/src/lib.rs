@@ -605,33 +605,19 @@ fn mouse_resend() -> Result<(), &'static str> {
 }
 
 /// enable the packet streaming
-pub fn enable_mouse_packet_streaming() -> Result<(), &'static str> {
-    if let Err(_e) = command_to_mouse(HostToMouseCommandOrData::MouseCommand(EnableDataReporting)) {
+fn enable_mouse_packet_streaming() -> Result<(), &'static str> {
+    command_to_mouse(HostToMouseCommandOrData::MouseCommand(EnableDataReporting)).map_err(|_| {
         warn!("enable streaming failed");
-        Err("enable mouse streaming failed")
-    } else {
-        Ok(())
-    }
+        "enable mouse streaming failed"
+    })
 }
 
 /// disable the packet streaming
-pub fn disable_mouse_packet_streaming() -> Result<(), &'static str> {
-    if data_to_port2(0xf5) as u8 != 0xfa {
-        for x in 0..15 {
-            if x == 14 {
-                warn!("disable mouse streaming failed");
-                return Err("disable mouse streaming failed");
-            }
-            let response = read_data();
-
-            if response != 0xfa {
-                trace!("{response}");
-            } else {
-                return Ok(());
-            }
-        }
-    }
-    Ok(())
+fn disable_mouse_packet_streaming() -> Result<(), &'static str> {
+    command_to_mouse(HostToMouseCommandOrData::MouseCommand(DisableDataReporting)).map_err(|_| {
+        warn!("disable mouse streaming failed");
+        "disable mouse streaming failed"
+    })
 }
 
 pub enum MouseResolution {
