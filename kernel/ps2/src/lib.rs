@@ -19,7 +19,7 @@ static PS2_COMMAND_AND_STATUS_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x64)
 /// Clean the [PS2_DATA_PORT] output buffer, skipping the [ControllerToHostStatus] `output_buffer_full` check
 fn flush_output_buffer() {
     //NOTE(hecatia): on my end, this is always 250 for port 1 and 65 for port 2, even if read multiple times
-    trace!("{}", read_data());
+    trace!("ps2::flush_output_buffer: {}", read_data());
 }
 
 // https://wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Commands
@@ -471,16 +471,16 @@ pub struct MousePacketBits4 {
 impl MousePacketBits4 {
     /// `x_1st_to_8th_bit` and `x_9th_bit` should not be accessed directly, because they're part of one signed 9-bit number
     pub fn x_movement(&self) -> i16 {
-        Self::combine_and_2s_complement(self.x_1st_to_8th_bit(), self.x_9th_bit())
+        Self::to_2s_complement(self.x_1st_to_8th_bit(), self.x_9th_bit())
     }
 
     /// `y_1st_to_8th_bit` and `y_9th_bit` should not be accessed directly, because they're part of one signed 9-bit number
     pub fn y_movement(&self) -> i16 {
-        Self::combine_and_2s_complement(self.y_1st_to_8th_bit(), self.y_9th_bit())
+        Self::to_2s_complement(self.y_1st_to_8th_bit(), self.y_9th_bit())
     }
 
     // implementation from https://wiki.osdev.org/PS/2_Mouse
-    fn combine_and_2s_complement(bit1to8: u8, bit9: bool) -> i16 {
+    fn to_2s_complement(bit1to8: u8, bit9: bool) -> i16 {
         // to fit a 9th bit inside; we can't just convert to i16, because it would turn e.g. 255 into -1
         let unsigned = bit1to8 as u16; // 1111_1111 as u16 = 0000_0000_1111_1111
 
@@ -579,10 +579,10 @@ fn reset_mouse() -> Result<(), &'static str> {
         //BAT = Basic Assurance Test
         let bat_code = read_data();
         if bat_code == 0xAA {
-                // command reset mouse succeeded
-                return Ok(());
-            }
+            // command reset mouse succeeded
+            return Ok(());
         }
+    }
     Err("failed to reset mouse")
 }
 
@@ -639,6 +639,7 @@ fn keyboard_scancode_set(value: ScancodeSet) -> Result<(), &'static str> {
         .map_err(|_| "failed to set the keyboard scancode set")
 }
 
+//NOTE: could be combined into a PS2DeviceType enum, see https://wiki.osdev.org/%228042%22_PS/2_Controller#Detecting_PS.2F2_Device_Types
 pub enum KeyboardType {
     MF2Keyboard,
     MF2KeyboardWithPSControllerTranslator,
