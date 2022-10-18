@@ -772,7 +772,7 @@ impl MappedPages {
     }
 
 
-    /// Reinterprets this `MappedPages`'s underlying memory region as a slice of any type.
+    /// Reinterprets this `MappedPages`'s underlying memory region as `&[T]`, a `length`-element slice of type `T`.
     /// 
     /// It has similar type requirements as the [`as_type()`](#method.as_type) method.
     /// 
@@ -785,7 +785,7 @@ impl MappedPages {
     ///    Thus, the slice's address bounds will span from `byte_offset` to
     ///    `byte_offset + (size_of::<T>() * length)`.
     /// 
-    /// Returns a reference to the new slice that a reference to the underlying memory region,
+    /// Returns a reference to the new slice that is formed from the underlying memory region,
     /// with a lifetime dependent upon the lifetime of this `MappedPages` object.
     /// This ensures safety by guaranteeing that the returned slice 
     /// cannot be used after this `MappedPages` object is dropped and unmapped.
