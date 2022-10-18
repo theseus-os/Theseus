@@ -901,6 +901,22 @@
 <span id="895">895</span>
 <span id="896">896</span>
 <span id="897">897</span>
+<span id="898">898</span>
+<span id="899">899</span>
+<span id="900">900</span>
+<span id="901">901</span>
+<span id="902">902</span>
+<span id="903">903</span>
+<span id="904">904</span>
+<span id="905">905</span>
+<span id="906">906</span>
+<span id="907">907</span>
+<span id="908">908</span>
+<span id="909">909</span>
+<span id="910">910</span>
+<span id="911">911</span>
+<span id="912">912</span>
+<span id="913">913</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md</span>
 <span class="comment">// file at the top-level directory of this distribution.</span>
 <span class="comment">//</span>
@@ -1584,109 +1600,117 @@
     <span class="doccomment">/// from &quot;untyped&quot; memory, i.e., an array of bytes.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// `offset`: the offset into the memory region at which the struct is located (where it should start).</span>
+    <span class="doccomment">/// * `byte_offset`: the offset (in number of bytes) from the beginning of the memory region</span>
+    <span class="doccomment">///    at which the struct is located (where it should start).</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// Returns a reference to the new struct (`&amp;T`) that is formed from the underlying memory region,</span>
     <span class="doccomment">/// with a lifetime dependent upon the lifetime of this `MappedPages` object.</span>
     <span class="doccomment">/// This ensures safety by guaranteeing that the returned struct reference </span>
     <span class="doccomment">/// cannot be used after this `MappedPages` object is dropped and unmapped.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_type</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">FromBytes</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">offset</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">T</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_type</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">FromBytes</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">byte_offset</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">T</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>();
         <span class="kw">if</span> <span class="bool-val">false</span> {
-            <span class="macro">debug!</span>(<span class="string">&quot;MappedPages::as_type(): requested type {} with size {} at offset {}, MappedPages size {}!&quot;</span>,
+            <span class="macro">debug!</span>(<span class="string">&quot;MappedPages::as_type(): requested type {} with size {} at byte_offset {}, MappedPages size {}!&quot;</span>,
                 <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(),
-                <span class="ident">size</span>, <span class="ident">offset</span>, <span class="self">self</span>.<span class="ident">size_in_bytes</span>()
+                <span class="ident">size</span>, <span class="ident">byte_offset</span>, <span class="self">self</span>.<span class="ident">size_in_bytes</span>()
             );
         }
 
-        <span class="kw">if</span> <span class="ident">offset</span> <span class="op">%</span> <span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>() <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_type(): requested type {} with size {}, but the offset {} is unaligned with type alignment {}!&quot;</span>,
+        <span class="kw">if</span> <span class="ident">byte_offset</span> <span class="op">%</span> <span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>() <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_type(): requested type {} with size {}, but the byte_offset {} is unaligned with type alignment {}!&quot;</span>,
                 <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(),
-                <span class="ident">size</span>, <span class="ident">offset</span>, <span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>()
+                <span class="ident">size</span>, <span class="ident">byte_offset</span>, <span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>()
             );
         }
 
-        <span class="comment">// check that size of the type T fits within the size of the mapping</span>
-        <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">offset</span> <span class="op">+</span> <span class="ident">size</span>;
-        <span class="kw">if</span> <span class="ident">end</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">size_in_bytes</span>() {
-            <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_type(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!&quot;</span>,
+        <span class="kw">let</span> <span class="ident">start_vaddr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">start_address</span>().<span class="ident">value</span>().<span class="ident">checked_add</span>(<span class="ident">byte_offset</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;MappedPages::as_type(): overflow: start_address + byte_offset&quot;</span>)<span class="question-mark">?</span>;
+        <span class="comment">// check that size of type T fits within the size of the mapping</span>
+        <span class="kw">let</span> <span class="ident">end_bound</span> <span class="op">=</span> <span class="ident">byte_offset</span>.<span class="ident">checked_add</span>(<span class="ident">size</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;MappedPages::as_type(): overflow: byte_offset + size_of::&lt;T&gt;())&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">if</span> <span class="ident">end_bound</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">size_in_bytes</span>() {
+            <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_type(): requested type {} with size {} at byte_offset {}, which is too large for MappedPages of size {}!&quot;</span>,
                 <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(),
-                <span class="ident">size</span>, <span class="ident">offset</span>, <span class="self">self</span>.<span class="ident">size_in_bytes</span>()
+                <span class="ident">size</span>, <span class="ident">byte_offset</span>, <span class="self">self</span>.<span class="ident">size_in_bytes</span>()
             );
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;requested type and offset would not fit within the MappedPages bounds&quot;</span>);
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;MappedPages::as_type(): requested type and byte_offset would not fit within the MappedPages bounds&quot;</span>);
         }
 
         <span class="comment">// SAFE: we guarantee the size and lifetime are within that of this MappedPages object</span>
-        <span class="kw">let</span> <span class="ident">t</span>: <span class="kw-2">&amp;</span><span class="ident">T</span> <span class="op">=</span> <span class="kw">unsafe</span> { 
-            <span class="kw-2">&amp;</span><span class="kw-2">*</span>((<span class="self">self</span>.<span class="ident">pages</span>.<span class="ident">start_address</span>().<span class="ident">value</span>() <span class="op">+</span> <span class="ident">offset</span>) <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">T</span>)
+        <span class="kw">let</span> <span class="ident">t</span>: <span class="kw-2">&amp;</span><span class="ident">T</span> <span class="op">=</span> <span class="kw">unsafe</span> {
+            <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="ident">start_vaddr</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">T</span>)
         };
 
         <span class="prelude-val">Ok</span>(<span class="ident">t</span>)
     }
 
 
-    <span class="doccomment">/// Same as [`as_type()`](#method.as_type), but returns a *mutable* reference to the type `T`.</span>
+    <span class="doccomment">/// Same as [`MappedPages::as_type()`], but returns a *mutable* reference to the type `T`.</span>
     <span class="doccomment">/// </span>
-    <span class="doccomment">/// Thus, it checks to make sure that the underlying mapping is writable.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_type_mut</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">FromBytes</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">offset</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;mut</span> <span class="ident">T</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Thus, it also checks that the underlying mapping is writable.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_type_mut</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">FromBytes</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">byte_offset</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;mut</span> <span class="ident">T</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>();
         <span class="kw">if</span> <span class="bool-val">false</span> {
-            <span class="macro">debug!</span>(<span class="string">&quot;MappedPages::as_type_mut(): requested type {} with size {} at offset {}, MappedPages size {}!&quot;</span>,
+            <span class="macro">debug!</span>(<span class="string">&quot;MappedPages::as_type_mut(): requested type {} with size {} at byte_offset {}, MappedPages size {}!&quot;</span>,
                 <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(),
-                <span class="ident">size</span>, <span class="ident">offset</span>, <span class="self">self</span>.<span class="ident">size_in_bytes</span>()
+                <span class="ident">size</span>, <span class="ident">byte_offset</span>, <span class="self">self</span>.<span class="ident">size_in_bytes</span>()
             );
         }
 
-        <span class="kw">if</span> <span class="ident">offset</span> <span class="op">%</span> <span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>() <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_type_mut(): requested type {} with size {}, but the offset {} is unaligned with type alignment {}!&quot;</span>,
+        <span class="kw">if</span> <span class="ident">byte_offset</span> <span class="op">%</span> <span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>() <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_type_mut(): requested type {} with size {}, but the byte_offset {} is unaligned with type alignment {}!&quot;</span>,
                 <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(),
-                <span class="ident">size</span>, <span class="ident">offset</span>, <span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>()
+                <span class="ident">size</span>, <span class="ident">byte_offset</span>, <span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>()
             );
         }
 
         <span class="comment">// check flags to make sure mutability is allowed (otherwise a page fault would occur on a write)</span>
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">flags</span>.<span class="ident">is_writable</span>() {
-            <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_type_mut(): requested type {} with size {} at offset {}, but MappedPages weren&#39;t writable (flags: {:?})&quot;</span>,
+            <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_type_mut(): requested type {} with size {} at byte_offset {}, but MappedPages weren&#39;t writable (flags: {:?})&quot;</span>,
                 <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(),
-                <span class="ident">size</span>, <span class="ident">offset</span>, <span class="self">self</span>.<span class="ident">flags</span>
+                <span class="ident">size</span>, <span class="ident">byte_offset</span>, <span class="self">self</span>.<span class="ident">flags</span>
             );
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;as_type_mut(): MappedPages were not writable&quot;</span>);
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;MappedPages::as_type_mut(): MappedPages were not writable&quot;</span>);
         }
         
+        <span class="kw">let</span> <span class="ident">start_vaddr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">start_address</span>().<span class="ident">value</span>().<span class="ident">checked_add</span>(<span class="ident">byte_offset</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;MappedPages::as_type_mut(): overflow: start_address + byte_offset&quot;</span>)<span class="question-mark">?</span>;
         <span class="comment">// check that size of type T fits within the size of the mapping</span>
-        <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">offset</span> <span class="op">+</span> <span class="ident">size</span>;
-        <span class="kw">if</span> <span class="ident">end</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">size_in_bytes</span>() {
-            <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_type_mut(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!&quot;</span>,
+        <span class="kw">let</span> <span class="ident">end_bound</span> <span class="op">=</span> <span class="ident">byte_offset</span>.<span class="ident">checked_add</span>(<span class="ident">size</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;MappedPages::as_type_mut(): overflow: byte_offset + size_of::&lt;T&gt;())&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">if</span> <span class="ident">end_bound</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">size_in_bytes</span>() {
+            <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_type_mut(): requested type {} with size {} at byte_offset {}, which is too large for MappedPages of size {}!&quot;</span>,
                 <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(),
-                <span class="ident">size</span>, <span class="ident">offset</span>, <span class="self">self</span>.<span class="ident">size_in_bytes</span>()
+                <span class="ident">size</span>, <span class="ident">byte_offset</span>, <span class="self">self</span>.<span class="ident">size_in_bytes</span>()
             );
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;requested type and offset would not fit within the MappedPages bounds&quot;</span>);
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;MappedPages::as_type_mut(): requested type and byte_offset would not fit within the MappedPages bounds&quot;</span>);
         }
 
         <span class="comment">// SAFE: we guarantee the size and lifetime are within that of this MappedPages object</span>
         <span class="kw">let</span> <span class="ident">t</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span> <span class="op">=</span> <span class="kw">unsafe</span> {
-            <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span>((<span class="self">self</span>.<span class="ident">pages</span>.<span class="ident">start_address</span>().<span class="ident">value</span>() <span class="op">+</span> <span class="ident">offset</span>) <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">T</span>)
+            <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span>(<span class="ident">start_vaddr</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">T</span>)
         };
 
         <span class="prelude-val">Ok</span>(<span class="ident">t</span>)
     }
 
 
-    <span class="doccomment">/// Reinterprets this `MappedPages`&#39;s underlying memory region as a slice of any type.</span>
+    <span class="doccomment">/// Reinterprets this `MappedPages`&#39;s underlying memory region as a slice of the given type `T`.</span>
     <span class="doccomment">/// </span>
-    <span class="doccomment">/// It has similar type requirements as the [`as_type()`](#method.as_type) method.</span>
+    <span class="doccomment">/// It has similar requirements and behavior as [`MappedPages::as_type()`].</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// # Arguments</span>
     <span class="doccomment">/// * `byte_offset`: the offset (in number of bytes) into the memory region at which the slice should start.</span>
     <span class="doccomment">/// * `length`: the length of the slice, i.e., the number of `T` elements in the slice. </span>
-    <span class="doccomment">///   Thus, the slice will go from `offset` to `offset` + (sizeof(`T`) * `length`).</span>
+    <span class="doccomment">///   Thus, the slice will go from `byte_offset` to `byte_offset` + (sizeof(`T`) * `length`).</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// Returns a reference to the new slice that is formed from the underlying memory region,</span>
     <span class="doccomment">/// with a lifetime dependent upon the lifetime of this `MappedPages` object.</span>
     <span class="doccomment">/// This ensures safety by guaranteeing that the returned slice </span>
     <span class="doccomment">/// cannot be used after this `MappedPages` object is dropped and unmapped.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_slice</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">FromBytes</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">byte_offset</span>: <span class="ident">usize</span>, <span class="ident">length</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span>[<span class="ident">T</span>], <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">size_in_bytes</span> <span class="op">=</span> <span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>() <span class="op">*</span> <span class="ident">length</span>;
+        <span class="kw">let</span> <span class="ident">size_in_bytes</span> <span class="op">=</span> <span class="ident">length</span>.<span class="ident">checked_mul</span>(<span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>())
+            .<span class="ident">ok_or</span>(<span class="string">&quot;MappedPages::as_slice(): overflow: length * size_of::&lt;T&gt;()&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">if</span> <span class="bool-val">false</span> {
             <span class="macro">debug!</span>(<span class="string">&quot;MappedPages::as_slice(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!&quot;</span>,
                 <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(),
@@ -1701,30 +1725,35 @@
             );
         }
         
+        <span class="kw">let</span> <span class="ident">start_vaddr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">start_address</span>().<span class="ident">value</span>().<span class="ident">checked_add</span>(<span class="ident">byte_offset</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;MappedPages::as_slice(): overflow: start_address + byte_offset&quot;</span>)<span class="question-mark">?</span>;
         <span class="comment">// check that size of slice fits within the size of the mapping</span>
-        <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">byte_offset</span> <span class="op">+</span> (<span class="ident">length</span> <span class="op">*</span> <span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>());
-        <span class="kw">if</span> <span class="ident">end</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">size_in_bytes</span>() {
+        <span class="kw">let</span> <span class="ident">end_bound</span> <span class="op">=</span> <span class="ident">byte_offset</span>.<span class="ident">checked_add</span>(<span class="ident">size_in_bytes</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;MappedPages::as_slice_mut(): overflow: byte_offset + (length * size_of::&lt;T&gt;())&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">if</span> <span class="ident">end_bound</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">size_in_bytes</span>() {
             <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_slice(): requested slice of type {} with length {} (total size {}) at byte_offset {}, which is too large for MappedPages of size {}!&quot;</span>,
                 <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(),
                 <span class="ident">length</span>, <span class="ident">size_in_bytes</span>, <span class="ident">byte_offset</span>, <span class="self">self</span>.<span class="ident">size_in_bytes</span>()
             );
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;requested slice length and offset would not fit within the MappedPages bounds&quot;</span>);
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;MappedPages::as_slice(): requested slice length and byte_offset would not fit within the MappedPages bounds&quot;</span>);
         }
 
-        <span class="comment">// SAFE: we guarantee the size and lifetime are within that of this MappedPages object</span>
+        <span class="comment">// SAFE: we guarantee the bounds and lifetime are within that of this MappedPages object</span>
         <span class="kw">let</span> <span class="ident">slc</span>: <span class="kw-2">&amp;</span>[<span class="ident">T</span>] <span class="op">=</span> <span class="kw">unsafe</span> {
-            <span class="ident">slice::from_raw_parts</span>((<span class="self">self</span>.<span class="ident">pages</span>.<span class="ident">start_address</span>().<span class="ident">value</span>() <span class="op">+</span> <span class="ident">byte_offset</span>) <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">T</span>, <span class="ident">length</span>)
+            <span class="ident">slice::from_raw_parts</span>(<span class="ident">start_vaddr</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">T</span>, <span class="ident">length</span>)
         };
 
         <span class="prelude-val">Ok</span>(<span class="ident">slc</span>)
     }
 
 
-    <span class="doccomment">/// Same as [`as_slice()`](#method.as_slice), but returns a *mutable* slice. </span>
+    <span class="doccomment">/// Same as [`MappedPages::as_slice()`], but returns a *mutable* slice. </span>
     <span class="doccomment">/// </span>
-    <span class="doccomment">/// Thus, it checks to make sure that the underlying mapping is writable.</span>
+    <span class="doccomment">/// Thus, it checks that the underlying mapping is writable.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_slice_mut</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">FromBytes</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">byte_offset</span>: <span class="ident">usize</span>, <span class="ident">length</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;mut</span> [<span class="ident">T</span>], <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">size_in_bytes</span> <span class="op">=</span> <span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>() <span class="op">*</span> <span class="ident">length</span>;
+        <span class="kw">let</span> <span class="ident">size_in_bytes</span> <span class="op">=</span> <span class="ident">length</span>.<span class="ident">checked_mul</span>(<span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>())
+            .<span class="ident">ok_or</span>(<span class="string">&quot;MappedPages::as_slice_mut(): overflow: length * size_of::&lt;T&gt;()&quot;</span>)<span class="question-mark">?</span>;
+
         <span class="kw">if</span> <span class="bool-val">false</span> {
             <span class="macro">debug!</span>(<span class="string">&quot;MappedPages::as_slice_mut(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!&quot;</span>,
                 <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(), 
@@ -1745,22 +1774,25 @@
                 <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(),
                 <span class="ident">length</span>, <span class="ident">size_in_bytes</span>, <span class="ident">byte_offset</span>, <span class="self">self</span>.<span class="ident">flags</span>
             );
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;as_slice_mut(): MappedPages were not writable&quot;</span>);
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;MappedPages::as_slice_mut(): MappedPages were not writable&quot;</span>);
         }
 
+        <span class="kw">let</span> <span class="ident">start_vaddr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">start_address</span>().<span class="ident">value</span>().<span class="ident">checked_add</span>(<span class="ident">byte_offset</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;MappedPages::as_slice_mut(): overflow: start_address + byte_offset&quot;</span>)<span class="question-mark">?</span>;
         <span class="comment">// check that size of slice fits within the size of the mapping</span>
-        <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">byte_offset</span> <span class="op">+</span> (<span class="ident">length</span> <span class="op">*</span> <span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>());
-        <span class="kw">if</span> <span class="ident">end</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">size_in_bytes</span>() {
+        <span class="kw">let</span> <span class="ident">end_bound</span> <span class="op">=</span> <span class="ident">byte_offset</span>.<span class="ident">checked_add</span>(<span class="ident">size_in_bytes</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;MappedPages::as_slice_mut(): overflow: byte_offset + (length * size_of::&lt;T&gt;())&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">if</span> <span class="ident">end_bound</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">size_in_bytes</span>() {
             <span class="macro">error!</span>(<span class="string">&quot;MappedPages::as_slice_mut(): requested mutable slice of type {} with length {} (total size {}) at byte_offset {}, which is too large for MappedPages of size {}!&quot;</span>,
                 <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(),
                 <span class="ident">length</span>, <span class="ident">size_in_bytes</span>, <span class="ident">byte_offset</span>, <span class="self">self</span>.<span class="ident">size_in_bytes</span>()
             );
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;requested slice length and offset would not fit within the MappedPages bounds&quot;</span>);
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;MappedPages::as_slice_mut(): requested slice length and byte_offset would not fit within the MappedPages bounds&quot;</span>);
         }
 
-        <span class="comment">// SAFE: we guarantee the size and lifetime are within that of this MappedPages object</span>
+        <span class="comment">// SAFE: we guarantee the bounds and lifetime are within that of this MappedPages object</span>
         <span class="kw">let</span> <span class="ident">slc</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">T</span>] <span class="op">=</span> <span class="kw">unsafe</span> {
-            <span class="ident">slice::from_raw_parts_mut</span>((<span class="self">self</span>.<span class="ident">pages</span>.<span class="ident">start_address</span>().<span class="ident">value</span>() <span class="op">+</span> <span class="ident">byte_offset</span>) <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">T</span>, <span class="ident">length</span>)
+            <span class="ident">slice::from_raw_parts_mut</span>(<span class="ident">start_vaddr</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">T</span>, <span class="ident">length</span>)
         };
 
         <span class="prelude-val">Ok</span>(<span class="ident">slc</span>)
