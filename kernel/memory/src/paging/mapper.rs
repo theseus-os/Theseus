@@ -783,7 +783,7 @@ impl MappedPages {
     ///    of type `T`, otherwise an error will be returned.
     /// * `length`: the length of the slice, i.e., the number of elements of type `T` in the slice. 
     ///    Thus, the slice's address bounds will span from `byte_offset` to
-    ///    `byte_offset + (size_of::<T> * length)`.
+    ///    `byte_offset + (size_of::<T>() * length)`.
     /// 
     /// Returns a reference to the new slice that a reference to the underlying memory region,
     /// with a lifetime dependent upon the lifetime of this `MappedPages` object.
