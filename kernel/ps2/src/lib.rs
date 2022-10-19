@@ -78,29 +78,38 @@ type bool1 = bool;
 pub struct ControllerToHostStatus {
     /// When using [Polling](https://wiki.osdev.org/%228042%22_PS/2_Controller#Polling), must be `true` before attempting to read data from [PS2_DATA_PORT].
     /// When using [Interrupts](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts), guaranteed to be `true`, because an interrupt only happens if the buffer is full
+    #[allow(dead_code)]
     output_buffer_full: bool1,
     /// Must be `false` before attempting to write data to [PS2_DATA_PORT] or [PS2_COMMAND_AND_STATUS_PORT]
+    #[allow(dead_code)]
     input_buffer_full: bool1,
     /// Cleared on reset; set when the system passed Power-on self-test
+    #[allow(dead_code)]
     system_passed_self_test: bool1,
     /// Input buffer should be written to: 0 - [PS2_DATA_PORT], 1 - [PS2_COMMAND_AND_STATUS_PORT]
+    #[allow(dead_code)]
     input_buffer_is_command: u1,
     /// Whether or not communication is inhibited (via switch) / Unknown (chipset specific) / (more likely unused on modern systems)
+    #[allow(dead_code)]
     keyboard_enabled: bool1,
     ///// Keyboard didn't generate clock signals within 15 ms of "request-to-send" (exclusive to AT-compatible mode)
     // transmit_timeout: bool1,
     ///// Keyboard didn't generate clock signals within 20 ms of command reception (exclusive to AT-compatible mode)
     // receive_timeout: bool1,
     /// Similar to `output_buffer_full`, except for mouse
+    #[allow(dead_code)]
     mouse_output_buffer_full: bool1,
     /// Timeout during keyboard command receive or response (Same as [transmit_timeout] + [receive_timeout])
+    #[allow(dead_code)]
     timeout_error: bool1,
     /// Should be odd parity, set to `true` if even parity received
+    #[allow(dead_code)]
     parity_error: bool1,
 }
 
 /// Read the PS/2 status port/register
 /// Note: Currently unused, might be used later for error checking
+#[allow(dead_code)]
 fn status_register() -> ControllerToHostStatus {
     ControllerToHostStatus::from_bytes([PS2_COMMAND_AND_STATUS_PORT.lock().read()])
 }
@@ -123,11 +132,15 @@ pub struct ControllerConfigurationByte {
     port1_interrupt_enabled: bool1,
     port2_interrupt_enabled: bool1, //NOTE: only if 2 PS/2 ports supported
     /// Cleared on reset; set when the system passed Power-on self-test
+    #[allow(dead_code)]
     system_passed_self_test: bool1,
+    #[allow(dead_code)]
     should_be_zero: u1,
     port1_clock_disabled: bool1,
     port2_clock_disabled: bool1, //NOTE: only if 2 PS/2 ports supported
+    #[allow(dead_code)]
     port1_translation: bool1,
+    #[allow(dead_code)]
     must_be_zero: u1,
 }
 
@@ -420,6 +433,7 @@ fn command_to_mouse(value: HostToMouseCommandOrData) -> Result<(), &'static str>
 }
 
 /// write data to the second ps2 output buffer
+#[allow(dead_code)]
 fn write_to_second_output_buffer(value: u8) {
     write_command(WriteByteToPort2OutputBuffer);
     write_data(value);
@@ -452,7 +466,9 @@ pub struct MousePacketBits4 {
     z_movement: B4, //u8 with #[bits = 4] attribute didn't work
     pub button_4: bool1,
     pub button_5: bool1,
+    #[allow(dead_code)]
     zero1: u1,
+    #[allow(dead_code)]
     zero2: u1,
 }
 
@@ -562,6 +578,7 @@ pub fn mouse_id() -> Result<u8, &'static str> {
 }
 
 /// reset the mouse
+#[allow(dead_code)]
 fn reset_mouse() -> Result<(), &'static str> {
     command_to_mouse(HostToMouseCommandOrData::MouseCommand(Reset))?; 
     for _ in 0..14 {
@@ -576,6 +593,7 @@ fn reset_mouse() -> Result<(), &'static str> {
 }
 
 /// resend the most recent packet again
+#[allow(dead_code)]
 fn mouse_resend() -> Result<(), &'static str> {
     command_to_mouse(HostToMouseCommandOrData::MouseCommand(HostToMouseCommand::ResendByte))
         .map_err(|_| "mouse resend request failed, please request again")
@@ -606,6 +624,7 @@ pub enum MouseResolution {
 }
 
 /// set the resolution of the mouse
+#[allow(dead_code)]
 fn mouse_resolution(value: MouseResolution) -> Result<(), &'static str> {
     command_to_mouse(HostToMouseCommandOrData::MouseCommand(SetResolution))
         .and(command_to_mouse(HostToMouseCommandOrData::MouseResolution(value)))
