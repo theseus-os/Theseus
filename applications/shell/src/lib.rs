@@ -684,8 +684,8 @@ impl Shell {
         let cmdline = self.cmdline.trim().to_string();
         let mut task_refs = Vec::new();
 
-        // If the command line is empty or starts with `|`, return 'AppErr'
-        if cmdline.is_empty() || cmdline.starts_with("|") {
+        // If the command line is empty or starts with '|', return 'AppErr'
+        if cmdline.is_empty() || cmdline.starts_with('|') {
             return Err(AppErr::NotFound(cmdline))
         }
 
