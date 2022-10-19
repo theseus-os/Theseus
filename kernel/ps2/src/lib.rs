@@ -302,6 +302,7 @@ fn data_to_port2(value: u8) -> Result<DeviceToHostResponse, &'static str> {
 }
 
 // https://wiki.osdev.org/PS/2_Keyboard#Commands
+#[derive(Clone)]
 pub enum HostToKeyboardCommandOrData {
     KeyboardCommand(HostToKeyboardCommand),
     LEDState(LEDState),
@@ -309,6 +310,7 @@ pub enum HostToKeyboardCommandOrData {
     //TODO: Typematic, Scancode
 }
 
+#[derive(Clone)]
 pub enum HostToKeyboardCommand {
     SetLEDStatus = 0xED,
     ///// for diagnostic purposes and useful for device removal detection
@@ -340,12 +342,14 @@ pub enum HostToKeyboardCommand {
 }
 
 #[bitfield(bits = 3)]
+#[derive(Clone)]
 pub struct LEDState {
     pub scroll_lock: bool,
     pub number_lock: bool,
     pub caps_lock: bool,
 }
 
+#[derive(Clone)]
 pub enum ScancodeSet {
     GetCurrentSet = 0,
     Set1 = 1,
@@ -355,38 +359,31 @@ pub enum ScancodeSet {
 
 /// write command to the keyboard and return the result
 fn command_to_keyboard(value: HostToKeyboardCommandOrData) -> Result<(), &'static str> {
-    let response = match value {
-        HostToKeyboardCommandOrData::KeyboardCommand(c) => data_to_port1(c as u8),
-        HostToKeyboardCommandOrData::LEDState(l) => data_to_port1(l.into_bytes()[0]),
-        HostToKeyboardCommandOrData::ScancodeSet(s) => data_to_port1(s as u8),
-    };
+    for _ in 0..3 {
+        let response = match value.clone() {
+            HostToKeyboardCommandOrData::KeyboardCommand(c) => data_to_port1(c as u8),
+            HostToKeyboardCommandOrData::LEDState(l) => data_to_port1(l.into_bytes()[0]),
+            HostToKeyboardCommandOrData::ScancodeSet(s) => data_to_port1(s as u8),
+        };
 
-    match response {
-        Ok(Acknowledge) => Ok(()),
-        Ok(ResendCommand) => Err("Fail to send the command to the keyboard"),
-        _ => {
-            for _ in 0..14 {
-                // wait for response
-                let response = read_data().try_into();
-                match response {
-                    Ok(Acknowledge) => return Ok(()),
-                    Ok(ResendCommand) => return Err("Please resend the command to the keyboard"),
-                    _ => (),
-                }
-            }
-            Err("command is not acknowledged")
+        match response {
+            Ok(Acknowledge) => return Ok(()),
+            Ok(ResendCommand) => continue,
+            _ => continue,
         }
     }
+    Err("keyboard doesn't support the command or there has been a hardware failure")
 }
 
+#[derive(Clone)]
 pub enum HostToMouseCommandOrData {
     MouseCommand(HostToMouseCommand),
     SampleRate(SampleRate),
     MouseResolution(MouseResolution),
 }
 
-
 // https://wiki.osdev.org/PS/2_Mouse#Mouse_Device_Over_PS.2F2
+#[derive(Clone)]
 pub enum HostToMouseCommand {
     SetScaling = 0xE6, //1 or 2
     SetResolution = 0xE8, //[MouseResolution]
@@ -407,28 +404,19 @@ pub enum HostToMouseCommand {
 
 /// write command to the mouse and return the result
 fn command_to_mouse(value: HostToMouseCommandOrData) -> Result<(), &'static str> {
-    let response = match value {
-        HostToMouseCommandOrData::MouseCommand(c) => data_to_port2(c as u8),
-        HostToMouseCommandOrData::MouseResolution(r) => data_to_port2(r as u8),
-        HostToMouseCommandOrData::SampleRate(s) => data_to_port2(s as u8),
-    };
+    for _ in 0..3 {
+        let response = match value.clone() {
+            HostToMouseCommandOrData::MouseCommand(c) => data_to_port2(c as u8),
+            HostToMouseCommandOrData::MouseResolution(r) => data_to_port2(r as u8),
+            HostToMouseCommandOrData::SampleRate(s) => data_to_port2(s as u8),
+        };
 
-    match response {
-        Ok(Acknowledge) => Ok(()),
-        _ => {
-            for _x in 0..14 {
-                // wait for response
-                let response = read_data().try_into();
-                #[allow(clippy::single_match)]
-                match response {
-                    Ok(Acknowledge) => return Ok(()),
-                    _ => (), //no Ok(Resend) check for mouse
-                }
-            }
-            warn!("mouse command to second port is not accepted");
-            Err("mouse command is not responded!!!")
+        match response {
+            Ok(Acknowledge) => return Ok(()),
+            _ => continue,
         }
     }
+    Err("mouse doesn't support the command or there has been a hardware failure")
 }
 
 /// write data to the second ps2 output buffer
@@ -512,6 +500,7 @@ pub fn read_mouse_packet() -> MousePacketBits4 {
     ])
 }
 
+#[derive(Clone)]
 pub enum SampleRate {
     _10 = 10,
     _20 = 20,
@@ -541,7 +530,7 @@ pub enum MouseId {
 pub fn set_mouse_id(id: MouseId) -> Result<(), &'static str> {
     disable_mouse_packet_streaming().map_err(|_| "failed to disable mouse streaming")?;
 
-    use SampleRate::*;
+    use crate::SampleRate::*;
     match id {
         MouseId::Three => {
             for rate in [_200, _100, _80] {
@@ -608,6 +597,7 @@ fn disable_mouse_packet_streaming() -> Result<(), &'static str> {
     })
 }
 
+#[derive(Clone)]
 pub enum MouseResolution {
     Count1PerMm = 0,
     Count2PerMm = 1,
