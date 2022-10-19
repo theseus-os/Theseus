@@ -16,9 +16,10 @@ pub mod table;
 
 
 pub use page_table_entry::PageTableEntry;
-pub use self::temporary_page::TemporaryPage;
-pub use self::mapper::Mapper;
-pub use self::mapper::MappedPages;
+pub use self::{
+    temporary_page::TemporaryPage,
+    mapper::{Mapper, MappedPages},
+};
 
 use core::{
     ops::{Deref, DerefMut},
