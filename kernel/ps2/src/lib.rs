@@ -114,14 +114,49 @@ fn status_register() -> ControllerToHostStatus {
     ControllerToHostStatus::from_bytes([PS2_COMMAND_AND_STATUS_PORT.lock().read()])
 }
 
-/// Read data from the PS/2 data port
+/// Read data from the PS/2 data port.
+/// This is the lowest level interface to the port.
 fn read_data() -> u8 {
     PS2_DATA_PORT.lock().read()
 }
 
-/// Write data to the PS/2 data port
-fn write_data(value: u8) {
-    unsafe { PS2_DATA_PORT.lock().write(value) };
+/// All types of data writable to the [PS2_DATA_PORT].
+enum WritableData {
+    Configuration(ControllerConfigurationByte),
+    HostToDevice(HostToDevice)
+}
+
+// NOTE: could also use a macro / reminds me of serde
+impl From<WritableData> for u8 {
+    fn from(value: WritableData) -> Self {
+        match value {
+            WritableData::Configuration(value) => value.into_bytes()[0],
+            WritableData::HostToDevice(value) => {
+                match value {
+                    HostToDevice::Keyboard(value) => {
+                        match value {
+                            HostToKeyboardCommandOrData::KeyboardCommand(c) => c as u8,
+                            HostToKeyboardCommandOrData::LEDState(l) => l.into_bytes()[0],
+                            HostToKeyboardCommandOrData::ScancodeSet(s) => s as u8,
+                        }
+                    }
+                    HostToDevice::Mouse(value) => {
+                        match value {
+                            HostToMouseCommandOrData::MouseCommand(c) => c as u8,
+                            HostToMouseCommandOrData::MouseResolution(r) => r as u8,
+                            HostToMouseCommandOrData::SampleRate(s) => s as u8,
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Write data to the PS/2 data port.
+/// This is the lowest level interface to the port.
+fn write_data(value: WritableData) {
+    unsafe { PS2_DATA_PORT.lock().write(value.into()) };
 }
 
 // wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Configuration_Byte
@@ -153,7 +188,7 @@ fn read_config() -> ControllerConfigurationByte {
 /// write the new config to the ps2 command port (0x64)
 fn write_config(value: ControllerConfigurationByte) {
     write_command(WriteToInternalRAMByte0);
-    write_data(value.into_bytes()[0]);
+    write_data(WritableData::Configuration(value));
 }
 
 /// initialize the first ps2 data port
@@ -302,16 +337,15 @@ pub enum DeviceToHostResponse {
     KeyDetectionErrorOrInternalBufferOverrun2 = 0xFF,
 }
 
-/// write data to the first ps2 data port and return the response
-fn data_to_port1(value: u8) -> Result<DeviceToHostResponse, &'static str> {
-    write_data(value);
-    read_data().try_into().map_err(|_| "data_to_port1 response conversion failed")
+/// write data to the data port and return the response
+fn send(value: HostToDevice) -> Result<DeviceToHostResponse, &'static str> {
+    write_data(WritableData::HostToDevice(value));
+    read_data().try_into().map_err(|_| "send response could not be parsed")
 }
 
-/// write data to the second ps2 data port and return the response
-fn data_to_port2(value: u8) -> Result<DeviceToHostResponse, &'static str> {
-    write_command(WriteByteToPort2InputBuffer);
-    data_to_port1(value)
+enum HostToDevice {
+    Keyboard(HostToKeyboardCommandOrData),
+    Mouse(HostToMouseCommandOrData)
 }
 
 // https://wiki.osdev.org/PS/2_Keyboard#Commands
@@ -373,11 +407,7 @@ pub enum ScancodeSet {
 /// write command to the keyboard and return the result
 fn command_to_keyboard(value: HostToKeyboardCommandOrData) -> Result<(), &'static str> {
     for _ in 0..3 {
-        let response = match value.clone() {
-            HostToKeyboardCommandOrData::KeyboardCommand(c) => data_to_port1(c as u8),
-            HostToKeyboardCommandOrData::LEDState(l) => data_to_port1(l.into_bytes()[0]),
-            HostToKeyboardCommandOrData::ScancodeSet(s) => data_to_port1(s as u8),
-        };
+        let response = send(HostToDevice::Keyboard(value.clone()));
 
         match response {
             Ok(Acknowledge) => return Ok(()),
@@ -418,11 +448,8 @@ pub enum HostToMouseCommand {
 /// write command to the mouse and return the result
 fn command_to_mouse(value: HostToMouseCommandOrData) -> Result<(), &'static str> {
     for _ in 0..3 {
-        let response = match value.clone() {
-            HostToMouseCommandOrData::MouseCommand(c) => data_to_port2(c as u8),
-            HostToMouseCommandOrData::MouseResolution(r) => data_to_port2(r as u8),
-            HostToMouseCommandOrData::SampleRate(s) => data_to_port2(s as u8),
-        };
+        write_command(WriteByteToPort2InputBuffer);
+        let response = send(HostToDevice::Mouse(value.clone()));
 
         match response {
             Ok(Acknowledge) => return Ok(()),
@@ -430,13 +457,6 @@ fn command_to_mouse(value: HostToMouseCommandOrData) -> Result<(), &'static str>
         }
     }
     Err("mouse doesn't support the command or there has been a hardware failure")
-}
-
-/// write data to the second ps2 output buffer
-#[allow(dead_code)]
-fn write_to_second_output_buffer(value: u8) {
-    write_command(WriteByteToPort2OutputBuffer);
-    write_data(value);
 }
 
 //TODO: different MousePacketBits for different MouseId?
