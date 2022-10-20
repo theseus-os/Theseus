@@ -104,7 +104,6 @@ dependencies = [
  "log",
  "memory",
  "msr",
- "owning_ref",
  "pit_clock_basic",
  "raw-cpuid",
  "spin 0.9.0",
@@ -1026,7 +1025,6 @@ dependencies = [
  "log",
  "memory",
  "multicore_bringup",
- "owning_ref",
  "shapes",
  "zerocopy",
 ]
@@ -1196,7 +1194,6 @@ dependencies = [
  "kernel_config",
  "log",
  "memory",
- "owning_ref",
  "sdt",
  "spin 0.9.0",
  "volatile 0.2.7",
@@ -2599,7 +2596,6 @@ name = "rsdp"
 version = "0.1.0"
 dependencies = [
  "memory",
- "owning_ref",
  "zerocopy",
 ]
 

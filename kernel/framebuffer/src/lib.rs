@@ -7,17 +7,14 @@
 extern crate alloc;
 extern crate memory;
 extern crate multicore_bringup;
-extern crate owning_ref;
 extern crate shapes;
 extern crate color;
 extern crate zerocopy;
 
 pub mod pixel;
-use alloc::boxed::Box;
-use core::ops::DerefMut;
+use core::{ops::{DerefMut, Deref}, hash::{Hash, Hasher}};
 
-use memory::{EntryFlags, MappedPages, PhysicalAddress};
-use owning_ref::BoxRefMut;
+use memory::{EntryFlags, PhysicalAddress, Mutable, BorrowedSliceMappedPages};
 use shapes::Coord;
 pub use pixel::*;
 
@@ -49,12 +46,18 @@ pub fn init<P: Pixel>() -> Result<Framebuffer<P>, &'static str> {
 
 /// A framebuffer is a region of memory interpreted as a 2-D array of pixels.
 /// The memory buffer is a rectangular region with a width and height.
-#[derive(Hash)]
 pub struct Framebuffer<P: Pixel> {
     width: usize,
     height: usize,
-    buffer: BoxRefMut<MappedPages, [P]>,
+    buffer: BorrowedSliceMappedPages<P, Mutable>,
 } 
+impl<P: Pixel> Hash for Framebuffer<P> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.width.hash(state);
+        self.height.hash(state);
+        self.buffer.deref().hash(state);
+    }
+}
 
 impl<P: Pixel> Framebuffer<P> {
     /// Creates a new framebuffer with rectangular dimensions of `width * height`, 
@@ -93,23 +96,26 @@ impl<P: Pixel> Framebuffer<P> {
         };
 
         // obtain a slice reference to the framebuffer's memory
-        let buffer = BoxRefMut::new(Box::new(mapped_framebuffer))
-            .try_map_mut(|mp| mp.as_slice_mut(0, width * height))?;
+        let buffer = BorrowedSliceMappedPages::try_into_borrowed_slice_mut(
+            mapped_framebuffer,
+            0,
+            width * height,
+        ).map_err(|(|_mp, s)| s)?;
 
         Ok(Framebuffer {
-            width: width,
-            height: height,
-            buffer: buffer,
+            width,
+            height,
+            buffer,
         })
     }
 
-    /// Returns a mutable reference to the mapped memory of the buffer.
-    pub fn buffer_mut(&mut self) -> &mut BoxRefMut<MappedPages, [P]> {
+    /// Returns a mutable reference to this framebuffer's memory as a slice of pixels.
+    pub fn buffer_mut(&mut self) -> &mut [P] {
         &mut self.buffer
     }
 
-    /// Returns a reference to the mapped memory of the buffer
-    pub fn buffer(&self) -> &BoxRefMut<MappedPages, [P]> {
+    /// Returns a reference to this framebuffer's memory as a slice of pixels.
+    pub fn buffer(&self) -> &[P] {
         &self.buffer
     }
 

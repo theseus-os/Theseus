@@ -2,15 +2,11 @@
 
 #![no_std]
 
-extern crate alloc;
 extern crate memory;
-extern crate owning_ref;
 extern crate zerocopy;
 
 use core::mem;
-use memory::{PageTable, MappedPages, PhysicalAddress, allocate_pages_by_bytes, allocate_frames_by_bytes_at, EntryFlags};
-use owning_ref::BoxRef;
-use alloc::boxed::Box;
+use memory::{PageTable, MappedPages, PhysicalAddress, allocate_pages_by_bytes, allocate_frames_by_bytes_at, EntryFlags, BorrowedMappedPages};
 use zerocopy::FromBytes;
 
 /// The starting physical address of the region of memory where the RSDP table exists.
@@ -44,7 +40,7 @@ pub struct Rsdp {
 impl Rsdp {
     /// Search for the RSDP in the BIOS memory area from 0xE_0000 to 0xF_FFFF.
     /// Returns the RSDP structure and the pages that are currently mapping it.
-    pub fn get_rsdp(page_table: &mut PageTable) -> Result<BoxRef<MappedPages, Rsdp>, &'static str> {
+    pub fn get_rsdp(page_table: &mut PageTable) -> Result<BorrowedMappedPages<Rsdp>, &'static str> {
         let size: usize = RSDP_SEARCH_END - RSDP_SEARCH_START;
         let pages = allocate_pages_by_bytes(size).ok_or("couldn't allocate pages")?;
         let frames_to_search = allocate_frames_by_bytes_at(PhysicalAddress::new_canonical(RSDP_SEARCH_START), size)
@@ -54,7 +50,7 @@ impl Rsdp {
     }
 
     /// Searches a region of memory for the RSDP, which is identified by the "RSD PTR " signature.
-    fn search(region: MappedPages) -> Result<BoxRef<MappedPages, Rsdp>, &'static str> {
+    fn search(region: MappedPages) -> Result<BorrowedMappedPages<Rsdp>, &'static str> {
         let size = region.size_in_bytes() - mem::size_of::<Rsdp>();
         let signature_length = mem::size_of_val(RSDP_SIGNATURE);
         let mut found_offset: Option<usize> = None;
@@ -70,7 +66,9 @@ impl Rsdp {
 
         found_offset
             .ok_or("couldn't find RSDP signature in BIOS memory")
-            .and_then(|offset| BoxRef::new(Box::new(region)).try_map(|mp| mp.as_type::<Rsdp>(offset)))
+            .and_then(|offset| BorrowedMappedPages::try_into_borrowed(region, offset)
+                .map_err(|(_mp, err)| err)
+            )
     }
 
     /// Returns the `PhysicalAddress` of the RSDT or XSDT.
