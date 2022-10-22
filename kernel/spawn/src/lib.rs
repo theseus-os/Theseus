@@ -356,9 +356,9 @@ impl<F, A, R> TaskBuilder<F, A, R>
 
         // The new task is ready to be scheduled in, now that its stack trampoline has been set up.
         if self.blocked {
-            new_task.block().unwrap();
+            new_task.block_initing_task().unwrap();
         } else {
-            new_task.unblock().unwrap();
+            new_task.unblock_initing_task().unwrap();
         }
 
         // The new task is marked as idle

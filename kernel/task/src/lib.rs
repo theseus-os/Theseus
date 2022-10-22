@@ -679,57 +679,59 @@ impl Task {
 
     /// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].
     ///
-    /// Returns the previous runstate. Trying to block an exited or reaped task
-    /// will return an error.
-    pub fn block(&self) -> Result<RunState, ()> {
-        if self
-            .runstate
-            .compare_exchange(RunState::Initing, RunState::Blocked)
-            .is_ok()
-        {
-            Ok(RunState::Initing)
-        } else if self
-            .runstate
-            .compare_exchange(RunState::Runnable, RunState::Blocked)
-            .is_ok()
-        {
-            Ok(RunState::Runnable)
-        } else if self
-            .runstate
-            .compare_exchange(RunState::Blocked, RunState::Blocked)
-            .is_ok()
-        {
-            Ok(RunState::Blocked)
+    /// Returns the previous runstate on success, and the current runstate on
+    /// error. Will only suceed if the task is runnable or already blocked.
+    pub fn block(&self) -> Result<RunState, RunState> {
+        use RunState::{Blocked, Runnable};
+
+        if self.runstate.compare_exchange(Runnable, Blocked).is_ok() {
+            Ok(Runnable)
+        } else if self.runstate.compare_exchange(Blocked, Blocked).is_ok() {
+            warn!("Task::block(): blocked an already blocked task");
+            Ok(Blocked)
         } else {
-            Err(())
+            Err(self.runstate.load())
+        }
+    }
+
+    /// Blocks this `Task` if it is currently in the initialisation run state.
+    ///
+    /// Returns the previous runstate (i.e. `RunState::Initing`) on success, and
+    /// the current runstate on error.
+    pub fn block_initing_task(&self) -> Result<RunState, RunState> {
+        if self.runstate.compare_exchange(RunState::Initing, RunState::Blocked).is_ok() {
+            Ok(RunState::Initing)
+        } else {
+            Err(self.runstate.load())
         }
     }
 
     /// Unblocks this `Task` by setting its runstate to [`RunState::Runnable`].
     ///
-    /// Returns the previous runstate. Trying to unblock an exited or reaped
-    /// task will return an error.
-    pub fn unblock(&self) -> Result<RunState, ()> {
-        if self
-            .runstate
-            .compare_exchange(RunState::Initing, RunState::Runnable)
-            .is_ok()
-        {
-            Ok(RunState::Initing)
-        } else if self
-            .runstate
-            .compare_exchange(RunState::Runnable, RunState::Runnable)
-            .is_ok()
-        {
-            Ok(RunState::Runnable)
-        } else if self
-            .runstate
-            .compare_exchange(RunState::Blocked, RunState::Runnable)
-            .is_ok()
-        {
-            Ok(RunState::Blocked)
+    /// Returns the previous runstate on success, and the current runstate on
+    /// error. Will only succed if the task is blocked or already runnable.
+    pub fn unblock(&self) -> Result<RunState, RunState> {
+        use RunState::{Blocked, Runnable};
+
+        if self.runstate.compare_exchange(Blocked, Runnable).is_ok() {
+            Ok(Blocked)
+        } else if self.runstate.compare_exchange(Runnable, Runnable).is_ok() {
+            warn!("Task::unblock(): unblocked an already unblocked task");
+            Ok(Runnable)
         } else {
-            Err(())
+            Err(self.runstate.load())
+        }
+    }
+
+    /// Unblocks this `Task` if it is currently in the initialisation run state.
+    ///
+    /// Returns the previous runstate (i.e. `RunState::Initing`) on success, and
+    /// the current runstate on error.
+    pub fn unblock_initing_task(&self) -> Result<RunState, RunState> {
+        if self.runstate.compare_exchange(RunState::Initing, RunState::Runnable).is_ok() {
+            Ok(RunState::Initing)
+        } else {
+            Err(self.runstate.load())
         }
     }
 
