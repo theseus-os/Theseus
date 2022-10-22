@@ -10,8 +10,8 @@ authors = ["Andrew Pham <apham727@gmail.com>"]
 version = "0.4.8"
 
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"
 
 [dependencies.memfs]
 path = "../../kernel/memfs"

@@ -10,8 +10,8 @@ backtrace = { path = "../../ports/backtrace", default-features = false }
 version = "0.4.8"
 
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"
 
 [dependencies.task]
 path = "../../kernel/task"

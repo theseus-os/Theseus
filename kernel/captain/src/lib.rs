@@ -38,7 +38,7 @@ extern crate acpi;
 extern crate device_manager;
 extern crate e1000;
 extern crate scheduler;
-#[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
+#[cfg(mirror_log_to_vga)] #[macro_use] extern crate app_io;
 extern crate first_application;
 extern crate exceptions_full;
 extern crate network_manager;

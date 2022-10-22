@@ -4,7 +4,7 @@
 #![no_std]
 
 #[macro_use] extern crate log;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 extern crate getopts;
 extern crate alloc;
 extern crate spawn;

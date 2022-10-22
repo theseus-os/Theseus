@@ -7,7 +7,7 @@
 #![feature(drain_filter)]
 
 #[macro_use] extern crate vga_buffer; // for println_raw!()
-#[macro_use] extern crate print; // for regular println!()
+#[macro_use] extern crate app_io; // for regular println!()
 #[macro_use] extern crate log;
 extern crate alloc;
 extern crate memory;

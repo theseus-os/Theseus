@@ -25,5 +25,5 @@ path = "../../kernel/spawn"
 [dependencies.wait_condition]
 path = "../../kernel/wait_condition"
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"

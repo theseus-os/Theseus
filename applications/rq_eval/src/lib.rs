@@ -20,7 +20,7 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 extern crate task;
 extern crate apic;
 extern crate spawn;

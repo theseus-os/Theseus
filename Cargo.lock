@@ -260,6 +260,7 @@ name = "bm"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "app_io",
  "async_channel",
  "fs_node",
  "getopts",
@@ -277,7 +278,6 @@ dependencies = [
  "simple_ipc",
  "spawn",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -305,6 +305,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "apic",
+ "app_io",
  "console",
  "device_manager",
  "dfqueue",
@@ -322,7 +323,6 @@ dependencies = [
  "multiple_heaps",
  "network_manager",
  "ota_update_client",
- "print",
  "scheduler",
  "simd_personality",
  "spawn",
@@ -365,6 +365,7 @@ checksum = "79c2681d6594606957bbb8631c4b90a7fcaaa72cdb714743a437b156d6a7eedd"
 name = "cd"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "environment",
  "fs_node",
  "getopts",
@@ -372,7 +373,6 @@ dependencies = [
  "path",
  "root",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -392,11 +392,11 @@ name = "channel_eval"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "app_io",
  "getopts",
  "log",
  "spawn",
  "task",
- "terminal_print",
  "unified_channel",
 ]
 
@@ -533,10 +533,10 @@ name = "cpu"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "app_io",
  "getopts",
  "runqueue",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -646,8 +646,8 @@ checksum = "7313c0d620d0cb4dbd9d019e461a4beb501071ff46ec0ab933efb4daa76d73e3"
 name = "date"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "rtc",
- "terminal_print",
 ]
 
 [[package]]
@@ -701,6 +701,7 @@ dependencies = [
 name = "deps"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "crate_name_utils",
  "getopts",
  "itertools",
@@ -709,7 +710,6 @@ dependencies = [
  "mod_mgmt",
  "spin 0.9.0",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -908,13 +908,13 @@ name = "exceptions_full"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "app_io",
  "debug_info",
  "fault_log",
  "locked_idt",
  "log",
  "memory",
  "pmu_x86",
- "print",
  "runqueue",
  "signal_handler",
  "stack_trace",
@@ -979,10 +979,10 @@ name = "fault_log"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "app_io",
  "irq_safety",
  "log",
  "memory",
- "print",
  "task",
  "vga_buffer",
 ]
@@ -1164,6 +1164,7 @@ name = "heap_eval"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "app_io",
  "getopts",
  "hashbrown 0.11.2",
  "heap",
@@ -1173,7 +1174,6 @@ dependencies = [
  "qp-trie",
  "runqueue",
  "spawn",
- "terminal_print",
 ]
 
 [[package]]
@@ -1192,8 +1192,8 @@ dependencies = [
 name = "hello"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "log",
- "terminal_print",
 ]
 
 [[package]]
@@ -1440,11 +1440,11 @@ dependencies = [
 name = "kill"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "debugit",
  "getopts",
  "runqueue",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -1498,7 +1498,6 @@ dependencies = [
  "framebuffer_drawer",
  "framebuffer_printer",
  "log",
- "print",
  "root",
  "shapes",
  "text_display",
@@ -1595,12 +1594,12 @@ dependencies = [
 name = "ls"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "fs_node",
  "getopts",
  "log",
  "path",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -1772,10 +1771,10 @@ dependencies = [
 name = "mkdir"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "fs_node",
  "getopts",
  "task",
- "terminal_print",
  "vfs_node",
 ]
 
@@ -1824,6 +1823,7 @@ name = "mm_eval"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "app_io",
  "cfg-if 0.1.10",
  "getopts",
  "hpet",
@@ -1835,7 +1835,6 @@ dependencies = [
  "memory",
  "memory_structs",
  "runqueue",
- "terminal_print",
  "tsc",
 ]
 
@@ -2095,13 +2094,13 @@ dependencies = [
 name = "ns"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "fs_node",
  "getopts",
  "memory",
  "mod_mgmt",
  "path",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -2316,6 +2315,7 @@ dependencies = [
 name = "ping"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "byteorder",
  "getopts",
  "hashbrown 0.11.2",
@@ -2325,7 +2325,6 @@ dependencies = [
  "ota_update_client",
  "smoltcp",
  "smoltcp_helper",
- "terminal_print",
  "upd",
 ]
 
@@ -2359,9 +2358,9 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 name = "pmu_sample_start"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "getopts",
  "pmu_x86",
- "print",
  "spawn",
 ]
 
@@ -2369,9 +2368,9 @@ dependencies = [
 name = "pmu_sample_stop"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "getopts",
  "pmu_x86",
- "print",
 ]
 
 [[package]]
@@ -2413,16 +2412,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "print"
-version = "0.1.0"
-dependencies = [
- "dfqueue",
- "event_types",
- "log",
- "spin 0.9.0",
-]
-
-[[package]]
 name = "print_fault_log"
 version = "0.1.0"
 dependencies = [
@@ -2442,10 +2431,10 @@ dependencies = [
 name = "ps"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "getopts",
  "scheduler",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -2470,9 +2459,9 @@ dependencies = [
 name = "pwd"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "getopts",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -2592,13 +2581,13 @@ dependencies = [
 name = "rm"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "fs_node",
  "getopts",
  "log",
  "path",
  "root",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -2616,6 +2605,7 @@ name = "rq_eval"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "app_io",
  "getopts",
  "hpet",
  "libtest",
@@ -2623,7 +2613,6 @@ dependencies = [
  "runqueue",
  "spawn",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -3162,6 +3151,7 @@ version = "0.1.0"
 name = "swap"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "crate_swap",
  "fs_node",
  "getopts",
@@ -3171,7 +3161,6 @@ dependencies = [
  "mod_mgmt",
  "path",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -3240,37 +3229,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "terminal_print"
-version = "0.1.0"
-dependencies = [
- "dfqueue",
- "event_types",
- "logger",
- "spin 0.9.0",
- "task",
-]
-
-[[package]]
 name = "test_backtrace"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "backtrace",
  "log",
  "task",
- "terminal_print",
 ]
 
 [[package]]
 name = "test_block_io"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "ata",
  "core2",
  "io",
  "log",
  "storage_manager",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -3278,6 +3256,7 @@ name = "test_channel"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "app_io",
  "async_channel",
  "getopts",
  "log",
@@ -3286,7 +3265,6 @@ dependencies = [
  "spawn",
  "spin 0.9.0",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -3294,6 +3272,7 @@ name = "test_downtime"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "app_io",
  "async_channel",
  "color",
  "framebuffer",
@@ -3308,7 +3287,6 @@ dependencies = [
  "spawn",
  "spin 0.9.0",
  "task",
- "terminal_print",
  "unified_channel",
  "window",
 ]
@@ -3317,23 +3295,23 @@ dependencies = [
 name = "test_filerw"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "log",
  "memfs",
  "memory",
  "root",
- "terminal_print",
 ]
 
 [[package]]
 name = "test_ixgbe"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "getopts",
  "ixgbe",
  "log",
  "network_interface_card",
  "spawn",
- "terminal_print",
 ]
 
 [[package]]
@@ -3348,10 +3326,10 @@ dependencies = [
 name = "test_mlx5"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "ixgbe",
  "log",
  "mlx5",
- "terminal_print",
 ]
 
 [[package]]
@@ -3370,53 +3348,53 @@ dependencies = [
 name = "test_panic"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "log",
  "task",
- "terminal_print",
 ]
 
 [[package]]
 name = "test_realtime"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "log",
  "scheduler",
  "sleep",
  "spawn",
- "terminal_print",
 ]
 
 [[package]]
 name = "test_restartable"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "getopts",
  "log",
  "spawn",
  "spin 0.9.0",
- "terminal_print",
 ]
 
 [[package]]
 name = "test_serial_echo"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "core2",
  "io",
  "irq_safety",
  "log",
  "serial_port",
  "task",
- "terminal_print",
 ]
 
 [[package]]
 name = "test_std_fs"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "core2",
  "log",
- "terminal_print",
  "theseus_std",
 ]
 
@@ -3434,12 +3412,12 @@ name = "test_wait_queue"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "app_io",
  "log",
  "scheduler",
  "spawn",
  "spin 0.9.0",
  "task",
- "terminal_print",
  "wait_condition",
 ]
 
@@ -3448,11 +3426,11 @@ name = "test_wasmtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "app_io",
  "getopts",
  "log",
  "path",
  "task",
- "terminal_print",
  "wasmtime",
 ]
 
@@ -3603,8 +3581,8 @@ dependencies = [
 name = "tls_test"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "log",
- "terminal_print",
  "test_thread_local",
  "thread_local_macro",
 ]
@@ -3698,16 +3676,17 @@ dependencies = [
 name = "unwind_test"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "catch_unwind",
  "log",
  "task",
- "terminal_print",
 ]
 
 [[package]]
 name = "upd"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "crate_swap",
  "fs_node",
  "getopts",
@@ -3721,7 +3700,6 @@ dependencies = [
  "smoltcp",
  "spin 0.9.0",
  "task",
- "terminal_print",
  "vfs_node",
 ]
 

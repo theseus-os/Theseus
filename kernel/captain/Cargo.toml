@@ -73,8 +73,8 @@ path = "../scheduler"
 [dependencies.console]
 path = "../console"
 
-[dependencies.print]
-path = "../print"
+[dependencies.app_io]
+path = "../app_io"
 
 [dependencies.network_manager]
 path = "../network_manager"

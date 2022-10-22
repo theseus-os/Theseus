@@ -66,11 +66,11 @@ pub fn init(idt_ref: &'static LockedIdt) {
 macro_rules! println_both {
     ($fmt:expr) => {
         vga_buffer::print_raw!(concat!($fmt, "\n"));
-        print::print!(concat!($fmt, "\n"));
+        app_io::print!(concat!($fmt, "\n"));
     };
     ($fmt:expr, $($arg:tt)*) => {
         vga_buffer::print_raw!(concat!($fmt, "\n"), $($arg)*);
-        print::print!(concat!($fmt, "\n"), $($arg)*);
+        app_io::print!(concat!($fmt, "\n"), $($arg)*);
     };
 }
 

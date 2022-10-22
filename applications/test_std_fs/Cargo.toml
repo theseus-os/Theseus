@@ -10,5 +10,5 @@ core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nig
 [dependencies.theseus_std]
 path = "../../ports/theseus_std"
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"
