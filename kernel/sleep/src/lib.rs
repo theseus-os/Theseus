@@ -88,7 +88,7 @@ fn add_to_delayed_tasklist(new_node: SleepingTaskNode) {
 fn remove_next_task_from_delayed_tasklist() {
     let mut delayed_tasklist = DELAYED_TASKLIST.lock();
     if let Some(SleepingTaskNode { taskref, .. }) = delayed_tasklist.pop() {
-        let _ = taskref.unblock();
+        taskref.unblock().expect("failed to unblock sleeping task");
 
         match delayed_tasklist.peek() {
             Some(SleepingTaskNode { resume_time, .. }) => 
