@@ -9,7 +9,8 @@ mod wrapper;
 
 pub use error::{Error, Result};
 
-use alloc::{borrow::ToOwned, format, string::String, sync::Arc, vec::Vec};
+use crate::job::{JobPart, State};
+use alloc::{borrow::ToOwned, format, string::String, sync::Arc, vec, vec::Vec};
 use app_io::println;
 use core::fmt::Write;
 use hashbrown::HashMap;
@@ -72,7 +73,6 @@ impl Shell {
     fn _run(&mut self) -> Result<()> {
         self.set_shell_discipline();
 
-        // TODO: Ideally don't clone
         let wrapper = wrapper::Wrapper {
             stdin: app_io::stdin().unwrap(),
             stdout: app_io::stdout().unwrap(),
@@ -126,11 +126,16 @@ impl Shell {
 
         match result {
             Ok(()) => Ok(()),
-            Err(e) if e.is_fatal() => Err(e),
-            Err(e) => {
-                println!("exit {}", e.exit_code());
+            Err(Error::ExitRequested) | Err(Error::CurrentTaskUnavailable) => result,
+            Err(Error::Command(exit_code)) => {
+                println!("exit {}", exit_code);
                 Ok(())
             }
+            Err(Error::CommandNotFound(command)) => {
+                println!("{}: command not found", command);
+                Ok(())
+            }
+            _ => Ok(()),
         }
     }
 
@@ -159,6 +164,7 @@ impl Shell {
                 return match event {
                     Event::CtrlC => {
                         job.kill();
+                        self.jobs.remove(&num).unwrap();
                         Err(Error::Command(130))
                     }
                     Event::CtrlD => todo!(),
@@ -168,6 +174,7 @@ impl Shell {
                     }
                 };
             } else if let Some(exit_value) = job.update() {
+                self.jobs.remove(&num).unwrap();
                 return match exit_value {
                     0 => Ok(()),
                     _ => Err(Error::Command(exit_value)),
@@ -177,25 +184,19 @@ impl Shell {
     }
 
     fn resolve_external(&self, cmd: &str, args: Vec<&str>) -> Result<Job> {
-        // FIXME: Console spawns the shell in kernel namespace
         let namespace_dir = task::get_my_current_task()
             .map(|t| t.get_namespace().dir().clone())
             .expect("couldn't get namespace dir");
-        // let namespace_dir = mod_mgmt::NamespaceDir::new(
-        //     Path::new("/namespaces/_applications".to_owned())
-        //         .get_dir(root::get_root())
-        //         .unwrap(),
-        // );
 
         let crate_name = format!("{}-", cmd);
         let mut matching_files = namespace_dir
             .get_files_starting_with(&crate_name)
             .into_iter();
 
-        let app_path = matching_files
-            .next()
-            .map(|f| Path::new(f.lock().get_absolute_path()))
-            .expect("couldn't find file");
+        let app_path = match matching_files.next() {
+            Some(f) => Path::new(f.lock().get_absolute_path()),
+            None => return Err(Error::CommandNotFound(cmd.to_owned())),
+        };
 
         if matching_files.next().is_some() {
             panic!("multiple matching files found");
@@ -217,7 +218,11 @@ impl Shell {
         app_io::insert_child_streams(id, app_io::streams().unwrap());
         // TODO: set environment
 
-        todo!();
-        // Ok(Job { tasks: vec![task] })
+        Ok(Job {
+            parts: vec![JobPart {
+                state: State::Running,
+                task,
+            }],
+        })
     }
 }

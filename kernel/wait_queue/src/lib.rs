@@ -125,7 +125,8 @@ impl WaitQueue {
                 if !wq_locked.contains(curr_task) {
                     wq_locked.push_back(curr_task.clone());
                 } else {
-                    warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
+                    // FIXME: This continually triggers after the shell is shutdown. #657 fixes it.
+                    // warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
                 }
                 // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
                 curr_task.block();
