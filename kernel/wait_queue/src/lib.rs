@@ -9,7 +9,7 @@ extern crate scheduler;
 
 use alloc::collections::VecDeque;
 use irq_safety::MutexIrqSafe;
-use task::TaskRef;
+use task::{TaskRef, RunState};
 
 
 /// An object that holds a blocked `Task` 
@@ -20,17 +20,23 @@ pub struct WaitGuard {
 impl WaitGuard {
     /// Blocks the given `Task` and returns a new `WaitGuard` object
     /// that will automatically unblock that Task when it is dropped. 
-    pub fn new(task: TaskRef) -> WaitGuard {
-        task.block().unwrap();
-        WaitGuard {
+    ///
+    /// Returns an error if the task cannot be blocked. See [`Task::block`] for
+    ///  more details.
+    pub fn new(task: TaskRef) -> Result<WaitGuard, RunState> {
+        task.block()?;
+        Ok(WaitGuard {
             task,
-        }
+        })
     }
 
     /// Blocks the task guarded by this waitguard,
     /// which is useful to re-block a task after it spuriously woke up. 
-    pub fn block_again(&self) {
-        self.task.block().unwrap();
+    ///
+    /// Returns an error if the task cannot be blocked. See [`Task::block`] for
+    ///  more details.
+    pub fn block_again(&self) -> Result<RunState, RunState> {
+        self.task.block()
     }
 
     /// Returns a reference to the `Task` being blocked in this `WaitGuard`.

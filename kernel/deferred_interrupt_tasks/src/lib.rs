@@ -171,7 +171,10 @@ fn deferred_task_entry_point<DIA, Arg, Success, Failure>(
             Err(failure) => error!("Deferred interrupt action returned failure: {:?}", debugit!(failure)),
         }
 
-        curr_task.block().expect("BUG: deffered_task_entry_point: couldn't block task");
+        if curr_task.block().is_err() {
+            error!("deffered_task_entry_point: couldn't block task");
+        }
+
         scheduler::schedule();
     }
 }
