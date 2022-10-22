@@ -93,18 +93,14 @@ impl Master {
 
     pub fn write_byte(&self, byte: u8) -> Result<()> {
         self.discipline
-            .process_byte(byte, &self.master, &self.slave)?;
+            .process_input_byte(byte, &self.master, &self.slave)?;
         Ok(())
     }
 
     pub fn write(&self, buf: &[u8]) -> Result<usize> {
         // TODO: Don't fail if we can't send entire buf.
-        if buf.is_empty() {
-            return Ok(0);
-        }
-
         self.discipline
-            .process_buf(buf, &self.master, &self.slave)?;
+            .process_input_buf(buf, &self.master, &self.slave)?;
         Ok(buf.len())
     }
 }
@@ -153,12 +149,13 @@ impl Slave {
     }
 
     pub fn write_byte(&self, byte: u8) -> Result<()> {
-        self.master.send(byte)
+        self.discipline.process_output_byte(byte, &self.master)?;
+        Ok(())
     }
 
     pub fn write(&self, buf: &[u8]) -> Result<usize> {
         // TODO: Don't fail if we can't send entire buf.
-        self.master.send_buf(buf)?;
+        self.discipline.process_output_buf(buf, &self.master)?;
         Ok(buf.len())
     }
 }

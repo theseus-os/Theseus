@@ -86,7 +86,11 @@ impl Shell {
         loop {
             editor.dedup_history();
             if let Ok(line) = editor.readline("> ", &mut io) {
-                self.execute(line)?;
+                match self.execute(line) {
+                    Ok(()) => {}
+                    Err(Error::ExitRequested) => return Ok(()),
+                    Err(e) => return Err(e),
+                };
             } else {
                 write!(io, "failed to read line").unwrap();
             }

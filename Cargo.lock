@@ -885,8 +885,8 @@ dependencies = [
 name = "example"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "getopts",
- "terminal_print",
 ]
 
 [[package]]

@@ -20,11 +20,8 @@ use mutex_sleep::MutexSleep as Mutex;
 /// flags. For more information, visit the [`cfmakeraw`
 /// documentation][cfmakeraw].
 ///
-/// When the line discipline encounters a carriage return and echoing is
-/// enabled, it will send a carriage return followed by a line feed to the
-/// master. If canonical mode is enabled, it will convert the carriage return to
-/// a line feed (hence flushing the input buffer). This behaviour is equivalent
-/// to `ICRNL` on Linux.
+/// The line discipline prepends a carriage return to all line feeds on output.
+/// This behaviour is equivalent to `ONLCR` on Linux.
 ///
 /// [cfmakeraw]: https://linux.die.net/man/3/cfmakeraw
 pub struct LineDiscipline {
@@ -98,6 +95,9 @@ impl LineDiscipline {
         self.echo.store(echo, Ordering::SeqCst);
     }
 
+    /// Sets the line discipline to canonical mode.
+    ///
+    /// This is equivalent to `ICANON | ICRNL` on Linux.
     pub fn canonical(&self) -> bool {
         self.canonical.lock().unwrap().is_some()
     }
@@ -129,7 +129,12 @@ impl LineDiscipline {
         }
     }
 
-    pub(crate) fn process_byte(&self, byte: u8, master: &Channel, slave: &Channel) -> Result<()> {
+    pub(crate) fn process_input_byte(
+        &self,
+        byte: u8,
+        master: &Channel,
+        slave: &Channel,
+    ) -> Result<()> {
         const ERASE: u8 = 0x7f; // DEL (backspace key)
         const WERASE: u8 = 0x17; // ^W
 
@@ -154,9 +159,6 @@ impl LineDiscipline {
         // TODO: UTF-8?
         if self.echo.load(Ordering::SeqCst) {
             match (byte, &*self.canonical.lock().unwrap()) {
-                (b'\r', _) => {
-                    master.send_buf([b'\r', b'\n'])?;
-                }
                 // TODO: Also pass-through START and STOP characters
                 (b'\t' | b'\n', _) => {
                     master.send(byte)?;
@@ -207,10 +209,31 @@ impl LineDiscipline {
         Ok(())
     }
 
-    pub(crate) fn process_buf(&self, buf: &[u8], master: &Channel, slave: &Channel) -> Result<()> {
+    pub(crate) fn process_input_buf(
+        &self,
+        buf: &[u8],
+        master: &Channel,
+        slave: &Channel,
+    ) -> Result<()> {
         for byte in buf {
-            // TODO: This locks internal fields on every byte.
-            self.process_byte(*byte, master, slave)?;
+            // TODO: This locks internal channels on every byte.
+            self.process_input_byte(*byte, master, slave)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn process_output_byte(&self, byte: u8, master: &Channel) -> Result<()> {
+        if byte == b'\n' {
+            master.send_buf(&[b'\r', b'\n'])
+        } else {
+            master.send(byte)
+        }
+    }
+
+    pub(crate) fn process_output_buf(&self, buf: &[u8], master: &Channel) -> Result<()> {
+        for byte in buf {
+            // TODO: This locks internal channels on every byte.
+            self.process_output_byte(*byte, master)?;
         }
         Ok(())
     }
