@@ -1,6 +1,6 @@
 #![no_std]
 
-use log::{warn, info, trace};
+use log::trace;
 use num_enum::TryFromPrimitive;
 use port_io::Port;
 use spin::Mutex;
@@ -15,12 +15,6 @@ use DeviceToHostResponse::*;
 static PS2_DATA_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
 /// Port used to send commands to and receive status from the PS/2 Controller
 static PS2_COMMAND_AND_STATUS_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x64));
-
-/// Clean the [PS2_DATA_PORT] output buffer, skipping the [ControllerToHostStatus] `output_buffer_full` check
-fn flush_output_buffer() {
-    //NOTE(hecatia): on my end, this is always 250 for port 1 and 65 for port 2, even if read multiple times
-    trace!("ps2::flush_output_buffer: {}", read_data());
-}
 
 // https://wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Commands
 /// Command types which can be sent to the PS/2 Controller
@@ -236,6 +230,12 @@ fn init_ps2_port(port: PS2Port) {
     };
 }
 
+/// Clean the [PS2_DATA_PORT] output buffer, skipping the [ControllerToHostStatus] `output_buffer_full` check
+fn flush_output_buffer() {
+    //NOTE(hecatia): on my end, this is always 250 for port 1 and 65 for port 2, even if read multiple times
+    trace!("ps2::flush_output_buffer: {}", read_data());
+}
+
 /// test the first ps2 data port
 pub fn test_ps2_port1() -> Result<(), &'static str> {
     test_ps2_port(PS2Port::One)
@@ -251,8 +251,8 @@ fn test_ps2_port(port: PS2Port) -> Result<(), &'static str> {
     // test the ps2 controller
     write_command(TestController);
     match read_controller_test_result()? {
-        ControllerTestResult::Passed => info!("ps2 controller test pass!!!"),
-        ControllerTestResult::Failed => warn!("ps2 controller test failed!!!"),
+        ControllerTestResult::Passed => trace!("passed PS/2 controller test"),
+        ControllerTestResult::Failed => Err("failed PS/2 controller test")?,
     }
 
     // test the ps2 data port
@@ -262,11 +262,11 @@ fn test_ps2_port(port: PS2Port) -> Result<(), &'static str> {
     }
     use PortTestResult::*;
     match read_port_test_result()? {
-        Passed => info!("ps2 port {} test pass!!!", port as u8 + 1),
-        ClockLineStuckLow => warn!("ps2 port {} clock line stuck low", port as u8 + 1),
-        ClockLineStuckHigh => warn!("ps2 port {} clock line stuck high", port as u8 + 1),
-        DataLineStuckLow => warn!("ps2 port {} data line stuck low", port as u8 + 1),
-        DataLineStuckHigh => warn!("ps2 port {} data line stuck high", port as u8 + 1),
+        Passed => trace!("passed PS/2 port {} test", port as u8 + 1),
+        ClockLineStuckLow => Err("failed PS/2 port test, clock line stuck low")?,
+        ClockLineStuckHigh => Err("failed PS/2 port test, clock line stuck high")?,
+        DataLineStuckLow => Err("failed PS/2 port test, data line stuck low")?,
+        DataLineStuckHigh => Err("failed PS/2 port test, clock line stuck high")?,
     }
 
     // enable PS2 interrupt and see the new config
@@ -281,14 +281,14 @@ fn test_ps2_port(port: PS2Port) -> Result<(), &'static str> {
     };
 
     if port_interrupt_enabled {
-        info!("ps2 port {} interrupt enabled", port as u8 + 1)
+        trace!("ps2 port {} interrupt enabled", port as u8 + 1)
     } else {
-        warn!("ps2 port {} interrupt disabled", port as u8 + 1)
+        Err("PS/2 port test config's interrupt disabled")?
     }
     if clock_enabled {
-        info!("ps2 port {} enabled", port as u8 + 1)
+        trace!("ps2 port {} clock enabled", port as u8 + 1)
     } else {
-        warn!("ps2 port {} disabled", port as u8 + 1)
+        Err("PS/2 port test config's clock disabled")?
     }
     Ok(())
 }
@@ -303,7 +303,7 @@ enum ControllerTestResult {
 /// must only be called after writing the [TestController] command
 /// otherwise would read bogus data
 fn read_controller_test_result() -> Result<ControllerTestResult, &'static str> {
-    read_data().try_into().map_err(|_| "read_controller_test_result called at the wrong time")
+    read_data().try_into().map_err(|_| "failed to read controller test result")
 }
 
 #[derive(TryFromPrimitive)]
@@ -319,7 +319,7 @@ enum PortTestResult {
 /// must only be called after writing the [TestPort1] or [TestPort2] command
 /// otherwise would read bogus data
 fn read_port_test_result() -> Result<PortTestResult, &'static str> {
-    read_data().try_into().map_err(|_| "read_port_test_result called at the wrong time")
+    read_data().try_into().map_err(|_| "failed to read port test result")
 }
 
 // https://wiki.osdev.org/PS/2_Keyboard#Special_Bytes //NOTE: all other bytes sent by the keyboard are scan codes
@@ -340,7 +340,7 @@ pub enum DeviceToHostResponse {
 /// write data to the data port and return the response
 fn send(value: HostToDevice) -> Result<DeviceToHostResponse, &'static str> {
     write_data(WritableData::HostToDevice(value));
-    read_data().try_into().map_err(|_| "send response could not be parsed")
+    read_data().try_into().map_err(|_| "failed to read device response")
 }
 
 enum HostToDevice {
@@ -551,7 +551,7 @@ pub enum SampleRate {
 fn set_mouse_sampling_rate(value: SampleRate) -> Result<(), &'static str> {
     command_to_mouse(HostToMouseCommandOrData::MouseCommand(SampleRate))
         .and(command_to_mouse(HostToMouseCommandOrData::SampleRate(value)))
-        .map_err(|_| "could not set mouse sampling rate")
+        .map_err(|_| "failed to set the mouse sampling rate")
     
 }
 
@@ -564,7 +564,7 @@ pub enum MouseId {
 
 /// set the [MouseId] by magic sequence
 pub fn set_mouse_id(id: MouseId) -> Result<(), &'static str> {
-    disable_mouse_packet_streaming().map_err(|_| "failed to disable mouse streaming")?;
+    disable_mouse_packet_streaming()?;
 
     use crate::SampleRate::*;
     match id {
@@ -581,19 +581,19 @@ pub fn set_mouse_id(id: MouseId) -> Result<(), &'static str> {
         }
     }
 
-    enable_mouse_packet_streaming().map_err(|_| "failed to enable mouse streaming after set_mouse_id")?;
+    enable_mouse_packet_streaming()?;
     Ok(())
 }
 
 
 pub fn mouse_id() -> Result<u8, &'static str> {
-    disable_mouse_packet_streaming().map_err(|_| "failed to disable mouse streaming")?;
+    disable_mouse_packet_streaming()?;
 
     // check whether the command is acknowledged
     command_to_mouse(HostToMouseCommandOrData::MouseCommand(GetDeviceID))?;
     let id_num = read_data();
 
-    enable_mouse_packet_streaming().map_err(|_| "failed to enable mouse streaming after mouse_id")?;
+    enable_mouse_packet_streaming()?;
     Ok(id_num)
 }
 
@@ -616,22 +616,20 @@ fn reset_mouse() -> Result<(), &'static str> {
 #[allow(dead_code)]
 fn mouse_resend() -> Result<(), &'static str> {
     command_to_mouse(HostToMouseCommandOrData::MouseCommand(HostToMouseCommand::ResendByte))
-        .map_err(|_| "mouse resend request failed, please request again")
+        .map_err(|_| "failed to resend mouse request")
 }
 
 /// enable the packet streaming
 fn enable_mouse_packet_streaming() -> Result<(), &'static str> {
     command_to_mouse(HostToMouseCommandOrData::MouseCommand(EnableDataReporting)).map_err(|_| {
-        warn!("enable streaming failed");
-        "enable mouse streaming failed"
+        "failed to enable mouse streaming"
     })
 }
 
 /// disable the packet streaming
 fn disable_mouse_packet_streaming() -> Result<(), &'static str> {
     command_to_mouse(HostToMouseCommandOrData::MouseCommand(DisableDataReporting)).map_err(|_| {
-        warn!("disable mouse streaming failed");
-        "disable mouse streaming failed"
+        "failed to disable mouse streaming"
     })
 }
 
@@ -649,8 +647,7 @@ fn mouse_resolution(value: MouseResolution) -> Result<(), &'static str> {
     command_to_mouse(HostToMouseCommandOrData::MouseCommand(SetResolution))
         .and(command_to_mouse(HostToMouseCommandOrData::MouseResolution(value)))
         .map_err(|_| {
-            warn!("command set mouse resolution is not accepted");
-            "failed to set the keyboard scancode set"
+            "failed to set the mouse resolution"
         })
 }
 
