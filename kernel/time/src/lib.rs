@@ -55,6 +55,13 @@ impl Instant {
         };
         instant_to_duration(instant)
     }
+
+    pub fn checked_duraction_since(&self, earlier: Self) -> Option<Duration> {
+        let instant = Instant {
+            counter: self.counter.checked_sub(earlier.counter)?,
+        };
+        Some(instant_to_duration(instant))
+    }
 }
 
 impl core::ops::Add<Duration> for Instant {
