@@ -1,6 +1,6 @@
 #![no_std]
 
-use log::trace;
+use log::debug;
 use num_enum::TryFromPrimitive;
 use port_io::Port;
 use spin::Mutex;
@@ -233,7 +233,7 @@ fn init_ps2_port(port: PS2Port) {
 /// Clean the [PS2_DATA_PORT] output buffer, skipping the [ControllerToHostStatus] `output_buffer_full` check
 fn flush_output_buffer() {
     //NOTE(hecatia): on my end, this is always 250 for port 1 and 65 for port 2, even if read multiple times
-    trace!("ps2::flush_output_buffer: {}", read_data());
+    debug!("ps2::flush_output_buffer: {}", read_data());
 }
 
 /// test the first ps2 data port
@@ -251,7 +251,7 @@ fn test_ps2_port(port: PS2Port) -> Result<(), &'static str> {
     // test the ps2 controller
     write_command(TestController);
     match read_controller_test_result()? {
-        ControllerTestResult::Passed => trace!("passed PS/2 controller test"),
+        ControllerTestResult::Passed => debug!("passed PS/2 controller test"),
         ControllerTestResult::Failed => Err("failed PS/2 controller test")?,
     }
 
@@ -262,7 +262,7 @@ fn test_ps2_port(port: PS2Port) -> Result<(), &'static str> {
     }
     use PortTestResult::*;
     match read_port_test_result()? {
-        Passed => trace!("passed PS/2 port {} test", port as u8 + 1),
+        Passed => debug!("passed PS/2 port {} test", port as u8 + 1),
         ClockLineStuckLow => Err("failed PS/2 port test, clock line stuck low")?,
         ClockLineStuckHigh => Err("failed PS/2 port test, clock line stuck high")?,
         DataLineStuckLow => Err("failed PS/2 port test, data line stuck low")?,
@@ -281,12 +281,12 @@ fn test_ps2_port(port: PS2Port) -> Result<(), &'static str> {
     };
 
     if port_interrupt_enabled {
-        trace!("ps2 port {} interrupt enabled", port as u8 + 1)
+        debug!("ps2 port {} interrupt enabled", port as u8 + 1)
     } else {
         Err("PS/2 port test config's interrupt disabled")?
     }
     if clock_enabled {
-        trace!("ps2 port {} clock enabled", port as u8 + 1)
+        debug!("ps2 port {} clock enabled", port as u8 + 1)
     } else {
         Err("PS/2 port test config's clock disabled")?
     }

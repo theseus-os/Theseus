@@ -5,7 +5,7 @@
 
 use core::sync::atomic::{AtomicBool, Ordering};
 use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET, KeyAction, KeyEvent};
-use log::{info, error, warn};
+use log::{error, warn, debug};
 use once_cell::unsync::Lazy;
 use spin::Once;
 use mpmc::Queue;
@@ -32,14 +32,15 @@ pub fn init(keyboard_queue_producer: Queue<Event>) -> Result<(), &'static str> {
     init_ps2_port1();
     // Test the first port.
     test_ps2_port1()?;
+
     // Detect which kind of keyboard is connected.
     // TODO: actually do something with the keyboard type.
     match keyboard_detect() {
-        Ok(KeyboardType::AncientATKeyboard) => info!("Ancient AT Keyboard with translator enabled in the PS/2 Controller"),
-        Ok(KeyboardType::MF2Keyboard) => info!("MF2Keyboard"),
-        Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator) => info!("MF2 Keyboard with translator enabled in PS/2 Controller"),
+        Ok(KeyboardType::AncientATKeyboard) => debug!("The PS/2 keyboard type is: Ancient AT Keyboard with translator enabled in the PS/2 Controller"),
+        Ok(KeyboardType::MF2Keyboard) => debug!("The PS/2 keyboard type is: MF2Keyboard"),
+        Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator) => debug!("The PS/2 keyboard type is: MF2 Keyboard with translator enabled in PS/2 Controller"),
         Err(e) => {
-            error!("Failed to detect the Ps2 keyboard type, error: {} ", e);
+            error!("Failed to detect the PS/2 keyboard type: {e}");
             return Err("Failed to detect the PS2 keyboard type");
         }
     }
@@ -48,10 +49,8 @@ pub fn init(keyboard_queue_producer: Queue<Event>) -> Result<(), &'static str> {
 
     // Register the interrupt handler
     interrupts::register_interrupt(PS2_KEYBOARD_IRQ, ps2_keyboard_handler).map_err(|e| {
-        error!("PS2 keyboard IRQ {:#X} was already in use by handler {:#X}! Sharing IRQs is currently unsupported.", 
-            PS2_KEYBOARD_IRQ, e,
-        );
-        "PS2 keyboard IRQ was already in use! Sharing IRQs is currently unsupported."
+        error!("PS/2 keyboard IRQ {PS2_KEYBOARD_IRQ:#X} was already in use by handler {e:#X}! Sharing IRQs is currently unsupported.");
+        "PS/2 keyboard IRQ was already in use! Sharing IRQs is currently unsupported."
     })?;
 
     // Final step: set the producer end of the keyboard event queue.
@@ -70,12 +69,12 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame
     // 0xE0 indicates an extended scancode, so we must wait for the next interrupt to get the actual scancode
     if scan_code == 0xE0 {
         if extended {
-            error!("PS2_PORT interrupt: got two extended scancodes (0xE0) in a row! Shouldn't happen.");
+            error!("ps2_keyboard_handler: got two extended scancodes (0xE0) in a row! Shouldn't happen.");
         }
         // mark it true for the next interrupt
         EXTENDED_SCANCODE.store(true, Ordering::SeqCst);
     } else if scan_code == 0xE1 {
-        error!("PAUSE/BREAK key pressed ... ignoring it!");
+        error!("ps2_keyboard_handler: PAUSE/BREAK key pressed ... ignoring it!");
         // TODO: handle this, it's a 6-byte sequence (over the next 5 interrupts)
         EXTENDED_SCANCODE.store(true, Ordering::SeqCst);
     } else { // a regular scancode, go ahead and handle it
@@ -183,13 +182,11 @@ fn handle_keyboard_input(scan_code: u8, extended: bool) -> Result<(), &'static s
         if let Some(producer) = KEYBOARD_PRODUCER.get() {
             producer.push(event).map_err(|_| "keyboard input queue is full")
         } else {
-            warn!("handle_keyboard_input(): KEYBOARD_PRODUCER wasn't yet initialized, dropping keyboard event {:?}.", event);
+            warn!("handle_keyboard_input(): KEYBOARD_PRODUCER wasn't yet initialized, dropping keyboard event {event:?}.");
             Err("keyboard event queue not ready")
         }
     } else {
-        error!("handle_keyboard_input(): Unknown scancode: {:?}, adjusted scancode: {:?}",
-            scan_code, adjusted_scan_code
-        );
+        error!("handle_keyboard_input(): Unknown scancode: {scan_code:?}, adjusted scancode: {adjusted_scan_code:?}");
         Err("unknown keyboard scancode")
     }
 }

@@ -3,7 +3,7 @@
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
-use log::{info, error, warn};
+use log::{error, warn, debug};
 use spin::Once;
 use mpmc::Queue;
 use event_types::Event;
@@ -30,22 +30,20 @@ pub fn init(mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
 
     // Set Mouse ID to 4, and read it back to check that it worked.
     if let Err(e) = set_mouse_id(MouseId::Four) {
-        error!("{e}");
+        error!("Failed to set the mouse id to four: {e}");
     }
     match mouse_id() {
-        Ok(id) => info!("the initial mouse ID is: {}", id),
+        Ok(id) => debug!("The PS/2 mouse ID is: {id}"),
         Err(e) => {
-            error!("Failed to read the initial PS2 mouse ID, error: {:?}", e);
-            return Err("Failed to read the initial PS2 mouse ID");
+            error!("Failed to read the PS/2 mouse ID: {e}");
+            return Err("Failed to read the PS/2 mouse ID");
         }
     }
 
     // Register the interrupt handler
     interrupts::register_interrupt(PS2_MOUSE_IRQ, ps2_mouse_handler).map_err(|e| {
-        error!("PS2 mouse IRQ {:#X} was already in use by handler {:#X}! Sharing IRQs is currently unsupported.", 
-            PS2_MOUSE_IRQ, e,
-        );
-        "PS2 mouse IRQ was already in use! Sharing IRQs is currently unsupported."
+        error!("PS/2 mouse IRQ {PS2_MOUSE_IRQ:#X} was already in use by handler {e:#X}! Sharing IRQs is currently unsupported.");
+        "PS/2 mouse IRQ was already in use! Sharing IRQs is currently unsupported."
     })?;
 
     // Final step: set the producer end of the mouse event queue.
@@ -82,10 +80,10 @@ fn handle_mouse_input(mouse_packet: MousePacketBits4) -> Result<(), &'static str
     let event = Event::MouseMovementEvent(mouse_event);
 
     if let Some(producer) = MOUSE_PRODUCER.get() {
-        producer.push(event).map_err(|_e| "Fail to enqueue the mouse event")
+        producer.push(event).map_err(|_| "failed to enqueue the mouse event")
     } else {
-        warn!("handle_mouse_input(): MOUSE_PRODUCER wasn't yet initialized, dropping mouse event {:?}.", event);
-        Err("mouse event queue not ready")
+        warn!("MOUSE_PRODUCER wasn't yet initialized, dropping mouse event {event:?}.");
+        Err("MOUSE_PRODUCER wasn't yet initialized")
     }
 }
 
