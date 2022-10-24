@@ -425,7 +425,6 @@ dependencies = [
  "mod_mgmt",
  "path",
  "serial_port",
- "shell_2",
  "spawn",
  "task",
  "tty",

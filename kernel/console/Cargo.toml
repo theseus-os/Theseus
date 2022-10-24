@@ -43,10 +43,5 @@ path = "../path"
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
 
-# FIXME: kernel can't depend on application
-[dependencies.shell]
-package = "shell_2"
-path = "../../applications/shell_2"
-
 [lib]
 crate-type = ["rlib"]

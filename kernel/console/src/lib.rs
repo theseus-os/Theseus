@@ -4,14 +4,13 @@
 
 extern crate alloc;
 
-use alloc::{format, string::ToString, sync::Arc};
+use alloc::{format, sync::Arc};
 use async_channel::Receiver;
 use core::sync::atomic::{AtomicU16, Ordering};
-use core2::io::{Read, Write};
+use core2::io::Write;
 use irq_safety::MutexIrqSafe;
-use log::{error, warn};
+use log::{error, info, trace, warn};
 use serial_port::{get_serial_port, DataChunk, SerialPort, SerialPortAddress};
-use shell::Shell;
 use task::{JoinableTaskRef, KillReason};
 
 /// The serial port being used for the default system logger can optionally
@@ -80,7 +79,7 @@ fn console_connection_detector(
         }
 
         let _ = spawn::new_task_builder(shell_loop, (serial_port, serial_port_address, receiver))
-            .name(format!("tty_reader_loop_{:?}", serial_port_address))
+            .name(format!("{:?}_manager", serial_port_address))
             .spawn()
             .unwrap();
     }
@@ -95,31 +94,30 @@ fn shell_loop(
         Receiver<DataChunk>,
     ),
 ) {
+    info!("creating new tty for serial port {:?}", address);
+
     let tty = tty::Tty::new();
 
-    let reader_task = spawn::new_task_builder(tty_reader_loop, (port.clone(), tty.master()))
-        .name(format!("tty_reader_loop_{:?}", address))
+    let reader_task = spawn::new_task_builder(tty_to_port_loop, (port.clone(), tty.master()))
+        .name(format!("tty_to_{:?}", address))
         .spawn()
         .unwrap();
-    let writer_task = spawn::new_task_builder(tty_writer_loop, (receiver, tty.master()))
-        .name(format!("tty_writer_loop_{:?}", address))
+    let writer_task = spawn::new_task_builder(port_to_tty_loop, (receiver, tty.master()))
+        .name(format!("{:?}_to_tty", address))
         .spawn()
         .unwrap();
 
     let new_app_ns = mod_mgmt::create_application_namespace(None).unwrap();
 
-    // NOTE: see crate-level docs and note in this crate's `Cargo.toml`.
+    // TODO: Replace shell with shell_2
     let (app_file, _ns) =
         mod_mgmt::CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "shell_2-")
-            .ok_or("Couldn't find first application in default app namespace")
-            .unwrap();
+            .expect("Couldn't find shell in default app namespace");
 
     let path = path::Path::new(app_file.lock().get_absolute_path());
-    log::info!("Starting first application: crate at {:?}", path);
-    // Spawn the default shell
     let task = spawn::new_application_task_builder(path, Some(new_app_ns))
         .unwrap()
-        .name("default_shell".to_string())
+        .name(format!("{:?}_shell", address))
         .block()
         .spawn()
         .unwrap();
@@ -149,22 +147,22 @@ fn shell_loop(
         port.lock().write(&data[..len]).unwrap();
     };
 
-    // TODO: Close port
+    // TODO: Close port?
 }
 
-fn tty_reader_loop((port, master): (Arc<MutexIrqSafe<SerialPort>>, tty::Master)) {
+fn tty_to_port_loop((port, master): (Arc<MutexIrqSafe<SerialPort>>, tty::Master)) {
     loop {
         let mut data = [0; 256];
         let len = master.read(&mut data).unwrap();
-        log::trace!("writing data to serial port: {:?}", &data[..len]);
+        trace!("writing data to serial port: {:?}", &data[..len]);
         port.lock().write(&data[..len]).unwrap();
     }
 }
 
-fn tty_writer_loop((receiver, master): (Receiver<DataChunk>, tty::Master)) {
+fn port_to_tty_loop((receiver, master): (Receiver<DataChunk>, tty::Master)) {
     loop {
         let DataChunk { data, len } = receiver.receive().unwrap();
-        log::trace!("read data from serial port: {:?}", &data[..len.into()]);
+        trace!("read data from serial port: {:?}", &data[..len.into()]);
         master.write(&data[..len as usize]).unwrap();
     }
 }
