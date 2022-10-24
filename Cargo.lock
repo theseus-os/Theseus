@@ -994,7 +994,7 @@ dependencies = [
  "log",
  "mod_mgmt",
  "path",
- "shell_2",
+ "shell",
  "spawn",
 ]
 
@@ -2871,6 +2871,31 @@ dependencies = [
 [[package]]
 name = "shapes"
 version = "0.1.0"
+
+[[package]]
+name = "shell"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "core2",
+ "dfqueue",
+ "environment",
+ "event_types",
+ "fs_node",
+ "keycodes_ascii",
+ "lazy_static",
+ "libterm",
+ "log",
+ "path",
+ "root",
+ "runqueue",
+ "scheduler",
+ "spawn",
+ "spin 0.9.0",
+ "stdio",
+ "task",
+ "window_manager",
+]
 
 [[package]]
 name = "shell_2"

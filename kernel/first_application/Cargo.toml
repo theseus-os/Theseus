@@ -29,8 +29,7 @@ path = "../path"
 ## Note: if another application crate is used, make sure to change
 ##       both this dependency and the invocation string in `lib.rs`.
 [dependencies.shell]
-package = "shell_2"
-path = "../../applications/shell_2"
+path = "../../applications/shell"
 
 [lib]
 crate-type = ["rlib"]

@@ -230,9 +230,6 @@ pub fn print_to_stdout_args(fmt_args: core::fmt::Arguments) {
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => {
-            logger::write_str("THINGY").unwrap();
-            logger::write_fmt(fmt_args).unwrap();
-            logger::write_str("\n").unwrap();
             if queues
                 .stdout
                 .write_all(format!("{}", fmt_args).as_bytes())
