@@ -1095,13 +1095,24 @@ impl<T: FromBytes, M: Mutability> BorrowedSliceMappedPages<T, M> {
 }
 
 
-/// A marker type for use with
+/// A marker type used to indicate that a [`BorrowedMappedPages`]
+/// or [`BorrowedSliceMappedPages`] is borrowed mutably.
+/// 
+/// Implements the [`Mutability`] trait. 
 #[non_exhaustive]
 pub struct Mutable { }
 
+/// A marker type used to indicate that a [`BorrowedMappedPages`]
+/// or [`BorrowedSliceMappedPages`] is borrowed immutably.
+/// 
+/// Implements the [`Mutability`] trait.
 #[non_exhaustive]
 pub struct Immutable { }
 
+/// A trait for parameterizing a [`BorrowedMappedPages`]
+/// or [`BorrowedSliceMappedPages`] as mutably or immutably borrowed.
+/// 
+/// Only [`Mutable`] and [`Immutable`] implement this trait.
 pub trait Mutability { } // : sealed::Sealed { }
 
 mod sealed {

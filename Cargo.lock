@@ -822,7 +822,6 @@ dependencies = [
  "nic_buffers",
  "nic_initialization",
  "nic_queues",
- "owning_ref",
  "pci",
  "spin 0.9.0",
  "static_assertions",
@@ -2038,7 +2037,6 @@ dependencies = [
  "mpmc",
  "nic_buffers",
  "nic_queues",
- "owning_ref",
  "pci",
  "volatile 0.2.7",
 ]
@@ -2052,7 +2050,6 @@ dependencies = [
  "memory",
  "mpmc",
  "nic_buffers",
- "owning_ref",
 ]
 
 [[package]]

@@ -5,7 +5,6 @@ description = "A set of functions used to initialize a Network Interface Card"
 version = "0.1.0"
 
 [dependencies]
-owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 volatile = "0.2.7"
 mpmc = "0.1.6"
 
