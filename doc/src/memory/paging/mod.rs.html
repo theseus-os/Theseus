@@ -375,6 +375,11 @@
 <span id="369">369</span>
 <span id="370">370</span>
 <span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md</span>
 <span class="comment">// file at the top-level directory of this distribution.</span>
 <span class="comment">//</span>
@@ -392,15 +397,20 @@
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">table</span>;
 
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">page_table_entry</span>::<span class="kw-2">*</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::temporary_page::TemporaryPage</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::mapper</span>::<span class="kw-2">*</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">page_table_entry::PageTableEntry</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::{
+    <span class="ident">temporary_page::TemporaryPage</span>,
+    <span class="ident">mapper</span>::{<span class="ident">Mapper</span>, <span class="ident">MappedPages</span>},
+};
 
 <span class="kw">use</span> <span class="ident">core</span>::{
     <span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>},
     <span class="ident">fmt</span>,
 };
-<span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">Frame</span>, <span class="ident">FrameRange</span>, <span class="ident">PageRange</span>, <span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>,
+    <span class="ident">AllocatedPages</span>, <span class="ident">allocate_pages</span>, <span class="ident">AllocatedFrames</span>, <span class="ident">EntryFlags</span>,
+    <span class="ident">tlb_flush_all</span>, <span class="ident">tlb_flush_virt_addr</span>, <span class="ident">get_p4</span>, <span class="ident">find_section_memory_bounds</span>,
+    <span class="ident">get_vga_mem_addr</span>, <span class="ident">KERNEL_OFFSET</span>};
 
 <span class="kw">use</span> <span class="ident">kernel_config::memory</span>::{<span class="ident">RECURSIVE_P4_INDEX</span>};
 <span class="comment">// use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};</span>

@@ -277,6 +277,9 @@
 <span id="271">271</span>
 <span id="272">272</span>
 <span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem for Theseus,</span>
 <span class="doccomment">//! which is fairly robust and provides a unification between </span>
 <span class="doccomment">//! arbitrarily mapped sections of memory and Rust&#39;s lifetime system. </span>
@@ -311,15 +314,18 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">mapper_spillful</span>)]</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">paging</span>;
 
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::paging</span>::{<span class="ident">MappedPages</span>, <span class="ident">PageTable</span>, <span class="ident">Mapper</span>};
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::paging</span>::<span class="kw-2">*</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">memory_structs</span>::{<span class="ident">Frame</span>, <span class="ident">Page</span>, <span class="ident">FrameRange</span>, <span class="ident">PageRange</span>, <span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">page_allocator</span>::{<span class="ident">AllocatedPages</span>, <span class="ident">allocate_pages</span>, <span class="ident">allocate_pages_at</span>,
+    <span class="ident">allocate_pages_by_bytes</span>, <span class="ident">allocate_pages_by_bytes_at</span>};
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">memory_structs</span>::<span class="kw-2">*</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">page_allocator</span>::<span class="kw-2">*</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">frame_allocator</span>::<span class="kw-2">*</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">frame_allocator</span>::{<span class="ident">AllocatedFrames</span>, <span class="ident">MemoryRegionType</span>, <span class="ident">PhysicalMemoryRegion</span>,
+    <span class="ident">allocate_frames_by_bytes_at</span>, <span class="ident">allocate_frames_by_bytes</span>, <span class="ident">allocate_frames_at</span>};
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86_64&quot;</span>)]</span>
-<span class="kw">use</span> <span class="ident">memory_x86_64</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">memory_x86_64</span>::{<span class="ident">BootInformation</span>, <span class="ident">get_kernel_address</span>, <span class="ident">get_boot_info_mem_area</span>, <span class="ident">find_section_memory_bounds</span>,
+    <span class="ident">get_vga_mem_addr</span>, <span class="ident">get_modules_address</span>, <span class="ident">tlb_flush_virt_addr</span>, <span class="ident">tlb_flush_all</span>, <span class="ident">get_p4</span>};
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86_64&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">memory_x86_64::EntryFlags</span>;<span class="comment">// Export EntryFlags so that others does not need to get access to memory_&lt;arch&gt;.</span>
