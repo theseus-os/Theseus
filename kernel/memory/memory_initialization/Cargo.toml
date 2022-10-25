@@ -8,16 +8,16 @@ version = "0.1.0"
 multiboot2 = "0.14.0"
 
 [dependencies.memory]
-path = "../memory"
+path = ".."
 
 [dependencies.stack]
-path = "../stack"
+path = "../../stack"
 
 [dependencies.kernel_config]
-path = "../kernel_config"
+path = "../../kernel_config"
 
 [dependencies.bootloader_modules]
-path = "../bootloader_modules"
+path = "../../bootloader_modules"
 
 [dependencies.log]
 version = "0.4.8"
@@ -26,4 +26,4 @@ version = "0.4.8"
 git = "https://github.com/theseus-os/irq_safety"
 
 [dependencies.heap]
-path = "../heap"
+path = "../../heap"

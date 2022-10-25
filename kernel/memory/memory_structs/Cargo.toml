@@ -13,7 +13,7 @@ derive_more = "0.99.0"
 paste = "1.0.5"
 
 [dependencies.kernel_config]
-path = "../kernel_config"
+path = "../../kernel_config"
 
 [dependencies.entryflags_x86_64]
 path = "../entryflags_x86_64"

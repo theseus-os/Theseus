@@ -286,7 +286,7 @@ dependencies = [
 name = "bootloader_modules"
 version = "0.1.0"
 dependencies = [
- "memory_structs",
+ "memory",
 ]
 
 [[package]]
@@ -1143,7 +1143,6 @@ dependencies = [
 name = "heap"
 version = "0.1.0"
 dependencies = [
- "block_allocator",
  "irq_safety",
  "kernel_config",
  "log",
@@ -1640,8 +1639,6 @@ dependencies = [
  "lazy_static",
  "log",
  "memory",
- "memory_structs",
- "memory_x86_64",
  "rbtree",
 ]
 
@@ -1688,6 +1685,7 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "bitflags",
+ "block_allocator",
  "frame_allocator",
  "irq_safety",
  "kernel_config",
@@ -1781,7 +1779,6 @@ dependencies = [
  "libm",
  "log",
  "memory",
- "memory_structs",
  "mlx_ethernet",
  "mpmc",
  "nic_buffers",
@@ -1825,7 +1822,6 @@ dependencies = [
  "log",
  "mapper_spillful",
  "memory",
- "memory_structs",
  "runqueue",
  "terminal_print",
  "tsc",
@@ -1939,7 +1935,6 @@ dependencies = [
  "kernel_config",
  "log",
  "memory",
- "page_allocator",
  "slabmalloc",
  "slabmalloc_safe",
  "slabmalloc_unsafe",
@@ -3042,8 +3037,6 @@ dependencies = [
  "kernel_config",
  "log",
  "memory",
- "memory_structs",
- "page_allocator",
  "spin 0.9.0",
 ]
 

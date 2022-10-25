@@ -23,6 +23,7 @@ extern crate memory_structs;
 extern crate page_table_entry;
 extern crate page_allocator;
 extern crate frame_allocator;
+extern crate block_allocator;
 extern crate zerocopy;
 
 
@@ -38,6 +39,8 @@ pub use self::paging::*;
 pub use memory_structs::*;
 pub use page_allocator::*;
 pub use frame_allocator::*;
+pub use block_allocator::FixedSizeBlockAllocator;
+pub use page_allocator::{allocate_pages_by_bytes_deferred, DeferredAllocAction};
 
 #[cfg(target_arch = "x86_64")]
 use memory_x86_64::*;

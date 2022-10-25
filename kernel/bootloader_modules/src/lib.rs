@@ -3,10 +3,10 @@
 #![no_std]
 
 extern crate alloc;
-extern crate memory_structs;
+extern crate memory;
 
 use alloc::string::String;
-use memory_structs::PhysicalAddress;
+use memory::PhysicalAddress;
 
 /// A record of a bootloader module's name and location in physical memory.
 #[derive(Debug)]

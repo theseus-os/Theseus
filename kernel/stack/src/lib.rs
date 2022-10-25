@@ -6,15 +6,11 @@
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate kernel_config;
-extern crate memory_structs;
 extern crate memory;
-extern crate page_allocator;
 
 use core::ops::{Deref, DerefMut};
 use kernel_config::memory::PAGE_SIZE;
-use memory_structs::VirtualAddress;
-use memory::{EntryFlags, MappedPages, Mapper};
-use page_allocator::AllocatedPages;
+use memory::{EntryFlags, MappedPages, PageRange, Mapper, VirtualAddress, AllocatedPages, allocate_pages};
 
 
 /// Allocates a new stack and maps it to the active page table. 
@@ -28,7 +24,7 @@ pub fn alloc_stack(
     page_table: &mut Mapper, 
 ) -> Option<Stack> {
     // Allocate enough pages for an additional guard page. 
-    let pages = page_allocator::allocate_pages(size_in_pages + 1)?;
+    let pages = allocate_pages(size_in_pages + 1)?;
     inner_alloc_stack(pages, page_table)
 }
 
@@ -136,7 +132,7 @@ impl Stack {
     ///
     /// Guard pages are virtual pages that are reserved/owned by this stack
     /// but are not mapped, causing any access to them to result in a page fault. 
-    pub fn guard_page(&self) -> &memory_structs::PageRange {
+    pub fn guard_page(&self) -> &PageRange {
         &self.guard_page
     }
 }
