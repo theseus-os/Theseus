@@ -1,23 +1,17 @@
 #![no_std]
 
-
-extern crate alloc;
 #[macro_use] extern crate log;
 extern crate spin;
 extern crate memory;
 extern crate volatile;
 extern crate zerocopy;
 extern crate atomic_linked_list;
-extern crate owning_ref;
 
-
-use alloc::boxed::Box;
 use spin::{Mutex, MutexGuard};
 use volatile::{Volatile, WriteOnly};
 use zerocopy::FromBytes;
-use memory::{PageTable, PhysicalAddress, EntryFlags, allocate_pages, allocate_frames_at, MappedPages};
+use memory::{PageTable, PhysicalAddress, EntryFlags, allocate_pages, allocate_frames_at, BorrowedMappedPages, Mutable};
 use atomic_linked_list::atomic_map::AtomicMap;
-use owning_ref::BoxRefMut;
 
 
 /// The system-wide list of all `IoApic`s, of which there is usually one, 
@@ -62,7 +56,7 @@ const INTERRUPT_ENTRIES_PER_IOAPIC: u32 = 24;
 
 /// A representation of an IoApic (x86-specific interrupt chip for I/O devices).
 pub struct IoApic {
-    regs: BoxRefMut<MappedPages, IoApicRegisters>,
+    regs: BorrowedMappedPages<IoApicRegisters, Mutable>,
     /// The ID of this IoApic.
     pub id: u8,
     /// not yet used.
@@ -85,12 +79,13 @@ impl IoApic {
             EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
         )?;
 
-        let ioapic_regs = BoxRefMut::new(Box::new(ioapic_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<IoApicRegisters>(0))?;
+        let ioapic_regs = BorrowedMappedPages::try_into_borrowed_mut(ioapic_mapped_page, 0)
+            .map_err(|(_mp, err)| err)?;
         let ioapic = IoApic {
             regs: ioapic_regs,
-			id: id,
+			id,
             _phys_addr: phys_addr,
-            gsi_base: gsi_base,
+            gsi_base,
 		};
 
         debug!("Created new IoApic, id: {}, gsi_base: {}, phys_addr: {:#X}", id, gsi_base, phys_addr);

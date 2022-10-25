@@ -243,7 +243,7 @@ impl E1000Nic {
         let e1000_nic = E1000Nic {
             bar_type,
             mem_base,
-            interrupt_num: interrupt_num,
+            interrupt_num,
             mac_hardware: mac_addr_hardware,
             mac_spoofed: None,
             rx_queue: rxq,

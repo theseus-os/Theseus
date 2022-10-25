@@ -4,7 +4,6 @@
 #![no_std]
 
 #[macro_use] extern crate log;
-extern crate alloc;
 extern crate memory;
 extern crate multicore_bringup;
 extern crate shapes;

@@ -1306,7 +1306,6 @@ dependencies = [
  "atomic_linked_list",
  "log",
  "memory",
- "owning_ref",
  "spin 0.9.0",
  "volatile 0.2.7",
  "zerocopy",

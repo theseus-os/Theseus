@@ -2,7 +2,6 @@
 
 #![no_std]
 
-extern crate alloc;
 #[macro_use] extern crate log;
 extern crate kernel_config;
 extern crate memory;
