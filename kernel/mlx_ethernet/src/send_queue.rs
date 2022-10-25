@@ -8,9 +8,7 @@
 use zerocopy::{U32, FromBytes};
 use volatile::Volatile;
 use byteorder::BigEndian;
-use alloc::boxed::Box;
-use memory::{PhysicalAddress, MappedPages};
-use owning_ref:: BoxRefMut;
+use memory::{PhysicalAddress, MappedPages, BorrowedSliceMappedPages, Mutable, BorrowedMappedPages};
 use core::fmt;
 use num_enum::TryFromPrimitive;
 use core::convert::TryFrom;
@@ -177,11 +175,11 @@ impl CurrentUARDoorbell {
 /// and is used to interact with the SQ once initialized.
 pub struct SendQueue {
     /// physically-contiguous SQ descriptors
-    entries: BoxRefMut<MappedPages, [WorkQueueEntrySend]>, 
+    entries: BorrowedSliceMappedPages<WorkQueueEntrySend, Mutable>, 
     /// the doorbell for the SQ
-    doorbell: BoxRefMut<MappedPages, DoorbellRecord>,
+    doorbell: BorrowedMappedPages<DoorbellRecord, Mutable>,
     /// the UAR page associated with the SQ
-    uar: BoxRefMut<MappedPages, UserAccessRegion>,
+    uar: BorrowedMappedPages<UserAccessRegion, Mutable>,
     /// The number of WQEs that have been completed.
     /// From this we also calculate the next descriptor to use
     wqe_counter: u16,
@@ -219,15 +217,19 @@ impl SendQueue {
         lkey: Lkey
     ) -> Result<SendQueue, &'static str> {
         // map the descriptor ring and initialize
-        let mut entries = BoxRefMut::new(Box::new(entries_mp)).try_map_mut(|mp| mp.as_slice_mut::<WorkQueueEntrySend>(0, num_entries))?;
+        let mut entries: BorrowedSliceMappedPages<WorkQueueEntrySend, Mutable> =
+            BorrowedSliceMappedPages::try_into_borrowed_slice_mut(entries_mp, 0, num_entries)
+            .map_err(|(_mp, err)| err)?;
         for entry in entries.iter_mut() {
             entry.init()
         }
         // map the doorbell and initialize
-        let mut doorbell = BoxRefMut::new(Box::new(doorbell_mp)).try_map_mut(|mp| mp.as_type_mut::<DoorbellRecord>(0))?;
+        let mut doorbell = BorrowedMappedPages::try_into_borrowed_mut(doorbell_mp, 0)
+            .map_err(|(_mp, err)| err)?;
         *doorbell = DoorbellRecord::default();
         // map the uar and initialize
-        let mut uar = BoxRefMut::new(Box::new(uar_mp)).try_map_mut(|mp| mp.as_type_mut::<UserAccessRegion>(0))?;
+        let mut uar = BorrowedMappedPages::try_into_borrowed_mut(uar_mp, 0)
+            .map_err(|(_mp, err)| err)?;
         *uar = UserAccessRegion::default();
 
         Ok( SendQueue{entries, doorbell, uar, wqe_counter: 0, sqn, _tisn, lkey, uar_db: CurrentUARDoorbell::Even} )

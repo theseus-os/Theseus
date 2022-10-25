@@ -1781,7 +1781,6 @@ dependencies = [
  "mpmc",
  "nic_buffers",
  "nic_initialization",
- "owning_ref",
  "pci",
  "spin 0.9.0",
 ]
@@ -1800,7 +1799,6 @@ dependencies = [
  "nic_buffers",
  "nic_initialization",
  "num_enum",
- "owning_ref",
  "static_assertions",
  "volatile 0.2.7",
  "zerocopy",

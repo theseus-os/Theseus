@@ -11,9 +11,7 @@ use bit_field::BitField;
 use zerocopy::{U32, FromBytes};
 use volatile::Volatile;
 use byteorder::BigEndian;
-use alloc::boxed::Box;
-use memory::{PhysicalAddress, MappedPages};
-use owning_ref::BoxRefMut;
+use memory::{PhysicalAddress, MappedPages, BorrowedSliceMappedPages, Mutable, BorrowedMappedPages};
 use num_enum::TryFromPrimitive;
 
 #[allow(unused_imports)]
@@ -251,9 +249,9 @@ const_assert_eq!(core::mem::size_of::<CompletionQueueDoorbellRecord>(), 8);
 #[allow(dead_code)]
 pub struct CompletionQueue {
     /// Physically-contiguous completion queue entries
-    pub(crate) entries: BoxRefMut<MappedPages, [CompletionQueueEntry]>,
+    pub(crate) entries: BorrowedSliceMappedPages<CompletionQueueEntry, Mutable>,
     /// Doorbell record for this CQ
-    doorbell: BoxRefMut<MappedPages, CompletionQueueDoorbellRecord>,
+    doorbell: BorrowedMappedPages<CompletionQueueDoorbellRecord, Mutable>,
     /// CQ number that is returned by the [`CommandOpcode::CreateCq`] command
     cqn: Cqn,
 }
@@ -275,15 +273,18 @@ impl CompletionQueue {
         doorbell_mp: MappedPages,
         cqn: Cqn
     ) -> Result<CompletionQueue, &'static str> {
-        let mut entries = BoxRefMut::new(Box::new(entries_mp)).try_map_mut(|mp| mp.as_slice_mut::<CompletionQueueEntry>(0, num_entries))?;
-        let mut doorbell = BoxRefMut::new(Box::new(doorbell_mp)).try_map_mut(|mp| mp.as_type_mut::<CompletionQueueDoorbellRecord>(0))?;
+        let mut entries: BorrowedSliceMappedPages<CompletionQueueEntry, Mutable> =
+            BorrowedSliceMappedPages::try_into_borrowed_slice_mut(entries_mp, 0, num_entries)
+            .map_err(|(_mp, err)| err)?;
+        let mut doorbell = BorrowedMappedPages::try_into_borrowed_mut(doorbell_mp, 0)
+            .map_err(|(_mp, err)| err)?;
         
         for entry in entries.iter_mut() {
             entry.init()
         }
         *doorbell = CompletionQueueDoorbellRecord::default();
 
-        Ok( CompletionQueue{entries, doorbell, cqn} )
+        Ok( CompletionQueue { entries, doorbell, cqn } )
     }
 
     /// Checks if a packet is transmitted by comparing the `wqe_counter` with the value in the CQE.
