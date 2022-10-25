@@ -11,7 +11,7 @@ use core::{
     mem,
     fmt::{self, Write},
     ops::Deref,
-    ptr::Unique,
+    ptr::{NonNull, Unique},
     slice,
 };
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames}; 
@@ -683,6 +683,8 @@ impl MappedPages {
     /// # Arguments
     /// * `byte_offset`: the offset (in number of bytes) from the beginning of the memory region
     ///    at which the struct is located (where it should start).
+    ///    This `offset` must be properly aligned with respect to the alignment requirements
+    ///    of type `T`, otherwise an error will be returned.
     /// 
     /// Returns a reference to the new struct (`&T`) that is formed from the underlying memory region,
     /// with a lifetime dependent upon the lifetime of this `MappedPages` object.
@@ -776,14 +778,18 @@ impl MappedPages {
     }
 
 
-    /// Reinterprets this `MappedPages`'s underlying memory region as a slice of the given type `T`.
+    /// Reinterprets this `MappedPages`'s underlying memory region as `&[T]`, a `length`-element slice of type `T`.
     /// 
     /// It has similar requirements and behavior as [`MappedPages::as_type()`].
     /// 
     /// # Arguments
-    /// * `byte_offset`: the offset (in number of bytes) into the memory region at which the slice should start.
-    /// * `length`: the length of the slice, i.e., the number of `T` elements in the slice. 
-    ///   Thus, the slice will go from `byte_offset` to `byte_offset` + (sizeof(`T`) * `length`).
+    /// * `byte_offset`: the offset (in number of bytes) into the memory region
+    ///    at which the slice should start.
+    ///    This `byte_offset` must be properly aligned with respect to the alignment requirements
+    ///    of type `T`, otherwise an error will be returned.
+    /// * `length`: the length of the slice, i.e., the number of elements of type `T` in the slice. 
+    ///    Thus, the slice's address bounds will span the range from
+    ///    `byte_offset` (inclusive) to `byte_offset + (size_of::<T>() * length)` (exclusive).
     /// 
     /// Returns a reference to the new slice that is formed from the underlying memory region,
     /// with a lifetime dependent upon the lifetime of this `MappedPages` object.
@@ -910,4 +916,103 @@ pub fn mapped_pages_unmap(
 #[cfg(mapper_spillful)]
 pub fn mapper_from_current() -> Mapper {
     Mapper::from_current()
+}
+
+
+/// An immutably borrowed [`MappedPages`] object that derefs to `&T`.
+///
+/// When dropped, the borrow ends and the contained `MappedPages` is dropped and unmapped.
+pub struct BorrowedMappedPages<T: FromBytes> {
+    ptr: NonNull<T>,
+    mp: MappedPages,
+}
+impl<T: FromBytes> Deref for BorrowedMappedPages<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        // SAFETY:
+        // ✅ The pointer is properly aligned, as its alignment has been checked in `MappedPages::as_type()`.
+        // ✅ The pointer is dereferenceable, as it has been bounds checked by `MappedPages::as_type()`.
+        // ✅ The pointer has been initialized in the constructor `try_into_borrowed()`.
+        // ✅ The lifetime of the returned reference `&T` is tied to the lifetime of the `MappedPages`,
+        //    ensuring that the `MappedPages` object will persist at least as long as the reference.
+        unsafe { self.ptr.as_ref() }
+    }
+}
+impl<T: FromBytes> BorrowedMappedPages<T> {
+    /// Immutably borrows the given `MappedPages` as an instance of type `&T` 
+    /// starting at the given `offset` into the `MappedPages`.
+    ///
+    /// See [`MappedPages::as_type()`] for more info.
+    ///
+    /// Returns an error containing the unmodified `MappedPages` and a string
+    /// describing the error.
+    pub fn try_into_borrowed(
+        mp: MappedPages,
+        offset: usize,
+    ) -> Result<BorrowedMappedPages<T>, (MappedPages, &'static str)> {
+        let borrowed_mp = BorrowedMappedPages {
+            ptr: match mp.as_type::<T>(offset) {
+                Ok(r) => r.into(),
+                Err(e_str) => return Err((mp, e_str)),
+            },
+            mp,
+        };
+        Ok(borrowed_mp)
+    }
+
+    /// Consumes this `BorrowedMappedPages` and returns the inner `MappedPages`.
+    pub fn into_inner(self) -> MappedPages {
+        self.mp
+    }
+}
+
+/// A mutably borrowed `MappedPages` object that derefs to `&T` and `&mut T`.
+///
+/// When dropped, the borrow ends and the contained `MappedPages` is dropped and unmapped.
+pub struct BorrowedMutMappedPages<T: FromBytes> {
+    ptr: NonNull<T>,
+    mp: MappedPages,
+}
+impl<T: FromBytes> Deref for BorrowedMutMappedPages<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        // SAFETY:
+        // ✅ Same as `BorrowedMappedPages<T>`.
+        unsafe { self.ptr.as_ref() }
+    }
+}
+impl<T: FromBytes> core::ops::DerefMut for BorrowedMutMappedPages<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        // SAFETY:
+        // ✅ Same as `BorrowedMappedPages<T>`, plus:
+        // ✅ The underlying `MappedPages` is guaranteed to be writable by `MappedPages::as_type_mut()`.
+        unsafe { self.ptr.as_mut() }
+    }
+}
+impl<T: FromBytes> BorrowedMutMappedPages<T> {
+    /// Mutably borrows the given `MappedPages` as an instance of type `&mut T` 
+    /// starting at the given `offset` into the `MappedPages`.
+    /// 
+    /// See [`MappedPages::as_type_mut()`] for more info.
+    /// 
+    /// Returns an error containing the unmodified `MappedPages` and a string
+    /// describing the error.
+    pub fn try_into_borrowed_mut(
+        mut mp: MappedPages,
+        offset: usize,
+    ) -> Result<BorrowedMutMappedPages<T>, (MappedPages, &'static str)> {
+        let borrowed_mp = BorrowedMutMappedPages {
+            ptr: match mp.as_type_mut::<T>(offset) {
+                Ok(r) => r.into(),
+                Err(e_str) => return Err((mp, e_str)),
+            },
+            mp,
+        };
+        Ok(borrowed_mp)
+    }
+
+    /// Consumes this `BorrowedMutMappedPages` and returns the inner `MappedPages`.
+    pub fn into_inner(self) -> MappedPages {
+        self.mp
+    }
 }
