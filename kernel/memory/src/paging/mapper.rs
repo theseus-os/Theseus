@@ -1112,16 +1112,14 @@ pub struct Immutable { }
 /// A trait for parameterizing a [`BorrowedMappedPages`]
 /// or [`BorrowedSliceMappedPages`] as mutably or immutably borrowed.
 /// 
-/// Only [`Mutable`] and [`Immutable`] implement this trait.
-pub trait Mutability { } // : sealed::Sealed { }
+/// Only [`Mutable`] and [`Immutable`] are able to implement this trait.
+pub trait Mutability: private::Sealed { }
 
-mod sealed {
-    use super::{Mutability, Immutable, Mutable};
-    pub(crate) trait Sealed { }
+impl private::Sealed for Immutable { }
+impl private::Sealed for Mutable { }
+impl Mutability for Immutable { }
+impl Mutability for Mutable { }
 
-    impl Sealed for Immutable { }
-    impl Sealed for Mutable { }
-
-    impl Mutability for Immutable { }
-    impl Mutability for Mutable { }
+mod private {
+    pub trait Sealed { }
 }
