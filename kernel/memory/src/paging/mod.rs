@@ -15,15 +15,20 @@ mod table;
 pub mod table;
 
 
-pub use page_table_entry::*;
-pub use self::temporary_page::TemporaryPage;
-pub use self::mapper::*;
+pub use page_table_entry::PageTableEntry;
+pub use self::{
+    temporary_page::TemporaryPage,
+    mapper::{Mapper, MappedPages},
+};
 
 use core::{
     ops::{Deref, DerefMut},
     fmt,
 };
-use super::*;
+use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
+    AllocatedPages, allocate_pages, AllocatedFrames, EntryFlags,
+    tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
+    get_vga_mem_addr, KERNEL_OFFSET};
 
 use kernel_config::memory::{RECURSIVE_P4_INDEX};
 // use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};

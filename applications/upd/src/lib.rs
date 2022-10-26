@@ -250,7 +250,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
 
     for (old_crate_module_file_name, new_crate_module_file_name) in diffs.pairs.into_iter() {
         println!("Looking at diff {} -> {}", old_crate_module_file_name, new_crate_module_file_name);
-        let old_crate_name = if old_crate_module_file_name == "" {
+        let old_crate_name = if old_crate_module_file_name.is_empty() {
             // An empty old_crate_name indicates that there is no old crate or object file to remove, we are just loading a new crate (or inserting its object file)
             None
         } else {

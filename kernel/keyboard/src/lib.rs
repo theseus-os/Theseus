@@ -179,15 +179,13 @@ fn handle_keyboard_input(scan_code: u8, extended: bool) -> Result<(), &'static s
             warn!("handle_keyboard_input(): KEYBOARD_PRODUCER wasn't yet initialized, dropping keyboard event {:?}.", event);
             Err("keyboard event queue not ready")
         }
+    } else if scan_code == 0xE0 {
+        Ok(()) //ignore 0xE0 prefix
     } else {
-        if scan_code == 0xE0 {
-            Ok(()) //ignore 0xE0 prefix
-        } else { 
-            error!("handle_keyboard_input(): Unknown scancode: {:?}, adjusted scancode: {:?}",
-                scan_code, adjusted_scan_code
-            );
-            Err("unknown keyboard scancode") 
-        }
+        error!("handle_keyboard_input(): Unknown scancode: {:?}, adjusted scancode: {:?}",
+            scan_code, adjusted_scan_code
+        );
+        Err("unknown keyboard scancode")
     }
 }
 
