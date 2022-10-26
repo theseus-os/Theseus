@@ -5,11 +5,7 @@ description = "An interface glue layer that allows smoltcp to use ethernet crate
 version = "0.1.0"
 
 [dependencies]
-owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
-
-
-[dependencies.log]
-version = "0.4.8"
+log = "0.4.8"
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]
