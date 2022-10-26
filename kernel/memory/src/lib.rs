@@ -32,7 +32,10 @@ mod paging;
 #[cfg(mapper_spillful)]
 pub mod paging;
 
-pub use self::paging::{MappedPages, PageTable, Mapper};
+pub use self::paging::{
+    PageTable, Mapper, Mutability, Mutable, Immutable,
+    MappedPages, BorrowedMappedPages, BorrowedSliceMappedPages,
+};
 
 pub use memory_structs::{Frame, Page, FrameRange, PageRange, VirtualAddress, PhysicalAddress};
 pub use page_allocator::{AllocatedPages, allocate_pages, allocate_pages_at,

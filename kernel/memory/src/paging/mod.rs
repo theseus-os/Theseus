@@ -18,7 +18,10 @@ pub mod table;
 pub use page_table_entry::PageTableEntry;
 pub use self::{
     temporary_page::TemporaryPage,
-    mapper::{Mapper, MappedPages},
+    mapper::{
+        Mapper, MappedPages, BorrowedMappedPages, BorrowedSliceMappedPages,
+        Mutability, Mutable, Immutable,
+    },
 };
 
 use core::{
