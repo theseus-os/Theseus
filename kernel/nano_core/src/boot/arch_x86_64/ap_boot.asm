@@ -151,6 +151,13 @@ start_high_ap:
 	wrmsr
 	mov ecx, 0xc0000102   ; GS KERNEL BASE MSR
 	wrmsr
+
+	; set the IA32_TSC_AUX MSR to a sentry value, in order to prevent
+	; invalid usage of its value before Theseus sets it to the CPU's APIC ID.
+	mov eax, 0xFFFFFFFF
+	mov edx, 0xFFFFFFFF
+	mov ecx, 0xc0000103   ; IA32_TSC_AUX MSR
+	wrmsr
 	
 	; each character is reversed in the dword cuz of little endianness
 	mov dword [0xb8048 + KERNEL_OFFSET], 0x4f2E4f2E ; ".."

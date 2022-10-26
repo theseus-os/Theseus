@@ -334,6 +334,12 @@ start_high:
 	mov ecx, 0xc0000102   ; GS KERNEL BASE MSR
 	wrmsr
 
+	; set the IA32_TSC_AUX MSR to a sentry value, in order to prevent
+	; invalid usage of its value before Theseus sets it to the CPU's APIC ID.
+	mov eax, 0xFFFFFFFF
+	mov edx, 0xFFFFFFFF
+	mov ecx, 0xc0000103   ; IA32_TSC_AUX MSR
+	wrmsr
 
 	; Save the multiboot address
 	push rdi
