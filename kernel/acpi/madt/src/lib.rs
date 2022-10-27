@@ -302,9 +302,12 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
     use pic::IRQ_BASE_OFFSET;
 
     let me = get_my_apic_id();
+    log::trace!("handle_bsp_lapic_entry(): me: {:#X}", me);
+    log::trace!("handle_bsp_lapic_entry(): before BSP id: {:#X?}", get_bsp_id());
 
     for madt_entry in madt_iter.clone() {
         if let MadtEntry::LocalApic(lapic_entry) = madt_entry { 
+            log::debug!("MadtLocalApic: {:#X?}", lapic_entry);
             if lapic_entry.apic_id == me {
                 let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
 
@@ -330,6 +333,8 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
             }
         }
     }
+
+    log::trace!("handle_bsp_lapic_entry(): BSP id: {:#X?}", get_bsp_id());
 
     let bsp_id = get_bsp_id().ok_or("handle_bsp_lapic_entry(): Couldn't find BSP LocalApic in Madt!")?;
 

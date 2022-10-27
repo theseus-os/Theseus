@@ -89,7 +89,10 @@ pub fn get_my_apic_id() -> u8 {
 
 /// Returns a reference to the LocalApic for the currently executing CPU core.
 pub fn get_my_apic() -> Option<&'static RwLockIrqSafe<LocalApic>> {
-    LOCAL_APICS.get(&get_my_apic_id())
+    let apic_id = rdmsr(IA32_TSC_AUX);
+    log::warn!("get_my_apic(): {:#X}", apic_id);
+    let apic_id = apic_id as u8;
+    LOCAL_APICS.get(&apic_id)
 }
 
 
@@ -135,6 +138,8 @@ pub fn init(_page_table: &mut PageTable) -> Result<(), &'static str> {
         // Ensure the local apic is enabled in xapic mode, otherwise we'll get a General Protection fault
         unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE); }
     }
+
+    log::warn!("apic::init(): BSP apic id: {:#X}", rdmsr(IA32_TSC_AUX));
 
     Ok(())
 }
