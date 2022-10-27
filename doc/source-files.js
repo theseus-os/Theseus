@@ -90,6 +90,7 @@ sourcesIndex["network_manager"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["nic_buffers"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["nic_initialization"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["nic_queues"] = {"name":"","files":["lib.rs"]};
+sourcesIndex["no_drop"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["ota_update_client"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["page_allocator"] = {"name":"","files":["lib.rs","static_array_rb_tree.rs"]};
 sourcesIndex["page_table_entry"] = {"name":"","files":["lib.rs"]};

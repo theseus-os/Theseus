@@ -137,18 +137,6 @@
 <span id="131">131</span>
 <span id="132">132</span>
 <span id="133">133</span>
-<span id="134">134</span>
-<span id="135">135</span>
-<span id="136">136</span>
-<span id="137">137</span>
-<span id="138">138</span>
-<span id="139">139</span>
-<span id="140">140</span>
-<span id="141">141</span>
-<span id="142">142</span>
-<span id="143">143</span>
-<span id="144">144</span>
-<span id="145">145</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
@@ -157,6 +145,7 @@
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">stack</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">no_drop</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">multiboot2</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bootloader_modules</span>;
 
@@ -169,23 +158,9 @@
 };
 <span class="kw">use</span> <span class="ident">heap::HEAP_FLAGS</span>;
 <span class="kw">use</span> <span class="ident">stack::Stack</span>;
+<span class="kw">use</span> <span class="ident">no_drop::NoDrop</span>;
 <span class="kw">use</span> <span class="ident">bootloader_modules::BootloaderModule</span>;
 
-<span class="doccomment">/// Just like Rust&#39;s `try!()` macro, </span>
-<span class="doccomment">/// but forgets the given `obj`s to prevent them from being dropped,</span>
-<span class="doccomment">/// as they would normally be upon return of an Error using `try!()`.</span>
-<span class="doccomment">/// This must come BEFORE the below modules in order for them to be able to use it.</span>
-<span class="macro">macro_rules!</span> <span class="ident">try_forget</span> {
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">expr</span>:<span class="ident">expr</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">obj</span>:<span class="ident">expr</span>),<span class="kw-2">*</span>) =&gt; (<span class="kw">match</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">expr</span> {
-        <span class="prelude-val">Ok</span>(<span class="ident">val</span>) =&gt; <span class="ident">val</span>,
-        <span class="prelude-val">Err</span>(<span class="ident">err</span>) =&gt; {
-            $(
-                <span class="ident">core::mem::forget</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">obj</span>);
-            )<span class="op">*</span>
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">err</span>);
-        }
-    });
-}
 
 <span class="doccomment">/// Initializes the virtual memory management system and returns a MemoryManagementInfo instance,</span>
 <span class="doccomment">/// which represents the initial (kernel) address space. </span>
@@ -194,23 +169,25 @@
 <span class="doccomment">/// the original BootInformation will be unmapped and inaccessible.</span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// Returns the following tuple, if successful:</span>
-<span class="doccomment">///  1. The kernel&#39;s new MemoryManagementInfo</span>
+<span class="doccomment">///  1. The kernel&#39;s new MemoryManagementInfo,</span>
 <span class="doccomment">///  2. the MappedPages of the kernel&#39;s text section,</span>
 <span class="doccomment">///  3. the MappedPages of the kernel&#39;s rodata section,</span>
 <span class="doccomment">///  4. the MappedPages of the kernel&#39;s data section,</span>
 <span class="doccomment">///  5. the initial stack for this CPU (e.g., the BSP stack) that is currently in use,</span>
 <span class="doccomment">///  6. the list of bootloader modules obtained from the given `boot_info`,</span>
-<span class="doccomment">///  7. the kernel&#39;s list of identity-mapped MappedPages which should be dropped before starting the first user application. </span>
+<span class="doccomment">///  7. the kernel&#39;s list of identity-mapped [`MappedPages`],</span>
+<span class="doccomment">///     which must not be dropped until all AP (additional CPUs) are fully booted,</span>
+<span class="doccomment">///     but *should* be dropped before starting the first user application.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_memory_management</span>(
     <span class="ident">boot_info</span>: <span class="ident">BootInformation</span>
 ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(
         <span class="ident">MmiRef</span>,
-        <span class="ident">MappedPages</span>,
-        <span class="ident">MappedPages</span>,
-        <span class="ident">MappedPages</span>,
-        <span class="ident">Stack</span>,
+        <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>,
+        <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>,
+        <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>,
+        <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">Stack</span><span class="op">&gt;</span>,
         <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">BootloaderModule</span><span class="op">&gt;</span>,
-        <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>
+        <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>
 {
     <span class="comment">// Initialize memory management: paging (create a new page table), essential kernel mappings</span>
@@ -224,17 +201,17 @@
         <span class="ident">higher_half_mapped_pages</span>, 
         <span class="ident">identity_mapped_pages</span>
     ) <span class="op">=</span> <span class="ident">memory::init</span>(<span class="kw-2">&amp;</span><span class="ident">boot_info</span>)<span class="question-mark">?</span>;
-    <span class="comment">// After this point, at which `memory::init()` has returned new `MappedPages` that represent</span>
-    <span class="comment">// the currently-executing code/data regions, we must &quot;forget&quot; all of the above mapped_pages instances</span>
-    <span class="comment">// if an error occurs, because they will be auto-unmapped from the new page table when they are dropped upon return,</span>
-    <span class="comment">// causing all execution to stop and a processor fault/reset. </span>
-    <span class="comment">// We use the try_forget!() macro to do so.</span>
-    <span class="kw">let</span> <span class="ident">stack</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">Stack::from_pages</span>(<span class="ident">stack_guard_page</span>, <span class="ident">stack_pages</span>) {
-        <span class="prelude-val">Ok</span>(<span class="ident">s</span>) =&gt; <span class="ident">s</span>,
-        <span class="prelude-val">Err</span>((<span class="ident">_stack_guard_page</span>, <span class="ident">stack_pages</span>)) =&gt; <span class="macro">try_forget!</span>(
-            <span class="prelude-val">Err</span>(<span class="string">&quot;initial Stack was not contiguous in virtual memory&quot;</span>),
-            <span class="ident">text_mapped_pages</span>, <span class="ident">rodata_mapped_pages</span>, <span class="ident">data_mapped_pages</span>, <span class="ident">stack_pages</span>, <span class="ident">higher_half_mapped_pages</span>, <span class="ident">identity_mapped_pages</span>
-        )
+    <span class="comment">// After this point, at which `memory::init()` has returned new objects that represent</span>
+    <span class="comment">// the currently-executing code/data/stack, we must ensure they aren&#39;t dropped if an error occurs,</span>
+    <span class="comment">// because that will cause them to be auto-unmapped.</span>
+    <span class="comment">// That will then cause all execution to stop and a processor fault/reset. </span>
+    <span class="comment">// We use the `NoDrop` type wrapper to accomplish this.</span>
+    <span class="kw">let</span> <span class="ident">stack</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">Stack::from_pages</span>(<span class="ident">stack_guard_page</span>, <span class="ident">stack_pages</span>.<span class="ident">into_inner</span>()) {
+        <span class="prelude-val">Ok</span>(<span class="ident">s</span>) =&gt; <span class="ident">NoDrop::new</span>(<span class="ident">s</span>),
+        <span class="prelude-val">Err</span>((<span class="ident">_stack_guard_page</span>, <span class="ident">stack_mp</span>)) =&gt; {
+            <span class="kw">let</span> <span class="ident">_stack_mp</span> <span class="op">=</span> <span class="ident">NoDrop::new</span>(<span class="ident">stack_mp</span>);
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;initial Stack was not contiguous in virtual memory&quot;</span>);
+        }
     };
 
     <span class="comment">// Initialize the kernel heap.</span>
@@ -242,21 +219,15 @@
     <span class="kw">let</span> <span class="ident">heap_initial_size</span> <span class="op">=</span> <span class="ident">KERNEL_HEAP_INITIAL_SIZE</span>;
     
     <span class="kw">let</span> <span class="ident">heap_mapped_pages</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="macro">try_forget!</span>(
-            <span class="ident">memory::allocate_pages_by_bytes_at</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">heap_start</span>), <span class="ident">heap_initial_size</span>),
-            <span class="ident">text_mapped_pages</span>, <span class="ident">rodata_mapped_pages</span>, <span class="ident">data_mapped_pages</span>, <span class="ident">stack</span>, <span class="ident">higher_half_mapped_pages</span>, <span class="ident">identity_mapped_pages</span>
-        );
+        <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="ident">memory::allocate_pages_by_bytes_at</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">heap_start</span>), <span class="ident">heap_initial_size</span>)<span class="question-mark">?</span>;
         <span class="macro">debug!</span>(<span class="string">&quot;Initial heap starts at: {:#X}, size: {:#X}, pages: {:?}&quot;</span>, <span class="ident">heap_start</span>, <span class="ident">heap_initial_size</span>, <span class="ident">pages</span>);
-        <span class="kw">let</span> <span class="ident">heap_mp</span> <span class="op">=</span> <span class="macro">try_forget!</span>(
-            <span class="ident">page_table</span>.<span class="ident">map_allocated_pages</span>(<span class="ident">pages</span>, <span class="ident">HEAP_FLAGS</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                <span class="macro">error!</span>(<span class="string">&quot;Failed to map kernel heap memory pages, {} bytes starting at virtual address {:#X}. Error: {:?}&quot;</span>,
-                    <span class="ident">KERNEL_HEAP_INITIAL_SIZE</span>, <span class="ident">KERNEL_HEAP_START</span>, <span class="ident">e</span>
-                );
-                <span class="string">&quot;Failed to map the kernel heap memory. Perhaps the KERNEL_HEAP_INITIAL_SIZE \
-                 exceeds the size of the system&#39;s physical memory?&quot;</span>
-            }),
-            <span class="ident">text_mapped_pages</span>, <span class="ident">rodata_mapped_pages</span>, <span class="ident">data_mapped_pages</span>, <span class="ident">stack</span>, <span class="ident">higher_half_mapped_pages</span>, <span class="ident">identity_mapped_pages</span>
-        );
+        <span class="kw">let</span> <span class="ident">heap_mp</span> <span class="op">=</span> <span class="ident">page_table</span>.<span class="ident">map_allocated_pages</span>(<span class="ident">pages</span>, <span class="ident">HEAP_FLAGS</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+            <span class="macro">error!</span>(<span class="string">&quot;Failed to map kernel heap memory pages, {} bytes starting at virtual address {:#X}. Error: {:?}&quot;</span>,
+                <span class="ident">KERNEL_HEAP_INITIAL_SIZE</span>, <span class="ident">KERNEL_HEAP_START</span>, <span class="ident">e</span>
+            );
+            <span class="string">&quot;Failed to map the kernel heap memory. Perhaps the KERNEL_HEAP_INITIAL_SIZE \
+                exceeds the size of the system&#39;s physical memory?&quot;</span>
+        })<span class="question-mark">?</span>;
         <span class="ident">heap::init_single_heap</span>(<span class="ident">heap_start</span>, <span class="ident">heap_initial_size</span>);
         <span class="ident">heap_mp</span>
     };
@@ -264,7 +235,12 @@
     <span class="macro">debug!</span>(<span class="string">&quot;Mapped and initialized the initial heap&quot;</span>);
 
     <span class="comment">// Initialize memory management post heap intialization: set up kernel stack allocator and kernel memory management info.</span>
-    <span class="kw">let</span> (<span class="ident">kernel_mmi_ref</span>, <span class="ident">identity_mapped_pages</span>) <span class="op">=</span> <span class="ident">memory::init_post_heap</span>(<span class="ident">page_table</span>, <span class="ident">higher_half_mapped_pages</span>, <span class="ident">identity_mapped_pages</span>, <span class="ident">heap_mapped_pages</span>)<span class="question-mark">?</span>;
+    <span class="kw">let</span> (<span class="ident">kernel_mmi_ref</span>, <span class="ident">identity_mapped_pages</span>) <span class="op">=</span> <span class="ident">memory::init_post_heap</span>(
+        <span class="ident">page_table</span>,
+        <span class="ident">higher_half_mapped_pages</span>,
+        <span class="ident">identity_mapped_pages</span>,
+        <span class="ident">heap_mapped_pages</span>,
+    );
 
     <span class="comment">// Because bootloader modules may overlap with the actual boot information, </span>
     <span class="comment">// we need to preserve those records here in a separate list,</span>

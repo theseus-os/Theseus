@@ -937,6 +937,7 @@
 <span id="931">931</span>
 <span id="932">932</span>
 <span id="933">933</span>
+<span id="934">934</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks</span>
 <span class="doccomment">//! and convenient builder patterns for customizing new tasks. </span>
 <span class="doccomment">//! </span>
@@ -972,6 +973,7 @@
 <span class="kw">use</span> <span class="ident">apic::get_my_apic_id</span>;
 <span class="kw">use</span> <span class="ident">fs_node::FileOrDir</span>;
 <span class="kw">use</span> <span class="ident">preemption</span>::{<span class="ident">hold_preemption</span>, <span class="ident">PreemptionGuard</span>};
+<span class="kw">use</span> <span class="ident">no_drop::NoDrop</span>;
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">simd_personality</span>)]</span>
 <span class="kw">use</span> <span class="ident">task::SimdExt</span>;
@@ -982,7 +984,7 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(
     <span class="ident">kernel_mmi_ref</span>: <span class="ident">MmiRef</span>,
     <span class="ident">apic_id</span>: <span class="ident">u8</span>,
-    <span class="ident">stack</span>: <span class="ident">Stack</span>,
+    <span class="ident">stack</span>: <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">Stack</span><span class="op">&gt;</span>,
 ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BootstrapTaskRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="ident">runqueue::init</span>(<span class="ident">apic_id</span>)<span class="question-mark">?</span>;
     
