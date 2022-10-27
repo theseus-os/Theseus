@@ -25,17 +25,24 @@ enum HostToControllerCommand {
     /// sets [ControllerConfigurationByte]
     WriteToInternalRAMByte0 = 0x60,
     // WriteToInternalRAMByteN = 0x61, //0x61-0x7F; N is the command byte & 0x1F
+    // PasswordInstalledTest = 0xA4,
+    // LoadSecurity = 0xA5,
+    // EnableSecurity = 0xA6,
+    /// sets [ControllerConfigurationByte] `port2_clock_disabled`
     DisablePort2 = 0xA7, //NOTE: only if 2 PS/2 ports supported
+    /// clears [ControllerConfigurationByte] `port2_clock_disabled`
     EnablePort2 = 0xA8,  //NOTE: only if 2 PS/2 ports supported
-    /// returns [TestPortResult]
+    /// returns [PortTestResult]
     TestPort2 = 0xA9, //NOTE: only if 2 PS/2 ports supported
-    /// returns [TestControllerResult]
+    /// returns [ControllerTestResult]
     TestController = 0xAA,
-    /// returns [TestPortResult]
+    /// returns [PortTestResult]
     TestPort1 = 0xAB,
     ///// read all bytes of internal RAM
     // DiagnosticDump = 0xAC,
+    /// sets [ControllerConfigurationByte] `port1_clock_disabled`
     DisablePort1 = 0xAD,
+    /// clears [ControllerConfigurationByte] `port1_clock_disabled`
     EnablePort1 = 0xAE,
     // ReadControllerInputPort = 0xC0, //return Unknown/non-standard
     // CopyBits0to3ofInputPortToStatusBits4to7 = 0xC1,
@@ -46,14 +53,17 @@ enum HostToControllerCommand {
     // WriteByteToControllerOutputPort = 0xD1, //Check if output buffer is empty first
     ///// makes it look like the byte written was received from the first PS/2 port
     // WriteByteToPort1OutputBuffer = 0xD2, //NOTE: only if 2 PS/2 ports supported
-    /// makes it look like the byte written was received from the second PS/2 port
-    WriteByteToPort2OutputBuffer = 0xD3, //NOTE: only if 2 PS/2 ports supported //https://wiki.osdev.org/%228042%22_PS/2_Controller#Buffer_Naming_Perspective OUTPUT means "out of the device into host"
+    ///// makes it look like the byte written was received from the second PS/2 port
+    // WriteByteToPort2OutputBuffer = 0xD3, //NOTE: only if 2 PS/2 ports supported //https://wiki.osdev.org/%228042%22_PS/2_Controller#Buffer_Naming_Perspective OUTPUT means "out of the device into host"
     /// sends next byte to the second PS/2 port
     WriteByteToPort2InputBuffer = 0xD4, //NOTE: only if 2 PS/2 ports supported
+    // ReadTestInputs = 0xE0,
     // PulseOutputLineLowFor6ms = 0xF0, //0xF0-0xFF; Bits 0 to 3 correspond to 4 different output lines and are used as a mask (0 = pulse line, 1 = don't pulse line); Bit 0 corresponds to the "reset" line. The other output lines don't have a standard/defined purpose.
 }
 
 /// Write a command to the PS/2 command port/register
+/// Note: Devices attached to the controller should be disabled
+/// before sending commands that return data, otherwise the output buffer could get overwritten
 fn write_command(value: HostToControllerCommand) {
     unsafe {
         PS2_COMMAND_AND_STATUS_PORT.lock().write(value as u8);
@@ -72,10 +82,10 @@ type bool1 = bool;
 pub struct ControllerToHostStatus {
     /// When using [Polling](https://wiki.osdev.org/%228042%22_PS/2_Controller#Polling), must be `true` before attempting to read data from [PS2_DATA_PORT].
     /// When using [Interrupts](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts), guaranteed to be `true`, because an interrupt only happens if the buffer is full
-    #[allow(dead_code)]
+    /// Alternative name: output_register_full, which might make more sense because it only ever fits 1 byte. "Buffer" sounds like multiple.
     output_buffer_full: bool1,
-    /// Must be `false` before attempting to write data to [PS2_DATA_PORT] or [PS2_COMMAND_AND_STATUS_PORT]
-    #[allow(dead_code)]
+    /// Must be `false` before attempting to write data to [PS2_DATA_PORT] or [PS2_COMMAND_AND_STATUS_PORT] for 8042 keyboard controller
+    /// Alternative name: input_register_full, which might make more sense because it only ever fits 1 byte. "Buffer" sounds like multiple.
     input_buffer_full: bool1,
     /// Cleared on reset; set when the system passed Power-on self-test
     #[allow(dead_code)]
@@ -102,12 +112,11 @@ pub struct ControllerToHostStatus {
 }
 
 /// Read the PS/2 status port/register
-/// Note: Currently unused, might be used later for error checking
-#[allow(dead_code)]
 fn status_register() -> ControllerToHostStatus {
     ControllerToHostStatus::from_bytes([PS2_COMMAND_AND_STATUS_PORT.lock().read()])
 }
 
+//NOTE: if we are _not_ in an interrupt handler, it might be necessary to check for `output_buffer_full` first
 /// Read data from the PS/2 data port.
 /// This is the lowest level interface to the port.
 fn read_data() -> u8 {
@@ -147,6 +156,7 @@ impl From<WritableData> for u8 {
     }
 }
 
+//NOTE: it might be necessary to check for `!input_buffer_full` first
 /// Write data to the PS/2 data port.
 /// This is the lowest level interface to the port.
 fn write_data(value: WritableData) {
@@ -158,17 +168,23 @@ fn write_data(value: WritableData) {
 #[bitfield(bits = 8)]
 #[derive(Debug)]
 pub struct ControllerConfigurationByte {
+    /// interrupt on [ControllerToHostStatus] `output_buffer_full`
     port1_interrupt_enabled: bool1,
+    /// interrupt on [ControllerToHostStatus] `mouse_output_buffer_full`
     port2_interrupt_enabled: bool1, //NOTE: only if 2 PS/2 ports supported
     /// Cleared on reset; set when the system passed Power-on self-test
     #[allow(dead_code)]
     system_passed_self_test: bool1,
+    // or override_keyboard_inhibiting
     #[allow(dead_code)]
     should_be_zero: u1,
+    /// disables the keyboard
     port1_clock_disabled: bool1,
+    /// disables the auxilary device (mouse)
     port2_clock_disabled: bool1, //NOTE: only if 2 PS/2 ports supported
+    /// whether IBM scancode translation is enabled (0=AT, 1=PC)
     #[allow(dead_code)]
-    port1_translation: bool1,
+    port1_translation_enabled: bool1,
     #[allow(dead_code)]
     must_be_zero: u1,
 }
@@ -297,6 +313,7 @@ fn test_ps2_port(port: PS2Port) -> Result<(), &'static str> {
 #[repr(u8)]
 enum ControllerTestResult {
     Passed = 0x55,
+    //NOTE: can just be removed
     Failed = 0xFC,
 }
 
@@ -337,12 +354,28 @@ pub enum DeviceToHostResponse {
     KeyDetectionErrorOrInternalBufferOverrun2 = 0xFF,
 }
 
+// https://wiki.osdev.org/%228042%22_PS/2_Controller#Sending_Bytes_To_Device.2Fs
+// and https://wiki.osdev.org/PS/2_Mouse#Set_Sample_Rate_Example
+// AND https://wiki.osdev.org/%228042%22_PS/2_Controller#Polling, which still has some _maybe relevant information_:
+// We might still need to disable one of the devices every time we send so we can read_data reliably.
+// As it currently works, it might only be a problem for older devices, so I won't overoptimize.
 /// write data to the data port and return the response
 fn send(value: HostToDevice) -> Result<DeviceToHostResponse, &'static str> {
-    write_data(WritableData::HostToDevice(value));
-    read_data().try_into().map_err(|_| "failed to read device response")
+    const VERY_ARBITRARY_TIMEOUT_VALUE: u8 = 3;
+    for _ in 0..VERY_ARBITRARY_TIMEOUT_VALUE {
+        // so that we don't overwrite the previously sent command
+        if !status_register().input_buffer_full() {
+            write_data(WritableData::HostToDevice(value.clone()));
+            // so that we only read when data is available
+            if status_register().output_buffer_full() {
+                return read_data().try_into().map_err(|_| "failed to read device response");
+            }
+        }
+    }
+    Err("timeout value exceeded")
 }
 
+#[derive(Clone)]
 enum HostToDevice {
     Keyboard(HostToKeyboardCommandOrData),
     Mouse(HostToMouseCommandOrData)
