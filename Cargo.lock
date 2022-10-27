@@ -86,6 +86,7 @@ dependencies = [
  "kernel_config",
  "log",
  "memory",
+ "no_drop",
  "scheduler",
  "spawn",
  "stack",
@@ -323,6 +324,7 @@ dependencies = [
  "multicore_bringup",
  "multiple_heaps",
  "network_manager",
+ "no_drop",
  "ota_update_client",
  "print",
  "scheduler",
@@ -1696,6 +1698,7 @@ dependencies = [
  "memory_structs",
  "memory_x86_64",
  "multiboot2",
+ "no_drop",
  "page_allocator",
  "page_table_entry",
  "spin 0.9.0",
@@ -1715,6 +1718,7 @@ dependencies = [
  "log",
  "memory",
  "multiboot2",
+ "no_drop",
  "stack",
 ]
 
@@ -1986,6 +1990,7 @@ dependencies = [
  "memory_initialization",
  "mod_mgmt",
  "multiboot2",
+ "no_drop",
  "panic_entry",
  "serial_port_basic",
  "spin 0.9.0",
@@ -2057,6 +2062,10 @@ dependencies = [
  "nic_buffers",
  "owning_ref",
 ]
+
+[[package]]
+name = "no_drop"
+version = "0.1.0"
 
 [[package]]
 name = "ns"
@@ -3002,6 +3011,7 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
+ "no_drop",
  "path",
  "pause",
  "preemption",
@@ -3193,6 +3203,7 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
+ "no_drop",
  "preemption",
  "root",
  "spin 0.9.0",

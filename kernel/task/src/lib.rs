@@ -45,6 +45,7 @@ extern crate x86_64;
 extern crate spin;
 extern crate kernel_config;
 extern crate crossbeam_utils;
+extern crate no_drop;
 
 
 use core::{
@@ -71,7 +72,7 @@ use environment::Environment;
 use spin::Mutex;
 use x86_64::registers::model_specific::{GsBase, FsBase};
 use preemption::PreemptionGuard;
-
+use no_drop::NoDrop;
 
 /// The function signature of the callback that will be invoked
 /// when a given Task panics or otherwise fails, e.g., a machine exception occurs.
@@ -1240,7 +1241,7 @@ impl Deref for TaskRef {
 /// This function does not add the new task to any runqueue.
 pub fn bootstrap_task(
     apic_id: u8, 
-    stack: Stack,
+    stack: NoDrop<Stack>,
     kernel_mmi_ref: MmiRef,
 ) -> Result<JoinableTaskRef, &'static str> {
     // Here, we cannot call `Task::new()` because tasking hasn't yet been set up for this core.
@@ -1250,7 +1251,7 @@ pub fn bootstrap_task(
         .clone();
     let default_env = Arc::new(Mutex::new(Environment::default()));
     let mut bootstrap_task = Task::new_internal(
-        stack,
+        stack.into_inner(),
         kernel_mmi_ref,
         default_namespace,
         default_env,
@@ -1268,6 +1269,9 @@ pub fn bootstrap_task(
     task_ref.set_as_current_task();
     if get_my_current_task().is_none() {
         error!("BUG: bootstrap_task(): failed to properly set the new boostrapped task as the current task on AP {}", apic_id);
+        // Don't drop the bootstrap task upon error, because it contains the stack
+        // used for the currently running code -- that would trigger an exception.
+        core::mem::forget(task_ref);
         return Err("BUG: bootstrap_task(): failed to properly set the new bootstrapped task as the current task");
     }
 
