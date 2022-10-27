@@ -31,6 +31,9 @@ path = "../first_application"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.no_drop]
+path = "../no_drop"
+
 [dependencies.stack]
 path = "../stack"
 

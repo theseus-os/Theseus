@@ -27,6 +27,7 @@ extern crate dfqueue; // decoupled, fault-tolerant queue
 
 extern crate logger;
 extern crate memory; // the virtual memory subsystem 
+extern crate no_drop;
 extern crate stack;
 extern crate apic; 
 extern crate mod_mgmt;
@@ -48,14 +49,13 @@ extern crate console;
 #[cfg(simd_personality)] extern crate simd_personality;
 
 
-
 use alloc::vec::Vec;
 use core::ops::DerefMut;
 use memory::{VirtualAddress, MappedPages, MmiRef};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::enable_interrupts;
 use stack::Stack;
-
+use no_drop::NoDrop;
 
 
 #[cfg(mirror_log_to_vga)]
@@ -67,12 +67,22 @@ pub fn mirror_to_vga_cb(args: core::fmt::Arguments) {
 
 
 /// Initialize the Captain, which is the main module that steers the ship of Theseus. 
-/// This does all the rest of the module loading and initialization so that the OS 
+/// 
+/// This does the rest of the initialization procedures so that the OS 
 /// can continue running and do actual useful work.
+/// 
+/// # Arguments
+/// * `kernel_mmi_ref`: a reference to the kernel's memory management info.
+/// * `identity_mapped_pages`: the memory containing the identity-mapped content,
+///    which must not be dropped until all APs are finished booting.
+/// * `bsp_initial_stack`: the stack currently in use for running this code,
+///    which must not be dropped for the entire execution of the initial bootstrap task.
+/// * `ap_start_realmode_begin`: the start bound (inclusive) of the AP's realmode boot code.
+/// * `ap_start_realmode_end`: the end bound (exlusive) of the AP's realmode boot code.
 pub fn init(
     kernel_mmi_ref: MmiRef,
-    identity_mapped_pages: Vec<MappedPages>,
-    bsp_initial_stack: Stack,
+    identity_mapped_pages: NoDrop<Vec<MappedPages>>,
+    bsp_initial_stack: NoDrop<Stack>,
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
 ) -> Result<(), &'static str> {
@@ -136,7 +146,7 @@ pub fn init(
 
     // We can drop and unmap the identity mappings after the initial bootstrap is complete.
     // We could probably do this earlier, but we definitely can't do it until after the APs boot.
-    drop(identity_mapped_pages);
+    drop(identity_mapped_pages.into_inner());
     
     // create a SIMD personality
     #[cfg(simd_personality)] {

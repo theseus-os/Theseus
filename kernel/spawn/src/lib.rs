@@ -33,6 +33,7 @@ use path::Path;
 use apic::get_my_apic_id;
 use fs_node::FileOrDir;
 use preemption::{hold_preemption, PreemptionGuard};
+use no_drop::NoDrop;
 
 #[cfg(simd_personality)]
 use task::SimdExt;
@@ -43,7 +44,7 @@ use task::SimdExt;
 pub fn init(
     kernel_mmi_ref: MmiRef,
     apic_id: u8,
-    stack: Stack,
+    stack: NoDrop<Stack>,
 ) -> Result<BootstrapTaskRef, &'static str> {
     runqueue::init(apic_id)?;
     
