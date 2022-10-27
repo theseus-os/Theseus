@@ -1271,7 +1271,7 @@ pub fn bootstrap_task(
         error!("BUG: bootstrap_task(): failed to properly set the new boostrapped task as the current task on AP {}", apic_id);
         // Don't drop the bootstrap task upon error, because it contains the stack
         // used for the currently running code -- that would trigger an exception.
-        core::mem::forget(task_ref);
+        let _task_ref = NoDrop::new(task_ref);
         return Err("BUG: bootstrap_task(): failed to properly set the new bootstrapped task as the current task");
     }
 
