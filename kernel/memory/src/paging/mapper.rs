@@ -805,6 +805,10 @@ impl MappedPages {
             );
         }
 
+        if size_in_bytes >= isize::MAX as usize {
+            return Err("MappedPages::as_slice(): length * size_of::<T>() must be less than isize::MAX");
+        }
+
         if byte_offset % mem::align_of::<T>() != 0 {
             error!("MappedPages::as_slice(): requested slice of type {} with length {} (total size {}), but the byte_offset {} is unaligned with type alignment {}!",
                 core::any::type_name::<T>(),
@@ -825,7 +829,13 @@ impl MappedPages {
             return Err("MappedPages::as_slice(): requested slice length and byte_offset would not fit within the MappedPages bounds");
         }
 
-        // SAFE: we guarantee the bounds and lifetime are within that of this MappedPages object
+        // SAFETY:
+        // ✅ The pointer is properly aligned (checked above) and is non-null.
+        // ✅ The entire memory range of the slice is contained within this `MappedPages` (bounds checked above).
+        // ✅ The pointer points to `length` consecutive values of type T.
+        // ✅ The slice memory cannot be mutated by anyone else because we only return an immutable reference to it.
+        // ✅ The total size of the slice does not exceed isize::MAX (checked above).
+        // ✅ The lifetime of the returned slice reference is tied to the lifetime of this `MappedPages`.
         let slc: &[T] = unsafe {
             slice::from_raw_parts(start_vaddr as *const T, length)
         };
@@ -846,6 +856,10 @@ impl MappedPages {
                 core::any::type_name::<T>(), 
                 length, size_in_bytes, byte_offset, self.size_in_bytes()
             );
+        }
+
+        if size_in_bytes >= isize::MAX as usize {
+            return Err("MappedPages::as_slice_mut(): length * size_of::<T>() must be less than isize::MAX");
         }
         
         if byte_offset % mem::align_of::<T>() != 0 {
@@ -877,7 +891,9 @@ impl MappedPages {
             return Err("MappedPages::as_slice_mut(): requested slice length and byte_offset would not fit within the MappedPages bounds");
         }
 
-        // SAFE: we guarantee the bounds and lifetime are within that of this MappedPages object
+        // SAFETY:
+        // ✅ same as for `MappedPages::as_slice()`, plus:
+        // ✅ The underlying memory is not accessible through any other pointer, as we require a `&mut self` above.
         let slc: &mut [T] = unsafe {
             slice::from_raw_parts_mut(start_vaddr as *mut T, length)
         };
