@@ -981,10 +981,10 @@ impl CrateNamespace {
                 }
 
                 write_relocation(
-                    relocation_entry, 
-                    &mut target_sec_mapped_pages, 
-                    target_sec.mapped_pages_offset, 
-                    new_section.start_address(), 
+                    relocation_entry,
+                    target_sec_mapped_pages.as_slice_mut(0, target_sec.mapped_pages_offset + target_sec.size())?,
+                    target_sec.mapped_pages_offset,
+                    new_section.start_address(),
                     false
                 )?;
 
@@ -1330,13 +1330,16 @@ impl CrateNamespace {
             }
 
             // Actually copy the section data from the ELF file to the given destination MappedPages.
-            let dest_slice: &mut [u8] = mapped_pages.as_slice_mut(mapped_pages_offset, sec_size)?;
-            match sec.get_data(&elf_file) {
-                Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                Ok(SectionData::Empty) => dest_slice.fill(0),
-                _other => {
-                    error!("Couldn't get section data for merged section: {:?}", _other);
-                    return Err("couldn't get section data for merged section");
+            // Skip TLS BSS (.tbss) sections, which have no data and occupy no space in memory.
+            if typ != SectionType::TlsBss {
+                let dest_slice: &mut [u8] = mapped_pages.as_slice_mut(mapped_pages_offset, sec_size)?;
+                match sec.get_data(&elf_file) {
+                    Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                    Ok(SectionData::Empty) => dest_slice.fill(0),
+                    _other => {
+                        error!("Couldn't get section data for merged section: {:?}", _other);
+                        return Err("couldn't get section data for merged section");
+                    }
                 }
             }
 
@@ -2114,6 +2117,10 @@ impl CrateNamespace {
             let mut target_sec_internal_dependencies: Vec<InternalDependency> = Vec::new();
             {
                 let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
+                let target_sec_slice: &mut [u8] = target_sec_mapped_pages.as_slice_mut(
+                    0,
+                    target_sec.mapped_pages_offset + target_sec.size(),
+                )?;
 
                 // iterate through each relocation entry in the relocation array for the target_sec
                 for rela_entry in rela_array {
@@ -2176,7 +2183,7 @@ impl CrateNamespace {
                     let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
                     write_relocation(
                         relocation_entry,
-                        &mut target_sec_mapped_pages,
+                        target_sec_slice,
                         target_sec.mapped_pages_offset,
                         source_sec.start_address() + source_sec_value,
                         verbose_log

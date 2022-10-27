@@ -368,15 +368,13 @@ impl Shell {
         if self.history_index == 0 {
             return Ok(());
         }
-        if self.history_index == 1 {
-            if self.buffered_cmd_recorded {
-                let selected_command = self.command_history.pop()
-                    .ok_or("BUG: shell::goto_next_command(): empty command line history when history_index was 1")?;
-                self.set_cmdline(selected_command, true)?;
-                self.history_index -= 1;
-                self.buffered_cmd_recorded = false;
-                return Ok(());
-            }
+        if self.history_index == 1 && self.buffered_cmd_recorded {
+            let selected_command = self.command_history.pop()
+                .ok_or("BUG: shell::goto_next_command(): empty command line history when history_index was 1")?;
+            self.set_cmdline(selected_command, true)?;
+            self.history_index -= 1;
+            self.buffered_cmd_recorded = false;
+            return Ok(());
         }
         self.history_index -=1;
         if self.history_index == 0 {

@@ -45,7 +45,7 @@
 
 extern crate alloc;
 
-use core::convert::TryFrom;
+use core::{convert::TryFrom, mem::size_of};
 use core::fmt;
 use core::ops::Range;
 use log::{error, debug, trace};
@@ -506,6 +506,10 @@ impl LoadedCrate {
                     .ok_or("BUG: missing data pages in newly-copied crate")?,
             };
             let new_sec_mapped_pages_offset = new_sec.mapped_pages_offset;
+            let new_sec_slice: &mut [u8] = new_sec_mapped_pages.as_slice_mut(
+                0,
+                new_sec_mapped_pages_offset + new_sec.size(),
+            )?;
 
             // The newly-duplicated crate still depends on the same sections, so we keep those as is, 
             // but we do need to recalculate those relocations.
@@ -517,7 +521,7 @@ impl LoadedCrate {
                     // perform the actual fix by writing the relocation
                     write_relocation(
                         strong_dep.relocation, 
-                        new_sec_mapped_pages, 
+                        new_sec_slice, 
                         new_sec_mapped_pages_offset,
                         source_sec.start_address(),
                         true
@@ -552,7 +556,7 @@ impl LoadedCrate {
                 };
                 write_relocation(
                     internal_dep.relocation, 
-                    new_sec_mapped_pages, 
+                    new_sec_slice, 
                     new_sec_mapped_pages_offset,
                     source_sec_vaddr,
                     true
@@ -1014,58 +1018,67 @@ impl InternalDependency {
 }
 
 
-/// Write an actual relocation entry.
+/// Actually write the value of a relocation entry.
+/// 
 /// # Arguments
-/// * `relocation_entry`: the relocation entry from the ELF file that specifies the details of the relocation action to perform.
-/// * `target_sec_mapped_pages`: the `MappedPages` that covers the target section, i.e., the section where the relocation data will be written to.
-/// * `target_sec_mapped_pages_offset`: the offset into `target_sec_mapped_pages` where the target section is located.
-/// * `source_sec_vaddr`: the `VirtualAddress` of the source section of the relocation, i.e., the section that the `target_sec` depends on and "points" to.
+/// * `relocation_entry`: the relocation entry from the ELF file that specifies the details
+///    of the relocation action to perform.
+/// * `target_sec_slice`: a byte slice holding the entire contents of the target section,
+///    i.e., the section where the relocation data will be written to.
+/// * `target_sec_offset`: the offset into `target_sec_slice` where the target section's contents begin.
+/// * `source_sec_vaddr`: the `VirtualAddress` of the source section of the relocation, i.e.,
+///    the section that the `target_sec` depends on and "points" to.
 /// * `verbose_log`: whether to output verbose logging information about this relocation action.
 pub fn write_relocation(
     relocation_entry: RelocationEntry,
-    target_sec_mapped_pages: &mut MappedPages,
-    target_sec_mapped_pages_offset: usize,
+    target_sec_slice: &mut [u8],
+    target_sec_offset: usize,
     source_sec_vaddr: VirtualAddress,
     verbose_log: bool
 ) -> Result<(), &'static str> {
     // Calculate exactly where we should write the relocation data to.
-    let target_offset = target_sec_mapped_pages_offset + relocation_entry.offset;
+    let target_sec_offset = target_sec_offset + relocation_entry.offset;
 
-    // Perform the actual relocation data writing here.
-    // There is a great, succint table of relocation types here
-    // https://docs.rs/goblin/0.0.24/goblin/elf/reloc/index.html
+    // Perform the actual writing of relocation data here.
+    // There is a great, succint table of relocation types here:
+    // <https://docs.rs/goblin/0.0.24/goblin/elf/reloc/index.html>
     match relocation_entry.typ {
         R_X86_64_32 => {
-            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
-            *target_ref = source_val as u32;
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u32;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
         R_X86_64_64 => {
-            let target_ref: &mut u64 = target_sec_mapped_pages.as_type_mut(target_offset)?;
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
-            *target_ref = source_val as u64;
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u64>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u64;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
         R_X86_64_PC32 |
         R_X86_64_PLT32 => {
-            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
-            *target_ref = source_val as u32;
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize) as u32;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
         R_X86_64_PC64 => {
-            let target_ref: &mut u64 = target_sec_mapped_pages.as_type_mut(target_offset)?;
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
-            *target_ref = source_val as u64;
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u64>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize);
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
         R_X86_64_TPOFF32 => {
-            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
+            let target_ref = &mut target_sec_slice[target_range];
             let source_val = u32::try_from(source_sec_vaddr.value())
                 .map_err(|_| "BUG: TLS relocation (R_X86_64_TPOFF32) source section value (TLS offset) cannot fit in a `u32`")?;
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
-            *target_ref = source_val;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
         // R_X86_64_GOTPCREL => { 
         //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table

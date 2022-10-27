@@ -820,7 +820,7 @@ impl IxgbeNic {
             val.set_bits(0..4, rx_buffer_size_kbytes as u32);
             val.set_bits(8..13, BSIZEHEADER_0B);
             val.set_bits(25..27, DESCTYPE_ADV_1BUFFER);
-            val = val | DROP_ENABLE;
+            val |= DROP_ENABLE;
             rxq.srrctl.write(val);
 
             //enable the rx queue
@@ -1048,33 +1048,33 @@ impl IxgbeNic {
         // set the source ip address for the filter
         if let Some (addr) = source_ip {
             self.regs3.saqf[filter_num].write(((addr[3] as u32) << 24) | ((addr[2] as u32) << 16) | ((addr[1] as u32) << 8) | (addr[0] as u32));
-            filter_mask = filter_mask & !FTQF_SOURCE_ADDRESS_MASK;
+            filter_mask &= !FTQF_SOURCE_ADDRESS_MASK;
         };
 
         // set the destination ip address for the filter
         if let Some(addr) = dest_ip {
             self.regs3.daqf[filter_num].write(((addr[3] as u32) << 24) | ((addr[2] as u32) << 16) | ((addr[1] as u32) << 8) | (addr[0] as u32));
-            filter_mask = filter_mask & !FTQF_DEST_ADDRESS_MASK;
+            filter_mask &= !FTQF_DEST_ADDRESS_MASK;
         };        
 
         // set the source port for the filter    
         if let Some(port) = source_port {
             self.regs3.sdpqf[filter_num].write((port as u32) << SPDQF_SOURCE_SHIFT);
-            filter_mask = filter_mask & !FTQF_SOURCE_PORT_MASK;
+            filter_mask &= !FTQF_SOURCE_PORT_MASK;
         };   
 
         // set the destination port for the filter    
         if let Some(port) = dest_port {
             let port_val = self.regs3.sdpqf[filter_num].read();
             self.regs3.sdpqf[filter_num].write(port_val | (port as u32) << SPDQF_DEST_SHIFT);
-            filter_mask = filter_mask & !FTQF_DEST_PORT_MASK;
+            filter_mask &= !FTQF_DEST_PORT_MASK;
         };
 
         // set the filter protocol
         let mut filter_protocol = FilterProtocol::Other;
         if let Some(protocol) = protocol {
             filter_protocol = protocol;
-            filter_mask = filter_mask & !FTQF_PROTOCOL_MASK;
+            filter_mask &= !FTQF_PROTOCOL_MASK;
         };
 
         // write the parameters of the filter
@@ -1142,7 +1142,7 @@ impl IxgbeNic {
         // the lower 16 bits are for the 16 receive queue interrupts
         let mut val = 0;
         for i in 0..num_msi_vec_enabled {
-            val = val | (EIMS_INTERRUPT_ENABLE << i);
+            val |= EIMS_INTERRUPT_ENABLE << i;
         }
         regs.eims.write(val); 
         // debug!("EIMS: {:#X}", regs.eims.read());
