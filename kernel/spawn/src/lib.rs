@@ -27,7 +27,7 @@ use spin::Mutex;
 use irq_safety::enable_interrupts;
 use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
-use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef};
+use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use apic::get_my_apic_id;
@@ -107,11 +107,11 @@ pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
 pub struct BootstrapTaskRef {
     #[allow(dead_code)]
     apic_id: u8,
-    task_ref: JoinableTaskRef,
+    task_ref: TaskRef<true>,
 }
 impl Deref for BootstrapTaskRef {
-    type Target = TaskRef;
-    fn deref(&self) -> &TaskRef {
+    type Target = TaskRef<true>;
+    fn deref(&self) -> &Self::Target {
         &self.task_ref
     }
 }
@@ -154,7 +154,7 @@ impl Drop for BootstrapTaskRef {
 pub fn new_task_builder<F, A, R>(
     func: F,
     argument: A
-) -> TaskBuilder<F, A, R>
+) -> TaskBuilder<F, A, R, false>
     where A: Send + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R,
@@ -192,7 +192,7 @@ type MainFunc = fn(MainFuncArg) -> MainFuncRet;
 pub fn new_application_task_builder(
     crate_object_file: Path, // TODO FIXME: use `mod_mgmt::IntoCrateObjectFile`,
     new_namespace: Option<Arc<CrateNamespace>>,
-) -> Result<TaskBuilder<MainFunc, MainFuncArg, MainFuncRet>, &'static str> {
+) -> Result<TaskBuilder<MainFunc, MainFuncArg, MainFuncRet, false>, &'static str> {
     
     let namespace = new_namespace.or_else(|| task::get_my_current_task().map(|t| t.get_namespace().clone()))
         .ok_or("spawn::new_application_task_builder(): couldn't get current task to use its CrateNamespace")?;
@@ -252,13 +252,12 @@ pub fn new_application_task_builder(
 /// 
 /// [tb]:  fn.new_task_builder.html
 /// [atb]: fn.new_application_task_builder.html
-pub struct TaskBuilder<F, A, R> {
+pub struct TaskBuilder<F, A, R, const BLOCKED: bool> {
     func: F,
     argument: A,
     _return_type: PhantomData<R>,
     name: Option<String>,
     pin_on_core: Option<u8>,
-    blocked: bool,
     idle: bool,
     post_build_function: Option<Box< dyn FnOnce(&mut Task) -> Result<(), &'static str> >>,
 
@@ -266,21 +265,16 @@ pub struct TaskBuilder<F, A, R> {
     simd: SimdExt,
 }
 
-impl<F, A, R> TaskBuilder<F, A, R> 
-    where A: Send + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R,
-{
+impl<F, A, R> TaskBuilder<F, A, R, false> {
     /// Creates a new `Task` from the given function `func`
     /// that will be passed the argument `arg` when spawned. 
-    fn new(func: F, argument: A) -> TaskBuilder<F, A, R> {
+    fn new(func: F, argument: A) -> Self {
         TaskBuilder {
-            argument: argument,
-            func: func,
+            argument,
+            func,
             _return_type: PhantomData,
             name: None,
             pin_on_core: None,
-            blocked: false,
             idle: false,
             post_build_function: None,
 
@@ -288,21 +282,41 @@ impl<F, A, R> TaskBuilder<F, A, R>
             simd: SimdExt::None,
         }
     }
+}
 
+impl<F, A, R> TaskBuilder<F, A, R, false> {
+    /// Set the new Task's `RunState` to be `Blocked` instead of `Runnable` when it is first spawned.
+    /// This allows another task to delay the new task's execution arbitrarily, 
+    /// e.g., to set up other things for the newly-spawned (but not yet running) task. 
+    /// 
+    /// Note that the new Task will not be `Runnable` until it is explicitly set as such.
+    pub fn block(mut self) -> TaskBuilder<F, A, R, true> {
+        TaskBuilder {
+            ..self
+        }
+    }
+
+}
+
+impl<F, A, R, const BLOCKED: bool> TaskBuilder<F, A, R, BLOCKED> 
+    where A: Send + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R,
+{
     /// Set the String name for the new Task.
-    pub fn name(mut self, name: String) -> TaskBuilder<F, A, R> {
+    pub fn name(mut self, name: String) -> TaskBuilder<F, A, R, BLOCKED> {
         self.name = Some(name);
         self
     }
 
     /// Set the argument that will be passed to the new Task's entry function.
-    pub fn argument(mut self, argument: A) -> TaskBuilder<F, A, R> {
+    pub fn argument(mut self, argument: A) -> TaskBuilder<F, A, R, BLOCKED> {
         self.argument = argument;
         self
     }
 
     /// Pin the new Task to a specific core.
-    pub fn pin_on_core(mut self, core_apic_id: u8) -> TaskBuilder<F, A, R> {
+    pub fn pin_on_core(mut self, core_apic_id: u8) -> TaskBuilder<F, A, R, BLOCKED> {
         self.pin_on_core = Some(core_apic_id);
         self
     }
@@ -314,22 +328,12 @@ impl<F, A, R> TaskBuilder<F, A, R>
         self.simd = extension;
         self
     }
-
-    /// Set the new Task's `RunState` to be `Blocked` instead of `Runnable` when it is first spawned.
-    /// This allows another task to delay the new task's execution arbitrarily, 
-    /// e.g., to set up other things for the newly-spawned (but not yet running) task. 
-    /// 
-    /// Note that the new Task will not be `Runnable` until it is explicitly set as such.
-    pub fn block(mut self) -> TaskBuilder<F, A, R> {
-        self.blocked = true;
-        self
-    }
-
+    
     /// Finishes this `TaskBuilder` and spawns the new task as described by its builder functions.
     /// 
     /// This merely makes the new task Runnable, it does not switch to it immediately; that will happen on the next scheduler invocation.
     #[inline(never)]
-    pub fn spawn(self) -> Result<JoinableTaskRef, &'static str> {
+    pub fn spawn(self) -> Result<TaskRef<true, BLOCKED>, &'static str> {
         let mut new_task = Task::new(
             None,
             task_cleanup_failure::<F, A, R>,
@@ -355,12 +359,6 @@ impl<F, A, R> TaskBuilder<F, A, R>
         *bottom_of_stack = box_ptr as usize;
 
         // The new task is ready to be scheduled in, now that its stack trampoline has been set up.
-        if self.blocked {
-            new_task.block_initing_task().unwrap();
-        } else {
-            new_task.unblock_initing_task().unwrap();
-        }
-
         // The new task is marked as idle
         if self.idle {
             new_task.is_an_idle_task = true;
@@ -370,10 +368,21 @@ impl<F, A, R> TaskBuilder<F, A, R>
         if let Some(pb_func) = self.post_build_function {
             pb_func(&mut new_task)?;
         }
+        
+        // SAFETY: the transmutes do nothing as the methods
+        let task_ref: TaskRef<true, BLOCKED> = unsafe {
+            if BLOCKED {
+                core::mem::transmute(new_task.init())
+            } else {
+                core::mem::transmute(new_task.init().unblock().0)
+            }
+        };
+        todo!();
+    }
 
-        let new_task_id = new_task.id;
-        let task_ref = TaskRef::new(new_task);
-        let _existing_task = TASKLIST.lock().insert(new_task_id, task_ref.clone());
+
+    fn post_unblock_spawn(&self, task: TaskRef<true, BLOCKED>) -> Result<TaskRef<true, BLOCKED>, &'static str>  {
+        let _existing_task = TASKLIST.lock().insert(task.id, task.clone());
         // insert should return None, because that means there was no existing task with the same ID 
         if let Some(_existing_task) = _existing_task {
             error!("BUG: TaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID! {:?}", _existing_task);
@@ -381,25 +390,19 @@ impl<F, A, R> TaskBuilder<F, A, R>
         }
         
         if let Some(core) = self.pin_on_core {
-            runqueue::add_task_to_specific_runqueue(core, task_ref.clone())?;
+            runqueue::add_task_to_specific_runqueue(core, task.clone())?;
         } else {
-            runqueue::add_task_to_any_runqueue(task_ref.clone())?;
+            runqueue::add_task_to_any_runqueue(task.clone())?;
         }
 
-        Ok(task_ref)
-
-        // Ok(TaskJoiner::<R> {
-        //     task: task_ref,
-        //     _phantom: PhantomData,
-        // })
+        Ok(task)
     }
-
 }
 
 /// Additional implementation of `TaskBuilder` to be used for 
 /// restartable functions. Further restricts the function (F) 
 /// and argument (A) to implement `Clone` trait.
-impl<F, A, R> TaskBuilder<F, A, R> 
+impl<F, A, R, const BLOCKED: bool> TaskBuilder<F, A, R, BLOCKED> 
     where A: Send + Clone + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R + Send + Clone +'static,
@@ -413,7 +416,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
     /// but or to restart an idle task that has exited or failed.
     /// 
     /// There is no harm spawning multiple idle tasks on each core, but it's a waste of space. 
-    pub fn idle(mut self, core_id: u8) -> TaskBuilder<F, A, R> {
+    pub fn idle(mut self, core_id: u8) -> TaskBuilder<F, A, R, BLOCKED> {
         self.idle = true;
         self.pin_on_core(core_id)
     }
@@ -445,7 +448,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
     pub fn spawn_restartable(
         mut self,
         restart_with_arg: Option<A>
-    ) -> Result<JoinableTaskRef, &'static str> {
+    ) -> Result<TaskRef<true, BLOCKED>, &'static str> {
         let restart_info = RestartInfo {
             argument: Box::new(restart_with_arg.unwrap_or_else(|| self.argument.clone())),
             func: Box::new(self.func.clone()),
@@ -908,7 +911,7 @@ fn remove_current_task_from_runqueue(current_task: &TaskRef) {
 }
 
 /// Spawns an idle task on the current CPU and adds it to this CPU's runqueue.
-pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
+pub fn create_idle_task() -> Result<TaskRef<true, false>, &'static str> {
     let apic_id = get_my_apic_id();
     debug!("Spawning a new idle task on core {}", apic_id);
 
