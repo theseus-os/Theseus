@@ -3,7 +3,7 @@
 #![no_std]
 
 use core::{
-    // fmt,
+    fmt::{self, Debug},
     mem::ManuallyDrop,
     ops::{Deref, DerefMut}
 };
@@ -15,7 +15,6 @@ use core::{
 /// Auto-derefs to the inner object type `T`.
 ///
 /// To re-take ownership of the object, call [`Self::into_inner()`].
-#[derive(Debug)]
 #[repr(transparent)]
 pub struct NoDrop<T>(ManuallyDrop<T>);
 
@@ -31,6 +30,11 @@ impl<T> NoDrop<T> {
     }
 }
 
+impl<T: Debug> Debug for NoDrop<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Debug::fmt(&self.0.deref(), f)
+    }
+}
 impl<T> Deref for NoDrop<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
