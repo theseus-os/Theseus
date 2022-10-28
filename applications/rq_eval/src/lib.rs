@@ -36,7 +36,7 @@ use alloc::{
 };
 use getopts::{Matches, Options};
 use hpet::get_hpet;
-use task::{Task, TaskRef};
+use task::Task;
 use libtest::{hpet_timing_overhead, hpet_2_us};
 
 

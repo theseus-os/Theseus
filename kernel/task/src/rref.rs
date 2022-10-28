@@ -1,4 +1,12 @@
-use super::*;
+use crate::{get_my_current_task, ExitValue, KillReason, RunState, Task};
+use alloc::{boxed::Box, sync::Arc};
+use core::{
+    any::Any,
+    hash::{Hash, Hasher},
+    ops::Deref,
+    sync::atomic::Ordering,
+};
+use irq_safety::interrupts_enabled;
 
 // FIXME Document.
 #[derive(Debug)]

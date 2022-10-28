@@ -47,6 +47,8 @@ extern crate spin;
 extern crate kernel_config;
 extern crate crossbeam_utils;
 
+mod rref;
+pub use rref::TaskRef;
 
 use core::{
     any::Any,
@@ -63,7 +65,7 @@ use alloc::{
     sync::Arc,
 };
 use crossbeam_utils::atomic::AtomicCell;
-use irq_safety::{MutexIrqSafe, interrupts_enabled, hold_interrupts};
+use irq_safety::{MutexIrqSafe, hold_interrupts};
 use memory::MmiRef;
 use stack::Stack;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
@@ -1105,6 +1107,3 @@ pub fn get_my_current_task() -> Option<&'static TaskRef> {
 pub fn get_my_current_task_id() -> Option<usize> {
     get_task_local_data().map(|tld| tld.task_id)
 }
-
-pub mod rref;
-pub use rref::*;
