@@ -62,8 +62,7 @@ pub fn init(host_address_width: u8,
         page_table.map_allocated_pages_to(pages, frames, flags)?
     };
 
-    let regs: BorrowedMappedPages<IntelIommuRegisters, Mutable> =
-        BorrowedMappedPages::try_into_borrowed_mut(mp, 0)
+    let regs = mp.into_borrowed_mut::<IntelIommuRegisters>(0)
         .map_err(|(_mp, err)| err)?;
 
     // get the version number

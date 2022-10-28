@@ -902,6 +902,40 @@ impl MappedPages {
 
         Ok(slc)
     }
+
+    /// A convenience function for [`BorrowedMappedPages::from()`].
+    pub fn into_borrowed<T: FromBytes>(
+        self,
+        byte_offset: usize,
+    ) -> Result<BorrowedMappedPages<T, Immutable>, (MappedPages, &'static str)> {
+        BorrowedMappedPages::from(self, byte_offset)
+    }
+
+    /// A convenience function for [`BorrowedMappedPages::from_mut()`].
+    pub fn into_borrowed_mut<T: FromBytes>(
+        self,
+        byte_offset: usize,
+    ) -> Result<BorrowedMappedPages<T, Mutable>, (MappedPages, &'static str)> {
+        BorrowedMappedPages::from_mut(self, byte_offset)
+    }
+
+    /// A convenience function for [`BorrowedSliceMappedPages::from()`].
+    pub fn into_borrowed_slice<T: FromBytes>(
+        self,
+        byte_offset: usize,
+        length: usize,
+    ) -> Result<BorrowedSliceMappedPages<T, Immutable>, (MappedPages, &'static str)> {
+        BorrowedSliceMappedPages::from(self, byte_offset, length)
+    }
+
+    /// A convenience function for [`BorrowedSliceMappedPages::from_mut()`].
+    pub fn into_borrowed_slice_mut<T: FromBytes>(
+        self,
+        byte_offset: usize,
+        length: usize,
+    ) -> Result<BorrowedSliceMappedPages<T, Mutable>, (MappedPages, &'static str)> {
+        BorrowedSliceMappedPages::from_mut(self, byte_offset, length)
+    }
 }
 
 impl Drop for MappedPages {
@@ -972,6 +1006,7 @@ impl<T: FromBytes> DerefMut for BorrowedMappedPages<T, Mutable> {
         unsafe { self.ptr.as_mut() }
     }
 }
+
 impl<T: FromBytes> BorrowedMappedPages<T, Immutable> {
     /// Immutably borrows the given `MappedPages` as an instance of type `&T` 
     /// located at the given `byte_offset` into the `MappedPages`.
@@ -980,7 +1015,7 @@ impl<T: FromBytes> BorrowedMappedPages<T, Immutable> {
     ///
     /// Upon failure, returns an error containing the unmodified `MappedPages` and a string
     /// describing the error.
-    pub fn try_into_borrowed(
+    pub fn from(
         mp: MappedPages,
         byte_offset: usize,
     ) -> Result<BorrowedMappedPages<T>, (MappedPages, &'static str)> {
@@ -1007,7 +1042,7 @@ impl<T: FromBytes> BorrowedMappedPages<T, Mutable> {
     /// 
     /// Upon failure, returns an error containing the unmodified `MappedPages`
     /// and a string describing the error.
-    pub fn try_into_borrowed_mut(
+    pub fn from_mut(
         mut mp: MappedPages,
         byte_offset: usize,
     ) -> Result<BorrowedMappedPages<T, Mutable>, (MappedPages, &'static str)> {
@@ -1066,6 +1101,7 @@ impl<T: FromBytes> DerefMut for BorrowedSliceMappedPages<T, Mutable> {
         unsafe { self.ptr.as_mut() }
     }
 }
+
 impl<T: FromBytes> BorrowedSliceMappedPages<T, Immutable> {
     /// Immutably borrows the given `MappedPages` as a slice `&[T]`
     /// of `length` elements of type `T` starting at the given `byte_offset` into the `MappedPages`.
@@ -1074,7 +1110,7 @@ impl<T: FromBytes> BorrowedSliceMappedPages<T, Immutable> {
     ///
     /// Upon failure, returns an error containing the unmodified `MappedPages` and a string
     /// describing the error.
-    pub fn try_into_borrowed_slice(
+    pub fn from(
         mp: MappedPages,
         byte_offset: usize,
         length: usize,
@@ -1102,7 +1138,7 @@ impl<T: FromBytes> BorrowedSliceMappedPages<T, Mutable> {
     /// 
     /// Upon failure, returns an error containing the unmodified `MappedPages`
     /// and a string describing the error.
-    pub fn try_into_borrowed_slice_mut(
+    pub fn from_mut(
         mut mp: MappedPages,
         byte_offset: usize,
         length: usize,

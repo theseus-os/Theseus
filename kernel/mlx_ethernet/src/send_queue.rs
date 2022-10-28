@@ -217,19 +217,16 @@ impl SendQueue {
         lkey: Lkey
     ) -> Result<SendQueue, &'static str> {
         // map the descriptor ring and initialize
-        let mut entries: BorrowedSliceMappedPages<WorkQueueEntrySend, Mutable> =
-            BorrowedSliceMappedPages::try_into_borrowed_slice_mut(entries_mp, 0, num_entries)
+        let mut entries = entries_mp.into_borrowed_slice_mut::<WorkQueueEntrySend>(0, num_entries)
             .map_err(|(_mp, err)| err)?;
         for entry in entries.iter_mut() {
             entry.init()
         }
         // map the doorbell and initialize
-        let mut doorbell = BorrowedMappedPages::try_into_borrowed_mut(doorbell_mp, 0)
-            .map_err(|(_mp, err)| err)?;
+        let mut doorbell = doorbell_mp.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
         *doorbell = DoorbellRecord::default();
         // map the uar and initialize
-        let mut uar = BorrowedMappedPages::try_into_borrowed_mut(uar_mp, 0)
-            .map_err(|(_mp, err)| err)?;
+        let mut uar = uar_mp.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
         *uar = UserAccessRegion::default();
 
         Ok( SendQueue{entries, doorbell, uar, wqe_counter: 0, sqn, _tisn, lkey, uar_db: CurrentUARDoorbell::Even} )

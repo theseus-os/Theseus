@@ -66,7 +66,7 @@ impl Rsdp {
 
         found_offset
             .ok_or("couldn't find RSDP signature in BIOS memory")
-            .and_then(|offset| BorrowedMappedPages::try_into_borrowed(region, offset)
+            .and_then(|offset| region.into_borrowed(offset)
                 .map_err(|(_mp, err)| err)
             )
     }

@@ -135,8 +135,7 @@ impl EventQueue {
     /// * `num_entries`: number of entries in the EQ
     /// * `eqn`: EQ number returned by the HCA
     pub fn init(mp: MappedPages, num_entries: usize, eqn: Eqn) -> Result<EventQueue, &'static str> {
-        let mut entries: BorrowedSliceMappedPages<EventQueueEntry, Mutable> =
-            BorrowedSliceMappedPages::try_into_borrowed_slice_mut(mp, 0, num_entries)
+        let mut entries = mp.into_borrowed_slice_mut::<EventQueueEntry>(0, num_entries)
             .map_err(|(_mp, err)| err)?;
         for eqe in entries.iter_mut() {
             eqe.init()

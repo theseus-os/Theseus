@@ -193,8 +193,7 @@ impl ReceiveQueue {
         cq: CompletionQueue
     ) -> Result<ReceiveQueue, &'static str> {
         // map the descriptor ring and initialize
-        let mut entries: BorrowedSliceMappedPages<WorkQueueEntryReceive, Mutable> =
-            BorrowedSliceMappedPages::try_into_borrowed_slice_mut(entries_mp, 0, num_entries)
+        let mut entries = entries_mp.into_borrowed_slice_mut::<WorkQueueEntryReceive>(0, num_entries)
             .map_err(|(_mp, err)| err)?;
         for entry in entries.iter_mut() {
             entry.init()

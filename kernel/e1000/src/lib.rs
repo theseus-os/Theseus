@@ -277,15 +277,15 @@ impl E1000Nic {
         const TX_REGISTERS_SIZE_BYTES: usize = 4096;
         const MAC_REGISTERS_SIZE_BYTES: usize = 114_688;
 
-        let nic_regs_mapped_page = allocate_memory(mem_base, GENERAL_REGISTERS_SIZE_BYTES)?;
-        let nic_rx_regs_mapped_page = allocate_memory(mem_base + GENERAL_REGISTERS_SIZE_BYTES, RX_REGISTERS_SIZE_BYTES)?;
-        let nic_tx_regs_mapped_page = allocate_memory(mem_base + GENERAL_REGISTERS_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES, TX_REGISTERS_SIZE_BYTES)?;
+        let nic_regs_mapped_page     = allocate_memory(mem_base, GENERAL_REGISTERS_SIZE_BYTES)?;
+        let nic_rx_regs_mapped_page  = allocate_memory(mem_base + GENERAL_REGISTERS_SIZE_BYTES, RX_REGISTERS_SIZE_BYTES)?;
+        let nic_tx_regs_mapped_page  = allocate_memory(mem_base + GENERAL_REGISTERS_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES, TX_REGISTERS_SIZE_BYTES)?;
         let nic_mac_regs_mapped_page = allocate_memory(mem_base + GENERAL_REGISTERS_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES + TX_REGISTERS_SIZE_BYTES, MAC_REGISTERS_SIZE_BYTES)?;
 
-        let regs = BorrowedMappedPages::try_into_borrowed_mut(nic_regs_mapped_page, 0).map_err(|(_mp, err)| err)?;
-        let rx_regs = BorrowedMappedPages::try_into_borrowed_mut(nic_rx_regs_mapped_page, 0).map_err(|(_mp, err)| err)?;
-        let tx_regs = BorrowedMappedPages::try_into_borrowed_mut(nic_tx_regs_mapped_page, 0).map_err(|(_mp, err)| err)?;
-        let mac_regs = BorrowedMappedPages::try_into_borrowed_mut(nic_mac_regs_mapped_page, 0).map_err(|(_mp, err)| err)?;
+        let regs     = nic_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        let rx_regs  = nic_rx_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        let tx_regs  = nic_tx_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        let mac_regs = nic_mac_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
 
         Ok((regs, rx_regs, tx_regs, mac_regs))
     }

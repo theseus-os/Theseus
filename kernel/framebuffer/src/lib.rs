@@ -95,11 +95,8 @@ impl<P: Pixel> Framebuffer<P> {
         };
 
         // obtain a slice reference to the framebuffer's memory
-        let buffer = BorrowedSliceMappedPages::try_into_borrowed_slice_mut(
-            mapped_framebuffer,
-            0,
-            width * height,
-        ).map_err(|(|_mp, s)| s)?;
+        let buffer = mapped_framebuffer.into_borrowed_slice_mut(0, width * height)
+            .map_err(|(|_mp, s)| s)?;
 
         Ok(Framebuffer {
             width,

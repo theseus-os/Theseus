@@ -447,10 +447,10 @@ impl IxgbeNic {
         let nic_regs3_mapped_page = allocate_memory(offset, GENERAL_REGISTERS_3_SIZE_BYTES)?;
 
         // Map the memory as the register struct and tie the lifetime of the struct with its backing mapped pages
-        let regs1 = BorrowedMappedPages::try_into_borrowed_mut(nic_regs1_mapped_page, 0).map_err(|(_mp, err)| err)?;
-        let regs2 = BorrowedMappedPages::try_into_borrowed_mut(nic_regs2_mapped_page, 0).map_err(|(_mp, err)| err)?;
-        let regs3 = BorrowedMappedPages::try_into_borrowed_mut(nic_regs3_mapped_page, 0).map_err(|(_mp, err)| err)?;
-        let mac_regs = BorrowedMappedPages::try_into_borrowed_mut(nic_mac_regs_mapped_page, 0).map_err(|(_mp, err)| err)?;
+        let regs1    = nic_regs1_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        let regs2    = nic_regs2_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        let regs3    = nic_regs3_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        let mac_regs = nic_mac_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
         
         // Divide the pages of the Rx queue registers into multiple 64B regions
         let mut regs_rx = Self::mapped_regs_from_rx_memory(nic_rx_regs1_mapped_page);
@@ -539,7 +539,7 @@ impl IxgbeNic {
         // debug!("msi-x vector table bar: {}, base_address: {:#X} and size: {} bytes", bar, mem_base, mem_size_in_bytes);
 
         let msix_mapped_pages = allocate_memory(mem_base, mem_size_in_bytes)?;
-        let vector_table = BorrowedMappedPages::try_into_borrowed_mut(msix_mapped_pages, 0)
+        let vector_table = BorrowedMappedPages::from_mut(msix_mapped_pages, 0)
             .map_err(|(_mp, err)| err)?;
 
         Ok(vector_table)

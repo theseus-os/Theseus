@@ -79,8 +79,7 @@ impl IoApic {
             EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
         )?;
 
-        let ioapic_regs = BorrowedMappedPages::try_into_borrowed_mut(ioapic_mapped_page, 0)
-            .map_err(|(_mp, err)| err)?;
+        let ioapic_regs = ioapic_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
         let ioapic = IoApic {
             regs: ioapic_regs,
 			id,

@@ -29,7 +29,7 @@ extern crate mpmc;
 use spin::Once; 
 use alloc::vec::Vec;
 use irq_safety::MutexIrqSafe;
-use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedMappedPages, Mutable, BorrowedSliceMappedPages};
+use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedMappedPages, Mutable};
 use pci::PciDevice;
 use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory, init_rx_buf_pool};
 use mlx_ethernet::{
@@ -180,8 +180,7 @@ impl ConnectX5Nic {
     
         // cast our physically-contiguous MappedPages into a slice of command queue entries
         let mut cmdq = CommandQueue::create(
-            BorrowedSliceMappedPages::try_into_borrowed_slice_mut(cmdq_mapped_pages, 0, num_cmdq_entries)
-                .map_err(|(_mp, err)| err)?,
+            cmdq_mapped_pages.into_borrowed_slice_mut(0, num_cmdq_entries).map_err(|(_mp, err)| err)?,
             num_cmdq_entries
         )?;
 
@@ -643,8 +642,9 @@ impl ConnectX5Nic {
     
     /// Returns the memory-mapped initialization segment of the NIC
     fn map_init_segment(mem_base: PhysicalAddress) -> Result<BorrowedMappedPages<InitializationSegment, Mutable>, &'static str> {
-        let mp = allocate_memory(mem_base, core::mem::size_of::<InitializationSegment>())?;
-        BorrowedMappedPages::try_into_borrowed_mut(mp, 0).map_err(|(_mp, err)| err)
+        allocate_memory(mem_base, core::mem::size_of::<InitializationSegment>())?
+            .into_borrowed_mut(0)
+            .map_err(|(_mp, err)| err)
     }
 
     /// Allocates `num_pages` [`MappedPages`] each of the standard kernel page size [`PAGE_SIZE`].

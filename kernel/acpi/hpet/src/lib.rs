@@ -183,8 +183,7 @@ impl HpetAcpiTable {
             EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
         )?;
 
-        let mut hpet: BorrowedMappedPages<Hpet, Mutable> = 
-            BorrowedMappedPages::try_into_borrowed_mut(hpet_mp, phys_addr.frame_offset())
+        let mut hpet = hpet_mp.into_borrowed_mut::<Hpet>(phys_addr.frame_offset())
             .map_err(|(|_mp, s)| s)?;
         // enable the main counter
         {

@@ -273,10 +273,9 @@ impl CompletionQueue {
         doorbell_mp: MappedPages,
         cqn: Cqn
     ) -> Result<CompletionQueue, &'static str> {
-        let mut entries: BorrowedSliceMappedPages<CompletionQueueEntry, Mutable> =
-            BorrowedSliceMappedPages::try_into_borrowed_slice_mut(entries_mp, 0, num_entries)
+        let mut entries = entries_mp.into_borrowed_slice_mut::<CompletionQueueEntry>(0, num_entries)
             .map_err(|(_mp, err)| err)?;
-        let mut doorbell = BorrowedMappedPages::try_into_borrowed_mut(doorbell_mp, 0)
+        let mut doorbell = doorbell_mp.into_borrowed_mut(0)
             .map_err(|(_mp, err)| err)?;
         
         for entry in entries.iter_mut() {

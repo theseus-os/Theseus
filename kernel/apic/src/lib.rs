@@ -368,10 +368,9 @@ impl LocalApic {
             LapicType::X2Apic
         } else {
             LapicType::XApic(
-                BorrowedMappedPages::try_into_borrowed_mut(
-                    map_apic(page_table)?,
-                    0,
-                ).map_err(|(_mp, err)| err)?
+                map_apic(page_table)?
+                    .into_borrowed_mut(0)
+                    .map_err(|(_mp, err)| err)?
             )
         };
 		let mut lapic = LocalApic {

@@ -99,8 +99,7 @@ pub fn init_rx_queue<T: RxDescriptor, S:RxQueueRegisters>(num_desc: usize, rx_bu
     let (rx_descs_mapped_pages, rx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_rx_descs_per_queue, NIC_MAPPING_FLAGS)?;
 
     // cast our physically-contiguous MappedPages into a slice of receive descriptors
-    let mut rx_descs: BorrowedSliceMappedPages<T, Mutable> =
-        BorrowedSliceMappedPages::try_into_borrowed_slice_mut(rx_descs_mapped_pages, 0, num_desc)
+    let mut rx_descs = rx_descs_mapped_pages.into_borrowed_slice_mut::<T>(0, num_desc)
         .map_err(|(_mp, err)| err)?;
 
     // now that we've created the rx descriptors, we can fill them in with initial values
@@ -155,8 +154,7 @@ pub fn init_tx_queue<T: TxDescriptor, S: TxQueueRegisters>(num_desc: usize, txq_
     let (tx_descs_mapped_pages, tx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_tx_descs, NIC_MAPPING_FLAGS)?;
 
     // cast our physically-contiguous MappedPages into a slice of transmit descriptors
-    let mut tx_descs: BorrowedSliceMappedPages<T, Mutable> =
-        BorrowedSliceMappedPages::try_into_borrowed_slice_mut(tx_descs_mapped_pages, 0, num_desc)
+    let mut tx_descs = tx_descs_mapped_pages.into_borrowed_slice_mut::<T>(0, num_desc)
         .map_err(|(_mp, err)| err)?;
 
     // now that we've created the tx descriptors, we can fill them in with initial values
