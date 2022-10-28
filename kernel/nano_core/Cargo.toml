@@ -35,6 +35,9 @@ path = "../state_store"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.no_drop]
+path = "../no_drop"
+
 [dependencies.serial_port_basic]
 path = "../serial_port_basic"
 

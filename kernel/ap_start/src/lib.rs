@@ -16,6 +16,7 @@ extern crate scheduler;
 extern crate kernel_config;
 extern crate apic;
 extern crate tlb_shootdown;
+extern crate no_drop;
 
 use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicBool, Ordering};
@@ -24,7 +25,7 @@ use memory::{VirtualAddress, get_kernel_mmi_ref};
 use stack::Stack;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use apic::LocalApic;
-
+use no_drop::NoDrop;
 
 /// An atomic flag used for synchronizing progress between the BSP 
 /// and the AP that is currently being booted.
@@ -33,20 +34,24 @@ pub static AP_READY_FLAG: AtomicBool = AtomicBool::new(false);
 
 /// Temporary storage for transferring allocated `Stack`s from 
 /// the main bootstrap processor (BSP) to the AP processor being booted in `kstart_ap()` below.
-static AP_STACKS: MutexIrqSafe<BTreeMap<u8, Stack>> = MutexIrqSafe::new(BTreeMap::new());
+static AP_STACKS: MutexIrqSafe<BTreeMap<u8, NoDrop<Stack>>> = MutexIrqSafe::new(BTreeMap::new());
 
 /// Insert a new stack that was allocated for the AP with the given `apic_id`.
 pub fn insert_ap_stack(apic_id: u8, stack: Stack) {
-    AP_STACKS.lock().insert(apic_id, stack);
+    AP_STACKS.lock().insert(apic_id, NoDrop::new(stack));
 }
 
 
 /// Entry to rust for an AP.
 /// The arguments must match the invocation order in "ap_boot.asm"
-pub fn kstart_ap(processor_id: u8, apic_id: u8, 
-                 _stack_start: VirtualAddress, _stack_end: VirtualAddress,
-                 nmi_lint: u8, nmi_flags: u16) -> ! 
-{
+pub fn kstart_ap(
+    processor_id: u8,
+    apic_id: u8,
+    _stack_start: VirtualAddress,
+    _stack_end: VirtualAddress,
+    nmi_lint: u8,
+    nmi_flags: u16,
+) -> ! {
     info!("Booted AP: proc: {}, apic: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}", 
         processor_id, apic_id, _stack_start, _stack_end, nmi_lint, nmi_flags
     );

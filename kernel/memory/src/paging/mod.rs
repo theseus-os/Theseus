@@ -32,7 +32,7 @@ use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
     AllocatedPages, allocate_pages, AllocatedFrames, EntryFlags,
     tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
     get_vga_mem_addr, KERNEL_OFFSET};
-
+use no_drop::NoDrop;
 use kernel_config::memory::{RECURSIVE_P4_INDEX};
 // use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
@@ -210,13 +210,13 @@ pub fn init(
     into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames,
 ) -> Result<(
         PageTable,
+        NoDrop<MappedPages>,
+        NoDrop<MappedPages>,
+        NoDrop<MappedPages>,
+        (AllocatedPages, NoDrop<MappedPages>),
         MappedPages,
-        MappedPages,
-        MappedPages,
-        (AllocatedPages, MappedPages),
-        MappedPages,
-        [Option<MappedPages>; 32],
-        [Option<MappedPages>; 32]
+        [Option<NoDrop<MappedPages>>; 32],
+        [Option<NoDrop<MappedPages>>; 32],
     ), &'static str>
 {
     // Store the callback from `frame_allocator::init()` that allows the `Mapper` to convert
@@ -239,13 +239,13 @@ pub fn init(
     let new_p4_frame = frame_allocator::allocate_frames(1).ok_or("couldn't allocate frame for new page table")?; 
     let mut new_table = PageTable::new_table(&mut page_table, new_p4_frame, None)?;
 
-    let mut text_mapped_pages:        Option<MappedPages> = None;
-    let mut rodata_mapped_pages:      Option<MappedPages> = None;
-    let mut data_mapped_pages:        Option<MappedPages> = None;
-    let mut stack_page_group:         Option<(AllocatedPages, MappedPages)> = None;
+    let mut text_mapped_pages:        Option<NoDrop<MappedPages>> = None;
+    let mut rodata_mapped_pages:      Option<NoDrop<MappedPages>> = None;
+    let mut data_mapped_pages:        Option<NoDrop<MappedPages>> = None;
+    let mut stack_page_group:         Option<(AllocatedPages, NoDrop<MappedPages>)> = None;
     let mut boot_info_mapped_pages:   Option<MappedPages> = None;
-    let mut higher_half_mapped_pages: [Option<MappedPages>; 32] = Default::default();
-    let mut identity_mapped_pages:    [Option<MappedPages>; 32] = Default::default();
+    let mut higher_half_mapped_pages: [Option<NoDrop<MappedPages>>; 32] = Default::default();
+    let mut identity_mapped_pages:    [Option<NoDrop<MappedPages>>; 32] = Default::default();
 
     // Create and initialize a new page table with the same contents as the currently-executing kernel code/data sections.
     page_table.with(&mut new_table, |mapper| {
@@ -280,28 +280,28 @@ pub fn init(
         let text_pages = page_allocator::allocate_pages_by_bytes_at(text_start_virt, text_end_virt.value() - text_start_virt.value())?;
         let text_frames = frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())?;
         let text_pages_identity = page_allocator::allocate_pages_by_bytes_at(text_start_virt - KERNEL_OFFSET, text_end_virt.value() - text_start_virt.value())?;
-        identity_mapped_pages[index] = Some( unsafe {
+        identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(mapper, text_pages_identity, &text_frames, text_flags)?
-        });
-        text_mapped_pages = Some(mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)?);
+        }));
+        text_mapped_pages = Some(NoDrop::new(mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)?));
         index += 1;
 
         let rodata_pages = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())?;
         let rodata_frames = frame_allocator::allocate_frames_by_bytes_at(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value())?;
         let rodata_pages_identity = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt - KERNEL_OFFSET, rodata_end_virt.value() - rodata_start_virt.value())?;
-        identity_mapped_pages[index] = Some( unsafe {
+        identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(mapper, rodata_pages_identity, &rodata_frames, rodata_flags)?
-        });
-        rodata_mapped_pages = Some(mapper.map_allocated_pages_to(rodata_pages, rodata_frames, rodata_flags)?);
+        }));
+        rodata_mapped_pages = Some(NoDrop::new(mapper.map_allocated_pages_to(rodata_pages, rodata_frames, rodata_flags)?));
         index += 1;
 
         let data_pages = page_allocator::allocate_pages_by_bytes_at(data_start_virt, data_end_virt.value() - data_start_virt.value())?;
         let data_frames = frame_allocator::allocate_frames_by_bytes_at(data_start_phys, data_end_phys.value() - data_start_phys.value())?;
         let data_pages_identity = page_allocator::allocate_pages_by_bytes_at(data_start_virt - KERNEL_OFFSET, data_end_virt.value() - data_start_virt.value())?;
-        identity_mapped_pages[index] = Some( unsafe {
+        identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(mapper, data_pages_identity, &data_frames, data_flags)?
-        });
-        data_mapped_pages = Some(mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)?);
+        }));
+        data_mapped_pages = Some(NoDrop::new(mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)?));
         index += 1;
 
         // We don't need to do any mapping for the initial root (P4) page table stack (a separate data section),
@@ -321,7 +321,7 @@ pub fn init(
             stack_allocated_frames,
             data_flags,
         )?;
-        stack_page_group = Some((stack_guard_page, stack_mapped_pages));
+        stack_page_group = Some((stack_guard_page, NoDrop::new(stack_mapped_pages)));
 
         // Map the VGA display memory as writable. 
         // We do an identity mapping for the VGA display too, because the AP cores may access it while booting.
@@ -330,10 +330,10 @@ pub fn init(
         let vga_display_pages = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity + KERNEL_OFFSET, vga_size_in_bytes)?;
         let vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)?;
         let vga_display_pages_identity = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity, vga_size_in_bytes)?;
-        identity_mapped_pages[index] = Some( unsafe {
+        identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(mapper, vga_display_pages_identity, &vga_display_frames, vga_flags)?
-        });
-        higher_half_mapped_pages[index] = Some(mapper.map_allocated_pages_to(vga_display_pages, vga_display_frames, vga_flags)?);
+        }));
+        higher_half_mapped_pages[index] = Some(NoDrop::new(mapper.map_allocated_pages_to(vga_display_pages, vga_display_frames, vga_flags)?));
         index += 1;
 
 

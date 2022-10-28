@@ -26,6 +26,7 @@ extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
+extern crate no_drop;
 extern crate stack;
 extern crate serial_port_basic;
 extern crate mod_mgmt;
@@ -140,10 +141,6 @@ pub extern "C" fn nano_core_start(
         identity_mapped_pages
     ) = try_exit!(memory_initialization::init_memory_management(boot_info));
     println_raw!("nano_core_start(): initialized memory subsystem."); 
-    // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
-    // because they will be auto-unmapped upon a returned error, causing all execution to stop. 
-    // (at least until we transfer ownership of them to the `parse_nano_core` function below.)
-
 
     state_store::init();
     trace!("state_store initialized.");
@@ -152,12 +149,7 @@ pub extern "C" fn nano_core_start(
     // initialize the module management subsystem, so we can create the default crate namespace
     let default_namespace = match mod_mgmt::init(bootloader_modules, kernel_mmi_ref.lock().deref_mut()) {
         Ok(namespace) => namespace,
-        Err(err) => { 
-            core::mem::forget(text_mapped_pages);
-            core::mem::forget(rodata_mapped_pages);
-            core::mem::forget(data_mapped_pages);
-            core::mem::forget(stack);
-            core::mem::forget(identity_mapped_pages);
+        Err(err) => {
             shutdown(format_args!("{}", err));
         }
     };
@@ -166,7 +158,11 @@ pub extern "C" fn nano_core_start(
     // Parse the nano_core crate (the code we're already running) since we need it to load and run applications.
     println_raw!("nano_core_start(): parsing nano_core crate, please wait ..."); 
     let (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end) = match mod_mgmt::parse_nano_core::parse_nano_core(
-        default_namespace, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false
+        default_namespace,
+        text_mapped_pages.into_inner(),
+        rodata_mapped_pages.into_inner(),
+        data_mapped_pages.into_inner(),
+        false,
     ) {
         Ok((nano_core_crate_ref, init_symbols, _num_new_syms)) => {
             // Get symbols from the boot assembly code that defines where the ap_start code are.
@@ -198,11 +194,8 @@ pub extern "C" fn nano_core_start(
         // // If in loadable mode, load each of the nano_core's constituent crates such that other crates loaded in the future
         // // can depend on those dynamically-loaded instances rather than on the statically-linked sections in the nano_core's base kernel image.
         // try_exit!(mod_mgmt::replace_nano_core_crates::replace_nano_core_crates(&default_namespace, nano_core_crate_ref, &kernel_mmi_ref));
-        drop(nano_core_crate_ref);
     }
-    #[cfg(not(loadable))] {
-        drop(nano_core_crate_ref);
-    }
+    drop(nano_core_crate_ref);
     
     // if in loadable mode, parse the crates we always need: the core library (Rust no_std lib), the panic handlers, and the captain
     #[cfg(loadable)] {
@@ -227,6 +220,7 @@ pub extern "C" fn nano_core_start(
     #[cfg(loadable)] {
         use alloc::vec::Vec;
         use memory::{MmiRef, MappedPages};
+        use no_drop::NoDrop;
 
         let section = try_exit!(
             default_namespace.get_symbol_starting_with("captain::init::")
@@ -235,7 +229,7 @@ pub extern "C" fn nano_core_start(
         );
         info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section.name);
 
-        type CaptainInitFunc = fn(MmiRef, Vec<MappedPages>, stack::Stack, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
+        type CaptainInitFunc = fn(MmiRef, NoDrop<Vec<MappedPages>>, NoDrop<stack::Stack>, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
         let func: &CaptainInitFunc = try_exit!(unsafe { section.as_func() });
 
         try_exit!(
