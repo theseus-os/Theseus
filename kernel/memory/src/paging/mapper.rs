@@ -805,8 +805,8 @@ impl MappedPages {
             );
         }
 
-        if size_in_bytes >= isize::MAX as usize {
-            return Err("MappedPages::as_slice(): length * size_of::<T>() must be less than isize::MAX");
+        if size_in_bytes > isize::MAX as usize {
+            return Err("MappedPages::as_slice(): length * size_of::<T>() must be no larger than isize::MAX");
         }
 
         if byte_offset % mem::align_of::<T>() != 0 {
@@ -858,9 +858,8 @@ impl MappedPages {
             );
         }
 
-        if size_in_bytes >= isize::MAX as usize {
-            return Err("MappedPages::as_slice_mut(): length * size_of::<T>() must be less than isize::MAX");
-        }
+        if size_in_bytes > isize::MAX as usize {
+            return Err("MappedPages::as_slice_mut(): length * size_of::<T>() must be no larger than isize::MAX");
         
         if byte_offset % mem::align_of::<T>() != 0 {
             error!("MappedPages::as_slice_mut(): requested slice of type {} with length {} (total size {}), but the byte_offset {} is unaligned with type alignment {}!",
