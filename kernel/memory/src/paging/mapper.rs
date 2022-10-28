@@ -893,6 +893,7 @@ impl MappedPages {
         // SAFETY:
         // ✅ same as for `MappedPages::as_slice()`, plus:
         // ✅ The underlying memory is not accessible through any other pointer, as we require a `&mut self` above.
+        // ✅ The underlying memory can be mutated because it is mapped as writable (checked above).
         let slc: &mut [T] = unsafe {
             slice::from_raw_parts_mut(start_vaddr as *mut T, length)
         };
