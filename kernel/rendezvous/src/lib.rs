@@ -34,7 +34,8 @@ use core::fmt;
 use alloc::sync::Arc;
 use irq_safety::MutexIrqSafe;
 use spin::Mutex;
-use wait_queue::{WaitQueue, WaitGuard, WaitError};
+use wait_queue::{WaitQueue, WaitError};
+use task::TaskRef;
 
 
 /// A wrapper type for an `ExchangeSlot` that is used for sending only.
@@ -94,10 +95,10 @@ enum ExchangeState<T> {
     /// A sender has arrived before a receiver. 
     /// The `WaitGuard` contains the blocked sender task,
     /// and the `T` is the message that will be exchanged.
-    WaitingForReceiver(WaitGuard, T),
+    WaitingForReceiver(TaskRef<false, true>, T),
     /// A receiver has arrived before a sender.
     /// The `WaitGuard` contains the blocked receiver task.
-    WaitingForSender(WaitGuard),
+    WaitingForSender(TaskRef<false, true>),
     /// Sender and Receiver have rendezvoused, and the receiver finished first.
     /// Thus, it is the sender's responsibility to reset to the initial state.
     ReceiverFinishedFirst,
@@ -250,7 +251,7 @@ impl <T: Send> Sender<T> {
                 ExchangeState::Init => {
                     // Hold interrupts to avoid blocking & descheduling this task until we release the slot lock,
                     // which is currently done automatically because the slot uses a MutexIrqSafe.
-                    *exchange_state = ExchangeState::WaitingForReceiver(WaitGuard::new(curr_task.clone()).map_err(|_| "failed to create wait guard")?, msg);
+                    *exchange_state = ExchangeState::WaitingForReceiver(curr_task.clone().block().map_err(|_| "failed to block current task")?, msg);
                     None
                 }
                 ExchangeState::WaitingForSender(receiver_to_notify) => {
@@ -288,20 +289,16 @@ impl <T: Send> Sender<T> {
         }
 
         // Here, the sender (this task) is waiting for a receiver
-        loop {
-            {
-                let exchange_state = sender_slot.0.lock();
-                match &*exchange_state {
-                    ExchangeState::WaitingForReceiver(blocked_sender, ..) => {
-                        if blocked_sender.task() != curr_task {
-                            return Err("BUG: CURR TASK WAS DIFFERENT THAN BLOCKED SENDER");
-                        }
-                        blocked_sender.block_again().map_err(|_| "failed to block sender")?;
-                    }
-                    _ => break,
-                }
+        {
+            let exchange_state = sender_slot.0.lock();
+            if let ExchangeState::WaitingForReceiver(_blocked_sender, ..) = &*exchange_state {
+                // FIXME
+                panic!("spurious wakeup??");
+                // if blocked_sender.task() != curr_task {
+                //     return Err("BUG: CURR TASK WAS DIFFERENT THAN BLOCKED SENDER");
+                // }
+                // blocked_sender.block_again().map_err(|_| "failed to block sender")?;
             }
-            scheduler::schedule();
         }
 
         // Here, we are at the rendezvous point
@@ -398,7 +395,7 @@ impl <T: Send> Receiver<T> {
                 ExchangeState::Init => {
                     // Hold interrupts to avoid blocking & descheduling this task until we release the slot lock,
                     // which is currently done automatically because the slot uses a MutexIrqSafe.
-                    *exchange_state = ExchangeState::WaitingForSender(WaitGuard::new(curr_task.clone()).map_err(|_| "failed to create wait guard")?);
+                    *exchange_state = ExchangeState::WaitingForSender(curr_task.clone().block().map_err(|_| "failed to block current task")?);
                     None
                 }
                 ExchangeState::WaitingForReceiver(sender_to_notify, msg) => {
@@ -438,21 +435,17 @@ impl <T: Send> Receiver<T> {
         }
 
         // Here, the receiver (this task) is waiting for a sender
-        loop {
-            {
-                let exchange_state = receiver_slot.0.lock();
-                match &*exchange_state {
-                    ExchangeState::WaitingForSender(blocked_receiver) => {
-                        warn!("spurious wakeup while receiver is WaitingForSender... re-blocking task.");
-                        if blocked_receiver.task() != curr_task {
-                            return Err("BUG: CURR TASK WAS DIFFERENT THAN BLOCKED RECEIVER");
-                        }
-                        blocked_receiver.block_again().map_err(|_| "failed to block receiver")?;
-                    }
-                    _ => break,
-                }
+        {
+            let exchange_state = receiver_slot.0.lock();
+            if let ExchangeState::WaitingForSender(_blocked_receiver) = &*exchange_state {
+                // FIXME
+                panic!("spurious wakeup??");
+                // warn!("spurious wakeup while receiver is WaitingForSender... re-blocking task.");
+                // if blocked_receiver != curr_task {
+                //     return Err("BUG: CURR TASK WAS DIFFERENT THAN BLOCKED RECEIVER");
+                // }
+                // blocked_receiver.block_again().map_err(|_| "failed to block receiver")?;
             }
-            scheduler::schedule();
         }
 
 

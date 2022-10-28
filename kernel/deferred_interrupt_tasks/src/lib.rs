@@ -56,7 +56,7 @@ extern crate scheduler;
 extern crate interrupts;
 
 use alloc::string::String;
-use task::{get_my_current_task, JoinableTaskRef};
+use task::{get_my_current_task, TaskRef};
 
 pub type InterruptHandlerFunction = x86_64::structures::idt::HandlerFunc;
 
@@ -103,7 +103,7 @@ pub enum InterruptRegistrationError {
 /// e.g., when an interrupt has occurred.
 ///
 /// # Return
-/// * `Ok(JoinableTaskRef)` if successfully registered, in which the returned task is the
+/// * `Ok(TaskRef)` if successfully registered, in which the returned task is the
 ///    long-running loop that repeatedly invokes the given `deferred_interrupt_action`.
 /// * `Err(existing_handler_address)` if the given `interrupt_number` was already in use.
 pub fn register_interrupt_handler<DIA, Arg, Success, Failure, S>(
@@ -112,7 +112,7 @@ pub fn register_interrupt_handler<DIA, Arg, Success, Failure, S>(
     deferred_interrupt_action: DIA,
     deferred_action_argument: Arg,
     deferred_task_name: Option<S>,
-) -> Result<JoinableTaskRef, InterruptRegistrationError> 
+) -> Result<TaskRef<true, true>, InterruptRegistrationError> 
     where DIA: Fn(&Arg) -> Result<Success, Failure> + Send + 'static,
           Arg: Send + 'static,
           S: Into<String>,
@@ -171,7 +171,7 @@ fn deferred_task_entry_point<DIA, Arg, Success, Failure>(
             Err(failure) => error!("Deferred interrupt action returned failure: {:?}", debugit!(failure)),
         }
 
-        if curr_task.block().is_err() {
+        if curr_task.clone().block().is_err() {
             error!("deffered_task_entry_point: couldn't block task");
         }
 

@@ -33,7 +33,7 @@ use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use path::Path;
-use task::{ExitValue, KillReason, JoinableTaskRef};
+use task::{ExitValue, KillReason, TaskRef, Task};
 use libterm::Terminal;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use alloc::sync::Arc;
@@ -66,7 +66,7 @@ enum JobStatus {
 struct Job {
     /// References to the tasks that form this job. They are stored in the same sequence as
     /// in the command line.
-    tasks: Vec<JoinableTaskRef>,
+    tasks: Vec<TaskRefKind>,
     /// A copy of the task ids. Mainly for performance optimization. Task ids are stored
     /// in the same sequence as in `tasks`.
     task_ids: Vec<usize>,
@@ -91,6 +91,87 @@ struct Job {
     cmd: String
 }
 
+pub enum TaskRefKind {
+    Blockable(TaskRef<true, false>),
+    Unblockable(TaskRef<true, true>),
+    #[doc(hidden)]
+    Temp,
+}
+
+impl Deref for TaskRefKind {
+    type Target = Task;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Blockable(t) => &**t,
+            Self::Unblockable(t) => &**t,
+            // From the Deref documentation:
+            // > For similar reasons, this trait should never fail.
+            //
+            // That sign won't stop me because I can't read.
+            Self::Temp => panic!(),
+        }
+    }
+}
+
+impl TaskRefKind {
+    fn block(&mut self) -> Result<(), ()> {
+        match core::mem::replace(self, Self::Temp) {
+            Self::Blockable(task) => match task.block() {
+                Ok(task) => {
+                    *self = Self::Unblockable(task);
+                    Ok(())
+                }
+                Err(task) => {
+                    *self = Self::Blockable(task);
+                    Err(())
+                }
+            }
+            Self::Unblockable(task) => {
+                *self = Self::Unblockable(task);
+                Ok(())
+            }
+            Self::Temp => panic!(),
+        }
+    }
+
+    fn unblock(&mut self) -> Result<(), ()> {
+        match core::mem::replace(self, Self::Temp) {
+            Self::Blockable(task) => {
+                *self = Self::Blockable(task);
+                Ok(())
+            }
+            Self::Unblockable(task) => match task.unblock() {
+                Ok(task) => {
+                    *self = Self::Blockable(task);
+                    Ok(())
+                }
+                Err(task) => {
+                    *self = Self::Blockable(task);
+                    Err(())
+                }
+            }
+            Self::Temp => panic!(),
+        }
+    }
+
+    fn kill(&self, reason: KillReason) -> Result<(), &'static str> {
+        match self {
+            Self::Blockable(t) => t.kill(reason),
+            Self::Unblockable(t) => t.kill(reason),
+            Self::Temp => panic!(),
+        }
+    }
+
+    fn clone_ref(&self) -> TaskRef<false, false> {
+        match self {
+            Self::Blockable(t) => t.clone(),
+            Self::Unblockable(t) => t.clone(),
+            Self::Temp => panic!(),
+        }
+    }
+}
+
 /// A main function that spawns a new shell and waits for the shell loop to exit before returning an exit value
 pub fn main(_args: Vec<String>) -> isize {
     {
@@ -109,8 +190,9 @@ pub fn main(_args: Vec<String>) -> isize {
     loop {
         // block this task, because it never needs to actually run again
         if let Some(my_task) = task::get_my_current_task() {
-            my_task.block().unwrap();
+            my_task.clone().block().unwrap();
         }
+        scheduler::schedule();
     }
 
     // TODO: when `join` puts this task to sleep instead of spinning, we can re-enable it.
@@ -414,7 +496,7 @@ impl Shell {
                         if task_ref.has_exited() { continue; }
                         match task_ref.kill(KillReason::Requested) {
                             Ok(_) => {
-                                if let Err(e) = runqueue::remove_task_from_all(&task_ref) {
+                                if let Err(e) = runqueue::remove_task_from_all(&task_ref.clone_ref()) {
                                     error!("Killed task but could not remove it from runqueue: {}", e);
                                 }
                             }
@@ -455,28 +537,25 @@ impl Shell {
                 return Ok(());
             };
 
-            if let Some(task_refs) = self.jobs.get(&fg_job_num).map(|job| &job.tasks) {
-                // Lock the shared structure in `app_io` and then stop the running application
-                app_io::lock_and_execute(&|_flags_guard, _streams_guard| {
-                    // Stop all tasks in the job.
-                    for task_ref in task_refs {
-                        if task_ref.block().is_err() {
-                            continue;
-                        }
+            if let Some(task_refs) = self.jobs.get_mut(&fg_job_num).map(|job| &mut job.tasks) {
+                // Stop all tasks in the job.
+                for task_ref in task_refs.iter_mut() {
+                    if task_ref.block().is_err() {
+                        continue;
+                    }
 
-                        // Here we must wait for the running application to stop before releasing the lock,
-                        // because the previous `block` method will NOT stop the application immediately.
-                        // We must circumvent the situation where the application is stopped while holding the
-                        // lock. We wait for the application to finish its last time slice. It will then be
-                        // truly blocked. We can thereafter release the lock.
-                        loop {
-                            scheduler::schedule(); // yield the CPU
-                            if !task_ref.is_running() {
-                                break;
-                            }
+                    // Here we must wait for the running application to stop before releasing the lock,
+                    // because the previous `block` method will NOT stop the application immediately.
+                    // We must circumvent the situation where the application is stopped while holding the
+                    // lock. We wait for the application to finish its last time slice. It will then be
+                    // truly blocked. We can thereafter release the lock.
+                    loop {
+                        scheduler::schedule(); // yield the CPU
+                        if !task_ref.is_running() {
+                            break;
                         }
                     }
-                });
+                }
             }
             return Ok(());
         }
@@ -650,7 +729,7 @@ impl Shell {
 
     /// Create a single task. `cmd` is the name of the application. `args` are the provided
     /// arguments. It returns a task reference on success.
-    fn create_single_task(&mut self, cmd: String, args: Vec<String>) -> Result<JoinableTaskRef, AppErr> {
+    fn create_single_task(&mut self, cmd: String, args: Vec<String>) -> Result<TaskRef<true, true>, AppErr> {
 
         // Check that the application actually exists
         let namespace_dir = task::get_my_current_task()
@@ -680,7 +759,7 @@ impl Shell {
     /// Evaluate the command line. It creates a sequence of jobs, which forms a chain of applications that
     /// pipe the output from one to the next, and finally back to the shell. If any task fails to start up,
     /// all tasks that have already been spawned will be killed immeidately before returning error.
-    fn eval_cmdline(&mut self) -> Result<Vec<JoinableTaskRef>, AppErr> {
+    fn eval_cmdline(&mut self) -> Result<Vec<TaskRef<true, true>>, AppErr> {
 
         let cmdline = self.cmdline.clone();
         let mut task_refs = Vec::new();
@@ -756,8 +835,8 @@ impl Shell {
 
                 let job_stdout_reader = previous_queue_reader;
 
-                let new_job = Job {
-                    tasks: task_refs,
+                let mut new_job = Job {
+                    tasks: Vec::new(),
                     task_ids,
                     status: JobStatus::Running,
                     pipe_queues,
@@ -768,8 +847,8 @@ impl Shell {
                 };
 
                 // All IO streams have been set up for the new tasks. Safe to unblock them now.
-                for task_ref in &new_job.tasks {
-                    task_ref.unblock().unwrap();
+                for task_ref in task_refs {
+                    new_job.tasks.push(TaskRefKind::Blockable(task_ref.unblock().unwrap()));
                 }
 
                 // Allocate a job number for the new job. It will start from 1 and choose the smallest number
@@ -1416,7 +1495,7 @@ impl Shell {
             let job_num = args[0].chars().skip(1).collect::<String>();
             if let Ok(job_num) = job_num.parse::<isize>() {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
-                    for task_ref in &job.tasks {
+                    for task_ref in job.tasks.iter_mut() {
                         if let Err(_) = task_ref.unblock() {
                             job.status = JobStatus::Stopped;
                         } else {
@@ -1450,7 +1529,7 @@ impl Shell {
             if let Ok(job_num) = job_num.parse::<isize>() {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
                     self.fg_job_num = Some(job_num);
-                    for task_ref in &job.tasks {
+                    for task_ref in job.tasks.iter_mut() {
                         if let Err(_) = task_ref.unblock() {
                             job.status = JobStatus::Stopped;
                         } else {
