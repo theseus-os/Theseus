@@ -28,6 +28,7 @@
 #![no_std]
 #![feature(panic_info_message)]
 #![feature(const_btree_new)]
+#![deny(unsafe_op_in_unsafe_fn)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -677,8 +678,9 @@ impl Task {
         self.on_runqueue.store(runqueue.into());
     }
 
+    // FIXME: Document
     pub fn init(self) -> TaskRef<true, true> {
-        // FIXME: document
+        // FIXME: Document
         assert!(self.runstate.compare_exchange(RunState::Initing, RunState::Blocked).is_ok());
 
         let task_id = self.id;
@@ -686,9 +688,7 @@ impl Task {
             task: Arc::new(self),
         };
         let tld = TaskLocalData {
-            // clone from <true, true> to <false, true>
-            // transmute from <false, true> to <false, false>
-            taskref: unsafe { core::mem::transmute(task_ref.clone()) },
+            taskref: task_ref.clone(),
             task_id,
         };
         task_ref.inner.lock().task_local_data = Some(Box::new(tld));
@@ -1033,7 +1033,7 @@ pub fn bootstrap_task(
     bootstrap_task.running_on_cpu.store(Some(apic_id).into()); 
     bootstrap_task.inner.get_mut().pinned_core = Some(apic_id); // can only run on this CPU core
     let bootstrap_task_id = bootstrap_task.id;
-    let (task_ref, _) = bootstrap_task.init().unblock();
+    let task_ref = bootstrap_task.init().unblock().map_err(|_| "BUG: bootstrap_task(): couldn't unblock bootstrap_task")?;
 
     // set this as this core's current task, since it's obviously running
     task_ref.set_as_current_task();

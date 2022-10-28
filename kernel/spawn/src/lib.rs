@@ -10,7 +10,7 @@
 //! [atb]: fn.new_application_task_builder.html
 
 #![no_std]
-#![feature(stmt_expr_attributes)]
+#![feature(stmt_expr_attributes, type_changing_struct_update)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -132,7 +132,7 @@ impl Drop for BootstrapTaskRef {
     // See the documentation for `BootstrapTaskRef::finish()` for more details.
     fn drop(&mut self) {
         // trace!("Finishing Bootstrap Task on core {}: {:?}", self.apic_id, self.task_ref);
-        remove_current_task_from_runqueue(&self.task_ref);
+        remove_current_task_from_runqueue(self.task_ref.clone());
         self.mark_as_exited(Box::new(()))
             .expect("BUG: bootstrap task was unable to mark itself as exited");
 
@@ -290,7 +290,7 @@ impl<F, A, R> TaskBuilder<F, A, R, false> {
     /// e.g., to set up other things for the newly-spawned (but not yet running) task. 
     /// 
     /// Note that the new Task will not be `Runnable` until it is explicitly set as such.
-    pub fn block(mut self) -> TaskBuilder<F, A, R, true> {
+    pub fn block(self) -> TaskBuilder<F, A, R, true> {
         TaskBuilder {
             ..self
         }
@@ -369,20 +369,17 @@ impl<F, A, R, const BLOCKED: bool> TaskBuilder<F, A, R, BLOCKED>
             pb_func(&mut new_task)?;
         }
         
-        // SAFETY: the transmutes do nothing as the methods
-        let task_ref: TaskRef<true, BLOCKED> = unsafe {
-            if BLOCKED {
-                core::mem::transmute(new_task.init())
-            } else {
-                core::mem::transmute(new_task.init().unblock().0)
-            }
+        // SAFETY: the into_kind calls do nothing as the methods return TaskRefs with the correct
+        // blocked variant. The type system isn't smart enough to recognise it.
+        let task_ref: TaskRef<true, BLOCKED> = if BLOCKED {
+            let task_ref: TaskRef<true, true> = new_task.init();
+            unsafe { task_ref.into_kind() }
+        } else {
+            let task_ref: TaskRef<true, false> = new_task.init().unblock().map_err(|_| "BUG: TaskBuilder::spawn() couldn't unblock new_task")?;
+            unsafe { task_ref.into_kind() }
         };
-        todo!();
-    }
 
-
-    fn post_unblock_spawn(&self, task: TaskRef<true, BLOCKED>) -> Result<TaskRef<true, BLOCKED>, &'static str>  {
-        let _existing_task = TASKLIST.lock().insert(task.id, task.clone());
+        let _existing_task = TASKLIST.lock().insert(task_ref.id, task_ref.clone());
         // insert should return None, because that means there was no existing task with the same ID 
         if let Some(_existing_task) = _existing_task {
             error!("BUG: TaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID! {:?}", _existing_task);
@@ -390,12 +387,12 @@ impl<F, A, R, const BLOCKED: bool> TaskBuilder<F, A, R, BLOCKED>
         }
         
         if let Some(core) = self.pin_on_core {
-            runqueue::add_task_to_specific_runqueue(core, task.clone())?;
+            runqueue::add_task_to_specific_runqueue(core, task_ref.clone())?;
         } else {
-            runqueue::add_task_to_any_runqueue(task.clone())?;
+            runqueue::add_task_to_any_runqueue(task_ref.clone())?;
         }
 
-        Ok(task)
+        Ok(task_ref)
     }
 }
 
@@ -764,7 +761,7 @@ fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason:
 #[inline(always)]
 fn task_cleanup_final_internal(current_task: &TaskRef) {
     // First, remove the task from its runqueue(s).
-    remove_current_task_from_runqueue(current_task);
+    remove_current_task_from_runqueue(current_task.clone());
 
     // Second, run TLS object destructors, which will drop any TLS objects
     // that were lazily initialized during this execution of this task.
@@ -885,7 +882,7 @@ fn task_restartable_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, cu
 }
 
 /// Helper function to remove a task from its runqueue and drop it.
-fn remove_current_task_from_runqueue(current_task: &TaskRef) {
+fn remove_current_task_from_runqueue(current_task: TaskRef) {
     // Special behavior when evaluating runqueues
     #[cfg(rq_eval)] {
         // The special spillful version does nothing here, since it was already done in `internal_exit()`
@@ -894,7 +891,7 @@ fn remove_current_task_from_runqueue(current_task: &TaskRef) {
         }
         // The regular spill-free version does brute-force removal of the task from ALL runqueues.
         #[cfg(not(runqueue_spillful))] {
-            runqueue::remove_task_from_all(current_task).unwrap();
+            runqueue::remove_task_from_all(&current_task).unwrap();
         }
     }
 
@@ -903,7 +900,7 @@ fn remove_current_task_from_runqueue(current_task: &TaskRef) {
     #[cfg(not(rq_eval))] {
         if let Err(e) = runqueue::get_runqueue(apic::get_my_apic_id())
             .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
-            .and_then(|rq| rq.write().remove_task(current_task)) 
+            .and_then(|rq| rq.write().remove_task(&current_task))
         {
             error!("BUG: couldn't remove exited task from runqueue: {}", e);
         }

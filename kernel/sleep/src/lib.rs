@@ -88,7 +88,7 @@ fn add_to_delayed_tasklist(new_node: SleepingTaskNode) {
 fn remove_next_task_from_delayed_tasklist() {
     let mut delayed_tasklist = DELAYED_TASKLIST.lock();
     if let Some(SleepingTaskNode { taskref, .. }) = delayed_tasklist.pop() {
-        assert!(taskref.unblock().1, "failed to unblock sleeping task");
+        taskref.unblock().expect("failed to unblock sleeping task");
 
         match delayed_tasklist.peek() {
             Some(SleepingTaskNode { resume_time, .. }) => 
@@ -116,9 +116,16 @@ pub fn sleep(duration: usize) -> Result<(), ()> {
 
     let current_task = get_my_current_task().unwrap().clone();
     // Add the current task to the delayed tasklist and then block it.
-    // FIXME
-    add_to_delayed_tasklist(SleepingTaskNode{taskref: unsafe { core::mem::transmute(current_task.clone()) }, resume_time});
-    current_task.block().map_err(|_| ())?;
+    // SAFETY: add_to_delayed_tasklist doesn't drop taskref.
+    unsafe {
+        current_task.run_and_block(|taskref| {
+            add_to_delayed_tasklist(SleepingTaskNode {
+                taskref,
+                resume_time,
+            });
+        })
+    }
+    .map_err(|_| ())?;
     scheduler::schedule();
     Ok(())
 }
