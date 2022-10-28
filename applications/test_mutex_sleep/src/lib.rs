@@ -59,9 +59,9 @@ fn test_contention() -> Result<(), &'static str> {
 
     warn!("Finished spawning the 3 tasks");
 
-    t3.unblock().unwrap();
-    t2.unblock().unwrap();
-    t1.unblock().unwrap();
+    let t3 = t3.unblock().unwrap();
+    let t2 = t2.unblock().unwrap();
+    let t1 = t1.unblock().unwrap();
 
     t1.join()?;
     t2.join()?;
@@ -117,9 +117,9 @@ fn test_lockstep() -> Result<(), &'static str> {
 
     warn!("Finished spawning the 3 tasks");
 
-    t3.unblock().unwrap();
-    t2.unblock().unwrap();
-    t1.unblock().unwrap();
+    let t3 = t3.unblock().unwrap();
+    let t2 = t2.unblock().unwrap();
+    let t1 = t1.unblock().unwrap();
 
     t1.join()?;
     t2.join()?;

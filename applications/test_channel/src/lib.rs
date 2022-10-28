@@ -182,8 +182,8 @@ fn rendezvous_test_oneshot() -> Result<(), &'static str> {
     let t2 = pin_task!(t2, my_cpu).spawn()?;
 
     warn!("rendezvous_test_oneshot(): Finished spawning the sender and receiver tasks");
-    t2.unblock().unwrap();
-    t1.unblock().unwrap();
+    let t2 = t2.unblock().unwrap();
+    let t1 = t1.unblock().unwrap();
 
     t1.join()?;
     t2.join()?;
@@ -214,8 +214,8 @@ fn rendezvous_test_multiple(send_count: usize, receive_count: usize, send_panic:
     let t2 = pin_task!(t2, my_cpu).spawn()?;
 
     warn!("rendezvous_test_multiple(): Finished spawning the sender and receiver tasks");
-    t2.unblock().unwrap();
-    t1.unblock().unwrap();
+    let t2 = t2.unblock().unwrap();
+    let t1 = t1.unblock().unwrap();
 
     t1.join()?;
     t2.join()?;
@@ -308,8 +308,8 @@ fn asynchronous_test_oneshot() -> Result<(), &'static str> {
     let t2 = pin_task!(t2, my_cpu).spawn()?;
 
     warn!("asynchronous_test_oneshot(): Finished spawning the sender and receiver tasks");
-    t2.unblock().unwrap();
-    t1.unblock().unwrap();
+    let t2 = t2.unblock().unwrap();
+    let t1 = t1.unblock().unwrap();
 
     t1.join()?;
     t2.join()?;
@@ -338,8 +338,8 @@ fn asynchronous_test_multiple(send_count: usize, receive_count: usize, send_pani
     let t2 = pin_task!(t2, my_cpu).spawn()?;
 
     warn!("asynchronous_test_multiple(): Finished spawning the sender and receiver tasks");
-    t2.unblock().unwrap();
-    t1.unblock().unwrap();
+    let t2 = t2.unblock().unwrap();
+    let t1 = t1.unblock().unwrap();
 
     t1.join()?;
     t2.join()?;

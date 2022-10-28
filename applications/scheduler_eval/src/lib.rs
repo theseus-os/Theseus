@@ -16,7 +16,7 @@ pub fn main(_args: Vec<String>) -> (){
         .pin_on_core(1)
         .spawn().expect("failed to initiate task");
 
-    if let Err(e) = scheduler::set_priority(&taskref1, 30) {
+    if let Err(e) = scheduler::set_priority(&taskref1.clone(), 30) {
         error!("scheduler_eval(): Could not set priority to taskref1: {}", e);
     }
 
@@ -27,7 +27,7 @@ pub fn main(_args: Vec<String>) -> (){
         .pin_on_core(1)
         .spawn().expect("failed to initiate task");
 
-    if let Err(e) = scheduler::set_priority(&taskref2, 20) {
+    if let Err(e) = scheduler::set_priority(&taskref2.clone(), 20) {
         error!("scheduler_eval(): Could not set priority to taskref2: {}", e);
     }
 
@@ -38,7 +38,7 @@ pub fn main(_args: Vec<String>) -> (){
         .pin_on_core(1)
         .spawn().expect("failed to initiate task");
 
-    if let Err(e) = scheduler::set_priority(&taskref3, 10) {
+    if let Err(e) = scheduler::set_priority(&taskref3.clone(), 10) {
         error!("scheduler_eval(): Could not set priority to taskref3: {}", e);
     }
 
@@ -46,9 +46,9 @@ pub fn main(_args: Vec<String>) -> (){
 
     debug!("Spawned all tasks");
 
-    let _priority1 = scheduler::get_priority(&taskref1);
-    let _priority2 = scheduler::get_priority(&taskref2);
-    let _priority3 = scheduler::get_priority(&taskref3);
+    let _priority1 = scheduler::get_priority(&taskref1.clone());
+    let _priority2 = scheduler::get_priority(&taskref2.clone());
+    let _priority3 = scheduler::get_priority(&taskref3.clone());
 
     #[cfg(priority_scheduler)]
     {

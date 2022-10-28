@@ -157,7 +157,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
         |_, _| loop { }, // dummy failure function
     )?;
     task.name = String::from("rq_eval_single_task_unrunnable");
-    let taskref = TaskRef::new(task);
+    let taskref = task.init();
     
     let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
     let start = hpet.get_counter();
@@ -168,13 +168,13 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
         #[cfg(runqueue_spillful)] {   
             if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.get() {
                 if let Some(rq) = taskref.on_runqueue() {
-                    remove_from_runqueue(&taskref, rq)?;
+                    remove_from_runqueue(&taskref.clone(), rq)?;
                 }
             }
         }
         #[cfg(not(runqueue_spillful))]
         {
-            runqueue::remove_task_from_all(&taskref)?;
+            runqueue::remove_task_from_all(&taskref.clone())?;
         }
     }
 
