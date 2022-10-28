@@ -998,7 +998,7 @@ impl<T: FromBytes> BorrowedMappedPages<T, Immutable> {
         mp: MappedPages,
         byte_offset: usize,
     ) -> Result<BorrowedMappedPages<T>, (MappedPages, &'static str)> {
-        let borrowed_mp = Self {
+        Ok(Self {
             ptr: match mp.as_type::<T>(byte_offset) {
                 Ok(r) => {
                     let nn: NonNull<T> = r.into();
@@ -1008,8 +1008,7 @@ impl<T: FromBytes> BorrowedMappedPages<T, Immutable> {
             },
             mp,
             _mut: PhantomData,
-        };
-        Ok(borrowed_mp)
+        })
     }
 }
 
@@ -1025,15 +1024,14 @@ impl<T: FromBytes> BorrowedMappedPages<T, Mutable> {
         mut mp: MappedPages,
         byte_offset: usize,
     ) -> Result<BorrowedMappedPages<T, Mutable>, (MappedPages, &'static str)> {
-        let borrowed_mp = Self {
+        Ok(Self {
             ptr: match mp.as_type_mut::<T>(byte_offset) {
                 Ok(r) => r.into(),
                 Err(e_str) => return Err((mp, e_str)),
             },
             mp,
             _mut: PhantomData,
-        };
-        Ok(borrowed_mp)
+        })
     }
 }
 
@@ -1124,7 +1122,7 @@ impl<T: FromBytes> BorrowedSliceMappedPages<T, Immutable> {
         byte_offset: usize,
         length: usize,
     ) -> Result<BorrowedSliceMappedPages<T>, (MappedPages, &'static str)> {
-        let borrowed_mp = Self {
+        Ok(Self {
             ptr: match mp.as_slice::<T>(byte_offset, length) {
                 Ok(r) => {
                     let nn: NonNull<[T]> = r.into();
@@ -1134,8 +1132,7 @@ impl<T: FromBytes> BorrowedSliceMappedPages<T, Immutable> {
             },
             mp,
             _mut: PhantomData,
-        };
-        Ok(borrowed_mp)
+        })
     }
 }
 
@@ -1152,15 +1149,14 @@ impl<T: FromBytes> BorrowedSliceMappedPages<T, Mutable> {
         byte_offset: usize,
         length: usize,
     ) -> Result<Self, (MappedPages, &'static str)> {
-        let borrowed_mp = Self {
+        Ok(Self {
             ptr: match mp.as_slice_mut::<T>(byte_offset, length) {
                 Ok(r) => r.into(),
                 Err(e_str) => return Err((mp, e_str)),
             },
             mp,
             _mut: PhantomData,
-        };
-        Ok(borrowed_mp)
+        })
     }
 }
 
@@ -1176,8 +1172,8 @@ impl<T: FromBytes, M: Mutability> Deref for BorrowedSliceMappedPages<T, M> {
     type Target = [T];
     fn deref(&self) -> &[T] {
         // SAFETY:
-        // ✅ The pointer is properly aligned, as its alignment has been checked in `MappedPages::as_slice()`.
-        // ✅ The pointer is dereferenceable, as it has been bounds checked by `MappedPages::as_slice()`.
+        // ✅ The pointer is properly aligned; its alignment has been checked in `MappedPages::as_slice()`.
+        // ✅ The pointer is dereferenceable; it has been bounds checked by `MappedPages::as_slice()`.
         // ✅ The pointer has been initialized in the constructor `from()`.
         // ✅ The lifetime of the returned reference `&[T]` is tied to the lifetime of the `MappedPages`,
         //     ensuring that the `MappedPages` object will persist at least as long as the reference.
