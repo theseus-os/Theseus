@@ -300,7 +300,7 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
         if let MadtEntry::LocalApic(lapic_entry) = madt_entry { 
             let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
 
-            let lapic = match LocalApic::init(
+            match LocalApic::init(
                 page_table,
                 lapic_entry.processor,
                 None, // we don't know the hardware-assigned APIC ID of the BSP (this CPU) yet
@@ -311,13 +311,10 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
                 // this `lapic_entry` wasn't for the BSP, try the next one.
                 Err(LapicInitError::NotBSP) => continue,
                 Err(other_err) => return Err(Box::leak(format!("{:?}", other_err).into_boxed_str())),
-                Ok(lapic) => lapic, // fall through
+                Ok(()) => { } // fall through
             };
 
             assert!(get_my_apic_id() == lapic_entry.apic_id);
-            if let Err(e) = lapic.finish_init() {
-                return Err(Box::leak(format!("{:?}", e).into_boxed_str()));
-            }
             let bsp_id = lapic_entry.apic_id;
 
             // redirect every IoApic's interrupts to the one BSP

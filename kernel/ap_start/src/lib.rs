@@ -79,7 +79,7 @@ pub fn kstart_ap(
     // Initialize this CPU's Local APIC such that we can use everything that depends on APIC IDs.
     // This must be done before initializing task spawning, because that relies on the ability to
     // enable/disable preemption, which is partially implemented by the Local APIC.
-    let lapic = LocalApic::init(
+    LocalApic::init(
         &mut kernel_mmi_ref.lock().page_table,
         processor_id,
         Some(apic_id),
@@ -87,7 +87,6 @@ pub fn kstart_ap(
         nmi_lint,
         nmi_flags,
     ).unwrap();
-    lapic.finish_init().unwrap();
 
     // Now that the Local APIC has been initialized for this CPU, we can initialize the
     // task management subsystem and create the idle task for this CPU.
