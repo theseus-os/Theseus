@@ -43,6 +43,9 @@ path = "../mod_mgmt"
 [dependencies.exceptions_full]
 path = "../exceptions_full"
 
+[dependencies.tlb_shootdown]
+path = "../tlb_shootdown"
+
 [dependencies.apic]
 path = "../apic"
 

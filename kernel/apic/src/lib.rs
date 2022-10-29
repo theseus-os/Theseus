@@ -370,6 +370,10 @@ impl LocalApic {
     /// ## Important Usage Note
     /// This MUST be invoked from each CPU itself when it is booting up, i.e.,
     /// the BSP cannot invoke this for other APs.
+    /// 
+    /// This only performs a "local" initialization, i.e., setting up the local APIC
+    /// for this CPU only. It is not visible to or usable by other CPUS until
+    /// after [`LocalApic::finish_init()`] is invoked with the result of this function.
     pub fn init(
         page_table: &mut PageTable,
         processor_id: u8,
@@ -377,7 +381,7 @@ impl LocalApic {
         should_be_bsp: bool,
         nmi_lint: u8,
         nmi_flags: u16,
-    ) -> Result<(), LapicInitError> {
+    ) -> Result<LocalApic, LapicInitError> {
 
         let nmi_lint = match nmi_lint {
             0 => LvtLint::Pin0,
@@ -442,16 +446,26 @@ impl LocalApic {
         lapic.set_nmi(nmi_lint, nmi_flags);
         info!("Initialized new CPU ({:?})", lapic);
 
-        let _existing = LOCAL_APICS.insert(actual_apic_id, RwLockIrqSafe::new(lapic));
-        if _existing.is_some() {
-            return Err(LapicInitError::AlreadyExisted(actual_apic_id));
-        }
-
         // Theseus uses this MSR to hold each CPU's ID (which is an OS-chosen value).
         unsafe { wrmsr(IA32_TSC_AUX, actual_apic_id as u64); }
         if is_bsp {
             BSP_PROCESSOR_ID.call_once(|| actual_apic_id); 
         }
+        Ok(lapic)
+    }
+
+    /// Finishes the initialization process for this LocalApic,
+    /// making it available for use by the rest of the system.
+    /// 
+    /// This function actually adds this `LocalApic` to the system-wide list
+    /// of `LocalAPIC`s, and increments the `CPU_COUNT` accordingly.
+    pub fn finish_init(self) -> Result<(), LapicInitError> {
+        let apic_id = self.apic_id;
+        let _existing = LOCAL_APICS.insert(apic_id, RwLockIrqSafe::new(self));
+        if _existing.is_some() {
+            return Err(LapicInitError::AlreadyExisted(apic_id));
+        }
+
         CPU_COUNT.fetch_add(1, Ordering::Relaxed);
 		Ok(())      
     }

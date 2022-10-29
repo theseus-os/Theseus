@@ -90,7 +90,6 @@ dependencies = [
  "scheduler",
  "spawn",
  "stack",
- "tlb_shootdown",
 ]
 
 [[package]]
@@ -333,6 +332,7 @@ dependencies = [
  "stack",
  "task",
  "task_fs",
+ "tlb_shootdown",
  "tsc",
  "window_manager",
 ]
