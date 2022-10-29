@@ -52,19 +52,29 @@ pub fn kstart_ap(
     nmi_lint: u8,
     nmi_flags: u16,
 ) -> ! {
-    info!("Booted AP: proc: {}, apic: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}", 
+    info!("Booting AP: proc: {}, apic: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}",
         processor_id, apic_id, _stack_start, _stack_end, nmi_lint, nmi_flags
     );
 
     // set a flag telling the BSP that this AP has entered Rust code
     AP_READY_FLAG.store(true, Ordering::SeqCst);
 
+    // Initialize this CPU's Local APIC such that we can use everything that depends on APIC IDs.
+    let kernel_mmi_ref = get_kernel_mmi_ref().expect("kstart_ap(): kernel_mmi ref was None");
+    LocalApic::init(
+        &mut kernel_mmi_ref.lock().page_table,
+        processor_id,
+        Some(apic_id),
+        false,
+        nmi_lint,
+        nmi_flags,
+    ).unwrap();
+
     // get the stack that was allocated for us (this AP) by the BSP.
     let this_ap_stack = AP_STACKS.lock().remove(&apic_id)
         .unwrap_or_else(|| panic!("BUG: kstart_ap(): couldn't get stack created for AP with apic_id: {}", apic_id));
 
     // initialize interrupts (including TSS/GDT) for this AP
-    let kernel_mmi_ref = get_kernel_mmi_ref().expect("kstart_ap(): kernel_mmi ref was None");
     let (double_fault_stack, privilege_stack) = {
         let mut kernel_mmi = kernel_mmi_ref.lock();
         (
@@ -78,13 +88,6 @@ pub fn kstart_ap(
         .expect("kstart_ap(): failed to initialize interrupts!");
 
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), apic_id, this_ap_stack).unwrap();
-
-    // as a final step, init this apic as a new LocalApic, and add it to the list of all lapics.
-    // we do this last (after all other initialization) in order to prevent this lapic
-    // from prematurely receiving IPIs or being used in other ways,
-    // and also to ensure that if this apic fails to init, it's not accidentally used as a functioning apic in the list.
-    LocalApic::init(&mut kernel_mmi_ref.lock().page_table, processor_id, apic_id, false, nmi_lint, nmi_flags)
-        .expect("kstart_ap(): failed to create LocalApic");
     tlb_shootdown::init();
 
     info!("Initialization complete on AP core {}. Spawning idle task and enabling interrupts...", apic_id);
