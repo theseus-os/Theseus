@@ -373,10 +373,10 @@ impl<F, A, R, const BLOCKED: bool> TaskBuilder<F, A, R, BLOCKED>
         // blocked variant. The type system isn't smart enough to recognise it.
         let task_ref: TaskRef<true, BLOCKED> = if BLOCKED {
             let task_ref: TaskRef<true, true> = new_task.init();
-            unsafe { task_ref.into_kind() }
+            task_ref.into_kind()
         } else {
             let task_ref: TaskRef<true, false> = new_task.init().unblock().map_err(|_| "BUG: TaskBuilder::spawn() couldn't unblock new_task")?;
-            unsafe { task_ref.into_kind() }
+            task_ref.into_kind()
         };
 
         let _existing_task = TASKLIST.lock().insert(task_ref.id, task_ref.clone());

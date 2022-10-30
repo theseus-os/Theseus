@@ -91,16 +91,14 @@ impl WaitQueue {
                     return Ok(ret);
                 }
                 // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
-                unsafe {
-                    curr_task.clone().run_and_block(|taskref| {
-                        // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
-                        if !wq_locked.contains(&taskref) {
-                            wq_locked.push_back(taskref);
-                        } else {
-                            panic!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
-                        }
-                    })
-                }
+                curr_task.clone().run_and_block(|taskref| {
+                    // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
+                    if !wq_locked.contains(&taskref) {
+                        wq_locked.push_back(taskref);
+                    } else {
+                        panic!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
+                    }
+                })
                 .map_err(|_| WaitError::CantBlockCurrentTask)?;
             }
             scheduler::schedule();
@@ -129,16 +127,14 @@ impl WaitQueue {
                     return Ok(ret);
                 }
                 // trace!("WaitQueue::wait_until_mut():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
-                unsafe {
-                    curr_task.clone().run_and_block(|taskref| {
-                        // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
-                        if !wq_locked.contains(&taskref) {
-                            wq_locked.push_back(taskref);
-                        } else {
-                            panic!("WaitQueue::wait_until_mut():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
-                        }
-                    })
-                }
+                curr_task.clone().run_and_block(|taskref| {
+                    // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
+                    if !wq_locked.contains(&taskref) {
+                        wq_locked.push_back(taskref);
+                    } else {
+                        panic!("WaitQueue::wait_until_mut():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
+                    }
+                })
                 .map_err(|_| WaitError::CantBlockCurrentTask)?;
             }
             scheduler::schedule();

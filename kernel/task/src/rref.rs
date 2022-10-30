@@ -228,23 +228,38 @@ impl<const JOINABLE: bool, const UNBLOCKABLE: bool> TaskRef<JOINABLE, UNBLOCKABL
         Ok(())
     }
 
-    /// Converts a task reference into the desired kind. This function should
-    /// only be used to _trick_ the type system.
+    /// Converts a task reference into the desired kind.
     ///
-    /// # Safety
+    /// This function must only be used to _trick_ the type system. The
+    /// constants must not change.
     ///
-    /// The constants must not change. See `spawn::TaskBuild::spawn` for example
-    /// usage.
-    pub unsafe fn into_kind<const J: bool, const U: bool>(self) -> TaskRef<J, U> {
-        unsafe { self._into_kind() }
+    /// # Examples
+    /// ```rust,no_run
+    /// # use task::{Task, TaskRef};
+    /// fn foo<const BLOCKED: bool>() -> Result<TaskRef<true, BLOCKED>, &'static str> {
+    ///     let task: TaskRef<true, true> = Task::new(None, |_, _| loop {})?.init();
+    ///     let task: TaskRef<true, BLOCKED> = if BLOCKED {
+    ///         let task: TaskRef<true, true> = task;
+    ///         task.into_kind()
+    ///     } else {
+    ///         let task: TaskRef<true, false> = task.unblock().expect("couldn't unblock task");
+    ///         task.into_kind()
+    ///     };
+    ///     Ok(task)
+    /// }
+    /// # fn main() {
+    /// # foo::<true>().unwrap();
+    /// # foo::<false>().unwrap();
+    /// # }
+    /// ```
+    pub fn into_kind<const J: bool, const U: bool>(self) -> TaskRef<J, U> {
+        self._into_kind()
     }
 
     /// Converts a task reference into the desired kind.
     ///
-    /// # Safety
-    ///
     /// The transition must make logical sense.
-    unsafe fn _into_kind<const J: bool, const U: bool>(self) -> TaskRef<J, U> {
+    fn _into_kind<const J: bool, const U: bool>(self) -> TaskRef<J, U> {
         let s = core::mem::ManuallyDrop::new(self);
         // SAFETY: - s.task is a valid reference
         //         - the arc's strong count correctly remains unchanged
@@ -262,15 +277,14 @@ impl<const JOINABLE: bool> TaskRef<JOINABLE, true> {
             .runstate
             .compare_exchange(RunState::Blocked, RunState::Runnable)
         {
-            // SAFETY: We just unblocked the task.
-            Ok(_) => Ok(unsafe { self.into_kind() }),
+            Ok(_) => Ok(self._into_kind()),
             // SAFETY: The task was already not blocked.
             // TODO: Ideally we would transition the TaskRef into some kind of Killed state.
             Err(current) => {
                 // We should only hit this if the task has been killed. No other task should be
                 // able to unblock us.
                 debug_assert_ne!(current, RunState::Runnable);
-                Err(unsafe { self.into_kind() })
+                Err(self._into_kind())
             }
         }
     }
@@ -285,7 +299,7 @@ impl<const JOINABLE: bool> TaskRef<JOINABLE, false> {
 
     pub fn block(self) -> Result<TaskRef<JOINABLE, true>, TaskRef<JOINABLE, false>> {
         match self._block() {
-            Ok(_) => Ok(unsafe { self.into_kind() }),
+            Ok(_) => Ok(self._into_kind()),
             Err(_) => Err(self),
         }
     }
@@ -296,6 +310,8 @@ impl<const JOINABLE: bool> TaskRef<JOINABLE, false> {
     /// queue prior to blocking the task. However, to avoid race conditions,
     /// the lock on the queue must be obtained prior to calling
     /// `run_and_block`. `f` must operate on the guard.
+    ///
+    /// `f` must not drop the provided [`TaskRef`].
     ///
     /// # Examples
     ///
@@ -314,16 +330,12 @@ impl<const JOINABLE: bool> TaskRef<JOINABLE, false> {
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// # Safety
-    ///
-    /// `f` must not drop the provided `TaskRef`.
-    pub unsafe fn run_and_block<F>(self, mut f: F) -> Result<(), ()>
+    pub fn run_and_block<F>(self, mut f: F) -> Result<(), ()>
     where
         F: FnMut(TaskRef<JOINABLE, true>),
     {
         let task = self.task.clone();
-        f(unsafe { self.into_kind() });
+        f(self.into_kind());
 
         let task_ref: TaskRef<false, false> = TaskRef { task };
         match task_ref._block() {

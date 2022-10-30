@@ -119,15 +119,14 @@ pub fn sleep(duration: usize) -> Result<(), ()> {
     // condition present because we do not hold the lock on DELAYED_TASKLIST for
     // the duration of run_and_block. However, this is ok as unblock_sleeping_tasks
     // is called at regular intervals by the LAPIC timer interrupt handler.
-    unsafe {
-        current_task.run_and_block(|taskref| {
+    current_task
+        .run_and_block(|taskref| {
             add_to_delayed_tasklist(SleepingTaskNode {
                 taskref,
                 resume_time,
             });
         })
-    }
-    .map_err(|_| ())?;
+        .map_err(|_| ())?;
     scheduler::schedule();
     Ok(())
 }
