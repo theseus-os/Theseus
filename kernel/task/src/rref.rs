@@ -290,7 +290,33 @@ impl<const JOINABLE: bool> TaskRef<JOINABLE, false> {
         }
     }
 
+    /// Runs a closure and then blocks the task.
+    ///
+    /// This function must only be used to add a blocked task reference to a
+    /// queue prior to blocking the task. However, to avoid race conditions,
+    /// the lock on the queue must be obtained prior to calling
+    /// `run_and_block`. `f` must operate on the guard.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # fn main() -> Result<(), &'static str> {
+    /// # let queue = irq_safety::MutexIrqSafe::new(Vec::new());
+    /// let task = task::get_my_current_task().ok_or("couldn't get current task")?;
+    /// let mut guard = queue.lock();
+    /// // SAFETY: blocked_task is not dropped.
+    /// unsafe {
+    ///     task.clone()
+    ///         .run_and_block(|blocked_task| guard.push(blocked_task))
+    /// }
+    /// .map_err(|_| "couldn't block current task")?;
+    /// drop(guard);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Safety
+    ///
     /// `f` must not drop the provided `TaskRef`.
     pub unsafe fn run_and_block<F>(self, mut f: F) -> Result<(), ()>
     where
@@ -308,9 +334,9 @@ impl<const JOINABLE: bool> TaskRef<JOINABLE, false> {
 }
 
 impl<const JOINABLE: bool, const UNBLOCKABLE: bool> Drop for TaskRef<JOINABLE, UNBLOCKABLE> {
-    /// Marks the inner [`Task`] as not joinable, meaning that it is an orphaned
-    /// task that will be auto-reaped after exiting.
     fn drop(&mut self) {
+        // Marks the inner [`Task`] as not joinable, meaning that it is an
+        // orphaned task that will be auto-reaped after exiting.
         if JOINABLE {
             self.task.joinable.store(false, Ordering::Relaxed);
         }

@@ -5,7 +5,7 @@
 //! 
 //! # Examples
 //! How to wait for a `Task` to complete (using `join()`) and get its exit value.
-//! ```
+//! ```no_compile // FIXME
 //! taskref.join(); // taskref is the task that we're waiting on
 //! if let Some(exit_result) = taskref.take_exit_value() {
 //!     match exit_result {
