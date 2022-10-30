@@ -149,10 +149,11 @@ where
 /// Wait for the given `duration`.
 ///
 /// This function spins the current task rather than sleeping it and so, when
-/// possible, the `sleep` crate should be used.
+/// possible, the `sleep` crate should be used. However, unlike the `sleep`
+/// crate, this function doesn't rely on interrupts.
 ///
-/// However, unlike the `sleep` crate, this function doesn't rely on interrupts,
-/// and can be used prior to the scheduler being initiated.
+/// This function must not be called prior to registering an early sleeper using
+/// [`register_early_sleeper`].
 pub fn early_sleep(duration: Duration) {
     let f = EARLY_SLEEP_FUNCTION.load();
     f(duration)
@@ -190,11 +191,8 @@ where
 /// [`Duration`] signifying the time since 12:00am January 1st 1970 (i.e. Unix
 /// time).
 ///
-/// # Panics
-///
-/// This function will panic if called prior to registering a clock using
-/// [`register_clock_source`]. [`register_clock_source`] must return [`Ok`] and
-/// the [`ClockType`] of the registered clock must be the same as `T`.
+/// This function must not be called prior to registering a clock source of the
+/// specified type using [`register_clock_source`].
 pub fn now<T>() -> T::Unit
 where
     T: ClockType,
