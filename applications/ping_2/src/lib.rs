@@ -14,7 +14,7 @@ use net::{
 pub fn main(_: Vec<String>) -> isize {
     let remote = IpAddress::from_str("142.250.80.78").unwrap();
 
-    let iface = net::get_interfaces().lock().iter().next().cloned().unwrap();
+    let iface: &'static _ = net::get_interfaces().lock().iter().next().unwrap();
 
     let rx_buffer = PacketBuffer::new(vec![PacketMetadata::EMPTY], vec![0; 256]);
     let tx_buffer = PacketBuffer::new(vec![PacketMetadata::EMPTY], vec![0; 256]);
@@ -29,7 +29,7 @@ pub fn main(_: Vec<String>) -> isize {
 
     loop {
         log::info!("1");
-        iface.lock().poll(&mut sockets);
+        // iface.lock().poll(&mut sockets);
         log::info!("2");
 
         let socket = sockets.get_mut::<Socket>(handle);

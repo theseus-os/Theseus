@@ -2464,7 +2464,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ping_new"
+name = "ping_2"
 version = "0.1.0"
 dependencies = [
  "log",
@@ -3768,7 +3768,7 @@ dependencies = [
  "mm_eval",
  "ns",
  "ping",
- "ping_new",
+ "ping_2",
  "pmu_sample_start",
  "pmu_sample_stop",
  "print_fault_log",
