@@ -74,7 +74,7 @@ impl<'a, 'b> phy::Device<'a> for DeviceWrapper<'b> {
 }
 
 /// The receive token.
-pub struct RxToken {
+pub(crate) struct RxToken {
     inner: BoxRefMut<ReceivedFrame, [u8]>,
 }
 
@@ -88,7 +88,7 @@ impl phy::RxToken for RxToken {
 }
 
 /// The transmit token.
-pub struct TxToken<'a> {
+pub(crate) struct TxToken<'a> {
     device: &'a mut dyn Device,
 }
 

@@ -11,9 +11,9 @@ mod device;
 mod error;
 mod interface;
 
-pub use device::*;
+pub use device::{Device, DeviceCapabilities};
 pub use error::{Error, Result};
-pub use interface::*;
+pub use interface::{Interface, IpAddress, IpCidr, SocketSet};
 pub use smoltcp::{phy, socket, time::Instant, wire};
 
 /// A randomly chosen IP address that must be outside of the DHCP range.

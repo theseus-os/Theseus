@@ -1,4 +1,4 @@
-use crate::{Device, DeviceWrapper, Result};
+use crate::{device::DeviceWrapper, Device, Result};
 use alloc::{collections::BTreeMap, sync::Arc};
 use irq_safety::MutexIrqSafe;
 use smoltcp::{iface, phy::DeviceCapabilities, wire};
