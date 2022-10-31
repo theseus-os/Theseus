@@ -44,6 +44,7 @@ extern crate first_application;
 extern crate exceptions_full;
 extern crate network_manager;
 extern crate window_manager;
+extern crate tlb_shootdown;
 extern crate multiple_heaps;
 extern crate console;
 #[cfg(simd_personality)] extern crate simd_personality;
@@ -132,6 +133,10 @@ pub fn init(
     let cpu_count = ap_count + 1;
     info!("Finished handling and booting up all {} AP cores; {} total CPUs are running.", ap_count, cpu_count);
 
+    // Now that other CPUs are fully booted, init TLB shootdowns,
+    // which rely on Local APICs to broadcast an IPI to all running CPUs.
+    tlb_shootdown::init();
+    
     // //initialize the per core heaps
     multiple_heaps::switch_to_multiple_heaps()?;
     info!("Initialized per-core heaps");

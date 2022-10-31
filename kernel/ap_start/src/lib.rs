@@ -15,7 +15,6 @@ extern crate spawn;
 extern crate scheduler;
 extern crate kernel_config;
 extern crate apic;
-extern crate tlb_shootdown;
 extern crate no_drop;
 
 use alloc::collections::BTreeMap;
@@ -52,7 +51,7 @@ pub fn kstart_ap(
     nmi_lint: u8,
     nmi_flags: u16,
 ) -> ! {
-    info!("Booted AP: proc: {}, apic: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}", 
+    info!("Booting AP: proc: {}, apic: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}",
         processor_id, apic_id, _stack_start, _stack_end, nmi_lint, nmi_flags
     );
 
@@ -77,25 +76,30 @@ pub fn kstart_ap(
     let _idt = interrupts::init_ap(apic_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
         .expect("kstart_ap(): failed to initialize interrupts!");
 
+    // Initialize this CPU's Local APIC such that we can use everything that depends on APIC IDs.
+    // This must be done before initializing task spawning, because that relies on the ability to
+    // enable/disable preemption, which is partially implemented by the Local APIC.
+    LocalApic::init(
+        &mut kernel_mmi_ref.lock().page_table,
+        processor_id,
+        Some(apic_id),
+        false,
+        nmi_lint,
+        nmi_flags,
+    ).unwrap();
+
+    // Now that the Local APIC has been initialized for this CPU, we can initialize the
+    // task management subsystem and create the idle task for this CPU.
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), apic_id, this_ap_stack).unwrap();
+    spawn::create_idle_task().unwrap();
 
-    // as a final step, init this apic as a new LocalApic, and add it to the list of all lapics.
-    // we do this last (after all other initialization) in order to prevent this lapic
-    // from prematurely receiving IPIs or being used in other ways,
-    // and also to ensure that if this apic fails to init, it's not accidentally used as a functioning apic in the list.
-    LocalApic::init(&mut kernel_mmi_ref.lock().page_table, processor_id, apic_id, false, nmi_lint, nmi_flags)
-        .expect("kstart_ap(): failed to create LocalApic");
-    tlb_shootdown::init();
-
-    info!("Initialization complete on AP core {}. Spawning idle task and enabling interrupts...", apic_id);
+    info!("Initialization complete on AP core {}. Enabling interrupts...", apic_id);
     // The following final initialization steps are important, and order matters:
     // 1. Drop any other local stack variables that still exist.
     // (currently nothing else needs to be dropped)
-    // 2. Create the idle task for this CPU.
-    spawn::create_idle_task().unwrap();
-    // 3. "Finish" this bootstrap task, indicating it has exited and no longer needs to run.
+    // 2. "Finish" this bootstrap task, indicating it has exited and no longer needs to run.
     bootstrap_task.finish();
-    // 4. Enable interrupts such that other tasks can be scheduled in.
+    // 3. Enable interrupts such that other tasks can be scheduled in.
     enable_interrupts();
     // ****************************************************
     // NOTE: nothing below here is guaranteed to run again!
