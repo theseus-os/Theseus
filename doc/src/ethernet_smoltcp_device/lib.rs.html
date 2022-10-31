@@ -280,9 +280,6 @@
 <span id="274">274</span>
 <span id="275">275</span>
 <span id="276">276</span>
-<span id="277">277</span>
-<span id="278">278</span>
-<span id="279">279</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements an interface/glue layer between our ethernet drivers</span>
 <span class="doccomment">//! and the smoltcp network stack.</span>
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
@@ -293,14 +290,10 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">network_interface_card</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">nic_buffers</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">owning_ref</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">network_manager</span>;
 
 
-<span class="kw">use</span> <span class="ident">alloc</span>::{
-    <span class="ident">boxed::Box</span>,
-    <span class="ident">collections::BTreeMap</span>,
-};
+<span class="kw">use</span> <span class="ident">alloc::collections::BTreeMap</span>;
 <span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
 <span class="kw">use</span> <span class="ident">smoltcp</span>::{
     <span class="ident">socket::SocketSet</span>,
@@ -311,7 +304,6 @@
 };
 <span class="kw">use</span> <span class="ident">network_interface_card::NetworkInterfaceCard</span>;
 <span class="kw">use</span> <span class="ident">nic_buffers</span>::{<span class="ident">TransmitBuffer</span>, <span class="ident">ReceivedFrame</span>};
-<span class="kw">use</span> <span class="ident">owning_ref::BoxRefMut</span>;
 <span class="kw">use</span> <span class="ident">network_manager::NetworkInterface</span>;
 <span class="kw">use</span> <span class="ident">core::str::FromStr</span>;
 
@@ -477,19 +469,10 @@
             <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::receive(): WARNING: Ethernet frame consists of {} ReceiveBuffers, we currently only handle a single-buffer frame, so this may not work correctly!&quot;</span>,  <span class="ident">received_frame</span>.<span class="number">0</span>.<span class="ident">len</span>());
         }
 
-        <span class="kw">let</span> <span class="ident">first_buf_len</span> <span class="op">=</span> <span class="ident">received_frame</span>.<span class="number">0</span>[<span class="number">0</span>].<span class="ident">length</span>;
-        <span class="kw">let</span> <span class="ident">rxbuf_byte_slice</span> <span class="op">=</span> <span class="ident">BoxRefMut::new</span>(<span class="ident">Box::new</span>(<span class="ident">received_frame</span>))
-            .<span class="ident">try_map_mut</span>(<span class="op">|</span><span class="ident">rxframe</span><span class="op">|</span> <span class="ident">rxframe</span>.<span class="number">0</span>[<span class="number">0</span>].<span class="ident">as_slice_mut</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="number">0</span>, <span class="ident">first_buf_len</span> <span class="kw">as</span> <span class="ident">usize</span>))
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::receive(): couldn&#39;t convert receive buffer of length {} into byte slice, error {:?}&quot;</span>, <span class="ident">first_buf_len</span>, <span class="ident">e</span>);
-                <span class="ident">e</span>
-            })
-            .<span class="ident">ok</span>()<span class="question-mark">?</span>;
-
         <span class="comment">// Just create and return a pair of (receive token, transmit token), </span>
         <span class="comment">// the actual rx buffer handling is done in the RxToken::consume() function</span>
         <span class="prelude-val">Some</span>((
-            <span class="ident">RxToken</span>(<span class="ident">rxbuf_byte_slice</span>),
+            <span class="ident">RxToken</span>(<span class="ident">received_frame</span>),
             <span class="ident">TxToken</span> {
                 <span class="ident">nic_ref</span>: <span class="self">self</span>.<span class="ident">nic_ref</span>,
             },
@@ -553,14 +536,26 @@
 
 <span class="doccomment">/// The receive token type used by smoltcp, </span>
 <span class="doccomment">/// which contains only a `ReceivedFrame` to be consumed later.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RxToken</span>(<span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">ReceivedFrame</span>, [<span class="ident">u8</span>]<span class="op">&gt;</span>);
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RxToken</span>(<span class="ident">ReceivedFrame</span>);
 
 <span class="kw">impl</span> <span class="ident">smoltcp::phy::RxToken</span> <span class="kw">for</span> <span class="ident">RxToken</span> {
     <span class="kw">fn</span> <span class="ident">consume</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">F</span><span class="op">&gt;</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_timestamp</span>: <span class="ident">Instant</span>, <span class="ident">f</span>: <span class="ident">F</span>) -&gt; <span class="ident">smoltcp::Result</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>
         <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>]) -&gt; <span class="ident">smoltcp::Result</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>
     {
-        <span class="ident">f</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">as_mut</span>())
+        <span class="kw">let</span> <span class="ident">first_buf</span> <span class="op">=</span> <span class="self">self</span>.<span class="number">0.0</span>.<span class="ident">first_mut</span>().<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
+            <span class="macro">error!</span>(<span class="string">&quot;ReceivedFrame contained no receive buffers&quot;</span>);
+            <span class="ident">smoltcp::Error::Exhausted</span>
+        })<span class="question-mark">?</span>;
+
+        <span class="kw">let</span> <span class="ident">first_buf_len</span> <span class="op">=</span> <span class="ident">first_buf</span>.<span class="ident">length</span> <span class="kw">as</span> <span class="ident">usize</span>;
+        <span class="kw">let</span> <span class="ident">slice_mut</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">first_buf</span>.<span class="ident">mp</span>.<span class="ident">as_slice_mut</span>(<span class="number">0</span>, <span class="ident">first_buf_len</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+            <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::receive(): couldn&#39;t convert receive buffer of length {} into byte slice, error {:?}&quot;</span>, <span class="ident">first_buf_len</span>, <span class="ident">e</span>);
+            <span class="ident">smoltcp::Error::Exhausted</span>
+        })<span class="question-mark">?</span>;
+
+        <span class="ident">f</span>(<span class="ident">slice_mut</span>)
     }
-}</code></pre></div>
+}
+</code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ethernet_smoltcp_device" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
 </body></html>
