@@ -86,21 +86,15 @@
 <span id="80">80</span>
 <span id="81">81</span>
 <span id="82">82</span>
-<span id="83">83</span>
-<span id="84">84</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for ACPI RSDP (Root System Descriptor Pointer).</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">owning_ref</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">zerocopy</span>;
 
 <span class="kw">use</span> <span class="ident">core::mem</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PageTable</span>, <span class="ident">MappedPages</span>, <span class="ident">PhysicalAddress</span>, <span class="ident">allocate_pages_by_bytes</span>, <span class="ident">allocate_frames_by_bytes_at</span>, <span class="ident">EntryFlags</span>};
-<span class="kw">use</span> <span class="ident">owning_ref::BoxRef</span>;
-<span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
+<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PageTable</span>, <span class="ident">MappedPages</span>, <span class="ident">PhysicalAddress</span>, <span class="ident">allocate_pages_by_bytes</span>, <span class="ident">allocate_frames_by_bytes_at</span>, <span class="ident">EntryFlags</span>, <span class="ident">BorrowedMappedPages</span>};
 <span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
 
 <span class="doccomment">/// The starting physical address of the region of memory where the RSDP table exists.</span>
@@ -134,7 +128,7 @@
 <span class="kw">impl</span> <span class="ident">Rsdp</span> {
     <span class="doccomment">/// Search for the RSDP in the BIOS memory area from 0xE_0000 to 0xF_FFFF.</span>
     <span class="doccomment">/// Returns the RSDP structure and the pages that are currently mapping it.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_rsdp</span>(<span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BoxRef</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">Rsdp</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_rsdp</span>(<span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">Rsdp</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">size</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">RSDP_SEARCH_END</span> <span class="op">-</span> <span class="ident">RSDP_SEARCH_START</span>;
         <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="ident">allocate_pages_by_bytes</span>(<span class="ident">size</span>).<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t allocate pages&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">frames_to_search</span> <span class="op">=</span> <span class="ident">allocate_frames_by_bytes_at</span>(<span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">RSDP_SEARCH_START</span>), <span class="ident">size</span>)
@@ -144,7 +138,7 @@
     }
 
     <span class="doccomment">/// Searches a region of memory for the RSDP, which is identified by the &quot;RSD PTR &quot; signature.</span>
-    <span class="kw">fn</span> <span class="ident">search</span>(<span class="ident">region</span>: <span class="ident">MappedPages</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BoxRef</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">Rsdp</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">search</span>(<span class="ident">region</span>: <span class="ident">MappedPages</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">Rsdp</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">region</span>.<span class="ident">size_in_bytes</span>() <span class="op">-</span> <span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="ident">Rsdp</span><span class="op">&gt;</span>();
         <span class="kw">let</span> <span class="ident">signature_length</span> <span class="op">=</span> <span class="ident">mem::size_of_val</span>(<span class="ident">RSDP_SIGNATURE</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">found_offset</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
@@ -160,7 +154,9 @@
 
         <span class="ident">found_offset</span>
             .<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t find RSDP signature in BIOS memory&quot;</span>)
-            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">offset</span><span class="op">|</span> <span class="ident">BoxRef::new</span>(<span class="ident">Box::new</span>(<span class="ident">region</span>)).<span class="ident">try_map</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> <span class="ident">mp</span>.<span class="ident">as_type</span>::<span class="op">&lt;</span><span class="ident">Rsdp</span><span class="op">&gt;</span>(<span class="ident">offset</span>)))
+            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">offset</span><span class="op">|</span> <span class="ident">region</span>.<span class="ident">into_borrowed</span>(<span class="ident">offset</span>)
+                .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)
+            )
     }
 
     <span class="doccomment">/// Returns the `PhysicalAddress` of the RSDT or XSDT.</span>

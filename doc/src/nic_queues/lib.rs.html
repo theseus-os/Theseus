@@ -186,8 +186,6 @@
 <span id="180">180</span>
 <span id="181">181</span>
 <span id="182">182</span>
-<span id="183">183</span>
-<span id="184">184</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines the receive and transmit queues that store a ring of DMA descriptors and related information.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! Receive and transmit queues are used across all NICs to keep track of incoming and outgoing packets.</span>
@@ -203,14 +201,12 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">intel_ethernet</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">nic_buffers</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">owning_ref</span>;
 
-<span class="kw">use</span> <span class="ident">owning_ref::BoxRefMut</span>;
 <span class="kw">use</span> <span class="ident">alloc</span>::{
     <span class="ident">vec::Vec</span>,
     <span class="ident">collections::VecDeque</span>
 };
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">MappedPages</span>, <span class="ident">create_contiguous_mapping</span>, <span class="ident">EntryFlags</span>};
+<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">create_contiguous_mapping</span>, <span class="ident">EntryFlags</span>, <span class="ident">BorrowedSliceMappedPages</span>, <span class="ident">Mutable</span>};
 <span class="kw">use</span> <span class="ident">intel_ethernet::descriptors</span>::{<span class="ident">RxDescriptor</span>, <span class="ident">TxDescriptor</span>};
 <span class="kw">use</span> <span class="ident">nic_buffers</span>::{<span class="ident">ReceiveBuffer</span>, <span class="ident">ReceivedFrame</span>, <span class="ident">TransmitBuffer</span>};
 
@@ -250,7 +246,7 @@
     <span class="doccomment">/// Registers for this receive queue</span>
     <span class="kw">pub</span> <span class="ident">regs</span>: <span class="ident">S</span>,
     <span class="doccomment">/// Receive descriptors</span>
-    <span class="kw">pub</span> <span class="ident">rx_descs</span>: <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, [<span class="ident">T</span>]<span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">rx_descs</span>: <span class="ident">BorrowedSliceMappedPages</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
     <span class="doccomment">/// The number of receive descriptors in the descriptor ring</span>
     <span class="kw">pub</span> <span class="ident">num_rx_descs</span>: <span class="ident">u16</span>,
     <span class="doccomment">/// Current receive descriptor index</span>
@@ -344,7 +340,7 @@
     <span class="doccomment">/// Registers for this transmit queue</span>
     <span class="kw">pub</span> <span class="ident">regs</span>: <span class="ident">S</span>,
     <span class="doccomment">/// Transmit descriptors </span>
-    <span class="kw">pub</span> <span class="ident">tx_descs</span>: <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, [<span class="ident">T</span>]<span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">tx_descs</span>: <span class="ident">BorrowedSliceMappedPages</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
     <span class="doccomment">/// The number of transmit descriptors in the descriptor ring</span>
     <span class="kw">pub</span> <span class="ident">num_tx_descs</span>: <span class="ident">u16</span>,
     <span class="doccomment">/// Current transmit descriptor index</span>

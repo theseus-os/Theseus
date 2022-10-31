@@ -686,10 +686,6 @@
 <span id="680">680</span>
 <span id="681">681</span>
 <span id="682">682</span>
-<span id="683">683</span>
-<span id="684">684</span>
-<span id="685">685</span>
-<span id="686">686</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A mlx5 driver for a ConnectX-5 100GbE Network Interface Card.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! Currently the following steps are completed </span>
@@ -709,7 +705,6 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pci</span>; 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">owning_ref</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">nic_initialization</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mlx_ethernet</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
@@ -720,14 +715,10 @@
 
 
 <span class="kw">use</span> <span class="ident">spin::Once</span>; 
-<span class="kw">use</span> <span class="ident">alloc</span>::{
-    <span class="ident">vec::Vec</span>,
-    <span class="ident">boxed::Box</span>
-};
+<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
 <span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PhysicalAddress</span>, <span class="ident">MappedPages</span>, <span class="ident">create_contiguous_mapping</span>};
+<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PhysicalAddress</span>, <span class="ident">MappedPages</span>, <span class="ident">create_contiguous_mapping</span>, <span class="ident">BorrowedMappedPages</span>, <span class="ident">Mutable</span>};
 <span class="kw">use</span> <span class="ident">pci::PciDevice</span>;
-<span class="kw">use</span> <span class="ident">owning_ref::BoxRefMut</span>;
 <span class="kw">use</span> <span class="ident">nic_initialization</span>::{<span class="ident">NIC_MAPPING_FLAGS</span>, <span class="ident">allocate_memory</span>, <span class="ident">init_rx_buf_pool</span>};
 <span class="kw">use</span> <span class="ident">mlx_ethernet</span>::{
     <span class="ident">command_queue</span>::{<span class="ident">AccessRegisterOpMod</span>, <span class="ident">CommandBuilder</span>, <span class="ident">CommandOpcode</span>, <span class="ident">CommandQueue</span>, <span class="ident">CommandQueueEntry</span>, <span class="ident">HCACapabilities</span>, <span class="ident">ManagePagesOpMod</span>, <span class="ident">QueryHcaCapCurrentOpMod</span>, <span class="ident">QueryHcaCapMaxOpMod</span>, <span class="ident">QueryPagesOpMod</span>}, 
@@ -783,7 +774,7 @@
     <span class="doccomment">/// Initialization segment base address</span>
     <span class="ident">mem_base</span>: <span class="ident">PhysicalAddress</span>,
     <span class="doccomment">/// Initialization segment</span>
-    <span class="ident">init_segment</span>: <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">InitializationSegment</span><span class="op">&gt;</span>,
+    <span class="ident">init_segment</span>: <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">InitializationSegment</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Command Queue</span>
     <span class="ident">command_queue</span>: <span class="ident">CommandQueue</span>,
     <span class="doccomment">/// Boot pages passed to the NIC. Once transferred, they should not be accessed by the driver.</span>
@@ -851,7 +842,7 @@
         <span class="comment">// map pages to the physical address given by mem_base as that is the intialization segment</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">init_segment</span> <span class="op">=</span> <span class="ident">ConnectX5Nic::map_init_segment</span>(<span class="ident">mem_base</span>)<span class="question-mark">?</span>;
 
-        <span class="macro">trace!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">init_segment</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">init_segment</span>);
         
         <span class="comment">// find number of entries in command queue and stride</span>
         <span class="kw">let</span> <span class="ident">num_cmdq_entries</span> <span class="op">=</span> <span class="ident">init_segment</span>.<span class="ident">num_cmdq_entries</span>() <span class="kw">as</span> <span class="ident">usize</span>;
@@ -877,7 +868,7 @@
     
         <span class="comment">// cast our physically-contiguous MappedPages into a slice of command queue entries</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cmdq</span> <span class="op">=</span> <span class="ident">CommandQueue::create</span>(
-            <span class="ident">BoxRefMut::new</span>(<span class="ident">Box::new</span>(<span class="ident">cmdq_mapped_pages</span>)).<span class="ident">try_map_mut</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> <span class="ident">mp</span>.<span class="ident">as_slice_mut</span>::<span class="op">&lt;</span><span class="ident">CommandQueueEntry</span><span class="op">&gt;</span>(<span class="number">0</span>, <span class="ident">num_cmdq_entries</span>))<span class="question-mark">?</span>,
+            <span class="ident">cmdq_mapped_pages</span>.<span class="ident">into_borrowed_slice_mut</span>(<span class="number">0</span>, <span class="ident">num_cmdq_entries</span>).<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>,
             <span class="ident">num_cmdq_entries</span>
         )<span class="question-mark">?</span>;
 
@@ -1338,9 +1329,10 @@
     }
     
     <span class="doccomment">/// Returns the memory-mapped initialization segment of the NIC</span>
-    <span class="kw">fn</span> <span class="ident">map_init_segment</span>(<span class="ident">mem_base</span>: <span class="ident">PhysicalAddress</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">InitializationSegment</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">mp</span> <span class="op">=</span> <span class="ident">allocate_memory</span>(<span class="ident">mem_base</span>, <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">InitializationSegment</span><span class="op">&gt;</span>())<span class="question-mark">?</span>;
-        <span class="ident">BoxRefMut::new</span>(<span class="ident">Box::new</span>(<span class="ident">mp</span>)).<span class="ident">try_map_mut</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> <span class="ident">mp</span>.<span class="ident">as_type_mut</span>::<span class="op">&lt;</span><span class="ident">InitializationSegment</span><span class="op">&gt;</span>(<span class="number">0</span>))
+    <span class="kw">fn</span> <span class="ident">map_init_segment</span>(<span class="ident">mem_base</span>: <span class="ident">PhysicalAddress</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">InitializationSegment</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+        <span class="ident">allocate_memory</span>(<span class="ident">mem_base</span>, <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">InitializationSegment</span><span class="op">&gt;</span>())<span class="question-mark">?</span>
+            .<span class="ident">into_borrowed_mut</span>(<span class="number">0</span>)
+            .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)
     }
 
     <span class="doccomment">/// Allocates `num_pages` [`MappedPages`] each of the standard kernel page size [`PAGE_SIZE`].</span>

@@ -268,6 +268,9 @@
 <span id="262">262</span>
 <span id="263">263</span>
 <span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem for Theseus,</span>
 <span class="doccomment">//! which is fairly robust and provides a unification between </span>
 <span class="doccomment">//! arbitrarily mapped sections of memory and Rust&#39;s lifetime system. </span>
@@ -304,7 +307,10 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">mapper_spillful</span>)]</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">paging</span>;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::paging</span>::{<span class="ident">MappedPages</span>, <span class="ident">PageTable</span>, <span class="ident">Mapper</span>};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::paging</span>::{
+    <span class="ident">PageTable</span>, <span class="ident">Mapper</span>, <span class="ident">Mutability</span>, <span class="ident">Mutable</span>, <span class="ident">Immutable</span>,
+    <span class="ident">MappedPages</span>, <span class="ident">BorrowedMappedPages</span>, <span class="ident">BorrowedSliceMappedPages</span>,
+};
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">memory_structs</span>::{<span class="ident">Frame</span>, <span class="ident">Page</span>, <span class="ident">FrameRange</span>, <span class="ident">PageRange</span>, <span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>};
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">page_allocator</span>::{<span class="ident">AllocatedPages</span>, <span class="ident">allocate_pages</span>, <span class="ident">allocate_pages_at</span>,

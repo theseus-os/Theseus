@@ -777,23 +777,16 @@
 <span id="771">771</span>
 <span id="772">772</span>
 <span id="773">773</span>
-<span id="774">774</span>
-<span id="775">775</span>
-<span id="776">776</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
-
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 
 <span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">fmt</span>, <span class="ident">sync::atomic</span>::{<span class="ident">AtomicU8</span>, <span class="ident">Ordering</span>}};
 <span class="kw">use</span> <span class="ident">volatile</span>::{<span class="ident">Volatile</span>, <span class="ident">ReadOnly</span>, <span class="ident">WriteOnly</span>};
 <span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
-<span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
-<span class="kw">use</span> <span class="ident">owning_ref::BoxRefMut</span>;
 <span class="kw">use</span> <span class="ident">spin::Once</span>;
 <span class="kw">use</span> <span class="ident">raw_cpuid::CpuId</span>;
 <span class="kw">use</span> <span class="ident">msr</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">irq_safety::RwLockIrqSafe</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PageTable</span>, <span class="ident">PhysicalAddress</span>, <span class="ident">EntryFlags</span>, <span class="ident">MappedPages</span>, <span class="ident">allocate_pages</span>, <span class="ident">allocate_frames_at</span>, <span class="ident">AllocatedFrames</span>};
+<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PageTable</span>, <span class="ident">PhysicalAddress</span>, <span class="ident">EntryFlags</span>, <span class="ident">MappedPages</span>, <span class="ident">allocate_pages</span>, <span class="ident">allocate_frames_at</span>, <span class="ident">AllocatedFrames</span>, <span class="ident">BorrowedMappedPages</span>, <span class="ident">Mutable</span>};
 <span class="kw">use</span> <span class="ident">kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS</span>;
 <span class="kw">use</span> <span class="ident">atomic_linked_list::atomic_map::AtomicMap</span>;
 <span class="kw">use</span> <span class="ident">crossbeam_utils::atomic::AtomicCell</span>;
@@ -1069,7 +1062,7 @@
 <span class="doccomment">/// used within the [`LocalApic`] struct.</span>
 <span class="kw">enum</span> <span class="ident">LapicType</span> {
     <span class="ident">X2Apic</span>,
-    <span class="ident">XApic</span>(<span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">ApicRegisters</span><span class="op">&gt;</span>),
+    <span class="ident">XApic</span>(<span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">ApicRegisters</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>),
 }
 <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">LapicType</span> {
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
@@ -1154,8 +1147,9 @@
             <span class="ident">LapicType::X2Apic</span>
         } <span class="kw">else</span> {
             <span class="ident">LapicType::XApic</span>(
-                <span class="ident">BoxRefMut::new</span>(<span class="ident">Box::new</span>(<span class="ident">map_apic</span>(<span class="ident">page_table</span>)<span class="question-mark">?</span>))
-                    .<span class="ident">try_map_mut</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> <span class="ident">mp</span>.<span class="ident">as_type_mut</span>::<span class="op">&lt;</span><span class="ident">ApicRegisters</span><span class="op">&gt;</span>(<span class="number">0</span>))<span class="question-mark">?</span>
+                <span class="ident">map_apic</span>(<span class="ident">page_table</span>)<span class="question-mark">?</span>
+                    .<span class="ident">into_borrowed_mut</span>(<span class="number">0</span>)
+                    .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>
             )
         };
 		<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lapic</span> <span class="op">=</span> <span class="ident">LocalApic</span> {

@@ -1925,20 +1925,15 @@
 <span id="1919">1919</span>
 <span id="1920">1920</span>
 <span id="1921">1921</span>
-<span id="1922">1922</span>
 </pre><pre class="rust"><code> <span class="doccomment">//! Defines the Command Queue that is used to pass commands from the driver to the NIC.</span>
  <span class="doccomment">//! Also defines multiple enums that specify the valid input and output values for different commands.</span>
 
-<span class="kw">use</span> <span class="ident">alloc</span>::{
-    <span class="ident">vec::Vec</span>,
-    <span class="ident">boxed::Box</span>
-};
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PhysicalAddress</span>, <span class="ident">MappedPages</span>, <span class="ident">create_contiguous_mapping</span>};
+<span class="kw">use</span> <span class="ident">alloc</span>::{<span class="ident">vec::Vec</span>, <span class="ident">boxed::Box</span>};
+<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PhysicalAddress</span>, <span class="ident">MappedPages</span>, <span class="ident">create_contiguous_mapping</span>, <span class="ident">BorrowedSliceMappedPages</span>, <span class="ident">Mutable</span>};
 <span class="kw">use</span> <span class="ident">volatile</span>::{<span class="ident">ReadOnly</span>,<span class="ident">Volatile</span>};
 <span class="kw">use</span> <span class="ident">bit_field::BitField</span>;
 <span class="kw">use</span> <span class="ident">zerocopy</span>::{<span class="ident">U32</span>, <span class="ident">FromBytes</span>};
 <span class="kw">use</span> <span class="ident">byteorder::BigEndian</span>;
-<span class="kw">use</span> <span class="ident">owning_ref</span>:: <span class="ident">BoxRefMut</span>;
 <span class="kw">use</span> <span class="ident">nic_initialization::NIC_MAPPING_FLAGS</span>;
 <span class="kw">use</span> <span class="ident">kernel_config::memory::PAGE_SIZE</span>;
 <span class="kw">use</span> <span class="ident">core::fmt</span>;
@@ -2440,7 +2435,7 @@
         <span class="kw-2">mut</span> <span class="ident">entry</span>: <span class="ident">CommandQueueEntry</span>, 
         <span class="ident">input_mailbox_buffers</span>: <span class="ident">Box</span><span class="op">&lt;</span>[<span class="ident">MailboxBuffer</span>]<span class="op">&gt;</span>,
         <span class="ident">output_mailbox_buffers</span>: <span class="ident">Box</span><span class="op">&lt;</span>[<span class="ident">MailboxBuffer</span>]<span class="op">&gt;</span>,
-        <span class="ident">command_queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, [<span class="ident">CommandQueueEntry</span>]<span class="op">&gt;</span>
+        <span class="ident">command_queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BorrowedSliceMappedPages</span><span class="op">&lt;</span><span class="ident">CommandQueueEntry</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">Command</span><span class="op">&lt;</span>{<span class="ident">CmdState::Initialized</span>}<span class="op">&gt;</span> {
         <span class="ident">core::mem::swap</span>(<span class="kw-2">&amp;mut</span> <span class="ident">entry</span>, <span class="kw-2">&amp;mut</span> <span class="ident">command_queue</span>[<span class="ident">entry_num</span>]);
         <span class="ident">Command</span> {
@@ -2622,7 +2617,7 @@
 <span class="doccomment">/// (Section 8.24.1: HCA Command Queue)</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CommandQueue</span> {
     <span class="doccomment">/// Physically-contiguous command queue entries</span>
-    <span class="ident">entries</span>: <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, [<span class="ident">CommandQueueEntry</span>]<span class="op">&gt;</span>,
+    <span class="ident">entries</span>: <span class="ident">BorrowedSliceMappedPages</span><span class="op">&lt;</span><span class="ident">CommandQueueEntry</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Per-entry boolean flags to keep track of which entries are in use</span>
     <span class="ident">available_entries</span>: <span class="ident">Box</span><span class="op">&lt;</span>[<span class="ident">bool</span>]<span class="op">&gt;</span>,
     <span class="doccomment">/// A random number that needs to be different for every command, and the same for all mailboxes that are part of a command.</span>
@@ -2638,7 +2633,10 @@
     <span class="doccomment">/// # Arguments</span>
     <span class="doccomment">/// * `entries`: physically contiguous memory that is mapped as a slice of command queue entries.</span>
     <span class="doccomment">/// * `num_cmdq_entries`: number of entries in the queue.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create</span>(<span class="ident">entries</span>: <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, [<span class="ident">CommandQueueEntry</span>]<span class="op">&gt;</span>, <span class="ident">num_cmdq_entries</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">CommandQueue</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create</span>(
+        <span class="ident">entries</span>: <span class="ident">BorrowedSliceMappedPages</span><span class="op">&lt;</span><span class="ident">CommandQueueEntry</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
+        <span class="ident">num_cmdq_entries</span>: <span class="ident">usize</span>,
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">CommandQueue</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         
         <span class="comment">// initially, all command entries are available</span>
         <span class="kw">let</span> <span class="ident">available_entries</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="bool-val">true</span>; <span class="ident">num_cmdq_entries</span>];
@@ -2653,7 +2651,7 @@
         <span class="comment">// Assign a random number to token, another OS (Snabb) starts off with 0xAA</span>
         <span class="kw">let</span> <span class="ident">token</span> <span class="op">=</span> <span class="number">0xAA</span>;
 
-        <span class="prelude-val">Ok</span>(<span class="ident">CommandQueue</span>{ <span class="ident">entries</span>, <span class="ident">available_entries</span>: <span class="ident">available_entries</span>.<span class="ident">into_boxed_slice</span>(), <span class="ident">token</span>, <span class="ident">mailbox_buffers</span> })
+        <span class="prelude-val">Ok</span>(<span class="ident">CommandQueue</span> { <span class="ident">entries</span>, <span class="ident">available_entries</span>: <span class="ident">available_entries</span>.<span class="ident">into_boxed_slice</span>(), <span class="ident">token</span>, <span class="ident">mailbox_buffers</span> })
     }
 
     <span class="doccomment">/// Find an command queue entry that is not in use</span>

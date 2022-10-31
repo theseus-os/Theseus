@@ -156,7 +156,6 @@
 <span id="150">150</span>
 <span id="151">151</span>
 <span id="152">152</span>
-<span id="153">153</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Event Queues (EQ) are circular buffers used by the HCA to report completion events, errors and other asynchronous events.</span>
 <span class="doccomment">//! This module defines the layout of an EQ, the context used to initialize an EQ and related functions.</span>
 <span class="doccomment">//! </span>
@@ -165,9 +164,7 @@
 <span class="kw">use</span> <span class="ident">zerocopy</span>::{<span class="ident">U32</span>, <span class="ident">FromBytes</span>};
 <span class="kw">use</span> <span class="ident">volatile::Volatile</span>;
 <span class="kw">use</span> <span class="ident">byteorder::BigEndian</span>;
-<span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
-<span class="kw">use</span> <span class="ident">memory::MappedPages</span>;
-<span class="kw">use</span> <span class="ident">owning_ref::BoxRefMut</span>;
+<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">MappedPages</span>, <span class="ident">BorrowedSliceMappedPages</span>, <span class="ident">Mutable</span>};
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_imports</span>)]</span>
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">log_page_size</span>, <span class="ident">Cqn</span>, <span class="ident">Eqn</span>, <span class="ident">UAR_MASK</span>, <span class="ident">LOG_QUEUE_SIZE_MASK</span>, <span class="ident">LOG_QUEUE_SIZE_SHIFT</span>, <span class="ident">LOG_PAGE_SIZE_SHIFT</span>, <span class="ident">HW_OWNERSHIP</span>,
@@ -281,7 +278,7 @@
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">EventQueue</span> {
     <span class="doccomment">/// Physically-contiguous event queue entries</span>
-    <span class="ident">entries</span>: <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, [<span class="ident">EventQueueEntry</span>]<span class="op">&gt;</span>,
+    <span class="ident">entries</span>: <span class="ident">BorrowedSliceMappedPages</span><span class="op">&lt;</span><span class="ident">EventQueueEntry</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
     <span class="doccomment">/// EQ number that is returned by the [`CommandOpcode::CreateEq`] command</span>
     <span class="ident">eqn</span>: <span class="ident">Eqn</span>
 }
@@ -296,11 +293,12 @@
     <span class="doccomment">/// * `num_entries`: number of entries in the EQ</span>
     <span class="doccomment">/// * `eqn`: EQ number returned by the HCA</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">mp</span>: <span class="ident">MappedPages</span>, <span class="ident">num_entries</span>: <span class="ident">usize</span>, <span class="ident">eqn</span>: <span class="ident">Eqn</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">EventQueue</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entries</span> <span class="op">=</span> <span class="ident">BoxRefMut::new</span>(<span class="ident">Box::new</span>(<span class="ident">mp</span>)).<span class="ident">try_map_mut</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> <span class="ident">mp</span>.<span class="ident">as_slice_mut</span>::<span class="op">&lt;</span><span class="ident">EventQueueEntry</span><span class="op">&gt;</span>(<span class="number">0</span>, <span class="ident">num_entries</span>))<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entries</span> <span class="op">=</span> <span class="ident">mp</span>.<span class="ident">into_borrowed_slice_mut</span>::<span class="op">&lt;</span><span class="ident">EventQueueEntry</span><span class="op">&gt;</span>(<span class="number">0</span>, <span class="ident">num_entries</span>)
+            .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
         <span class="kw">for</span> <span class="ident">eqe</span> <span class="kw">in</span> <span class="ident">entries</span>.<span class="ident">iter_mut</span>() {
             <span class="ident">eqe</span>.<span class="ident">init</span>()
         }
-        <span class="prelude-val">Ok</span>( <span class="ident">EventQueue</span>{<span class="ident">entries</span>, <span class="ident">eqn</span>} )
+        <span class="prelude-val">Ok</span>( <span class="ident">EventQueue</span> { <span class="ident">entries</span>, <span class="ident">eqn</span> } )
     }
 
     <span class="doccomment">/// Prints out all entries in the EQ</span>

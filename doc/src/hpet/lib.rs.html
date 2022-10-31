@@ -206,7 +206,6 @@
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
@@ -215,38 +214,35 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">sdt</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">acpi_table</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">owning_ref</span>;
 
 <span class="kw">use</span> <span class="ident">volatile</span>::{<span class="ident">Volatile</span>, <span class="ident">ReadOnly</span>};
 <span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
-<span class="kw">use</span> <span class="ident">owning_ref::BoxRefMut</span>;
-<span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
 <span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">Once</span>, <span class="ident">RwLock</span>, <span class="ident">RwLockReadGuard</span>, <span class="ident">RwLockWriteGuard</span>};
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">MappedPages</span>, <span class="ident">allocate_pages</span>, <span class="ident">allocate_frames_by_bytes_at</span>, <span class="ident">PageTable</span>, <span class="ident">PhysicalAddress</span>, <span class="ident">EntryFlags</span>};
+<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">allocate_pages</span>, <span class="ident">allocate_frames_by_bytes_at</span>, <span class="ident">PageTable</span>, <span class="ident">PhysicalAddress</span>, <span class="ident">EntryFlags</span>, <span class="ident">BorrowedMappedPages</span>, <span class="ident">Mutable</span>};
 <span class="kw">use</span> <span class="ident">sdt</span>::{<span class="ident">Sdt</span>, <span class="ident">GenericAddressStructure</span>};
 <span class="kw">use</span> <span class="ident">acpi_table</span>::{<span class="ident">AcpiTables</span>, <span class="ident">AcpiSignature</span>};
 
 <span class="doccomment">/// The static instance of the HPET&#39;s ACPI memory region, which derefs to an Hpet instance.</span>
-<span class="kw">static</span> <span class="ident">HPET</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">Hpet</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+<span class="kw">static</span> <span class="ident">HPET</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">Hpet</span>, <span class="ident">Mutable</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
 
 
-<span class="doccomment">/// Returns a reference to the HPET timer structure, wrapped in an Option,</span>
-<span class="doccomment">/// because it is not guaranteed that HPET exists or has been initialized.</span>
+<span class="doccomment">/// Returns a locked guard that immutably derefs to the HPET timer.</span>
+<span class="doccomment">/// </span>
 <span class="doccomment">/// # Example</span>
 <span class="doccomment">/// ```</span>
 <span class="doccomment">/// let counter_val = get_hpet().as_ref().unwrap().get_counter();</span>
 <span class="doccomment">/// ```</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_hpet</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RwLockReadGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span>, <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">Hpet</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_hpet</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RwLockReadGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span>, <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">Hpet</span>, <span class="ident">Mutable</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
     <span class="ident">HPET</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">h</span><span class="op">|</span> <span class="ident">h</span>.<span class="ident">read</span>())
 }
 
-<span class="doccomment">/// Returns a mutable reference to the HPET timer structure, wrapped in an Option,</span>
-<span class="doccomment">/// because it is not guaranteed that HPET exists or has been initialized.</span>
+<span class="doccomment">/// Returns a locked guard that mutably derefs to the HPET timer.</span>
+<span class="doccomment">/// </span>
 <span class="doccomment">/// # Example</span>
 <span class="doccomment">/// ```</span>
 <span class="doccomment">/// get_hpet_mut().as_mut().unwrap().enable_counter(true);</span>
 <span class="doccomment">/// ```</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_hpet_mut</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RwLockWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span>, <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">Hpet</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_hpet_mut</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RwLockWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span>, <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">Hpet</span>, <span class="ident">Mutable</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
     <span class="ident">HPET</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">h</span><span class="op">|</span> <span class="ident">h</span>.<span class="ident">write</span>())
 }
 
@@ -375,7 +371,10 @@
     <span class="doccomment">/// based on the hardware details from this ACPI table.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// Returns a reference to the initialized `Hpet` structure.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_hpet</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">Hpet</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_hpet</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>,
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">Hpet</span>, <span class="ident">Mutable</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">phys_addr</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(<span class="self">self</span>.<span class="ident">gen_addr_struct</span>.<span class="ident">phys_addr</span> <span class="kw">as</span> <span class="ident">usize</span>)
             .<span class="ident">ok_or</span>(<span class="string">&quot;HPET physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">frames</span> <span class="op">=</span> <span class="ident">allocate_frames_by_bytes_at</span>(<span class="ident">phys_addr</span>, <span class="self">self</span>.<span class="ident">header</span>.<span class="ident">length</span> <span class="kw">as</span> <span class="ident">usize</span>)
@@ -388,7 +387,8 @@
             <span class="ident">EntryFlags::PRESENT</span> <span class="op">|</span> <span class="ident">EntryFlags::WRITABLE</span> <span class="op">|</span> <span class="ident">EntryFlags::NO_CACHE</span> <span class="op">|</span> <span class="ident">EntryFlags::NO_EXECUTE</span>,
         )<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">hpet</span> <span class="op">=</span> <span class="ident">BoxRefMut::new</span>(<span class="ident">Box::new</span>(<span class="ident">hpet_mp</span>)).<span class="ident">try_map_mut</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> <span class="ident">mp</span>.<span class="ident">as_type_mut</span>::<span class="op">&lt;</span><span class="ident">Hpet</span><span class="op">&gt;</span>(<span class="ident">phys_addr</span>.<span class="ident">frame_offset</span>()))<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">hpet</span> <span class="op">=</span> <span class="ident">hpet_mp</span>.<span class="ident">into_borrowed_mut</span>::<span class="op">&lt;</span><span class="ident">Hpet</span><span class="op">&gt;</span>(<span class="ident">phys_addr</span>.<span class="ident">frame_offset</span>())
+            .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="op">|</span><span class="ident">_mp</span>, <span class="ident">s</span>)<span class="op">|</span> <span class="ident">s</span>)<span class="question-mark">?</span>;
         <span class="comment">// enable the main counter</span>
         {
             <span class="ident">hpet</span>.<span class="ident">enable_counter</span>(<span class="bool-val">true</span>);

@@ -289,7 +289,6 @@
 <span id="283">283</span>
 <span id="284">284</span>
 <span id="285">285</span>
-<span id="286">286</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The Send Queue (SQ) object holds the descriptor ring used to send outgoing messages and packets.</span>
 <span class="doccomment">//! The descriptor ring is referred to as a Work Queue Buffer.</span>
 <span class="doccomment">//! This module defines the layout of an SQ, the context used to initialize a SQ,</span>
@@ -300,9 +299,7 @@
 <span class="kw">use</span> <span class="ident">zerocopy</span>::{<span class="ident">U32</span>, <span class="ident">FromBytes</span>};
 <span class="kw">use</span> <span class="ident">volatile::Volatile</span>;
 <span class="kw">use</span> <span class="ident">byteorder::BigEndian</span>;
-<span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PhysicalAddress</span>, <span class="ident">MappedPages</span>};
-<span class="kw">use</span> <span class="ident">owning_ref</span>:: <span class="ident">BoxRefMut</span>;
+<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PhysicalAddress</span>, <span class="ident">MappedPages</span>, <span class="ident">BorrowedSliceMappedPages</span>, <span class="ident">Mutable</span>, <span class="ident">BorrowedMappedPages</span>};
 <span class="kw">use</span> <span class="ident">core::fmt</span>;
 <span class="kw">use</span> <span class="ident">num_enum::TryFromPrimitive</span>;
 <span class="kw">use</span> <span class="ident">core::convert::TryFrom</span>;
@@ -469,11 +466,11 @@
 <span class="doccomment">/// and is used to interact with the SQ once initialized.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SendQueue</span> {
     <span class="doccomment">/// physically-contiguous SQ descriptors</span>
-    <span class="ident">entries</span>: <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, [<span class="ident">WorkQueueEntrySend</span>]<span class="op">&gt;</span>, 
+    <span class="ident">entries</span>: <span class="ident">BorrowedSliceMappedPages</span><span class="op">&lt;</span><span class="ident">WorkQueueEntrySend</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>, 
     <span class="doccomment">/// the doorbell for the SQ</span>
-    <span class="ident">doorbell</span>: <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">DoorbellRecord</span><span class="op">&gt;</span>,
+    <span class="ident">doorbell</span>: <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">DoorbellRecord</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
     <span class="doccomment">/// the UAR page associated with the SQ</span>
-    <span class="ident">uar</span>: <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">UserAccessRegion</span><span class="op">&gt;</span>,
+    <span class="ident">uar</span>: <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">UserAccessRegion</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
     <span class="doccomment">/// The number of WQEs that have been completed.</span>
     <span class="doccomment">/// From this we also calculate the next descriptor to use</span>
     <span class="ident">wqe_counter</span>: <span class="ident">u16</span>,
@@ -511,15 +508,16 @@
         <span class="ident">lkey</span>: <span class="ident">Lkey</span>
     ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">SendQueue</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="comment">// map the descriptor ring and initialize</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entries</span> <span class="op">=</span> <span class="ident">BoxRefMut::new</span>(<span class="ident">Box::new</span>(<span class="ident">entries_mp</span>)).<span class="ident">try_map_mut</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> <span class="ident">mp</span>.<span class="ident">as_slice_mut</span>::<span class="op">&lt;</span><span class="ident">WorkQueueEntrySend</span><span class="op">&gt;</span>(<span class="number">0</span>, <span class="ident">num_entries</span>))<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entries</span> <span class="op">=</span> <span class="ident">entries_mp</span>.<span class="ident">into_borrowed_slice_mut</span>::<span class="op">&lt;</span><span class="ident">WorkQueueEntrySend</span><span class="op">&gt;</span>(<span class="number">0</span>, <span class="ident">num_entries</span>)
+            .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
         <span class="kw">for</span> <span class="ident">entry</span> <span class="kw">in</span> <span class="ident">entries</span>.<span class="ident">iter_mut</span>() {
             <span class="ident">entry</span>.<span class="ident">init</span>()
         }
         <span class="comment">// map the doorbell and initialize</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">doorbell</span> <span class="op">=</span> <span class="ident">BoxRefMut::new</span>(<span class="ident">Box::new</span>(<span class="ident">doorbell_mp</span>)).<span class="ident">try_map_mut</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> <span class="ident">mp</span>.<span class="ident">as_type_mut</span>::<span class="op">&lt;</span><span class="ident">DoorbellRecord</span><span class="op">&gt;</span>(<span class="number">0</span>))<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">doorbell</span> <span class="op">=</span> <span class="ident">doorbell_mp</span>.<span class="ident">into_borrowed_mut</span>(<span class="number">0</span>).<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
         <span class="kw-2">*</span><span class="ident">doorbell</span> <span class="op">=</span> <span class="ident">DoorbellRecord::default</span>();
         <span class="comment">// map the uar and initialize</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">uar</span> <span class="op">=</span> <span class="ident">BoxRefMut::new</span>(<span class="ident">Box::new</span>(<span class="ident">uar_mp</span>)).<span class="ident">try_map_mut</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> <span class="ident">mp</span>.<span class="ident">as_type_mut</span>::<span class="op">&lt;</span><span class="ident">UserAccessRegion</span><span class="op">&gt;</span>(<span class="number">0</span>))<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">uar</span> <span class="op">=</span> <span class="ident">uar_mp</span>.<span class="ident">into_borrowed_mut</span>(<span class="number">0</span>).<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
         <span class="kw-2">*</span><span class="ident">uar</span> <span class="op">=</span> <span class="ident">UserAccessRegion::default</span>();
 
         <span class="prelude-val">Ok</span>( <span class="ident">SendQueue</span>{<span class="ident">entries</span>, <span class="ident">doorbell</span>, <span class="ident">uar</span>, <span class="ident">wqe_counter</span>: <span class="number">0</span>, <span class="ident">sqn</span>, <span class="ident">_tisn</span>, <span class="ident">lkey</span>, <span class="ident">uar_db</span>: <span class="ident">CurrentUARDoorbell::Even</span>} )

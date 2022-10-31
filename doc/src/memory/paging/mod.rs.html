@@ -380,6 +380,9 @@
 <span id="374">374</span>
 <span id="375">375</span>
 <span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md</span>
 <span class="comment">// file at the top-level directory of this distribution.</span>
 <span class="comment">//</span>
@@ -400,7 +403,10 @@
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">page_table_entry::PageTableEntry</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span>::{
     <span class="ident">temporary_page::TemporaryPage</span>,
-    <span class="ident">mapper</span>::{<span class="ident">Mapper</span>, <span class="ident">MappedPages</span>},
+    <span class="ident">mapper</span>::{
+        <span class="ident">Mapper</span>, <span class="ident">MappedPages</span>, <span class="ident">BorrowedMappedPages</span>, <span class="ident">BorrowedSliceMappedPages</span>,
+        <span class="ident">Mutability</span>, <span class="ident">Mutable</span>, <span class="ident">Immutable</span>,
+    },
 };
 
 <span class="kw">use</span> <span class="ident">core</span>::{

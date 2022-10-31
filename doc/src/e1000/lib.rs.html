@@ -436,9 +436,6 @@
 <span id="430">430</span>
 <span id="431">431</span>
 <span id="432">432</span>
-<span id="433">433</span>
-<span id="434">434</span>
-<span id="435">435</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="attribute">#![<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span> <span class="comment">//  to suppress warnings for unused functions/methods</span>
@@ -456,7 +453,6 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pci</span>; 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">owning_ref</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">interrupts</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">x86_64</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mpmc</span>;
@@ -474,11 +470,9 @@
 <span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
 <span class="kw">use</span> <span class="ident">alloc::collections::VecDeque</span>;
 <span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
-<span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PhysicalAddress</span>, <span class="ident">MappedPages</span>};
+<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PhysicalAddress</span>, <span class="ident">BorrowedMappedPages</span>, <span class="ident">BorrowedSliceMappedPages</span>, <span class="ident">Mutable</span>};
 <span class="kw">use</span> <span class="ident">pci</span>::{<span class="ident">PciDevice</span>, <span class="ident">PCI_INTERRUPT_LINE</span>, <span class="ident">PciConfigSpaceAccessMechanism</span>};
 <span class="kw">use</span> <span class="ident">kernel_config::memory::PAGE_SIZE</span>;
-<span class="kw">use</span> <span class="ident">owning_ref::BoxRefMut</span>;
 <span class="kw">use</span> <span class="ident">interrupts</span>::{<span class="ident">eoi</span>, <span class="ident">register_interrupt</span>};
 <span class="kw">use</span> <span class="ident">x86_64::structures::idt::InterruptStackFrame</span>;
 <span class="kw">use</span> <span class="ident">network_interface_card</span>:: <span class="ident">NetworkInterfaceCard</span>;
@@ -524,7 +518,7 @@
 
 <span class="doccomment">/// A struct which contains the receive queue registers and implements the `RxQueueRegisters` trait,</span>
 <span class="doccomment">/// which is required to store the registers in an `RxQueue` object.</span>
-<span class="kw">struct</span> <span class="ident">E1000RxQueueRegisters</span>(<span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">E1000RxRegisters</span><span class="op">&gt;</span>);
+<span class="kw">struct</span> <span class="ident">E1000RxQueueRegisters</span>(<span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">E1000RxRegisters</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>);
 
 <span class="kw">impl</span> <span class="ident">RxQueueRegisters</span> <span class="kw">for</span> <span class="ident">E1000RxQueueRegisters</span> {
     <span class="kw">fn</span> <span class="ident">set_rdbal</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
@@ -546,7 +540,7 @@
 
 <span class="doccomment">/// A struct which contains the transmit queue registers and implements the `TxQueueRegisters` trait,</span>
 <span class="doccomment">/// which is required to store the registers in a `TxQueue` object.</span>
-<span class="kw">struct</span> <span class="ident">E1000TxQueueRegisters</span>(<span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">E1000TxRegisters</span><span class="op">&gt;</span>);
+<span class="kw">struct</span> <span class="ident">E1000TxQueueRegisters</span>(<span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">E1000TxRegisters</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>);
 
 <span class="kw">impl</span> <span class="ident">TxQueueRegisters</span> <span class="kw">for</span> <span class="ident">E1000TxQueueRegisters</span> {
     <span class="kw">fn</span> <span class="ident">set_tdbal</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
@@ -579,13 +573,13 @@
     <span class="doccomment">/// The optional spoofed MAC address to use in place of `mac_hardware` when transmitting.  </span>
     <span class="ident">mac_spoofed</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">6</span>]<span class="op">&gt;</span>,
     <span class="doccomment">/// Receive queue with descriptors</span>
-    <span class="ident">rx_queue</span>: <span class="ident">RxQueue</span><span class="op">&lt;</span><span class="ident">E1000RxQueueRegisters</span>,<span class="ident">LegacyRxDescriptor</span><span class="op">&gt;</span>,
+    <span class="ident">rx_queue</span>: <span class="ident">RxQueue</span><span class="op">&lt;</span><span class="ident">E1000RxQueueRegisters</span>, <span class="ident">LegacyRxDescriptor</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Transmit queue with descriptors</span>
-    <span class="ident">tx_queue</span>: <span class="ident">TxQueue</span><span class="op">&lt;</span><span class="ident">E1000TxQueueRegisters</span>,<span class="ident">LegacyTxDescriptor</span><span class="op">&gt;</span>,     
+    <span class="ident">tx_queue</span>: <span class="ident">TxQueue</span><span class="op">&lt;</span><span class="ident">E1000TxQueueRegisters</span>, <span class="ident">LegacyTxDescriptor</span><span class="op">&gt;</span>,     
     <span class="doccomment">/// memory-mapped control registers</span>
-    <span class="ident">regs</span>: <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">E1000Registers</span><span class="op">&gt;</span>,
+    <span class="ident">regs</span>: <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">E1000Registers</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
     <span class="doccomment">/// memory-mapped registers holding the MAC address</span>
-    <span class="ident">mac_regs</span>: <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">E1000MacRegisters</span><span class="op">&gt;</span>
+    <span class="ident">mac_regs</span>: <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">E1000MacRegisters</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>
 }
 
 
@@ -662,7 +656,7 @@
         <span class="kw">let</span> <span class="ident">rxq</span> <span class="op">=</span> <span class="ident">RxQueue</span> {
             <span class="ident">id</span>: <span class="number">0</span>,
             <span class="ident">regs</span>: <span class="ident">rx_registers</span>,
-            <span class="ident">rx_descs</span>: <span class="ident">rx_descs</span>,
+            <span class="ident">rx_descs</span>,
             <span class="ident">num_rx_descs</span>: <span class="ident">E1000_NUM_RX_DESC</span>,
             <span class="ident">rx_cur</span>: <span class="number">0</span>,
             <span class="ident">rx_bufs_in_use</span>: <span class="ident">rx_buffers</span>,
@@ -678,16 +672,16 @@
         <span class="kw">let</span> <span class="ident">txq</span> <span class="op">=</span> <span class="ident">TxQueue</span> {
             <span class="ident">id</span>: <span class="number">0</span>,
             <span class="ident">regs</span>: <span class="ident">tx_registers</span>,
-            <span class="ident">tx_descs</span>: <span class="ident">tx_descs</span>,
+            <span class="ident">tx_descs</span>,
             <span class="ident">num_tx_descs</span>: <span class="ident">E1000_NUM_TX_DESC</span>,
             <span class="ident">tx_cur</span>: <span class="number">0</span>,
             <span class="ident">cpu_id</span>: <span class="prelude-val">None</span>,
         };
 
         <span class="kw">let</span> <span class="ident">e1000_nic</span> <span class="op">=</span> <span class="ident">E1000Nic</span> {
-            <span class="ident">bar_type</span>: <span class="ident">bar_type</span>,
-            <span class="ident">mem_base</span>: <span class="ident">mem_base</span>,
-            <span class="ident">interrupt_num</span>: <span class="ident">interrupt_num</span>,
+            <span class="ident">bar_type</span>,
+            <span class="ident">mem_base</span>,
+            <span class="ident">interrupt_num</span>,
             <span class="ident">mac_hardware</span>: <span class="ident">mac_addr_hardware</span>,
             <span class="ident">mac_spoofed</span>: <span class="prelude-val">None</span>,
             <span class="ident">rx_queue</span>: <span class="ident">rxq</span>,
@@ -710,10 +704,10 @@
         <span class="ident">_device</span>: <span class="kw-2">&amp;</span><span class="ident">PciDevice</span>, 
         <span class="ident">mem_base</span>: <span class="ident">PhysicalAddress</span>
     ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(
-        <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">E1000Registers</span><span class="op">&gt;</span>, 
-        <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">E1000RxRegisters</span><span class="op">&gt;</span>, 
-        <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">E1000TxRegisters</span><span class="op">&gt;</span>, 
-        <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">E1000MacRegisters</span><span class="op">&gt;</span>
+        <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">E1000Registers</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>, 
+        <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">E1000RxRegisters</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>, 
+        <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">E1000TxRegisters</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>, 
+        <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">E1000MacRegisters</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>
     ), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
 
         <span class="kw">const</span> <span class="ident">GENERAL_REGISTERS_SIZE_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">8192</span>;
@@ -721,15 +715,15 @@
         <span class="kw">const</span> <span class="ident">TX_REGISTERS_SIZE_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">4096</span>;
         <span class="kw">const</span> <span class="ident">MAC_REGISTERS_SIZE_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">114_688</span>;
 
-        <span class="kw">let</span> <span class="ident">nic_regs_mapped_page</span> <span class="op">=</span> <span class="ident">allocate_memory</span>(<span class="ident">mem_base</span>, <span class="ident">GENERAL_REGISTERS_SIZE_BYTES</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">nic_rx_regs_mapped_page</span> <span class="op">=</span> <span class="ident">allocate_memory</span>(<span class="ident">mem_base</span> <span class="op">+</span> <span class="ident">GENERAL_REGISTERS_SIZE_BYTES</span>, <span class="ident">RX_REGISTERS_SIZE_BYTES</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">nic_tx_regs_mapped_page</span> <span class="op">=</span> <span class="ident">allocate_memory</span>(<span class="ident">mem_base</span> <span class="op">+</span> <span class="ident">GENERAL_REGISTERS_SIZE_BYTES</span> <span class="op">+</span> <span class="ident">RX_REGISTERS_SIZE_BYTES</span>, <span class="ident">TX_REGISTERS_SIZE_BYTES</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">nic_regs_mapped_page</span>     <span class="op">=</span> <span class="ident">allocate_memory</span>(<span class="ident">mem_base</span>, <span class="ident">GENERAL_REGISTERS_SIZE_BYTES</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">nic_rx_regs_mapped_page</span>  <span class="op">=</span> <span class="ident">allocate_memory</span>(<span class="ident">mem_base</span> <span class="op">+</span> <span class="ident">GENERAL_REGISTERS_SIZE_BYTES</span>, <span class="ident">RX_REGISTERS_SIZE_BYTES</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">nic_tx_regs_mapped_page</span>  <span class="op">=</span> <span class="ident">allocate_memory</span>(<span class="ident">mem_base</span> <span class="op">+</span> <span class="ident">GENERAL_REGISTERS_SIZE_BYTES</span> <span class="op">+</span> <span class="ident">RX_REGISTERS_SIZE_BYTES</span>, <span class="ident">TX_REGISTERS_SIZE_BYTES</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">nic_mac_regs_mapped_page</span> <span class="op">=</span> <span class="ident">allocate_memory</span>(<span class="ident">mem_base</span> <span class="op">+</span> <span class="ident">GENERAL_REGISTERS_SIZE_BYTES</span> <span class="op">+</span> <span class="ident">RX_REGISTERS_SIZE_BYTES</span> <span class="op">+</span> <span class="ident">TX_REGISTERS_SIZE_BYTES</span>, <span class="ident">MAC_REGISTERS_SIZE_BYTES</span>)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">regs</span> <span class="op">=</span> <span class="ident">BoxRefMut::new</span>(<span class="ident">Box::new</span>(<span class="ident">nic_regs_mapped_page</span>)).<span class="ident">try_map_mut</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> <span class="ident">mp</span>.<span class="ident">as_type_mut</span>::<span class="op">&lt;</span><span class="ident">E1000Registers</span><span class="op">&gt;</span>(<span class="number">0</span>))<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">rx_regs</span> <span class="op">=</span> <span class="ident">BoxRefMut::new</span>(<span class="ident">Box::new</span>(<span class="ident">nic_rx_regs_mapped_page</span>)).<span class="ident">try_map_mut</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> <span class="ident">mp</span>.<span class="ident">as_type_mut</span>::<span class="op">&lt;</span><span class="ident">E1000RxRegisters</span><span class="op">&gt;</span>(<span class="number">0</span>))<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">tx_regs</span> <span class="op">=</span> <span class="ident">BoxRefMut::new</span>(<span class="ident">Box::new</span>(<span class="ident">nic_tx_regs_mapped_page</span>)).<span class="ident">try_map_mut</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> <span class="ident">mp</span>.<span class="ident">as_type_mut</span>::<span class="op">&lt;</span><span class="ident">E1000TxRegisters</span><span class="op">&gt;</span>(<span class="number">0</span>))<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">mac_regs</span> <span class="op">=</span> <span class="ident">BoxRefMut::new</span>(<span class="ident">Box::new</span>(<span class="ident">nic_mac_regs_mapped_page</span>)).<span class="ident">try_map_mut</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> <span class="ident">mp</span>.<span class="ident">as_type_mut</span>::<span class="op">&lt;</span><span class="ident">E1000MacRegisters</span><span class="op">&gt;</span>(<span class="number">0</span>))<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">regs</span>     <span class="op">=</span> <span class="ident">nic_regs_mapped_page</span>.<span class="ident">into_borrowed_mut</span>(<span class="number">0</span>).<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">rx_regs</span>  <span class="op">=</span> <span class="ident">nic_rx_regs_mapped_page</span>.<span class="ident">into_borrowed_mut</span>(<span class="number">0</span>).<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">tx_regs</span>  <span class="op">=</span> <span class="ident">nic_tx_regs_mapped_page</span>.<span class="ident">into_borrowed_mut</span>(<span class="number">0</span>).<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">mac_regs</span> <span class="op">=</span> <span class="ident">nic_mac_regs_mapped_page</span>.<span class="ident">into_borrowed_mut</span>(<span class="number">0</span>).<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
 
         <span class="prelude-val">Ok</span>((<span class="ident">regs</span>, <span class="ident">rx_regs</span>, <span class="ident">tx_regs</span>, <span class="ident">mac_regs</span>))
     }
@@ -788,7 +782,7 @@
         <span class="ident">regs</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E1000Registers</span>, 
         <span class="ident">rx_regs</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E1000RxQueueRegisters</span>
     ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(
-        <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, [<span class="ident">LegacyRxDescriptor</span>]<span class="op">&gt;</span>, 
+        <span class="ident">BorrowedSliceMappedPages</span><span class="op">&lt;</span><span class="ident">LegacyRxDescriptor</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>, 
         <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ReceiveBuffer</span><span class="op">&gt;</span>
     ), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="comment">// get the queue of rx descriptors and its corresponding rx buffers     </span>
@@ -812,7 +806,7 @@
     <span class="kw">fn</span> <span class="ident">tx_init</span>(
         <span class="ident">regs</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E1000Registers</span>, 
         <span class="ident">tx_regs</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E1000TxQueueRegisters</span>
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, [<span class="ident">LegacyTxDescriptor</span>]<span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BorrowedSliceMappedPages</span><span class="op">&lt;</span><span class="ident">LegacyTxDescriptor</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="comment">// get the queue of tx descriptors     </span>
         <span class="kw">let</span> <span class="ident">tx_descs</span> <span class="op">=</span> <span class="ident">init_tx_queue</span>(<span class="ident">E1000_NUM_TX_DESC</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">tx_regs</span>)<span class="question-mark">?</span>;
         <span class="ident">regs</span>.<span class="ident">tctl</span>.<span class="ident">write</span>(<span class="ident">regs::TCTL_EN</span> <span class="op">|</span> <span class="ident">regs::TCTL_PSP</span>);

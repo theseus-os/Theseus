@@ -15,10 +15,8 @@ specified by the format here: <a href="https://wiki.osdev.org/HPET#HPET_register
 There are between 3 and 32 of these in an HPET-enabled system.</p>
 </div></div></div><h2 id="constants" class="small-section-header"><a href="#constants">Constants</a></h2>
 <div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="constant" href="constant.HPET_SIGNATURE.html" title="hpet::HPET_SIGNATURE constant">HPET_SIGNATURE</a></div><div class="item-right docblock-short"></div></div></div><h2 id="functions" class="small-section-header"><a href="#functions">Functions</a></h2>
-<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.get_hpet.html" title="hpet::get_hpet fn">get_hpet</a></div><div class="item-right docblock-short"><p>Returns a reference to the HPET timer structure, wrapped in an Option,
-because it is not guaranteed that HPET exists or has been initialized.</p>
-</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.get_hpet_mut.html" title="hpet::get_hpet_mut fn">get_hpet_mut</a></div><div class="item-right docblock-short"><p>Returns a mutable reference to the HPET timer structure, wrapped in an Option,
-because it is not guaranteed that HPET exists or has been initialized.</p>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.get_hpet.html" title="hpet::get_hpet fn">get_hpet</a></div><div class="item-right docblock-short"><p>Returns a locked guard that immutably derefs to the HPET timer.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.get_hpet_mut.html" title="hpet::get_hpet_mut fn">get_hpet_mut</a></div><div class="item-right docblock-short"><p>Returns a locked guard that mutably derefs to the HPET timer.</p>
 </div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.handle.html" title="hpet::handle fn">handle</a></div><div class="item-right docblock-short"><p>The handler for parsing the HPET table and adding it to the ACPI tables list.</p>
 </div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../" data-current-crate="hpet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
 </body></html>
