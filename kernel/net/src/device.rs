@@ -1,11 +1,12 @@
-use alloc::{boxed::Box, vec};
+use alloc::vec;
 use core::any::Any;
 use log::error;
 use nic_buffers::ReceivedFrame;
-use owning_ref::BoxRefMut;
 use smoltcp::phy;
 
 pub use phy::DeviceCapabilities;
+
+use crate::Error;
 
 /// Standard maximum transition unit for ethernet cards.
 const STANDARD_MTU: usize = 1500;
@@ -50,18 +51,7 @@ impl<'a, 'b> phy::Device<'a> for DeviceWrapper<'b> {
 
     fn receive(&'a mut self) -> Option<(Self::RxToken, Self::TxToken)> {
         let frame = self.inner.receive()?;
-
-        if frame.0.len() > 1 {
-            error!(
-                "DeviceWrapper::receive(): received frame with {} buffers",
-                frame.0.len()
-            );
-        }
-
-        let byte_slice = BoxRefMut::new(Box::new(frame)).map_mut(|frame| frame.0[0].as_slice_mut());
-
-        let rx_token = RxToken { inner: byte_slice };
-        Some((rx_token, TxToken { device: self.inner }))
+        Some((RxToken { inner: frame }, TxToken { device: self.inner }))
     }
 
     fn transmit(&'a mut self) -> Option<Self::TxToken> {
@@ -75,7 +65,7 @@ impl<'a, 'b> phy::Device<'a> for DeviceWrapper<'b> {
 
 /// The receive token.
 pub(crate) struct RxToken {
-    inner: BoxRefMut<ReceivedFrame, [u8]>,
+    inner: ReceivedFrame,
 }
 
 impl phy::RxToken for RxToken {
@@ -83,7 +73,20 @@ impl phy::RxToken for RxToken {
     where
         F: FnOnce(&mut [u8]) -> smoltcp::Result<R>,
     {
-        f(&mut self.inner)
+        if self.inner.0.len() > 1 {
+            error!(
+                "DeviceWrapper::receive(): received frame with {} buffers",
+                self.inner.0.len()
+            );
+        }
+        // TODO: Which error variant?
+        let mut slice = self
+            .inner
+            .0
+            .first_mut()
+            .ok_or(Error::Unknown)?
+            .as_slice_mut();
+        f(&mut slice)
     }
 }
 

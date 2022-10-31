@@ -2153,7 +2153,6 @@ dependencies = [
  "irq_safety",
  "log",
  "nic_buffers",
- "owning_ref",
  "random",
  "smoltcp 0.8.0",
  "spin 0.9.4",

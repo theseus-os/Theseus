@@ -8,7 +8,6 @@ edition = "2021"
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 log = "0.4.8"
 nic_buffers = { path = "../nic_buffers" }
-owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 random = { path = "../random" }
 spin = "0.9"
 
