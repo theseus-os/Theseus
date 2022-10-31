@@ -173,6 +173,7 @@ impl NetworkInterfaceCard for E1000Nic {
 
 /// Functions that setup the NIC struct and handle the sending and receiving of packets.
 impl E1000Nic {
+    /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
     pub fn init(e1000_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<E1000Nic>, &'static str> {
         use interrupts::IRQ_BASE_OFFSET;
 

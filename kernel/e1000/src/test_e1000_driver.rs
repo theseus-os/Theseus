@@ -1,11 +1,9 @@
-use super::{NetworkInterfaceCard, TransmitBuffer, E1000_NIC};
+use super::{E1000_NIC, NetworkInterfaceCard, TransmitBuffer};
 
 pub fn test_e1000_nic_driver(_: Option<u64>) {
     match dhcp_request_packet() {
         Ok(_) => debug!("test_e1000_nic_driver(): sent DHCP request packet successfully!"),
-        Err(e) => {
-            error!("test_e1000_nic_driver(): failed to send DHCP request packet: error {:?}", e)
-        }
+        Err(e) => error!("test_e1000_nic_driver(): failed to send DHCP request packet: error {:?}", e),
     };
 }
 

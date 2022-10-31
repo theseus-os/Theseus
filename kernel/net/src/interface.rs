@@ -10,7 +10,7 @@ pub use wire::{IpAddress, IpCidr};
 pub struct Interface {
     // FIXME: Can this be a regular mutex?
     inner: Arc<MutexIrqSafe<iface::Interface<'static>>>,
-    pub(crate) device: &'static MutexIrqSafe<dyn crate::Device>,
+    device: &'static MutexIrqSafe<dyn crate::Device>,
 }
 
 impl Interface {
