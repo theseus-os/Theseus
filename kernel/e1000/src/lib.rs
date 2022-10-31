@@ -432,13 +432,8 @@ impl net::Device for E1000Nic {
         Ok(())
     }
 
-    fn receive(&mut self) -> Option<Vec<u8>> {
-        self.get_received_frame().map(|frame| {
-            let buffers = frame.0;
-            assert_eq!(buffers.len(), 1);
-            let buffer = &buffers[0];
-            buffer.as_slice(0, buffer.length.into()).unwrap().to_vec()
-        })
+    fn receive(&mut self) -> Option<ReceivedFrame> {
+        self.rx_queue.received_frames.pop_front()
     }
 
     /// Returns the MAC address.

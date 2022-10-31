@@ -1,5 +1,8 @@
-use alloc::{vec, vec::Vec};
+use alloc::{boxed::Box, vec};
 use core::any::Any;
+use log::error;
+use nic_buffers::ReceivedFrame;
+use owning_ref::BoxRefMut;
 use smoltcp::phy;
 
 pub use phy::DeviceCapabilities;
@@ -16,7 +19,7 @@ const STANDARD_MTU: usize = 1500;
 pub trait Device: Send + Sync + Any {
     fn send(&mut self, buf: &[u8]) -> core::result::Result<(), crate::Error>;
 
-    fn receive(&mut self) -> Option<Vec<u8>>;
+    fn receive(&mut self) -> Option<ReceivedFrame>;
 
     /// Returns the MAC address.
     fn mac_address(&self) -> [u8; 6];
@@ -46,9 +49,23 @@ impl<'a, 'b> phy::Device<'a> for DeviceWrapper<'b> {
     type TxToken = TxToken<'a>;
 
     fn receive(&'a mut self) -> Option<(Self::RxToken, Self::TxToken)> {
-        let rx_token = RxToken {
-            inner: self.inner.receive()?,
-        };
+        let frame = self.inner.receive()?;
+
+        if frame.0.len() > 1 {
+            error!(
+                "DeviceWrapper::receive(): received frame with {} buffers",
+                frame.0.len()
+            );
+        }
+
+        let byte_slice = BoxRefMut::new(Box::new(frame))
+            .try_map_mut(|frame| {
+                let len = frame.0[0].length.into();
+                frame.0[0].as_slice_mut::<u8>(0, len)
+            })
+            .ok()?;
+
+        let rx_token = RxToken { inner: byte_slice };
         Some((rx_token, TxToken { device: self.inner }))
     }
 
@@ -63,8 +80,7 @@ impl<'a, 'b> phy::Device<'a> for DeviceWrapper<'b> {
 
 /// The receive token.
 pub struct RxToken {
-    // FIXME: Use nic_buffers
-    inner: Vec<u8>,
+    inner: BoxRefMut<ReceivedFrame, [u8]>,
 }
 
 impl phy::RxToken for RxToken {

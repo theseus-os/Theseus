@@ -6,10 +6,14 @@ edition = "2021"
 
 [dependencies]
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+log = "0.4.8"
+nic_buffers = { path = "../nic_buffers" }
+owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 random = { path = "../random" }
 spin = "0.9"
 
 [dependencies.smoltcp]
+# TODO: move to patch in root Cargo.toml after removing legacy net interface
 git = "https://github.com/smoltcp-rs/smoltcp"
 default-features = false
 features = [
