@@ -871,7 +871,6 @@ dependencies = [
  "network_interface_card",
  "network_manager",
  "nic_buffers",
- "owning_ref",
  "smoltcp",
 ]
 
