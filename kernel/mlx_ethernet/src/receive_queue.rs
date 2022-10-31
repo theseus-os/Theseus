@@ -236,6 +236,7 @@ impl ReceiveQueue {
                         .map(|(buf_mapped, buf_paddr)| 
                             ReceiveBuffer::new(buf_mapped, buf_paddr, buffer_size as u16, mem_pool)
                         )
+                        .flatten()
                 })?;
             let paddr_buf = rx_buf.phys_addr;
             rx_bufs_in_use.push(rx_buf); 

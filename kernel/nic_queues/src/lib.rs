@@ -109,7 +109,7 @@ impl<S: RxQueueRegisters, T: RxDescriptor> RxQueue<S,T> {
                     // if the pool was empty, then we allocate a new receive buffer
                     let len = self.rx_buffer_size_bytes;
                     let (mp, phys_addr) = create_contiguous_mapping(len as usize, NIC_MAPPING_FLAGS)?;
-                    ReceiveBuffer::new(mp, phys_addr, len, self.rx_buffer_pool)
+                    ReceiveBuffer::new(mp, phys_addr, len, self.rx_buffer_pool)?
                 }
             };
 

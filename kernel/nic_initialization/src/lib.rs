@@ -3,6 +3,7 @@
 //! They include allocating memory space for the device's registers, and initializing its receive and transmit queues.
 
 #![no_std]
+#![feature(result_flattening)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -16,7 +17,7 @@ extern crate volatile;
 extern crate nic_queues;
 
 use memory::{EntryFlags, PhysicalAddress, allocate_pages_by_bytes, allocate_frames_by_bytes_at, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping};
-use pci::{PciDevice};
+use pci::PciDevice;
 use alloc::{
     vec::Vec,
     boxed::Box,
@@ -77,7 +78,7 @@ pub fn init_rx_buf_pool(num_rx_buffers: usize, buffer_size: u16, rx_buffer_pool:
     let length = buffer_size;
     for _i in 0..num_rx_buffers {
         let (mp, phys_addr) = create_contiguous_mapping(length as usize, NIC_MAPPING_FLAGS)?; 
-        let rx_buf = ReceiveBuffer::new(mp, phys_addr, length, rx_buffer_pool);
+        let rx_buf = ReceiveBuffer::new(mp, phys_addr, length, rx_buffer_pool)?;
         if rx_buffer_pool.push(rx_buf).is_err() {
             // if the queue is full, it returns an Err containing the object trying to be pushed
             error!("intel_ethernet::init_rx_buf_pool(): rx buffer pool is full, cannot add rx buffer {}!", _i);
@@ -118,6 +119,7 @@ pub fn init_rx_queue<T: RxDescriptor, S:RxQueueRegisters>(num_desc: usize, rx_bu
                     .map(|(buf_mapped, buf_paddr)| 
                         ReceiveBuffer::new(buf_mapped, buf_paddr, buffer_size as u16, rx_buffer_pool)
                     )
+                    .flatten()
             })?;
         let paddr_buf = rx_buf.phys_addr;
         rx_bufs_in_use.push(rx_buf); 

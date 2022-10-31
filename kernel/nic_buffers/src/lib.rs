@@ -77,15 +77,18 @@ pub struct ReceiveBuffer {
 impl ReceiveBuffer {
     /// Creates a new ReceiveBuffer with the given `MappedPages`, `PhysicalAddress`, and `length`. 
     /// When this ReceiveBuffer object is dropped, it will be returned to the given `pool`.
-    pub fn new(mp: MappedPages, phys_addr: PhysicalAddress, length: u16, pool: &'static mpmc::Queue<ReceiveBuffer>) -> ReceiveBuffer {
-        assert!(usize::from(length) <= mp.size_in_bytes());
-        assert!(mp.flags().is_writable());
-        
-        ReceiveBuffer {
-            mp,
-            phys_addr,
-            length,
-            pool,
+    pub fn new(mp: MappedPages, phys_addr: PhysicalAddress, length: u16, pool: &'static mpmc::Queue<ReceiveBuffer>) -> Result<ReceiveBuffer, &'static str> {
+        if usize::from(length) > mp.size_in_bytes() {
+            Err("mapped pages too small")
+        } else if !mp.flags().is_writable() {
+            Err("mapped pages aren't writable")
+        } else {
+            Ok(ReceiveBuffer {
+                mp,
+                phys_addr,
+                length,
+                pool,
+            })
         }
     }
 
