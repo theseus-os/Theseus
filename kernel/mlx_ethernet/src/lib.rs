@@ -10,7 +10,6 @@
 #![no_std]
 #![feature(slice_pattern)]
 #![feature(core_intrinsics)]
-#![feature(result_flattening)]
 #![allow(incomplete_features)]
 #![feature(adt_const_params)]
 

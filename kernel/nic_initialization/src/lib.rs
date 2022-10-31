@@ -3,7 +3,6 @@
 //! They include allocating memory space for the device's registers, and initializing its receive and transmit queues.
 
 #![no_std]
-#![feature(result_flattening)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -116,10 +115,9 @@ pub fn init_rx_queue<T: RxDescriptor, S:RxQueueRegisters>(num_desc: usize, rx_bu
             .ok_or("Couldn't obtain a ReceiveBuffer from the pool")
             .or_else(|_e| {
                 create_contiguous_mapping(buffer_size, NIC_MAPPING_FLAGS)
-                    .map(|(buf_mapped, buf_paddr)| 
+                    .and_then(|(buf_mapped, buf_paddr)|
                         ReceiveBuffer::new(buf_mapped, buf_paddr, buffer_size as u16, rx_buffer_pool)
                     )
-                    .flatten()
             })?;
         let paddr_buf = rx_buf.phys_addr;
         rx_bufs_in_use.push(rx_buf); 
