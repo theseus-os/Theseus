@@ -35,7 +35,7 @@ static NETWORK_INTERFACES: Mutex<Vec<InterfaceRef>> = Mutex::new(Vec::new());
 ///
 /// The function will convert the device to an interface and it will then be
 /// accessible using [`get_interface`].
-pub fn register_device<T>(device: Arc<MutexIrqSafe<T>>)
+pub fn register_device<T>(device: &'static MutexIrqSafe<T>)
 where
     T: 'static + Device + Send,
 {

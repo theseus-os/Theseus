@@ -1,4 +1,5 @@
 use alloc::{sync::Arc, vec, vec::Vec};
+use core::any::Any;
 use irq_safety::MutexIrqSafe;
 use smoltcp::phy;
 
@@ -15,7 +16,7 @@ pub type DeviceRef = Arc<MutexIrqSafe<dyn crate::Device>>;
 /// [`register_device`].
 ///
 /// [`register_device`]: crate::register_device
-pub trait Device: Send + Sync {
+pub trait Device: Send + Sync + Any {
     fn send(&mut self, buf: &[u8]) -> core::result::Result<(), crate::Error>;
 
     fn receive(&mut self) -> Option<Vec<u8>>;
@@ -40,15 +41,16 @@ pub trait Device: Send + Sync {
 /// ```
 #[derive(Clone)]
 pub(crate) struct DeviceWrapper {
-    pub(crate) inner: Arc<MutexIrqSafe<dyn crate::Device>>,
+    // pub(crate) inner: Arc<MutexIrqSafe<dyn crate::Device>>,
+    pub(crate) inner: &'static MutexIrqSafe<dyn crate::Device>,
 }
 
 impl DeviceWrapper {
-    pub(crate) fn new<T>(inner: Arc<MutexIrqSafe<T>>) -> Self
+    pub(crate) fn new<T>(device: &'static MutexIrqSafe<T>) -> Self
     where
-        T: 'static + crate::Device + Send + Sync,
+        T: crate::Device,
     {
-        Self { inner }
+        Self { inner: device }
     }
 }
 
@@ -59,12 +61,21 @@ impl<'a> phy::Device<'a> for DeviceWrapper {
 
     fn receive(&'a mut self) -> Option<(Self::RxToken, Self::TxToken)> {
         let mut device = self.inner.lock();
-        let rx_token = RxToken { inner: device.receive()? };
-        Some((rx_token, TxToken { device: self.clone() }))
+        let rx_token = RxToken {
+            inner: device.receive()?,
+        };
+        Some((
+            rx_token,
+            TxToken {
+                device: self.clone(),
+            },
+        ))
     }
 
     fn transmit(&'a mut self) -> Option<Self::TxToken> {
-        Some(TxToken { device: self.clone() })
+        Some(TxToken {
+            device: self.clone(),
+        })
     }
 
     fn capabilities(&self) -> DeviceCapabilities {

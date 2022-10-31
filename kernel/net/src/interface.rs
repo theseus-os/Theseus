@@ -1,5 +1,5 @@
 use crate::DeviceWrapper;
-use alloc::{collections::BTreeMap, sync::Arc};
+use alloc::collections::BTreeMap;
 use irq_safety::MutexIrqSafe;
 use smoltcp::{iface, wire};
 
@@ -12,7 +12,7 @@ pub struct Interface {
 }
 
 impl Interface {
-    pub(crate) fn new<T>(device: Arc<MutexIrqSafe<T>>, ip: IpCidr, gateway: IpAddress) -> Self
+    pub(crate) fn new<T>(device: &'static MutexIrqSafe<T>, ip: IpCidr, gateway: IpAddress) -> Self
     where
         T: 'static + crate::Device,
     {
@@ -35,11 +35,16 @@ impl Interface {
             .neighbor_cache(iface::NeighborCache::new(BTreeMap::new()))
             .finalize(&mut wrapper);
 
-        Self { inner, device: wrapper }
+        Self {
+            inner,
+            device: wrapper,
+        }
     }
 
     pub fn poll(&mut self, sockets: &mut SocketSet) {
         // FIXME: Timestamp
-        self.inner.poll(smoltcp::time::Instant::ZERO, &mut self.device, sockets).unwrap();
+        self.inner
+            .poll(smoltcp::time::Instant::ZERO, &mut self.device, sockets)
+            .unwrap();
     }
 }

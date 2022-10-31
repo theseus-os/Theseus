@@ -32,7 +32,7 @@ mod regs;
 use regs::*;
 
 use spin::Once; 
-use alloc::{vec::Vec, sync::Arc};
+use alloc::vec::Vec;
 use alloc::collections::VecDeque;
 use irq_safety::MutexIrqSafe;
 use alloc::boxed::Box;
@@ -66,15 +66,15 @@ const INT_RX:               u32 = 0x80;
 /// The single instance of the E1000 NIC.
 /// TODO: in the future, we should support multiple NICs all stored elsewhere,
 /// e.g., on the PCI bus or somewhere else.
-static E1000_NIC: Once<Arc<MutexIrqSafe<E1000Nic>>> = Once::new();
+static E1000_NIC: Once<MutexIrqSafe<E1000Nic>> = Once::new();
 
 /// Returns a reference to the E1000Nic wrapped in a MutexIrqSafe,
 /// if it exists and has been initialized.
-pub fn get_nic() -> Option<Arc<MutexIrqSafe<E1000Nic>>> {
-    E1000_NIC.get().cloned()
+pub fn get_nic() -> Option<&'static MutexIrqSafe<E1000Nic>> {
+    E1000_NIC.get()
 }
 
-pub fn set_nic(nic: Arc<MutexIrqSafe<E1000Nic>>) {
+pub fn set_nic(nic: MutexIrqSafe<E1000Nic>) {
     E1000_NIC.call_once(|| nic);
 } 
 
@@ -264,10 +264,9 @@ impl E1000Nic {
     }
     
     /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
-    pub fn init(pci_device: &PciDevice) -> Result<Arc<MutexIrqSafe<E1000Nic>>, &'static str> {
+    pub fn init(pci_device: &PciDevice) -> Result<&'static MutexIrqSafe<E1000Nic>, &'static str> {
         let nic = Self::new(pci_device)?;
-        let arc = Arc::new(MutexIrqSafe::new(nic));
-        Ok(Arc::clone(E1000_NIC.call_once(|| arc)))
+        Ok(E1000_NIC.call_once(|| MutexIrqSafe::new(nic)))
     }
     
     /// Allocates memory for the NIC and maps the E1000 Register struct to that memory area.

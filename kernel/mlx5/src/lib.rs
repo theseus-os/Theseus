@@ -30,7 +30,7 @@ extern crate mpmc;
 use spin::Once; 
 use alloc::{
     vec::Vec,
-    boxed::Box, sync::Arc
+    boxed::Box,
 };
 use irq_safety::MutexIrqSafe;
 use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
@@ -77,12 +77,12 @@ lazy_static! {
 
 /// The singleton connectx-5 NIC.
 /// TODO: Allow for multiple NICs
-static CONNECTX5_NIC: Once<Arc<MutexIrqSafe<ConnectX5Nic>>> = Once::new();
+static CONNECTX5_NIC: Once<MutexIrqSafe<ConnectX5Nic>> = Once::new();
 
 /// Returns a reference to the NIC wrapped in a MutexIrqSafe,
 /// if it exists and has been initialized.
-pub fn get_nic() -> Option<Arc<MutexIrqSafe<ConnectX5Nic>>> {
-    CONNECTX5_NIC.get().cloned()
+pub fn get_nic() -> Option<&'static MutexIrqSafe<ConnectX5Nic>> {
+    CONNECTX5_NIC.get()
 }
 
 /// Struct representing a ConnectX-5 network interface card.
@@ -641,7 +641,7 @@ impl ConnectX5Nic {
             receive_queue
         };
         
-        let nic_ref = CONNECTX5_NIC.call_once(|| Arc::new(MutexIrqSafe::new(mlx5_nic)));
+        let nic_ref = CONNECTX5_NIC.call_once(|| MutexIrqSafe::new(mlx5_nic));
         Ok(nic_ref)
     }
     
