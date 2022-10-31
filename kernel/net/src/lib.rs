@@ -2,7 +2,7 @@
 
 extern crate alloc;
 
-use alloc::{sync::Arc, vec::Vec};
+use alloc::vec::Vec;
 use irq_safety::MutexIrqSafe;
 use smoltcp::wire::Ipv4Address;
 use spin::Mutex;
@@ -26,10 +26,8 @@ const DEFAULT_LOCAL_IP: &str = "10.0.2.15/24";
 /// `10.0.2.2` is the default QEMU user-slirp networking gateway IP.
 const DEFAULT_GATEWAY_IP: IpAddress = IpAddress::Ipv4(Ipv4Address::new(10, 0, 2, 2));
 
-pub type InterfaceRef = Arc<MutexIrqSafe<Interface>>;
-
 // TODO: Make outer mutex rwlock?
-static NETWORK_INTERFACES: Mutex<Vec<InterfaceRef>> = Mutex::new(Vec::new());
+static NETWORK_INTERFACES: Mutex<Vec<Interface>> = Mutex::new(Vec::new());
 
 /// Registers a network device.
 ///
@@ -46,21 +44,21 @@ where
         DEFAULT_GATEWAY_IP,
     );
 
-    NETWORK_INTERFACES.lock().push(Arc::new(MutexIrqSafe::new(interface)));
+    NETWORK_INTERFACES.lock().push(interface);
 }
 
 /// Returns a list of available interfaces behind a mutex.
-pub fn get_interfaces() -> &'static Mutex<Vec<InterfaceRef>> {
+pub fn get_interfaces() -> &'static Mutex<Vec<Interface>> {
     &NETWORK_INTERFACES
 }
 
 /// Gets the interface with the specified `index`.
 ///
 /// If `index` is `None` the first interface is returned.
-pub fn get_interface(index: Option<usize>) -> Option<InterfaceRef> {
+pub fn get_interface(index: Option<usize>) -> Option<Interface> {
     let index = index.unwrap_or(0);
     let interfaces = NETWORK_INTERFACES.lock();
-    let interface = interfaces.get(index).map(Arc::clone);
+    let interface = interfaces.get(index).cloned();
     drop(interfaces);
     interface
 }

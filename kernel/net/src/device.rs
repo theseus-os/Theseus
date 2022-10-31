@@ -1,14 +1,11 @@
-use alloc::{sync::Arc, vec, vec::Vec};
+use alloc::{vec, vec::Vec};
 use core::any::Any;
-use irq_safety::MutexIrqSafe;
 use smoltcp::phy;
 
 pub use phy::DeviceCapabilities;
 
 /// Standard maximum transition unit for ethernet cards.
 const STANDARD_MTU: usize = 1500;
-
-pub type DeviceRef = Arc<MutexIrqSafe<dyn crate::Device>>;
 
 /// A network device.
 ///
@@ -39,47 +36,28 @@ pub trait Device: Send + Sync + Any {
 /// ```
 /// error[E0210]: type parameter `T` must be used as the type parameter for some local type (e.g., `MyStruct<T>`)
 /// ```
-#[derive(Clone)]
-pub(crate) struct DeviceWrapper {
-    // pub(crate) inner: Arc<MutexIrqSafe<dyn crate::Device>>,
-    pub(crate) inner: &'static MutexIrqSafe<dyn crate::Device>,
+pub(crate) struct DeviceWrapper<'a> {
+    pub(crate) inner: &'a mut dyn Device,
 }
 
-impl DeviceWrapper {
-    pub(crate) fn new<T>(device: &'static MutexIrqSafe<T>) -> Self
-    where
-        T: crate::Device,
-    {
-        Self { inner: device }
-    }
-}
-
-impl<'a> phy::Device<'a> for DeviceWrapper {
+impl<'a, 'b> phy::Device<'a> for DeviceWrapper<'b> {
     type RxToken = RxToken;
 
-    type TxToken = TxToken;
+    type TxToken = TxToken<'a>;
 
     fn receive(&'a mut self) -> Option<(Self::RxToken, Self::TxToken)> {
-        let mut device = self.inner.lock();
         let rx_token = RxToken {
-            inner: device.receive()?,
+            inner: self.inner.receive()?,
         };
-        Some((
-            rx_token,
-            TxToken {
-                device: self.clone(),
-            },
-        ))
+        Some((rx_token, TxToken { device: self.inner }))
     }
 
     fn transmit(&'a mut self) -> Option<Self::TxToken> {
-        Some(TxToken {
-            device: self.clone(),
-        })
+        Some(TxToken { device: self.inner })
     }
 
     fn capabilities(&self) -> DeviceCapabilities {
-        self.inner.lock().capabilities()
+        self.inner.capabilities()
     }
 }
 
@@ -99,11 +77,11 @@ impl phy::RxToken for RxToken {
 }
 
 /// The transmit token.
-pub struct TxToken {
-    device: DeviceWrapper,
+pub struct TxToken<'a> {
+    device: &'a mut dyn Device,
 }
 
-impl phy::TxToken for TxToken {
+impl<'a> phy::TxToken for TxToken<'a> {
     fn consume<R, F>(
         self,
         _timestamp: smoltcp::time::Instant,
@@ -115,7 +93,7 @@ impl phy::TxToken for TxToken {
     {
         let mut buf = vec![0; len];
         let ret = f(&mut buf)?;
-        self.device.inner.lock().send(&buf)?;
+        self.device.send(&buf)?;
         Ok(ret)
     }
 }
