@@ -1,17 +1,13 @@
 #![no_std]
 
-extern crate alloc;
-
 use core::{fmt, sync::atomic::{AtomicU8, Ordering}};
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use zerocopy::FromBytes;
-use alloc::boxed::Box;
-use owning_ref::BoxRefMut;
 use spin::Once;
 use raw_cpuid::CpuId;
 use msr::*;
 use irq_safety::RwLockIrqSafe;
-use memory::{PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages, allocate_frames_at, AllocatedFrames};
+use memory::{PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages, allocate_frames_at, AllocatedFrames, BorrowedMappedPages, Mutable};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
 use crossbeam_utils::atomic::AtomicCell;
@@ -285,7 +281,7 @@ impl LvtLint {
 /// used within the [`LocalApic`] struct.
 enum LapicType {
     X2Apic,
-    XApic(BoxRefMut<MappedPages, ApicRegisters>),
+    XApic(BorrowedMappedPages<ApicRegisters, Mutable>),
 }
 impl fmt::Debug for LapicType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -401,7 +397,7 @@ impl LocalApic {
         }
 
         // Next, before we can check other conditions, we have to enable the APIC hardware
-        // (which, if xapic, also requires mapping the Lapic MMIO registers).
+        // (which, if xapic, also requires mapping the Local APIC's MMIO registers).
         let inner: LapicType;
         let enable_bitmask: u64;
         if has_x2apic() {
@@ -411,11 +407,10 @@ impl LocalApic {
             let apic_regs = map_apic(page_table)
                 .map_err(|e| LapicInitError::MemoryMappingError(e))
                 .and_then(|apic_mp| 
-                    BoxRefMut::new(Box::new(apic_mp)).try_map_mut(|mp| mp
-                        .as_type_mut::<ApicRegisters>(0)
-                        .map_err(|e| LapicInitError::MemoryMappingError(e))
-                    )
+                    apic_mp.into_borrowed_mut(0)
+                        .map_err(|(_mp, err)| LapicInitError::MemoryMappingError(err))
                 )?;
+
             inner = LapicType::XApic(apic_regs);
             enable_bitmask = IA32_APIC_XAPIC_ENABLE;
         };

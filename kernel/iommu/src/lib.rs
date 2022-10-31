@@ -5,7 +5,6 @@
 #![allow(dead_code)]
 #![no_std]
 
-extern crate alloc;
 extern crate irq_safety;
 #[macro_use] extern crate log;
 #[macro_use] extern crate static_assertions;
@@ -13,14 +12,11 @@ extern crate memory;
 extern crate spin;
 extern crate volatile;
 extern crate zerocopy;
-extern crate owning_ref;
 extern crate bitflags;
 
 use spin::Once;
 use irq_safety::MutexIrqSafe;
-use memory::{MappedPages, PageTable, EntryFlags, PhysicalAddress, allocate_frames_at, allocate_pages};
-use owning_ref::BoxRefMut;
-use alloc::boxed::Box;
+use memory::{PageTable, EntryFlags, PhysicalAddress, allocate_frames_at, allocate_pages, BorrowedMappedPages, Mutable};
 
 mod regs;
 use regs::*;
@@ -34,7 +30,7 @@ pub struct IntelIommu {
     /// Register set base address
     register_base_address: PhysicalAddress,
     /// Memory mapped control registers
-    regs: BoxRefMut<MappedPages,IntelIommuRegisters>,
+    regs: BorrowedMappedPages<IntelIommuRegisters, Mutable>,
 }
 
 /// Singleton representing IOMMU (TODO: could there be more than one IOMMU?)
@@ -66,8 +62,8 @@ pub fn init(host_address_width: u8,
         page_table.map_allocated_pages_to(pages, frames, flags)?
     };
 
-    let regs = BoxRefMut::new(Box::new(mp))
-        .try_map_mut(|mp| mp.as_type_mut::<IntelIommuRegisters>(0))?;
+    let regs = mp.into_borrowed_mut::<IntelIommuRegisters>(0)
+        .map_err(|(_mp, err)| err)?;
 
     // get the version number
     {

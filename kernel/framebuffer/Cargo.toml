@@ -6,7 +6,6 @@ description = "a framebuffer is a buffer of pixels which can be composited to an
 
 [dependencies]
 log = "0.4.8"
-owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 zerocopy = "0.5.0"
 
 [dependencies.memory]

@@ -7,15 +7,11 @@
 use zerocopy::{U32, FromBytes};
 use volatile::Volatile;
 use byteorder::BigEndian;
-use memory::{MappedPages, create_contiguous_mapping};
-use owning_ref:: BoxRefMut;
+use memory::{MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
 use core::fmt;
 use num_enum::TryFromPrimitive;
 use core::convert::TryFrom;
-use alloc::{
-    vec::Vec,
-    boxed::Box
-};
+use alloc::vec::Vec;
 use nic_buffers::ReceiveBuffer;
 use nic_initialization::NIC_MAPPING_FLAGS;
 
@@ -152,7 +148,7 @@ impl ReceiveQueueContext {
 #[allow(dead_code)]
 pub struct ReceiveQueue {
     /// physically-contiguous RQ descriptors
-    entries: BoxRefMut<MappedPages, [WorkQueueEntryReceive]>, 
+    entries: BorrowedSliceMappedPages<WorkQueueEntryReceive, Mutable>, 
     /// the packet buffers in use by the descriptors
     packet_buffers: Vec<ReceiveBuffer>,
     /// The size of a receive buffers in bytes. 
@@ -197,21 +193,22 @@ impl ReceiveQueue {
         cq: CompletionQueue
     ) -> Result<ReceiveQueue, &'static str> {
         // map the descriptor ring and initialize
-        let mut entries = BoxRefMut::new(Box::new(entries_mp)).try_map_mut(|mp| mp.as_slice_mut::<WorkQueueEntryReceive>(0, num_entries))?;
+        let mut entries = entries_mp.into_borrowed_slice_mut::<WorkQueueEntryReceive>(0, num_entries)
+            .map_err(|(_mp, err)| err)?;
         for entry in entries.iter_mut() {
             entry.init()
         }
-        Ok( ReceiveQueue {
-                entries, 
-                packet_buffers: Vec::new(), 
-                buffer_size_bytes: mtu,
-                pool,
-                wqe_counter: 0,
-                cqe_counter: 0, 
-                owner: 0,
-                rqn, 
-                lkey,
-                cq
+        Ok(ReceiveQueue {
+            entries, 
+            packet_buffers: Vec::new(), 
+            buffer_size_bytes: mtu,
+            pool,
+            wqe_counter: 0,
+            cqe_counter: 0, 
+            owner: 0,
+            rqn, 
+            lkey,
+            cq
         })
     }
 
