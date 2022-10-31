@@ -304,6 +304,7 @@
 <span id="298">298</span>
 <span id="299">299</span>
 <span id="300">300</span>
+<span id="301">301</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">trait_alias</span>)]</span>
 
@@ -357,8 +358,9 @@
 <span class="doccomment">/// * local APICs ([`apic`]),</span>
 <span class="doccomment">/// * [`acpi`] tables for system configuration info, including the IOAPIC.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">early_init</span>(<span class="ident">kernel_mmi</span>: <span class="kw-2">&amp;mut</span> <span class="ident">MemoryManagementInfo</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="comment">// First, initialize the local apic info.</span>
-    <span class="ident">apic::init</span>(<span class="kw-2">&amp;mut</span> <span class="ident">kernel_mmi</span>.<span class="ident">page_table</span>)<span class="question-mark">?</span>;
+    <span class="comment">// First, initialize the local APIC hardware such that we can populate</span>
+    <span class="comment">// and initialize each LocalAPIC discovered in the ACPI table initialization routine below.</span>
+    <span class="ident">apic::init</span>();
     
     <span class="comment">// Then, parse the ACPI tables to acquire system configuration info.</span>
     <span class="ident">acpi::init</span>(<span class="kw-2">&amp;mut</span> <span class="ident">kernel_mmi</span>.<span class="ident">page_table</span>)<span class="question-mark">?</span>;

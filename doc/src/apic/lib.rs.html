@@ -777,6 +777,49 @@
 <span id="771">771</span>
 <span id="772">772</span>
 <span id="773">773</span>
+<span id="774">774</span>
+<span id="775">775</span>
+<span id="776">776</span>
+<span id="777">777</span>
+<span id="778">778</span>
+<span id="779">779</span>
+<span id="780">780</span>
+<span id="781">781</span>
+<span id="782">782</span>
+<span id="783">783</span>
+<span id="784">784</span>
+<span id="785">785</span>
+<span id="786">786</span>
+<span id="787">787</span>
+<span id="788">788</span>
+<span id="789">789</span>
+<span id="790">790</span>
+<span id="791">791</span>
+<span id="792">792</span>
+<span id="793">793</span>
+<span id="794">794</span>
+<span id="795">795</span>
+<span id="796">796</span>
+<span id="797">797</span>
+<span id="798">798</span>
+<span id="799">799</span>
+<span id="800">800</span>
+<span id="801">801</span>
+<span id="802">802</span>
+<span id="803">803</span>
+<span id="804">804</span>
+<span id="805">805</span>
+<span id="806">806</span>
+<span id="807">807</span>
+<span id="808">808</span>
+<span id="809">809</span>
+<span id="810">810</span>
+<span id="811">811</span>
+<span id="812">812</span>
+<span id="813">813</span>
+<span id="814">814</span>
+<span id="815">815</span>
+<span id="816">816</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">fmt</span>, <span class="ident">sync::atomic</span>::{<span class="ident">AtomicU8</span>, <span class="ident">Ordering</span>}};
@@ -900,9 +943,9 @@
 }
 
 
-<span class="doccomment">/// Initially maps the base APIC MMIO register frames so that we can know which LAPIC (core) we are.</span>
-<span class="doccomment">/// This only does something for apic/xapic systems, it does nothing for x2apic systems, as required.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">_page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="doccomment">/// Determines whether this system contains an xapic or x2apic</span>
+<span class="doccomment">/// and enables the Local APIC hardware in the correct mode.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>() {
     <span class="kw">let</span> <span class="ident">is_x2apic</span> <span class="op">=</span> <span class="ident">has_x2apic</span>();
     <span class="macro">debug!</span>(<span class="string">&quot;is x2apic? {}. IA32_APIC_BASE (phys addr): {:X?}&quot;</span>, <span class="ident">is_x2apic</span>, <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>));
 
@@ -910,8 +953,6 @@
         <span class="comment">// Ensure the local apic is enabled in xapic mode, otherwise we&#39;ll get a General Protection fault</span>
         <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_APIC_BASE</span>, <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="op">|</span> <span class="ident">IA32_APIC_XAPIC_ENABLE</span>); }
     }
-
-    <span class="prelude-val">Ok</span>(())
 }
 
 
@@ -1075,19 +1116,37 @@
     }
 }
 
+<span class="doccomment">/// The possible errors that can occur in [`LocalApic::init()`].</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">LapicInitError</span> {
+    <span class="doccomment">/// This CPU wasn&#39;t the BSP, as expected.</span>
+    <span class="ident">NotBSP</span>,
+    <span class="doccomment">/// This CPU wasn&#39;t an AP, as expected.</span>
+    <span class="ident">NotAP</span>,
+    <span class="doccomment">/// Invalid NMI local interrupt pin value; given by the included `u8`.</span>
+    <span class="ident">InvalidNmiLint</span>(<span class="ident">u8</span>),
+    <span class="ident">UnexpectedApicID</span> {
+        <span class="ident">expected</span>: <span class="ident">u8</span>,
+        <span class="ident">actual</span>: <span class="ident">u8</span>,
+    },
+    <span class="doccomment">/// An error occurred while mapping the Local APIC&#39;s MMIO registers into memory.</span>
+    <span class="ident">MemoryMappingError</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>),
+    <span class="doccomment">/// The Local APIC already existed (BUG), given by the included `u8` APIC ID.</span>
+    <span class="ident">AlreadyExisted</span>(<span class="ident">u8</span>),
+}
 
-<span class="doccomment">/// This structure represents a single APIC in the system, there is one per core. </span>
+
+<span class="doccomment">/// This structure represents a single Local APIC in the system; there is one per CPU. </span>
 <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">alias</span> <span class="op">=</span> <span class="string">&quot;lapic&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LocalApic</span> {
     <span class="doccomment">/// The inner lapic object that disambiguates between xapic and x2apic.</span>
     <span class="ident">inner</span>: <span class="ident">LapicType</span>,
-    <span class="doccomment">/// The processor id of this APIC,</span>
-    <span class="doccomment">/// obtained from the `MADT` ACPI table entry.</span>
-    <span class="ident">processor</span>: <span class="ident">u8</span>,
-    <span class="doccomment">/// The APIC system id of this APIC,</span>
-    <span class="doccomment">/// obtained from the `MADT` ACPI table entry.</span>
+    <span class="doccomment">/// The hardware-provided ID of this Local APIC.</span>
     <span class="ident">apic_id</span>: <span class="ident">u8</span>,
-    <span class="doccomment">/// Whether this `LocalApic` is the bootstrap processor (the first processor to boot up).</span>
+    <span class="doccomment">/// The processor ID of this APIC (from the `MADT` ACPI table entry).</span>
+    <span class="doccomment">/// This is currently not used for anything in Theseus.</span>
+    <span class="ident">processor_id</span>: <span class="ident">u8</span>,
+    <span class="doccomment">/// Whether this Local APIC is the BootStrap Processor (the first CPU to boot up).</span>
     <span class="ident">is_bsp</span>: <span class="ident">bool</span>,
 }
 <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">LocalApic</span> {
@@ -1095,7 +1154,7 @@
         <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;LocalApic&quot;</span>)
             .<span class="ident">field</span>(<span class="string">&quot;type&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span>)
             .<span class="ident">field</span>(<span class="string">&quot;apic_id&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">apic_id</span>)
-            .<span class="ident">field</span>(<span class="string">&quot;processor&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">processor</span>)
+            .<span class="ident">field</span>(<span class="string">&quot;processor_id&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">processor_id</span>)
             .<span class="ident">field</span>(<span class="string">&quot;is_bsp&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">is_bsp</span>)
             .<span class="ident">finish</span>()
     }
@@ -1110,81 +1169,117 @@
     <span class="doccomment">/// Creates and initializes a new `LocalApic` for the current CPU core</span>
     <span class="doccomment">/// and adds it to the global set of initialized local APICs.</span>
     <span class="doccomment">/// </span>
+    <span class="doccomment">/// ## Arguments</span>
+    <span class="doccomment">/// * `page_table`: the page table used to map the APIC MMIO registers</span>
+    <span class="doccomment">///    (only used for xapic, not x2apic).</span>
+    <span class="doccomment">/// * `processor_id`: the processor ID specified in the ACPI `Madt` table.</span>
+    <span class="doccomment">///    This value is currently unused in Theseus.</span>
+    <span class="doccomment">/// * `expected_apic_id`: the expected APIC ID as specified in the ACPI `Madt` table.</span>
+    <span class="doccomment">///    * If `Some`, the APIC&#39;s own ID (given by [`LocalApic::id()`]) *must* match this value,</span>
+    <span class="doccomment">///      otherwise an error will be returned.</span>
+    <span class="doccomment">///    * If `None`, the local APIC will determine its own ID value, and no check is performed.</span>
+    <span class="doccomment">/// * `should_be_bsp`: whether or not this CPU is expected to be the BSP.</span>
+    <span class="doccomment">///    * If `true`, this CPU must be the BSP (bootstrap processor).</span>
+    <span class="doccomment">///    * If `false`, this CPU must *not* be the BSP -- it must be an AP.</span>
+    <span class="doccomment">///    * An error is returned if the above checks fail.</span>
+    <span class="doccomment">/// * `nmi_lint`: the local interrupt pin used for NMI. Must be `0` or `1`.</span>
+    <span class="doccomment">/// * `nmi_flags`: the flags used to configure the local NMI interrupt.</span>
+    <span class="doccomment">/// </span>
     <span class="doccomment">/// ## Important Usage Note</span>
-    <span class="doccomment">/// This MUST be invoked from the AP core itself when it is booting up.</span>
-    <span class="doccomment">/// The BSP cannot invoke this for other APs (it can only invoke it for itself).</span>
+    <span class="doccomment">/// This MUST be invoked from each CPU itself when it is booting up, i.e.,</span>
+    <span class="doccomment">/// the BSP cannot invoke this for other APs.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(
         <span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>,
-        <span class="ident">processor</span>: <span class="ident">u8</span>,
-        <span class="ident">apic_id</span>: <span class="ident">u8</span>,
-        <span class="ident">is_bsp</span>: <span class="ident">bool</span>,
+        <span class="ident">processor_id</span>: <span class="ident">u8</span>,
+        <span class="ident">expected_apic_id</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+        <span class="ident">should_be_bsp</span>: <span class="ident">bool</span>,
         <span class="ident">nmi_lint</span>: <span class="ident">u8</span>,
-        <span class="ident">nmi_flags</span>: <span class="ident">u16</span>
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-
-        <span class="macro">trace!</span>(<span class="string">&quot;size of LocalApic: {}&quot;</span>, <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">LocalApic</span><span class="op">&gt;</span>());
+        <span class="ident">nmi_flags</span>: <span class="ident">u16</span>,
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">LapicInitError</span><span class="op">&gt;</span> {
 
         <span class="kw">let</span> <span class="ident">nmi_lint</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">nmi_lint</span> {
             <span class="number">0</span> =&gt; <span class="ident">LvtLint::Pin0</span>,
             <span class="number">1</span> =&gt; <span class="ident">LvtLint::Pin1</span>,
             <span class="ident">_invalid</span> =&gt; {
                 <span class="macro">error!</span>(<span class="string">&quot;BUG: invalid `nmi_lint` value (must be `0` or `1`) in \
-                    LocalApic::init(processor: {}, apic_id: {}, is_bsp: {}, nmi_lint: {}, nmi_flags: {}&quot;</span>,
-                    <span class="ident">processor</span>, <span class="ident">apic_id</span>, <span class="ident">is_bsp</span>, <span class="ident">nmi_lint</span>, <span class="ident">nmi_flags</span>
+                    LocalApic::init(processor_id: {}, expected_apic_id: {:?}, should_be_bsp: {}, nmi_lint: {}, nmi_flags: {}&quot;</span>,
+                    <span class="ident">processor_id</span>, <span class="ident">expected_apic_id</span>, <span class="ident">should_be_bsp</span>, <span class="ident">nmi_lint</span>, <span class="ident">nmi_flags</span>
                 );
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: invalid `nmi_lint` value, must be `0` or `1`&quot;</span>);
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">LapicInitError::InvalidNmiLint</span>(<span class="ident">nmi_lint</span>));
             }
         };
 
-        <span class="comment">// Theseus uses this MSR to hold each CPU&#39;s ID (which is an OS-chosen value).</span>
-        <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_TSC_AUX</span>, <span class="ident">apic_id</span> <span class="kw">as</span> <span class="ident">u64</span>); }
-
-        <span class="kw">if</span> <span class="ident">is_bsp</span> {
-            <span class="ident">BSP_PROCESSOR_ID</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">apic_id</span>); 
+        <span class="comment">// Check whether the caller&#39;s expectations about BSP vs AP were met.</span>
+        <span class="kw">let</span> <span class="ident">is_bsp</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="op">&amp;</span> <span class="ident">IA32_APIC_BASE_MSR_IS_BSP</span> <span class="op">==</span> <span class="ident">IA32_APIC_BASE_MSR_IS_BSP</span>;
+        <span class="kw">if</span> <span class="ident">should_be_bsp</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">is_bsp</span> {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">LapicInitError::NotBSP</span>);
+        }
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">should_be_bsp</span> <span class="op">&amp;&amp;</span> <span class="ident">is_bsp</span> {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">LapicInitError::NotAP</span>);
         }
 
-        <span class="kw">let</span> <span class="ident">inner</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">has_x2apic</span>() {
-            <span class="ident">LapicType::X2Apic</span>
+        <span class="comment">// Next, before we can check other conditions, we have to enable the APIC hardware</span>
+        <span class="comment">// (which, if xapic, also requires mapping the Local APIC&#39;s MMIO registers).</span>
+        <span class="kw">let</span> <span class="ident">inner</span>: <span class="ident">LapicType</span>;
+        <span class="kw">let</span> <span class="ident">enable_bitmask</span>: <span class="ident">u64</span>;
+        <span class="kw">if</span> <span class="ident">has_x2apic</span>() {
+            <span class="ident">inner</span> <span class="op">=</span> <span class="ident">LapicType::X2Apic</span>;
+            <span class="ident">enable_bitmask</span> <span class="op">=</span> <span class="ident">IA32_APIC_XAPIC_ENABLE</span> <span class="op">|</span> <span class="ident">IA32_APIC_X2APIC_ENABLE</span>;
         } <span class="kw">else</span> {
-            <span class="ident">LapicType::XApic</span>(
-                <span class="ident">map_apic</span>(<span class="ident">page_table</span>)<span class="question-mark">?</span>
-                    .<span class="ident">into_borrowed_mut</span>(<span class="number">0</span>)
-                    .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>
-            )
+            <span class="kw">let</span> <span class="ident">apic_regs</span> <span class="op">=</span> <span class="ident">map_apic</span>(<span class="ident">page_table</span>)
+                .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">LapicInitError::MemoryMappingError</span>(<span class="ident">e</span>))
+                .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">apic_mp</span><span class="op">|</span> 
+                    <span class="ident">apic_mp</span>.<span class="ident">into_borrowed_mut</span>(<span class="number">0</span>)
+                        .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">LapicInitError::MemoryMappingError</span>(<span class="ident">err</span>))
+                )<span class="question-mark">?</span>;
+
+            <span class="ident">inner</span> <span class="op">=</span> <span class="ident">LapicType::XApic</span>(<span class="ident">apic_regs</span>);
+            <span class="ident">enable_bitmask</span> <span class="op">=</span> <span class="ident">IA32_APIC_XAPIC_ENABLE</span>;
         };
+
+        <span class="comment">// Enable the xapic/x2apic hardware.</span>
+        <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_APIC_BASE</span>, <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="op">|</span> <span class="ident">enable_bitmask</span>); }
+
 		<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lapic</span> <span class="op">=</span> <span class="ident">LocalApic</span> {
             <span class="ident">inner</span>,
-            <span class="ident">processor</span>,
-            <span class="ident">apic_id</span>,
+            <span class="ident">processor_id</span>,
+            <span class="ident">apic_id</span>: <span class="ident">u8::MAX</span>, <span class="comment">// placeholder, is replaced below.</span>
             <span class="ident">is_bsp</span>,
         };
 
-        <span class="ident">lapic</span>.<span class="ident">enable</span>();
+        <span class="comment">// Now that the APIC hardware is enabled, we can safely obtain this Local APIC&#39;s ID.</span>
+        <span class="kw">let</span> <span class="ident">actual_apic_id</span> <span class="op">=</span> <span class="ident">lapic</span>.<span class="ident">read_apic_id</span>();
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">expected</span>) <span class="op">=</span> <span class="ident">expected_apic_id</span> <span class="op">&amp;&amp;</span> <span class="ident">expected</span> <span class="op">!</span><span class="op">=</span> <span class="ident">actual_apic_id</span> {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">LapicInitError::UnexpectedApicID</span> { <span class="ident">expected</span>, <span class="ident">actual</span>: <span class="ident">actual_apic_id</span> });
+        }
+
+        <span class="ident">lapic</span>.<span class="ident">apic_id</span> <span class="op">=</span> <span class="ident">actual_apic_id</span>;
+        <span class="ident">lapic</span>.<span class="ident">clean_enable</span>();
         <span class="ident">lapic</span>.<span class="ident">init_lvt_timer</span>();
         <span class="ident">lapic</span>.<span class="ident">set_nmi</span>(<span class="ident">nmi_lint</span>, <span class="ident">nmi_flags</span>);
-        <span class="macro">info!</span>(<span class="string">&quot;Found new processor core ({:?})&quot;</span>, <span class="ident">lapic</span>);
+        <span class="macro">info!</span>(<span class="string">&quot;Initialized new CPU ({:?})&quot;</span>, <span class="ident">lapic</span>);
 
-        <span class="kw">let</span> <span class="ident">_existing</span> <span class="op">=</span> <span class="ident">LOCAL_APICS</span>.<span class="ident">insert</span>(<span class="ident">apic_id</span>, <span class="ident">RwLockIrqSafe::new</span>(<span class="ident">lapic</span>));
-        <span class="macro">assert!</span>(<span class="ident">_existing</span>.<span class="ident">is_none</span>(), <span class="string">&quot;Local APIC should not already exist&quot;</span>);
+        <span class="comment">// Theseus uses this MSR to hold each CPU&#39;s ID (which is an OS-chosen value).</span>
+        <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_TSC_AUX</span>, <span class="ident">actual_apic_id</span> <span class="kw">as</span> <span class="ident">u64</span>); }
+        <span class="kw">if</span> <span class="ident">is_bsp</span> {
+            <span class="ident">BSP_PROCESSOR_ID</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">actual_apic_id</span>); 
+        }
+
+        <span class="kw">let</span> <span class="ident">_existing</span> <span class="op">=</span> <span class="ident">LOCAL_APICS</span>.<span class="ident">insert</span>(<span class="ident">actual_apic_id</span>, <span class="ident">RwLockIrqSafe::new</span>(<span class="ident">lapic</span>));
+        <span class="kw">if</span> <span class="ident">_existing</span>.<span class="ident">is_some</span>() {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">LapicInitError::AlreadyExisted</span>(<span class="ident">actual_apic_id</span>));
+        }
+
         <span class="ident">CPU_COUNT</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::Relaxed</span>);
-		<span class="prelude-val">Ok</span>(())      
+        <span class="prelude-val">Ok</span>(())
     }
 
 
-    <span class="doccomment">/// Returns the APIC ID of this lapic.</span>
+    <span class="doccomment">/// Returns the &quot;processor ID&quot; of this local APIC, which is currently unused.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// This value comes from the `MADT` ACPI table entry that was used</span>
     <span class="doccomment">/// to boot up this CPU core.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Currently this returns the same value as [`LocalApic::id()`].</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">apic_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> { <span class="self">self</span>.<span class="ident">apic_id</span> }
-
-    <span class="doccomment">/// Returns the &quot;processor ID&quot; of this lapic,</span>
-    <span class="doccomment">/// which is usually a meaningless value.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// This value comes from the `MADT` ACPI table entry that was used</span>
-    <span class="doccomment">/// to boot up this CPU core.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">processor</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> { <span class="self">self</span>.<span class="ident">processor</span> }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">processor_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> { <span class="self">self</span>.<span class="ident">processor_id</span> }
 
     <span class="doccomment">/// Returns `true` if this CPU core was the BootStrap Processor (BSP),</span>
     <span class="doccomment">/// i.e., the first CPU to boot and run the OS code.</span>
@@ -1192,19 +1287,10 @@
     <span class="doccomment">/// There is only one BSP per system.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_bsp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> { <span class="self">self</span>.<span class="ident">is_bsp</span> }
 
-    <span class="doccomment">/// Enable this lapic by initializing it to a clean state</span>
-    <span class="doccomment">/// and enabling its spurious interrupt vector.</span>
-    <span class="kw">fn</span> <span class="ident">enable</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="ident">is_bsp</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="op">&amp;</span> <span class="ident">IA32_APIC_BASE_MSR_IS_BSP</span> <span class="op">==</span> <span class="ident">IA32_APIC_BASE_MSR_IS_BSP</span>;
-
-        <span class="comment">// Globally enable the xapic/x2apic by setting the XAPIC_ENABLE (and optionally X2APIC_ENABLE) bits</span>
-        <span class="kw">let</span> <span class="ident">enable_bitmask</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="op">|</span> <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span> {
-            <span class="ident">LapicType::X2Apic</span>   =&gt; <span class="ident">IA32_APIC_XAPIC_ENABLE</span> <span class="op">|</span> <span class="ident">IA32_APIC_X2APIC_ENABLE</span>,
-            <span class="ident">LapicType::XApic</span>(<span class="kw">_</span>) =&gt; <span class="ident">IA32_APIC_XAPIC_ENABLE</span>
-        };
-        <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_APIC_BASE</span>, <span class="ident">enable_bitmask</span>); }
-
-        <span class="kw">let</span> <span class="ident">id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">id</span>();
+    <span class="doccomment">/// Set this Local APIC to a known &quot;clean state&quot; and enable its spurious interrupt vector.</span>
+    <span class="kw">fn</span> <span class="ident">clean_enable</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="kw">let</span> <span class="ident">is_bsp</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">is_bsp</span>;
+        <span class="kw">let</span> <span class="ident">id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">read_apic_id</span>();
         <span class="kw">let</span> <span class="ident">version</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">version</span>();
 
         <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span> {
@@ -1237,15 +1323,12 @@
                 }
             }
             <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; {
-                <span class="comment">// Globally enable the apic by setting the XAPIC_ENABLE bit</span>
-                <span class="kw">let</span> <span class="ident">enable_bitmask</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="op">|</span> <span class="ident">IA32_APIC_XAPIC_ENABLE</span>;
-                <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_APIC_BASE</span>, <span class="ident">enable_bitmask</span>); }
                 <span class="macro">info!</span>(<span class="string">&quot;LAPIC ID {:#x}, version: {:#x}, is_bsp: {}&quot;</span>, <span class="ident">id</span>, <span class="ident">version</span>, <span class="ident">is_bsp</span>);
                 <span class="kw">if</span> <span class="ident">is_bsp</span> {
                     <span class="ident">INTERRUPT_CHIP</span>.<span class="ident">store</span>(<span class="ident">InterruptChip::APIC</span>);
                 }
 
-                <span class="comment">// Init APIC to a clean known state.</span>
+                <span class="comment">// Init xAPIC to a clean known state.</span>
                 <span class="comment">// See &lt;http://wiki.osdev.org/APIC#Logical_Destination_Mode&gt;</span>
                 <span class="ident">regs</span>.<span class="ident">destination_format</span>.<span class="ident">write</span>(<span class="number">0xFFFF_FFFF</span>);
                 <span class="ident">regs</span>.<span class="ident">lvt_timer</span>.<span class="ident">write</span>(<span class="ident">APIC_DISABLE</span>);
@@ -1349,10 +1432,13 @@
         }
     }
 
-    <span class="doccomment">/// Reads the hardware-provided ID of this lapic (from its registers).</span>
+    <span class="doccomment">/// Returns the ID of this Local APIC (fast).</span>
     <span class="doccomment">/// </span>
-    <span class="doccomment">/// Currently, this matches the value returned by [`LocalApic::apic_id()`].</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> {
+    <span class="doccomment">/// Unlike [`read_apic_id()`], this does not read any hardware registers.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">apic_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> { <span class="self">self</span>.<span class="ident">apic_id</span> }
+
+    <span class="doccomment">/// Reads the hardware-provided ID of this Local APIC from its registers (slow).</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read_apic_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> {
         <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span> {
             <span class="ident">LapicType::X2Apic</span> =&gt; <span class="ident">rdmsr</span>(<span class="ident">IA32_X2APIC_APICID</span>) <span class="kw">as</span> <span class="ident">u32</span> <span class="kw">as</span> <span class="ident">u8</span>,
             <span class="ident">LapicType::XApic</span>(<span class="ident">regs</span>) =&gt; {

@@ -192,6 +192,11 @@
 <span id="186">186</span>
 <span id="187">187</span>
 <span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. </span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! The `captain` steers the ship of Theseus, meaning that it contains basic logic </span>
@@ -238,6 +243,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">exceptions_full</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">network_manager</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">window_manager</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">tlb_shootdown</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">multiple_heaps</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">console</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">simd_personality</span>)]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">simd_personality</span>;
@@ -326,6 +332,10 @@
     <span class="kw">let</span> <span class="ident">cpu_count</span> <span class="op">=</span> <span class="ident">ap_count</span> <span class="op">+</span> <span class="number">1</span>;
     <span class="macro">info!</span>(<span class="string">&quot;Finished handling and booting up all {} AP cores; {} total CPUs are running.&quot;</span>, <span class="ident">ap_count</span>, <span class="ident">cpu_count</span>);
 
+    <span class="comment">// Now that other CPUs are fully booted, init TLB shootdowns,</span>
+    <span class="comment">// which rely on Local APICs to broadcast an IPI to all running CPUs.</span>
+    <span class="ident">tlb_shootdown::init</span>();
+    
     <span class="comment">// //initialize the per core heaps</span>
     <span class="ident">multiple_heaps::switch_to_multiple_heaps</span>()<span class="question-mark">?</span>;
     <span class="macro">info!</span>(<span class="string">&quot;Initialized per-core heaps&quot;</span>);

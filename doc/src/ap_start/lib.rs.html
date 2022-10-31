@@ -112,6 +112,10 @@
 <span id="106">106</span>
 <span id="107">107</span>
 <span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for booting up secondary CPU cores, </span>
 <span class="doccomment">//! aka application processors (APs) on x86_64.</span>
 <span class="doccomment">//! </span>
@@ -129,7 +133,6 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">scheduler</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">apic</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">tlb_shootdown</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">no_drop</span>;
 
 <span class="kw">use</span> <span class="ident">alloc::collections::BTreeMap</span>;
@@ -166,7 +169,7 @@
     <span class="ident">nmi_lint</span>: <span class="ident">u8</span>,
     <span class="ident">nmi_flags</span>: <span class="ident">u16</span>,
 ) -&gt; <span class="op">!</span> {
-    <span class="macro">info!</span>(<span class="string">&quot;Booted AP: proc: {}, apic: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}&quot;</span>, 
+    <span class="macro">info!</span>(<span class="string">&quot;Booting AP: proc: {}, apic: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}&quot;</span>,
         <span class="ident">processor_id</span>, <span class="ident">apic_id</span>, <span class="ident">_stack_start</span>, <span class="ident">_stack_end</span>, <span class="ident">nmi_lint</span>, <span class="ident">nmi_flags</span>
     );
 
@@ -191,25 +194,30 @@
     <span class="kw">let</span> <span class="ident">_idt</span> <span class="op">=</span> <span class="ident">interrupts::init_ap</span>(<span class="ident">apic_id</span>, <span class="ident">double_fault_stack</span>.<span class="ident">top_unusable</span>(), <span class="ident">privilege_stack</span>.<span class="ident">top_unusable</span>())
         .<span class="ident">expect</span>(<span class="string">&quot;kstart_ap(): failed to initialize interrupts!&quot;</span>);
 
+    <span class="comment">// Initialize this CPU&#39;s Local APIC such that we can use everything that depends on APIC IDs.</span>
+    <span class="comment">// This must be done before initializing task spawning, because that relies on the ability to</span>
+    <span class="comment">// enable/disable preemption, which is partially implemented by the Local APIC.</span>
+    <span class="ident">LocalApic::init</span>(
+        <span class="kw-2">&amp;mut</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>().<span class="ident">page_table</span>,
+        <span class="ident">processor_id</span>,
+        <span class="prelude-val">Some</span>(<span class="ident">apic_id</span>),
+        <span class="bool-val">false</span>,
+        <span class="ident">nmi_lint</span>,
+        <span class="ident">nmi_flags</span>,
+    ).<span class="ident">unwrap</span>();
+
+    <span class="comment">// Now that the Local APIC has been initialized for this CPU, we can initialize the</span>
+    <span class="comment">// task management subsystem and create the idle task for this CPU.</span>
     <span class="kw">let</span> <span class="ident">bootstrap_task</span> <span class="op">=</span> <span class="ident">spawn::init</span>(<span class="ident">kernel_mmi_ref</span>.<span class="ident">clone</span>(), <span class="ident">apic_id</span>, <span class="ident">this_ap_stack</span>).<span class="ident">unwrap</span>();
+    <span class="ident">spawn::create_idle_task</span>().<span class="ident">unwrap</span>();
 
-    <span class="comment">// as a final step, init this apic as a new LocalApic, and add it to the list of all lapics.</span>
-    <span class="comment">// we do this last (after all other initialization) in order to prevent this lapic</span>
-    <span class="comment">// from prematurely receiving IPIs or being used in other ways,</span>
-    <span class="comment">// and also to ensure that if this apic fails to init, it&#39;s not accidentally used as a functioning apic in the list.</span>
-    <span class="ident">LocalApic::init</span>(<span class="kw-2">&amp;mut</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>().<span class="ident">page_table</span>, <span class="ident">processor_id</span>, <span class="ident">apic_id</span>, <span class="bool-val">false</span>, <span class="ident">nmi_lint</span>, <span class="ident">nmi_flags</span>)
-        .<span class="ident">expect</span>(<span class="string">&quot;kstart_ap(): failed to create LocalApic&quot;</span>);
-    <span class="ident">tlb_shootdown::init</span>();
-
-    <span class="macro">info!</span>(<span class="string">&quot;Initialization complete on AP core {}. Spawning idle task and enabling interrupts...&quot;</span>, <span class="ident">apic_id</span>);
+    <span class="macro">info!</span>(<span class="string">&quot;Initialization complete on AP core {}. Enabling interrupts...&quot;</span>, <span class="ident">apic_id</span>);
     <span class="comment">// The following final initialization steps are important, and order matters:</span>
     <span class="comment">// 1. Drop any other local stack variables that still exist.</span>
     <span class="comment">// (currently nothing else needs to be dropped)</span>
-    <span class="comment">// 2. Create the idle task for this CPU.</span>
-    <span class="ident">spawn::create_idle_task</span>().<span class="ident">unwrap</span>();
-    <span class="comment">// 3. &quot;Finish&quot; this bootstrap task, indicating it has exited and no longer needs to run.</span>
+    <span class="comment">// 2. &quot;Finish&quot; this bootstrap task, indicating it has exited and no longer needs to run.</span>
     <span class="ident">bootstrap_task</span>.<span class="ident">finish</span>();
-    <span class="comment">// 4. Enable interrupts such that other tasks can be scheduled in.</span>
+    <span class="comment">// 3. Enable interrupts such that other tasks can be scheduled in.</span>
     <span class="ident">enable_interrupts</span>();
     <span class="comment">// ****************************************************</span>
     <span class="comment">// NOTE: nothing below here is guaranteed to run again!</span>

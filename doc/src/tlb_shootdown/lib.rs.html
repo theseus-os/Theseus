@@ -147,7 +147,7 @@
 <span class="doccomment">/// which will invoke it as needed (on remap/unmap operations).</span>
 <span class="kw">fn</span> <span class="ident">broadcast_tlb_shootdown</span>(<span class="ident">pages_to_invalidate</span>: <span class="ident">PageRange</span>) {
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">my_lapic</span>) <span class="op">=</span> <span class="ident">get_my_apic</span>() {
-        <span class="comment">// info!(&quot;broadcast_tlb_shootdown():  AP {}, vaddrs: {:?}&quot;, my_lapic.read().apic_id, virtual_addresses);</span>
+        <span class="comment">// log::info!(&quot;broadcast_tlb_shootdown():  AP {}, pages: {:?}&quot;, my_lapic.read().apic_id(), pages_to_invalidate);</span>
         <span class="ident">send_tlb_shootdown_ipi</span>(<span class="kw-2">&amp;mut</span> <span class="ident">my_lapic</span>.<span class="ident">write</span>(), <span class="ident">pages_to_invalidate</span>);
     }
 }
@@ -158,7 +158,7 @@
 <span class="doccomment">/// </span>
 <span class="doccomment">/// There is no need to invoke this directly, it will be called by an IPI interrupt handler.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_tlb_shootdown_ipi</span>(<span class="ident">pages_to_invalidate</span>: <span class="ident">PageRange</span>) {
-    <span class="comment">// trace!(&quot;handle_tlb_shootdown_ipi(): AP {}, pages: {:?}&quot;, apic::get_my_apic_id(), pages_to_invalidate);</span>
+    <span class="comment">// log::trace!(&quot;handle_tlb_shootdown_ipi(): AP {}, pages: {:?}&quot;, apic::get_my_apic_id(), pages_to_invalidate);</span>
 
     <span class="kw">for</span> <span class="ident">page</span> <span class="kw">in</span> <span class="ident">pages_to_invalidate</span> {
         <span class="ident">x86_64::instructions::tlb::flush</span>(<span class="ident">x86_64::VirtAddr::new</span>(<span class="ident">page</span>.<span class="ident">start_address</span>().<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>));
@@ -176,7 +176,7 @@
         <span class="kw">return</span>;
     }
 
-    <span class="comment">// trace!(&quot;send_tlb_shootdown_ipi(): from AP {}, cpu_count: {}, {:?}&quot;, my_lapic.apic_id, cpu_count, pages_to_invalidate);</span>
+    <span class="comment">// log::trace!(&quot;send_tlb_shootdown_ipi(): from AP {}, cpu_count: {}, {:?}&quot;, my_lapic.apic_id(), cpu_count, pages_to_invalidate);</span>
 
     <span class="comment">// interrupts must be disabled here, because this IPI sequence must be fully synchronous with other cores,</span>
     <span class="comment">// and we wouldn&#39;t want this core to be interrupted while coordinating IPI responses across multiple cores.</span>
