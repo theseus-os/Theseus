@@ -4042,7 +4042,6 @@ dependencies = [
  "log",
  "mouse",
  "mpmc",
- "owning_ref",
  "path",
  "shapes",
  "spawn",
