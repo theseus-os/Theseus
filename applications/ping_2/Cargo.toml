@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+app_io = { path = "../../kernel/app_io" }
 net = { path = "../../kernel/net" }
-log = "*"
+getopts = "0.2.21"

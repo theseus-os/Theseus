@@ -3,7 +3,9 @@
 extern crate alloc;
 
 use alloc::{string::String, vec, vec::Vec};
+use app_io::{print, println};
 use core::str::FromStr;
+use getopts::{Matches, Options};
 use net::{
     phy::ChecksumCapabilities,
     socket::icmp::{Endpoint, PacketBuffer, PacketMetadata, Socket},
@@ -11,10 +13,61 @@ use net::{
     IpAddress, SocketSet,
 };
 
-pub fn main(_: Vec<String>) -> isize {
-    let remote = IpAddress::from_str("142.250.80.78").unwrap();
+pub fn main(args: Vec<String>) -> isize {
+    let mut opts = Options::new();
+    opts.optflag("h", "help", "print this help menu");
+    opts.optopt("c", "count", "stop after <count> replies (default: 4)", "<count>");
+    opts.optopt("s", "packet size", "send <size> data bytes in each packet (max: 248, default: 56)", "<size>");
 
-    let iface: &'static _ = net::get_interfaces().lock().iter().next().unwrap();
+    let matches = match opts.parse(&args) {
+        Ok(m) => m,
+        Err(_f) => {
+            println!("{}", _f);
+            print_usage(&opts);
+            return -1;
+        }
+    };
+
+    if matches.opt_present("h") {
+        print_usage(&opts);
+        0
+    } else {
+        match _main(matches) {
+            Ok(_) => 0,
+            Err(e) => {
+                println!("{}", e);
+                -1
+            }
+        }
+    }
+}
+
+fn _main(matches: Matches) -> Result<(), &'static str> {
+    let remote = IpAddress::from_str(matches.free.get(0).ok_or("no arguments_provided")?)
+        .map_err(|_| "invalid argument")?;
+
+    let iface = net::get_interfaces()
+        .lock()
+        .get(0)
+        .ok_or("no network interfaces available")?
+        .clone();
+    let mtu = iface.capabilities().max_transmission_unit;
+
+    let count = matches
+        .opt_get_default("c", 4)
+        .map_err(|_| "invalid count")?;
+    let packet_size = {
+        let packet_size = matches
+            .opt_get_default("s", 56)
+            .map_err(|_| "invalid packet size")?;
+        if packet_size > 248 {
+            return Err("packet size too large");
+        } else {
+            packet_size
+        }
+    };
+
+    let data = vec![0; packet_size];
 
     let rx_buffer = PacketBuffer::new(vec![PacketMetadata::EMPTY], vec![0; 256]);
     let tx_buffer = PacketBuffer::new(vec![PacketMetadata::EMPTY], vec![0; 256]);
@@ -24,59 +77,52 @@ pub fn main(_: Vec<String>) -> isize {
     let mut sockets = SocketSet::new(vec![]);
     let handle = sockets.add(socket);
 
-    let mut seq_no = 0;
+    let mut sent = 0;
     let mut received = 0;
 
     loop {
-        log::info!("1");
-        // iface.lock().poll(&mut sockets);
-        log::info!("2");
+        iface.poll(&mut sockets);
 
         let socket = sockets.get_mut::<Socket>(handle);
-        log::info!("3");
 
         if !socket.is_open() {
-            log::info!("4");
             socket.bind(Endpoint::Ident(0x22b)).unwrap();
-            log::info!("5");
         }
 
-        if socket.can_send()  && seq_no < 5 {
-            log::info!("6");
-            let repr = Icmpv4Repr::EchoRequest { ident: 0x22b, seq_no, data: &[] };
+        if socket.can_send() && sent == received && sent < count {
+            let repr = Icmpv4Repr::EchoRequest {
+                ident: 0x22b,
+                seq_no: sent,
+                data: &data,
+            };
 
             let payload = socket.send(repr.buffer_len(), remote).unwrap();
-            log::info!("7");
             let mut packet = Icmpv4Packet::new_unchecked(payload);
-            log::info!("8");
 
             repr.emit(&mut packet, &ChecksumCapabilities::ignored());
-            log::info!("9");
-            seq_no += 1;
+            sent += 1;
         }
 
-        log::info!("10");
-
         if socket.can_recv() {
-            log::info!("11");
             let (payload, _) = socket.recv().unwrap();
-            log::info!("12");
             let packet = Icmpv4Packet::new_checked(&payload).unwrap();
             let repr = Icmpv4Repr::parse(&packet, &ChecksumCapabilities::ignored()).unwrap();
 
-            log::info!("13");
-            if let Icmpv4Repr::EchoReply { seq_no: _recvd_seq_no, .. } = repr {
-                log::info!("14");
-                return 0;
+            if let Icmpv4Repr::EchoReply { seq_no, .. } = repr {
+                println!("{} bytes from {}: seq_no={}", payload.len(), remote, seq_no);
+                received += 1;
             }
-            log::info!("15");
-            received += 1;
         }
-        
-        if received == 5 {
-            return 0;
+
+        if received == count {
+            return Ok(());
         }
     }
-
-    // -2
 }
+
+fn print_usage(opts: &Options) {
+    println!("{}", opts.usage(USAGE));
+}
+
+const USAGE: &str = "Usage: ping DESTINATION
+Pings an IPv4 address and displays network statistics";

@@ -26,7 +26,8 @@ const DEFAULT_LOCAL_IP: &str = "10.0.2.15/24";
 /// `10.0.2.2` is the default QEMU user-slirp networking gateway IP.
 const DEFAULT_GATEWAY_IP: IpAddress = IpAddress::Ipv4(Ipv4Address::new(10, 0, 2, 2));
 
-// TODO: Make outer mutex rwlock?
+// TODO: Make mutex rwlock?
+// TODO: Use atomic append-only vec?
 static NETWORK_INTERFACES: Mutex<Vec<Interface>> = Mutex::new(Vec::new());
 
 /// Registers a network device.

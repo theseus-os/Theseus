@@ -1,7 +1,7 @@
-use crate::{DeviceWrapper, Device};
+use crate::{Device, DeviceWrapper};
 use alloc::{collections::BTreeMap, sync::Arc};
 use irq_safety::MutexIrqSafe;
-use smoltcp::{iface, wire};
+use smoltcp::{iface, phy::DeviceCapabilities, wire};
 
 pub use smoltcp::iface::SocketSet;
 pub use wire::{IpAddress, IpCidr};
@@ -41,10 +41,7 @@ impl Interface {
                 .finalize(&mut wrapper),
         ));
 
-        Self {
-            inner,
-            device,
-        }
+        Self { inner, device }
     }
 
     pub fn poll(&self, sockets: &mut SocketSet) {
@@ -56,5 +53,9 @@ impl Interface {
             .lock()
             .poll(smoltcp::time::Instant::ZERO, &mut wrapper, sockets)
             .unwrap();
+    }
+
+    pub fn capabilities(&self) -> DeviceCapabilities {
+        self.device.lock().capabilities()
     }
 }
