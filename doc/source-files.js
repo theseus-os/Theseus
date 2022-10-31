@@ -153,6 +153,7 @@ sourcesIndex["text_display"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["text_terminal"] = {"name":"","files":["ansi_colors.rs","ansi_style.rs","lib.rs"]};
 sourcesIndex["theseus_features"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["thread_local_macro"] = {"name":"","files":["lib.rs"]};
+sourcesIndex["time"] = {"name":"","files":["dummy.rs","lib.rs"]};
 sourcesIndex["tlb_shootdown"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["tsc"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["tss"] = {"name":"","files":["lib.rs"]};
