@@ -58,12 +58,7 @@ impl<'a, 'b> phy::Device<'a> for DeviceWrapper<'b> {
             );
         }
 
-        let byte_slice = BoxRefMut::new(Box::new(frame))
-            .try_map_mut(|frame| {
-                let len = frame.0[0].length.into();
-                frame.0[0].as_slice_mut::<u8>(0, len)
-            })
-            .ok()?;
+        let byte_slice = BoxRefMut::new(Box::new(frame)).map_mut(|frame| frame.0[0].as_slice_mut());
 
         let rx_token = RxToken { inner: byte_slice };
         Some((rx_token, TxToken { device: self.inner }))

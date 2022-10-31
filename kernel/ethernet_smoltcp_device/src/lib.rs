@@ -192,14 +192,7 @@ impl<'d, N: NetworkInterfaceCard + 'static> smoltcp::phy::Device<'d> for Etherne
             error!("EthernetDevice::receive(): WARNING: Ethernet frame consists of {} ReceiveBuffers, we currently only handle a single-buffer frame, so this may not work correctly!",  received_frame.0.len());
         }
 
-        let first_buf_len = received_frame.0[0].length;
-        let rxbuf_byte_slice = BoxRefMut::new(Box::new(received_frame))
-            .try_map_mut(|rxframe| rxframe.0[0].as_slice_mut::<u8>(0, first_buf_len as usize))
-            .map_err(|e| {
-                error!("EthernetDevice::receive(): couldn't convert receive buffer of length {} into byte slice, error {:?}", first_buf_len, e);
-                e
-            })
-            .ok()?;
+        let rxbuf_byte_slice = BoxRefMut::new(Box::new(received_frame)).map_mut(|rxframe| rxframe.0[0].as_slice_mut());
 
         // Just create and return a pair of (receive token, transmit token), 
         // the actual rx buffer handling is done in the RxToken::consume() function
@@ -248,10 +241,7 @@ impl<N: NetworkInterfaceCard + 'static> smoltcp::phy::TxToken for TxToken<N> {
         })?;
 
         let closure_retval = {
-            let txbuf_byte_slice = txbuf.as_slice_mut::<u8>(0, len).map_err(|e| {
-                error!("EthernetDevice::transmit(): couldn't convert TransmitBuffer of length {} into byte slice, error {:?}", len, e);
-                smoltcp::Error::Exhausted
-            })?;
+            let txbuf_byte_slice = txbuf.as_slice_mut();
             f(txbuf_byte_slice)?
         };
         self.nic_ref.lock()

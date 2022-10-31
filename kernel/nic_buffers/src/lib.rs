@@ -29,17 +29,26 @@ impl TransmitBuffer {
             EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
         )?;
         Ok(TransmitBuffer {
-            mp: mp,
+            mp,
             phys_addr: starting_phys_addr,
             length: size_in_bytes,
         })
     }
 
-    // / Send this `TransmitBuffer` out through the given `NetworkInterfaceCard`. 
-    // / This function consumes this `TransmitBuffer`.
-    // pub fn send<N: NetworkInterfaceCard>(self, nic: &mut N) -> Result<(), &'static str> {
-    //     nic.send_packet(self)
-    // }
+    pub fn as_slice(&self) -> &[u8] {
+        // We checked that the mapped pages are >= to self.length during initialisation.
+        // There can be no overflows since length is a u16, nor can there be alignment
+        // issues because we are operating on u8s.
+        self.mp.as_slice(0, self.length.into()).unwrap() 
+    }
+    
+    pub fn as_slice_mut(&mut self) -> &mut [u8] {
+        // We checked that the mapped pages are >= to self.length during initialisation
+        // and that they are writable. There can be no overflows since length is
+        // a u16, nor can there be alignment issues because we are operating on
+        // u8s.
+        self.mp.as_slice_mut(0, self.length.into()).unwrap()
+    }
 }
 
 impl Deref for TransmitBuffer {
@@ -69,12 +78,30 @@ impl ReceiveBuffer {
     /// Creates a new ReceiveBuffer with the given `MappedPages`, `PhysicalAddress`, and `length`. 
     /// When this ReceiveBuffer object is dropped, it will be returned to the given `pool`.
     pub fn new(mp: MappedPages, phys_addr: PhysicalAddress, length: u16, pool: &'static mpmc::Queue<ReceiveBuffer>) -> ReceiveBuffer {
+        assert!(usize::from(length) <= mp.size_in_bytes());
+        assert!(mp.flags().is_writable());
+        
         ReceiveBuffer {
-            mp: mp,
-            phys_addr: phys_addr,
-            length: length,
-            pool: pool,
+            mp,
+            phys_addr,
+            length,
+            pool,
         }
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        // We checked that the mapped pages are >= to self.length during initialisation.
+        // There can be no overflows since length is a u16, nor can there be alignment
+        // issues because we are operating on u8s.
+        self.mp.as_slice(0, usize::from(self.length)).unwrap() 
+    }
+    
+    pub fn as_slice_mut(&mut self) -> &mut [u8] {
+        // We checked that the mapped pages are >= to self.length during initialisation
+        // and that they are writable. There can be no overflows since length is
+        // a u16, nor can there be alignment issues because we are operating on
+        // u8s.
+        self.mp.as_slice_mut(0, usize::from(self.length)).unwrap()
     }
 }
 impl Deref for ReceiveBuffer {
