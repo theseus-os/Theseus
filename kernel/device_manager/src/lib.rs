@@ -135,9 +135,9 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
         if dev.class == 0x02 && dev.subclass == 0x00 {
             if dev.vendor_id == e1000::INTEL_VEND && dev.device_id == e1000::E1000_DEV {
                 info!("e1000 PCI device found at: {:?}", dev.location);
-                // let e1000_nic_ref = e1000::E1000Nic::init(dev)?;
                 let nic = e1000::E1000Nic::init(dev)?;
                 net::register_device(nic);
+
                 let e1000_interface = EthernetNetworkInterface::new_ipv4_interface(nic, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
                 add_to_network_interfaces(e1000_interface);
                 

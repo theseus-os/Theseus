@@ -1,4 +1,4 @@
-use crate::{Device, DeviceWrapper};
+use crate::{Device, DeviceWrapper, Result};
 use alloc::{collections::BTreeMap, sync::Arc};
 use irq_safety::MutexIrqSafe;
 use smoltcp::{iface, phy::DeviceCapabilities, wire};
@@ -44,7 +44,13 @@ impl Interface {
         Self { inner, device }
     }
 
-    pub fn poll(&self, sockets: &mut SocketSet) {
+    /// Transmit packets queued in the given sockets, and receive queued
+    /// packets.
+    ///
+    /// Returns a boolean value indicating whether any packets were processed or
+    /// emitted, and thus, whether the readiness af any socket might have
+    /// changed.
+    pub fn poll(&self, sockets: &mut SocketSet) -> Result<bool> {
         let mut wrapper = DeviceWrapper {
             inner: &mut *self.device.lock(),
         };
@@ -52,7 +58,7 @@ impl Interface {
         self.inner
             .lock()
             .poll(smoltcp::time::Instant::ZERO, &mut wrapper, sockets)
-            .unwrap();
+            .map_err(|e| e.into())
     }
 
     pub fn capabilities(&self) -> DeviceCapabilities {

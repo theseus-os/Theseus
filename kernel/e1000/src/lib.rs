@@ -1,9 +1,8 @@
 #![no_std]
 
-#![allow(dead_code, incomplete_features)] //  to suppress warnings for unused functions/methods
+#![allow(dead_code)] //  to suppress warnings for unused functions/methods
 #![feature(rustc_private)]
 #![feature(abi_x86_interrupt)]
-#![feature(trait_upcasting)]
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
@@ -70,13 +69,9 @@ static E1000_NIC: Once<MutexIrqSafe<E1000Nic>> = Once::new();
 
 /// Returns a reference to the E1000Nic wrapped in a MutexIrqSafe,
 /// if it exists and has been initialized.
-pub fn get_nic() -> Option<&'static MutexIrqSafe<E1000Nic>> {
+pub fn get_e1000_nic() -> Option<&'static MutexIrqSafe<E1000Nic>> {
     E1000_NIC.get()
 }
-
-pub fn set_nic(nic: MutexIrqSafe<E1000Nic>) {
-    E1000_NIC.call_once(|| nic);
-} 
 
 /// How many ReceiveBuffers are preallocated for this driver to use. 
 const RX_BUFFER_POOL_SIZE: usize = 256; 
@@ -178,7 +173,7 @@ impl NetworkInterfaceCard for E1000Nic {
 
 /// Functions that setup the NIC struct and handle the sending and receiving of packets.
 impl E1000Nic {
-    pub fn new(e1000_pci_dev: &PciDevice) -> Result<Self, &'static str> {
+    pub fn init(e1000_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<E1000Nic>, &'static str> {
         use interrupts::IRQ_BASE_OFFSET;
 
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
@@ -260,13 +255,8 @@ impl E1000Nic {
             mac_regs: mac_registers
         };
         
-        Ok(e1000_nic)
-    }
-    
-    /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
-    pub fn init(pci_device: &PciDevice) -> Result<&'static MutexIrqSafe<E1000Nic>, &'static str> {
-        let nic = Self::new(pci_device)?;
-        Ok(E1000_NIC.call_once(|| MutexIrqSafe::new(nic)))
+        let nic_ref = E1000_NIC.call_once(|| MutexIrqSafe::new(e1000_nic));
+        Ok(nic_ref)
     }
     
     /// Allocates memory for the NIC and maps the E1000 Register struct to that memory area.

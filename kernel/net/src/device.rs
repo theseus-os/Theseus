@@ -63,7 +63,7 @@ impl<'a, 'b> phy::Device<'a> for DeviceWrapper<'b> {
 
 /// The receive token.
 pub struct RxToken {
-    // TODO: Use nic_buffers style memory reuse.
+    // FIXME: Use nic_buffers
     inner: Vec<u8>,
 }
 

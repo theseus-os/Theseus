@@ -1,6 +1,4 @@
 use super::{NetworkInterfaceCard, TransmitBuffer, E1000_NIC};
-use crate::E1000Nic;
-use core::{any::Any, ops::DerefMut};
 
 pub fn test_e1000_nic_driver(_: Option<u64>) {
     match dhcp_request_packet() {
@@ -37,21 +35,17 @@ pub struct arp_packet {
     pub tpa2: u16, // ", last
 }
 
-//should test packet transmission and reception as QEMU DHCP server will
-// respond
+//should test packet transmission and reception as QEMU DHCP server will respond
 
-//will only b able to see this Tx message in netdump.pcap if user is not
-// mentioned in QEMU flags of Makefile QEMU_FLAGS += -net
-// nic,vlan=0,model=e1000,macaddr=00:0b:82:01:fc:42 -net dump,file=netdump.pcap
+//will only b able to see this Tx message in netdump.pcap if user is not mentioned in QEMU flags of Makefile
+//QEMU_FLAGS += -net nic,vlan=0,model=e1000,macaddr=00:0b:82:01:fc:42 -net dump,file=netdump.pcap
 
 //will only receive a response if user is mentioned in qemu flags
-//QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:0b:82:01:fc:42 -net
-// user,vlan=1 -net dump,file=netdump.pcap
+//QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:0b:82:01:fc:42 -net user,vlan=1 -net dump,file=netdump.pcap
 
 //or else use a tap interface (default)
-//QEMU_FLAGS += -device e1000,netdev=network0,mac=52:55:00:d1:55:01 -netdev
-// tap,id=network0,ifname=tap0,script=no,downscript=no will receive a DHCP
-// messgae from 00:1f:c6:9c:89:4c
+//QEMU_FLAGS += -device e1000,netdev=network0,mac=52:55:00:d1:55:01 -netdev tap,id=network0,ifname=tap0,script=no,downscript=no
+//will receive a DHCP messgae from 00:1f:c6:9c:89:4c
 
 pub fn dhcp_request_packet() -> Result<(), &'static str> {
     let packet: [u8; 314] = [
@@ -83,6 +77,5 @@ pub fn dhcp_request_packet() -> Result<(), &'static str> {
         buffer.copy_from_slice(&packet);
     }
     let mut e1000_nic = E1000_NIC.get().ok_or("e1000 NIC hasn't been initialized yet")?.lock();
-    let e1000_nic: &mut E1000Nic = (e1000_nic.deref_mut() as &mut dyn Any).downcast_mut().unwrap();
     e1000_nic.send_packet(transmit_buffer)
 }

@@ -2467,7 +2467,8 @@ dependencies = [
 name = "ping_2"
 version = "0.1.0"
 dependencies = [
- "log",
+ "app_io",
+ "getopts",
  "net",
 ]
 

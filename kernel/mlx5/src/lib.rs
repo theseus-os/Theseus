@@ -81,7 +81,7 @@ static CONNECTX5_NIC: Once<MutexIrqSafe<ConnectX5Nic>> = Once::new();
 
 /// Returns a reference to the NIC wrapped in a MutexIrqSafe,
 /// if it exists and has been initialized.
-pub fn get_nic() -> Option<&'static MutexIrqSafe<ConnectX5Nic>> {
+pub fn get_mlx5_nic() -> Option<&'static MutexIrqSafe<ConnectX5Nic>> {
     CONNECTX5_NIC.get()
 }
 

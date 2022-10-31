@@ -56,10 +56,6 @@ pub fn get_interfaces() -> &'static Mutex<Vec<Interface>> {
 /// Gets the interface with the specified `index`.
 ///
 /// If `index` is `None` the first interface is returned.
-pub fn get_interface(index: Option<usize>) -> Option<Interface> {
-    let index = index.unwrap_or(0);
-    let interfaces = NETWORK_INTERFACES.lock();
-    let interface = interfaces.get(index).cloned();
-    drop(interfaces);
-    interface
+pub fn get_default_interface() -> Option<Interface> {
+    NETWORK_INTERFACES.lock().get(0).cloned()
 }
