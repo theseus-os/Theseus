@@ -125,7 +125,7 @@ impl<P: Pixel> Framebuffer<P> {
         Pixel::composite_buffer(src, &mut self.buffer_mut()[index..dest_end]);
     }
 
-    /// Draw a pixel at the given 1coordinate1. 
+    /// Draw a pixel at the given coordinate. 
     /// The `pixel` will be blended with the existing pixel value
     /// at that `coordinate` in this framebuffer.
     pub fn draw_pixel(&mut self, coordinate: Coord, pixel: P) {

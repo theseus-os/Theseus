@@ -619,35 +619,33 @@ impl WindowManager {
 
 /// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.
 pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
-    let final_framebuffer: Framebuffer<AlphaPixel> = framebuffer::init()?;
-    let (width, height) = final_framebuffer.get_size();
+    let final_fb: Framebuffer<AlphaPixel> = framebuffer::init()?;
+    let (width, height) = final_fb.get_size();
 
-    let mut bottom_framebuffer = Framebuffer::new(width, height, None)?;
-    let mut top_framebuffer = Framebuffer::new(width, height, None)?;
-    let (screen_width, screen_height) = bottom_framebuffer.get_size();
-    bottom_framebuffer.fill(color::LIGHT_GRAY.into());
-    top_framebuffer.fill(color::TRANSPARENT.into()); 
+    let mut bottom_fb = Framebuffer::new(width, height, None)?;
+    let mut top_fb = Framebuffer::new(width, height, None)?;
+    let (screen_width, screen_height) = bottom_fb.get_size();
+    bottom_fb.fill(color::LIGHT_GRAY.into());
+    top_fb.fill(color::TRANSPARENT.into()); 
 
-    // the mouse starts in the center of the screen.
-    let center = Coord {
+    // Initial position for the mouse
+    let mouse = Coord {
         x: screen_width as isize / 2,
         y: screen_height as isize / 2,
     }; 
 
-    // initialize static window manager
+    // Initialize static window manager
     let window_manager = WindowManager {
         hide_list: VecDeque::new(),
         show_list: VecDeque::new(),
         active: Weak::new(),
-        mouse: center,
+        mouse,
         repositioned_border: None,
-        bottom_fb: bottom_framebuffer,
-        top_fb: top_framebuffer,
-        final_fb: final_framebuffer,
+        bottom_fb,
+        top_fb,
+        final_fb,
     };
-    let _wm = WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
-
-    // wm.refresh_bottom_windows(None, false)?;
+    WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
 
     // keyinput queue initialization
     let key_consumer: Queue<Event> = Queue::with_capacity(100);
