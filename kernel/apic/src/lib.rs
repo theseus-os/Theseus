@@ -1,17 +1,13 @@
 #![no_std]
 
-extern crate alloc;
-
 use core::{fmt, sync::atomic::{AtomicU8, Ordering}};
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use zerocopy::FromBytes;
-use alloc::boxed::Box;
-use owning_ref::BoxRefMut;
 use spin::Once;
 use raw_cpuid::CpuId;
 use msr::*;
 use irq_safety::RwLockIrqSafe;
-use memory::{PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages, allocate_frames_at, AllocatedFrames};
+use memory::{PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages, allocate_frames_at, AllocatedFrames, BorrowedMappedPages, Mutable};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
 use crossbeam_utils::atomic::AtomicCell;
@@ -287,7 +283,7 @@ impl LvtLint {
 /// used within the [`LocalApic`] struct.
 enum LapicType {
     X2Apic,
-    XApic(BoxRefMut<MappedPages, ApicRegisters>),
+    XApic(BorrowedMappedPages<ApicRegisters, Mutable>),
 }
 impl fmt::Debug for LapicType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -372,8 +368,9 @@ impl LocalApic {
             LapicType::X2Apic
         } else {
             LapicType::XApic(
-                BoxRefMut::new(Box::new(map_apic(page_table)?))
-                    .try_map_mut(|mp| mp.as_type_mut::<ApicRegisters>(0))?
+                map_apic(page_table)?
+                    .into_borrowed_mut(0)
+                    .map_err(|(_mp, err)| err)?
             )
         };
 		let mut lapic = LocalApic {

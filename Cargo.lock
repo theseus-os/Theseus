@@ -105,7 +105,6 @@ dependencies = [
  "log",
  "memory",
  "msr",
- "owning_ref",
  "pit_clock_basic",
  "raw-cpuid",
  "spin 0.9.0",
@@ -825,7 +824,6 @@ dependencies = [
  "nic_buffers",
  "nic_initialization",
  "nic_queues",
- "owning_ref",
  "pci",
  "spin 0.9.0",
  "static_assertions",
@@ -1027,7 +1025,6 @@ dependencies = [
  "log",
  "memory",
  "multicore_bringup",
- "owning_ref",
  "shapes",
  "zerocopy",
 ]
@@ -1197,7 +1194,6 @@ dependencies = [
  "kernel_config",
  "log",
  "memory",
- "owning_ref",
  "sdt",
  "spin 0.9.0",
  "volatile 0.2.7",
@@ -1311,7 +1307,6 @@ dependencies = [
  "atomic_linked_list",
  "log",
  "memory",
- "owning_ref",
  "spin 0.9.0",
  "volatile 0.2.7",
  "zerocopy",
@@ -1325,7 +1320,6 @@ dependencies = [
  "irq_safety",
  "log",
  "memory",
- "owning_ref",
  "spin 0.9.0",
  "static_assertions",
  "volatile 0.2.7",
@@ -1372,7 +1366,6 @@ dependencies = [
  "nic_buffers",
  "nic_initialization",
  "nic_queues",
- "owning_ref",
  "pci",
  "physical_nic",
  "pic",
@@ -1789,7 +1782,6 @@ dependencies = [
  "mpmc",
  "nic_buffers",
  "nic_initialization",
- "owning_ref",
  "pci",
  "spin 0.9.0",
 ]
@@ -1808,7 +1800,6 @@ dependencies = [
  "nic_buffers",
  "nic_initialization",
  "num_enum",
- "owning_ref",
  "static_assertions",
  "volatile 0.2.7",
  "zerocopy",
@@ -2011,7 +2002,6 @@ version = "0.1.0"
 dependencies = [
  "e1000",
  "log",
- "owning_ref",
  "smoltcp",
  "spin 0.9.0",
 ]
@@ -2032,7 +2022,6 @@ dependencies = [
  "log",
  "memory",
  "mpmc",
- "owning_ref",
 ]
 
 [[package]]
@@ -2045,7 +2034,6 @@ dependencies = [
  "mpmc",
  "nic_buffers",
  "nic_queues",
- "owning_ref",
  "pci",
  "volatile 0.2.7",
 ]
@@ -2059,7 +2047,6 @@ dependencies = [
  "memory",
  "mpmc",
  "nic_buffers",
- "owning_ref",
 ]
 
 [[package]]
@@ -2159,7 +2146,6 @@ dependencies = [
  "itertools",
  "log",
  "network_manager",
- "owning_ref",
  "percent-encoding",
  "rand",
  "sha3",
@@ -2172,7 +2158,7 @@ dependencies = [
 [[package]]
 name = "owning_ref"
 version = "0.4.1"
-source = "git+https://github.com/theseus-os/owning-ref-rs#0d2dcdcffd75b80157d0e72fb82593a8696a9c49"
+source = "git+https://github.com/theseus-os/owning-ref-rs.git#0d2dcdcffd75b80157d0e72fb82593a8696a9c49"
 dependencies = [
  "spin 0.9.0",
  "stable_deref_trait",
@@ -2607,7 +2593,6 @@ name = "rsdp"
 version = "0.1.0"
 dependencies = [
  "memory",
- "owning_ref",
  "zerocopy",
 ]
 
@@ -3124,7 +3109,6 @@ dependencies = [
  "io",
  "lazy_static",
  "log",
- "owning_ref",
  "spin 0.9.0",
 ]
 
@@ -3134,7 +3118,6 @@ version = "0.1.0"
 dependencies = [
  "ata",
  "log",
- "owning_ref",
  "pci",
  "spin 0.9.0",
  "storage_device",

@@ -9,7 +9,6 @@
 extern crate smoltcp;
 extern crate network_manager;
 extern crate hpet;
-extern crate owning_ref;
 extern crate spawn;
 extern crate task;
 extern crate sha3;
