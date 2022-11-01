@@ -763,7 +763,7 @@
                 <span class="ident">ExchangeState::Init</span> =&gt; {
                     <span class="comment">// Hold interrupts to avoid blocking &amp; descheduling this task until we release the slot lock,</span>
                     <span class="comment">// which is currently done automatically because the slot uses a MutexIrqSafe.</span>
-                    <span class="kw-2">*</span><span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">ExchangeState::WaitingForReceiver</span>(<span class="ident">WaitGuard::new</span>(<span class="ident">curr_task</span>.<span class="ident">clone</span>()), <span class="ident">msg</span>);
+                    <span class="kw-2">*</span><span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">ExchangeState::WaitingForReceiver</span>(<span class="ident">WaitGuard::new</span>(<span class="ident">curr_task</span>.<span class="ident">clone</span>()).<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;failed to create wait guard&quot;</span>)<span class="question-mark">?</span>, <span class="ident">msg</span>);
                     <span class="prelude-val">None</span>
                 }
                 <span class="ident">ExchangeState::WaitingForSender</span>(<span class="ident">receiver_to_notify</span>) =&gt; {
@@ -809,7 +809,7 @@
                         <span class="kw">if</span> <span class="ident">blocked_sender</span>.<span class="ident">task</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">curr_task</span> {
                             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: CURR TASK WAS DIFFERENT THAN BLOCKED SENDER&quot;</span>);
                         }
-                        <span class="ident">blocked_sender</span>.<span class="ident">block_again</span>();
+                        <span class="ident">blocked_sender</span>.<span class="ident">block_again</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;failed to block sender&quot;</span>)<span class="question-mark">?</span>;
                     }
                     <span class="kw">_</span> =&gt; <span class="kw">break</span>,
                 }
@@ -911,7 +911,7 @@
                 <span class="ident">ExchangeState::Init</span> =&gt; {
                     <span class="comment">// Hold interrupts to avoid blocking &amp; descheduling this task until we release the slot lock,</span>
                     <span class="comment">// which is currently done automatically because the slot uses a MutexIrqSafe.</span>
-                    <span class="kw-2">*</span><span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">ExchangeState::WaitingForSender</span>(<span class="ident">WaitGuard::new</span>(<span class="ident">curr_task</span>.<span class="ident">clone</span>()));
+                    <span class="kw-2">*</span><span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">ExchangeState::WaitingForSender</span>(<span class="ident">WaitGuard::new</span>(<span class="ident">curr_task</span>.<span class="ident">clone</span>()).<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;failed to create wait guard&quot;</span>)<span class="question-mark">?</span>);
                     <span class="prelude-val">None</span>
                 }
                 <span class="ident">ExchangeState::WaitingForReceiver</span>(<span class="ident">sender_to_notify</span>, <span class="ident">msg</span>) =&gt; {
@@ -960,7 +960,7 @@
                         <span class="kw">if</span> <span class="ident">blocked_receiver</span>.<span class="ident">task</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">curr_task</span> {
                             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: CURR TASK WAS DIFFERENT THAN BLOCKED RECEIVER&quot;</span>);
                         }
-                        <span class="ident">blocked_receiver</span>.<span class="ident">block_again</span>();
+                        <span class="ident">blocked_receiver</span>.<span class="ident">block_again</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;failed to block receiver&quot;</span>)<span class="question-mark">?</span>;
                     }
                     <span class="kw">_</span> =&gt; <span class="kw">break</span>,
                 }

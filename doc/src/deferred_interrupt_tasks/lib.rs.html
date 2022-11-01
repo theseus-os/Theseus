@@ -181,6 +181,9 @@
 <span id="175">175</span>
 <span id="176">176</span>
 <span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Abstractions for deferred interrupt tasks, a companion to regular interrupt handlers.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! Deferred interrupt tasks are similar to the concept of &quot;top half&quot; and &quot;bottom half&quot;</span>
@@ -354,7 +357,10 @@
             <span class="prelude-val">Err</span>(<span class="ident">failure</span>) =&gt; <span class="macro">error!</span>(<span class="string">&quot;Deferred interrupt action returned failure: {:?}&quot;</span>, <span class="macro">debugit!</span>(<span class="ident">failure</span>)),
         }
 
-        <span class="ident">curr_task</span>.<span class="ident">block</span>();
+        <span class="kw">if</span> <span class="ident">curr_task</span>.<span class="ident">block</span>().<span class="ident">is_err</span>() {
+            <span class="macro">error!</span>(<span class="string">&quot;deffered_task_entry_point: couldn&#39;t block task&quot;</span>);
+        }
+
         <span class="ident">scheduler::schedule</span>();
     }
 }

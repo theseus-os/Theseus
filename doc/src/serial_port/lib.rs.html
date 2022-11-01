@@ -385,6 +385,12 @@
 <span id="379">379</span>
 <span id="380">380</span>
 <span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A full serial driver with more advanced I/O support, e.g., interrupt-based data receival.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This crate builds on  [`serial_port_basic`], which provides the lower-level types</span>
@@ -573,12 +579,18 @@
                 <span class="kw">match</span> <span class="ident">SerialPortAddress::try_from</span>(<span class="ident">base_port</span>) {
                     <span class="prelude-val">Ok</span>(<span class="ident">SerialPortAddress::COM1</span> <span class="op">|</span> <span class="ident">SerialPortAddress::COM3</span>) =&gt; {
                         <span class="ident">INTERRUPT_ACTION_COM1_COM3</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> 
-                            <span class="ident">Box::new</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> { <span class="ident">deferred_task</span>.<span class="ident">unblock</span>(); })
+                            <span class="ident">Box::new</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+                                <span class="ident">deferred_task</span>.<span class="ident">unblock</span>()
+                                    .<span class="ident">expect</span>(<span class="string">&quot;BUG: com_1_com3_interrupt_handler: couldn&#39;t unblock deferred task&quot;</span>);
+                            })
                         );
                     }
                     <span class="prelude-val">Ok</span>(<span class="ident">SerialPortAddress::COM2</span> <span class="op">|</span> <span class="ident">SerialPortAddress::COM4</span>) =&gt; {
                         <span class="ident">INTERRUPT_ACTION_COM2_COM4</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> 
-                            <span class="ident">Box::new</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> { <span class="ident">deferred_task</span>.<span class="ident">unblock</span>(); })
+                            <span class="ident">Box::new</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
+                                <span class="ident">deferred_task</span>.<span class="ident">unblock</span>()
+                                    .<span class="ident">expect</span>(<span class="string">&quot;BUG: com_2_com4_interrupt_handler: couldn&#39;t unblock deferred task&quot;</span>);
+                            })
                         );
                     }
                     <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="macro">warn!</span>(<span class="string">&quot;Registering interrupt handler for unknown serial port at {:#X}&quot;</span>, <span class="ident">base_port</span>),

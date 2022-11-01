@@ -938,6 +938,8 @@
 <span id="932">932</span>
 <span id="933">933</span>
 <span id="934">934</span>
+<span id="935">935</span>
+<span id="936">936</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks</span>
 <span class="doccomment">//! and convenient builder patterns for customizing new tasks. </span>
 <span class="doccomment">//! </span>
@@ -1297,9 +1299,11 @@
 
         <span class="comment">// The new task is ready to be scheduled in, now that its stack trampoline has been set up.</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">blocked</span> {
-            <span class="ident">new_task</span>.<span class="ident">block</span>();
+            <span class="ident">new_task</span>.<span class="ident">block_initing_task</span>()
+                .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;BUG: newly-spawned blocked task was not in the Initing runstate&quot;</span>)<span class="question-mark">?</span>;
         } <span class="kw">else</span> {
-            <span class="ident">new_task</span>.<span class="ident">unblock</span>();
+            <span class="ident">new_task</span>.<span class="ident">make_inited_task_runnable</span>()
+                .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;BUG: newly-spawned task was not in the Initing runstate&quot;</span>)<span class="question-mark">?</span>;
         }
 
         <span class="comment">// The new task is marked as idle</span>

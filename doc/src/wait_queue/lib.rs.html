@@ -224,6 +224,17 @@
 <span id="218">218</span>
 <span id="219">219</span>
 <span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
@@ -235,7 +246,7 @@
 
 <span class="kw">use</span> <span class="ident">alloc::collections::VecDeque</span>;
 <span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
-<span class="kw">use</span> <span class="ident">task::TaskRef</span>;
+<span class="kw">use</span> <span class="ident">task</span>::{<span class="ident">TaskRef</span>, <span class="ident">RunState</span>};
 
 
 <span class="doccomment">/// An object that holds a blocked `Task` </span>
@@ -246,17 +257,23 @@
 <span class="kw">impl</span> <span class="ident">WaitGuard</span> {
     <span class="doccomment">/// Blocks the given `Task` and returns a new `WaitGuard` object</span>
     <span class="doccomment">/// that will automatically unblock that Task when it is dropped. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">task</span>: <span class="ident">TaskRef</span>) -&gt; <span class="ident">WaitGuard</span> {
-        <span class="ident">task</span>.<span class="ident">block</span>();
-        <span class="ident">WaitGuard</span> {
-            <span class="ident">task</span>: <span class="ident">task</span>,
-        }
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Returns an error if the task cannot be blocked. See [`Task::block`] for</span>
+    <span class="doccomment">///  more details.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">task</span>: <span class="ident">TaskRef</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">WaitGuard</span>, <span class="ident">RunState</span><span class="op">&gt;</span> {
+        <span class="ident">task</span>.<span class="ident">block</span>()<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(<span class="ident">WaitGuard</span> {
+            <span class="ident">task</span>,
+        })
     }
 
     <span class="doccomment">/// Blocks the task guarded by this waitguard,</span>
     <span class="doccomment">/// which is useful to re-block a task after it spuriously woke up. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">block_again</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">task</span>.<span class="ident">block</span>();
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Returns an error if the task cannot be blocked. See [`Task::block`] for</span>
+    <span class="doccomment">///  more details.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">block_again</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">RunState</span>, <span class="ident">RunState</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">task</span>.<span class="ident">block</span>()
     }
 
     <span class="doccomment">/// Returns a reference to the `Task` being blocked in this `WaitGuard`.</span>
@@ -266,7 +283,7 @@
 }
 <span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">WaitGuard</span> {
     <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">task</span>.<span class="ident">unblock</span>();
+        <span class="self">self</span>.<span class="ident">task</span>.<span class="ident">unblock</span>().<span class="ident">unwrap</span>();
     }
 }
 
@@ -278,6 +295,7 @@
     <span class="ident">Interrupted</span>,
     <span class="ident">Timeout</span>,
     <span class="ident">SpuriousWakeup</span>,
+    <span class="ident">CantBlockCurrentTask</span>,
 }
 
 <span class="doccomment">/// A queue in which multiple `Task`s can wait for other `Task`s to notify them.</span>
@@ -354,7 +372,7 @@
                     <span class="macro">warn!</span>(<span class="string">&quot;WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}&quot;</span>, <span class="ident">curr_task</span>);
                 }
                 <span class="comment">// trace!(&quot;WaitQueue::wait_until():  putting task to sleep: {:?}\n    --&gt; WQ: {:?}&quot;, curr_task, &amp;*wq_locked);</span>
-                <span class="ident">curr_task</span>.<span class="ident">block</span>();
+                <span class="ident">curr_task</span>.<span class="ident">block</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">WaitError::CantBlockCurrentTask</span>)<span class="question-mark">?</span>;
             }
             <span class="ident">scheduler::schedule</span>();
 
@@ -386,7 +404,7 @@
                     <span class="macro">warn!</span>(<span class="string">&quot;WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}&quot;</span>, <span class="ident">curr_task</span>);
                 }
                 <span class="comment">// trace!(&quot;WaitQueue::wait_until():  putting task to sleep: {:?}\n    --&gt; WQ: {:?}&quot;, curr_task, &amp;*wq_locked);</span>
-                <span class="ident">curr_task</span>.<span class="ident">block</span>();
+                <span class="ident">curr_task</span>.<span class="ident">block</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">WaitError::CantBlockCurrentTask</span>)<span class="question-mark">?</span>;
             }
             <span class="ident">scheduler::schedule</span>();
 
@@ -424,23 +442,27 @@
         <span class="comment">// (4) Release the lock on the waitqueue.</span>
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wq_locked</span> <span class="op">=</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="ident">tref</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">ttw</span>) <span class="op">=</span> <span class="ident">task_to_wakeup</span> {
-            <span class="comment">// find a specific task to wake up</span>
-            <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident">wq_locked</span>.<span class="ident">iter</span>().<span class="ident">position</span>(<span class="op">|</span><span class="ident">t</span><span class="op">|</span> <span class="ident">t</span> <span class="op">==</span> <span class="ident">ttw</span>);
-            <span class="ident">index</span>.<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="ident">wq_locked</span>.<span class="ident">remove</span>(<span class="ident">i</span>))
-        } <span class="kw">else</span> {
-            <span class="comment">// just wake up the first task</span>
-            <span class="ident">wq_locked</span>.<span class="ident">pop_front</span>()
-        };
+        
+        <span class="kw">loop</span> {
+            <span class="kw">let</span> <span class="ident">tref</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">ttw</span>) <span class="op">=</span> <span class="ident">task_to_wakeup</span> {
+                <span class="comment">// find a specific task to wake up</span>
+                <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident">wq_locked</span>.<span class="ident">iter</span>().<span class="ident">position</span>(<span class="op">|</span><span class="ident">t</span><span class="op">|</span> <span class="ident">t</span> <span class="op">==</span> <span class="ident">ttw</span>);
+                <span class="ident">index</span>.<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="ident">wq_locked</span>.<span class="ident">remove</span>(<span class="ident">i</span>))
+            } <span class="kw">else</span> {
+                <span class="comment">// just wake up the first task</span>
+                <span class="ident">wq_locked</span>.<span class="ident">pop_front</span>()
+            };
 
-        <span class="comment">// trace!(&quot;  notify: chose task to wakeup: {:?}&quot;, tref);</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">t</span>) <span class="op">=</span> <span class="ident">tref</span> {
-            <span class="comment">// trace!(&quot;WaitQueue::notify():  unblocked task on waitqueue\n    --&gt; WQ: {:?}&quot;, &amp;*wq_locked);</span>
-            <span class="ident">t</span>.<span class="ident">unblock</span>();
-            <span class="bool-val">true</span>
-        } <span class="kw">else</span> {
-            <span class="comment">// trace!(&quot;WaitQueue::notify():  did nothing&quot;);</span>
-            <span class="bool-val">false</span>
+            <span class="comment">// trace!(&quot;  notify: chose task to wakeup: {:?}&quot;, tref);</span>
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">t</span>) <span class="op">=</span> <span class="ident">tref</span> {
+                <span class="comment">// trace!(&quot;WaitQueue::notify():  unblocked task on waitqueue\n    --&gt; WQ: {:?}&quot;, &amp;*wq_locked);</span>
+                <span class="kw">if</span> <span class="ident">t</span>.<span class="ident">unblock</span>().<span class="ident">is_ok</span>() {
+                    <span class="kw">return</span> <span class="bool-val">true</span>;
+                }
+            } <span class="kw">else</span> {
+                <span class="comment">// trace!(&quot;WaitQueue::notify():  did nothing&quot;);</span>
+                <span class="kw">return</span> <span class="bool-val">false</span>;
+            }
         }
     }
 }</code></pre></div>
