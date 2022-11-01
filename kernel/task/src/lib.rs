@@ -694,10 +694,13 @@ impl Task {
         }
     }
 
-    /// Blocks this `Task` if it is currently in the initialisation run state.
+    /// Blocks this `Task` if it is a newly-spawned task currently being initialized.
     ///
-    /// Returns the previous runstate (i.e. `RunState::Initing`) on success, and
-    /// the current runstate on error.
+    /// This is a special case only to be used when spawning a new task that
+    /// should not be immediately scheduled in; it will fail for all other cases.
+    ///
+    /// Returns the previous runstate (i.e. `RunState::Initing`) on success,
+    /// or the current runstate on error.
     pub fn block_initing_task(&self) -> Result<RunState, RunState> {
         if self.runstate.compare_exchange(RunState::Initing, RunState::Blocked).is_ok() {
             Ok(RunState::Initing)
