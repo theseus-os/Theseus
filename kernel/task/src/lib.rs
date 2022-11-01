@@ -726,6 +726,18 @@ impl Task {
         }
     }
 
+    /// Unblocks this `Task` if it is currently in the initialisation run state.
+    ///
+    /// Returns the previous runstate (i.e. `RunState::Initing`) on success, and
+    /// the current runstate on error.
+    pub fn unblock_initing_task(&self) -> Result<RunState, RunState> {
+        if self.runstate.compare_exchange(RunState::Initing, RunState::Runnable).is_ok() {
+            Ok(RunState::Initing)
+        } else {
+            Err(self.runstate.load())
+        }
+    }
+
     /// Sets this `Task` as this core's current task.
     /// 
     /// Currently this is achieved by writing a pointer to the `TaskLocalData` 
