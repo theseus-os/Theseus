@@ -106,11 +106,12 @@ pub fn main(_args: Vec<String>) -> isize {
         };
     }
 
+    // block this task, because it never needs to actually run again
+    task::get_my_current_task().unwrap().block().unwrap();
+    scheduler::schedule();
+
     loop {
-        // block this task, because it never needs to actually run again
-        if let Some(my_task) = task::get_my_current_task() {
-            my_task.block().unwrap();
-        }
+        warn!("BUG: blocked shell task was scheduled in unexpectedly");
     }
 
     // TODO: when `join` puts this task to sleep instead of spinning, we can re-enable it.

@@ -356,9 +356,11 @@ impl<F, A, R> TaskBuilder<F, A, R>
 
         // The new task is ready to be scheduled in, now that its stack trampoline has been set up.
         if self.blocked {
-            new_task.block_initing_task().unwrap();
+            new_task.block_initing_task()
+                .map_err(|_| "BUG: newly-spawned blocked task was not in the Initing runstate")?;
         } else {
-            new_task.unblock_initing_task().unwrap();
+            new_task.make_inited_task_runnable()
+                .map_err(|_| "BUG: newly-spawned task was not in the Initing runstate")?;
         }
 
         // The new task is marked as idle
