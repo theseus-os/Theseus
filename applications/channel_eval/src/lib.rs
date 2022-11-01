@@ -96,7 +96,8 @@ fn test_multiple(iterations: usize) -> Result<(), &'static str> {
         .spawn()?;
 
     info!("test_multiple(): Finished spawning the sender and receiver tasks");
-    t2.unblock(); t1.unblock();
+    t2.unblock().unwrap();
+    t1.unblock().unwrap();
 
     t1.join()?;
     t2.join()?;

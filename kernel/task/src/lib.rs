@@ -679,13 +679,71 @@ impl Task {
     }
 
     /// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].
-    pub fn block(&self) {
-        self.runstate.store(RunState::Blocked);
+    ///
+    /// Returns the previous runstate on success, and the current runstate on
+    /// error. Will only suceed if the task is runnable or already blocked.
+    pub fn block(&self) -> Result<RunState, RunState> {
+        use RunState::{Blocked, Runnable};
+
+        if self.runstate.compare_exchange(Runnable, Blocked).is_ok() {
+            Ok(Runnable)
+        } else if self.runstate.compare_exchange(Blocked, Blocked).is_ok() {
+            warn!("Blocked an already blocked task: {:?}\n\t --> Current {:?}",
+                self, get_my_current_task()
+            );
+            Ok(Blocked)
+        } else {
+            Err(self.runstate.load())
+        }
+    }
+
+    /// Blocks this `Task` if it is a newly-spawned task currently being initialized.
+    ///
+    /// This is a special case only to be used when spawning a new task that
+    /// should not be immediately scheduled in; it will fail for all other cases.
+    ///
+    /// Returns the previous runstate (i.e. `RunState::Initing`) on success,
+    /// or the current runstate on error.
+    pub fn block_initing_task(&self) -> Result<RunState, RunState> {
+        if self.runstate.compare_exchange(RunState::Initing, RunState::Blocked).is_ok() {
+            Ok(RunState::Initing)
+        } else {
+            Err(self.runstate.load())
+        }
     }
 
     /// Unblocks this `Task` by setting its runstate to [`RunState::Runnable`].
-    pub fn unblock(&self) {
-        self.runstate.store(RunState::Runnable);
+    ///
+    /// Returns the previous runstate on success, and the current runstate on
+    /// error. Will only succed if the task is blocked or already runnable.
+    pub fn unblock(&self) -> Result<RunState, RunState> {
+        use RunState::{Blocked, Runnable};
+
+        if self.runstate.compare_exchange(Blocked, Runnable).is_ok() {
+            Ok(Blocked)
+        } else if self.runstate.compare_exchange(Runnable, Runnable).is_ok() {
+            warn!("Unblocked an already runnable task: {:?}\n\t --> Current {:?}",
+                self, get_my_current_task()
+            );
+            Ok(Runnable)
+        } else {
+            Err(self.runstate.load())
+        }
+    }
+
+    /// Makes this `Task` `Runnable` if it is a newly-spawned and fully initialized task.
+    ///
+    /// This is a special case only to be used when spawning a new task that
+    /// is ready to be scheduled in; it will fail for all other cases.
+    ///
+    /// Returns the previous runstate (i.e. `RunState::Initing`) on success, and
+    /// the current runstate on error.
+    pub fn make_inited_task_runnable(&self) -> Result<RunState, RunState> {
+        if self.runstate.compare_exchange(RunState::Initing, RunState::Runnable).is_ok() {
+            Ok(RunState::Initing)
+        } else {
+            Err(self.runstate.load())
+        }
     }
 
     /// Sets this `Task` as this core's current task.
