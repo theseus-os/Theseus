@@ -39,7 +39,10 @@ path = "../spawn"
 path = "../mouse"
 
 [dependencies.path]
-path = "../../kernel/path"
+path = "../path"
+
+[dependencies.dereffer]
+path = "../../libs/dereffer"
 
 [lib]
 crate-type = ["rlib"]

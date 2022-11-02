@@ -11,6 +11,8 @@
 //!
 
 #![no_std]
+#![feature(type_alias_impl_trait)]
+
 extern crate alloc;
 extern crate mpmc;
 extern crate event_types;
@@ -24,14 +26,14 @@ extern crate window_inner;
 extern crate window_manager;
 extern crate shapes;
 extern crate color;
-
-use core::ops::{Deref, DerefMut};
+extern crate dereffer;
 
 use alloc::sync::Arc;
+use dereffer::{DerefsTo, DerefsToMut};
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
 use framebuffer::{Framebuffer, AlphaPixel};
-use color::{Color};
+use color::Color;
 use shapes::{Coord, Rectangle};
 use spin::{Mutex, MutexGuard};
 use window_inner::{WindowInner, WindowMovingStatus, DEFAULT_BORDER_SIZE, DEFAULT_TITLE_BAR_HEIGHT};
@@ -356,12 +358,19 @@ impl Window {
 
     /// Returns an immutable reference to this window's virtual `Framebuffer`. 
     pub fn framebuffer(&self) -> FramebufferRef {
-        FramebufferRef { guard: self.inner.lock() }
+        FramebufferRef::new(
+            self.inner.lock(),
+            |guard| guard.framebuffer(),
+        )
     }
 
     /// Returns a mutable reference to this window's virtual `Framebuffer`. 
     pub fn framebuffer_mut(&mut self) -> FramebufferRefMut {
-        FramebufferRefMut { guard: self.inner.lock() }
+        FramebufferRefMut::new(
+            self.inner.lock(),
+            |guard| guard.framebuffer(),
+            |guard| guard.framebuffer_mut(),
+        )
     }
 
     /// Returns `true` if this window is the currently active window. 
@@ -508,30 +517,9 @@ impl Drop for Window{
 /// A wrapper around a locked inner window that immutably derefs to a `Framebuffer`.
 ///
 /// The lock is auto-released when this object is dropped.
-pub struct FramebufferRef<'g> {
-    guard: MutexGuard<'g, WindowInner>,
-}
-impl<'g> Deref for FramebufferRef<'g> {
-    type Target = Framebuffer<AlphaPixel>;
-    fn deref(&self) -> &Self::Target {
-        self.guard.framebuffer()
-    }
-}
+pub type FramebufferRef<'g> = DerefsTo<MutexGuard<'g, WindowInner>, Framebuffer<AlphaPixel>>;
 
 /// A wrapper around a locked inner window that mutably derefs to a `Framebuffer`.
 ///
 /// The lock is auto-released when this object is dropped.
-pub struct FramebufferRefMut<'g> {
-    guard: MutexGuard<'g, WindowInner>,
-}
-impl<'g> Deref for FramebufferRefMut<'g> {
-    type Target = Framebuffer<AlphaPixel>;
-    fn deref(&self) -> &Self::Target {
-        self.guard.framebuffer()
-    }
-}
-impl<'g> DerefMut for FramebufferRefMut<'g> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.guard.framebuffer_mut()
-    }
-}
+pub type FramebufferRefMut<'g> = DerefsToMut<MutexGuard<'g, WindowInner>, Framebuffer<AlphaPixel>>;
