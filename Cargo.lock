@@ -507,7 +507,7 @@ source = "git+https://github.com/rust-lang/stdsimd#0711e11593e7d3ce7cffdb7bd9665
 name = "cow_arc"
 version = "0.1.0"
 dependencies = [
- "owning_ref",
+ "dereffer",
  "spin 0.9.0",
 ]
 
