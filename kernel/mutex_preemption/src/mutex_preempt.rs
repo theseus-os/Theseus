@@ -1,8 +1,6 @@
 use core::{fmt, ops::{Deref, DerefMut}};
 use preemption::{PreemptionGuard, hold_preemption};
 use spin::{Mutex, MutexGuard};
-use stable_deref_trait::StableDeref;
-use owning_ref::{OwningRef, OwningRefMut};
 use lockable::{Lockable, LockableSized};
 
 /// A mutual exclusion wrapper based on [`spin::Mutex`] that ensures preemption
@@ -149,14 +147,6 @@ impl<'a, T: ?Sized> DerefMut for MutexPreemptGuard<'a, T> {
         &mut *(self.guard)
     }
 }
-
-// Implement the StableDeref trait for MutexPreempt guards, just like it's implemented for Mutex guards
-unsafe impl<'a, T: ?Sized> StableDeref for MutexPreemptGuard<'a, T> {}
-
-/// Typedef of a owning reference that uses a `MutexPreemptGuard` as the owner.
-pub type MutexPreemptGuardRef<'a, T, U = T> = OwningRef<MutexPreemptGuard<'a, T>, U>;
-/// Typedef of a mutable owning reference that uses a `MutexPreemptGuard` as the owner.
-pub type MutexPreemptGuardRefMut<'a, T, U = T> = OwningRefMut<MutexPreemptGuard<'a, T>, U>;
 
 /// Implement `Lockable` for [`MutexPreempt`].
 impl<'t, T> Lockable<'t, T> for MutexPreempt<T> where T: 't + ?Sized {

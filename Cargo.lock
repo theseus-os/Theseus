@@ -1950,10 +1950,8 @@ name = "mutex_preemption"
 version = "0.1.0"
 dependencies = [
  "lockable",
- "owning_ref",
  "preemption",
  "spin 0.9.0",
- "stable_deref_trait",
 ]
 
 [[package]]
@@ -1962,9 +1960,7 @@ version = "0.1.0"
 dependencies = [
  "lockable",
  "log",
- "owning_ref",
  "spin 0.9.0",
- "stable_deref_trait",
  "task",
  "wait_queue",
 ]
@@ -2162,7 +2158,7 @@ dependencies = [
 [[package]]
 name = "owning_ref"
 version = "0.4.1"
-source = "git+https://github.com/theseus-os/owning-ref-rs.git#0d2dcdcffd75b80157d0e72fb82593a8696a9c49"
+source = "git+https://github.com/theseus-os/owning-ref-rs#0d2dcdcffd75b80157d0e72fb82593a8696a9c49"
 dependencies = [
  "spin 0.9.0",
  "stable_deref_trait",

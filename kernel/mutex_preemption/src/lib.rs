@@ -1,4 +1,4 @@
-//! Offers preemption-safe `Mutex` and `RwLock` types that auto-disable/re-enabled preemption
+//! Offers preemption-safe `Mutex` and `RwLock` types that auto-disable/re-enable preemption
 //! on a per-CPU core basis.
 
 #![no_std]
