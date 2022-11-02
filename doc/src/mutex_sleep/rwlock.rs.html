@@ -328,22 +328,9 @@
 <span id="322">322</span>
 <span id="323">323</span>
 <span id="324">324</span>
-<span id="325">325</span>
-<span id="326">326</span>
-<span id="327">327</span>
-<span id="328">328</span>
-<span id="329">329</span>
-<span id="330">330</span>
-<span id="331">331</span>
-<span id="332">332</span>
-<span id="333">333</span>
-<span id="334">334</span>
-<span id="335">335</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">core::fmt</span>;
 <span class="kw">use</span> <span class="ident">core::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
 <span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">RwLock</span>, <span class="ident">RwLockReadGuard</span>, <span class="ident">RwLockWriteGuard</span>};
-<span class="kw">use</span> <span class="ident">owning_ref</span>::{<span class="ident">OwningRef</span>, <span class="ident">OwningRefMut</span>};
-<span class="kw">use</span> <span class="ident">stable_deref_trait::StableDeref</span>;
 <span class="kw">use</span> <span class="ident">wait_queue::WaitQueue</span>;
 <span class="kw">use</span> <span class="ident">lockable</span>::{<span class="ident">Lockable</span>, <span class="ident">LockableSized</span>};
 
@@ -646,15 +633,6 @@
         <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">notify_one</span>();
     }
 }
-
-<span class="comment">// Implement the StableDeref trait for RwLockSleep guards, just like it&#39;s implemented for RwLock guards</span>
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">StableDeref</span> <span class="kw">for</span> <span class="ident">RwLockSleepReadGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span> {}
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">StableDeref</span> <span class="kw">for</span> <span class="ident">RwLockSleepWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span> {}
-
-<span class="doccomment">/// Typedef of a owning reference that uses a `RwLockSleepSafeReadGuard` as the owner.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">RwLockSleepReadGuardRef</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>, <span class="ident">U</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">OwningRef</span><span class="op">&lt;</span><span class="ident">RwLockSleepReadGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">U</span><span class="op">&gt;</span>;
-<span class="doccomment">/// Typedef of a mutable owning reference that uses a `RwLockSleepWriteGuard` as the owner.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">RwLockSleepWriteGuardRefMut</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>, <span class="ident">U</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">OwningRefMut</span><span class="op">&lt;</span><span class="ident">RwLockSleepWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">U</span><span class="op">&gt;</span>;
 
 <span class="doccomment">/// Implement `Lockable` for [`RwLockSleep`].</span>
 <span class="doccomment">/// Because [`RwLockSleep::read()`] and [`RwLockSleep::write()`] return `Result`s and may fail,</span>

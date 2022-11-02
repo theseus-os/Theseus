@@ -167,21 +167,9 @@
 <span id="161">161</span>
 <span id="162">162</span>
 <span id="163">163</span>
-<span id="164">164</span>
-<span id="165">165</span>
-<span id="166">166</span>
-<span id="167">167</span>
-<span id="168">168</span>
-<span id="169">169</span>
-<span id="170">170</span>
-<span id="171">171</span>
-<span id="172">172</span>
-<span id="173">173</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">core::fmt</span>;
 <span class="kw">use</span> <span class="ident">core::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
 <span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
-<span class="kw">use</span> <span class="ident">owning_ref</span>::{<span class="ident">OwningRef</span>, <span class="ident">OwningRefMut</span>};
-<span class="kw">use</span> <span class="ident">stable_deref_trait::StableDeref</span>;
 <span class="kw">use</span> <span class="ident">wait_queue::WaitQueue</span>;
 <span class="kw">use</span> <span class="ident">lockable</span>::{<span class="ident">Lockable</span>, <span class="ident">LockableSized</span>};
 
@@ -323,14 +311,6 @@
         <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">notify_one</span>();
     }
 }
-
-<span class="comment">// Implement the StableDeref trait for MutexSleep guards, just like it&#39;s implemented for Mutex guards</span>
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">StableDeref</span> <span class="kw">for</span> <span class="ident">MutexSleepGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span> {}
-
-<span class="doccomment">/// Typedef of a owning reference that uses a `MutexSleepGuard` as the owner.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">MutexSleepGuardRef</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>, <span class="ident">U</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">OwningRef</span><span class="op">&lt;</span><span class="ident">MutexSleepGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">U</span><span class="op">&gt;</span>;
-<span class="doccomment">/// Typedef of a mutable owning reference that uses a `MutexSleepGuard` as the owner.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">MutexSleepGuardRefMut</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>, <span class="ident">U</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">OwningRefMut</span><span class="op">&lt;</span><span class="ident">MutexSleepGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">U</span><span class="op">&gt;</span>;
 
 <span class="doccomment">/// Implement `Lockable` for [`MutexSleep`].</span>
 <span class="doccomment">/// Because [`MutexSleep::lock()`] returns a `Result` and may fail,</span>
