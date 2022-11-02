@@ -3,8 +3,9 @@
 //!
 //! These types can be used as a purely-safe alternative to replace some of the
 //! typical use cases for self-referential types.
-//! They can also be used to limit access to and visibility of an inner type
-//! by acting as wrappers that restrict callers to only accessing their deref target type.
+//! They can also be used to limit access to and visibility of an inner type by
+//! acting as wrappers that restrict callers to only accessing its `Deref::Target` type,
+//! which we call `Ref` in this crate.
 
 #![no_std]
 #![feature(const_mut_refs)]
@@ -13,10 +14,10 @@ use core::ops::{Deref, DerefMut};
 
 /// A struct that holds an inner value and a function
 /// that is used deref the `Inner` value into a `&Ref`.
-/// 
+///
 /// As with [`Deref`], the dereffer function must not fail.
 /// It typically just accesses an arbitrary field reachable from `Inner`.
-/// 
+///
 /// This is also useful to prevent a caller from accessing all of `Inner`,
 /// rather only giving them access to `Ref`.
 pub struct DerefsTo<Inner, Ref>
@@ -49,9 +50,8 @@ where
     }
 }
 
-
 /// Similar to [`DerefsTo`], but supports mutable dereferencing too.
-/// 
+///
 /// Because Ruse doesn't offer a way to abstract over mutability,
 /// i.e., accept both `&T` and `&mut T`, this struct must handle the
 /// `Deref` and `DerefMut` cases separately with individual functions.
@@ -71,7 +71,10 @@ where
         deref_func: fn(&Inner) -> &Ref,
         deref_mut_func: fn(&mut Inner) -> &mut Ref,
     ) -> Self {
-        Self { inner: DerefsTo::new(inner, deref_func), deref_mut_func }
+        Self {
+            inner: DerefsTo::new(inner, deref_func),
+            deref_mut_func,
+        }
     }
 }
 impl<Inner, Ref> Deref for DerefsToMut<Inner, Ref>
