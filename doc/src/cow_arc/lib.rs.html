@@ -200,11 +200,11 @@
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">owning_ref</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">dereffer</span>;
 
 <span class="kw">use</span> <span class="ident">alloc::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Weak</span>};
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">owning_ref</span>::{<span class="ident">MutexGuardRef</span>, <span class="ident">MutexGuardRefMut</span>};
+<span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
+<span class="kw">use</span> <span class="ident">dereffer</span>::{<span class="ident">DerefsTo</span>, <span class="ident">DerefsToMut</span>};
 
 <span class="doccomment">/// A special form of an `Arc` reference that uses two nested `Arc`s to support a </span>
 <span class="doccomment">/// mechanism similar to copy-on-write or clone-on-write.</span>
@@ -255,8 +255,8 @@
     <span class="doccomment">/// regardless of whether the data is `Shared` or `Exclusive`.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// The returned value derefs to and can be used exactly like `&amp;T`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lock_as_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">MutexGuardRef</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">MutexGuardRef::new</span>(<span class="self">self</span>.<span class="ident">arc</span>.<span class="ident">inner_arc</span>.<span class="ident">lock</span>())
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lock_as_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">DerefsTo</span><span class="op">&lt;</span><span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="ident">DerefsTo::new_default</span>(<span class="self">self</span>.<span class="ident">arc</span>.<span class="ident">inner_arc</span>.<span class="ident">lock</span>())
     }
 
     <span class="doccomment">/// This attempts to acquire the lock on the inner `Mutex` wrapping the data `T`.</span>
@@ -267,8 +267,8 @@
     <span class="doccomment">/// regardless of whether the data is `Shared` or `Exclusive`.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// The returned value derefs to and can be used exactly like `&amp;T`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_lock_as_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MutexGuardRef</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">arc</span>.<span class="ident">inner_arc</span>.<span class="ident">try_lock</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">guard</span><span class="op">|</span> <span class="ident">MutexGuardRef::new</span>(<span class="ident">guard</span>))
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_lock_as_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DerefsTo</span><span class="op">&lt;</span><span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">arc</span>.<span class="ident">inner_arc</span>.<span class="ident">try_lock</span>().<span class="ident">map</span>(<span class="ident">DerefsTo::new_default</span>)
     }
 
     <span class="doccomment">/// This acquires the lock on the inner `Mutex` wrapping the data `T` if it succeeds,</span>
@@ -276,13 +276,13 @@
     <span class="doccomment">/// only a single strong reference to the inner `Arc` is held.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// The returned value derefs to and can be used exactly like `&amp;mut T`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lock_as_mut</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MutexGuardRefMut</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lock_as_mut</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DerefsToMut</span><span class="op">&lt;</span><span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_shared</span>() {
             <span class="comment">// shared state, should not mutate </span>
             <span class="prelude-val">None</span>
         }
         <span class="kw">else</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">MutexGuardRefMut::new</span>(<span class="self">self</span>.<span class="ident">arc</span>.<span class="ident">inner_arc</span>.<span class="ident">lock</span>()))
+            <span class="prelude-val">Some</span>(<span class="ident">DerefsToMut::new_default</span>(<span class="self">self</span>.<span class="ident">arc</span>.<span class="ident">inner_arc</span>.<span class="ident">lock</span>()))
         }
     }
 
