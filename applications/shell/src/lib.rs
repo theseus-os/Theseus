@@ -683,8 +683,13 @@ impl Shell {
     /// all tasks that have already been spawned will be killed immeidately before returning error.
     fn eval_cmdline(&mut self) -> Result<Vec<JoinableTaskRef>, AppErr> {
 
-        let cmdline = self.cmdline.clone();
+        let cmdline = self.cmdline.trim().to_string();
         let mut task_refs = Vec::new();
+
+        // If the command line is empty or starts with '|', return 'AppErr'
+        if cmdline.is_empty() || cmdline.starts_with('|') {
+            return Err(AppErr::NotFound(cmdline))
+        }
 
         for single_task_cmd in cmdline.split('|') {
             let mut args: Vec<String> = single_task_cmd.split_whitespace().map(|s| s.to_string()).collect();
@@ -793,7 +798,15 @@ impl Shell {
             },
             Err(err) => {
                 let err_msg = match err {
-                    AppErr::NotFound(command) => format!("{:?} command not found.\n", command),
+                    AppErr::NotFound(command) => {
+                        // No need to return err if command is empty
+                        if command.trim().is_empty() {
+                            String::new()
+                        }
+                        else {
+                            format!("{:?} command not found.\n", command)
+                        }
+                    },
                     AppErr::NamespaceErr      => format!("Failed to find directory of application executables.\n"),
                     AppErr::SpawnErr(e)       => format!("Failed to spawn new task to run command. Error: {}.\n", e),
                 };
