@@ -47,7 +47,7 @@ impl Interface {
     /// Transmit and receive any packets queued in the given `sockets`.
     ///
     /// Returns a boolean value indicating whether any packets were processed or
-    /// emitted, and thus, whether the readiness af any socket might have
+    /// emitted, and thus, whether the readiness of any socket might have
     /// changed.
     pub fn poll(&self, sockets: &mut SocketSet) -> Result<bool> {
         let mut wrapper = DeviceWrapper {
