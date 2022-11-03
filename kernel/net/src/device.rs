@@ -16,8 +16,12 @@ const STANDARD_MTU: usize = 1500;
 /// Devices implementing this trait can then be registered using
 /// [`register_device`].
 ///
+/// Users should not interact with this trait directly, but [`NetworkInterface`]
+/// instead.
+///
 /// [`register_device`]: crate::register_device
-pub trait Device: Send + Sync + Any {
+/// [`NetworkInterface`]: crate::NetworkInterface.
+pub trait NetworkDevice: Send + Sync + Any {
     fn send(&mut self, buf: &[u8]) -> core::result::Result<(), crate::Error>;
 
     fn receive(&mut self) -> Option<ReceivedFrame>;
@@ -41,7 +45,7 @@ pub trait Device: Send + Sync + Any {
 /// error[E0210]: type parameter `T` must be used as the type parameter for some local type (e.g., `MyStruct<T>`)
 /// ```
 pub(crate) struct DeviceWrapper<'a> {
-    pub(crate) inner: &'a mut dyn Device,
+    pub(crate) inner: &'a mut dyn NetworkDevice,
 }
 
 impl<'a, 'b> phy::Device<'a> for DeviceWrapper<'b> {
@@ -92,7 +96,7 @@ impl phy::RxToken for RxToken {
 
 /// The transmit token.
 pub(crate) struct TxToken<'a> {
-    device: &'a mut dyn Device,
+    device: &'a mut dyn NetworkDevice,
 }
 
 impl<'a> phy::TxToken for TxToken<'a> {

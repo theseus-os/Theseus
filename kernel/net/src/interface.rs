@@ -1,4 +1,4 @@
-use crate::{device::DeviceWrapper, Device, Result};
+use crate::{device::DeviceWrapper, NetworkDevice, Result};
 use alloc::{collections::BTreeMap, sync::Arc};
 use irq_safety::MutexIrqSafe;
 use smoltcp::{iface, phy::DeviceCapabilities, wire};
@@ -6,17 +6,21 @@ use smoltcp::{iface, phy::DeviceCapabilities, wire};
 pub use smoltcp::iface::SocketSet;
 pub use wire::{IpAddress, IpCidr};
 
+/// A network interface.
+///
+/// This is a wrapper around a network device which provides higher level
+/// abstractions such as polling sockets.
 #[derive(Clone)]
-pub struct Interface {
+pub struct NetworkInterface {
     // FIXME: Can this be a regular mutex?
     inner: Arc<MutexIrqSafe<iface::Interface<'static>>>,
-    device: &'static MutexIrqSafe<dyn crate::Device>,
+    device: &'static MutexIrqSafe<dyn crate::NetworkDevice>,
 }
 
-impl Interface {
+impl NetworkInterface {
     pub(crate) fn new<T>(device: &'static MutexIrqSafe<T>, ip: IpCidr, gateway: IpAddress) -> Self
     where
-        T: Device,
+        T: NetworkDevice,
     {
         let hardware_addr = wire::EthernetAddress(device.lock().mac_address()).into();
 

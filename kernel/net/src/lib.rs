@@ -11,9 +11,9 @@ mod device;
 mod error;
 mod interface;
 
-pub use device::{Device, DeviceCapabilities};
+pub use device::{DeviceCapabilities, NetworkDevice};
 pub use error::{Error, Result};
-pub use interface::{Interface, IpAddress, IpCidr, SocketSet};
+pub use interface::{IpAddress, IpCidr, NetworkInterface, SocketSet};
 pub use smoltcp::{phy, socket, time::Instant, wire};
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
@@ -28,7 +28,7 @@ const DEFAULT_GATEWAY_IP: IpAddress = IpAddress::Ipv4(Ipv4Address::new(10, 0, 2,
 
 // TODO: Make mutex rwlock?
 // TODO: Use atomic append-only vec?
-static NETWORK_INTERFACES: Mutex<Vec<Interface>> = Mutex::new(Vec::new());
+static NETWORK_INTERFACES: Mutex<Vec<NetworkInterface>> = Mutex::new(Vec::new());
 
 /// Registers a network device.
 ///
@@ -36,9 +36,9 @@ static NETWORK_INTERFACES: Mutex<Vec<Interface>> = Mutex::new(Vec::new());
 /// accessible using [`get_interface`].
 pub fn register_device<T>(device: &'static MutexIrqSafe<T>)
 where
-    T: 'static + Device + Send,
+    T: 'static + NetworkDevice + Send,
 {
-    let interface = Interface::new(
+    let interface = NetworkInterface::new(
         device,
         // TODO: use DHCP to acquire an IP address and gateway.
         DEFAULT_LOCAL_IP.parse().unwrap(),
@@ -49,13 +49,11 @@ where
 }
 
 /// Returns a list of available interfaces behind a mutex.
-pub fn get_interfaces() -> &'static Mutex<Vec<Interface>> {
+pub fn get_interfaces() -> &'static Mutex<Vec<NetworkInterface>> {
     &NETWORK_INTERFACES
 }
 
-/// Gets the interface with the specified `index`.
-///
-/// If `index` is `None` the first interface is returned.
-pub fn get_default_interface() -> Option<Interface> {
+/// Gets the first available interface.
+pub fn get_default_interface() -> Option<NetworkInterface> {
     NETWORK_INTERFACES.lock().get(0).cloned()
 }

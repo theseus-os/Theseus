@@ -422,7 +422,7 @@ impl E1000Nic {
     }
 }
 
-impl net::Device for E1000Nic {
+impl net::NetworkDevice for E1000Nic {
     fn send(&mut self, buf: &[u8]) -> net::Result<()> {
         // TODO: This is just a workaround to make the new API work with the old machinery.
         let mut transmit_buffer = TransmitBuffer::new(buf.len() as u16).map_err(|_| net::Error::Exhausted)?;
