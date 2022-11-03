@@ -153,11 +153,6 @@ impl Window {
             window.show_button(TopButton::Hide, 1, &mut inner);
         }
 
-        let _window_bounding_box = Rectangle {
-            top_left: coordinate,
-            bottom_right: coordinate + (width as isize, height as isize)
-        };
-
         let mut wm = wm_ref.lock();
         wm.set_active(&window.inner, false)?; 
 

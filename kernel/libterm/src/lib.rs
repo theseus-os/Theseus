@@ -428,6 +428,7 @@ impl Terminal {
             let wm = wm_ref.lock();
             wm.get_screen_size()
         };
+
         let window = window::Window::new(
             Coord::new(0, 0), 
             window_width, 
@@ -439,11 +440,11 @@ impl Terminal {
         let text_display = TextDisplay::new(area.width(), area.height(), FONT_FOREGROUND_COLOR, FONT_BACKGROUND_COLOR)?;
 
         let mut terminal = Terminal {
-            window: window,
+            window,
             scrollback_buffer: String::new(),
             scroll_start_idx: 0,
             is_scroll_end: true,
-            text_display: text_display,
+            text_display,
             cursor: Cursor::default(),
         };
         terminal.display_text()?;
