@@ -826,8 +826,6 @@
 <span id="820">820</span>
 <span id="821">821</span>
 <span id="822">822</span>
-<span id="823">823</span>
-<span id="824">824</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate acts as a manager of a list of windows. It defines a `WindowManager` structure and an instance of it. </span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! A window manager holds a set of `WindowInner` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.</span>
@@ -1449,35 +1447,33 @@
 
 <span class="doccomment">/// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>, <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">final_framebuffer</span>: <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">AlphaPixel</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">framebuffer::init</span>()<span class="question-mark">?</span>;
-    <span class="kw">let</span> (<span class="ident">width</span>, <span class="ident">height</span>) <span class="op">=</span> <span class="ident">final_framebuffer</span>.<span class="ident">get_size</span>();
+    <span class="kw">let</span> <span class="ident">final_fb</span>: <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">AlphaPixel</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">framebuffer::init</span>()<span class="question-mark">?</span>;
+    <span class="kw">let</span> (<span class="ident">width</span>, <span class="ident">height</span>) <span class="op">=</span> <span class="ident">final_fb</span>.<span class="ident">get_size</span>();
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bottom_framebuffer</span> <span class="op">=</span> <span class="ident">Framebuffer::new</span>(<span class="ident">width</span>, <span class="ident">height</span>, <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">top_framebuffer</span> <span class="op">=</span> <span class="ident">Framebuffer::new</span>(<span class="ident">width</span>, <span class="ident">height</span>, <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> (<span class="ident">screen_width</span>, <span class="ident">screen_height</span>) <span class="op">=</span> <span class="ident">bottom_framebuffer</span>.<span class="ident">get_size</span>();
-    <span class="ident">bottom_framebuffer</span>.<span class="ident">fill</span>(<span class="ident">color::LIGHT_GRAY</span>.<span class="ident">into</span>());
-    <span class="ident">top_framebuffer</span>.<span class="ident">fill</span>(<span class="ident">color::TRANSPARENT</span>.<span class="ident">into</span>()); 
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bottom_fb</span> <span class="op">=</span> <span class="ident">Framebuffer::new</span>(<span class="ident">width</span>, <span class="ident">height</span>, <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">top_fb</span> <span class="op">=</span> <span class="ident">Framebuffer::new</span>(<span class="ident">width</span>, <span class="ident">height</span>, <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
+    <span class="kw">let</span> (<span class="ident">screen_width</span>, <span class="ident">screen_height</span>) <span class="op">=</span> <span class="ident">bottom_fb</span>.<span class="ident">get_size</span>();
+    <span class="ident">bottom_fb</span>.<span class="ident">fill</span>(<span class="ident">color::LIGHT_GRAY</span>.<span class="ident">into</span>());
+    <span class="ident">top_fb</span>.<span class="ident">fill</span>(<span class="ident">color::TRANSPARENT</span>.<span class="ident">into</span>()); 
 
-    <span class="comment">// the mouse starts in the center of the screen.</span>
-    <span class="kw">let</span> <span class="ident">center</span> <span class="op">=</span> <span class="ident">Coord</span> {
+    <span class="comment">// Initial position for the mouse</span>
+    <span class="kw">let</span> <span class="ident">mouse</span> <span class="op">=</span> <span class="ident">Coord</span> {
         <span class="ident">x</span>: <span class="ident">screen_width</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">/</span> <span class="number">2</span>,
         <span class="ident">y</span>: <span class="ident">screen_height</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">/</span> <span class="number">2</span>,
     }; 
 
-    <span class="comment">// initialize static window manager</span>
+    <span class="comment">// Initialize static window manager</span>
     <span class="kw">let</span> <span class="ident">window_manager</span> <span class="op">=</span> <span class="ident">WindowManager</span> {
         <span class="ident">hide_list</span>: <span class="ident">VecDeque::new</span>(),
         <span class="ident">show_list</span>: <span class="ident">VecDeque::new</span>(),
         <span class="ident">active</span>: <span class="ident">Weak::new</span>(),
-        <span class="ident">mouse</span>: <span class="ident">center</span>,
+        <span class="ident">mouse</span>,
         <span class="ident">repositioned_border</span>: <span class="prelude-val">None</span>,
-        <span class="ident">bottom_fb</span>: <span class="ident">bottom_framebuffer</span>,
-        <span class="ident">top_fb</span>: <span class="ident">top_framebuffer</span>,
-        <span class="ident">final_fb</span>: <span class="ident">final_framebuffer</span>,
+        <span class="ident">bottom_fb</span>,
+        <span class="ident">top_fb</span>,
+        <span class="ident">final_fb</span>,
     };
-    <span class="kw">let</span> <span class="ident">_wm</span> <span class="op">=</span> <span class="ident">WINDOW_MANAGER</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Mutex::new</span>(<span class="ident">window_manager</span>));
-
-    <span class="comment">// wm.refresh_bottom_windows(None, false)?;</span>
+    <span class="ident">WINDOW_MANAGER</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Mutex::new</span>(<span class="ident">window_manager</span>));
 
     <span class="comment">// keyinput queue initialization</span>
     <span class="kw">let</span> <span class="ident">key_consumer</span>: <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Queue::with_capacity</span>(<span class="number">100</span>);

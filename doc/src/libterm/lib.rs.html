@@ -664,6 +664,7 @@
 <span id="658">658</span>
 <span id="659">659</span>
 <span id="660">660</span>
+<span id="661">661</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A basic terminal emulator library.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The terminal has several main responsibilities: </span>
@@ -1094,6 +1095,7 @@
             <span class="kw">let</span> <span class="ident">wm</span> <span class="op">=</span> <span class="ident">wm_ref</span>.<span class="ident">lock</span>();
             <span class="ident">wm</span>.<span class="ident">get_screen_size</span>()
         };
+
         <span class="kw">let</span> <span class="ident">window</span> <span class="op">=</span> <span class="ident">window::Window::new</span>(
             <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>), 
             <span class="ident">window_width</span>, 
@@ -1105,11 +1107,11 @@
         <span class="kw">let</span> <span class="ident">text_display</span> <span class="op">=</span> <span class="ident">TextDisplay::new</span>(<span class="ident">area</span>.<span class="ident">width</span>(), <span class="ident">area</span>.<span class="ident">height</span>(), <span class="ident">FONT_FOREGROUND_COLOR</span>, <span class="ident">FONT_BACKGROUND_COLOR</span>)<span class="question-mark">?</span>;
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">terminal</span> <span class="op">=</span> <span class="ident">Terminal</span> {
-            <span class="ident">window</span>: <span class="ident">window</span>,
+            <span class="ident">window</span>,
             <span class="ident">scrollback_buffer</span>: <span class="ident">String::new</span>(),
             <span class="ident">scroll_start_idx</span>: <span class="number">0</span>,
             <span class="ident">is_scroll_end</span>: <span class="bool-val">true</span>,
-            <span class="ident">text_display</span>: <span class="ident">text_display</span>,
+            <span class="ident">text_display</span>,
             <span class="ident">cursor</span>: <span class="ident">Cursor::default</span>(),
         };
         <span class="ident">terminal</span>.<span class="ident">display_text</span>()<span class="question-mark">?</span>;

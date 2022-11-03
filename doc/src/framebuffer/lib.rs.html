@@ -321,7 +321,7 @@
         <span class="ident">Pixel::composite_buffer</span>(<span class="ident">src</span>, <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">buffer_mut</span>()[<span class="ident">index</span>..<span class="ident">dest_end</span>]);
     }
 
-    <span class="doccomment">/// Draw a pixel at the given 1coordinate1. </span>
+    <span class="doccomment">/// Draw a pixel at the given coordinate. </span>
     <span class="doccomment">/// The `pixel` will be blended with the existing pixel value</span>
     <span class="doccomment">/// at that `coordinate` in this framebuffer.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">draw_pixel</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">coordinate</span>: <span class="ident">Coord</span>, <span class="ident">pixel</span>: <span class="ident">P</span>) {
