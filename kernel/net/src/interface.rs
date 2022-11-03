@@ -44,8 +44,7 @@ impl Interface {
         Self { inner, device }
     }
 
-    /// Transmit packets queued in the given sockets, and receive queued
-    /// packets.
+    /// Transmit and receive any packets queued in the given `sockets`.
     ///
     /// Returns a boolean value indicating whether any packets were processed or
     /// emitted, and thus, whether the readiness af any socket might have
