@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/exceptions_early/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../exceptions_early/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../exceptions_early/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../exceptions_early/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/exceptions_early/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../exceptions_early/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -259,261 +253,260 @@
 <span id="253">253</span>
 <span id="254">254</span>
 <span id="255">255</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Early exception handlers that do nothing but print an error and hang.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Early exception handlers that do nothing but print an error and hang.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">abi_x86_interrupt</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(abi_x86_interrupt)]
 
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">x86_64</span>::{
-    <span class="ident">structures</span>::{
-        <span class="ident">idt</span>::{<span class="ident">InterruptStackFrame</span>, <span class="ident">PageFaultErrorCode</span>},
-        <span class="ident">tss::TaskStateSegment</span>,
+</span><span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>x86_64::{
+    structures::{
+        idt::{InterruptStackFrame, PageFaultErrorCode},
+        tss::TaskStateSegment,
     },
-    <span class="ident">instructions</span>::{
-        <span class="ident">segmentation</span>::{<span class="ident">CS</span>, <span class="ident">DS</span>, <span class="ident">SS</span>, <span class="ident">Segment</span>}, 
-        <span class="ident">tables::load_tss</span>,
+    instructions::{
+        segmentation::{CS, DS, SS, Segment}, 
+        tables::load_tss,
     },
 };
-<span class="kw">use</span> <span class="ident">locked_idt::LockedIdt</span>;
-<span class="kw">use</span> <span class="ident">gdt</span>::{<span class="ident">Gdt</span>, <span class="ident">create_gdt</span>};
-<span class="kw">use</span> <span class="ident">vga_buffer</span>::{<span class="ident">print_raw</span>, <span class="ident">println_raw</span>};
+<span class="kw">use </span>locked_idt::LockedIdt;
+<span class="kw">use </span>gdt::{Gdt, create_gdt};
+<span class="kw">use </span>vga_buffer::{print_raw, println_raw};
 
-<span class="doccomment">/// An initial Interrupt Descriptor Table (IDT) with only very simple CPU exceptions handlers.</span>
-<span class="doccomment">/// This is no longer used after interrupts are set up properly, it&#39;s just a failsafe.</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">EARLY_IDT</span>: <span class="ident">LockedIdt</span> <span class="op">=</span> <span class="ident">LockedIdt::new</span>();
+<span class="doccomment">/// An initial Interrupt Descriptor Table (IDT) with only very simple CPU exceptions handlers.
+/// This is no longer used after interrupts are set up properly, it&#39;s just a failsafe.
+</span><span class="kw">pub static </span>EARLY_IDT: LockedIdt = LockedIdt::new();
 
-<span class="doccomment">/// The initial GDT structure for the BSP (the first CPU to boot),</span>
-<span class="doccomment">/// which is only really used for the purpose of setting up a special</span>
-<span class="doccomment">/// interrupt stack to support gracefully handling early double faults. </span>
-<span class="kw">static</span> <span class="ident">EARLY_GDT</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Gdt</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">Gdt::new</span>());
+<span class="doccomment">/// The initial GDT structure for the BSP (the first CPU to boot),
+/// which is only really used for the purpose of setting up a special
+/// interrupt stack to support gracefully handling early double faults. 
+</span><span class="kw">static </span>EARLY_GDT: Mutex&lt;Gdt&gt; = Mutex::new(Gdt::new());
 
-<span class="doccomment">/// The initial TSS structure for the BSP (the first CPU to boot),</span>
-<span class="doccomment">/// which is only really used for the purpose of setting up a special</span>
-<span class="doccomment">/// interrupt stack to support gracefully handling early double faults. </span>
-<span class="kw">static</span> <span class="ident">EARLY_TSS</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">TaskStateSegment</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">TaskStateSegment::new</span>());
+<span class="doccomment">/// The initial TSS structure for the BSP (the first CPU to boot),
+/// which is only really used for the purpose of setting up a special
+/// interrupt stack to support gracefully handling early double faults. 
+</span><span class="kw">static </span>EARLY_TSS: Mutex&lt;TaskStateSegment&gt; = Mutex::new(TaskStateSegment::new());
 
-<span class="doccomment">/// Initializes an early IDT with a basic set of early exception handlers</span>
-<span class="doccomment">/// that print out basic information when an exception occurs, mostly for debugging.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// If a double fault stack address is specified, a new TSS and GDT</span>
-<span class="doccomment">/// will be created and set up such that the processor will jump to </span>
-<span class="doccomment">/// that stack upon a double fault.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">double_fault_stack_top_unusable</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">memory::VirtualAddress</span><span class="op">&gt;</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;exceptions_early(): double_fault_stack_top_unusable: {:X?}&quot;</span>, <span class="ident">double_fault_stack_top_unusable</span>);
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">df_stack_top</span>) <span class="op">=</span> <span class="ident">double_fault_stack_top_unusable</span> {
-        <span class="comment">// Create and load an initial TSS and GDT so we can handle early exceptions such as double faults. </span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tss</span> <span class="op">=</span> <span class="ident">TaskStateSegment::new</span>();
-        <span class="ident">tss</span>.<span class="ident">interrupt_stack_table</span>[<span class="ident">tss::DOUBLE_FAULT_IST_INDEX</span>] <span class="op">=</span> <span class="ident">x86_64::VirtAddr::new</span>(<span class="ident">df_stack_top</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
-        <span class="macro">println_raw!</span>(<span class="string">&quot;exceptions_early(): Created TSS: {:?}&quot;</span>, <span class="ident">tss</span>);
-        <span class="kw-2">*</span><span class="ident">EARLY_TSS</span>.<span class="ident">lock</span>() <span class="op">=</span> <span class="ident">tss</span>;
+<span class="doccomment">/// Initializes an early IDT with a basic set of early exception handlers
+/// that print out basic information when an exception occurs, mostly for debugging.
+///
+/// If a double fault stack address is specified, a new TSS and GDT
+/// will be created and set up such that the processor will jump to 
+/// that stack upon a double fault.
+</span><span class="kw">pub fn </span>init(double_fault_stack_top_unusable: <span class="prelude-ty">Option</span>&lt;memory::VirtualAddress&gt;) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;exceptions_early(): double_fault_stack_top_unusable: {:X?}&quot;</span>, double_fault_stack_top_unusable);
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(df_stack_top) = double_fault_stack_top_unusable {
+        <span class="comment">// Create and load an initial TSS and GDT so we can handle early exceptions such as double faults. 
+        </span><span class="kw">let </span><span class="kw-2">mut </span>tss = TaskStateSegment::new();
+        tss.interrupt_stack_table[tss::DOUBLE_FAULT_IST_INDEX] = x86_64::VirtAddr::new(df_stack_top.value() <span class="kw">as </span>u64);
+        <span class="macro">println_raw!</span>(<span class="string">&quot;exceptions_early(): Created TSS: {:?}&quot;</span>, tss);
+        <span class="kw-2">*</span>EARLY_TSS.lock() = tss;
         
-        <span class="kw">let</span> (<span class="ident">gdt</span>, <span class="ident">kernel_cs</span>, <span class="ident">kernel_ds</span>, <span class="ident">_user_cs_32</span>, <span class="ident">_user_ds_32</span>, <span class="ident">_user_cs_64</span>, <span class="ident">_user_ds_64</span>, <span class="ident">tss_segment</span>) <span class="op">=</span> <span class="ident">create_gdt</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">EARLY_TSS</span>.<span class="ident">lock</span>());
-        <span class="kw-2">*</span><span class="ident">EARLY_GDT</span>.<span class="ident">lock</span>() <span class="op">=</span> <span class="ident">gdt</span>;
-        <span class="ident">EARLY_GDT</span>.<span class="ident">lock</span>().<span class="ident">load</span>();
+        <span class="kw">let </span>(gdt, kernel_cs, kernel_ds, _user_cs_32, _user_ds_32, _user_cs_64, _user_ds_64, tss_segment) = create_gdt(<span class="kw-2">&amp;*</span>EARLY_TSS.lock());
+        <span class="kw-2">*</span>EARLY_GDT.lock() = gdt;
+        EARLY_GDT.lock().load();
 
-        <span class="kw">unsafe</span> {
-            <span class="ident">CS::set_reg</span>(<span class="ident">kernel_cs</span>);          <span class="comment">// reload code segment register</span>
-            <span class="ident">load_tss</span>(<span class="ident">tss_segment</span>);           <span class="comment">// load TSS</span>
-            <span class="ident">SS::set_reg</span>(<span class="ident">kernel_ds</span>.<span class="ident">clone</span>());  <span class="comment">// unsure if necessary, but doesn&#39;t hurt</span>
-            <span class="ident">DS::set_reg</span>(<span class="ident">kernel_ds</span>);          <span class="comment">// unsure if necessary, but doesn&#39;t hurt</span>
-        }
+        <span class="kw">unsafe </span>{
+            CS::set_reg(kernel_cs);          <span class="comment">// reload code segment register
+            </span>load_tss(tss_segment);           <span class="comment">// load TSS
+            </span>SS::set_reg(kernel_ds.clone());  <span class="comment">// unsure if necessary, but doesn&#39;t hurt
+            </span>DS::set_reg(kernel_ds);          <span class="comment">// unsure if necessary, but doesn&#39;t hurt
+        </span>}
     }
 
     { 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">idt</span> <span class="op">=</span> <span class="ident">EARLY_IDT</span>.<span class="ident">lock</span>(); <span class="comment">// withholds interrupts</span>
+        <span class="kw">let </span><span class="kw-2">mut </span>idt = EARLY_IDT.lock(); <span class="comment">// withholds interrupts
 
-        <span class="comment">// SET UP FIXED EXCEPTION HANDLERS</span>
-        <span class="ident">idt</span>.<span class="ident">divide_error</span>.<span class="ident">set_handler_fn</span>(<span class="ident">divide_error_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">debug</span>.<span class="ident">set_handler_fn</span>(<span class="ident">debug_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">non_maskable_interrupt</span>.<span class="ident">set_handler_fn</span>(<span class="ident">nmi_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">breakpoint</span>.<span class="ident">set_handler_fn</span>(<span class="ident">breakpoint_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">overflow</span>.<span class="ident">set_handler_fn</span>(<span class="ident">overflow_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">bound_range_exceeded</span>.<span class="ident">set_handler_fn</span>(<span class="ident">bound_range_exceeded_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">invalid_opcode</span>.<span class="ident">set_handler_fn</span>(<span class="ident">invalid_opcode_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">device_not_available</span>.<span class="ident">set_handler_fn</span>(<span class="ident">device_not_available_handler</span>);
-        <span class="kw">let</span> <span class="ident">double_fault_idt_entry_options</span> <span class="op">=</span> <span class="ident">idt</span>.<span class="ident">double_fault</span>.<span class="ident">set_handler_fn</span>(<span class="ident">double_fault_handler</span>);
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">_df_stack_top</span>) <span class="op">=</span> <span class="ident">double_fault_stack_top_unusable</span> {
-            <span class="comment">// SAFE: we set up the required TSS index at the top of this function.</span>
-            <span class="kw">unsafe</span> {
-                <span class="ident">double_fault_idt_entry_options</span>.<span class="ident">set_stack_index</span>(<span class="ident">tss::DOUBLE_FAULT_IST_INDEX</span> <span class="kw">as</span> <span class="ident">u16</span>);
+        // SET UP FIXED EXCEPTION HANDLERS
+        </span>idt.divide_error.set_handler_fn(divide_error_handler);
+        idt.debug.set_handler_fn(debug_handler);
+        idt.non_maskable_interrupt.set_handler_fn(nmi_handler);
+        idt.breakpoint.set_handler_fn(breakpoint_handler);
+        idt.overflow.set_handler_fn(overflow_handler);
+        idt.bound_range_exceeded.set_handler_fn(bound_range_exceeded_handler);
+        idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
+        idt.device_not_available.set_handler_fn(device_not_available_handler);
+        <span class="kw">let </span>double_fault_idt_entry_options = idt.double_fault.set_handler_fn(double_fault_handler);
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(_df_stack_top) = double_fault_stack_top_unusable {
+            <span class="comment">// SAFE: we set up the required TSS index at the top of this function.
+            </span><span class="kw">unsafe </span>{
+                double_fault_idt_entry_options.set_stack_index(tss::DOUBLE_FAULT_IST_INDEX <span class="kw">as </span>u16);
             }
         }
 
-        <span class="comment">// reserved: 0x09 coprocessor segment overrun exception</span>
-        <span class="ident">idt</span>.<span class="ident">invalid_tss</span>.<span class="ident">set_handler_fn</span>(<span class="ident">invalid_tss_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">segment_not_present</span>.<span class="ident">set_handler_fn</span>(<span class="ident">segment_not_present_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">stack_segment_fault</span>.<span class="ident">set_handler_fn</span>(<span class="ident">stack_segment_fault_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">general_protection_fault</span>.<span class="ident">set_handler_fn</span>(<span class="ident">general_protection_fault_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">page_fault</span>.<span class="ident">set_handler_fn</span>(<span class="ident">early_page_fault_handler</span>);
-        <span class="comment">// reserved: 0x0F</span>
-        <span class="ident">idt</span>.<span class="ident">x87_floating_point</span>.<span class="ident">set_handler_fn</span>(<span class="ident">x87_floating_point_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">alignment_check</span>.<span class="ident">set_handler_fn</span>(<span class="ident">alignment_check_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">machine_check</span>.<span class="ident">set_handler_fn</span>(<span class="ident">machine_check_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">simd_floating_point</span>.<span class="ident">set_handler_fn</span>(<span class="ident">simd_floating_point_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">virtualization</span>.<span class="ident">set_handler_fn</span>(<span class="ident">virtualization_handler</span>);
-        <span class="comment">// reserved: 0x15 - 0x1C</span>
-        <span class="ident">idt</span>.<span class="ident">vmm_communication_exception</span>.<span class="ident">set_handler_fn</span>(<span class="ident">vmm_communication_exception_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">security_exception</span>.<span class="ident">set_handler_fn</span>(<span class="ident">security_exception_handler</span>);
-        <span class="comment">// reserved: 0x1F</span>
-    }
+        <span class="comment">// reserved: 0x09 coprocessor segment overrun exception
+        </span>idt.invalid_tss.set_handler_fn(invalid_tss_handler);
+        idt.segment_not_present.set_handler_fn(segment_not_present_handler);
+        idt.stack_segment_fault.set_handler_fn(stack_segment_fault_handler);
+        idt.general_protection_fault.set_handler_fn(general_protection_fault_handler);
+        idt.page_fault.set_handler_fn(early_page_fault_handler);
+        <span class="comment">// reserved: 0x0F
+        </span>idt.x87_floating_point.set_handler_fn(x87_floating_point_handler);
+        idt.alignment_check.set_handler_fn(alignment_check_handler);
+        idt.machine_check.set_handler_fn(machine_check_handler);
+        idt.simd_floating_point.set_handler_fn(simd_floating_point_handler);
+        idt.virtualization.set_handler_fn(virtualization_handler);
+        <span class="comment">// reserved: 0x15 - 0x1C
+        </span>idt.vmm_communication_exception.set_handler_fn(vmm_communication_exception_handler);
+        idt.security_exception.set_handler_fn(security_exception_handler);
+        <span class="comment">// reserved: 0x1F
+    </span>}
 
-    <span class="ident">EARLY_IDT</span>.<span class="ident">load</span>();
+    EARLY_IDT.load();
 }
 
 
-<span class="doccomment">/// exception 0x00</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">divide_error_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DIVIDE ERROR\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
-    <span class="kw">loop</span> {}
+<span class="doccomment">/// exception 0x00
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>divide_error_handler(stack_frame: InterruptStackFrame) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DIVIDE ERROR\n{:#X?}&quot;</span>, stack_frame);
+    <span class="kw">loop </span>{}
 }
 
-<span class="doccomment">/// exception 0x01</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">debug_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DEBUG EXCEPTION\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
-    <span class="comment">// don&#39;t halt here, this isn&#39;t a fatal/permanent failure, just a brief pause.</span>
+<span class="doccomment">/// exception 0x01
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>debug_handler(stack_frame: InterruptStackFrame) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DEBUG EXCEPTION\n{:#X?}&quot;</span>, stack_frame);
+    <span class="comment">// don&#39;t halt here, this isn&#39;t a fatal/permanent failure, just a brief pause.
+</span>}
+
+<span class="doccomment">/// exception 0x02
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>nmi_handler(stack_frame: InterruptStackFrame) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): NON-MASKABLE INTERRUPT\n{:#X?}&quot;</span>, stack_frame);
+    <span class="kw">loop </span>{ }
 }
 
-<span class="doccomment">/// exception 0x02</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">nmi_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): NON-MASKABLE INTERRUPT\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
-    <span class="kw">loop</span> { }
+<span class="doccomment">/// exception 0x03
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>breakpoint_handler(stack_frame: InterruptStackFrame) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): BREAKPOINT\n{:#X?}&quot;</span>, stack_frame);
+    <span class="comment">// don&#39;t halt here, this isn&#39;t a fatal/permanent failure, just a brief pause.
+</span>}
+
+<span class="doccomment">/// exception 0x04
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>overflow_handler(stack_frame: InterruptStackFrame) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): OVERFLOW\n{:#X?}&quot;</span>, stack_frame);
+    <span class="kw">loop </span>{ }
 }
 
-<span class="doccomment">/// exception 0x03</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">breakpoint_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): BREAKPOINT\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
-    <span class="comment">// don&#39;t halt here, this isn&#39;t a fatal/permanent failure, just a brief pause.</span>
+<span class="doccomment">/// exception 0x05
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>bound_range_exceeded_handler(stack_frame: InterruptStackFrame) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): BOUND RANGE EXCEEDED\n{:#X?}&quot;</span>, stack_frame);
+    <span class="kw">loop </span>{ }
 }
 
-<span class="doccomment">/// exception 0x04</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">overflow_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): OVERFLOW\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
-    <span class="kw">loop</span> { }
+<span class="doccomment">/// exception 0x06
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>invalid_opcode_handler(stack_frame: InterruptStackFrame) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): INVALID OPCODE\n{:#X?}&quot;</span>, stack_frame);
+    <span class="kw">loop </span>{}
 }
 
-<span class="doccomment">/// exception 0x05</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">bound_range_exceeded_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): BOUND RANGE EXCEEDED\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
-    <span class="kw">loop</span> { }
+<span class="doccomment">/// exception 0x07
+/// 
+/// For more information about &quot;spurious interrupts&quot;, 
+/// see [here](http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason).
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>device_not_available_handler(stack_frame: InterruptStackFrame) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DEVICE NOT AVAILABLE\n{:#X?}&quot;</span>, stack_frame);
+    <span class="kw">loop </span>{}
 }
 
-<span class="doccomment">/// exception 0x06</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">invalid_opcode_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): INVALID OPCODE\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
-    <span class="kw">loop</span> {}
-}
-
-<span class="doccomment">/// exception 0x07</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// For more information about &quot;spurious interrupts&quot;, </span>
-<span class="doccomment">/// see [here](http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason).</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">device_not_available_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DEVICE NOT AVAILABLE\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
-    <span class="kw">loop</span> {}
-}
-
-<span class="doccomment">/// exception 0x08</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Note: this is `pub` so we can access it within `interrupts::init()`.</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">double_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) -&gt; <span class="op">!</span> {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DOUBLE FAULT\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
+<span class="doccomment">/// exception 0x08
+/// 
+/// Note: this is `pub` so we can access it within `interrupts::init()`.
+</span><span class="kw">pub extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>double_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) -&gt; ! {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DOUBLE FAULT\n{:#X?}\nError code: {:#b}&quot;</span>, stack_frame, error_code);
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nNote: this may be caused by stack overflow. Is the size of the initial_bsp_stack is too small?&quot;</span>);
-    <span class="kw">loop</span> {}
+    <span class="kw">loop </span>{}
 }
 
-<span class="doccomment">/// exception 0x0A</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">invalid_tss_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): INVALID TSS\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
-    <span class="kw">loop</span> {}
+<span class="doccomment">/// exception 0x0A
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>invalid_tss_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): INVALID TSS\n{:#X?}\nError code: {:#b}&quot;</span>, stack_frame, error_code);
+    <span class="kw">loop </span>{}
 }
 
-<span class="doccomment">/// exception 0x0B</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">segment_not_present_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): SEGMENT NOT PRESENT\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
-    <span class="kw">loop</span> {}
+<span class="doccomment">/// exception 0x0B
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>segment_not_present_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): SEGMENT NOT PRESENT\n{:#X?}\nError code: {:#b}&quot;</span>, stack_frame, error_code);
+    <span class="kw">loop </span>{}
 }
 
-<span class="doccomment">/// exception 0x0C</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">stack_segment_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): STACK SEGMENT FAULT\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
-    <span class="kw">loop</span> {}
+<span class="doccomment">/// exception 0x0C
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>stack_segment_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): STACK SEGMENT FAULT\n{:#X?}\nError code: {:#b}&quot;</span>, stack_frame, error_code);
+    <span class="kw">loop </span>{}
 }
 
-<span class="doccomment">/// exception 0x0D</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">general_protection_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): GENERAL PROTECTION FAULT\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
-    <span class="kw">loop</span> {}
+<span class="doccomment">/// exception 0x0D
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>general_protection_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): GENERAL PROTECTION FAULT\n{:#X?}\nError code: {:#b}&quot;</span>, stack_frame, error_code);
+    <span class="kw">loop </span>{}
 }
 
-<span class="doccomment">/// exception 0x0E</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">early_page_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">PageFaultErrorCode</span>) {
-    <span class="kw">let</span> <span class="ident">accessed_address</span> <span class="op">=</span> <span class="ident">x86_64::registers::control::Cr2::read_raw</span>();
+<span class="doccomment">/// exception 0x0E
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>early_page_fault_handler(stack_frame: InterruptStackFrame, error_code: PageFaultErrorCode) {
+    <span class="kw">let </span>accessed_address = x86_64::registers::control::Cr2::read_raw();
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): PAGE FAULT (early handler) while accessing {:#x}\n\
         error code: {:?}\n{:#X?}&quot;</span>,
-        <span class="ident">accessed_address</span>,
-        <span class="ident">error_code</span>,
-        <span class="ident">stack_frame</span>
+        accessed_address,
+        error_code,
+        stack_frame
     );
 
     <span class="macro">println_raw!</span>(<span class="string">&quot;Exception IP {:#X} is at {:?}&quot;</span>, 
-        <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>, 
-        <span class="ident">mod_mgmt::get_initial_kernel_namespace</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">ns</span><span class="op">|</span> <span class="ident">ns</span>.<span class="ident">get_section_containing_address</span>(
-            <span class="ident">memory::VirtualAddress::new_canonical</span>(<span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>),
-            <span class="bool-val">false</span> <span class="comment">// only look at .text sections, not all other types</span>
-        )),
+        stack_frame.instruction_pointer, 
+        mod_mgmt::get_initial_kernel_namespace().and_then(|ns| ns.get_section_containing_address(
+            memory::VirtualAddress::new_canonical(stack_frame.instruction_pointer.as_u64() <span class="kw">as </span>usize),
+            <span class="bool-val">false </span><span class="comment">// only look at .text sections, not all other types
+        </span>)),
     );
     <span class="macro">println_raw!</span>(<span class="string">&quot;Faulted access address {:#X} is at {:?}&quot;</span>,
-        <span class="ident">accessed_address</span>,
-        <span class="ident">mod_mgmt::get_initial_kernel_namespace</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">ns</span><span class="op">|</span> <span class="ident">ns</span>.<span class="ident">get_section_containing_address</span>(
-            <span class="ident">memory::VirtualAddress::new_canonical</span>(<span class="ident">accessed_address</span> <span class="kw">as</span> <span class="ident">usize</span>),
-            <span class="bool-val">true</span>, <span class="comment">// look at all sections (.data/.bss/.rodata), not just .text</span>
-        )),
+        accessed_address,
+        mod_mgmt::get_initial_kernel_namespace().and_then(|ns| ns.get_section_containing_address(
+            memory::VirtualAddress::new_canonical(accessed_address <span class="kw">as </span>usize),
+            <span class="bool-val">true</span>, <span class="comment">// look at all sections (.data/.bss/.rodata), not just .text
+        </span>)),
     );
-    <span class="kw">loop</span> {}
+    <span class="kw">loop </span>{}
 }
 
-<span class="doccomment">/// exception 0x10</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">x87_floating_point_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): x87 FLOATING POINT\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
-    <span class="kw">loop</span> {}
+<span class="doccomment">/// exception 0x10
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>x87_floating_point_handler(stack_frame: InterruptStackFrame) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): x87 FLOATING POINT\n{:#X?}&quot;</span>, stack_frame);
+    <span class="kw">loop </span>{}
 }
 
-<span class="doccomment">/// exception 0x11</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">alignment_check_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): ALIGNMENT CHECK\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
-    <span class="kw">loop</span> {}
+<span class="doccomment">/// exception 0x11
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>alignment_check_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): ALIGNMENT CHECK\n{:#X?}\nError code: {:#b}&quot;</span>, stack_frame, error_code);
+    <span class="kw">loop </span>{}
 }
 
-<span class="doccomment">/// exception 0x12</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">machine_check_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) -&gt; <span class="op">!</span> {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): MACHINE CHECK\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
-    <span class="kw">loop</span> {}
+<span class="doccomment">/// exception 0x12
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>machine_check_handler(stack_frame: InterruptStackFrame) -&gt; ! {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): MACHINE CHECK\n{:#X?}&quot;</span>, stack_frame);
+    <span class="kw">loop </span>{}
 }
 
-<span class="doccomment">/// exception 0x13</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">simd_floating_point_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): SIMD FLOATING POINT\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
-    <span class="kw">loop</span> {}
+<span class="doccomment">/// exception 0x13
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>simd_floating_point_handler(stack_frame: InterruptStackFrame) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): SIMD FLOATING POINT\n{:#X?}&quot;</span>, stack_frame);
+    <span class="kw">loop </span>{}
 }
 
-<span class="doccomment">/// exception 0x14</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">virtualization_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): VIRTUALIZATION\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
-    <span class="kw">loop</span> {}
+<span class="doccomment">/// exception 0x14
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>virtualization_handler(stack_frame: InterruptStackFrame) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): VIRTUALIZATION\n{:#X?}&quot;</span>, stack_frame);
+    <span class="kw">loop </span>{}
 }
 
-<span class="doccomment">/// exception 0x1D</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">vmm_communication_exception_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): VMM COMMUNICATION EXCEPTION\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
-    <span class="kw">loop</span> {}
+<span class="doccomment">/// exception 0x1D
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>vmm_communication_exception_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): VMM COMMUNICATION EXCEPTION\n{:#X?}\nError code: {:#b}&quot;</span>, stack_frame, error_code);
+    <span class="kw">loop </span>{}
 }
 
-<span class="doccomment">/// exception 0x1E</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">security_exception_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): SECURITY EXCEPTION\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
-    <span class="kw">loop</span> {}
+<span class="doccomment">/// exception 0x1E
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>security_exception_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): SECURITY EXCEPTION\n{:#X?}\nError code: {:#b}&quot;</span>, stack_frame, error_code);
+    <span class="kw">loop </span>{}
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="exceptions_early" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="exceptions_early" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

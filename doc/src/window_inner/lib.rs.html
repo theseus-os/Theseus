@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/window_inner/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../window_inner/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../window_inner/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../window_inner/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/window_inner/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../window_inner/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -188,190 +182,189 @@
 <span id="182">182</span>
 <span id="183">183</span>
 <span id="184">184</span>
-</pre><pre class="rust"><code><span class="doccomment">//! The `WindowInner` struct is the internal representation of a `Window` used by the window manager. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! In comparison, the `Window` struct is application-facing, meaning it is used by (owned by)</span>
-<span class="doccomment">//! and exposed directly to applications or tasks that wish to display content. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! The `WindowInner` in the window_manager-facing version of the `Window`, </span>
-<span class="doccomment">//! and each `Window` contains a reference to its `WindowInner`. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! The window manager typically holds `Weak` references to a `WindowInner` struct,</span>
-<span class="doccomment">//! which allows it to control the window itself and handle non-application-related components of the window,</span>
-<span class="doccomment">//! such as the title bar, border, etc. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! It also allows the window manager to control the window, e.g., move, hide, show, or resize it</span>
-<span class="doccomment">//! in a way that applications may not be able to do.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! The `WindowInner` struct is the internal representation of a `Window` used by the window manager. 
+//! 
+//! In comparison, the `Window` struct is application-facing, meaning it is used by (owned by)
+//! and exposed directly to applications or tasks that wish to display content. 
+//! 
+//! The `WindowInner` in the window_manager-facing version of the `Window`, 
+//! and each `Window` contains a reference to its `WindowInner`. 
+//! 
+//! The window manager typically holds `Weak` references to a `WindowInner` struct,
+//! which allows it to control the window itself and handle non-application-related components of the window,
+//! such as the title bar, border, etc. 
+//! 
+//! It also allows the window manager to control the window, e.g., move, hide, show, or resize it
+//! in a way that applications may not be able to do.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mpmc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">event_types</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">framebuffer</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">shapes</span>;
+</span><span class="kw">extern crate </span>mpmc;
+<span class="kw">extern crate </span>event_types;
+<span class="kw">extern crate </span>framebuffer;
+<span class="kw">extern crate </span>shapes;
 
-<span class="kw">use</span> <span class="ident">mpmc::Queue</span>;
-<span class="kw">use</span> <span class="ident">event_types</span>::{<span class="ident">Event</span>};
-<span class="kw">use</span> <span class="ident">framebuffer</span>::{<span class="ident">Framebuffer</span>, <span class="ident">AlphaPixel</span>};
-<span class="kw">use</span> <span class="ident">shapes</span>::{<span class="ident">Coord</span>, <span class="ident">Rectangle</span>};
-
-
-<span class="comment">// The title bar height, in number of pixels</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFAULT_TITLE_BAR_HEIGHT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">16</span>;
-<span class="comment">// left, right, bottom border size, in number of pixels</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFAULT_BORDER_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">2</span>;
+<span class="kw">use </span>mpmc::Queue;
+<span class="kw">use </span>event_types::{Event};
+<span class="kw">use </span>framebuffer::{Framebuffer, AlphaPixel};
+<span class="kw">use </span>shapes::{Coord, Rectangle};
 
 
-<span class="doccomment">/// Whether a window is moving (being dragged by the mouse).</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">WindowMovingStatus</span> {
-    <span class="doccomment">/// The window is not in motion.</span>
-    <span class="ident">Stationary</span>,
-    <span class="doccomment">/// The window is currently in motion. </span>
-    <span class="doccomment">/// The enclosed `Coord` represents the initial position of the window before it started moving.</span>
-    <span class="ident">Moving</span>(<span class="ident">Coord</span>),
+<span class="comment">// The title bar height, in number of pixels
+</span><span class="kw">pub const </span>DEFAULT_TITLE_BAR_HEIGHT: usize = <span class="number">16</span>;
+<span class="comment">// left, right, bottom border size, in number of pixels
+</span><span class="kw">pub const </span>DEFAULT_BORDER_SIZE: usize = <span class="number">2</span>;
+
+
+<span class="doccomment">/// Whether a window is moving (being dragged by the mouse).
+</span><span class="kw">pub enum </span>WindowMovingStatus {
+    <span class="doccomment">/// The window is not in motion.
+    </span>Stationary,
+    <span class="doccomment">/// The window is currently in motion. 
+    /// The enclosed `Coord` represents the initial position of the window before it started moving.
+    </span>Moving(Coord),
 }
 
-<span class="doccomment">/// The `WindowInner` struct is the internal system-facing representation of a window. </span>
-<span class="doccomment">/// Its members and functions describe the size, state, and events related to window handling,</span>
-<span class="doccomment">/// including elements like:</span>
-<span class="doccomment">/// * The underlying virtual framebuffer to which the window is rendered,</span>
-<span class="doccomment">/// * THe location and dimensions of the window in the final screen, </span>
-<span class="doccomment">/// * The window&#39;s title bar, buttons, and borders, </span>
-<span class="doccomment">/// * Queues for events that have been received by this window, and more. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// The window manager directly interacts with instances of `WindowInner` rather than `Window`,</span>
-<span class="doccomment">/// and the application tasks should not have direct access to this struct for correctness reasons.</span>
-<span class="doccomment">/// See the crate-level documentation for more details about how to use this</span>
-<span class="doccomment">/// and how it differs from `Window`.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WindowInner</span> {
-    <span class="doccomment">/// The position of the top-left corner of the window,</span>
-    <span class="doccomment">/// expressed relative to the top-left corner of the screen.</span>
-    <span class="ident">coordinate</span>: <span class="ident">Coord</span>,
-    <span class="doccomment">/// The width of the border in pixels.</span>
-    <span class="doccomment">/// By default, there is a border on the left, right, and bottom edges of the window.</span>
-    <span class="kw">pub</span> <span class="ident">border_size</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// The height of title bar in pixels.</span>
-    <span class="doccomment">/// By default, there is one title bar at the top edge of the window.</span>
-    <span class="kw">pub</span> <span class="ident">title_bar_height</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// The producer side of this window&#39;s event queue. </span>
-    <span class="doccomment">/// Entities that want to send events to this window (or the application that owns this window) </span>
-    <span class="doccomment">/// should push events onto this queue.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// The corresponding consumer for this event queue is found in the `Window` struct</span>
-    <span class="doccomment">/// that created and owns this `WindowInner` instance.</span>
-    <span class="ident">event_producer</span>: <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>, <span class="comment">// event output used by window manager</span>
-    <span class="doccomment">/// The virtual framebuffer that is used exclusively for rendering only this window.</span>
-    <span class="ident">framebuffer</span>: <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">AlphaPixel</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Whether a window is moving or stationary.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// TODO: FIXME (kevinaboos): this should be private, and window moving logic should be moved into this crate.</span>
-    <span class="kw">pub</span> <span class="ident">moving</span>: <span class="ident">WindowMovingStatus</span>,
+<span class="doccomment">/// The `WindowInner` struct is the internal system-facing representation of a window. 
+/// Its members and functions describe the size, state, and events related to window handling,
+/// including elements like:
+/// * The underlying virtual framebuffer to which the window is rendered,
+/// * THe location and dimensions of the window in the final screen, 
+/// * The window&#39;s title bar, buttons, and borders, 
+/// * Queues for events that have been received by this window, and more. 
+/// 
+/// The window manager directly interacts with instances of `WindowInner` rather than `Window`,
+/// and the application tasks should not have direct access to this struct for correctness reasons.
+/// See the crate-level documentation for more details about how to use this
+/// and how it differs from `Window`.
+</span><span class="kw">pub struct </span>WindowInner {
+    <span class="doccomment">/// The position of the top-left corner of the window,
+    /// expressed relative to the top-left corner of the screen.
+    </span>coordinate: Coord,
+    <span class="doccomment">/// The width of the border in pixels.
+    /// By default, there is a border on the left, right, and bottom edges of the window.
+    </span><span class="kw">pub </span>border_size: usize,
+    <span class="doccomment">/// The height of title bar in pixels.
+    /// By default, there is one title bar at the top edge of the window.
+    </span><span class="kw">pub </span>title_bar_height: usize,
+    <span class="doccomment">/// The producer side of this window&#39;s event queue. 
+    /// Entities that want to send events to this window (or the application that owns this window) 
+    /// should push events onto this queue.
+    /// 
+    /// The corresponding consumer for this event queue is found in the `Window` struct
+    /// that created and owns this `WindowInner` instance.
+    </span>event_producer: Queue&lt;Event&gt;, <span class="comment">// event output used by window manager
+    </span><span class="doccomment">/// The virtual framebuffer that is used exclusively for rendering only this window.
+    </span>framebuffer: Framebuffer&lt;AlphaPixel&gt;,
+    <span class="doccomment">/// Whether a window is moving or stationary.
+    /// 
+    /// TODO: FIXME (kevinaboos): this should be private, and window moving logic should be moved into this crate.
+    </span><span class="kw">pub </span>moving: WindowMovingStatus,
 }
 
-<span class="kw">impl</span> <span class="ident">WindowInner</span> {
-    <span class="doccomment">/// Creates a new `WindowInner` object backed by the given `framebuffer`</span>
-    <span class="doccomment">/// and that will be rendered at the given `coordinate` relative to the screen.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">coordinate</span>: <span class="ident">Coord</span>,
-        <span class="ident">framebuffer</span>: <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">AlphaPixel</span><span class="op">&gt;</span>,
-        <span class="ident">event_producer</span>: <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">WindowInner</span> {
-        <span class="ident">WindowInner</span> {
-            <span class="ident">coordinate</span>,
-            <span class="ident">border_size</span>: <span class="ident">DEFAULT_BORDER_SIZE</span>,
-            <span class="ident">title_bar_height</span>: <span class="ident">DEFAULT_TITLE_BAR_HEIGHT</span>,
-            <span class="ident">event_producer</span>,
-            <span class="ident">framebuffer</span>,
-            <span class="ident">moving</span>: <span class="ident">WindowMovingStatus::Stationary</span>,
+<span class="kw">impl </span>WindowInner {
+    <span class="doccomment">/// Creates a new `WindowInner` object backed by the given `framebuffer`
+    /// and that will be rendered at the given `coordinate` relative to the screen.
+    </span><span class="kw">pub fn </span>new(
+        coordinate: Coord,
+        framebuffer: Framebuffer&lt;AlphaPixel&gt;,
+        event_producer: Queue&lt;Event&gt;,
+    ) -&gt; WindowInner {
+        WindowInner {
+            coordinate,
+            border_size: DEFAULT_BORDER_SIZE,
+            title_bar_height: DEFAULT_TITLE_BAR_HEIGHT,
+            event_producer,
+            framebuffer,
+            moving: WindowMovingStatus::Stationary,
         }
     }
 
-    <span class="doccomment">/// Returns `true` if the given `coordinate` (relative to the top-left corner of this window)</span>
-    <span class="doccomment">/// is within the bounds of this window.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">coordinate</span>: <span class="ident">Coord</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">framebuffer</span>.<span class="ident">contains</span>(<span class="ident">coordinate</span>)
+    <span class="doccomment">/// Returns `true` if the given `coordinate` (relative to the top-left corner of this window)
+    /// is within the bounds of this window.
+    </span><span class="kw">pub fn </span>contains(<span class="kw-2">&amp;</span><span class="self">self</span>, coordinate: Coord) -&gt; bool {
+        <span class="self">self</span>.framebuffer.contains(coordinate)
     }
 
-    <span class="doccomment">/// Gets the size of a window in pixels</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (<span class="ident">usize</span>, <span class="ident">usize</span>) {
-        <span class="self">self</span>.<span class="ident">framebuffer</span>.<span class="ident">get_size</span>()
+    <span class="doccomment">/// Gets the size of a window in pixels
+    </span><span class="kw">pub fn </span>get_size(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (usize, usize) {
+        <span class="self">self</span>.framebuffer.get_size()
     }
 
-    <span class="doccomment">/// Gets the top-left position of the window relative to the top-left of the screen</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_position</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Coord</span> {
-        <span class="self">self</span>.<span class="ident">coordinate</span>
+    <span class="doccomment">/// Gets the top-left position of the window relative to the top-left of the screen
+    </span><span class="kw">pub fn </span>get_position(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Coord {
+        <span class="self">self</span>.coordinate
     }
 
-    <span class="doccomment">/// Sets the top-left position of the window relative to the top-left of the screen</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_position</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">coordinate</span>: <span class="ident">Coord</span>) {
-        <span class="self">self</span>.<span class="ident">coordinate</span> <span class="op">=</span> <span class="ident">coordinate</span>;
+    <span class="doccomment">/// Sets the top-left position of the window relative to the top-left of the screen
+    </span><span class="kw">pub fn </span>set_position(<span class="kw-2">&amp;mut </span><span class="self">self</span>, coordinate: Coord) {
+        <span class="self">self</span>.coordinate = coordinate;
     }
 
-    <span class="doccomment">/// Returns an immutable reference to this window&#39;s virtual Framebuffer. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">framebuffer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">AlphaPixel</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">framebuffer</span>
+    <span class="doccomment">/// Returns an immutable reference to this window&#39;s virtual Framebuffer. 
+    </span><span class="kw">pub fn </span>framebuffer(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Framebuffer&lt;AlphaPixel&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.framebuffer
     }
 
-    <span class="doccomment">/// Returns a mutable reference to this window&#39;s virtual Framebuffer. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">framebuffer_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">AlphaPixel</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">framebuffer</span>
+    <span class="doccomment">/// Returns a mutable reference to this window&#39;s virtual Framebuffer. 
+    </span><span class="kw">pub fn </span>framebuffer_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>Framebuffer&lt;AlphaPixel&gt; {
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>.framebuffer
     }
 
-    <span class="doccomment">/// Returns the pixel value at the given `coordinate`,</span>
-    <span class="doccomment">/// if the `coordinate` is within the window&#39;s bounds.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_pixel</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">coordinate</span>: <span class="ident">Coord</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AlphaPixel</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">framebuffer</span>.<span class="ident">get_pixel</span>(<span class="ident">coordinate</span>)
+    <span class="doccomment">/// Returns the pixel value at the given `coordinate`,
+    /// if the `coordinate` is within the window&#39;s bounds.
+    </span><span class="kw">pub fn </span>get_pixel(<span class="kw-2">&amp;</span><span class="self">self</span>, coordinate: Coord) -&gt; <span class="prelude-ty">Option</span>&lt;AlphaPixel&gt; {
+        <span class="self">self</span>.framebuffer.get_pixel(coordinate)
     }
 
-    <span class="doccomment">/// Returns the size of the Window border in pixels. </span>
-    <span class="doccomment">/// There is a border drawn on the left, right, and bottom edges.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_border_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">border_size</span>
+    <span class="doccomment">/// Returns the size of the Window border in pixels. 
+    /// There is a border drawn on the left, right, and bottom edges.
+    </span><span class="kw">pub fn </span>get_border_size(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.border_size
     }
 
-    <span class="doccomment">/// Returns the size of the Window title bar in pixels. </span>
-    <span class="doccomment">/// There is a title bar drawn on the top edge of the Window.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_title_bar_height</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">title_bar_height</span>
+    <span class="doccomment">/// Returns the size of the Window title bar in pixels. 
+    /// There is a title bar drawn on the top edge of the Window.
+    </span><span class="kw">pub fn </span>get_title_bar_height(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.title_bar_height
     }
 
-    <span class="doccomment">/// Returns the position and dimensions of the Window&#39;s content region,</span>
-    <span class="doccomment">/// i.e., the area within the window excluding the title bar and border.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// The returned `Rectangle` is expressed relative to this Window&#39;s position.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">content_area</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Rectangle</span> {
-        <span class="kw">let</span> (<span class="ident">window_width</span>, <span class="ident">window_height</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_size</span>();
-        <span class="comment">// There is one title bar on top, and a border on the left, right, and bottom</span>
-        <span class="kw">let</span> <span class="ident">top_left</span> <span class="op">=</span> <span class="ident">Coord::new</span>(<span class="self">self</span>.<span class="ident">border_size</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="self">self</span>.<span class="ident">title_bar_height</span> <span class="kw">as</span> <span class="ident">isize</span>);
-        <span class="kw">let</span> <span class="ident">bottom_right</span> <span class="op">=</span> <span class="ident">Coord::new</span>((<span class="ident">window_width</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">border_size</span>) <span class="kw">as</span> <span class="ident">isize</span>, (<span class="ident">window_height</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">border_size</span>) <span class="kw">as</span> <span class="ident">isize</span>);
-        <span class="ident">Rectangle</span> { <span class="ident">top_left</span>, <span class="ident">bottom_right</span> }
+    <span class="doccomment">/// Returns the position and dimensions of the Window&#39;s content region,
+    /// i.e., the area within the window excluding the title bar and border.
+    /// 
+    /// The returned `Rectangle` is expressed relative to this Window&#39;s position.
+    </span><span class="kw">pub fn </span>content_area(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Rectangle {
+        <span class="kw">let </span>(window_width, window_height) = <span class="self">self</span>.get_size();
+        <span class="comment">// There is one title bar on top, and a border on the left, right, and bottom
+        </span><span class="kw">let </span>top_left = Coord::new(<span class="self">self</span>.border_size <span class="kw">as </span>isize, <span class="self">self</span>.title_bar_height <span class="kw">as </span>isize);
+        <span class="kw">let </span>bottom_right = Coord::new((window_width - <span class="self">self</span>.border_size) <span class="kw">as </span>isize, (window_height - <span class="self">self</span>.border_size) <span class="kw">as </span>isize);
+        Rectangle { top_left, bottom_right }
     }
 
-    <span class="doccomment">/// Resizes and moves this window to fit the given `Rectangle` that describes its new position. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">resize</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">new_position</span>: <span class="ident">Rectangle</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// First, perform the actual resize of the inner window</span>
-        <span class="self">self</span>.<span class="ident">coordinate</span> <span class="op">=</span> <span class="ident">new_position</span>.<span class="ident">top_left</span>;
-        <span class="self">self</span>.<span class="ident">framebuffer</span> <span class="op">=</span> <span class="ident">Framebuffer::new</span>(<span class="ident">new_position</span>.<span class="ident">width</span>(), <span class="ident">new_position</span>.<span class="ident">height</span>(), <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
+    <span class="doccomment">/// Resizes and moves this window to fit the given `Rectangle` that describes its new position. 
+    </span><span class="kw">pub fn </span>resize(<span class="kw-2">&amp;mut </span><span class="self">self</span>, new_position: Rectangle) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// First, perform the actual resize of the inner window
+        </span><span class="self">self</span>.coordinate = new_position.top_left;
+        <span class="self">self</span>.framebuffer = Framebuffer::new(new_position.width(), new_position.height(), <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
 
-        <span class="comment">// Second, send a resize event to that application window (the `Window` object) </span>
-        <span class="comment">// so it knows to refresh its display.</span>
-        <span class="comment">// Rather than send the total size of the whole window, </span>
-        <span class="comment">// we instead send the size and position of the inner content area of the window. </span>
-        <span class="comment">// This prevents the application from thinking it can render over the area</span>
-        <span class="comment">// that contains this window&#39;s title bar or border.</span>
-        <span class="self">self</span>.<span class="ident">send_event</span>(<span class="ident">Event::new_window_resize_event</span>(<span class="self">self</span>.<span class="ident">content_area</span>()))
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;Failed to enqueue the resize event; window event queue was full.&quot;</span>)<span class="question-mark">?</span>;
+        <span class="comment">// Second, send a resize event to that application window (the `Window` object) 
+        // so it knows to refresh its display.
+        // Rather than send the total size of the whole window, 
+        // we instead send the size and position of the inner content area of the window. 
+        // This prevents the application from thinking it can render over the area
+        // that contains this window&#39;s title bar or border.
+        </span><span class="self">self</span>.send_event(Event::new_window_resize_event(<span class="self">self</span>.content_area()))
+            .map_err(|_e| <span class="string">&quot;Failed to enqueue the resize event; window event queue was full.&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Sends the given `event` to this window.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// If the event queue was full, `Err(event)` is returned.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">send_event</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">event</span>: <span class="ident">Event</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Event</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">event_producer</span>.<span class="ident">push</span>(<span class="ident">event</span>)
+    <span class="doccomment">/// Sends the given `event` to this window.
+    /// 
+    /// If the event queue was full, `Err(event)` is returned.
+    </span><span class="kw">pub fn </span>send_event(<span class="kw-2">&amp;</span><span class="self">self</span>, event: Event) -&gt; <span class="prelude-ty">Result</span>&lt;(), Event&gt; {
+        <span class="self">self</span>.event_producer.push(event)
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="window_inner" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="window_inner" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/memory/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../memory/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../memory/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../memory/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/memory/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../memory/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -271,273 +265,272 @@
 <span id="265">265</span>
 <span id="266">266</span>
 <span id="267">267</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem for Theseus,</span>
-<span class="doccomment">//! which is fairly robust and provides a unification between </span>
-<span class="doccomment">//! arbitrarily mapped sections of memory and Rust&#39;s lifetime system. </span>
-<span class="doccomment">//! Originally based on Phil Opp&#39;s blog_os. </span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem for Theseus,
+//! which is fairly robust and provides a unification between 
+//! arbitrarily mapped sections of memory and Rust&#39;s lifetime system. 
+//! Originally based on Phil Opp&#39;s blog_os. 
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">ptr_internals</span>)]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">unboxed_closures</span>)]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">result_option_inspect</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(ptr_internals)]
+#![feature(unboxed_closures)]
+#![feature(result_option_inspect)]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">multiboot2</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">atomic_linked_list</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">xmas_elf</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bit_field</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86_64&quot;</span>)]</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory_x86_64</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">x86_64</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory_structs</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">page_table_entry</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">page_allocator</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">frame_allocator</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">zerocopy</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">no_drop</span>;
+</span><span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>multiboot2;
+<span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>kernel_config;
+<span class="kw">extern crate </span>atomic_linked_list;
+<span class="kw">extern crate </span>xmas_elf;
+<span class="kw">extern crate </span>bit_field;
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+</span><span class="kw">extern crate </span>memory_x86_64;
+<span class="kw">extern crate </span>x86_64;
+<span class="kw">extern crate </span>memory_structs;
+<span class="kw">extern crate </span>page_table_entry;
+<span class="kw">extern crate </span>page_allocator;
+<span class="kw">extern crate </span>frame_allocator;
+<span class="kw">extern crate </span>zerocopy;
+<span class="kw">extern crate </span>no_drop;
 
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">mapper_spillful</span>))]</span>
-<span class="kw">mod</span> <span class="ident">paging</span>;
+<span class="attr">#[cfg(not(mapper_spillful))]
+</span><span class="kw">mod </span>paging;
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">mapper_spillful</span>)]</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">paging</span>;
+<span class="attr">#[cfg(mapper_spillful)]
+</span><span class="kw">pub mod </span>paging;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::paging</span>::{
-    <span class="ident">PageTable</span>, <span class="ident">Mapper</span>, <span class="ident">Mutability</span>, <span class="ident">Mutable</span>, <span class="ident">Immutable</span>,
-    <span class="ident">MappedPages</span>, <span class="ident">BorrowedMappedPages</span>, <span class="ident">BorrowedSliceMappedPages</span>,
+<span class="kw">pub use </span><span class="self">self</span>::paging::{
+    PageTable, Mapper, Mutability, Mutable, Immutable,
+    MappedPages, BorrowedMappedPages, BorrowedSliceMappedPages,
 };
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">memory_structs</span>::{<span class="ident">Frame</span>, <span class="ident">Page</span>, <span class="ident">FrameRange</span>, <span class="ident">PageRange</span>, <span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>};
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">page_allocator</span>::{<span class="ident">AllocatedPages</span>, <span class="ident">allocate_pages</span>, <span class="ident">allocate_pages_at</span>,
-    <span class="ident">allocate_pages_by_bytes</span>, <span class="ident">allocate_pages_by_bytes_at</span>};
+<span class="kw">pub use </span>memory_structs::{Frame, Page, FrameRange, PageRange, VirtualAddress, PhysicalAddress};
+<span class="kw">pub use </span>page_allocator::{AllocatedPages, allocate_pages, allocate_pages_at,
+    allocate_pages_by_bytes, allocate_pages_by_bytes_at};
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">frame_allocator</span>::{<span class="ident">AllocatedFrames</span>, <span class="ident">MemoryRegionType</span>, <span class="ident">PhysicalMemoryRegion</span>,
-    <span class="ident">allocate_frames_by_bytes_at</span>, <span class="ident">allocate_frames_by_bytes</span>, <span class="ident">allocate_frames_at</span>};
+<span class="kw">pub use </span>frame_allocator::{AllocatedFrames, MemoryRegionType, PhysicalMemoryRegion,
+    allocate_frames_by_bytes_at, allocate_frames_by_bytes, allocate_frames_at};
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86_64&quot;</span>)]</span>
-<span class="kw">use</span> <span class="ident">memory_x86_64</span>::{<span class="ident">BootInformation</span>, <span class="ident">get_kernel_address</span>, <span class="ident">get_boot_info_mem_area</span>, <span class="ident">find_section_memory_bounds</span>,
-    <span class="ident">get_vga_mem_addr</span>, <span class="ident">get_modules_address</span>, <span class="ident">tlb_flush_virt_addr</span>, <span class="ident">tlb_flush_all</span>, <span class="ident">get_p4</span>};
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+</span><span class="kw">use </span>memory_x86_64::{BootInformation, get_kernel_address, get_boot_info_mem_area, find_section_memory_bounds,
+    get_vga_mem_addr, get_modules_address, tlb_flush_virt_addr, tlb_flush_all, get_p4};
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86_64&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">memory_x86_64::EntryFlags</span>;<span class="comment">// Export EntryFlags so that others does not need to get access to memory_&lt;arch&gt;.</span>
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+</span><span class="kw">pub use </span>memory_x86_64::EntryFlags;<span class="comment">// Export EntryFlags so that others does not need to get access to memory_&lt;arch&gt;.
 
-<span class="kw">use</span> <span class="ident">spin::Once</span>;
-<span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">alloc::sync::Arc</span>;
-<span class="kw">use</span> <span class="ident">no_drop::NoDrop</span>;
-<span class="kw">use</span> <span class="ident">kernel_config::memory::KERNEL_OFFSET</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">kernel_config::memory::PAGE_SIZE</span>;
+</span><span class="kw">use </span>spin::Once;
+<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>alloc::sync::Arc;
+<span class="kw">use </span>no_drop::NoDrop;
+<span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
+<span class="kw">pub use </span>kernel_config::memory::PAGE_SIZE;
 
-<span class="doccomment">/// The memory management info and address space of the kernel</span>
-<span class="kw">static</span> <span class="ident">KERNEL_MMI</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">MmiRef</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+<span class="doccomment">/// The memory management info and address space of the kernel
+</span><span class="kw">static </span>KERNEL_MMI: Once&lt;MmiRef&gt; = Once::new();
 
-<span class="doccomment">/// A shareable reference to a `MemoryManagementInfo` struct wrapper in a lock.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">MmiRef</span> <span class="op">=</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">MemoryManagementInfo</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+<span class="doccomment">/// A shareable reference to a `MemoryManagementInfo` struct wrapper in a lock.
+</span><span class="kw">pub type </span>MmiRef = Arc&lt;MutexIrqSafe&lt;MemoryManagementInfo&gt;&gt;;
 
-<span class="doccomment">/// Returns a reference to the kernel&#39;s `MemoryManagementInfo`, if initialized.</span>
-<span class="doccomment">/// If not, it returns `None`.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_kernel_mmi_ref</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MmiRef</span><span class="op">&gt;</span> {
-    <span class="ident">KERNEL_MMI</span>.<span class="ident">get</span>()
+<span class="doccomment">/// Returns a reference to the kernel&#39;s `MemoryManagementInfo`, if initialized.
+/// If not, it returns `None`.
+</span><span class="kw">pub fn </span>get_kernel_mmi_ref() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MmiRef&gt; {
+    KERNEL_MMI.get()
 }
 
 
-<span class="doccomment">/// This holds all the information for a `Task`&#39;s memory mappings and address space</span>
-<span class="doccomment">/// (this is basically the equivalent of Linux&#39;s mm_struct)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MemoryManagementInfo</span> {
-    <span class="doccomment">/// the PageTable that should be switched to when this Task is switched to.</span>
-    <span class="kw">pub</span> <span class="ident">page_table</span>: <span class="ident">PageTable</span>,
+<span class="doccomment">/// This holds all the information for a `Task`&#39;s memory mappings and address space
+/// (this is basically the equivalent of Linux&#39;s mm_struct)
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>MemoryManagementInfo {
+    <span class="doccomment">/// the PageTable that should be switched to when this Task is switched to.
+    </span><span class="kw">pub </span>page_table: PageTable,
     
-    <span class="doccomment">/// a list of additional virtual-mapped Pages that have the same lifetime as this MMI</span>
-    <span class="doccomment">/// and are thus owned by this MMI, but is not all-inclusive (e.g., Stacks are excluded).</span>
-    <span class="kw">pub</span> <span class="ident">extra_mapped_pages</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// a list of additional virtual-mapped Pages that have the same lifetime as this MMI
+    /// and are thus owned by this MMI, but is not all-inclusive (e.g., Stacks are excluded).
+    </span><span class="kw">pub </span>extra_mapped_pages: Vec&lt;MappedPages&gt;,
 }
 
 
-<span class="doccomment">/// A convenience function that creates a new memory mapping by allocating frames that are contiguous in physical memory.</span>
-<span class="doccomment">/// If contiguous frames are not required, then see [`create_mapping()`](fn.create_mapping.html).</span>
-<span class="doccomment">/// Returns a tuple containing the new `MappedPages` and the starting PhysicalAddress of the first frame,</span>
-<span class="doccomment">/// which is a convenient way to get the physical address without walking the page tables.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Locking / Deadlock</span>
-<span class="doccomment">/// Currently, this function acquires the lock on the frame allocator and the kernel&#39;s `MemoryManagementInfo` instance.</span>
-<span class="doccomment">/// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_contiguous_mapping</span>(<span class="ident">size_in_bytes</span>: <span class="ident">usize</span>, <span class="ident">flags</span>: <span class="ident">EntryFlags</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">MappedPages</span>, <span class="ident">PhysicalAddress</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">kernel_mmi_ref</span> <span class="op">=</span> <span class="ident">get_kernel_mmi_ref</span>().<span class="ident">ok_or</span>(<span class="string">&quot;create_contiguous_mapping(): KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">allocated_pages</span> <span class="op">=</span> <span class="ident">allocate_pages_by_bytes</span>(<span class="ident">size_in_bytes</span>).<span class="ident">ok_or</span>(<span class="string">&quot;memory::create_contiguous_mapping(): couldn&#39;t allocate contiguous pages!&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">allocated_frames</span> <span class="op">=</span> <span class="ident">allocate_frames_by_bytes</span>(<span class="ident">size_in_bytes</span>).<span class="ident">ok_or</span>(<span class="string">&quot;memory::create_contiguous_mapping(): couldn&#39;t allocate contiguous frames!&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">starting_phys_addr</span> <span class="op">=</span> <span class="ident">allocated_frames</span>.<span class="ident">start_address</span>();
-    <span class="kw">let</span> <span class="ident">mp</span> <span class="op">=</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>().<span class="ident">page_table</span>.<span class="ident">map_allocated_pages_to</span>(<span class="ident">allocated_pages</span>, <span class="ident">allocated_frames</span>, <span class="ident">flags</span>)<span class="question-mark">?</span>;
-    <span class="prelude-val">Ok</span>((<span class="ident">mp</span>, <span class="ident">starting_phys_addr</span>))
+<span class="doccomment">/// A convenience function that creates a new memory mapping by allocating frames that are contiguous in physical memory.
+/// If contiguous frames are not required, then see [`create_mapping()`](fn.create_mapping.html).
+/// Returns a tuple containing the new `MappedPages` and the starting PhysicalAddress of the first frame,
+/// which is a convenient way to get the physical address without walking the page tables.
+/// 
+/// # Locking / Deadlock
+/// Currently, this function acquires the lock on the frame allocator and the kernel&#39;s `MemoryManagementInfo` instance.
+/// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
+</span><span class="kw">pub fn </span>create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -&gt; <span class="prelude-ty">Result</span>&lt;(MappedPages, PhysicalAddress), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>kernel_mmi_ref = get_kernel_mmi_ref().ok_or(<span class="string">&quot;create_contiguous_mapping(): KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or(<span class="string">&quot;memory::create_contiguous_mapping(): couldn&#39;t allocate contiguous pages!&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>allocated_frames = allocate_frames_by_bytes(size_in_bytes).ok_or(<span class="string">&quot;memory::create_contiguous_mapping(): couldn&#39;t allocate contiguous frames!&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>starting_phys_addr = allocated_frames.start_address();
+    <span class="kw">let </span>mp = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags)<span class="question-mark">?</span>;
+    <span class="prelude-val">Ok</span>((mp, starting_phys_addr))
 }
 
 
-<span class="doccomment">/// A convenience function that creates a new memory mapping. The pages allocated are contiguous in memory but there&#39;s</span>
-<span class="doccomment">/// no guarantee that the frames they are mapped to are also contiguous in memory. If contiguous frames are required</span>
-<span class="doccomment">/// then see [`create_contiguous_mapping()`](fn.create_contiguous_mapping.html).</span>
-<span class="doccomment">/// Returns the new `MappedPages.` </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Locking / Deadlock</span>
-<span class="doccomment">/// Currently, this function acquires the lock on the kernel&#39;s `MemoryManagementInfo` instance.</span>
-<span class="doccomment">/// Thus, the caller should ensure that lock is not held when invoking this function.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_mapping</span>(<span class="ident">size_in_bytes</span>: <span class="ident">usize</span>, <span class="ident">flags</span>: <span class="ident">EntryFlags</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">kernel_mmi_ref</span> <span class="op">=</span> <span class="ident">get_kernel_mmi_ref</span>().<span class="ident">ok_or</span>(<span class="string">&quot;create_contiguous_mapping(): KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">allocated_pages</span> <span class="op">=</span> <span class="ident">allocate_pages_by_bytes</span>(<span class="ident">size_in_bytes</span>).<span class="ident">ok_or</span>(<span class="string">&quot;memory::create_mapping(): couldn&#39;t allocate pages!&quot;</span>)<span class="question-mark">?</span>;
-    <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>().<span class="ident">page_table</span>.<span class="ident">map_allocated_pages</span>(<span class="ident">allocated_pages</span>, <span class="ident">flags</span>)
+<span class="doccomment">/// A convenience function that creates a new memory mapping. The pages allocated are contiguous in memory but there&#39;s
+/// no guarantee that the frames they are mapped to are also contiguous in memory. If contiguous frames are required
+/// then see [`create_contiguous_mapping()`](fn.create_contiguous_mapping.html).
+/// Returns the new `MappedPages.` 
+/// 
+/// # Locking / Deadlock
+/// Currently, this function acquires the lock on the kernel&#39;s `MemoryManagementInfo` instance.
+/// Thus, the caller should ensure that lock is not held when invoking this function.
+</span><span class="kw">pub fn </span>create_mapping(size_in_bytes: usize, flags: EntryFlags) -&gt; <span class="prelude-ty">Result</span>&lt;MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>kernel_mmi_ref = get_kernel_mmi_ref().ok_or(<span class="string">&quot;create_contiguous_mapping(): KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or(<span class="string">&quot;memory::create_mapping(): couldn&#39;t allocate pages!&quot;</span>)<span class="question-mark">?</span>;
+    kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags)
 }
 
 
-<span class="kw">static</span> <span class="ident">BROADCAST_TLB_SHOOTDOWN_FUNC</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="kw">fn</span>(<span class="ident">PageRange</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+<span class="kw">static </span>BROADCAST_TLB_SHOOTDOWN_FUNC: Once&lt;<span class="kw">fn</span>(PageRange)&gt; = Once::new();
 
-<span class="doccomment">/// Set the function callback that will be invoked every time a TLB shootdown is necessary,</span>
-<span class="doccomment">/// i.e., during page table remapping and unmapping operations.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_broadcast_tlb_shootdown_cb</span>(<span class="ident">func</span>: <span class="kw">fn</span>(<span class="ident">PageRange</span>)) {
-    <span class="ident">BROADCAST_TLB_SHOOTDOWN_FUNC</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">func</span>);
+<span class="doccomment">/// Set the function callback that will be invoked every time a TLB shootdown is necessary,
+/// i.e., during page table remapping and unmapping operations.
+</span><span class="kw">pub fn </span>set_broadcast_tlb_shootdown_cb(func: <span class="kw">fn</span>(PageRange)) {
+    BROADCAST_TLB_SHOOTDOWN_FUNC.call_once(|| func);
 }
 
 
 
-<span class="doccomment">/// Initializes the virtual memory management system.</span>
-<span class="doccomment">/// Consumes the given BootInformation, because after the memory system is initialized,</span>
-<span class="doccomment">/// the original BootInformation will be unmapped and inaccessible.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Returns the following tuple, if successful:</span>
-<span class="doccomment">///  1. the kernel&#39;s new `PageTable`, which is now currently active,</span>
-<span class="doccomment">///  2. the `MappedPages` of the kernel&#39;s text section,</span>
-<span class="doccomment">///  3. the `MappedPages` of the kernel&#39;s rodata section,</span>
-<span class="doccomment">///  4. the `MappedPages` of the kernel&#39;s data section,</span>
-<span class="doccomment">///  5. a tuple of the stack&#39;s underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,</span>
-<span class="doccomment">///  6. the `MappedPages` holding the bootloader info,</span>
-<span class="doccomment">///  7. the kernel&#39;s list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,</span>
-<span class="doccomment">///  8. the kernel&#39;s list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(
-    <span class="ident">boot_info</span>: <span class="kw-2">&amp;</span><span class="ident">BootInformation</span>
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(
-    <span class="ident">PageTable</span>,
-    <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>,
-    <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>,
-    <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>,
-    (<span class="ident">AllocatedPages</span>, <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>),
-    <span class="ident">MappedPages</span>,
-    [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>; <span class="number">32</span>],
-    [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>; <span class="number">32</span>],
-), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="comment">// Get the start and end addresses of the kernel, boot info, boot modules, etc.</span>
-    <span class="kw">let</span> (<span class="ident">kernel_phys_start</span>, <span class="ident">kernel_phys_end</span>, <span class="ident">kernel_virt_end</span>) <span class="op">=</span> <span class="ident">get_kernel_address</span>(<span class="kw-2">&amp;</span><span class="ident">boot_info</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> (<span class="ident">boot_info_paddr_start</span>, <span class="ident">boot_info_paddr_end</span>) <span class="op">=</span> <span class="ident">get_boot_info_mem_area</span>(<span class="kw-2">&amp;</span><span class="ident">boot_info</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> (<span class="ident">modules_start_paddr</span>, <span class="ident">modules_end_paddr</span>) <span class="op">=</span> <span class="ident">get_modules_address</span>(<span class="kw-2">&amp;</span><span class="ident">boot_info</span>);
+<span class="doccomment">/// Initializes the virtual memory management system.
+/// Consumes the given BootInformation, because after the memory system is initialized,
+/// the original BootInformation will be unmapped and inaccessible.
+/// 
+/// Returns the following tuple, if successful:
+///  1. the kernel&#39;s new `PageTable`, which is now currently active,
+///  2. the `MappedPages` of the kernel&#39;s text section,
+///  3. the `MappedPages` of the kernel&#39;s rodata section,
+///  4. the `MappedPages` of the kernel&#39;s data section,
+///  5. a tuple of the stack&#39;s underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
+///  6. the `MappedPages` holding the bootloader info,
+///  7. the kernel&#39;s list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
+///  8. the kernel&#39;s list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
+</span><span class="kw">pub fn </span>init(
+    boot_info: <span class="kw-2">&amp;</span>BootInformation
+) -&gt; <span class="prelude-ty">Result</span>&lt;(
+    PageTable,
+    NoDrop&lt;MappedPages&gt;,
+    NoDrop&lt;MappedPages&gt;,
+    NoDrop&lt;MappedPages&gt;,
+    (AllocatedPages, NoDrop&lt;MappedPages&gt;),
+    MappedPages,
+    [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
+    [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
+), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="comment">// Get the start and end addresses of the kernel, boot info, boot modules, etc.
+    </span><span class="kw">let </span>(kernel_phys_start, kernel_phys_end, kernel_virt_end) = get_kernel_address(<span class="kw-2">&amp;</span>boot_info)<span class="question-mark">?</span>;
+    <span class="kw">let </span>(boot_info_paddr_start, boot_info_paddr_end) = get_boot_info_mem_area(<span class="kw-2">&amp;</span>boot_info)<span class="question-mark">?</span>;
+    <span class="kw">let </span>(modules_start_paddr, modules_end_paddr) = get_modules_address(<span class="kw-2">&amp;</span>boot_info);
     <span class="macro">debug!</span>(<span class="string">&quot;bootloader info memory: p{:#X} to p{:#X}, bootloader modules: p{:#X} to p{:#X}&quot;</span>, 
-        <span class="ident">boot_info_paddr_start</span>, <span class="ident">boot_info_paddr_end</span>, <span class="ident">modules_start_paddr</span>, <span class="ident">modules_end_paddr</span>,
+        boot_info_paddr_start, boot_info_paddr_end, modules_start_paddr, modules_end_paddr,
     );
     <span class="macro">debug!</span>(<span class="string">&quot;kernel_phys_start: p{:#X}, kernel_phys_end: p{:#X} kernel_virt_end = v{:#x}&quot;</span>,
-        <span class="ident">kernel_phys_start</span>, <span class="ident">kernel_phys_end</span>, <span class="ident">kernel_virt_end</span>
+        kernel_phys_start, kernel_phys_end, kernel_virt_end
     );
 
-    <span class="comment">// In addition to the information about the hardware&#39;s physical memory map provided by the bootloader,</span>
-    <span class="comment">// Theseus chooses to reserve the following regions of physical memory for specific use.</span>
-    <span class="kw">let</span> <span class="ident">low_memory_frames</span>   <span class="op">=</span> <span class="ident">FrameRange::from_phys_addr</span>(<span class="ident">PhysicalAddress::zero</span>(), <span class="number">0x10_0000</span>); <span class="comment">// suggested by most OS developers</span>
-    <span class="kw">let</span> <span class="ident">kernel_frames</span>       <span class="op">=</span> <span class="ident">FrameRange::from_phys_addr</span>(<span class="ident">kernel_phys_start</span>, <span class="ident">kernel_phys_end</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">kernel_phys_start</span>.<span class="ident">value</span>());
-    <span class="kw">let</span> <span class="ident">boot_modules_frames</span> <span class="op">=</span> <span class="ident">FrameRange::from_phys_addr</span>(<span class="ident">modules_start_paddr</span>, <span class="ident">modules_end_paddr</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">modules_start_paddr</span>.<span class="ident">value</span>());
-    <span class="kw">let</span> <span class="ident">boot_info_frames</span>    <span class="op">=</span> <span class="ident">FrameRange::from_phys_addr</span>(<span class="ident">boot_info_paddr_start</span>, <span class="ident">boot_info_paddr_end</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">boot_info_paddr_start</span>.<span class="ident">value</span>());
+    <span class="comment">// In addition to the information about the hardware&#39;s physical memory map provided by the bootloader,
+    // Theseus chooses to reserve the following regions of physical memory for specific use.
+    </span><span class="kw">let </span>low_memory_frames   = FrameRange::from_phys_addr(PhysicalAddress::zero(), <span class="number">0x10_0000</span>); <span class="comment">// suggested by most OS developers
+    </span><span class="kw">let </span>kernel_frames       = FrameRange::from_phys_addr(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value());
+    <span class="kw">let </span>boot_modules_frames = FrameRange::from_phys_addr(modules_start_paddr, modules_end_paddr.value() - modules_start_paddr.value());
+    <span class="kw">let </span>boot_info_frames    = FrameRange::from_phys_addr(boot_info_paddr_start, boot_info_paddr_end.value() - boot_info_paddr_start.value());
     
-    <span class="comment">// Add the VGA display&#39;s memory region to the list of reserved physical memory areas.</span>
-    <span class="comment">// Currently this is covered by the first 1MiB region, but it&#39;s okay to duplicate it here.</span>
-    <span class="kw">let</span> (<span class="ident">vga_start_paddr</span>, <span class="ident">vga_size</span>, <span class="ident">_vga_flags</span>) <span class="op">=</span> <span class="ident">memory_x86_64::get_vga_mem_addr</span>()<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">vga_display_frames</span> <span class="op">=</span> <span class="ident">FrameRange::from_phys_addr</span>(<span class="ident">vga_start_paddr</span>, <span class="ident">vga_size</span>);
+    <span class="comment">// Add the VGA display&#39;s memory region to the list of reserved physical memory areas.
+    // Currently this is covered by the first 1MiB region, but it&#39;s okay to duplicate it here.
+    </span><span class="kw">let </span>(vga_start_paddr, vga_size, _vga_flags) = memory_x86_64::get_vga_mem_addr()<span class="question-mark">?</span>;
+    <span class="kw">let </span>vga_display_frames = FrameRange::from_phys_addr(vga_start_paddr, vga_size);
     
-    <span class="comment">// Now set up the list of free regions and reserved regions so we can initialize the frame allocator.</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">free_regions</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">PhysicalMemoryRegion</span><span class="op">&gt;</span>; <span class="number">32</span>] <span class="op">=</span> <span class="ident">Default::default</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">free_index</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reserved_regions</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">PhysicalMemoryRegion</span><span class="op">&gt;</span>; <span class="number">32</span>] <span class="op">=</span> <span class="ident">Default::default</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reserved_index</span> <span class="op">=</span> <span class="number">0</span>;
+    <span class="comment">// Now set up the list of free regions and reserved regions so we can initialize the frame allocator.
+    </span><span class="kw">let </span><span class="kw-2">mut </span>free_regions: [<span class="prelude-ty">Option</span>&lt;PhysicalMemoryRegion&gt;; <span class="number">32</span>] = Default::default();
+    <span class="kw">let </span><span class="kw-2">mut </span>free_index = <span class="number">0</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>reserved_regions: [<span class="prelude-ty">Option</span>&lt;PhysicalMemoryRegion&gt;; <span class="number">32</span>] = Default::default();
+    <span class="kw">let </span><span class="kw-2">mut </span>reserved_index = <span class="number">0</span>;
 
-    <span class="ident">reserved_regions</span>[<span class="ident">reserved_index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">PhysicalMemoryRegion::new</span>(<span class="ident">low_memory_frames</span>, <span class="ident">MemoryRegionType::Reserved</span>));
-    <span class="ident">reserved_index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-    <span class="ident">reserved_regions</span>[<span class="ident">reserved_index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">PhysicalMemoryRegion::new</span>(<span class="ident">kernel_frames</span>, <span class="ident">MemoryRegionType::Reserved</span>));
-    <span class="ident">reserved_index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-    <span class="ident">reserved_regions</span>[<span class="ident">reserved_index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">PhysicalMemoryRegion::new</span>(<span class="ident">boot_modules_frames</span>, <span class="ident">MemoryRegionType::Reserved</span>));
-    <span class="ident">reserved_index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-    <span class="ident">reserved_regions</span>[<span class="ident">reserved_index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">PhysicalMemoryRegion::new</span>(<span class="ident">boot_info_frames</span>, <span class="ident">MemoryRegionType::Reserved</span>));
-    <span class="ident">reserved_index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-    <span class="ident">reserved_regions</span>[<span class="ident">reserved_index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">PhysicalMemoryRegion::new</span>(<span class="ident">vga_display_frames</span>, <span class="ident">MemoryRegionType::Reserved</span>));
-    <span class="ident">reserved_index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+    reserved_regions[reserved_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(low_memory_frames, MemoryRegionType::Reserved));
+    reserved_index += <span class="number">1</span>;
+    reserved_regions[reserved_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(kernel_frames, MemoryRegionType::Reserved));
+    reserved_index += <span class="number">1</span>;
+    reserved_regions[reserved_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(boot_modules_frames, MemoryRegionType::Reserved));
+    reserved_index += <span class="number">1</span>;
+    reserved_regions[reserved_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(boot_info_frames, MemoryRegionType::Reserved));
+    reserved_index += <span class="number">1</span>;
+    reserved_regions[reserved_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(vga_display_frames, MemoryRegionType::Reserved));
+    reserved_index += <span class="number">1</span>;
 
-    <span class="kw">for</span> <span class="ident">area</span> <span class="kw">in</span> <span class="ident">boot_info</span>.<span class="ident">memory_map_tag</span>()
-        .<span class="ident">ok_or</span>(<span class="string">&quot;Multiboot2 boot information has no physical memory map information&quot;</span>)<span class="question-mark">?</span>
-        .<span class="ident">all_memory_areas</span>()
+    <span class="kw">for </span>area <span class="kw">in </span>boot_info.memory_map_tag()
+        .ok_or(<span class="string">&quot;Multiboot2 boot information has no physical memory map information&quot;</span>)<span class="question-mark">?
+        </span>.all_memory_areas()
     {
-        <span class="kw">let</span> <span class="ident">frames</span> <span class="op">=</span> <span class="ident">FrameRange::from_phys_addr</span>(<span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">area</span>.<span class="ident">start_address</span>() <span class="kw">as</span> <span class="ident">usize</span>), <span class="ident">area</span>.<span class="ident">size</span>() <span class="kw">as</span> <span class="ident">usize</span>);
-        <span class="kw">if</span> <span class="ident">area</span>.<span class="ident">typ</span>() <span class="op">==</span> <span class="ident">multiboot2::MemoryAreaType::Available</span> {
-            <span class="ident">free_regions</span>[<span class="ident">free_index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">PhysicalMemoryRegion::new</span>(<span class="ident">frames</span>, <span class="ident">MemoryRegionType::Free</span>));
-            <span class="ident">free_index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-        } <span class="kw">else</span> {
-            <span class="ident">reserved_regions</span>[<span class="ident">reserved_index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">PhysicalMemoryRegion::new</span>(<span class="ident">frames</span>, <span class="ident">MemoryRegionType::Reserved</span>));
-            <span class="ident">reserved_index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        <span class="kw">let </span>frames = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(area.start_address() <span class="kw">as </span>usize), area.size() <span class="kw">as </span>usize);
+        <span class="kw">if </span>area.typ() == multiboot2::MemoryAreaType::Available {
+            free_regions[free_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(frames, MemoryRegionType::Free));
+            free_index += <span class="number">1</span>;
+        } <span class="kw">else </span>{
+            reserved_regions[reserved_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(frames, MemoryRegionType::Reserved));
+            reserved_index += <span class="number">1</span>;
         }
     }
 
-    <span class="kw">let</span> <span class="ident">into_alloc_frames_fn</span> <span class="op">=</span> <span class="ident">frame_allocator::init</span>(<span class="ident">free_regions</span>.<span class="ident">iter</span>().<span class="ident">flatten</span>(), <span class="ident">reserved_regions</span>.<span class="ident">iter</span>().<span class="ident">flatten</span>())<span class="question-mark">?</span>;
+    <span class="kw">let </span>into_alloc_frames_fn = frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())<span class="question-mark">?</span>;
     <span class="macro">debug!</span>(<span class="string">&quot;Initialized new frame allocator!&quot;</span>);
-    <span class="ident">frame_allocator::dump_frame_allocator_state</span>();
+    frame_allocator::dump_frame_allocator_state();
 
-    <span class="ident">page_allocator::init</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">kernel_phys_end</span>.<span class="ident">value</span>()))<span class="question-mark">?</span>;
+    page_allocator::init(VirtualAddress::new_canonical(kernel_phys_end.value()))<span class="question-mark">?</span>;
     <span class="macro">debug!</span>(<span class="string">&quot;Initialized new page allocator!&quot;</span>);
-    <span class="ident">page_allocator::dump_page_allocator_state</span>();
+    page_allocator::dump_page_allocator_state();
 
-    <span class="comment">// Initialize paging, which creates a new page table and maps all of the current code/data sections into it.</span>
-    <span class="ident">paging::init</span>(<span class="ident">boot_info</span>, <span class="ident">into_alloc_frames_fn</span>)
-        .<span class="ident">inspect</span>(<span class="op">|</span>(<span class="ident">new_page_table</span>, ..)<span class="op">|</span> {
-            <span class="macro">debug!</span>(<span class="string">&quot;Done with paging::init(). new page table: {:?}&quot;</span>, <span class="ident">new_page_table</span>);
+    <span class="comment">// Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
+    </span>paging::init(boot_info, into_alloc_frames_fn)
+        .inspect(|(new_page_table, ..)| {
+            <span class="macro">debug!</span>(<span class="string">&quot;Done with paging::init(). new page table: {:?}&quot;</span>, new_page_table);
         })
 }
 
-<span class="doccomment">/// Finishes initializing the memory management system after the heap is ready.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Returns the following tuple:</span>
-<span class="doccomment">///  * The kernel&#39;s new [`MemoryManagementInfo`], representing the initial virtual address space,</span>
-<span class="doccomment">///  * The kernel&#39;s list of identity-mapped [`MappedPages`],</span>
-<span class="doccomment">///    which must not be dropped until all AP (additional CPUs) are fully booted,</span>
-<span class="doccomment">///    but *should* be dropped before starting the first user application. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_post_heap</span>(
-    <span class="ident">page_table</span>: <span class="ident">PageTable</span>,
-    <span class="kw-2">mut</span> <span class="ident">higher_half_mapped_pages</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>; <span class="number">32</span>],
-    <span class="kw-2">mut</span> <span class="ident">identity_mapped_pages</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>; <span class="number">32</span>],
-    <span class="ident">heap_mapped_pages</span>: <span class="ident">MappedPages</span>
-) -&gt; (<span class="ident">MmiRef</span>, <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
-    <span class="comment">// HERE: heap is initialized! We can now use `alloc` types.</span>
+<span class="doccomment">/// Finishes initializing the memory management system after the heap is ready.
+/// 
+/// Returns the following tuple:
+///  * The kernel&#39;s new [`MemoryManagementInfo`], representing the initial virtual address space,
+///  * The kernel&#39;s list of identity-mapped [`MappedPages`],
+///    which must not be dropped until all AP (additional CPUs) are fully booted,
+///    but *should* be dropped before starting the first user application. 
+</span><span class="kw">pub fn </span>init_post_heap(
+    page_table: PageTable,
+    <span class="kw-2">mut </span>higher_half_mapped_pages: [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
+    <span class="kw-2">mut </span>identity_mapped_pages: [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
+    heap_mapped_pages: MappedPages
+) -&gt; (MmiRef, NoDrop&lt;Vec&lt;MappedPages&gt;&gt;) {
+    <span class="comment">// HERE: heap is initialized! We can now use `alloc` types.
 
-    <span class="ident">page_allocator::convert_to_heap_allocated</span>();
-    <span class="ident">frame_allocator::convert_to_heap_allocated</span>();
+    </span>page_allocator::convert_to_heap_allocated();
+    frame_allocator::convert_to_heap_allocated();
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">higher_half_mapped_pages</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">higher_half_mapped_pages</span>
-        .<span class="ident">iter_mut</span>()
-        .<span class="ident">filter_map</span>(<span class="op">|</span><span class="ident">opt</span><span class="op">|</span> <span class="ident">opt</span>.<span class="ident">take</span>().<span class="ident">map</span>(<span class="ident">NoDrop::into_inner</span>))
-        .<span class="ident">collect</span>();
-    <span class="ident">higher_half_mapped_pages</span>.<span class="ident">push</span>(<span class="ident">heap_mapped_pages</span>);
-    <span class="kw">let</span> <span class="ident">identity_mapped_pages</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">identity_mapped_pages</span>
-        .<span class="ident">iter_mut</span>()
-        .<span class="ident">filter_map</span>(<span class="op">|</span><span class="ident">opt</span><span class="op">|</span> <span class="ident">opt</span>.<span class="ident">take</span>().<span class="ident">map</span>(<span class="ident">NoDrop::into_inner</span>))
-        .<span class="ident">collect</span>();
-    <span class="kw">let</span> <span class="ident">identity_mapped_pages</span> <span class="op">=</span> <span class="ident">NoDrop::new</span>(<span class="ident">identity_mapped_pages</span>);
+    <span class="kw">let </span><span class="kw-2">mut </span>higher_half_mapped_pages: Vec&lt;MappedPages&gt; = higher_half_mapped_pages
+        .iter_mut()
+        .filter_map(|opt| opt.take().map(NoDrop::into_inner))
+        .collect();
+    higher_half_mapped_pages.push(heap_mapped_pages);
+    <span class="kw">let </span>identity_mapped_pages: Vec&lt;MappedPages&gt; = identity_mapped_pages
+        .iter_mut()
+        .filter_map(|opt| opt.take().map(NoDrop::into_inner))
+        .collect();
+    <span class="kw">let </span>identity_mapped_pages = NoDrop::new(identity_mapped_pages);
    
-    <span class="comment">// Construct the kernel&#39;s memory mgmt info, i.e., its address space info</span>
-    <span class="kw">let</span> <span class="ident">kernel_mmi</span> <span class="op">=</span> <span class="ident">MemoryManagementInfo</span> {
-        <span class="ident">page_table</span>,
-        <span class="ident">extra_mapped_pages</span>: <span class="ident">higher_half_mapped_pages</span>,
+    <span class="comment">// Construct the kernel&#39;s memory mgmt info, i.e., its address space info
+    </span><span class="kw">let </span>kernel_mmi = MemoryManagementInfo {
+        page_table,
+        extra_mapped_pages: higher_half_mapped_pages,
     };
 
-    <span class="kw">let</span> <span class="ident">kernel_mmi_ref</span> <span class="op">=</span> <span class="ident">KERNEL_MMI</span>.<span class="ident">call_once</span>( <span class="op">|</span><span class="op">|</span> {
-        <span class="ident">Arc::new</span>(<span class="ident">MutexIrqSafe::new</span>(<span class="ident">kernel_mmi</span>))
+    <span class="kw">let </span>kernel_mmi_ref = KERNEL_MMI.call_once( || {
+        Arc::new(MutexIrqSafe::new(kernel_mmi))
     });
 
-    (<span class="ident">kernel_mmi_ref</span>.<span class="ident">clone</span>(), <span class="ident">identity_mapped_pages</span>)
+    (kernel_mmi_ref.clone(), identity_mapped_pages)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="memory" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="memory" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

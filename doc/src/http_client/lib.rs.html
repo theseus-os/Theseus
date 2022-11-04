@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/http_client/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../http_client/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../http_client/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../http_client/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/http_client/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../http_client/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -329,331 +323,330 @@
 <span id="323">323</span>
 <span id="324">324</span>
 <span id="325">325</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Functions for creating and sending HTTP requests and receiving responses.</span>
-<span class="doccomment">//! </span>
+</pre><pre class="rust"><code><span class="doccomment">//! Functions for creating and sending HTTP requests and receiving responses.
+//! 
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">slice_concat_ext</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(slice_concat_ext)]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">smoltcp</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">network_manager</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">hpet</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">httparse</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">smoltcp_helper</span>;
+#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>smoltcp;
+<span class="kw">extern crate </span>network_manager;
+<span class="kw">extern crate </span>hpet;
+<span class="kw">extern crate </span>httparse;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>smoltcp_helper;
 
-<span class="kw">use</span> <span class="ident">core::str</span>;
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">alloc::string::String</span>;
-<span class="kw">use</span> <span class="ident">hpet::get_hpet</span>;
-<span class="kw">use</span> <span class="ident">smoltcp</span>::{
-    <span class="ident">socket</span>::{<span class="ident">SocketSet</span>, <span class="ident">TcpSocket</span>, <span class="ident">SocketHandle</span>},
+<span class="kw">use </span>core::str;
+<span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>alloc::string::String;
+<span class="kw">use </span>hpet::get_hpet;
+<span class="kw">use </span>smoltcp::{
+    socket::{SocketSet, TcpSocket, SocketHandle},
 };
-<span class="kw">use</span> <span class="ident">network_manager</span>::{<span class="ident">NetworkInterfaceRef</span>};
-<span class="kw">use</span> <span class="ident">smoltcp_helper</span>::{<span class="ident">millis_since</span>, <span class="ident">poll_iface</span>};
+<span class="kw">use </span>network_manager::{NetworkInterfaceRef};
+<span class="kw">use </span>smoltcp_helper::{millis_since, poll_iface};
 
-<span class="doccomment">/// The states that implement the finite state machine for </span>
-<span class="doccomment">/// sending and receiving the HTTP request and response, respectively.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">enum</span> <span class="ident">HttpState</span> {
-    <span class="doccomment">/// The socket is connected, but the HTTP request has not yet been sent.</span>
-    <span class="ident">Requesting</span>,
-    <span class="doccomment">/// The HTTP request has been sent, but the response has not yet been fully received.</span>
-    <span class="ident">ReceivingResponse</span>,
-    <span class="doccomment">/// The response has been received in full, including the headers and the entire content.</span>
-    <span class="ident">Responded</span>
+<span class="doccomment">/// The states that implement the finite state machine for 
+/// sending and receiving the HTTP request and response, respectively.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">enum </span>HttpState {
+    <span class="doccomment">/// The socket is connected, but the HTTP request has not yet been sent.
+    </span>Requesting,
+    <span class="doccomment">/// The HTTP request has been sent, but the response has not yet been fully received.
+    </span>ReceivingResponse,
+    <span class="doccomment">/// The response has been received in full, including the headers and the entire content.
+    </span>Responded
 }
 
-<span class="doccomment">/// Checks to see if the provided HTTP request can be properly parsed, and returns true if so.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_http_request</span>(<span class="ident">request_bytes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) -&gt; <span class="ident">bool</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">headers</span> <span class="op">=</span> [<span class="ident">httparse::EMPTY_HEADER</span>; <span class="number">64</span>];
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">request</span> <span class="op">=</span> <span class="ident">httparse::Request::new</span>(<span class="kw-2">&amp;mut</span> <span class="ident">headers</span>);
-    <span class="ident">request</span>.<span class="ident">parse</span>(<span class="ident">request_bytes</span>).<span class="ident">is_ok</span>() <span class="op">&amp;&amp;</span> <span class="ident">request_bytes</span>.<span class="ident">ends_with</span>(<span class="string">b&quot;\r\n\r\n&quot;</span>)
+<span class="doccomment">/// Checks to see if the provided HTTP request can be properly parsed, and returns true if so.
+</span><span class="kw">pub fn </span>check_http_request(request_bytes: <span class="kw-2">&amp;</span>[u8]) -&gt; bool {
+    <span class="kw">let </span><span class="kw-2">mut </span>headers = [httparse::EMPTY_HEADER; <span class="number">64</span>];
+    <span class="kw">let </span><span class="kw-2">mut </span>request = httparse::Request::new(<span class="kw-2">&amp;mut </span>headers);
+    request.parse(request_bytes).is_ok() &amp;&amp; request_bytes.ends_with(<span class="string">b&quot;\r\n\r\n&quot;</span>)
 }
 
 
-<span class="doccomment">/// TODO: create a proper HttpRequest type with header creation fields and actual verification</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">HttpRequest</span> <span class="op">=</span> <span class="ident">String</span>;
+<span class="doccomment">/// TODO: create a proper HttpRequest type with header creation fields and actual verification
+</span><span class="kw">pub type </span>HttpRequest = String;
 
 
-<span class="doccomment">/// An HttpResponse that has been fully received from a remote server.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// TODO: revamp this structure to not store redundant data</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">HttpResponse</span> {
-    <span class="doccomment">/// The actual array of raw bytes received from the server, </span>
-    <span class="doccomment">/// including all of the headers and body.</span>
-    <span class="kw">pub</span> <span class="ident">packet</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The length of all headers</span>
-    <span class="kw">pub</span> <span class="ident">header_length</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// The status code, e.g., 200, 404</span>
-    <span class="kw">pub</span> <span class="ident">status_code</span>: <span class="ident">u16</span>,
-    <span class="doccomment">/// The reason, e.g., &quot;OK&quot;, &quot;File not found&quot;</span>
-    <span class="kw">pub</span> <span class="ident">reason</span>: <span class="ident">String</span>,
+<span class="doccomment">/// An HttpResponse that has been fully received from a remote server.
+/// 
+/// TODO: revamp this structure to not store redundant data
+</span><span class="kw">pub struct </span>HttpResponse {
+    <span class="doccomment">/// The actual array of raw bytes received from the server, 
+    /// including all of the headers and body.
+    </span><span class="kw">pub </span>packet: Vec&lt;u8&gt;,
+    <span class="doccomment">/// The length of all headers
+    </span><span class="kw">pub </span>header_length: usize,
+    <span class="doccomment">/// The status code, e.g., 200, 404
+    </span><span class="kw">pub </span>status_code: u16,
+    <span class="doccomment">/// The reason, e.g., &quot;OK&quot;, &quot;File not found&quot;
+    </span><span class="kw">pub </span>reason: String,
 }
-<span class="kw">impl</span> <span class="ident">HttpResponse</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">header_bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">packet</span>[<span class="number">0</span> .. <span class="self">self</span>.<span class="ident">header_length</span>]
+<span class="kw">impl </span>HttpResponse {
+    <span class="kw">pub fn </span>header_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8] {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.packet[<span class="number">0 </span>.. <span class="self">self</span>.header_length]
     }
 
-    <span class="kw">fn</span> <span class="ident">content</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">packet</span>[<span class="self">self</span>.<span class="ident">header_length</span> ..]
+    <span class="kw">fn </span>content(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8] {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.packet[<span class="self">self</span>.header_length ..]
     }
 
-    <span class="doccomment">/// Returns the content of this `HttpResponse` as a `Result`, </span>
-    <span class="doccomment">/// in which `Ok(content)` is returned if the status code is 200 (Ok),</span>
-    <span class="doccomment">/// and `Err((status_code, reason))` is returned otherwise.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_result</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span>[<span class="ident">u8</span>], (<span class="ident">u16</span>, <span class="kw-2">&amp;</span><span class="ident">str</span>)<span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">status_code</span> <span class="op">==</span> <span class="number">200</span> {
-            <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">content</span>())
-        } <span class="kw">else</span> {
-            <span class="prelude-val">Err</span>((<span class="self">self</span>.<span class="ident">status_code</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">reason</span>))
+    <span class="doccomment">/// Returns the content of this `HttpResponse` as a `Result`, 
+    /// in which `Ok(content)` is returned if the status code is 200 (Ok),
+    /// and `Err((status_code, reason))` is returned otherwise.
+    </span><span class="kw">pub fn </span>as_result(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>[u8], (u16, <span class="kw-2">&amp;</span>str)&gt; {
+        <span class="kw">if </span><span class="self">self</span>.status_code == <span class="number">200 </span>{
+            <span class="prelude-val">Ok</span>(<span class="self">self</span>.content())
+        } <span class="kw">else </span>{
+            <span class="prelude-val">Err</span>((<span class="self">self</span>.status_code, <span class="kw-2">&amp;</span><span class="self">self</span>.reason))
         }
     }
 
-    <span class="doccomment">/// A convenience function that just returns a standard Err `&amp;str`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_result_err_str</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">as_result</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;HttpResponse: error code {}, reason {:?}&quot;</span>, <span class="ident">_e</span>.<span class="number">0</span>, <span class="ident">_e</span>.<span class="number">1</span>);
-            <span class="string">&quot;HttpResponse had an error status code (not Ok 200)&quot;</span>
+    <span class="doccomment">/// A convenience function that just returns a standard Err `&amp;str`.
+    </span><span class="kw">pub fn </span>as_result_err_str(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>[u8], <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.as_result().map_err(|_e| {
+            <span class="macro">error!</span>(<span class="string">&quot;HttpResponse: error code {}, reason {:?}&quot;</span>, _e.<span class="number">0</span>, _e.<span class="number">1</span>);
+            <span class="string">&quot;HttpResponse had an error status code (not Ok 200)&quot;
+        </span>})
+    }
+}
+
+
+<span class="doccomment">/// A convenience struct that packages together a connected TCP socket
+/// with other elements that are necessary to transceive packets. 
+</span><span class="kw">pub struct </span>ConnectedTcpSocket&lt;<span class="lifetime">&#39;i</span>, <span class="lifetime">&#39;s</span>, <span class="lifetime">&#39;sockset_a</span>, <span class="lifetime">&#39;sockset_b</span>, <span class="lifetime">&#39;sockset_c</span>&gt; {
+    iface:   <span class="kw-2">&amp;</span><span class="lifetime">&#39;i </span>NetworkInterfaceRef, 
+    sockets: <span class="kw-2">&amp;</span><span class="lifetime">&#39;s </span><span class="kw-2">mut </span>SocketSet&lt;<span class="lifetime">&#39;sockset_a</span>, <span class="lifetime">&#39;sockset_b</span>, <span class="lifetime">&#39;sockset_c</span>&gt;,
+    handle:  SocketHandle,
+}
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;i</span>, <span class="lifetime">&#39;s</span>, <span class="lifetime">&#39;sockset_a</span>, <span class="lifetime">&#39;sockset_b</span>, <span class="lifetime">&#39;sockset_c</span>&gt; ConnectedTcpSocket&lt;<span class="lifetime">&#39;i</span>, <span class="lifetime">&#39;s</span>, <span class="lifetime">&#39;sockset_a</span>, <span class="lifetime">&#39;sockset_b</span>, <span class="lifetime">&#39;sockset_c</span>&gt; {
+    <span class="doccomment">/// Create a new `ConnectedTcpSocket` with the given necessary items:
+    /// # Arguments
+    /// * `iface`: a reference to the `NetworkInterface` that the given TCP socket was created on and uses for transceiving packets. 
+    /// * `sockets`: the set of sockets that includes the given TCP socket (usually just a set with just that one socket).
+    /// * `tcp_socket_handle`: the handle of the TCP socket, which must be in the given `sockets` set and be already connected to the remote endpoint.
+    /// 
+    /// Returns an `Err` result if the TCP socket isn&#39;t connected to the remote endpoint.
+    /// 
+    </span><span class="kw">pub fn </span>new(
+        iface: <span class="kw-2">&amp;</span><span class="lifetime">&#39;i </span>NetworkInterfaceRef, 
+        sockets: <span class="kw-2">&amp;</span><span class="lifetime">&#39;s </span><span class="kw-2">mut </span>SocketSet&lt;<span class="lifetime">&#39;sockset_a</span>, <span class="lifetime">&#39;sockset_b</span>, <span class="lifetime">&#39;sockset_c</span>&gt;,
+        tcp_socket_handle: SocketHandle, 
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;ConnectedTcpSocket&lt;<span class="lifetime">&#39;i</span>, <span class="lifetime">&#39;s</span>, <span class="lifetime">&#39;sockset_a</span>, <span class="lifetime">&#39;sockset_b</span>, <span class="lifetime">&#39;sockset_c</span>&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// ensure the socket actually connected to the remote endpoint (i.e., it should be able to send/recv)
+        </span>{
+            <span class="kw">let </span>socket = sockets.get::&lt;TcpSocket&gt;(tcp_socket_handle);
+            <span class="kw">let </span>connected = socket.may_send() &amp;&amp; socket.may_recv();
+            <span class="kw">if </span>!connected {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;http_client: the given TCP socket wasn&#39;t connected to the remote endpoint&quot;</span>);
+            }
+        }
+
+        <span class="prelude-val">Ok</span>(ConnectedTcpSocket {
+            iface: iface,
+            sockets: sockets,
+            handle: tcp_socket_handle,
         })
     }
 }
 
+<span class="doccomment">/// Sends the given HTTP request over the network via the given `socket` on the given `interface`,
+/// waits to receive a full HTTP response from the remote endpoint, 
+/// and then returns that full response, or an error if the response wasn&#39;t fully received properly.
+/// 
+/// # Arguments
+/// * `request`: the HTTP request to be sent via the connected socket.
+/// * `tcp_socket`: the connected TCP socket that will be used to send the HTTP request and receive the response.
+/// * `inactivity_timeout_millis`: the timeout in milliseconds that limits how long this function will wait during periods of inactivity. 
+///    This is not a timeout that bounds the total execution time of this function; the timer is reset when a packet is received. 
+///    For example, a value of `5000` means that the function will give up if more than 5 seconds elapses without any packets being received.
+/// 
+</span><span class="kw">pub fn </span>send_request(
+    request: HttpRequest, 
+    tcp_socket: <span class="kw-2">&amp;mut </span>ConnectedTcpSocket,
+    timeout_millis: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;HttpResponse, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 
-<span class="doccomment">/// A convenience struct that packages together a connected TCP socket</span>
-<span class="doccomment">/// with other elements that are necessary to transceive packets. </span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ConnectedTcpSocket</span><span class="op">&lt;</span><span class="lifetime">&#39;i</span>, <span class="lifetime">&#39;s</span>, <span class="lifetime">&#39;sockset_a</span>, <span class="lifetime">&#39;sockset_b</span>, <span class="lifetime">&#39;sockset_c</span><span class="op">&gt;</span> {
-    <span class="ident">iface</span>:   <span class="kw-2">&amp;</span><span class="lifetime">&#39;i</span> <span class="ident">NetworkInterfaceRef</span>, 
-    <span class="ident">sockets</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;s</span> <span class="kw-2">mut</span> <span class="ident">SocketSet</span><span class="op">&lt;</span><span class="lifetime">&#39;sockset_a</span>, <span class="lifetime">&#39;sockset_b</span>, <span class="lifetime">&#39;sockset_c</span><span class="op">&gt;</span>,
-    <span class="ident">handle</span>:  <span class="ident">SocketHandle</span>,
-}
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;i</span>, <span class="lifetime">&#39;s</span>, <span class="lifetime">&#39;sockset_a</span>, <span class="lifetime">&#39;sockset_b</span>, <span class="lifetime">&#39;sockset_c</span><span class="op">&gt;</span> <span class="ident">ConnectedTcpSocket</span><span class="op">&lt;</span><span class="lifetime">&#39;i</span>, <span class="lifetime">&#39;s</span>, <span class="lifetime">&#39;sockset_a</span>, <span class="lifetime">&#39;sockset_b</span>, <span class="lifetime">&#39;sockset_c</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Create a new `ConnectedTcpSocket` with the given necessary items:</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `iface`: a reference to the `NetworkInterface` that the given TCP socket was created on and uses for transceiving packets. </span>
-    <span class="doccomment">/// * `sockets`: the set of sockets that includes the given TCP socket (usually just a set with just that one socket).</span>
-    <span class="doccomment">/// * `tcp_socket_handle`: the handle of the TCP socket, which must be in the given `sockets` set and be already connected to the remote endpoint.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Returns an `Err` result if the TCP socket isn&#39;t connected to the remote endpoint.</span>
-    <span class="doccomment">/// </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">iface</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;i</span> <span class="ident">NetworkInterfaceRef</span>, 
-        <span class="ident">sockets</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;s</span> <span class="kw-2">mut</span> <span class="ident">SocketSet</span><span class="op">&lt;</span><span class="lifetime">&#39;sockset_a</span>, <span class="lifetime">&#39;sockset_b</span>, <span class="lifetime">&#39;sockset_c</span><span class="op">&gt;</span>,
-        <span class="ident">tcp_socket_handle</span>: <span class="ident">SocketHandle</span>, 
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ConnectedTcpSocket</span><span class="op">&lt;</span><span class="lifetime">&#39;i</span>, <span class="lifetime">&#39;s</span>, <span class="lifetime">&#39;sockset_a</span>, <span class="lifetime">&#39;sockset_b</span>, <span class="lifetime">&#39;sockset_c</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// ensure the socket actually connected to the remote endpoint (i.e., it should be able to send/recv)</span>
-        {
-            <span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">sockets</span>.<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">TcpSocket</span><span class="op">&gt;</span>(<span class="ident">tcp_socket_handle</span>);
-            <span class="kw">let</span> <span class="ident">connected</span> <span class="op">=</span> <span class="ident">socket</span>.<span class="ident">may_send</span>() <span class="op">&amp;&amp;</span> <span class="ident">socket</span>.<span class="ident">may_recv</span>();
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">connected</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;http_client: the given TCP socket wasn&#39;t connected to the remote endpoint&quot;</span>);
+    <span class="comment">// validate the HTTP request 
+    </span><span class="kw">if </span>!check_http_request(request.as_bytes()) {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;http_client: given HTTP request was improperly formatted or incomplete&quot;</span>);
+    }
+
+    <span class="kw">let </span>ConnectedTcpSocket { iface, sockets, handle } = tcp_socket;
+
+    <span class="kw">let </span><span class="kw-2">mut </span>_loop_ctr = <span class="number">0</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>state = HttpState::Requesting;
+    <span class="kw">let </span><span class="kw-2">mut </span>packet_byte_buffer:   Vec&lt;u8&gt; = Vec::new();
+    <span class="kw">let </span><span class="kw-2">mut </span>packet_header_length: <span class="prelude-ty">Option</span>&lt;usize&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>response_status_code: <span class="prelude-ty">Option</span>&lt;u16&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>response_reason:      <span class="prelude-ty">Option</span>&lt;String&gt; = <span class="prelude-val">None</span>;
+
+    <span class="kw">let </span>startup_time = <span class="macro">hpet_ticks!</span>();
+    <span class="kw">let </span><span class="kw-2">mut </span>latest_packet_timestamp = startup_time;
+
+    <span class="comment">// in the loop below, we do the actual work of sending the request and receiving the response 
+    </span><span class="kw">loop </span>{ 
+        _loop_ctr += <span class="number">1</span>;
+
+        <span class="kw">let </span>_packet_io_occurred = poll_iface(<span class="kw-2">&amp;</span>iface, sockets, startup_time)<span class="question-mark">?</span>;
+
+        <span class="comment">// check if we have timed out
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(t) = timeout_millis {
+            <span class="kw">if </span>millis_since(latest_packet_timestamp)<span class="question-mark">? </span>&gt; t {
+                <span class="macro">error!</span>(<span class="string">&quot;http_client: timed out after {} ms, in state {:?}&quot;</span>, t, state);
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;http_client: timed out&quot;</span>);
             }
         }
 
-        <span class="prelude-val">Ok</span>(<span class="ident">ConnectedTcpSocket</span> {
-            <span class="ident">iface</span>: <span class="ident">iface</span>,
-            <span class="ident">sockets</span>: <span class="ident">sockets</span>,
-            <span class="ident">handle</span>: <span class="ident">tcp_socket_handle</span>,
-        })
-    }
-}
+        <span class="kw">let </span><span class="kw-2">mut </span>socket = sockets.get::&lt;TcpSocket&gt;(<span class="kw-2">*</span>handle);
 
-<span class="doccomment">/// Sends the given HTTP request over the network via the given `socket` on the given `interface`,</span>
-<span class="doccomment">/// waits to receive a full HTTP response from the remote endpoint, </span>
-<span class="doccomment">/// and then returns that full response, or an error if the response wasn&#39;t fully received properly.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `request`: the HTTP request to be sent via the connected socket.</span>
-<span class="doccomment">/// * `tcp_socket`: the connected TCP socket that will be used to send the HTTP request and receive the response.</span>
-<span class="doccomment">/// * `inactivity_timeout_millis`: the timeout in milliseconds that limits how long this function will wait during periods of inactivity. </span>
-<span class="doccomment">///    This is not a timeout that bounds the total execution time of this function; the timer is reset when a packet is received. </span>
-<span class="doccomment">///    For example, a value of `5000` means that the function will give up if more than 5 seconds elapses without any packets being received.</span>
-<span class="doccomment">/// </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">send_request</span>(
-    <span class="ident">request</span>: <span class="ident">HttpRequest</span>, 
-    <span class="ident">tcp_socket</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ConnectedTcpSocket</span>,
-    <span class="ident">timeout_millis</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">HttpResponse</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-
-    <span class="comment">// validate the HTTP request </span>
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">check_http_request</span>(<span class="ident">request</span>.<span class="ident">as_bytes</span>()) {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;http_client: given HTTP request was improperly formatted or incomplete&quot;</span>);
-    }
-
-    <span class="kw">let</span> <span class="ident">ConnectedTcpSocket</span> { <span class="ident">iface</span>, <span class="ident">sockets</span>, <span class="ident">handle</span> } <span class="op">=</span> <span class="ident">tcp_socket</span>;
-
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">_loop_ctr</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">state</span> <span class="op">=</span> <span class="ident">HttpState::Requesting</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">packet_byte_buffer</span>:   <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">packet_header_length</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">response_status_code</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">response_reason</span>:      <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-
-    <span class="kw">let</span> <span class="ident">startup_time</span> <span class="op">=</span> <span class="macro">hpet_ticks!</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">latest_packet_timestamp</span> <span class="op">=</span> <span class="ident">startup_time</span>;
-
-    <span class="comment">// in the loop below, we do the actual work of sending the request and receiving the response </span>
-    <span class="kw">loop</span> { 
-        <span class="ident">_loop_ctr</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-
-        <span class="kw">let</span> <span class="ident">_packet_io_occurred</span> <span class="op">=</span> <span class="ident">poll_iface</span>(<span class="kw-2">&amp;</span><span class="ident">iface</span>, <span class="ident">sockets</span>, <span class="ident">startup_time</span>)<span class="question-mark">?</span>;
-
-        <span class="comment">// check if we have timed out</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">t</span>) <span class="op">=</span> <span class="ident">timeout_millis</span> {
-            <span class="kw">if</span> <span class="ident">millis_since</span>(<span class="ident">latest_packet_timestamp</span>)<span class="question-mark">?</span> <span class="op">&gt;</span> <span class="ident">t</span> {
-                <span class="macro">error!</span>(<span class="string">&quot;http_client: timed out after {} ms, in state {:?}&quot;</span>, <span class="ident">t</span>, <span class="ident">state</span>);
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;http_client: timed out&quot;</span>);
-            }
-        }
-
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">sockets</span>.<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">TcpSocket</span><span class="op">&gt;</span>(<span class="kw-2">*</span><span class="ident">handle</span>);
-
-        <span class="ident">state</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">state</span> {
-            <span class="ident">HttpState::Requesting</span> <span class="kw">if</span> <span class="ident">socket</span>.<span class="ident">can_send</span>() =&gt; {
-                <span class="macro">debug!</span>(<span class="string">&quot;http_client: sending HTTP request: {:?}&quot;</span>, <span class="ident">request</span>);
-                <span class="ident">socket</span>.<span class="ident">send_slice</span>(<span class="ident">request</span>.<span class="ident">as_ref</span>()).<span class="ident">expect</span>(<span class="string">&quot;http_client: cannot send request&quot;</span>);
-                <span class="ident">latest_packet_timestamp</span> <span class="op">=</span> <span class="macro">hpet_ticks!</span>();
-                <span class="ident">HttpState::ReceivingResponse</span>
+        state = <span class="kw">match </span>state {
+            HttpState::Requesting <span class="kw">if </span>socket.can_send() =&gt; {
+                <span class="macro">debug!</span>(<span class="string">&quot;http_client: sending HTTP request: {:?}&quot;</span>, request);
+                socket.send_slice(request.as_ref()).expect(<span class="string">&quot;http_client: cannot send request&quot;</span>);
+                latest_packet_timestamp = <span class="macro">hpet_ticks!</span>();
+                HttpState::ReceivingResponse
             }
 
-            <span class="ident">HttpState::ReceivingResponse</span> <span class="kw">if</span> <span class="ident">socket</span>.<span class="ident">can_recv</span>() =&gt; {
-                <span class="comment">// Stay in the receiving state for now; will be changed later if we receive the entire packet.</span>
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_state</span> <span class="op">=</span> <span class="ident">HttpState::ReceivingResponse</span>;
-                <span class="kw">let</span> <span class="ident">orig_packet_length</span> <span class="op">=</span> <span class="ident">packet_byte_buffer</span>.<span class="ident">len</span>();
+            HttpState::ReceivingResponse <span class="kw">if </span>socket.can_recv() =&gt; {
+                <span class="comment">// Stay in the receiving state for now; will be changed later if we receive the entire packet.
+                </span><span class="kw">let </span><span class="kw-2">mut </span>new_state = HttpState::ReceivingResponse;
+                <span class="kw">let </span>orig_packet_length = packet_byte_buffer.len();
 
-                <span class="kw">let</span> <span class="ident">recv_result</span> <span class="op">=</span> <span class="ident">socket</span>.<span class="ident">recv</span>(<span class="op">|</span><span class="ident">data</span><span class="op">|</span> {
-                    <span class="comment">// Eagerly append ALL of the received data onto the end of our packet slice, </span>
-                    <span class="comment">// which is necessary to attempt to parse it as an HTTP response.</span>
-                    <span class="comment">// Later, we can remove bytes towards the end if we ended up appending too many bytes,</span>
-                    <span class="comment">// e.g., we received more than enough bytes and some of them were for the next packet.</span>
-                    <span class="ident">packet_byte_buffer</span>.<span class="ident">extend_from_slice</span>(<span class="ident">data</span>);
+                <span class="kw">let </span>recv_result = socket.recv(|data| {
+                    <span class="comment">// Eagerly append ALL of the received data onto the end of our packet slice, 
+                    // which is necessary to attempt to parse it as an HTTP response.
+                    // Later, we can remove bytes towards the end if we ended up appending too many bytes,
+                    // e.g., we received more than enough bytes and some of them were for the next packet.
+                    </span>packet_byte_buffer.extend_from_slice(data);
 
-                    <span class="kw">let</span> <span class="ident">bytes_popped_off</span> <span class="op">=</span> {
-                        <span class="comment">// Check to see if we&#39;ve received the full HTTP response:</span>
-                        <span class="comment">// First, by checking whether we have received all of the headers (and can properly parse them)</span>
-                        <span class="comment">// Second, by getting the content length header and seeing if we&#39;ve received the full content (in num bytes)</span>
-                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">headers</span> <span class="op">=</span> [<span class="ident">httparse::EMPTY_HEADER</span>; <span class="number">64</span>];
-                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">httparse::Response::new</span>(<span class="kw-2">&amp;mut</span> <span class="ident">headers</span>);
-                        <span class="kw">match</span> <span class="ident">response</span>.<span class="ident">parse</span>(<span class="kw-2">&amp;</span><span class="ident">packet_byte_buffer</span>) {
-                            <span class="prelude-val">Ok</span>(<span class="ident">httparse::Status::Partial</span>) =&gt; {
+                    <span class="kw">let </span>bytes_popped_off = {
+                        <span class="comment">// Check to see if we&#39;ve received the full HTTP response:
+                        // First, by checking whether we have received all of the headers (and can properly parse them)
+                        // Second, by getting the content length header and seeing if we&#39;ve received the full content (in num bytes)
+                        </span><span class="kw">let </span><span class="kw-2">mut </span>headers = [httparse::EMPTY_HEADER; <span class="number">64</span>];
+                        <span class="kw">let </span><span class="kw-2">mut </span>response = httparse::Response::new(<span class="kw-2">&amp;mut </span>headers);
+                        <span class="kw">match </span>response.parse(<span class="kw-2">&amp;</span>packet_byte_buffer) {
+                            <span class="prelude-val">Ok</span>(httparse::Status::Partial) =&gt; {
                                 <span class="macro">trace!</span>(<span class="string">&quot;http_client: received partial HTTP response...&quot;</span>);
-                                <span class="comment">// we haven&#39;t received all of the HTTP header bytes yet, </span>
-                                <span class="comment">// so pop off all of the bytes from the recv buffer into our packet</span>
-                                <span class="ident">data</span>.<span class="ident">len</span>()
+                                <span class="comment">// we haven&#39;t received all of the HTTP header bytes yet, 
+                                // so pop off all of the bytes from the recv buffer into our packet
+                                </span>data.len()
                             }
 
-                            <span class="prelude-val">Ok</span>(<span class="ident">httparse::Status::Complete</span>(<span class="ident">total_header_len</span>)) =&gt; {
-                                <span class="ident">packet_header_length</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">total_header_len</span>);
-                                <span class="ident">response_status_code</span> <span class="op">=</span> <span class="ident">response</span>.<span class="ident">code</span>;
-                                <span class="ident">response_reason</span> <span class="op">=</span> <span class="ident">response</span>.<span class="ident">reason</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">String::from</span>(<span class="ident">s</span>));
+                            <span class="prelude-val">Ok</span>(httparse::Status::Complete(total_header_len)) =&gt; {
+                                packet_header_length = <span class="prelude-val">Some</span>(total_header_len);
+                                response_status_code = response.code;
+                                response_reason = response.reason.map(|s| String::from(s));
 
-                                <span class="comment">// Here: we&#39;ve received all headers, but we may not be done receiving the full response.</span>
-                                <span class="comment">// If there is a &quot;Content-Length&quot; header present, we can use that to see if all the bytes are received.</span>
-                                <span class="comment">// If there is no such header, then there might be a &quot;Connection: close&quot; header, indicating that the response is complete.</span>
-                                <span class="comment">// If neither headers exist, then there has been an unexpected problem, and we should return an error.</span>
+                                <span class="comment">// Here: we&#39;ve received all headers, but we may not be done receiving the full response.
+                                // If there is a &quot;Content-Length&quot; header present, we can use that to see if all the bytes are received.
+                                // If there is no such header, then there might be a &quot;Connection: close&quot; header, indicating that the response is complete.
+                                // If neither headers exist, then there has been an unexpected problem, and we should return an error.
 
-                                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">content_length_header</span>) <span class="op">=</span> <span class="ident">response</span>.<span class="ident">headers</span>.<span class="ident">iter</span>().<span class="ident">find</span>(<span class="op">|</span><span class="ident">h</span><span class="op">|</span> <span class="ident">h</span>.<span class="ident">name</span> <span class="op">==</span> <span class="string">&quot;Content-Length&quot;</span>) {
-                                    <span class="kw">match</span> <span class="ident">str::from_utf8</span>(<span class="ident">content_length_header</span>.<span class="ident">value</span>)
-                                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;failed to read Content-Length header value as UTF-8 string&quot;</span>)
-                                        .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>()
-                                            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;failed to parse Content-Length header value as usize&quot;</span>)
+                                </span><span class="kw">if let </span><span class="prelude-val">Some</span>(content_length_header) = response.headers.iter().find(|h| h.name == <span class="string">&quot;Content-Length&quot;</span>) {
+                                    <span class="kw">match </span>str::from_utf8(content_length_header.value)
+                                        .map_err(|_e| <span class="string">&quot;failed to read Content-Length header value as UTF-8 string&quot;</span>)
+                                        .and_then(|s| s.parse::&lt;usize&gt;()
+                                            .map_err(|_e| <span class="string">&quot;failed to parse Content-Length header value as usize&quot;</span>)
                                         )
                                     {
-                                        <span class="prelude-val">Ok</span>(<span class="ident">content_length</span>) =&gt; {
-                                            <span class="comment">// debug!(&quot;http_client: packet_byte_buffer len: {}, content_length: {}, header_len: {} (_loop_ctr: {})&quot;, </span>
-                                            <span class="comment">//     packet_byte_buffer.len(), content_length, total_header_len, _loop_ctr</span>
-                                            <span class="comment">// );</span>
-                                            <span class="comment">// the total num of bytes that we want is the length of all the headers + the content</span>
-                                            <span class="kw">let</span> <span class="ident">expected_length</span> <span class="op">=</span> <span class="ident">total_header_len</span> <span class="op">+</span> <span class="ident">content_length</span>;
-                                            <span class="kw">if</span> <span class="ident">packet_byte_buffer</span>.<span class="ident">len</span>() <span class="op">&lt;</span> <span class="ident">expected_length</span> {
-                                                <span class="comment">// here: we haven&#39;t gotten all of the content bytes yet, so we pop off all of the bytes received so far</span>
-                                                <span class="ident">data</span>.<span class="ident">len</span>()
-                                            } <span class="kw">else</span> {
-                                                <span class="comment">// here: we *have* received all of the content, so the full response is ready</span>
-                                                <span class="ident">new_state</span> <span class="op">=</span> <span class="ident">HttpState::Responded</span>;
-                                                <span class="comment">// we pop off the exact number of bytes that make up the rest of the content,</span>
-                                                <span class="comment">// leaving the rest on the recv buffer</span>
-                                                <span class="ident">expected_length</span> <span class="op">-</span> <span class="ident">orig_packet_length</span>
+                                        <span class="prelude-val">Ok</span>(content_length) =&gt; {
+                                            <span class="comment">// debug!(&quot;http_client: packet_byte_buffer len: {}, content_length: {}, header_len: {} (_loop_ctr: {})&quot;, 
+                                            //     packet_byte_buffer.len(), content_length, total_header_len, _loop_ctr
+                                            // );
+                                            // the total num of bytes that we want is the length of all the headers + the content
+                                            </span><span class="kw">let </span>expected_length = total_header_len + content_length;
+                                            <span class="kw">if </span>packet_byte_buffer.len() &lt; expected_length {
+                                                <span class="comment">// here: we haven&#39;t gotten all of the content bytes yet, so we pop off all of the bytes received so far
+                                                </span>data.len()
+                                            } <span class="kw">else </span>{
+                                                <span class="comment">// here: we *have* received all of the content, so the full response is ready
+                                                </span>new_state = HttpState::Responded;
+                                                <span class="comment">// we pop off the exact number of bytes that make up the rest of the content,
+                                                // leaving the rest on the recv buffer
+                                                </span>expected_length - orig_packet_length
                                             } 
 
                                         }
-                                        <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
-                                            <span class="macro">error!</span>(<span class="string">&quot;http_client: {}&quot;</span>, <span class="ident">e</span>);
-                                            <span class="comment">// upon error, return 0, which instructs the recv() method to pop off no bytes from the recv buffer</span>
-                                            <span class="number">0</span>
-                                        }
+                                        <span class="prelude-val">Err</span>(e) =&gt; {
+                                            <span class="macro">error!</span>(<span class="string">&quot;http_client: {}&quot;</span>, e);
+                                            <span class="comment">// upon error, return 0, which instructs the recv() method to pop off no bytes from the recv buffer
+                                            </span><span class="number">0
+                                        </span>}
                                     }
                                 } 
-                                <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">_connection_close_header</span>) <span class="op">=</span> <span class="ident">response</span>.<span class="ident">headers</span>.<span class="ident">iter</span>().<span class="ident">find</span>(<span class="op">|</span><span class="ident">h</span><span class="op">|</span> <span class="ident">h</span>.<span class="ident">name</span> <span class="op">==</span> <span class="string">&quot;Connection&quot;</span> <span class="op">&amp;&amp;</span> <span class="ident">h</span>.<span class="ident">value</span> <span class="op">==</span> <span class="string">b&quot;close&quot;</span>) {
-                                    <span class="comment">// Here: the remote endpoint closed the connection, meaning that the entire response is on the recv buffer.</span>
-                                    <span class="ident">new_state</span> <span class="op">=</span> <span class="ident">HttpState::Responded</span>;
-                                    <span class="ident">data</span>.<span class="ident">len</span>()
+                                <span class="kw">else if let </span><span class="prelude-val">Some</span>(_connection_close_header) = response.headers.iter().find(|h| h.name == <span class="string">&quot;Connection&quot; </span>&amp;&amp; h.value == <span class="string">b&quot;close&quot;</span>) {
+                                    <span class="comment">// Here: the remote endpoint closed the connection, meaning that the entire response is on the recv buffer.
+                                    </span>new_state = HttpState::Responded;
+                                    data.len()
                                 }
-                                <span class="kw">else</span> {
+                                <span class="kw">else </span>{
                                     <span class="macro">error!</span>(<span class="string">&quot;http_client: couldn&#39;t find Content-Length or Connection header, can&#39;t determine end of HTTP response&quot;</span>);
-                                    <span class="comment">// upon error, return 0, which instructs the recv() method to pop off no bytes from the recv buffer</span>
-                                    <span class="number">0</span>
-                                }
+                                    <span class="comment">// upon error, return 0, which instructs the recv() method to pop off no bytes from the recv buffer
+                                    </span><span class="number">0
+                                </span>}
                             }
 
-                            <span class="prelude-val">Err</span>(<span class="ident">_e</span>) =&gt; {
-                                <span class="macro">error!</span>(<span class="string">&quot;http_client: Error parsing incoming html: {:?}&quot;</span>, <span class="ident">_e</span>);
-                                <span class="number">0</span>
-                            }
+                            <span class="prelude-val">Err</span>(_e) =&gt; {
+                                <span class="macro">error!</span>(<span class="string">&quot;http_client: Error parsing incoming html: {:?}&quot;</span>, _e);
+                                <span class="number">0
+                            </span>}
                         }
                     };
 
-                    <span class="comment">// Since we eagerly appended all of the received bytes onto this buffer, </span>
-                    <span class="comment">// we need to fix that up based on how many bytes we actually ended up popping off the recv buffer</span>
-                    <span class="ident">packet_byte_buffer</span>.<span class="ident">truncate</span>(<span class="ident">orig_packet_length</span> <span class="op">+</span> <span class="ident">bytes_popped_off</span>);
+                    <span class="comment">// Since we eagerly appended all of the received bytes onto this buffer, 
+                    // we need to fix that up based on how many bytes we actually ended up popping off the recv buffer
+                    </span>packet_byte_buffer.truncate(orig_packet_length + bytes_popped_off);
 
-                    (<span class="ident">bytes_popped_off</span>, ())
+                    (bytes_popped_off, ())
                 });
 
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">recv_result</span> {
-                    <span class="macro">error!</span>(<span class="string">&quot;http_client: receive error on socket: {:?}&quot;</span>, <span class="ident">_e</span>);
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;receive error on socket&quot;</span>);
+                <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = recv_result {
+                    <span class="macro">error!</span>(<span class="string">&quot;http_client: receive error on socket: {:?}&quot;</span>, _e);
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;receive error on socket&quot;</span>);
                 }
 
-                <span class="comment">// if we just received another packet (the packet buffer changed size), then update the timeout deadline</span>
-                <span class="kw">if</span> <span class="ident">orig_packet_length</span> <span class="op">!</span><span class="op">=</span> <span class="ident">packet_byte_buffer</span>.<span class="ident">len</span>() {
-                    <span class="ident">latest_packet_timestamp</span> <span class="op">=</span> <span class="macro">hpet_ticks!</span>();
+                <span class="comment">// if we just received another packet (the packet buffer changed size), then update the timeout deadline
+                </span><span class="kw">if </span>orig_packet_length != packet_byte_buffer.len() {
+                    latest_packet_timestamp = <span class="macro">hpet_ticks!</span>();
                 }
                 
-                <span class="ident">new_state</span>
+                new_state
             }
 
-            <span class="ident">HttpState::Responded</span> =&gt; {
-                <span class="macro">debug!</span>(<span class="string">&quot;http_client: received full {}-byte HTTP response (_loop_ctr: {}).&quot;</span>, <span class="ident">packet_byte_buffer</span>.<span class="ident">len</span>(), <span class="ident">_loop_ctr</span>);
+            HttpState::Responded =&gt; {
+                <span class="macro">debug!</span>(<span class="string">&quot;http_client: received full {}-byte HTTP response (_loop_ctr: {}).&quot;</span>, packet_byte_buffer.len(), _loop_ctr);
                 <span class="kw">break</span>;
             }
 
-            <span class="ident">HttpState::ReceivingResponse</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">socket</span>.<span class="ident">may_recv</span>() =&gt; {
-                <span class="macro">error!</span>(<span class="string">&quot;http_client: socket was closed prematurely before full reponse was received! (_loop_ctr: {})&quot;</span>, <span class="ident">_loop_ctr</span>);
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;socket was closed prematurely before full reponse was received!&quot;</span>);
+            HttpState::ReceivingResponse <span class="kw">if </span>!socket.may_recv() =&gt; {
+                <span class="macro">error!</span>(<span class="string">&quot;http_client: socket was closed prematurely before full reponse was received! (_loop_ctr: {})&quot;</span>, _loop_ctr);
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;socket was closed prematurely before full reponse was received!&quot;</span>);
             }
 
-            <span class="kw">_</span> =&gt; { 
-                <span class="comment">// if _loop_ctr % 50000 == 0 {</span>
-                <span class="comment">//     warn!(&quot;http_client: waiting in state {:?} for socket to send/recv ...&quot;, state);</span>
-                <span class="comment">// }</span>
-                <span class="ident">state</span>
+            <span class="kw">_ </span>=&gt; { 
+                <span class="comment">// if _loop_ctr % 50000 == 0 {
+                //     warn!(&quot;http_client: waiting in state {:?} for socket to send/recv ...&quot;, state);
+                // }
+                </span>state
             }
         }
     }
 
 
-    <span class="comment">// debug!(&quot;http_client: exiting HTTP state loop with state: {:?} (_loop_ctr: {})&quot;, state, _loop_ctr);</span>
+    <span class="comment">// debug!(&quot;http_client: exiting HTTP state loop with state: {:?} (_loop_ctr: {})&quot;, state, _loop_ctr);
 
-    <span class="prelude-val">Ok</span>(<span class="ident">HttpResponse</span> {
-        <span class="ident">packet</span>: <span class="ident">packet_byte_buffer</span>,
-        <span class="ident">header_length</span>: <span class="ident">packet_header_length</span>.<span class="ident">ok_or</span>(<span class="string">&quot;BUG: received full HTTP response but couldn&#39;t determine packet header length&quot;</span>)<span class="question-mark">?</span>,
-        <span class="ident">status_code</span>: <span class="ident">response_status_code</span>.<span class="ident">ok_or</span>(<span class="string">&quot;BUG: received full HTTP response but couldn&#39;t determine its status code&quot;</span>)<span class="question-mark">?</span>,
-        <span class="ident">reason</span>: <span class="ident">response_reason</span>.<span class="ident">ok_or</span>(<span class="string">&quot;BUG: received full HTTP response but couldn&#39;t determine its reason phrase&quot;</span>)<span class="question-mark">?</span>,
+    </span><span class="prelude-val">Ok</span>(HttpResponse {
+        packet: packet_byte_buffer,
+        header_length: packet_header_length.ok_or(<span class="string">&quot;BUG: received full HTTP response but couldn&#39;t determine packet header length&quot;</span>)<span class="question-mark">?</span>,
+        status_code: response_status_code.ok_or(<span class="string">&quot;BUG: received full HTTP response but couldn&#39;t determine its status code&quot;</span>)<span class="question-mark">?</span>,
+        reason: response_reason.ok_or(<span class="string">&quot;BUG: received full HTTP response but couldn&#39;t determine its reason phrase&quot;</span>)<span class="question-mark">?</span>,
     })
     
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="http_client" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="http_client" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

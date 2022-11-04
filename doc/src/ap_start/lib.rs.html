@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ap_start/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../ap_start/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../ap_start/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../ap_start/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ap_start/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../ap_start/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -115,118 +109,115 @@
 <span id="109">109</span>
 <span id="110">110</span>
 <span id="111">111</span>
-<span id="112">112</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Routines for booting up secondary CPU cores, </span>
-<span class="doccomment">//! aka application processors (APs) on x86_64.</span>
-<span class="doccomment">//! </span>
+</pre><pre class="rust"><code><span class="doccomment">//! Routines for booting up secondary CPU cores, 
+//! aka application processors (APs) on x86_64.
+//! 
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">const_btree_new</span>)]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">stack</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">interrupts</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spawn</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">scheduler</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">apic</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">no_drop</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>stack;
+<span class="kw">extern crate </span>interrupts;
+<span class="kw">extern crate </span>spawn;
+<span class="kw">extern crate </span>scheduler;
+<span class="kw">extern crate </span>kernel_config;
+<span class="kw">extern crate </span>apic;
+<span class="kw">extern crate </span>no_drop;
 
-<span class="kw">use</span> <span class="ident">alloc::collections::BTreeMap</span>;
-<span class="kw">use</span> <span class="ident">core::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
-<span class="kw">use</span> <span class="ident">irq_safety</span>::{<span class="ident">enable_interrupts</span>, <span class="ident">MutexIrqSafe</span>};
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">VirtualAddress</span>, <span class="ident">get_kernel_mmi_ref</span>};
-<span class="kw">use</span> <span class="ident">stack::Stack</span>;
-<span class="kw">use</span> <span class="ident">kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES</span>;
-<span class="kw">use</span> <span class="ident">apic::LocalApic</span>;
-<span class="kw">use</span> <span class="ident">no_drop::NoDrop</span>;
+<span class="kw">use </span>alloc::collections::BTreeMap;
+<span class="kw">use </span>core::sync::atomic::{AtomicBool, Ordering};
+<span class="kw">use </span>irq_safety::{enable_interrupts, MutexIrqSafe};
+<span class="kw">use </span>memory::{VirtualAddress, get_kernel_mmi_ref};
+<span class="kw">use </span>stack::Stack;
+<span class="kw">use </span>kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
+<span class="kw">use </span>apic::LocalApic;
+<span class="kw">use </span>no_drop::NoDrop;
 
-<span class="doccomment">/// An atomic flag used for synchronizing progress between the BSP </span>
-<span class="doccomment">/// and the AP that is currently being booted.</span>
-<span class="doccomment">/// False means the AP hasn&#39;t started or hasn&#39;t yet finished booting.</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">AP_READY_FLAG</span>: <span class="ident">AtomicBool</span> <span class="op">=</span> <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>);
+<span class="doccomment">/// An atomic flag used for synchronizing progress between the BSP 
+/// and the AP that is currently being booted.
+/// False means the AP hasn&#39;t started or hasn&#39;t yet finished booting.
+</span><span class="kw">pub static </span>AP_READY_FLAG: AtomicBool = AtomicBool::new(<span class="bool-val">false</span>);
 
-<span class="doccomment">/// Temporary storage for transferring allocated `Stack`s from </span>
-<span class="doccomment">/// the main bootstrap processor (BSP) to the AP processor being booted in `kstart_ap()` below.</span>
-<span class="kw">static</span> <span class="ident">AP_STACKS</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">Stack</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">BTreeMap::new</span>());
+<span class="doccomment">/// Temporary storage for transferring allocated `Stack`s from 
+/// the main bootstrap processor (BSP) to the AP processor being booted in `kstart_ap()` below.
+</span><span class="kw">static </span>AP_STACKS: MutexIrqSafe&lt;BTreeMap&lt;u8, NoDrop&lt;Stack&gt;&gt;&gt; = MutexIrqSafe::new(BTreeMap::new());
 
-<span class="doccomment">/// Insert a new stack that was allocated for the AP with the given `apic_id`.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">insert_ap_stack</span>(<span class="ident">apic_id</span>: <span class="ident">u8</span>, <span class="ident">stack</span>: <span class="ident">Stack</span>) {
-    <span class="ident">AP_STACKS</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="ident">apic_id</span>, <span class="ident">NoDrop::new</span>(<span class="ident">stack</span>));
+<span class="doccomment">/// Insert a new stack that was allocated for the AP with the given `apic_id`.
+</span><span class="kw">pub fn </span>insert_ap_stack(apic_id: u8, stack: Stack) {
+    AP_STACKS.lock().insert(apic_id, NoDrop::new(stack));
 }
 
 
-<span class="doccomment">/// Entry to rust for an AP.</span>
-<span class="doccomment">/// The arguments must match the invocation order in &quot;ap_boot.asm&quot;</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">kstart_ap</span>(
-    <span class="ident">processor_id</span>: <span class="ident">u8</span>,
-    <span class="ident">apic_id</span>: <span class="ident">u8</span>,
-    <span class="ident">_stack_start</span>: <span class="ident">VirtualAddress</span>,
-    <span class="ident">_stack_end</span>: <span class="ident">VirtualAddress</span>,
-    <span class="ident">nmi_lint</span>: <span class="ident">u8</span>,
-    <span class="ident">nmi_flags</span>: <span class="ident">u16</span>,
-) -&gt; <span class="op">!</span> {
+<span class="doccomment">/// Entry to rust for an AP.
+/// The arguments must match the invocation order in &quot;ap_boot.asm&quot;
+</span><span class="kw">pub fn </span>kstart_ap(
+    processor_id: u8,
+    apic_id: u8,
+    _stack_start: VirtualAddress,
+    _stack_end: VirtualAddress,
+    nmi_lint: u8,
+    nmi_flags: u16,
+) -&gt; ! {
     <span class="macro">info!</span>(<span class="string">&quot;Booting AP: proc: {}, apic: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}&quot;</span>,
-        <span class="ident">processor_id</span>, <span class="ident">apic_id</span>, <span class="ident">_stack_start</span>, <span class="ident">_stack_end</span>, <span class="ident">nmi_lint</span>, <span class="ident">nmi_flags</span>
+        processor_id, apic_id, _stack_start, _stack_end, nmi_lint, nmi_flags
     );
 
-    <span class="comment">// set a flag telling the BSP that this AP has entered Rust code</span>
-    <span class="ident">AP_READY_FLAG</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
+    <span class="comment">// set a flag telling the BSP that this AP has entered Rust code
+    </span>AP_READY_FLAG.store(<span class="bool-val">true</span>, Ordering::SeqCst);
 
-    <span class="comment">// get the stack that was allocated for us (this AP) by the BSP.</span>
-    <span class="kw">let</span> <span class="ident">this_ap_stack</span> <span class="op">=</span> <span class="ident">AP_STACKS</span>.<span class="ident">lock</span>().<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">apic_id</span>)
-        .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">panic!</span>(<span class="string">&quot;BUG: kstart_ap(): couldn&#39;t get stack created for AP with apic_id: {}&quot;</span>, <span class="ident">apic_id</span>));
+    <span class="comment">// get the stack that was allocated for us (this AP) by the BSP.
+    </span><span class="kw">let </span>this_ap_stack = AP_STACKS.lock().remove(<span class="kw-2">&amp;</span>apic_id)
+        .unwrap_or_else(|| <span class="macro">panic!</span>(<span class="string">&quot;BUG: kstart_ap(): couldn&#39;t get stack created for AP with apic_id: {}&quot;</span>, apic_id));
 
-    <span class="comment">// initialize interrupts (including TSS/GDT) for this AP</span>
-    <span class="kw">let</span> <span class="ident">kernel_mmi_ref</span> <span class="op">=</span> <span class="ident">get_kernel_mmi_ref</span>().<span class="ident">expect</span>(<span class="string">&quot;kstart_ap(): kernel_mmi ref was None&quot;</span>);
-    <span class="kw">let</span> (<span class="ident">double_fault_stack</span>, <span class="ident">privilege_stack</span>) <span class="op">=</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kernel_mmi</span> <span class="op">=</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>();
+    <span class="comment">// initialize interrupts (including TSS/GDT) for this AP
+    </span><span class="kw">let </span>kernel_mmi_ref = get_kernel_mmi_ref().expect(<span class="string">&quot;kstart_ap(): kernel_mmi ref was None&quot;</span>);
+    <span class="kw">let </span>(double_fault_stack, privilege_stack) = {
+        <span class="kw">let </span><span class="kw-2">mut </span>kernel_mmi = kernel_mmi_ref.lock();
         (
-            <span class="ident">stack::alloc_stack</span>(<span class="ident">KERNEL_STACK_SIZE_IN_PAGES</span>, <span class="kw-2">&amp;mut</span> <span class="ident">kernel_mmi</span>.<span class="ident">page_table</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;kstart_ap(): could not allocate double fault stack&quot;</span>),
-            <span class="ident">stack::alloc_stack</span>(<span class="number">1</span>, <span class="kw-2">&amp;mut</span> <span class="ident">kernel_mmi</span>.<span class="ident">page_table</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;kstart_ap(): could not allocate privilege stack&quot;</span>),
+            stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, <span class="kw-2">&amp;mut </span>kernel_mmi.page_table)
+                .expect(<span class="string">&quot;kstart_ap(): could not allocate double fault stack&quot;</span>),
+            stack::alloc_stack(<span class="number">1</span>, <span class="kw-2">&amp;mut </span>kernel_mmi.page_table)
+                .expect(<span class="string">&quot;kstart_ap(): could not allocate privilege stack&quot;</span>),
         )
     };
-    <span class="kw">let</span> <span class="ident">_idt</span> <span class="op">=</span> <span class="ident">interrupts::init_ap</span>(<span class="ident">apic_id</span>, <span class="ident">double_fault_stack</span>.<span class="ident">top_unusable</span>(), <span class="ident">privilege_stack</span>.<span class="ident">top_unusable</span>())
-        .<span class="ident">expect</span>(<span class="string">&quot;kstart_ap(): failed to initialize interrupts!&quot;</span>);
+    <span class="kw">let </span>_idt = interrupts::init_ap(apic_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
+        .expect(<span class="string">&quot;kstart_ap(): failed to initialize interrupts!&quot;</span>);
 
-    <span class="comment">// Initialize this CPU&#39;s Local APIC such that we can use everything that depends on APIC IDs.</span>
-    <span class="comment">// This must be done before initializing task spawning, because that relies on the ability to</span>
-    <span class="comment">// enable/disable preemption, which is partially implemented by the Local APIC.</span>
-    <span class="ident">LocalApic::init</span>(
-        <span class="kw-2">&amp;mut</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>().<span class="ident">page_table</span>,
-        <span class="ident">processor_id</span>,
-        <span class="prelude-val">Some</span>(<span class="ident">apic_id</span>),
+    <span class="comment">// Initialize this CPU&#39;s Local APIC such that we can use everything that depends on APIC IDs.
+    // This must be done before initializing task spawning, because that relies on the ability to
+    // enable/disable preemption, which is partially implemented by the Local APIC.
+    </span>LocalApic::init(
+        <span class="kw-2">&amp;mut </span>kernel_mmi_ref.lock().page_table,
+        processor_id,
+        <span class="prelude-val">Some</span>(apic_id),
         <span class="bool-val">false</span>,
-        <span class="ident">nmi_lint</span>,
-        <span class="ident">nmi_flags</span>,
-    ).<span class="ident">unwrap</span>();
+        nmi_lint,
+        nmi_flags,
+    ).unwrap();
 
-    <span class="comment">// Now that the Local APIC has been initialized for this CPU, we can initialize the</span>
-    <span class="comment">// task management subsystem and create the idle task for this CPU.</span>
-    <span class="kw">let</span> <span class="ident">bootstrap_task</span> <span class="op">=</span> <span class="ident">spawn::init</span>(<span class="ident">kernel_mmi_ref</span>.<span class="ident">clone</span>(), <span class="ident">apic_id</span>, <span class="ident">this_ap_stack</span>).<span class="ident">unwrap</span>();
-    <span class="ident">spawn::create_idle_task</span>().<span class="ident">unwrap</span>();
+    <span class="comment">// Now that the Local APIC has been initialized for this CPU, we can initialize the
+    // task management subsystem and create the idle task for this CPU.
+    </span><span class="kw">let </span>bootstrap_task = spawn::init(kernel_mmi_ref.clone(), apic_id, this_ap_stack).unwrap();
+    spawn::create_idle_task().unwrap();
 
-    <span class="macro">info!</span>(<span class="string">&quot;Initialization complete on AP core {}. Enabling interrupts...&quot;</span>, <span class="ident">apic_id</span>);
-    <span class="comment">// The following final initialization steps are important, and order matters:</span>
-    <span class="comment">// 1. Drop any other local stack variables that still exist.</span>
-    <span class="comment">// (currently nothing else needs to be dropped)</span>
-    <span class="comment">// 2. &quot;Finish&quot; this bootstrap task, indicating it has exited and no longer needs to run.</span>
-    <span class="ident">bootstrap_task</span>.<span class="ident">finish</span>();
-    <span class="comment">// 3. Enable interrupts such that other tasks can be scheduled in.</span>
-    <span class="ident">enable_interrupts</span>();
-    <span class="comment">// ****************************************************</span>
-    <span class="comment">// NOTE: nothing below here is guaranteed to run again!</span>
-    <span class="comment">// ****************************************************</span>
+    <span class="macro">info!</span>(<span class="string">&quot;Initialization complete on AP core {}. Enabling interrupts...&quot;</span>, apic_id);
+    <span class="comment">// The following final initialization steps are important, and order matters:
+    // 1. Drop any other local stack variables that still exist.
+    // (currently nothing else needs to be dropped)
+    // 2. &quot;Finish&quot; this bootstrap task, indicating it has exited and no longer needs to run.
+    </span>bootstrap_task.finish();
+    <span class="comment">// 3. Enable interrupts such that other tasks can be scheduled in.
+    </span>enable_interrupts();
+    <span class="comment">// ****************************************************
+    // NOTE: nothing below here is guaranteed to run again!
+    // ****************************************************
 
-    <span class="ident">scheduler::schedule</span>();
-    <span class="kw">loop</span> { 
-        <span class="macro">error!</span>(<span class="string">&quot;BUG: ap_start::kstart_ap(): CPU {} bootstrap task was rescheduled after being dead!&quot;</span>, <span class="ident">apic_id</span>);
+    </span>scheduler::schedule();
+    <span class="kw">loop </span>{ 
+        <span class="macro">error!</span>(<span class="string">&quot;BUG: ap_start::kstart_ap(): CPU {} bootstrap task was rescheduled after being dead!&quot;</span>, apic_id);
     }
 }</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ap_start" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ap_start" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

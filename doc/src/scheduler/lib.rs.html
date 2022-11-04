@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/scheduler/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../scheduler/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../scheduler/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../scheduler/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/scheduler/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../scheduler/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -98,100 +92,99 @@
 <span id="92">92</span>
 <span id="93">93</span>
 <span id="94">94</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
+</pre><pre class="rust"><code><span class="attr">#![no_std]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
+#[macro_use] </span><span class="kw">extern crate </span>log;
 
-<span class="macro">cfg_if::cfg_if!</span> {
-    <span class="kw">if</span> <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">priority_scheduler</span>)]</span> {
-        <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">scheduler_priority</span> <span class="kw">as</span> <span class="ident">scheduler</span>;
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">realtime_scheduler</span>)]</span> {
-        <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">scheduler_realtime</span> <span class="kw">as</span> <span class="ident">scheduler</span>;
-    } <span class="kw">else</span> {
-        <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">scheduler_round_robin</span> <span class="kw">as</span> <span class="ident">scheduler</span>;
+<span class="macro">cfg_if::cfg_if! </span>{
+    <span class="kw">if </span><span class="attr">#[cfg(priority_scheduler)] </span>{
+        <span class="kw">extern crate </span>scheduler_priority <span class="kw">as </span>scheduler;
+    } <span class="kw">else if </span><span class="attr">#[cfg(realtime_scheduler)] </span>{
+        <span class="kw">extern crate </span>scheduler_realtime <span class="kw">as </span>scheduler;
+    } <span class="kw">else </span>{
+        <span class="kw">extern crate </span>scheduler_round_robin <span class="kw">as </span>scheduler;
     }
 }
 
-<span class="kw">use</span> <span class="ident">apic::get_my_apic_id</span>;
-<span class="kw">use</span> <span class="ident">task</span>::{<span class="ident">get_my_current_task</span>, <span class="ident">TaskRef</span>};
+<span class="kw">use </span>apic::get_my_apic_id;
+<span class="kw">use </span>task::{get_my_current_task, TaskRef};
 
-<span class="doccomment">/// Yields the current CPU by selecting a new `Task` to run </span>
-<span class="doccomment">/// and then switching to that new `Task`.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Preemption will be disabled while this function runs,</span>
-<span class="doccomment">/// but interrupts are not disabled because it is not necessary.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// ## Return</span>
-<span class="doccomment">/// * `true` if a new task was selected and switched to.</span>
-<span class="doccomment">/// * `false` if no new task was selected,</span>
-<span class="doccomment">///    meaning the current task will continue running.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">schedule</span>() -&gt; <span class="ident">bool</span> {
-    <span class="kw">let</span> <span class="ident">preemption_guard</span> <span class="op">=</span> <span class="ident">preemption::hold_preemption</span>();
-    <span class="comment">// If preemption was not previously enabled (before we disabled it above),</span>
-    <span class="comment">// then we shouldn&#39;t perform a task switch here.</span>
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">preemption_guard</span>.<span class="ident">preemption_was_enabled</span>() {
-        <span class="comment">// trace!(&quot;Note: preemption was disabled on CPU {}, skipping scheduler.&quot;, get_my_apic_id());</span>
-        <span class="kw">return</span> <span class="bool-val">false</span>;
+<span class="doccomment">/// Yields the current CPU by selecting a new `Task` to run 
+/// and then switching to that new `Task`.
+///
+/// Preemption will be disabled while this function runs,
+/// but interrupts are not disabled because it is not necessary.
+///
+/// ## Return
+/// * `true` if a new task was selected and switched to.
+/// * `false` if no new task was selected,
+///    meaning the current task will continue running.
+</span><span class="kw">pub fn </span>schedule() -&gt; bool {
+    <span class="kw">let </span>preemption_guard = preemption::hold_preemption();
+    <span class="comment">// If preemption was not previously enabled (before we disabled it above),
+    // then we shouldn&#39;t perform a task switch here.
+    </span><span class="kw">if </span>!preemption_guard.preemption_was_enabled() {
+        <span class="comment">// trace!(&quot;Note: preemption was disabled on CPU {}, skipping scheduler.&quot;, get_my_apic_id());
+        </span><span class="kw">return </span><span class="bool-val">false</span>;
     }
 
-    <span class="kw">let</span> <span class="ident">apic_id</span> <span class="op">=</span> <span class="ident">get_my_apic_id</span>();
+    <span class="kw">let </span>apic_id = get_my_apic_id();
 
-    <span class="kw">let</span> <span class="ident">curr_task</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">curr</span>) <span class="op">=</span> <span class="ident">get_my_current_task</span>() {
-        <span class="ident">curr</span>
-    } <span class="kw">else</span> {
+    <span class="kw">let </span>curr_task = <span class="kw">if let </span><span class="prelude-val">Some</span>(curr) = get_my_current_task() {
+        curr
+    } <span class="kw">else </span>{
         <span class="macro">error!</span>(<span class="string">&quot;BUG: schedule(): could not get current task.&quot;</span>);
-        <span class="kw">return</span> <span class="bool-val">false</span>; <span class="comment">// keep running the same current task</span>
-    };
+        <span class="kw">return </span><span class="bool-val">false</span>; <span class="comment">// keep running the same current task
+    </span>};
 
-    <span class="kw">let</span> <span class="ident">next_task</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">next</span>) <span class="op">=</span> <span class="ident">scheduler::select_next_task</span>(<span class="ident">apic_id</span>) {
-        <span class="ident">next</span>
-    } <span class="kw">else</span> {
-        <span class="kw">return</span> <span class="bool-val">false</span>; <span class="comment">// keep running the same current task</span>
-    };
+    <span class="kw">let </span>next_task = <span class="kw">if let </span><span class="prelude-val">Some</span>(next) = scheduler::select_next_task(apic_id) {
+        next
+    } <span class="kw">else </span>{
+        <span class="kw">return </span><span class="bool-val">false</span>; <span class="comment">// keep running the same current task
+    </span>};
 
-    <span class="kw">let</span> (<span class="ident">did_switch</span>, <span class="ident">recovered_preemption_guard</span>) <span class="op">=</span> <span class="ident">curr_task</span>.<span class="ident">task_switch</span>(
-        <span class="ident">next_task</span>,
-        <span class="ident">apic_id</span>,
-        <span class="ident">preemption_guard</span>,
+    <span class="kw">let </span>(did_switch, recovered_preemption_guard) = curr_task.task_switch(
+        next_task,
+        apic_id,
+        preemption_guard,
     ); 
 
-    <span class="comment">// trace!(&quot;AFTER TASK_SWITCH CALL (AP {}) new current: {:?}, interrupts are {}&quot;, apic_id, get_my_current_task(), irq_safety::interrupts_enabled());</span>
+    <span class="comment">// trace!(&quot;AFTER TASK_SWITCH CALL (AP {}) new current: {:?}, interrupts are {}&quot;, apic_id, get_my_current_task(), irq_safety::interrupts_enabled());
 
-    <span class="ident">drop</span>(<span class="ident">recovered_preemption_guard</span>);
-    <span class="ident">did_switch</span>
+    </span>drop(recovered_preemption_guard);
+    did_switch
 }
 
-<span class="doccomment">/// Changes the priority of the given task with the given priority level.</span>
-<span class="doccomment">/// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).</span>
-<span class="doccomment">/// This function returns an error when a scheduler without priority is loaded. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_priority</span>(<span class="ident">_task</span>: <span class="kw-2">&amp;</span><span class="ident">TaskRef</span>, <span class="ident">_priority</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">priority_scheduler</span>)]</span> {
-        <span class="ident">scheduler_priority::set_priority</span>(<span class="ident">_task</span>, <span class="ident">_priority</span>)
+<span class="doccomment">/// Changes the priority of the given task with the given priority level.
+/// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
+/// This function returns an error when a scheduler without priority is loaded. 
+</span><span class="kw">pub fn </span>set_priority(_task: <span class="kw-2">&amp;</span>TaskRef, _priority: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="attr">#[cfg(priority_scheduler)] </span>{
+        scheduler_priority::set_priority(_task, _priority)
     }
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">priority_scheduler</span>))]</span> {
+    <span class="attr">#[cfg(not(priority_scheduler))] </span>{
         <span class="prelude-val">Err</span>(<span class="string">&quot;no scheduler that uses task priority is currently loaded&quot;</span>)
     }
 }
 
-<span class="doccomment">/// Returns the priority of a given task.</span>
-<span class="doccomment">/// This function returns None when a scheduler without priority is loaded.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_priority</span>(<span class="ident">_task</span>: <span class="kw-2">&amp;</span><span class="ident">TaskRef</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">priority_scheduler</span>)]</span> {
-        <span class="ident">scheduler_priority::get_priority</span>(<span class="ident">_task</span>)
+<span class="doccomment">/// Returns the priority of a given task.
+/// This function returns None when a scheduler without priority is loaded.
+</span><span class="kw">pub fn </span>get_priority(_task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
+    <span class="attr">#[cfg(priority_scheduler)] </span>{
+        scheduler_priority::get_priority(_task)
     }
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">priority_scheduler</span>))]</span> {
-        <span class="prelude-val">None</span>
-    }
+    <span class="attr">#[cfg(not(priority_scheduler))] </span>{
+        <span class="prelude-val">None
+    </span>}
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_periodicity</span>(<span class="ident">_task</span>: <span class="kw-2">&amp;</span><span class="ident">TaskRef</span>, <span class="ident">_period</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">realtime_scheduler</span>)]</span> {
-        <span class="ident">scheduler_realtime::set_periodicity</span>(<span class="ident">_task</span>, <span class="ident">_period</span>)
+<span class="kw">pub fn </span>set_periodicity(_task: <span class="kw-2">&amp;</span>TaskRef, _period: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="attr">#[cfg(realtime_scheduler)] </span>{
+        scheduler_realtime::set_periodicity(_task, _period)
     }
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">realtime_scheduler</span>))]</span> {
+    <span class="attr">#[cfg(not(realtime_scheduler))] </span>{
         <span class="prelude-val">Err</span>(<span class="string">&quot;no scheduler that supports periodic tasks is currently loaded&quot;</span>)
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="scheduler" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="scheduler" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

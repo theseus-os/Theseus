@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/serial_port_basic/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../serial_port_basic/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../serial_port_basic/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../serial_port_basic/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/serial_port_basic/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../serial_port_basic/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -377,379 +371,378 @@
 <span id="371">371</span>
 <span id="372">372</span>
 <span id="373">373</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Support for basic serial port access, including initialization, transmit, and receive.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This is a near-standalone crate with very minimal dependencies and a basic feature set</span>
-<span class="doccomment">//! intended for use during early Theseus boot up and initialization.</span>
-<span class="doccomment">//! For a more featureful serial port driver, use the `serial_port` crate.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! # Notes</span>
-<span class="doccomment">//! Some serial port drivers use special cases for transmitting some byte values,</span>
-<span class="doccomment">//! specifically `0x08` and `0x7F`, which are ASCII &quot;backspace&quot; and &quot;delete&quot;, respectively.</span>
-<span class="doccomment">//! They do so by writing them as three distinct values (with proper busy waiting in between):</span>
-<span class="doccomment">//! 1. `0x08`</span>
-<span class="doccomment">//! 2. `0x20` (an ascii space character)</span>
-<span class="doccomment">//! 3. `0x08` again. </span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This isn&#39;t necessarily a bad idea, as it &quot;clears out&quot; whatever character was there before,</span>
-<span class="doccomment">//! presumably to prevent rendering/display issues for a deleted character. </span>
-<span class="doccomment">//! But, this isn&#39;t required, and I personally believe it should be handled by a higher layer,</span>
-<span class="doccomment">//! such as a shell or TTY program. </span>
-<span class="doccomment">//! We don&#39;t do anything like that here, in case a user of this crate wants to send binary data</span>
-<span class="doccomment">//! across the serial port, rather than &quot;smartly-interpreted&quot; ASCII characters.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! # Resources</span>
-<span class="doccomment">//! * &lt;https://en.wikibooks.org/wiki/Serial_Programming/8250_UART_Programming&gt;</span>
-<span class="doccomment">//! * &lt;https://tldp.org/HOWTO/Modem-HOWTO-4.html&gt;</span>
-<span class="doccomment">//! * &lt;https://wiki.osdev.org/Serial_Ports&gt;</span>
-<span class="doccomment">//! * &lt;https://www.sci.muni.cz/docs/pc/serport.txt&gt;</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Support for basic serial port access, including initialization, transmit, and receive.
+//!
+//! This is a near-standalone crate with very minimal dependencies and a basic feature set
+//! intended for use during early Theseus boot up and initialization.
+//! For a more featureful serial port driver, use the `serial_port` crate.
+//!
+//! # Notes
+//! Some serial port drivers use special cases for transmitting some byte values,
+//! specifically `0x08` and `0x7F`, which are ASCII &quot;backspace&quot; and &quot;delete&quot;, respectively.
+//! They do so by writing them as three distinct values (with proper busy waiting in between):
+//! 1. `0x08`
+//! 2. `0x20` (an ascii space character)
+//! 3. `0x08` again. 
+//!
+//! This isn&#39;t necessarily a bad idea, as it &quot;clears out&quot; whatever character was there before,
+//! presumably to prevent rendering/display issues for a deleted character. 
+//! But, this isn&#39;t required, and I personally believe it should be handled by a higher layer,
+//! such as a shell or TTY program. 
+//! We don&#39;t do anything like that here, in case a user of this crate wants to send binary data
+//! across the serial port, rather than &quot;smartly-interpreted&quot; ASCII characters.
+//!
+//! # Resources
+//! * &lt;https://en.wikibooks.org/wiki/Serial_Programming/8250_UART_Programming&gt;
+//! * &lt;https://tldp.org/HOWTO/Modem-HOWTO-4.html&gt;
+//! * &lt;https://wiki.osdev.org/Serial_Ports&gt;
+//! * &lt;https://www.sci.muni.cz/docs/pc/serport.txt&gt;
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">port_io</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
+</span><span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>port_io;
+<span class="kw">extern crate </span>irq_safety;
 
-<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">convert::TryFrom</span>, <span class="ident">fmt</span>, <span class="ident">str::FromStr</span>};
-<span class="kw">use</span> <span class="ident">port_io::Port</span>;
-<span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
+<span class="kw">use </span>core::{convert::TryFrom, fmt, str::FromStr};
+<span class="kw">use </span>port_io::Port;
+<span class="kw">use </span>irq_safety::MutexIrqSafe;
 
-<span class="doccomment">/// The base port I/O addresses for COM serial ports.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u16</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">SerialPortAddress</span> {
-    <span class="doccomment">/// The base port I/O address for the COM1 serial port.</span>
-    <span class="ident">COM1</span> <span class="op">=</span> <span class="number">0x3F8</span>,
-    <span class="doccomment">/// The base port I/O address for the COM2 serial port.</span>
-    <span class="ident">COM2</span> <span class="op">=</span> <span class="number">0x2F8</span>,
-    <span class="doccomment">/// The base port I/O address for the COM3 serial port.</span>
-    <span class="ident">COM3</span> <span class="op">=</span> <span class="number">0x3E8</span>,
-    <span class="doccomment">/// The base port I/O address for the COM4 serial port.</span>
-    <span class="ident">COM4</span> <span class="op">=</span> <span class="number">0x2E8</span>,
+<span class="doccomment">/// The base port I/O addresses for COM serial ports.
+</span><span class="attr">#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[repr(u16)]
+</span><span class="kw">pub enum </span>SerialPortAddress {
+    <span class="doccomment">/// The base port I/O address for the COM1 serial port.
+    </span>COM1 = <span class="number">0x3F8</span>,
+    <span class="doccomment">/// The base port I/O address for the COM2 serial port.
+    </span>COM2 = <span class="number">0x2F8</span>,
+    <span class="doccomment">/// The base port I/O address for the COM3 serial port.
+    </span>COM3 = <span class="number">0x3E8</span>,
+    <span class="doccomment">/// The base port I/O address for the COM4 serial port.
+    </span>COM4 = <span class="number">0x2E8</span>,
 }
-<span class="kw">impl</span> <span class="ident">SerialPortAddress</span> {
-    <span class="doccomment">/// Returns a reference to the static instance of this serial port.</span>
-    <span class="kw">fn</span> <span class="ident">to_static_port</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">TriState</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">SerialPortAddress::COM1</span> =&gt; <span class="kw-2">&amp;</span><span class="ident">COM1_SERIAL_PORT</span>,
-            <span class="ident">SerialPortAddress::COM2</span> =&gt; <span class="kw-2">&amp;</span><span class="ident">COM2_SERIAL_PORT</span>,
-            <span class="ident">SerialPortAddress::COM3</span> =&gt; <span class="kw-2">&amp;</span><span class="ident">COM3_SERIAL_PORT</span>,
-            <span class="ident">SerialPortAddress::COM4</span> =&gt; <span class="kw-2">&amp;</span><span class="ident">COM4_SERIAL_PORT</span>,
+<span class="kw">impl </span>SerialPortAddress {
+    <span class="doccomment">/// Returns a reference to the static instance of this serial port.
+    </span><span class="kw">fn </span>to_static_port(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; {
+        <span class="kw">match </span><span class="self">self </span>{
+            SerialPortAddress::COM1 =&gt; <span class="kw-2">&amp;</span>COM1_SERIAL_PORT,
+            SerialPortAddress::COM2 =&gt; <span class="kw-2">&amp;</span>COM2_SERIAL_PORT,
+            SerialPortAddress::COM3 =&gt; <span class="kw-2">&amp;</span>COM3_SERIAL_PORT,
+            SerialPortAddress::COM4 =&gt; <span class="kw-2">&amp;</span>COM4_SERIAL_PORT,
         }
     }
 }
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">SerialPortAddress</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> ();
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="ident">s</span> {
-            <span class="ident">v</span> <span class="kw">if</span> <span class="ident">v</span>.<span class="ident">eq_ignore_ascii_case</span>(<span class="string">&quot;COM1&quot;</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident"><span class="self">Self</span>::COM1</span>),
-            <span class="ident">v</span> <span class="kw">if</span> <span class="ident">v</span>.<span class="ident">eq_ignore_ascii_case</span>(<span class="string">&quot;COM2&quot;</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident"><span class="self">Self</span>::COM2</span>),
-            <span class="ident">v</span> <span class="kw">if</span> <span class="ident">v</span>.<span class="ident">eq_ignore_ascii_case</span>(<span class="string">&quot;COM3&quot;</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident"><span class="self">Self</span>::COM3</span>),
-            <span class="ident">v</span> <span class="kw">if</span> <span class="ident">v</span>.<span class="ident">eq_ignore_ascii_case</span>(<span class="string">&quot;COM4&quot;</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident"><span class="self">Self</span>::COM4</span>),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">Err</span>(()),
+<span class="kw">impl </span>TryFrom&lt;<span class="kw-2">&amp;</span>str&gt; <span class="kw">for </span>SerialPortAddress {
+    <span class="kw">type </span>Error = ();
+    <span class="kw">fn </span>try_from(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="kw">match </span>s {
+            v <span class="kw">if </span>v.eq_ignore_ascii_case(<span class="string">&quot;COM1&quot;</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>::COM1),
+            v <span class="kw">if </span>v.eq_ignore_ascii_case(<span class="string">&quot;COM2&quot;</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>::COM2),
+            v <span class="kw">if </span>v.eq_ignore_ascii_case(<span class="string">&quot;COM3&quot;</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>::COM3),
+            v <span class="kw">if </span>v.eq_ignore_ascii_case(<span class="string">&quot;COM4&quot;</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>::COM4),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(()),
         }
     }
 }
-<span class="kw">impl</span> <span class="ident">FromStr</span> <span class="kw">for</span> <span class="ident">SerialPortAddress</span> {
-    <span class="kw">type</span> <span class="prelude-val">Err</span> <span class="op">=</span> ();
-    <span class="kw">fn</span> <span class="ident">from_str</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Err</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::try_from</span>(<span class="ident">s</span>)
+<span class="kw">impl </span>FromStr <span class="kw">for </span>SerialPortAddress {
+    <span class="kw">type </span><span class="prelude-val">Err </span>= ();
+    <span class="kw">fn </span>from_str(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Err&gt; {
+        <span class="self">Self</span>::try_from(s)
     }
 }
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">SerialPortAddress</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> ();
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">port</span>: <span class="ident">u16</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="ident">port</span> {
-            <span class="ident">p</span> <span class="kw">if</span> <span class="ident">p</span> <span class="op">==</span> <span class="ident"><span class="self">Self</span>::COM1</span> <span class="kw">as</span> <span class="ident">u16</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident"><span class="self">Self</span>::COM1</span>),
-            <span class="ident">p</span> <span class="kw">if</span> <span class="ident">p</span> <span class="op">==</span> <span class="ident"><span class="self">Self</span>::COM2</span> <span class="kw">as</span> <span class="ident">u16</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident"><span class="self">Self</span>::COM2</span>),
-            <span class="ident">p</span> <span class="kw">if</span> <span class="ident">p</span> <span class="op">==</span> <span class="ident"><span class="self">Self</span>::COM3</span> <span class="kw">as</span> <span class="ident">u16</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident"><span class="self">Self</span>::COM3</span>),
-            <span class="ident">p</span> <span class="kw">if</span> <span class="ident">p</span> <span class="op">==</span> <span class="ident"><span class="self">Self</span>::COM4</span> <span class="kw">as</span> <span class="ident">u16</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident"><span class="self">Self</span>::COM4</span>),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">Err</span>(()),
+<span class="kw">impl </span>TryFrom&lt;u16&gt; <span class="kw">for </span>SerialPortAddress {
+    <span class="kw">type </span>Error = ();
+    <span class="kw">fn </span>try_from(port: u16) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="kw">match </span>port {
+            p <span class="kw">if </span>p == <span class="self">Self</span>::COM1 <span class="kw">as </span>u16 =&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>::COM1),
+            p <span class="kw">if </span>p == <span class="self">Self</span>::COM2 <span class="kw">as </span>u16 =&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>::COM2),
+            p <span class="kw">if </span>p == <span class="self">Self</span>::COM3 <span class="kw">as </span>u16 =&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>::COM3),
+            p <span class="kw">if </span>p == <span class="self">Self</span>::COM4 <span class="kw">as </span>u16 =&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>::COM4),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(()),
         }
     }
 }
 
-<span class="doccomment">/// This type is used to ensure that an object of type `T` is only initialized once,</span>
-<span class="doccomment">/// but still allows for a caller to take ownership of the object `T`. </span>
-<span class="kw">enum</span> <span class="ident">TriState</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="ident">Uninited</span>,
-    <span class="ident">Inited</span>(<span class="ident">T</span>),
-    <span class="ident">Taken</span>,
+<span class="doccomment">/// This type is used to ensure that an object of type `T` is only initialized once,
+/// but still allows for a caller to take ownership of the object `T`. 
+</span><span class="kw">enum </span>TriState&lt;T&gt; {
+    Uninited,
+    Inited(T),
+    Taken,
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">TriState</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">take</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="ident"><span class="self">Self</span>::Inited</span>(<span class="kw">_</span>) <span class="op">=</span> <span class="self">self</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="ident"><span class="self">Self</span>::Inited</span>(<span class="ident">v</span>) <span class="op">=</span> <span class="ident">core::mem::replace</span>(<span class="self">self</span>, <span class="ident"><span class="self">Self</span>::Taken</span>) {
-                <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">v</span>);
+<span class="kw">impl</span>&lt;T&gt; TriState&lt;T&gt; {
+    <span class="kw">fn </span>take(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;T&gt; {
+        <span class="kw">if let </span><span class="self">Self</span>::Inited(<span class="kw">_</span>) = <span class="self">self </span>{
+            <span class="kw">if let </span><span class="self">Self</span>::Inited(v) = core::mem::replace(<span class="self">self</span>, <span class="self">Self</span>::Taken) {
+                <span class="kw">return </span><span class="prelude-val">Some</span>(v);
             }
         }
-        <span class="prelude-val">None</span>
+        <span class="prelude-val">None
+    </span>}
+}
+
+<span class="comment">// Serial ports cannot be reliably probed (discovered dynamically), thus,
+// we ensure they are exposed safely as singletons through the below static instances.
+</span><span class="kw">static </span>COM1_SERIAL_PORT: MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; = MutexIrqSafe::new(TriState::Uninited);
+<span class="kw">static </span>COM2_SERIAL_PORT: MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; = MutexIrqSafe::new(TriState::Uninited);
+<span class="kw">static </span>COM3_SERIAL_PORT: MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; = MutexIrqSafe::new(TriState::Uninited);
+<span class="kw">static </span>COM4_SERIAL_PORT: MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; = MutexIrqSafe::new(TriState::Uninited);
+
+
+<span class="doccomment">/// Takes ownership of the [`SerialPort`] specified by the given [`SerialPortAddress`].
+///
+/// This function initializes the given serial port if it has not yet been initialized.
+/// If the serial port has already been initialized and taken by another crate,
+/// this returns `None`.
+///
+/// The returned [`SerialPort`] will be restored to this crate upon being dropped.
+</span><span class="kw">pub fn </span>take_serial_port(
+    serial_port_address: SerialPortAddress
+) -&gt; <span class="prelude-ty">Option</span>&lt;SerialPort&gt; {
+    <span class="kw">let </span>sp = serial_port_address.to_static_port();
+    <span class="kw">let </span><span class="kw-2">mut </span>locked = sp.lock();
+    <span class="kw">if let </span>TriState::Uninited = <span class="kw-2">&amp;*</span>locked {
+        <span class="kw-2">*</span>locked = TriState::Inited(SerialPort::new(serial_port_address <span class="kw">as </span>u16));
     }
+    locked.take()
 }
 
-<span class="comment">// Serial ports cannot be reliably probed (discovered dynamically), thus,</span>
-<span class="comment">// we ensure they are exposed safely as singletons through the below static instances.</span>
-<span class="kw">static</span> <span class="ident">COM1_SERIAL_PORT</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">TriState</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">TriState::Uninited</span>);
-<span class="kw">static</span> <span class="ident">COM2_SERIAL_PORT</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">TriState</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">TriState::Uninited</span>);
-<span class="kw">static</span> <span class="ident">COM3_SERIAL_PORT</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">TriState</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">TriState::Uninited</span>);
-<span class="kw">static</span> <span class="ident">COM4_SERIAL_PORT</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">TriState</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">TriState::Uninited</span>);
+<span class="comment">// The E9 port can be used with the Bochs emulator for extra debugging info.
+// const PORT_E9: u16 = 0xE9; // for use with bochs
+// static E9: Port&lt;u8&gt; = Port::new(PORT_E9); // see Bochs&#39;s port E9 hack
 
 
-<span class="doccomment">/// Takes ownership of the [`SerialPort`] specified by the given [`SerialPortAddress`].</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This function initializes the given serial port if it has not yet been initialized.</span>
-<span class="doccomment">/// If the serial port has already been initialized and taken by another crate,</span>
-<span class="doccomment">/// this returns `None`.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The returned [`SerialPort`] will be restored to this crate upon being dropped.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_serial_port</span>(
-    <span class="ident">serial_port_address</span>: <span class="ident">SerialPortAddress</span>
-) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">sp</span> <span class="op">=</span> <span class="ident">serial_port_address</span>.<span class="ident">to_static_port</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">locked</span> <span class="op">=</span> <span class="ident">sp</span>.<span class="ident">lock</span>();
-    <span class="kw">if</span> <span class="kw">let</span> <span class="ident">TriState::Uninited</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">locked</span> {
-        <span class="kw-2">*</span><span class="ident">locked</span> <span class="op">=</span> <span class="ident">TriState::Inited</span>(<span class="ident">SerialPort::new</span>(<span class="ident">serial_port_address</span> <span class="kw">as</span> <span class="ident">u16</span>));
-    }
-    <span class="ident">locked</span>.<span class="ident">take</span>()
+</span><span class="doccomment">/// A serial port and its various data and control registers.
+///
+/// TODO: use PortReadOnly and PortWriteOnly to set permissions for each register.
+</span><span class="kw">pub struct </span>SerialPort {
+    <span class="doccomment">/// The data port, for receiving and transmitting data.
+    </span>data:                       Port&lt;u8&gt;,
+    interrupt_enable:           Port&lt;u8&gt;,
+    interrupt_id_fifo_control:  Port&lt;u8&gt;,
+    line_control:               Port&lt;u8&gt;,
+    modem_control:              Port&lt;u8&gt;,
+    line_status:                Port&lt;u8&gt;,
+    _modem_status:              Port&lt;u8&gt;,
+    _scratch:                   Port&lt;u8&gt;,
 }
 
-<span class="comment">// The E9 port can be used with the Bochs emulator for extra debugging info.</span>
-<span class="comment">// const PORT_E9: u16 = 0xE9; // for use with bochs</span>
-<span class="comment">// static E9: Port&lt;u8&gt; = Port::new(PORT_E9); // see Bochs&#39;s port E9 hack</span>
-
-
-<span class="doccomment">/// A serial port and its various data and control registers.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// TODO: use PortReadOnly and PortWriteOnly to set permissions for each register.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SerialPort</span> {
-    <span class="doccomment">/// The data port, for receiving and transmitting data.</span>
-    <span class="ident">data</span>:                       <span class="ident">Port</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="ident">interrupt_enable</span>:           <span class="ident">Port</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="ident">interrupt_id_fifo_control</span>:  <span class="ident">Port</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="ident">line_control</span>:               <span class="ident">Port</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="ident">modem_control</span>:              <span class="ident">Port</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="ident">line_status</span>:                <span class="ident">Port</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="ident">_modem_status</span>:              <span class="ident">Port</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="ident">_scratch</span>:                   <span class="ident">Port</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-}
-
-<span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">SerialPort</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">sp</span>) <span class="op">=</span> <span class="ident">SerialPortAddress::try_from</span>(<span class="self">self</span>.<span class="ident">data</span>.<span class="ident">port_address</span>()).<span class="ident">map</span>(<span class="op">|</span><span class="ident">spa</span><span class="op">|</span> <span class="ident">spa</span>.<span class="ident">to_static_port</span>()) {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sp_locked</span> <span class="op">=</span> <span class="ident">sp</span>.<span class="ident">lock</span>();
-            <span class="kw">if</span> <span class="kw">let</span> <span class="ident">TriState::Taken</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">sp_locked</span> {
-                <span class="kw">let</span> <span class="ident">dummy</span> <span class="op">=</span> <span class="ident">SerialPort</span> { 
-                    <span class="ident">data</span>:                       <span class="ident">Port::new</span>(<span class="number">0</span>),
-                    <span class="ident">interrupt_enable</span>:           <span class="ident">Port::new</span>(<span class="number">0</span>),
-                    <span class="ident">interrupt_id_fifo_control</span>:  <span class="ident">Port::new</span>(<span class="number">0</span>),
-                    <span class="ident">line_control</span>:               <span class="ident">Port::new</span>(<span class="number">0</span>),
-                    <span class="ident">modem_control</span>:              <span class="ident">Port::new</span>(<span class="number">0</span>),
-                    <span class="ident">line_status</span>:                <span class="ident">Port::new</span>(<span class="number">0</span>),
-                    <span class="ident">_modem_status</span>:              <span class="ident">Port::new</span>(<span class="number">0</span>),
-                    <span class="ident">_scratch</span>:                   <span class="ident">Port::new</span>(<span class="number">0</span>),
+<span class="kw">impl </span>Drop <span class="kw">for </span>SerialPort {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(sp) = SerialPortAddress::try_from(<span class="self">self</span>.data.port_address()).map(|spa| spa.to_static_port()) {
+            <span class="kw">let </span><span class="kw-2">mut </span>sp_locked = sp.lock();
+            <span class="kw">if let </span>TriState::Taken = <span class="kw-2">&amp;*</span>sp_locked {
+                <span class="kw">let </span>dummy = SerialPort { 
+                    data:                       Port::new(<span class="number">0</span>),
+                    interrupt_enable:           Port::new(<span class="number">0</span>),
+                    interrupt_id_fifo_control:  Port::new(<span class="number">0</span>),
+                    line_control:               Port::new(<span class="number">0</span>),
+                    modem_control:              Port::new(<span class="number">0</span>),
+                    line_status:                Port::new(<span class="number">0</span>),
+                    _modem_status:              Port::new(<span class="number">0</span>),
+                    _scratch:                   Port::new(<span class="number">0</span>),
                 };
-                <span class="kw">let</span> <span class="ident">dropped</span> <span class="op">=</span> <span class="ident">core::mem::replace</span>(<span class="self">self</span>, <span class="ident">dummy</span>);
-                <span class="kw-2">*</span><span class="ident">sp_locked</span> <span class="op">=</span> <span class="ident">TriState::Inited</span>(<span class="ident">dropped</span>);
+                <span class="kw">let </span>dropped = core::mem::replace(<span class="self">self</span>, dummy);
+                <span class="kw-2">*</span>sp_locked = TriState::Inited(dropped);
             }
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">SerialPort</span> {
-    <span class="doccomment">/// Creates and returns a new serial port structure, </span>
-    <span class="doccomment">/// and initializes that port using standard configuration parameters. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// The configuration parameters used in this function are:</span>
-    <span class="doccomment">/// * A baud rate of 38400.</span>
-    <span class="doccomment">/// * &quot;8N1&quot; mode: data word length of 8 bits, with no parity and one stop bit.</span>
-    <span class="doccomment">/// * FIFO buffer enabled with a threshold of 14 bytes.</span>
-    <span class="doccomment">/// * Interrupts enabled for receiving bytes only (not transmitting).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `base_port`: the port number (port I/O address) of the serial port. </span>
-    <span class="doccomment">///    This should generally be one of the known serial ports, e.g., on x86, </span>
-    <span class="doccomment">///    [`SerialPortAddress::COM1`] through [`SerialPortAddress::COM4`].</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Note: if you are experiencing problems with serial port behavior,</span>
-    <span class="doccomment">/// try enabling the loopback test part of this function to see if that passes.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">base_port</span>: <span class="ident">u16</span>) -&gt; <span class="ident">SerialPort</span> {
-        <span class="kw">let</span> <span class="ident">serial</span> <span class="op">=</span> <span class="ident">SerialPort</span> {
-            <span class="ident">data</span>:                       <span class="ident">Port::new</span>(<span class="ident">base_port</span> <span class="op">+</span> <span class="number">0</span>),
-            <span class="ident">interrupt_enable</span>:           <span class="ident">Port::new</span>(<span class="ident">base_port</span> <span class="op">+</span> <span class="number">1</span>),
-            <span class="ident">interrupt_id_fifo_control</span>:  <span class="ident">Port::new</span>(<span class="ident">base_port</span> <span class="op">+</span> <span class="number">2</span>),
-            <span class="ident">line_control</span>:               <span class="ident">Port::new</span>(<span class="ident">base_port</span> <span class="op">+</span> <span class="number">3</span>),
-            <span class="ident">modem_control</span>:              <span class="ident">Port::new</span>(<span class="ident">base_port</span> <span class="op">+</span> <span class="number">4</span>),
-            <span class="ident">line_status</span>:                <span class="ident">Port::new</span>(<span class="ident">base_port</span> <span class="op">+</span> <span class="number">5</span>),
-            <span class="ident">_modem_status</span>:              <span class="ident">Port::new</span>(<span class="ident">base_port</span> <span class="op">+</span> <span class="number">6</span>),
-            <span class="ident">_scratch</span>:                   <span class="ident">Port::new</span>(<span class="ident">base_port</span> <span class="op">+</span> <span class="number">7</span>),
+<span class="kw">impl </span>SerialPort {
+    <span class="doccomment">/// Creates and returns a new serial port structure, 
+    /// and initializes that port using standard configuration parameters. 
+    /// 
+    /// The configuration parameters used in this function are:
+    /// * A baud rate of 38400.
+    /// * &quot;8N1&quot; mode: data word length of 8 bits, with no parity and one stop bit.
+    /// * FIFO buffer enabled with a threshold of 14 bytes.
+    /// * Interrupts enabled for receiving bytes only (not transmitting).
+    ///
+    /// # Arguments
+    /// * `base_port`: the port number (port I/O address) of the serial port. 
+    ///    This should generally be one of the known serial ports, e.g., on x86, 
+    ///    [`SerialPortAddress::COM1`] through [`SerialPortAddress::COM4`].
+    ///
+    /// Note: if you are experiencing problems with serial port behavior,
+    /// try enabling the loopback test part of this function to see if that passes.
+    </span><span class="kw">pub fn </span>new(base_port: u16) -&gt; SerialPort {
+        <span class="kw">let </span>serial = SerialPort {
+            data:                       Port::new(base_port + <span class="number">0</span>),
+            interrupt_enable:           Port::new(base_port + <span class="number">1</span>),
+            interrupt_id_fifo_control:  Port::new(base_port + <span class="number">2</span>),
+            line_control:               Port::new(base_port + <span class="number">3</span>),
+            modem_control:              Port::new(base_port + <span class="number">4</span>),
+            line_status:                Port::new(base_port + <span class="number">5</span>),
+            _modem_status:              Port::new(base_port + <span class="number">6</span>),
+            _scratch:                   Port::new(base_port + <span class="number">7</span>),
         };
 
-        <span class="comment">// SAFE: we are just accessing this serial port&#39;s registers.</span>
-        <span class="kw">unsafe</span> {
-            <span class="comment">// Before doing anything, disable interrupts for this serial port.</span>
-            <span class="ident">serial</span>.<span class="ident">interrupt_enable</span>.<span class="ident">write</span>(<span class="number">0x00</span>);
+        <span class="comment">// SAFE: we are just accessing this serial port&#39;s registers.
+        </span><span class="kw">unsafe </span>{
+            <span class="comment">// Before doing anything, disable interrupts for this serial port.
+            </span>serial.interrupt_enable.write(<span class="number">0x00</span>);
 
-            <span class="comment">// Enter DLAB mode so we can set the baud rate divisor</span>
-            <span class="ident">serial</span>.<span class="ident">line_control</span>.<span class="ident">write</span>(<span class="number">0x80</span>);
-            <span class="comment">// Set baud rate to 38400, which requires a divisor value of `3`. </span>
-            <span class="comment">// To do this, we enter DLAB mode (to se the baud rate divisor),</span>
-            <span class="comment">// the write the low byte of the divisor to the data register (DLL)</span>
-            <span class="comment">// and the high byte to the interrupt enable register (DLH).</span>
-            <span class="ident">serial</span>.<span class="ident">data</span>.<span class="ident">write</span>(<span class="number">0x03</span>);
-            <span class="ident">serial</span>.<span class="ident">interrupt_enable</span>.<span class="ident">write</span>(<span class="number">0x00</span>);
+            <span class="comment">// Enter DLAB mode so we can set the baud rate divisor
+            </span>serial.line_control.write(<span class="number">0x80</span>);
+            <span class="comment">// Set baud rate to 38400, which requires a divisor value of `3`. 
+            // To do this, we enter DLAB mode (to se the baud rate divisor),
+            // the write the low byte of the divisor to the data register (DLL)
+            // and the high byte to the interrupt enable register (DLH).
+            </span>serial.data.write(<span class="number">0x03</span>);
+            serial.interrupt_enable.write(<span class="number">0x00</span>);
 
-            <span class="comment">// Exit DLAB mode. At the same time, set the data word length to 8 bits,</span>
-            <span class="comment">// also specifying no parity and one stop bit. This is known as &quot;8N1&quot; mode.</span>
-            <span class="ident">serial</span>.<span class="ident">line_control</span>.<span class="ident">write</span>(<span class="number">0x03</span>);
+            <span class="comment">// Exit DLAB mode. At the same time, set the data word length to 8 bits,
+            // also specifying no parity and one stop bit. This is known as &quot;8N1&quot; mode.
+            </span>serial.line_control.write(<span class="number">0x03</span>);
 
-            <span class="comment">// Enable the FIFO queues (buffers in hardware) and clear both the transmit and receive queues.</span>
-            <span class="comment">// Also, set an interrupt threshold of 14 (0xC) bytes, which is the maximum value.</span>
-            <span class="comment">// Note that serial ports will fire an interrupt if there is a &quot;small delay&quot;</span>
-            <span class="comment">// between bytes, so we don&#39;t always have to wait for 14 entire bytes to arrive.</span>
-            <span class="ident">serial</span>.<span class="ident">interrupt_id_fifo_control</span>.<span class="ident">write</span>(<span class="number">0xC7</span>);
+            <span class="comment">// Enable the FIFO queues (buffers in hardware) and clear both the transmit and receive queues.
+            // Also, set an interrupt threshold of 14 (0xC) bytes, which is the maximum value.
+            // Note that serial ports will fire an interrupt if there is a &quot;small delay&quot;
+            // between bytes, so we don&#39;t always have to wait for 14 entire bytes to arrive.
+            </span>serial.interrupt_id_fifo_control.write(<span class="number">0xC7</span>);
 
-            <span class="comment">// Mark the data terminal as ready, signal request to send</span>
-            <span class="comment">// and enable auxilliary output #2 (used as interrupt line for CPU)</span>
-            <span class="ident">serial</span>.<span class="ident">modem_control</span>.<span class="ident">write</span>(<span class="number">0x0B</span>);
+            <span class="comment">// Mark the data terminal as ready, signal request to send
+            // and enable auxilliary output #2 (used as interrupt line for CPU)
+            </span>serial.modem_control.write(<span class="number">0x0B</span>);
 
-            <span class="comment">// Below, we can optionally test the serial port to see if the chip is working. </span>
-            <span class="kw">let</span> <span class="ident">_test_passed</span> <span class="op">=</span> <span class="kw">if</span> <span class="bool-val">false</span> {
-                <span class="kw">const</span> <span class="ident">TEST_BYTE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0xAE</span>;
-                <span class="comment">// Enable &quot;loopback&quot; mode (set bit 4), write a byte to the data port and try to read it back.</span>
-                <span class="ident">serial</span>.<span class="ident">modem_control</span>.<span class="ident">write</span>(<span class="number">0x10</span> <span class="op">|</span> (<span class="ident">TEST_BYTE</span> <span class="op">&amp;</span> <span class="number">0x0F</span>));
-                <span class="ident">serial</span>.<span class="ident">data</span>.<span class="ident">write</span>(<span class="ident">TEST_BYTE</span>);
-                <span class="kw">let</span> <span class="ident">byte_read_back</span> <span class="op">=</span> <span class="ident">serial</span>.<span class="ident">data</span>.<span class="ident">read</span>();
-                <span class="ident">byte_read_back</span> <span class="op">==</span> <span class="ident">TEST_BYTE</span>
-            } <span class="kw">else</span> {
-                <span class="bool-val">true</span>
-            };
+            <span class="comment">// Below, we can optionally test the serial port to see if the chip is working. 
+            </span><span class="kw">let </span>_test_passed = <span class="kw">if </span><span class="bool-val">false </span>{
+                <span class="kw">const </span>TEST_BYTE: u8 = <span class="number">0xAE</span>;
+                <span class="comment">// Enable &quot;loopback&quot; mode (set bit 4), write a byte to the data port and try to read it back.
+                </span>serial.modem_control.write(<span class="number">0x10 </span>| (TEST_BYTE &amp; <span class="number">0x0F</span>));
+                serial.data.write(TEST_BYTE);
+                <span class="kw">let </span>byte_read_back = serial.data.read();
+                byte_read_back == TEST_BYTE
+            } <span class="kw">else </span>{
+                <span class="bool-val">true
+            </span>};
             
-            <span class="comment">// Note: even if the above loopback test failed, we go ahead and ensure the serial port</span>
-            <span class="comment">// remains in a working state, because some hardware doesn&#39;t support loopback mode. </span>
+            <span class="comment">// Note: even if the above loopback test failed, we go ahead and ensure the serial port
+            // remains in a working state, because some hardware doesn&#39;t support loopback mode. 
             
-            <span class="comment">// Set the serial prot to regular mode (non-loopback) and enable standard config bits:</span>
-            <span class="comment">// Auxiliary Output 1 and 2, Request to Send (RTS), and Data Terminal Ready (DTR).</span>
-            <span class="ident">serial</span>.<span class="ident">modem_control</span>.<span class="ident">write</span>(<span class="number">0x0F</span>);
+            // Set the serial prot to regular mode (non-loopback) and enable standard config bits:
+            // Auxiliary Output 1 and 2, Request to Send (RTS), and Data Terminal Ready (DTR).
+            </span>serial.modem_control.write(<span class="number">0x0F</span>);
             
-            <span class="comment">// Finally, enable interrupts for this serial port, for received data only.</span>
-            <span class="ident">serial</span>.<span class="ident">interrupt_enable</span>.<span class="ident">write</span>(<span class="number">0x01</span>);
+            <span class="comment">// Finally, enable interrupts for this serial port, for received data only.
+            </span>serial.interrupt_enable.write(<span class="number">0x01</span>);
         }
 
-        <span class="ident">serial</span>
+        serial
 
     }
 
-    <span class="doccomment">/// Enable or disable interrupts on this serial port for various events.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enable_interrupt</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">event</span>: <span class="ident">SerialPortInterruptEvent</span>, <span class="ident">enable</span>: <span class="ident">bool</span>) {
-        <span class="kw">let</span> <span class="ident">existing</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">interrupt_enable</span>.<span class="ident">read</span>();
-        <span class="kw">let</span> <span class="ident">new</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">enable</span> {
-            <span class="ident">existing</span> <span class="op">|</span> <span class="ident">event</span> <span class="kw">as</span> <span class="ident">u8</span>
-        } <span class="kw">else</span> {
-            <span class="ident">existing</span> <span class="op">&amp;</span> <span class="op">!</span>(<span class="ident">event</span> <span class="kw">as</span> <span class="ident">u8</span>)
+    <span class="doccomment">/// Enable or disable interrupts on this serial port for various events.
+    </span><span class="kw">pub fn </span>enable_interrupt(<span class="kw-2">&amp;mut </span><span class="self">self</span>, event: SerialPortInterruptEvent, enable: bool) {
+        <span class="kw">let </span>existing = <span class="self">self</span>.interrupt_enable.read();
+        <span class="kw">let </span>new = <span class="kw">if </span>enable {
+            existing | event <span class="kw">as </span>u8
+        } <span class="kw">else </span>{
+            existing &amp; !(event <span class="kw">as </span>u8)
         };
-        <span class="kw">unsafe</span> {
-            <span class="self">self</span>.<span class="ident">interrupt_enable</span>.<span class="ident">write</span>(<span class="ident">new</span>);
+        <span class="kw">unsafe </span>{
+            <span class="self">self</span>.interrupt_enable.write(new);
         }
     }
 
-    <span class="doccomment">/// Write the given string to the serial port, blocking until data can be transmitted.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Special characters</span>
-    <span class="doccomment">/// Because this function writes strings, it will transmit a carriage return `&#39;\r&#39;`</span>
-    <span class="doccomment">/// after transmitting a line feed (new line) `&#39;\n&#39;` to ensure a proper new line.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">out_str</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
-        <span class="kw">for</span> <span class="ident">byte</span> <span class="kw">in</span> <span class="ident">s</span>.<span class="ident">bytes</span>() {
-            <span class="self">self</span>.<span class="ident">out_byte</span>(<span class="ident">byte</span>);
-            <span class="kw">if</span> <span class="ident">byte</span> <span class="op">==</span> <span class="string">b&#39;\n&#39;</span> {
-                <span class="self">self</span>.<span class="ident">out_byte</span>(<span class="string">b&#39;\r&#39;</span>);
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">byte</span> <span class="op">==</span> <span class="string">b&#39;\r&#39;</span> {
-                <span class="self">self</span>.<span class="ident">out_byte</span>(<span class="string">b&#39;\n&#39;</span>);
+    <span class="doccomment">/// Write the given string to the serial port, blocking until data can be transmitted.
+    ///
+    /// # Special characters
+    /// Because this function writes strings, it will transmit a carriage return `&#39;\r&#39;`
+    /// after transmitting a line feed (new line) `&#39;\n&#39;` to ensure a proper new line.
+    </span><span class="kw">pub fn </span>out_str(<span class="kw-2">&amp;mut </span><span class="self">self</span>, s: <span class="kw-2">&amp;</span>str) {
+        <span class="kw">for </span>byte <span class="kw">in </span>s.bytes() {
+            <span class="self">self</span>.out_byte(byte);
+            <span class="kw">if </span>byte == <span class="string">b&#39;\n&#39; </span>{
+                <span class="self">self</span>.out_byte(<span class="string">b&#39;\r&#39;</span>);
+            } <span class="kw">else if </span>byte == <span class="string">b&#39;\r&#39; </span>{
+                <span class="self">self</span>.out_byte(<span class="string">b&#39;\n&#39;</span>);
             }
         }
     }
 
-    <span class="doccomment">/// Write the given byte to the serial port, blocking until data can be transmitted.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This writes the byte directly with no special cases, e.g., new lines.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">out_byte</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">byte</span>: <span class="ident">u8</span>) {
-        <span class="kw">while</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">ready_to_transmit</span>() { }
+    <span class="doccomment">/// Write the given byte to the serial port, blocking until data can be transmitted.
+    ///
+    /// This writes the byte directly with no special cases, e.g., new lines.
+    </span><span class="kw">pub fn </span>out_byte(<span class="kw-2">&amp;mut </span><span class="self">self</span>, byte: u8) {
+        <span class="kw">while </span>!<span class="self">self</span>.ready_to_transmit() { }
 
-        <span class="comment">// SAFE: we&#39;re just writing to the serial port, which has already been initialized.</span>
-        <span class="kw">unsafe</span> { 
-            <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">write</span>(<span class="ident">byte</span>); 
-            <span class="comment">// E9.write(byte); // for Bochs debugging</span>
+        <span class="comment">// SAFE: we&#39;re just writing to the serial port, which has already been initialized.
+        </span><span class="kw">unsafe </span>{ 
+            <span class="self">self</span>.data.write(byte); 
+            <span class="comment">// E9.write(byte); // for Bochs debugging
+        </span>}
+    }
+
+    <span class="doccomment">/// Write the given bytes to the serial port, blocking until data can be transmitted.
+    ///
+    /// This writes the bytes directly with no special cases, e.g., new lines.
+    </span><span class="kw">pub fn </span>out_bytes(<span class="kw-2">&amp;mut </span><span class="self">self</span>, bytes: <span class="kw-2">&amp;</span>[u8]) {
+        <span class="kw">for </span>byte <span class="kw">in </span>bytes {
+            <span class="self">self</span>.out_byte(<span class="kw-2">*</span>byte);
         }
     }
 
-    <span class="doccomment">/// Write the given bytes to the serial port, blocking until data can be transmitted.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This writes the bytes directly with no special cases, e.g., new lines.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">out_bytes</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">bytes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
-        <span class="kw">for</span> <span class="ident">byte</span> <span class="kw">in</span> <span class="ident">bytes</span> {
-            <span class="self">self</span>.<span class="ident">out_byte</span>(<span class="kw-2">*</span><span class="ident">byte</span>);
-        }
+    <span class="doccomment">/// Read one byte from the serial port, blocking until data is available.
+    </span><span class="kw">pub fn </span>in_byte(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; u8 {
+        <span class="kw">while </span>!<span class="self">self</span>.data_available() { }
+        <span class="self">self</span>.data.read() 
     }
 
-    <span class="doccomment">/// Read one byte from the serial port, blocking until data is available.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">in_byte</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">u8</span> {
-        <span class="kw">while</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">data_available</span>() { }
-        <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">read</span>() 
-    }
-
-    <span class="doccomment">/// Reads multiple bytes from the serial port into the given `buffer`, non-blocking.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The buffer will be filled with as many bytes as are available in the serial port.</span>
-    <span class="doccomment">/// Once data is no longer available to be read, the read operation will stop. </span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If no data is immediately available on the serial port, this will read nothing and return `0`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Returns the number of bytes read into the given `buffer`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">in_bytes</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>]) -&gt; <span class="ident">usize</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bytes_read</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="kw">for</span> <span class="ident">byte</span> <span class="kw">in</span> <span class="ident">buffer</span> {
-            <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">data_available</span>() {
+    <span class="doccomment">/// Reads multiple bytes from the serial port into the given `buffer`, non-blocking.
+    ///
+    /// The buffer will be filled with as many bytes as are available in the serial port.
+    /// Once data is no longer available to be read, the read operation will stop. 
+    ///
+    /// If no data is immediately available on the serial port, this will read nothing and return `0`.
+    ///
+    /// Returns the number of bytes read into the given `buffer`.
+    </span><span class="kw">pub fn </span>in_bytes(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buffer: <span class="kw-2">&amp;mut </span>[u8]) -&gt; usize {
+        <span class="kw">let </span><span class="kw-2">mut </span>bytes_read = <span class="number">0</span>;
+        <span class="kw">for </span>byte <span class="kw">in </span>buffer {
+            <span class="kw">if </span>!<span class="self">self</span>.data_available() {
                 <span class="kw">break</span>;
             }
-            <span class="kw-2">*</span><span class="ident">byte</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">read</span>();
-            <span class="ident">bytes_read</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+            <span class="kw-2">*</span>byte = <span class="self">self</span>.data.read();
+            bytes_read += <span class="number">1</span>;
         }
-        <span class="ident">bytes_read</span>
+        bytes_read
     }
 
-    <span class="doccomment">/// Returns `true` if the serial port is ready to transmit a byte.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ready_to_transmit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">line_status</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="number">0x20</span> <span class="op">==</span> <span class="number">0x20</span>
-    }
+    <span class="doccomment">/// Returns `true` if the serial port is ready to transmit a byte.
+    </span><span class="attr">#[inline(always)]
+    </span><span class="kw">pub fn </span>ready_to_transmit(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.line_status.read() &amp; <span class="number">0x20 </span>== <span class="number">0x20
+    </span>}
 
-    <span class="doccomment">/// Returns `true` if the serial port has data available to read.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">data_available</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">line_status</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="number">0x01</span> <span class="op">==</span> <span class="number">0x01</span>
-    }
+    <span class="doccomment">/// Returns `true` if the serial port has data available to read.
+    </span><span class="attr">#[inline(always)]
+    </span><span class="kw">pub fn </span>data_available(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.line_status.read() &amp; <span class="number">0x01 </span>== <span class="number">0x01
+    </span>}
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">base_port_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u16</span> {
-        <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">port_address</span>()
+    <span class="kw">pub fn </span>base_port_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u16 {
+        <span class="self">self</span>.data.port_address()
     }
 
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Write</span> <span class="kw">for</span> <span class="ident">SerialPort</span> {
-    <span class="kw">fn</span> <span class="ident">write_str</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="self">self</span>.<span class="ident">out_str</span>(<span class="ident">s</span>); 
+<span class="kw">impl </span>fmt::Write <span class="kw">for </span>SerialPort {
+    <span class="kw">fn </span>write_str(<span class="kw-2">&amp;mut </span><span class="self">self</span>, s: <span class="kw-2">&amp;</span>str) -&gt; fmt::Result {
+        <span class="self">self</span>.out_str(s); 
         <span class="prelude-val">Ok</span>(())
     }
 }
 
-<span class="doccomment">/// The types of events that can trigger an interrupt on a serial port.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">SerialPortInterruptEvent</span> {
-    <span class="ident">DataReceived</span>     <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">0</span>,
-    <span class="ident">TransmitterEmpty</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>,
-    <span class="ident">ErrorOrBreak</span>     <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">2</span>,
-    <span class="ident">StatusChange</span>     <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">3</span>,
+<span class="doccomment">/// The types of events that can trigger an interrupt on a serial port.
+</span><span class="attr">#[derive(Debug)]
+#[repr(u8)]
+</span><span class="kw">pub enum </span>SerialPortInterruptEvent {
+    DataReceived     = <span class="number">1 </span>&lt;&lt; <span class="number">0</span>,
+    TransmitterEmpty = <span class="number">1 </span>&lt;&lt; <span class="number">1</span>,
+    ErrorOrBreak     = <span class="number">1 </span>&lt;&lt; <span class="number">2</span>,
+    StatusChange     = <span class="number">1 </span>&lt;&lt; <span class="number">3</span>,
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="serial_port_basic" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="serial_port_basic" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

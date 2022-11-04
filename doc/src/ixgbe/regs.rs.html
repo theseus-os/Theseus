@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ixgbe/src/regs.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>regs.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../ixgbe/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../ixgbe/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../ixgbe/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ixgbe/src/regs.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>regs.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../ixgbe/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -583,584 +577,583 @@
 <span id="577">577</span>
 <span id="578">578</span>
 <span id="579">579</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This file contains the structs that are used to access device registers and contains configuration values to write to registers.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! The registers are divided into multiple structs because we need to separate out the </span>
-<span class="doccomment">//! receive and transmit queue registers and store them separately for virtualization. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! The 7 structs which cover the registers of the entire memory-mapped region are:</span>
-<span class="doccomment">//! * `IntelIxgbeRegisters1`</span>
-<span class="doccomment">//! * `IntelIxgbeRxRegisters1`</span>
-<span class="doccomment">//! * `IntelIxgbeRegisters2`</span>
-<span class="doccomment">//! * `IntelIxgbeTxRegisters`</span>
-<span class="doccomment">//! * `IntelIxgbeMacRegisters`</span>
-<span class="doccomment">//! * `IntelIxgbeRxRegisters2`</span>
-<span class="doccomment">//! * `IntelIxgbeRegisters3`</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This file contains the structs that are used to access device registers and contains configuration values to write to registers.
+//! 
+//! The registers are divided into multiple structs because we need to separate out the 
+//! receive and transmit queue registers and store them separately for virtualization. 
+//! 
+//! The 7 structs which cover the registers of the entire memory-mapped region are:
+//! * `IntelIxgbeRegisters1`
+//! * `IntelIxgbeRxRegisters1`
+//! * `IntelIxgbeRegisters2`
+//! * `IntelIxgbeTxRegisters`
+//! * `IntelIxgbeMacRegisters`
+//! * `IntelIxgbeRxRegisters2`
+//! * `IntelIxgbeRegisters3`
 
-<span class="kw">use</span> <span class="ident">volatile</span>::{<span class="ident">Volatile</span>, <span class="ident">ReadOnly</span>, <span class="ident">WriteOnly</span>};
-<span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
+</span><span class="kw">use </span>volatile::{Volatile, ReadOnly, WriteOnly};
+<span class="kw">use </span>zerocopy::FromBytes;
 
-<span class="doccomment">/// The layout in memory of the first set of general registers of the 82599 device.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IntelIxgbeRegisters1</span> {
-    <span class="doccomment">/// Device Control Register</span>
-    <span class="kw">pub</span> <span class="ident">ctrl</span>:                           <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x0</span>
-    <span class="ident">_padding0</span>:                          [<span class="ident">u8</span>; <span class="number">4</span>],                <span class="comment">// 0x4 - 0x7</span>
+<span class="doccomment">/// The layout in memory of the first set of general registers of the 82599 device.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>IntelIxgbeRegisters1 {
+    <span class="doccomment">/// Device Control Register
+    </span><span class="kw">pub </span>ctrl:                           Volatile&lt;u32&gt;,          <span class="comment">// 0x0
+    </span>_padding0:                          [u8; <span class="number">4</span>],                <span class="comment">// 0x4 - 0x7
     
-    <span class="doccomment">/// Device Status Register</span>
-    <span class="kw">pub</span> <span class="ident">status</span>:                         <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x8</span>
-    <span class="ident">_padding1</span>:                          [<span class="ident">u8</span>; <span class="number">12</span>],               <span class="comment">// 0xC - 0x17</span>
+    </span><span class="doccomment">/// Device Status Register
+    </span><span class="kw">pub </span>status:                         ReadOnly&lt;u32&gt;,          <span class="comment">// 0x8
+    </span>_padding1:                          [u8; <span class="number">12</span>],               <span class="comment">// 0xC - 0x17
 
-    <span class="doccomment">/// Extended Device Control Register</span>
-    <span class="kw">pub</span> <span class="ident">ctrl_ext</span>:                       <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x18</span>
-    <span class="ident">_padding2</span>:                          [<span class="ident">u8</span>; <span class="number">12</span>],               <span class="comment">// 0x1C - 0x27</span>
+    </span><span class="doccomment">/// Extended Device Control Register
+    </span><span class="kw">pub </span>ctrl_ext:                       Volatile&lt;u32&gt;,          <span class="comment">// 0x18
+    </span>_padding2:                          [u8; <span class="number">12</span>],               <span class="comment">// 0x1C - 0x27
 
-    <span class="doccomment">/// I2C Control</span>
-    <span class="kw">pub</span> <span class="ident">i2cctl</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x28</span>
-    <span class="ident">_padding3</span>:                          [<span class="ident">u8</span>; <span class="number">2004</span>],             <span class="comment">// 0x2C - 0x7FF</span>
+    </span><span class="doccomment">/// I2C Control
+    </span><span class="kw">pub </span>i2cctl:                         Volatile&lt;u32&gt;,          <span class="comment">// 0x28
+    </span>_padding3:                          [u8; <span class="number">2004</span>],             <span class="comment">// 0x2C - 0x7FF
 
-    <span class="doccomment">/// Extended Interrupt Cause Register</span>
-    <span class="kw">pub</span> <span class="ident">eicr</span>:                           <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x800</span>
-    <span class="ident">_padding4</span>:                          [<span class="ident">u8</span>; <span class="number">4</span>],                <span class="comment">// 0x804 - 0x807</span>
+    </span><span class="doccomment">/// Extended Interrupt Cause Register
+    </span><span class="kw">pub </span>eicr:                           Volatile&lt;u32&gt;,          <span class="comment">// 0x800
+    </span>_padding4:                          [u8; <span class="number">4</span>],                <span class="comment">// 0x804 - 0x807
 
-    <span class="doccomment">/// Extended Interrupt Cause Set Register</span>
-    <span class="kw">pub</span> <span class="ident">eics</span>:                           <span class="ident">WriteOnly</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,         <span class="comment">// 0x808</span>
-    <span class="ident">_padding5</span>:                          [<span class="ident">u8</span>; <span class="number">4</span>],                <span class="comment">// 0x80C - 0x80F</span>
+    </span><span class="doccomment">/// Extended Interrupt Cause Set Register
+    </span><span class="kw">pub </span>eics:                           WriteOnly&lt;u32&gt;,         <span class="comment">// 0x808
+    </span>_padding5:                          [u8; <span class="number">4</span>],                <span class="comment">// 0x80C - 0x80F
 
-    <span class="doccomment">/// Extended Interrupt Auto Clear Register</span>
-    <span class="kw">pub</span> <span class="ident">eiac</span>:                           <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x810; </span>
-    <span class="ident">_padding6</span>:                          [<span class="ident">u8</span>; <span class="number">12</span>],               <span class="comment">// 0x814 - 0x81F </span>
+    </span><span class="doccomment">/// Extended Interrupt Auto Clear Register
+    </span><span class="kw">pub </span>eiac:                           Volatile&lt;u32&gt;,          <span class="comment">// 0x810; 
+    </span>_padding6:                          [u8; <span class="number">12</span>],               <span class="comment">// 0x814 - 0x81F 
     
-    <span class="doccomment">/// Extended Interrupt Throttle Registers</span>
-    <span class="kw">pub</span> <span class="ident">eitr</span>:                           [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>; <span class="number">24</span>],    <span class="comment">// 0x820 - 0x87F; </span>
+    </span><span class="doccomment">/// Extended Interrupt Throttle Registers
+    </span><span class="kw">pub </span>eitr:                           [Volatile&lt;u32&gt;; <span class="number">24</span>],    <span class="comment">// 0x820 - 0x87F; 
 
-    <span class="doccomment">/// Extended Interrupt Mask Set/ Read Register</span>
-    <span class="kw">pub</span> <span class="ident">eims</span>:                           <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x880; </span>
-    <span class="ident">_padding7</span>:                          [<span class="ident">u8</span>; <span class="number">4</span>],                <span class="comment">// 0x884 - 0x887</span>
+    </span><span class="doccomment">/// Extended Interrupt Mask Set/ Read Register
+    </span><span class="kw">pub </span>eims:                           Volatile&lt;u32&gt;,          <span class="comment">// 0x880; 
+    </span>_padding7:                          [u8; <span class="number">4</span>],                <span class="comment">// 0x884 - 0x887
 
-    <span class="doccomment">/// Extended Interrupt Mask Clear Register</span>
-    <span class="kw">pub</span> <span class="ident">eimc</span>:                           <span class="ident">WriteOnly</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,         <span class="comment">// 0x888; </span>
-    <span class="ident">_padding8</span>:                          [<span class="ident">u8</span>; <span class="number">4</span>],                <span class="comment">// 0x88C - 0x88F     </span>
+    </span><span class="doccomment">/// Extended Interrupt Mask Clear Register
+    </span><span class="kw">pub </span>eimc:                           WriteOnly&lt;u32&gt;,         <span class="comment">// 0x888; 
+    </span>_padding8:                          [u8; <span class="number">4</span>],                <span class="comment">// 0x88C - 0x88F     
 
-    <span class="doccomment">/// Extended Interrupt Auto Mask Enable Register</span>
-    <span class="kw">pub</span> <span class="ident">eiam</span>:                           <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x890; </span>
-    <span class="ident">_padding9</span>:                          [<span class="ident">u8</span>; <span class="number">4</span>],                <span class="comment">// 0x894 - 0x897</span>
+    </span><span class="doccomment">/// Extended Interrupt Auto Mask Enable Register
+    </span><span class="kw">pub </span>eiam:                           Volatile&lt;u32&gt;,          <span class="comment">// 0x890; 
+    </span>_padding9:                          [u8; <span class="number">4</span>],                <span class="comment">// 0x894 - 0x897
 
-    <span class="doccomment">/// General Purpose Interrupt Enable</span>
-    <span class="kw">pub</span> <span class="ident">gpie</span>:                           <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x898; </span>
-    <span class="ident">_padding10</span>:                         [<span class="ident">u8</span>; <span class="number">100</span>],              <span class="comment">// 0x89C - 0x8FF</span>
+    </span><span class="doccomment">/// General Purpose Interrupt Enable
+    </span><span class="kw">pub </span>gpie:                           Volatile&lt;u32&gt;,          <span class="comment">// 0x898; 
+    </span>_padding10:                         [u8; <span class="number">100</span>],              <span class="comment">// 0x89C - 0x8FF
 
-    <span class="doccomment">/// Interrupt Vector Allocation Registers</span>
-    <span class="kw">pub</span> <span class="ident">ivar</span>:                           [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>; <span class="number">64</span>],    <span class="comment">// 0x900 - 0x9FF  </span>
-    <span class="ident">_padding11</span>:                         [<span class="ident">u8</span>; <span class="number">1536</span>],             <span class="comment">// 0xA00 - 0xFFF</span>
+    </span><span class="doccomment">/// Interrupt Vector Allocation Registers
+    </span><span class="kw">pub </span>ivar:                           [Volatile&lt;u32&gt;; <span class="number">64</span>],    <span class="comment">// 0x900 - 0x9FF  
+    </span>_padding11:                         [u8; <span class="number">1536</span>],             <span class="comment">// 0xA00 - 0xFFF
 
-} <span class="comment">// 1 4KiB page</span>
+</span>} <span class="comment">// 1 4KiB page
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">IntelIxgbeRegisters1</span><span class="op">&gt;</span>(), <span class="number">4096</span>);
+</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIxgbeRegisters1&gt;(), <span class="number">4096</span>);
 
-<span class="doccomment">/// The layout in memory of the first set of receive queue registers of the 82599 device.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IntelIxgbeRxRegisters1</span> {
-    <span class="doccomment">/// First set of Rx Registers for 64 Rx Queues</span>
-    <span class="kw">pub</span> <span class="ident">rx_regs1</span>:                       [<span class="ident">RegistersRx</span>; <span class="number">64</span>],      <span class="comment">// 0x1000 - 0x1FFF</span>
+<span class="doccomment">/// The layout in memory of the first set of receive queue registers of the 82599 device.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>IntelIxgbeRxRegisters1 {
+    <span class="doccomment">/// First set of Rx Registers for 64 Rx Queues
+    </span><span class="kw">pub </span>rx_regs1:                       [RegistersRx; <span class="number">64</span>],      <span class="comment">// 0x1000 - 0x1FFF
 
-} <span class="comment">// 1 4KiB page</span>
+</span>} <span class="comment">// 1 4KiB page
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">IntelIxgbeRxRegisters1</span><span class="op">&gt;</span>(), <span class="number">4096</span>);
+</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIxgbeRxRegisters1&gt;(), <span class="number">4096</span>);
 
-<span class="doccomment">/// The layout in memory of the second set of general registers of the 82599 device.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IntelIxgbeRegisters2</span> {
-    <span class="ident">_padding1</span>:                          [<span class="ident">u8</span>; <span class="number">3840</span>],             <span class="comment">// 0x2000 - 0x2EFF</span>
+<span class="doccomment">/// The layout in memory of the second set of general registers of the 82599 device.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>IntelIxgbeRegisters2 {
+    _padding1:                          [u8; <span class="number">3840</span>],             <span class="comment">// 0x2000 - 0x2EFF
     
-    <span class="doccomment">/// Receive DMA Control Register</span>
-    <span class="kw">pub</span> <span class="ident">rdrxctl</span>:                        <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x2F00;</span>
-    <span class="ident">_padding2</span>:                          [<span class="ident">u8</span>; <span class="number">252</span>],              <span class="comment">// 0x2F04 - 0x2FFF</span>
+    </span><span class="doccomment">/// Receive DMA Control Register
+    </span><span class="kw">pub </span>rdrxctl:                        Volatile&lt;u32&gt;,          <span class="comment">// 0x2F00;
+    </span>_padding2:                          [u8; <span class="number">252</span>],              <span class="comment">// 0x2F04 - 0x2FFF
 
-    <span class="doccomment">/// Receive Control Register</span>
-    <span class="kw">pub</span> <span class="ident">rxctrl</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x3000;</span>
-    <span class="ident">_padding3</span>:                          [<span class="ident">u8</span>; <span class="number">508</span>],              <span class="comment">// 0x3004 - 0x31FF</span>
+    </span><span class="doccomment">/// Receive Control Register
+    </span><span class="kw">pub </span>rxctrl:                         Volatile&lt;u32&gt;,          <span class="comment">// 0x3000;
+    </span>_padding3:                          [u8; <span class="number">508</span>],              <span class="comment">// 0x3004 - 0x31FF
 
-    <span class="doccomment">/// Flow Control Transmit Timer Value</span>
-    <span class="kw">pub</span> <span class="ident">fcttv</span>:                          [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;<span class="number">4</span>],      <span class="comment">// 0x3200 - 0x320F</span>
-    <span class="ident">_padding4</span>:                          [<span class="ident">u8</span>; <span class="number">16</span>],               <span class="comment">// 0x3210 - 0x321F</span>
+    </span><span class="doccomment">/// Flow Control Transmit Timer Value
+    </span><span class="kw">pub </span>fcttv:                          [Volatile&lt;u32&gt;;<span class="number">4</span>],      <span class="comment">// 0x3200 - 0x320F
+    </span>_padding4:                          [u8; <span class="number">16</span>],               <span class="comment">// 0x3210 - 0x321F
 
-    <span class="doccomment">/// Flow Control Receive Threshold Low</span>
-    <span class="kw">pub</span> <span class="ident">fcrtl</span>:                          [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;<span class="number">8</span>],      <span class="comment">// 0x3220 - 0x323F</span>
-    <span class="ident">_padding5</span>:                          [<span class="ident">u8</span>; <span class="number">32</span>],               <span class="comment">// 0x3240 - 0x325F </span>
+    </span><span class="doccomment">/// Flow Control Receive Threshold Low
+    </span><span class="kw">pub </span>fcrtl:                          [Volatile&lt;u32&gt;;<span class="number">8</span>],      <span class="comment">// 0x3220 - 0x323F
+    </span>_padding5:                          [u8; <span class="number">32</span>],               <span class="comment">// 0x3240 - 0x325F 
 
-    <span class="doccomment">/// Flow Control Receive Threshold High</span>
-    <span class="kw">pub</span> <span class="ident">fcrth</span>:                          [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;<span class="number">8</span>],      <span class="comment">// 0x3260 - 0x327F</span>
-    <span class="ident">_padding6</span>:                          [<span class="ident">u8</span>; <span class="number">32</span>],               <span class="comment">// 0x3280 - 0x329F</span>
+    </span><span class="doccomment">/// Flow Control Receive Threshold High
+    </span><span class="kw">pub </span>fcrth:                          [Volatile&lt;u32&gt;;<span class="number">8</span>],      <span class="comment">// 0x3260 - 0x327F
+    </span>_padding6:                          [u8; <span class="number">32</span>],               <span class="comment">// 0x3280 - 0x329F
 
-    <span class="doccomment">/// Flow Control Refresh Threshold Value</span>
-    <span class="kw">pub</span> <span class="ident">fcrtv</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x32A0;</span>
-    <span class="ident">_padding7</span>:                          [<span class="ident">u8</span>; <span class="number">2396</span>],             <span class="comment">// 0x32A4 - 0x3CFF</span>
+    </span><span class="doccomment">/// Flow Control Refresh Threshold Value
+    </span><span class="kw">pub </span>fcrtv:                          Volatile&lt;u32&gt;,          <span class="comment">// 0x32A0;
+    </span>_padding7:                          [u8; <span class="number">2396</span>],             <span class="comment">// 0x32A4 - 0x3CFF
 
-    <span class="doccomment">///Receive Packet Buffer Size</span>
-    <span class="kw">pub</span> <span class="ident">rxpbsize</span>:                       [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;<span class="number">8</span>],      <span class="comment">// 0x3C00   </span>
-    <span class="ident">_padding8</span>:                          [<span class="ident">u8</span>; <span class="number">224</span>],              <span class="comment">// 0x3C20 - 0x3CFF        </span>
+    </span><span class="doccomment">///Receive Packet Buffer Size
+    </span><span class="kw">pub </span>rxpbsize:                       [Volatile&lt;u32&gt;;<span class="number">8</span>],      <span class="comment">// 0x3C00   
+    </span>_padding8:                          [u8; <span class="number">224</span>],              <span class="comment">// 0x3C20 - 0x3CFF        
 
-    <span class="doccomment">/// Flow Control Configuration</span>
-    <span class="kw">pub</span> <span class="ident">fccfg</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x3D00;</span>
-    <span class="ident">_padding9</span>:                          [<span class="ident">u8</span>; <span class="number">880</span>],              <span class="comment">// 0x3D04 - 0x4073</span>
+    </span><span class="doccomment">/// Flow Control Configuration
+    </span><span class="kw">pub </span>fccfg:                          Volatile&lt;u32&gt;,          <span class="comment">// 0x3D00;
+    </span>_padding9:                          [u8; <span class="number">880</span>],              <span class="comment">// 0x3D04 - 0x4073
 
-    <span class="doccomment">/// Good Packets Received Count</span>
-    <span class="kw">pub</span> <span class="ident">gprc</span>:                           <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x4074</span>
-    <span class="ident">_padding10</span>:                         [<span class="ident">u8</span>; <span class="number">8</span>],                <span class="comment">// 0x4078 - 0x407F</span>
+    </span><span class="doccomment">/// Good Packets Received Count
+    </span><span class="kw">pub </span>gprc:                           Volatile&lt;u32&gt;,          <span class="comment">// 0x4074
+    </span>_padding10:                         [u8; <span class="number">8</span>],                <span class="comment">// 0x4078 - 0x407F
 
-    <span class="doccomment">/// Good Packets Transmitted Count</span>
-    <span class="kw">pub</span> <span class="ident">gptc</span>:                           <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x4080</span>
-    <span class="ident">_padding11</span>:                         [<span class="ident">u8</span>; <span class="number">4</span>],                <span class="comment">// 0x4084 - 0x4087 </span>
+    </span><span class="doccomment">/// Good Packets Transmitted Count
+    </span><span class="kw">pub </span>gptc:                           Volatile&lt;u32&gt;,          <span class="comment">// 0x4080
+    </span>_padding11:                         [u8; <span class="number">4</span>],                <span class="comment">// 0x4084 - 0x4087 
 
-    <span class="doccomment">/// Good Octets Received Count Low</span>
-    <span class="kw">pub</span> <span class="ident">gorcl</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x4088</span>
+    </span><span class="doccomment">/// Good Octets Received Count Low
+    </span><span class="kw">pub </span>gorcl:                          Volatile&lt;u32&gt;,          <span class="comment">// 0x4088
 
-    <span class="doccomment">/// Good Octets Received Count High</span>
-    <span class="kw">pub</span> <span class="ident">gorch</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x408C</span>
+    </span><span class="doccomment">/// Good Octets Received Count High
+    </span><span class="kw">pub </span>gorch:                          Volatile&lt;u32&gt;,          <span class="comment">// 0x408C
     
-    <span class="doccomment">/// Good Octets Transmitted Count Low</span>
-    <span class="kw">pub</span> <span class="ident">gotcl</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x4090</span>
+    </span><span class="doccomment">/// Good Octets Transmitted Count Low
+    </span><span class="kw">pub </span>gotcl:                          Volatile&lt;u32&gt;,          <span class="comment">// 0x4090
 
-    <span class="doccomment">/// Good Octets Transmitted Count High</span>
-    <span class="kw">pub</span> <span class="ident">gotch</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x4094</span>
-    <span class="ident">_padding12</span>:                         [<span class="ident">u8</span>; <span class="number">424</span>],              <span class="comment">// 0x4098 - 0x423F</span>
+    </span><span class="doccomment">/// Good Octets Transmitted Count High
+    </span><span class="kw">pub </span>gotch:                          Volatile&lt;u32&gt;,          <span class="comment">// 0x4094
+    </span>_padding12:                         [u8; <span class="number">424</span>],              <span class="comment">// 0x4098 - 0x423F
 
-    <span class="doccomment">/// MAC Core Control 0 Register </span>
-    <span class="kw">pub</span> <span class="ident">hlreg0</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x4240;</span>
-    <span class="ident">_padding13</span>:                         [<span class="ident">u8</span>; <span class="number">92</span>],               <span class="comment">// 0x4244 - 0x429F</span>
+    </span><span class="doccomment">/// MAC Core Control 0 Register 
+    </span><span class="kw">pub </span>hlreg0:                         Volatile&lt;u32&gt;,          <span class="comment">// 0x4240;
+    </span>_padding13:                         [u8; <span class="number">92</span>],               <span class="comment">// 0x4244 - 0x429F
 
-    <span class="doccomment">/// Auto-Negotiation Control Register</span>
-    <span class="kw">pub</span> <span class="ident">autoc</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x42A0;</span>
+    </span><span class="doccomment">/// Auto-Negotiation Control Register
+    </span><span class="kw">pub </span>autoc:                          Volatile&lt;u32&gt;,          <span class="comment">// 0x42A0;
 
-    <span class="doccomment">/// Link Status Register</span>
-    <span class="kw">pub</span> <span class="ident">links</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x42A4;</span>
+    </span><span class="doccomment">/// Link Status Register
+    </span><span class="kw">pub </span>links:                          Volatile&lt;u32&gt;,          <span class="comment">// 0x42A4;
 
-    <span class="doccomment">/// Auto-Negotiation Control 2 Register    </span>
-    <span class="kw">pub</span> <span class="ident">autoc2</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x42A8;</span>
-    <span class="ident">_padding14</span>:                         [<span class="ident">u8</span>; <span class="number">120</span>],              <span class="comment">// 0x42AC - 0x4323</span>
+    </span><span class="doccomment">/// Auto-Negotiation Control 2 Register    
+    </span><span class="kw">pub </span>autoc2:                         Volatile&lt;u32&gt;,          <span class="comment">// 0x42A8;
+    </span>_padding14:                         [u8; <span class="number">120</span>],              <span class="comment">// 0x42AC - 0x4323
 
-    <span class="doccomment">/// Link Status Register 2</span>
-    <span class="kw">pub</span> <span class="ident">links2</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x4324</span>
-    <span class="ident">_padding15</span>:                         [<span class="ident">u8</span>; <span class="number">1496</span>],             <span class="comment">// 0x4328 - 0x48FF</span>
+    </span><span class="doccomment">/// Link Status Register 2
+    </span><span class="kw">pub </span>links2:                         Volatile&lt;u32&gt;,          <span class="comment">// 0x4324
+    </span>_padding15:                         [u8; <span class="number">1496</span>],             <span class="comment">// 0x4328 - 0x48FF
 
-    <span class="doccomment">/// DCB Transmit Descriptor Plane Control and Status</span>
-    <span class="kw">pub</span> <span class="ident">rttdcs</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x4900;</span>
-    <span class="ident">_padding16</span>:                         [<span class="ident">u8</span>; <span class="number">380</span>],              <span class="comment">// 0x4904 - 0x4A7F</span>
+    </span><span class="doccomment">/// DCB Transmit Descriptor Plane Control and Status
+    </span><span class="kw">pub </span>rttdcs:                         Volatile&lt;u32&gt;,          <span class="comment">// 0x4900;
+    </span>_padding16:                         [u8; <span class="number">380</span>],              <span class="comment">// 0x4904 - 0x4A7F
 
-    <span class="doccomment">/// DMA Tx Control</span>
-    <span class="kw">pub</span> <span class="ident">dmatxctl</span>:                       <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x4A80;</span>
-    <span class="ident">_padding17</span>:                         [<span class="ident">u8</span>; <span class="number">4</span>],                <span class="comment">// 0x4A84 - 0x4A87</span>
+    </span><span class="doccomment">/// DMA Tx Control
+    </span><span class="kw">pub </span>dmatxctl:                       Volatile&lt;u32&gt;,          <span class="comment">// 0x4A80;
+    </span>_padding17:                         [u8; <span class="number">4</span>],                <span class="comment">// 0x4A84 - 0x4A87
     
-    <span class="doccomment">/// DMA Tx TCP Flags Control Low</span>
-    <span class="kw">pub</span> <span class="ident">dtxtcpflgl</span>:                     <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x4A88;</span>
+    </span><span class="doccomment">/// DMA Tx TCP Flags Control Low
+    </span><span class="kw">pub </span>dtxtcpflgl:                     Volatile&lt;u32&gt;,          <span class="comment">// 0x4A88;
     
-    <span class="doccomment">/// DMA Tx TCP Flags Control High</span>
-    <span class="kw">pub</span> <span class="ident">dtxtcpflgh</span>:                     <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x4A8C;</span>
-    <span class="ident">_padding18</span>:                         [<span class="ident">u8</span>; <span class="number">1392</span>],             <span class="comment">// 0x4A90 - 0x4FFF</span>
+    </span><span class="doccomment">/// DMA Tx TCP Flags Control High
+    </span><span class="kw">pub </span>dtxtcpflgh:                     Volatile&lt;u32&gt;,          <span class="comment">// 0x4A8C;
+    </span>_padding18:                         [u8; <span class="number">1392</span>],             <span class="comment">// 0x4A90 - 0x4FFF
 
-    <span class="doccomment">/// Receive Checksum Control</span>
-    <span class="kw">pub</span> <span class="ident">rxcsum</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x5000</span>
-    <span class="ident">_padding19</span>:                         [<span class="ident">u8</span>; <span class="number">124</span>],              <span class="comment">// 0x5004 - 0x507F</span>
+    </span><span class="doccomment">/// Receive Checksum Control
+    </span><span class="kw">pub </span>rxcsum:                         Volatile&lt;u32&gt;,          <span class="comment">// 0x5000
+    </span>_padding19:                         [u8; <span class="number">124</span>],              <span class="comment">// 0x5004 - 0x507F
 
-    <span class="doccomment">/// Filter Control Register</span>
-    <span class="kw">pub</span> <span class="ident">fctrl</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x5080;</span>
-    <span class="ident">_padding20</span>:                         [<span class="ident">u8</span>; <span class="number">164</span>],              <span class="comment">// 0x5084 - 0x5127</span>
+    </span><span class="doccomment">/// Filter Control Register
+    </span><span class="kw">pub </span>fctrl:                          Volatile&lt;u32&gt;,          <span class="comment">// 0x5080;
+    </span>_padding20:                         [u8; <span class="number">164</span>],              <span class="comment">// 0x5084 - 0x5127
 
-    <span class="doccomment">/// EType Queue Filter</span>
-    <span class="kw">pub</span> <span class="ident">etqf</span>:                           [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;<span class="number">8</span>],      <span class="comment">// 0x5128 - 0x5147;</span>
-    <span class="ident">_padding21</span>:                         [<span class="ident">u8</span>; <span class="number">3768</span>],             <span class="comment">// 0x5148 - 0x5FFF</span>
-} <span class="comment">// 4 4KiB page</span>
+    </span><span class="doccomment">/// EType Queue Filter
+    </span><span class="kw">pub </span>etqf:                           [Volatile&lt;u32&gt;;<span class="number">8</span>],      <span class="comment">// 0x5128 - 0x5147;
+    </span>_padding21:                         [u8; <span class="number">3768</span>],             <span class="comment">// 0x5148 - 0x5FFF
+</span>} <span class="comment">// 4 4KiB page
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">IntelIxgbeRegisters2</span><span class="op">&gt;</span>(), <span class="number">4</span> <span class="op">*</span> <span class="number">4096</span>);
+</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIxgbeRegisters2&gt;(), <span class="number">4 </span>* <span class="number">4096</span>);
 
-<span class="doccomment">/// The layout in memory of the transmit queue registers of the 82599 device.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IntelIxgbeTxRegisters</span> {
-    <span class="doccomment">/// Set of registers for 128 transmit descriptor queues</span>
-    <span class="kw">pub</span> <span class="ident">tx_regs</span>:                        [<span class="ident">RegistersTx</span>; <span class="number">128</span>],     <span class="comment">// 0x6000 - 0x7FFF</span>
-} <span class="comment">// 2 4KiB page</span>
+<span class="doccomment">/// The layout in memory of the transmit queue registers of the 82599 device.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>IntelIxgbeTxRegisters {
+    <span class="doccomment">/// Set of registers for 128 transmit descriptor queues
+    </span><span class="kw">pub </span>tx_regs:                        [RegistersTx; <span class="number">128</span>],     <span class="comment">// 0x6000 - 0x7FFF
+</span>} <span class="comment">// 2 4KiB page
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">IntelIxgbeTxRegisters</span><span class="op">&gt;</span>(), <span class="number">2</span> <span class="op">*</span> <span class="number">4096</span>);
+</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIxgbeTxRegisters&gt;(), <span class="number">2 </span>* <span class="number">4096</span>);
 
-<span class="doccomment">/// The layout in memory of the set of registers containing the MAC address of the 82599 device.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IntelIxgbeMacRegisters</span> {
-    <span class="ident">_padding1</span>:                          [<span class="ident">u8</span>; <span class="number">256</span>],              <span class="comment">// 0x8000 - 0x80FF</span>
-    <span class="doccomment">/// DMA Tx TCP Max Allow Size Requests</span>
-    <span class="kw">pub</span> <span class="ident">dtxmxszrq</span>:                      <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0X8100</span>
-    <span class="ident">_padding2</span>:                          [<span class="ident">u8</span>; <span class="number">8444</span>],             <span class="comment">// 0x8104 - 0xA1FF</span>
+<span class="doccomment">/// The layout in memory of the set of registers containing the MAC address of the 82599 device.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>IntelIxgbeMacRegisters {
+    _padding1:                          [u8; <span class="number">256</span>],              <span class="comment">// 0x8000 - 0x80FF
+    </span><span class="doccomment">/// DMA Tx TCP Max Allow Size Requests
+    </span><span class="kw">pub </span>dtxmxszrq:                      Volatile&lt;u32&gt;,          <span class="comment">// 0X8100
+    </span>_padding2:                          [u8; <span class="number">8444</span>],             <span class="comment">// 0x8104 - 0xA1FF
     
-    <span class="doccomment">/// Receive Address Low</span>
-    <span class="kw">pub</span> <span class="ident">ral</span>:                            <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0xA200;</span>
+    </span><span class="doccomment">/// Receive Address Low
+    </span><span class="kw">pub </span>ral:                            Volatile&lt;u32&gt;,          <span class="comment">// 0xA200;
     
-    <span class="doccomment">/// Receive Address High</span>
-    <span class="kw">pub</span> <span class="ident">rah</span>:                            <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0xA204;</span>
-    <span class="ident">_padding3</span>:                          [<span class="ident">u8</span>; <span class="number">10744</span>],            <span class="comment">// 0xA208 - 0xCBFF</span>
+    </span><span class="doccomment">/// Receive Address High
+    </span><span class="kw">pub </span>rah:                            Volatile&lt;u32&gt;,          <span class="comment">// 0xA204;
+    </span>_padding3:                          [u8; <span class="number">10744</span>],            <span class="comment">// 0xA208 - 0xCBFF
 
-    <span class="doccomment">/// Transmit Packet Buffer Size</span>
-    <span class="kw">pub</span> <span class="ident">txpbsize</span>:                       [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;<span class="number">8</span>],      <span class="comment">// 0xCC00</span>
-    <span class="ident">_padding4</span>:                          [<span class="ident">u8</span>; <span class="number">992</span>],              <span class="comment">// 0xCC20 - 0xCFFF</span>
-} <span class="comment">// 5 4KiB page</span>
+    </span><span class="doccomment">/// Transmit Packet Buffer Size
+    </span><span class="kw">pub </span>txpbsize:                       [Volatile&lt;u32&gt;;<span class="number">8</span>],      <span class="comment">// 0xCC00
+    </span>_padding4:                          [u8; <span class="number">992</span>],              <span class="comment">// 0xCC20 - 0xCFFF
+</span>} <span class="comment">// 5 4KiB page
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">IntelIxgbeMacRegisters</span><span class="op">&gt;</span>(), <span class="number">5</span> <span class="op">*</span> <span class="number">4096</span>);
+</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIxgbeMacRegisters&gt;(), <span class="number">5 </span>* <span class="number">4096</span>);
 
-<span class="doccomment">/// The layout in memory of the second set of receive queue registers of the 82599 device.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IntelIxgbeRxRegisters2</span> {
-    <span class="doccomment">/// Second set of Rx Registers for 64 Rx Queues</span>
-    <span class="kw">pub</span> <span class="ident">rx_regs2</span>:                       [<span class="ident">RegistersRx</span>; <span class="number">64</span>],      <span class="comment">// 0xD000 - 0xDFFF, for 64 queues</span>
-} <span class="comment">// 1 4KiB page</span>
+<span class="doccomment">/// The layout in memory of the second set of receive queue registers of the 82599 device.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>IntelIxgbeRxRegisters2 {
+    <span class="doccomment">/// Second set of Rx Registers for 64 Rx Queues
+    </span><span class="kw">pub </span>rx_regs2:                       [RegistersRx; <span class="number">64</span>],      <span class="comment">// 0xD000 - 0xDFFF, for 64 queues
+</span>} <span class="comment">// 1 4KiB page
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">IntelIxgbeRxRegisters2</span><span class="op">&gt;</span>(), <span class="number">4096</span>);
+</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIxgbeRxRegisters2&gt;(), <span class="number">4096</span>);
 
-<span class="doccomment">/// The layout in memory of the third set of general registers of the 82599 device.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IntelIxgbeRegisters3</span> {
-    <span class="doccomment">/// Source Address Queue Filter</span>
-    <span class="kw">pub</span> <span class="ident">saqf</span>:                           [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;<span class="number">128</span>],    <span class="comment">// 0xE000 - 0xE1FF</span>
+<span class="doccomment">/// The layout in memory of the third set of general registers of the 82599 device.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>IntelIxgbeRegisters3 {
+    <span class="doccomment">/// Source Address Queue Filter
+    </span><span class="kw">pub </span>saqf:                           [Volatile&lt;u32&gt;;<span class="number">128</span>],    <span class="comment">// 0xE000 - 0xE1FF
     
-    <span class="doccomment">/// Destination Address Queue Filter</span>
-    <span class="kw">pub</span> <span class="ident">daqf</span>:                           [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;<span class="number">128</span>],    <span class="comment">// 0xE200 - 0xE3FF</span>
+    </span><span class="doccomment">/// Destination Address Queue Filter
+    </span><span class="kw">pub </span>daqf:                           [Volatile&lt;u32&gt;;<span class="number">128</span>],    <span class="comment">// 0xE200 - 0xE3FF
     
-    <span class="doccomment">/// Source Destination Port Queue Filter</span>
-    <span class="kw">pub</span> <span class="ident">sdpqf</span>:                          [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;<span class="number">128</span>],    <span class="comment">// 0xE400 - 0xE5FF</span>
+    </span><span class="doccomment">/// Source Destination Port Queue Filter
+    </span><span class="kw">pub </span>sdpqf:                          [Volatile&lt;u32&gt;;<span class="number">128</span>],    <span class="comment">// 0xE400 - 0xE5FF
     
-    <span class="doccomment">/// Five Tuple Queue Filter</span>
-    <span class="kw">pub</span> <span class="ident">ftqf</span>:                           [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;<span class="number">128</span>],    <span class="comment">// 0xE600 - 0xE7FF</span>
+    </span><span class="doccomment">/// Five Tuple Queue Filter
+    </span><span class="kw">pub </span>ftqf:                           [Volatile&lt;u32&gt;;<span class="number">128</span>],    <span class="comment">// 0xE600 - 0xE7FF
     
-    <span class="doccomment">/// L3 L4 Tuples Immediate Interrupt Rx </span>
-    <span class="kw">pub</span> <span class="ident">l34timir</span>:                       [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;<span class="number">128</span>],    <span class="comment">// 0xE800 - 0xE9FF</span>
+    </span><span class="doccomment">/// L3 L4 Tuples Immediate Interrupt Rx 
+    </span><span class="kw">pub </span>l34timir:                       [Volatile&lt;u32&gt;;<span class="number">128</span>],    <span class="comment">// 0xE800 - 0xE9FF
 
-    <span class="ident">_padding1</span>:                          [<span class="ident">u8</span>; <span class="number">256</span>],              <span class="comment">// 0xEA00 - 0xEAFF</span>
+    </span>_padding1:                          [u8; <span class="number">256</span>],              <span class="comment">// 0xEA00 - 0xEAFF
 
-    <span class="doccomment">/// Redirection Table</span>
-    <span class="kw">pub</span> <span class="ident">reta</span>:                           [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;<span class="number">32</span>],     <span class="comment">// 0xEB00 - 0xEB7F</span>
+    </span><span class="doccomment">/// Redirection Table
+    </span><span class="kw">pub </span>reta:                           [Volatile&lt;u32&gt;;<span class="number">32</span>],     <span class="comment">// 0xEB00 - 0xEB7F
 
-    <span class="doccomment">/// RSS Random Key Register</span>
-    <span class="kw">pub</span> <span class="ident">rssrk</span>:                          [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;<span class="number">10</span>],     <span class="comment">// 0xEB80 - 0xEBA7</span>
-    <span class="ident">_padding2</span>:                          [<span class="ident">u8</span>; <span class="number">88</span>],               <span class="comment">// 0xEBA8 - 0xEBFF</span>
+    </span><span class="doccomment">/// RSS Random Key Register
+    </span><span class="kw">pub </span>rssrk:                          [Volatile&lt;u32&gt;;<span class="number">10</span>],     <span class="comment">// 0xEB80 - 0xEBA7
+    </span>_padding2:                          [u8; <span class="number">88</span>],               <span class="comment">// 0xEBA8 - 0xEBFF
 
-    <span class="doccomment">/// EType Queue Select</span>
-    <span class="kw">pub</span> <span class="ident">etqs</span>:                           [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>;<span class="number">8</span>],      <span class="comment">// 0xEC00 - 0xEC1F;</span>
-    <span class="ident">_padding3</span>:                          [<span class="ident">u8</span>; <span class="number">96</span>],               <span class="comment">// 0xEC20 - 0xEC7F</span>
+    </span><span class="doccomment">/// EType Queue Select
+    </span><span class="kw">pub </span>etqs:                           [Volatile&lt;u32&gt;;<span class="number">8</span>],      <span class="comment">// 0xEC00 - 0xEC1F;
+    </span>_padding3:                          [u8; <span class="number">96</span>],               <span class="comment">// 0xEC20 - 0xEC7F
 
-    <span class="doccomment">/// Multiple Receive Queues Command Register</span>
-    <span class="kw">pub</span> <span class="ident">mrqc</span>:                           <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0xEC80;</span>
-    <span class="ident">_padding4</span>:                          [<span class="ident">u8</span>; <span class="number">5004</span>],             <span class="comment">// 0xEC84 - 0x1000F</span>
+    </span><span class="doccomment">/// Multiple Receive Queues Command Register
+    </span><span class="kw">pub </span>mrqc:                           Volatile&lt;u32&gt;,          <span class="comment">// 0xEC80;
+    </span>_padding4:                          [u8; <span class="number">5004</span>],             <span class="comment">// 0xEC84 - 0x1000F
 
-    <span class="doccomment">/// EEPROM/ Flash Control Register</span>
-    <span class="kw">pub</span> <span class="ident">eec</span>:                            <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x10010</span>
+    </span><span class="doccomment">/// EEPROM/ Flash Control Register
+    </span><span class="kw">pub </span>eec:                            Volatile&lt;u32&gt;,          <span class="comment">// 0x10010
 
-    <span class="doccomment">/// EEPROM Read Register</span>
-    <span class="kw">pub</span> <span class="ident">eerd</span>:                           <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x10014;</span>
-    <span class="ident">_padding5</span>:                          [<span class="ident">u8</span>; <span class="number">296</span>],              <span class="comment">// 0x10018 - 0x1013F</span>
+    </span><span class="doccomment">/// EEPROM Read Register
+    </span><span class="kw">pub </span>eerd:                           Volatile&lt;u32&gt;,          <span class="comment">// 0x10014;
+    </span>_padding5:                          [u8; <span class="number">296</span>],              <span class="comment">// 0x10018 - 0x1013F
 
-    <span class="doccomment">/// Software Semaphore Register</span>
-    <span class="kw">pub</span> <span class="ident">swsm</span>:                           <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x10140</span>
-    <span class="ident">_padding6</span>:                          [<span class="ident">u8</span>; <span class="number">28</span>],               <span class="comment">// 0x10144 - 0x1015F</span>
+    </span><span class="doccomment">/// Software Semaphore Register
+    </span><span class="kw">pub </span>swsm:                           Volatile&lt;u32&gt;,          <span class="comment">// 0x10140
+    </span>_padding6:                          [u8; <span class="number">28</span>],               <span class="comment">// 0x10144 - 0x1015F
 
-    <span class="doccomment">/// Software Firmware Synchronization</span>
-    <span class="kw">pub</span> <span class="ident">sw_fw_sync</span>:                     <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x10160 </span>
-    <span class="ident">_padding7</span>:                          [<span class="ident">u8</span>; <span class="number">3852</span>],             <span class="comment">// 0x10164 - 0x1106F</span>
+    </span><span class="doccomment">/// Software Firmware Synchronization
+    </span><span class="kw">pub </span>sw_fw_sync:                     Volatile&lt;u32&gt;,          <span class="comment">// 0x10160 
+    </span>_padding7:                          [u8; <span class="number">3852</span>],             <span class="comment">// 0x10164 - 0x1106F
 
-    <span class="doccomment">/// DCA Requester ID Information Register</span>
-    <span class="kw">pub</span> <span class="ident">dca_id</span>:                         <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x11070</span>
+    </span><span class="doccomment">/// DCA Requester ID Information Register
+    </span><span class="kw">pub </span>dca_id:                         ReadOnly&lt;u32&gt;,          <span class="comment">// 0x11070
 
-    <span class="doccomment">/// DCA Control Register</span>
-    <span class="kw">pub</span> <span class="ident">dca_ctrl</span>:                       <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x11074</span>
-    <span class="ident">_padding8</span>:                          [<span class="ident">u8</span>; <span class="number">61320</span>],            <span class="comment">// 0x11078 - 0x1FFFF</span>
+    </span><span class="doccomment">/// DCA Control Register
+    </span><span class="kw">pub </span>dca_ctrl:                       Volatile&lt;u32&gt;,          <span class="comment">// 0x11074
+    </span>_padding8:                          [u8; <span class="number">61320</span>],            <span class="comment">// 0x11078 - 0x1FFFF
 
-} <span class="comment">// 18 4KiB page (total NIC mem = 128 KB)</span>
+</span>} <span class="comment">// 18 4KiB page (total NIC mem = 128 KB)
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">IntelIxgbeRegisters3</span><span class="op">&gt;</span>(), <span class="number">18</span> <span class="op">*</span> <span class="number">4096</span>);
+</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIxgbeRegisters3&gt;(), <span class="number">18 </span>* <span class="number">4096</span>);
 
-<span class="comment">// check that the sum of all the register structs is equal to the memory of the ixgbe device (128 KiB).</span>
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">IntelIxgbeRegisters1</span><span class="op">&gt;</span>() <span class="op">+</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">IntelIxgbeRxRegisters1</span><span class="op">&gt;</span>() <span class="op">+</span>
-    <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">IntelIxgbeRegisters2</span><span class="op">&gt;</span>() <span class="op">+</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">IntelIxgbeTxRegisters</span><span class="op">&gt;</span>() <span class="op">+</span> 
-    <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">IntelIxgbeMacRegisters</span><span class="op">&gt;</span>() <span class="op">+</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">IntelIxgbeRxRegisters2</span><span class="op">&gt;</span>() <span class="op">+</span>
-    <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">IntelIxgbeRegisters3</span><span class="op">&gt;</span>(), <span class="number">0x20000</span>);
+<span class="comment">// check that the sum of all the register structs is equal to the memory of the ixgbe device (128 KiB).
+</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIxgbeRegisters1&gt;() + core::mem::size_of::&lt;IntelIxgbeRxRegisters1&gt;() +
+    core::mem::size_of::&lt;IntelIxgbeRegisters2&gt;() + core::mem::size_of::&lt;IntelIxgbeTxRegisters&gt;() + 
+    core::mem::size_of::&lt;IntelIxgbeMacRegisters&gt;() + core::mem::size_of::&lt;IntelIxgbeRxRegisters2&gt;() +
+    core::mem::size_of::&lt;IntelIxgbeRegisters3&gt;(), <span class="number">0x20000</span>);
 
-<span class="doccomment">/// Set of registers associated with one transmit descriptor queue.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RegistersTx</span> {
-    <span class="doccomment">/// Transmit Descriptor Base Address Low</span>
-    <span class="kw">pub</span> <span class="ident">tdbal</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,        <span class="comment">// 0x6000</span>
+<span class="doccomment">/// Set of registers associated with one transmit descriptor queue.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>RegistersTx {
+    <span class="doccomment">/// Transmit Descriptor Base Address Low
+    </span><span class="kw">pub </span>tdbal:                          Volatile&lt;u32&gt;,        <span class="comment">// 0x6000
 
-    <span class="doccomment">/// Transmit Descriptor Base Address High</span>
-    <span class="kw">pub</span> <span class="ident">tdbah</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,        <span class="comment">// 0x6004</span>
+    </span><span class="doccomment">/// Transmit Descriptor Base Address High
+    </span><span class="kw">pub </span>tdbah:                          Volatile&lt;u32&gt;,        <span class="comment">// 0x6004
     
-    <span class="doccomment">/// Transmit Descriptor Length    </span>
-    <span class="kw">pub</span> <span class="ident">tdlen</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,        <span class="comment">// 0x6008</span>
+    </span><span class="doccomment">/// Transmit Descriptor Length    
+    </span><span class="kw">pub </span>tdlen:                          Volatile&lt;u32&gt;,        <span class="comment">// 0x6008
 
-    <span class="doccomment">/// Tx DCA Control Register</span>
-    <span class="kw">pub</span> <span class="ident">dca_txctrl</span>:                     <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x600C</span>
+    </span><span class="doccomment">/// Tx DCA Control Register
+    </span><span class="kw">pub </span>dca_txctrl:                     Volatile&lt;u32&gt;,          <span class="comment">// 0x600C
 
-    <span class="doccomment">/// Transmit Descriptor Head</span>
-    <span class="kw">pub</span> <span class="ident">tdh</span>:                            <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x6010</span>
-    <span class="ident">_padding0</span>:                          [<span class="ident">u8</span>; <span class="number">4</span>],                <span class="comment">// 0x6014 - 0x6017</span>
+    </span><span class="doccomment">/// Transmit Descriptor Head
+    </span><span class="kw">pub </span>tdh:                            Volatile&lt;u32&gt;,          <span class="comment">// 0x6010
+    </span>_padding0:                          [u8; <span class="number">4</span>],                <span class="comment">// 0x6014 - 0x6017
 
-    <span class="doccomment">/// Transmit Descriptor Tail</span>
-    <span class="kw">pub</span> <span class="ident">tdt</span>:                            <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x6018</span>
-    <span class="ident">_padding1</span>:                          [<span class="ident">u8</span>; <span class="number">12</span>],               <span class="comment">// 0x601C - 0x6027</span>
+    </span><span class="doccomment">/// Transmit Descriptor Tail
+    </span><span class="kw">pub </span>tdt:                            Volatile&lt;u32&gt;,          <span class="comment">// 0x6018
+    </span>_padding1:                          [u8; <span class="number">12</span>],               <span class="comment">// 0x601C - 0x6027
 
-    <span class="doccomment">/// Transmit Descriptor Control</span>
-    <span class="kw">pub</span> <span class="ident">txdctl</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x6028</span>
-    <span class="ident">_padding2</span>:                          [<span class="ident">u8</span>; <span class="number">12</span>],               <span class="comment">// 0x602C - 0x6037</span>
+    </span><span class="doccomment">/// Transmit Descriptor Control
+    </span><span class="kw">pub </span>txdctl:                         Volatile&lt;u32&gt;,          <span class="comment">// 0x6028
+    </span>_padding2:                          [u8; <span class="number">12</span>],               <span class="comment">// 0x602C - 0x6037
 
-    <span class="doccomment">/// Transmit Descriptor Completion Write Back Address Low</span>
-    <span class="kw">pub</span> <span class="ident">tdwbal</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x6038</span>
+    </span><span class="doccomment">/// Transmit Descriptor Completion Write Back Address Low
+    </span><span class="kw">pub </span>tdwbal:                         Volatile&lt;u32&gt;,          <span class="comment">// 0x6038
 
-    <span class="doccomment">/// Transmit Descriptor Completion Write Back Address High</span>
-    <span class="kw">pub</span> <span class="ident">tdwbah</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x603C</span>
-} <span class="comment">// 64B</span>
+    </span><span class="doccomment">/// Transmit Descriptor Completion Write Back Address High
+    </span><span class="kw">pub </span>tdwbah:                         Volatile&lt;u32&gt;,          <span class="comment">// 0x603C
+</span>} <span class="comment">// 64B
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">RegistersTx</span><span class="op">&gt;</span>(), <span class="number">64</span>);
+</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;RegistersTx&gt;(), <span class="number">64</span>);
 
-<span class="doccomment">/// Set of registers associated with one receive descriptor queue.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RegistersRx</span> {
-    <span class="doccomment">/// Receive Descriptor Base Address Low</span>
-    <span class="kw">pub</span> <span class="ident">rdbal</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,        <span class="comment">// 0x1000</span>
+<span class="doccomment">/// Set of registers associated with one receive descriptor queue.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>RegistersRx {
+    <span class="doccomment">/// Receive Descriptor Base Address Low
+    </span><span class="kw">pub </span>rdbal:                          Volatile&lt;u32&gt;,        <span class="comment">// 0x1000
 
-    <span class="doccomment">/// Recive Descriptor Base Address High</span>
-    <span class="kw">pub</span> <span class="ident">rdbah</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,        <span class="comment">// 0x1004</span>
+    </span><span class="doccomment">/// Recive Descriptor Base Address High
+    </span><span class="kw">pub </span>rdbah:                          Volatile&lt;u32&gt;,        <span class="comment">// 0x1004
 
-    <span class="doccomment">/// Recive Descriptor Length</span>
-    <span class="kw">pub</span> <span class="ident">rdlen</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,        <span class="comment">// 0x1008</span>
+    </span><span class="doccomment">/// Recive Descriptor Length
+    </span><span class="kw">pub </span>rdlen:                          Volatile&lt;u32&gt;,        <span class="comment">// 0x1008
 
-    <span class="doccomment">/// Rx DCA Control Register</span>
-    <span class="kw">pub</span> <span class="ident">dca_rxctrl</span>:                     <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x100C</span>
+    </span><span class="doccomment">/// Rx DCA Control Register
+    </span><span class="kw">pub </span>dca_rxctrl:                     Volatile&lt;u32&gt;,          <span class="comment">// 0x100C
 
-    <span class="doccomment">/// Recive Descriptor Head</span>
-    <span class="kw">pub</span> <span class="ident">rdh</span>:                            <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x1010</span>
+    </span><span class="doccomment">/// Recive Descriptor Head
+    </span><span class="kw">pub </span>rdh:                            Volatile&lt;u32&gt;,          <span class="comment">// 0x1010
 
-    <span class="doccomment">/// Split Receive Control Registers</span>
-    <span class="kw">pub</span> <span class="ident">srrctl</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x1014 //specify descriptor type</span>
+    </span><span class="doccomment">/// Split Receive Control Registers
+    </span><span class="kw">pub </span>srrctl:                         Volatile&lt;u32&gt;,          <span class="comment">// 0x1014 //specify descriptor type
 
-    <span class="doccomment">/// Receive Descriptor Tail</span>
-    <span class="kw">pub</span> <span class="ident">rdt</span>:                            <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x1018</span>
-    <span class="ident">_padding1</span>:                          [<span class="ident">u8</span>;<span class="number">12</span>],                <span class="comment">// 0x101C - 0x1027</span>
+    </span><span class="doccomment">/// Receive Descriptor Tail
+    </span><span class="kw">pub </span>rdt:                            Volatile&lt;u32&gt;,          <span class="comment">// 0x1018
+    </span>_padding1:                          [u8;<span class="number">12</span>],                <span class="comment">// 0x101C - 0x1027
 
-    <span class="doccomment">/// Receive Descriptor Control</span>
-    <span class="kw">pub</span> <span class="ident">rxdctl</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,          <span class="comment">// 0x1028</span>
-    <span class="ident">_padding2</span>:                          [<span class="ident">u8</span>;<span class="number">20</span>],                <span class="comment">// 0x102C - 0x103F                                            </span>
-} <span class="comment">// 64B</span>
+    </span><span class="doccomment">/// Receive Descriptor Control
+    </span><span class="kw">pub </span>rxdctl:                         Volatile&lt;u32&gt;,          <span class="comment">// 0x1028
+    </span>_padding2:                          [u8;<span class="number">20</span>],                <span class="comment">// 0x102C - 0x103F                                            
+</span>} <span class="comment">// 64B
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">RegistersRx</span><span class="op">&gt;</span>(), <span class="number">64</span>);
+</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;RegistersRx&gt;(), <span class="number">64</span>);
 
-<span class="doccomment">/// Offset where the RDT register starts for the first 64 rx queues</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RDT_1</span>:                        <span class="ident">usize</span> <span class="op">=</span> <span class="number">0x1018</span>;
-<span class="doccomment">/// Offset where the RDT register starts for the second set of 64 rx queues</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RDT_2</span>:                        <span class="ident">usize</span> <span class="op">=</span> <span class="number">0xD018</span>;
-<span class="doccomment">/// Number of bytes between consecutive RDT registers</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RDT_DIST</span>:                     <span class="ident">usize</span> <span class="op">=</span> <span class="number">0x40</span>;
-<span class="doccomment">/// Offset where the TDT register starts for the first 64 queues</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TDT</span>:                          <span class="ident">usize</span> <span class="op">=</span> <span class="number">0x6018</span>;
-<span class="doccomment">/// Number of bytes between consecutive TDT registers</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TDT_DIST</span>:                     <span class="ident">usize</span> <span class="op">=</span> <span class="number">0x40</span>;
+<span class="doccomment">/// Offset where the RDT register starts for the first 64 rx queues
+</span><span class="kw">pub const </span>RDT_1:                        usize = <span class="number">0x1018</span>;
+<span class="doccomment">/// Offset where the RDT register starts for the second set of 64 rx queues
+</span><span class="kw">pub const </span>RDT_2:                        usize = <span class="number">0xD018</span>;
+<span class="doccomment">/// Number of bytes between consecutive RDT registers
+</span><span class="kw">pub const </span>RDT_DIST:                     usize = <span class="number">0x40</span>;
+<span class="doccomment">/// Offset where the TDT register starts for the first 64 queues
+</span><span class="kw">pub const </span>TDT:                          usize = <span class="number">0x6018</span>;
+<span class="doccomment">/// Number of bytes between consecutive TDT registers
+</span><span class="kw">pub const </span>TDT_DIST:                     usize = <span class="number">0x40</span>;
 
-<span class="comment">// Link set up commands</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AUTOC_LMS_CLEAR</span>:              <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x0000_E000</span>; 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AUTOC_LMS_1_GB</span>:               <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x0000_E000</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AUTOC_LMS_10_GBE_P</span>:           <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">13</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AUTOC_LMS_10_GBE_S</span>:           <span class="ident">u32</span> <span class="op">=</span> <span class="number">3</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">13</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AUTOC_LMS_KX_KX4_AUTONEG</span>:     <span class="ident">u32</span> <span class="op">=</span> <span class="number">6</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="number">13</span>; <span class="comment">//KX/KX4//KR</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AUTOC_FLU</span>:                    <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AUTOC_RESTART_AN</span>:             <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="number">12</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AUTOC_1G_PMA_PMD</span>:             <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x0000_0200</span>; <span class="comment">//clear bit 9</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AUTOC_10G_PMA_PMD_CLEAR</span>:      <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x0000_0180</span>; 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AUTOC_10G_PMA_PMD_XAUI</span>:       <span class="ident">u32</span> <span class="op">=</span> <span class="number">0</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">7</span>; 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AUTOC2_10G_PMA_PMD_S_CLEAR</span>:   <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x0003_0000</span>; <span class="comment">//clear bits 16 and 17 </span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AUTOC2_10G_PMA_PMD_S_SFI</span>:     <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">17</span>;
+<span class="comment">// Link set up commands
+</span><span class="kw">pub const </span>AUTOC_LMS_CLEAR:              u32 = <span class="number">0x0000_E000</span>; 
+<span class="kw">pub const </span>AUTOC_LMS_1_GB:               u32 = <span class="number">0x0000_E000</span>;
+<span class="kw">pub const </span>AUTOC_LMS_10_GBE_P:           u32 = <span class="number">1 </span>&lt;&lt; <span class="number">13</span>;
+<span class="kw">pub const </span>AUTOC_LMS_10_GBE_S:           u32 = <span class="number">3 </span>&lt;&lt; <span class="number">13</span>;
+<span class="kw">pub const </span>AUTOC_LMS_KX_KX4_AUTONEG:     u32 = <span class="number">6</span>&lt;&lt;<span class="number">13</span>; <span class="comment">//KX/KX4//KR
+</span><span class="kw">pub const </span>AUTOC_FLU:                    u32 = <span class="number">1</span>;
+<span class="kw">pub const </span>AUTOC_RESTART_AN:             u32 = <span class="number">1</span>&lt;&lt;<span class="number">12</span>;
+<span class="kw">pub const </span>AUTOC_1G_PMA_PMD:             u32 = <span class="number">0x0000_0200</span>; <span class="comment">//clear bit 9
+</span><span class="kw">pub const </span>AUTOC_10G_PMA_PMD_CLEAR:      u32 = <span class="number">0x0000_0180</span>; 
+<span class="kw">pub const </span>AUTOC_10G_PMA_PMD_XAUI:       u32 = <span class="number">0 </span>&lt;&lt; <span class="number">7</span>; 
+<span class="kw">pub const </span>AUTOC2_10G_PMA_PMD_S_CLEAR:   u32 = <span class="number">0x0003_0000</span>; <span class="comment">//clear bits 16 and 17 
+</span><span class="kw">pub const </span>AUTOC2_10G_PMA_PMD_S_SFI:     u32 = <span class="number">1 </span>&lt;&lt; <span class="number">17</span>;
 
-<span class="comment">// CTRL commands</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CTRL_LRST</span>:                    <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="number">3</span>; 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CTRL_RST</span>:                     <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="number">26</span>;
+<span class="comment">// CTRL commands
+</span><span class="kw">pub const </span>CTRL_LRST:                    u32 = <span class="number">1</span>&lt;&lt;<span class="number">3</span>; 
+<span class="kw">pub const </span>CTRL_RST:                     u32 = <span class="number">1</span>&lt;&lt;<span class="number">26</span>;
 
-<span class="comment">// semaphore commands</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SWSM_SMBI</span>:                    <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">0</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SWSM_SWESMBI</span>:                 <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SW_FW_SYNC_SMBITS_MASK</span>:       <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x3FF</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SW_FW_SYNC_SMBITS_SW</span>:         <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x1F</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SW_FW_SYNC_SMBITS_FW</span>:         <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x3E0</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SW_FW_SYNC_SW_MAC</span>:            <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">3</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SW_FW_SYNC_FW_MAC</span>:            <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">8</span>;
+<span class="comment">// semaphore commands
+</span><span class="kw">pub const </span>SWSM_SMBI:                    u32 = <span class="number">1 </span>&lt;&lt; <span class="number">0</span>;
+<span class="kw">pub const </span>SWSM_SWESMBI:                 u32 = <span class="number">1 </span>&lt;&lt; <span class="number">1</span>;
+<span class="kw">pub const </span>SW_FW_SYNC_SMBITS_MASK:       u32 = <span class="number">0x3FF</span>;
+<span class="kw">pub const </span>SW_FW_SYNC_SMBITS_SW:         u32 = <span class="number">0x1F</span>;
+<span class="kw">pub const </span>SW_FW_SYNC_SMBITS_FW:         u32 = <span class="number">0x3E0</span>;
+<span class="kw">pub const </span>SW_FW_SYNC_SW_MAC:            u32 = <span class="number">1 </span>&lt;&lt; <span class="number">3</span>;
+<span class="kw">pub const </span>SW_FW_SYNC_FW_MAC:            u32 = <span class="number">1 </span>&lt;&lt; <span class="number">8</span>;
 
-<span class="comment">// EEPROM Commands</span>
-<span class="doccomment">/// Bit which indicates that auto-read by hardware from EEPROM is done</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EEC_AUTO_RD</span>:                  <span class="ident">u32</span> <span class="op">=</span> <span class="number">9</span>;
+<span class="comment">// EEPROM Commands
+</span><span class="doccomment">/// Bit which indicates that auto-read by hardware from EEPROM is done
+</span><span class="kw">pub const </span>EEC_AUTO_RD:                  u32 = <span class="number">9</span>;
 
-<span class="comment">// Link Commands</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LINKS_SPEED_MASK</span>:             <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x3</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">28</span>;
+<span class="comment">// Link Commands
+</span><span class="kw">pub const </span>LINKS_SPEED_MASK:             u32 = <span class="number">0x3 </span>&lt;&lt; <span class="number">28</span>;
 
-<span class="comment">// MAC Control Commands</span>
-<span class="doccomment">/// Tx CRC Enable by HW (bit 0)</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HLREG0_TXCRCEN</span>:               <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span>;
-<span class="doccomment">/// Tx Pad Frame Enable (bit 10)</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HLREG0_TXPADEN</span>:               <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">10</span>;
-<span class="doccomment">/// Enable CRC strip by HW</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HLREG0_CRC_STRIP</span>:             <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>;
-<span class="doccomment">/// Enable CRC strip by HW</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RDRXCTL_CRC_STRIP</span>:            <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span>;
-<span class="doccomment">/// These 5 bits have to be cleared by software</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RDRXCTL_RSCFRSTSIZE</span>:          <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x1F</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">17</span>;
+<span class="comment">// MAC Control Commands
+</span><span class="doccomment">/// Tx CRC Enable by HW (bit 0)
+</span><span class="kw">pub const </span>HLREG0_TXCRCEN:               u32 = <span class="number">1</span>;
+<span class="doccomment">/// Tx Pad Frame Enable (bit 10)
+</span><span class="kw">pub const </span>HLREG0_TXPADEN:               u32 = <span class="number">1 </span>&lt;&lt; <span class="number">10</span>;
+<span class="doccomment">/// Enable CRC strip by HW
+</span><span class="kw">pub const </span>HLREG0_CRC_STRIP:             u32 = <span class="number">1 </span>&lt;&lt; <span class="number">1</span>;
+<span class="doccomment">/// Enable CRC strip by HW
+</span><span class="kw">pub const </span>RDRXCTL_CRC_STRIP:            u32 = <span class="number">1</span>;
+<span class="doccomment">/// These 5 bits have to be cleared by software
+</span><span class="kw">pub const </span>RDRXCTL_RSCFRSTSIZE:          u32 = <span class="number">0x1F </span>&lt;&lt; <span class="number">17</span>;
 
-<span class="doccomment">/// DCB Arbiters Disable</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RTTDCS_ARBDIS</span>:                <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">6</span>;
+<span class="doccomment">/// DCB Arbiters Disable
+</span><span class="kw">pub const </span>RTTDCS_ARBDIS:                u32 = <span class="number">1 </span>&lt;&lt; <span class="number">6</span>;
 
-<span class="doccomment">/// For DCB and VT disabled, set TXPBSIZE.SIZE to 160KB</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TXPBSIZE_160KB</span>:                <span class="ident">u32</span> <span class="op">=</span> <span class="number">0xA0</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">10</span>;
-<span class="doccomment">/// For DCB and VT disabled, set RXPBSIZE.SIZE to 512KB</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RXPBSIZE_512KB</span>:                <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x200</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">10</span>;
+<span class="doccomment">/// For DCB and VT disabled, set TXPBSIZE.SIZE to 160KB
+</span><span class="kw">pub const </span>TXPBSIZE_160KB:                u32 = <span class="number">0xA0 </span>&lt;&lt; <span class="number">10</span>;
+<span class="doccomment">/// For DCB and VT disabled, set RXPBSIZE.SIZE to 512KB
+</span><span class="kw">pub const </span>RXPBSIZE_512KB:                u32 = <span class="number">0x200 </span>&lt;&lt; <span class="number">10</span>;
 
-<span class="comment">// RCTL commands</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BSIZEPACKET_8K</span>:               <span class="ident">u32</span> <span class="op">=</span> <span class="number">8</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BSIZEHEADER_256B</span>:             <span class="ident">u32</span> <span class="op">=</span> <span class="number">4</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BSIZEHEADER_0B</span>:               <span class="ident">u32</span> <span class="op">=</span> <span class="number">0</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DESCTYPE_LEG</span>:                 <span class="ident">u32</span> <span class="op">=</span> <span class="number">0</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DESCTYPE_ADV_1BUFFER</span>:         <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DESCTYPE_ADV_HS</span>:              <span class="ident">u32</span> <span class="op">=</span> <span class="number">2</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RX_Q_ENABLE</span>:                  <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">25</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">STORE_BAD_PACKETS</span>:            <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MULTICAST_PROMISCUOUS_ENABLE</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">8</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">UNICAST_PROMISCUOUS_ENABLE</span>:   <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">9</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BROADCAST_ACCEPT_MODE</span>:        <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">10</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RECEIVE_ENABLE</span>:               <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DROP_ENABLE</span>:                  <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">28</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DCA_RXCTRL_CLEAR_BIT_12</span>:      <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">12</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CTRL_EXT_NO_SNOOP_DIS</span>:        <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>;
+<span class="comment">// RCTL commands
+</span><span class="kw">pub const </span>BSIZEPACKET_8K:               u32 = <span class="number">8</span>;
+<span class="kw">pub const </span>BSIZEHEADER_256B:             u32 = <span class="number">4</span>;
+<span class="kw">pub const </span>BSIZEHEADER_0B:               u32 = <span class="number">0</span>;
+<span class="kw">pub const </span>DESCTYPE_LEG:                 u32 = <span class="number">0</span>;
+<span class="kw">pub const </span>DESCTYPE_ADV_1BUFFER:         u32 = <span class="number">1</span>;
+<span class="kw">pub const </span>DESCTYPE_ADV_HS:              u32 = <span class="number">2</span>;
+<span class="kw">pub const </span>RX_Q_ENABLE:                  u32 = <span class="number">1 </span>&lt;&lt; <span class="number">25</span>;
+<span class="kw">pub const </span>STORE_BAD_PACKETS:            u32 = <span class="number">1 </span>&lt;&lt; <span class="number">1</span>;
+<span class="kw">pub const </span>MULTICAST_PROMISCUOUS_ENABLE: u32 = <span class="number">1 </span>&lt;&lt; <span class="number">8</span>;
+<span class="kw">pub const </span>UNICAST_PROMISCUOUS_ENABLE:   u32 = <span class="number">1 </span>&lt;&lt; <span class="number">9</span>;
+<span class="kw">pub const </span>BROADCAST_ACCEPT_MODE:        u32 = <span class="number">1 </span>&lt;&lt; <span class="number">10</span>;
+<span class="kw">pub const </span>RECEIVE_ENABLE:               u32 = <span class="number">1</span>;
+<span class="kw">pub const </span>DROP_ENABLE:                  u32 = <span class="number">1 </span>&lt;&lt; <span class="number">28</span>;
+<span class="kw">pub const </span>DCA_RXCTRL_CLEAR_BIT_12:      u32 = <span class="number">1 </span>&lt;&lt; <span class="number">12</span>;
+<span class="kw">pub const </span>CTRL_EXT_NO_SNOOP_DIS:        u32 = <span class="number">1 </span>&lt;&lt; <span class="number">16</span>;
 
-<span class="comment">// RSS commands</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RXCSUM_PCSD</span>:                  <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">13</span>; 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MRQC_MRQE_RSS</span>:                <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span>; <span class="comment">// set bits 0..3 in MRQC</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MRQC_TCPIPV4</span>:                 <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>; 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MRQC_IPV4</span>:                    <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">17</span>; 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MRQC_IPV6</span>:                    <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">20</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MRQC_TCPIPV6</span>:                 <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">21</span>;  
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MRQC_UDPIPV4</span>:                 <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">22</span>; 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MRQC_UDPIPV6</span>:                 <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">23</span>;  
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RETA_ENTRY_0_OFFSET</span>:          <span class="ident">u32</span> <span class="op">=</span> <span class="number">0</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RETA_ENTRY_1_OFFSET</span>:          <span class="ident">u32</span> <span class="op">=</span> <span class="number">8</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RETA_ENTRY_2_OFFSET</span>:          <span class="ident">u32</span> <span class="op">=</span> <span class="number">16</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RETA_ENTRY_3_OFFSET</span>:          <span class="ident">u32</span> <span class="op">=</span> <span class="number">24</span>;
+<span class="comment">// RSS commands
+</span><span class="kw">pub const </span>RXCSUM_PCSD:                  u32 = <span class="number">1 </span>&lt;&lt; <span class="number">13</span>; 
+<span class="kw">pub const </span>MRQC_MRQE_RSS:                u32 = <span class="number">1</span>; <span class="comment">// set bits 0..3 in MRQC
+</span><span class="kw">pub const </span>MRQC_TCPIPV4:                 u32 = <span class="number">1 </span>&lt;&lt; <span class="number">16</span>; 
+<span class="kw">pub const </span>MRQC_IPV4:                    u32 = <span class="number">1 </span>&lt;&lt; <span class="number">17</span>; 
+<span class="kw">pub const </span>MRQC_IPV6:                    u32 = <span class="number">1 </span>&lt;&lt; <span class="number">20</span>;
+<span class="kw">pub const </span>MRQC_TCPIPV6:                 u32 = <span class="number">1 </span>&lt;&lt; <span class="number">21</span>;  
+<span class="kw">pub const </span>MRQC_UDPIPV4:                 u32 = <span class="number">1 </span>&lt;&lt; <span class="number">22</span>; 
+<span class="kw">pub const </span>MRQC_UDPIPV6:                 u32 = <span class="number">1 </span>&lt;&lt; <span class="number">23</span>;  
+<span class="kw">pub const </span>RETA_ENTRY_0_OFFSET:          u32 = <span class="number">0</span>;
+<span class="kw">pub const </span>RETA_ENTRY_1_OFFSET:          u32 = <span class="number">8</span>;
+<span class="kw">pub const </span>RETA_ENTRY_2_OFFSET:          u32 = <span class="number">16</span>;
+<span class="kw">pub const </span>RETA_ENTRY_3_OFFSET:          u32 = <span class="number">24</span>;
 
-<span class="comment">// DCA commands</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RX_DESC_DCA_ENABLE</span>:           <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">5</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RX_HEADER_DCA_ENABLE</span>:         <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">6</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RX_PAYLOAD_DCA_ENABLE</span>:        <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">7</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RX_DESC_R_RELAX_ORDER_EN</span>:     <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">9</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RX_DATA_W_RELAX_ORDER_EN</span>:     <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">13</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RX_SP_HEAD_RELAX_ORDER_EN</span>:    <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">15</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DCA_CPUID_SHIFT</span>:              <span class="ident">u32</span> <span class="op">=</span> <span class="number">24</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DCA_CTRL_ENABLE</span>:              <span class="ident">u32</span> <span class="op">=</span> <span class="number">0</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DCA_MODE_1</span>:                   <span class="ident">u32</span> <span class="op">=</span> <span class="number">0</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>;  
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DCA_MODE_2</span>:                   <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>;
+<span class="comment">// DCA commands
+</span><span class="kw">pub const </span>RX_DESC_DCA_ENABLE:           u32 = <span class="number">1 </span>&lt;&lt; <span class="number">5</span>;
+<span class="kw">pub const </span>RX_HEADER_DCA_ENABLE:         u32 = <span class="number">1 </span>&lt;&lt; <span class="number">6</span>;
+<span class="kw">pub const </span>RX_PAYLOAD_DCA_ENABLE:        u32 = <span class="number">1 </span>&lt;&lt; <span class="number">7</span>;
+<span class="kw">pub const </span>RX_DESC_R_RELAX_ORDER_EN:     u32 = <span class="number">1 </span>&lt;&lt; <span class="number">9</span>;
+<span class="kw">pub const </span>RX_DATA_W_RELAX_ORDER_EN:     u32 = <span class="number">1 </span>&lt;&lt; <span class="number">13</span>;
+<span class="kw">pub const </span>RX_SP_HEAD_RELAX_ORDER_EN:    u32 = <span class="number">1 </span>&lt;&lt; <span class="number">15</span>;
+<span class="kw">pub const </span>DCA_CPUID_SHIFT:              u32 = <span class="number">24</span>;
+<span class="kw">pub const </span>DCA_CTRL_ENABLE:              u32 = <span class="number">0</span>;
+<span class="kw">pub const </span>DCA_MODE_1:                   u32 = <span class="number">0 </span>&lt;&lt; <span class="number">1</span>;  
+<span class="kw">pub const </span>DCA_MODE_2:                   u32 = <span class="number">1 </span>&lt;&lt; <span class="number">1</span>;
 
-<span class="comment">// 5-tuple Queue Filter commands</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SPDQF_SOURCE_SHIFT</span>:           <span class="ident">u32</span> <span class="op">=</span> <span class="number">0</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SPDQF_DEST_SHIFT</span>:             <span class="ident">u32</span> <span class="op">=</span> <span class="number">16</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FTQF_PROTOCOL</span>:                <span class="ident">u32</span> <span class="op">=</span> <span class="number">3</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FTQF_PROTOCOL_TCP</span>:            <span class="ident">u32</span> <span class="op">=</span> <span class="number">0</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FTQF_PROTOCOL_UDP</span>:            <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FTQF_PROTOCOL_SCTP</span>:           <span class="ident">u32</span> <span class="op">=</span> <span class="number">2</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FTQF_PRIORITY</span>:                <span class="ident">u32</span> <span class="op">=</span> <span class="number">7</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FTQF_PRIORITY_SHIFT</span>:          <span class="ident">u32</span> <span class="op">=</span> <span class="number">2</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FTQF_SOURCE_ADDRESS_MASK</span>:     <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">25</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FTQF_DEST_ADDRESS_MASK</span>:       <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">26</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FTQF_SOURCE_PORT_MASK</span>:        <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">27</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FTQF_DEST_PORT_MASK</span>:          <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">28</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FTQF_PROTOCOL_MASK</span>:           <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">29</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FTQF_POOL_MASK</span>:               <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">30</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FTQF_Q_ENABLE</span>:                <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">31</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">L34TIMIR_BYPASS_SIZE_CHECK</span>:   <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">12</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">L34TIMIR_RESERVED</span>:            <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x40</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">13</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">L34TIMIR_LLI_ENABLE</span>:          <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">20</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">L34TIMIR_RX_Q_SHIFT</span>:          <span class="ident">u32</span> <span class="op">=</span> <span class="number">21</span>;
+<span class="comment">// 5-tuple Queue Filter commands
+</span><span class="kw">pub const </span>SPDQF_SOURCE_SHIFT:           u32 = <span class="number">0</span>;
+<span class="kw">pub const </span>SPDQF_DEST_SHIFT:             u32 = <span class="number">16</span>;
+<span class="kw">pub const </span>FTQF_PROTOCOL:                u32 = <span class="number">3</span>;
+<span class="kw">pub const </span>FTQF_PROTOCOL_TCP:            u32 = <span class="number">0</span>;
+<span class="kw">pub const </span>FTQF_PROTOCOL_UDP:            u32 = <span class="number">1</span>;
+<span class="kw">pub const </span>FTQF_PROTOCOL_SCTP:           u32 = <span class="number">2</span>;
+<span class="kw">pub const </span>FTQF_PRIORITY:                u32 = <span class="number">7</span>;
+<span class="kw">pub const </span>FTQF_PRIORITY_SHIFT:          u32 = <span class="number">2</span>;
+<span class="kw">pub const </span>FTQF_SOURCE_ADDRESS_MASK:     u32 = <span class="number">1 </span>&lt;&lt; <span class="number">25</span>;
+<span class="kw">pub const </span>FTQF_DEST_ADDRESS_MASK:       u32 = <span class="number">1 </span>&lt;&lt; <span class="number">26</span>;
+<span class="kw">pub const </span>FTQF_SOURCE_PORT_MASK:        u32 = <span class="number">1 </span>&lt;&lt; <span class="number">27</span>;
+<span class="kw">pub const </span>FTQF_DEST_PORT_MASK:          u32 = <span class="number">1 </span>&lt;&lt; <span class="number">28</span>;
+<span class="kw">pub const </span>FTQF_PROTOCOL_MASK:           u32 = <span class="number">1 </span>&lt;&lt; <span class="number">29</span>;
+<span class="kw">pub const </span>FTQF_POOL_MASK:               u32 = <span class="number">1 </span>&lt;&lt; <span class="number">30</span>;
+<span class="kw">pub const </span>FTQF_Q_ENABLE:                u32 = <span class="number">1 </span>&lt;&lt; <span class="number">31</span>;
+<span class="kw">pub const </span>L34TIMIR_BYPASS_SIZE_CHECK:   u32 = <span class="number">1 </span>&lt;&lt; <span class="number">12</span>;
+<span class="kw">pub const </span>L34TIMIR_RESERVED:            u32 = <span class="number">0x40 </span>&lt;&lt; <span class="number">13</span>;
+<span class="kw">pub const </span>L34TIMIR_LLI_ENABLE:          u32 = <span class="number">1 </span>&lt;&lt; <span class="number">20</span>;
+<span class="kw">pub const </span>L34TIMIR_RX_Q_SHIFT:          u32 = <span class="number">21</span>;
 
  
-<span class="comment">// Buffer Sizes</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RCTL_BSIZE_256</span>:               <span class="ident">u32</span> <span class="op">=</span> <span class="number">3</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RCTL_BSIZE_512</span>:               <span class="ident">u32</span> <span class="op">=</span> <span class="number">2</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RCTL_BSIZE_1024</span>:              <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RCTL_BSIZE_2048</span>:              <span class="ident">u32</span> <span class="op">=</span> <span class="number">0</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RCTL_BSIZE_4096</span>:              <span class="ident">u32</span> <span class="op">=</span> (<span class="number">3</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>) <span class="op">|</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">25</span>);
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RCTL_BSIZE_8192</span>:              <span class="ident">u32</span> <span class="op">=</span> (<span class="number">2</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>) <span class="op">|</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">25</span>);
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RCTL_BSIZE_16384</span>:             <span class="ident">u32</span> <span class="op">=</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>) <span class="op">|</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">25</span>);
+<span class="comment">// Buffer Sizes
+</span><span class="kw">pub const </span>RCTL_BSIZE_256:               u32 = <span class="number">3 </span>&lt;&lt; <span class="number">16</span>;
+<span class="kw">pub const </span>RCTL_BSIZE_512:               u32 = <span class="number">2 </span>&lt;&lt; <span class="number">16</span>;
+<span class="kw">pub const </span>RCTL_BSIZE_1024:              u32 = <span class="number">1 </span>&lt;&lt; <span class="number">16</span>;
+<span class="kw">pub const </span>RCTL_BSIZE_2048:              u32 = <span class="number">0 </span>&lt;&lt; <span class="number">16</span>;
+<span class="kw">pub const </span>RCTL_BSIZE_4096:              u32 = (<span class="number">3 </span>&lt;&lt; <span class="number">16</span>) | (<span class="number">1 </span>&lt;&lt; <span class="number">25</span>);
+<span class="kw">pub const </span>RCTL_BSIZE_8192:              u32 = (<span class="number">2 </span>&lt;&lt; <span class="number">16</span>) | (<span class="number">1 </span>&lt;&lt; <span class="number">25</span>);
+<span class="kw">pub const </span>RCTL_BSIZE_16384:             u32 = (<span class="number">1 </span>&lt;&lt; <span class="number">16</span>) | (<span class="number">1 </span>&lt;&lt; <span class="number">25</span>);
   
  
-<span class="doccomment">/// Enable a transmit queue</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TX_Q_ENABLE</span>:                  <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">25</span>;
-<span class="doccomment">/// Transmit Enable</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TE</span>:                           <span class="ident">u32</span>  <span class="op">=</span> <span class="number">1</span>;           
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DTXMXSZRQ_MAX_BYTES</span>:          <span class="ident">u32</span> <span class="op">=</span> <span class="number">0xFFF</span>;
+<span class="doccomment">/// Enable a transmit queue
+</span><span class="kw">pub const </span>TX_Q_ENABLE:                  u32 = <span class="number">1 </span>&lt;&lt; <span class="number">25</span>;
+<span class="doccomment">/// Transmit Enable
+</span><span class="kw">pub const </span>TE:                           u32  = <span class="number">1</span>;           
+<span class="kw">pub const </span>DTXMXSZRQ_MAX_BYTES:          u32 = <span class="number">0xFFF</span>;
 
-<span class="doccomment">/// Tx descriptor pre-fetch threshold (value taken from DPDK)</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TXDCTL_PTHRESH</span>:               <span class="ident">u32</span> <span class="op">=</span> <span class="number">36</span>; 
-<span class="doccomment">/// Tx descriptor host threshold (value taken from DPDK)</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TXDCTL_HTHRESH</span>:               <span class="ident">u32</span> <span class="op">=</span> <span class="number">8</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">8</span>; 
-<span class="doccomment">/// Tx descriptor write-back threshold (value taken from DPDK)</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TXDCTL_WTHRESH</span>:               <span class="ident">u32</span> <span class="op">=</span> <span class="number">4</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>; 
+<span class="doccomment">/// Tx descriptor pre-fetch threshold (value taken from DPDK)
+</span><span class="kw">pub const </span>TXDCTL_PTHRESH:               u32 = <span class="number">36</span>; 
+<span class="doccomment">/// Tx descriptor host threshold (value taken from DPDK)
+</span><span class="kw">pub const </span>TXDCTL_HTHRESH:               u32 = <span class="number">8 </span>&lt;&lt; <span class="number">8</span>; 
+<span class="doccomment">/// Tx descriptor write-back threshold (value taken from DPDK)
+</span><span class="kw">pub const </span>TXDCTL_WTHRESH:               u32 = <span class="number">4 </span>&lt;&lt; <span class="number">16</span>; 
 
-<span class="comment">// Interrupt Register Commands </span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DISABLE_INTERRUPTS</span>:           <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x7FFFFFFF</span>; 
-<span class="doccomment">/// MSI-X Mode</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GPIE_MULTIPLE_MSIX</span>:           <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">4</span>;
-<span class="doccomment">/// EICS Immediate Interrupt Enable</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GPIE_EIMEN</span>:                   <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">6</span>;
-<span class="doccomment">/// Should be set in MSIX mode and cleared in legacy/msi mode</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GPIE_PBA_SUPPORT</span>:             <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">31</span>;
-<span class="doccomment">/// Each bit enables auto clear of the corresponding RTxQ bit in the EICR register following interrupt assertion</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EIAC_RTXQ_AUTO_CLEAR</span>:         <span class="ident">u32</span> <span class="op">=</span> <span class="number">0xFFFF</span>;
-<span class="doccomment">/// Bit position where the throttling interval is written</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EITR_ITR_INTERVAL_SHIFT</span>:      <span class="ident">u32</span> <span class="op">=</span> <span class="number">3</span>;
-<span class="doccomment">/// Enables the corresponding interrupt in the EICR register by setting the bit</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EIMS_INTERRUPT_ENABLE</span>:        <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span>;
+<span class="comment">// Interrupt Register Commands 
+</span><span class="kw">pub const </span>DISABLE_INTERRUPTS:           u32 = <span class="number">0x7FFFFFFF</span>; 
+<span class="doccomment">/// MSI-X Mode
+</span><span class="kw">pub const </span>GPIE_MULTIPLE_MSIX:           u32 = <span class="number">1 </span>&lt;&lt; <span class="number">4</span>;
+<span class="doccomment">/// EICS Immediate Interrupt Enable
+</span><span class="kw">pub const </span>GPIE_EIMEN:                   u32 = <span class="number">1 </span>&lt;&lt; <span class="number">6</span>;
+<span class="doccomment">/// Should be set in MSIX mode and cleared in legacy/msi mode
+</span><span class="kw">pub const </span>GPIE_PBA_SUPPORT:             u32 = <span class="number">1 </span>&lt;&lt; <span class="number">31</span>;
+<span class="doccomment">/// Each bit enables auto clear of the corresponding RTxQ bit in the EICR register following interrupt assertion
+</span><span class="kw">pub const </span>EIAC_RTXQ_AUTO_CLEAR:         u32 = <span class="number">0xFFFF</span>;
+<span class="doccomment">/// Bit position where the throttling interval is written
+</span><span class="kw">pub const </span>EITR_ITR_INTERVAL_SHIFT:      u32 = <span class="number">3</span>;
+<span class="doccomment">/// Enables the corresponding interrupt in the EICR register by setting the bit
+</span><span class="kw">pub const </span>EIMS_INTERRUPT_ENABLE:        u32 = <span class="number">1</span>;
 
-<span class="doccomment">/// The number of msi-x vectors this device can have. </span>
-<span class="doccomment">/// It can be set from PCI space, but we took the value from the data sheet.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">IXGBE_MAX_MSIX_VECTORS</span>:     <span class="ident">usize</span> <span class="op">=</span> <span class="number">64</span>;
+<span class="doccomment">/// The number of msi-x vectors this device can have. 
+/// It can be set from PCI space, but we took the value from the data sheet.
+</span><span class="kw">pub const </span>IXGBE_MAX_MSIX_VECTORS:     usize = <span class="number">64</span>;
 
-<span class="doccomment">/// Table that contains msi-x vector entries. </span>
-<span class="doccomment">/// It is mapped to a physical memory region specified by the BAR from the PCI space.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MsixVectorTable</span> {
-    <span class="kw">pub</span> <span class="ident">msi_vector</span>:     [<span class="ident">MsixVectorEntry</span>; <span class="ident">IXGBE_MAX_MSIX_VECTORS</span>],
+<span class="doccomment">/// Table that contains msi-x vector entries. 
+/// It is mapped to a physical memory region specified by the BAR from the PCI space.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>MsixVectorTable {
+    <span class="kw">pub </span>msi_vector:     [MsixVectorEntry; IXGBE_MAX_MSIX_VECTORS],
 }
 
-<span class="doccomment">/// A single Message Signaled Interrupt entry.</span>
-<span class="doccomment">/// It contains the interrupt number for this vector and the core this interrupt is redirected to.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MsixVectorEntry</span> {
-    <span class="doccomment">/// The lower portion of the address for the memory write transaction.</span>
-    <span class="doccomment">/// This part contains the apic id which the interrupt will be redirected to.</span>
-    <span class="kw">pub</span> <span class="ident">msg_lower_addr</span>:         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The upper portion of the address for the memory write transaction.</span>
-    <span class="kw">pub</span> <span class="ident">msg_upper_addr</span>:         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The data portion of the msi vector which contains the interrupt number.</span>
-    <span class="kw">pub</span> <span class="ident">msg_data</span>:               <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The control portion which contains the interrupt mask bit.</span>
-    <span class="kw">pub</span> <span class="ident">vector_control</span>:         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A single Message Signaled Interrupt entry.
+/// It contains the interrupt number for this vector and the core this interrupt is redirected to.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>MsixVectorEntry {
+    <span class="doccomment">/// The lower portion of the address for the memory write transaction.
+    /// This part contains the apic id which the interrupt will be redirected to.
+    </span><span class="kw">pub </span>msg_lower_addr:         Volatile&lt;u32&gt;,
+    <span class="doccomment">/// The upper portion of the address for the memory write transaction.
+    </span><span class="kw">pub </span>msg_upper_addr:         Volatile&lt;u32&gt;,
+    <span class="doccomment">/// The data portion of the msi vector which contains the interrupt number.
+    </span><span class="kw">pub </span>msg_data:               Volatile&lt;u32&gt;,
+    <span class="doccomment">/// The control portion which contains the interrupt mask bit.
+    </span><span class="kw">pub </span>vector_control:         Volatile&lt;u32&gt;,
 }
 
-<span class="doccomment">/// A constant which indicates the region that is reserved for interrupt messages</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MSIX_INTERRUPT_REGION</span>:    <span class="ident">u32</span> <span class="op">=</span> <span class="number">0xFEE</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">20</span>;
-<span class="doccomment">/// The location in the lower address register where the destination core id is written</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MSIX_DEST_ID_SHIFT</span>:       <span class="ident">u32</span> <span class="op">=</span> <span class="number">12</span>;
-<span class="doccomment">/// The bits in the lower address register that need to be cleared and set</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MSIX_ADDRESS_BITS</span>:        <span class="ident">u32</span> <span class="op">=</span> <span class="number">0xFFFF_FFF0</span>;
-<span class="doccomment">/// Clear the vector control field to unmask the interrupt</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MSIX_UNMASK_INT</span>:          <span class="ident">u32</span> <span class="op">=</span> <span class="number">0</span>;</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ixgbe" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+<span class="doccomment">/// A constant which indicates the region that is reserved for interrupt messages
+</span><span class="kw">pub const </span>MSIX_INTERRUPT_REGION:    u32 = <span class="number">0xFEE </span>&lt;&lt; <span class="number">20</span>;
+<span class="doccomment">/// The location in the lower address register where the destination core id is written
+</span><span class="kw">pub const </span>MSIX_DEST_ID_SHIFT:       u32 = <span class="number">12</span>;
+<span class="doccomment">/// The bits in the lower address register that need to be cleared and set
+</span><span class="kw">pub const </span>MSIX_ADDRESS_BITS:        u32 = <span class="number">0xFFFF_FFF0</span>;
+<span class="doccomment">/// Clear the vector control field to unmask the interrupt
+</span><span class="kw">pub const </span>MSIX_UNMASK_INT:          u32 = <span class="number">0</span>;</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ixgbe" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/wasi_interpreter/src/posix_file_system.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>posix_file_system.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../wasi_interpreter/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../wasi_interpreter/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../wasi_interpreter/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/wasi_interpreter/src/posix_file_system.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>posix_file_system.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../wasi_interpreter/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -505,507 +499,506 @@
 <span id="499">499</span>
 <span id="500">500</span>
 <span id="501">501</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Types for interacting with Theseus standard I/O and file system via POSIX-style abstraction.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This module provides APIs to:</span>
-<span class="doccomment">//! * interact with a file descriptor table (open path, close fd, get underlying Theseus handle).</span>
-<span class="doccomment">//! * read, write, or seek a file system node or standard I/O</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This abstraction is necessary as WASI assumes a POSIX-style file descriptor table interface.</span>
-<span class="doccomment">//!</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Types for interacting with Theseus standard I/O and file system via POSIX-style abstraction.
+//!
+//! This module provides APIs to:
+//! * interact with a file descriptor table (open path, close fd, get underlying Theseus handle).
+//! * read, write, or seek a file system node or standard I/O
+//!
+//! This abstraction is necessary as WASI assumes a POSIX-style file descriptor table interface.
+//!
 
-<span class="kw">use</span> <span class="ident">alloc::string::String</span>;
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">cmp</span>, <span class="ident">convert::TryFrom</span> <span class="kw">as</span> <span class="kw">_</span>};
-<span class="kw">use</span> <span class="ident">core2::io</span>::{<span class="ident">Read</span>, <span class="ident">Write</span>};
-<span class="kw">use</span> <span class="ident">fs_node</span>::{<span class="ident">DirRef</span>, <span class="ident">FileOrDir</span>, <span class="ident">FileRef</span>, <span class="ident">FsNode</span>};
-<span class="kw">use</span> <span class="ident">hashbrown::HashMap</span>;
-<span class="kw">use</span> <span class="ident">memfs::MemFile</span>;
-<span class="kw">use</span> <span class="ident">path::Path</span>;
+</span><span class="kw">use </span>alloc::string::String;
+<span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>core::{cmp, convert::TryFrom <span class="kw">as _</span>};
+<span class="kw">use </span>core2::io::{Read, Write};
+<span class="kw">use </span>fs_node::{DirRef, FileOrDir, FileRef, FsNode};
+<span class="kw">use </span>hashbrown::HashMap;
+<span class="kw">use </span>memfs::MemFile;
+<span class="kw">use </span>path::Path;
 
-<span class="kw">const</span> <span class="ident">FIRST_NONRESERVED_FD</span>: <span class="ident">wasi::Fd</span> <span class="op">=</span> <span class="number">3</span>;
+<span class="kw">const </span>FIRST_NONRESERVED_FD: wasi::Fd = <span class="number">3</span>;
 
-<span class="doccomment">/// File types that can be accessed through file descriptor table.</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">PosixNodeOrStdio</span> {
-    <span class="doccomment">/// Standard input.</span>
-    <span class="ident">Stdin</span>,
-    <span class="doccomment">/// Standard output.</span>
-    <span class="ident">Stdout</span>,
-    <span class="doccomment">/// Standard error.</span>
-    <span class="ident">Stderr</span>,
-    <span class="doccomment">/// An underlying file system node.</span>
-    <span class="ident">Inode</span>(<span class="ident">PosixNode</span>),
+<span class="doccomment">/// File types that can be accessed through file descriptor table.
+</span><span class="kw">pub enum </span>PosixNodeOrStdio {
+    <span class="doccomment">/// Standard input.
+    </span>Stdin,
+    <span class="doccomment">/// Standard output.
+    </span>Stdout,
+    <span class="doccomment">/// Standard error.
+    </span>Stderr,
+    <span class="doccomment">/// An underlying file system node.
+    </span>Inode(PosixNode),
 }
 
-<span class="kw">impl</span> <span class="ident">PosixNodeOrStdio</span> {
-    <span class="doccomment">/// Writes data from the given `buffer` to this file.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The number of bytes written is dictated by the length of the given `buffer`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `buffer`: the buffer from which data will be written.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// If successful, returns the number of bytes written to this file.</span>
-    <span class="doccomment">/// Otherwise, returns a wasi::Errno.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">wasi::Errno</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">PosixNodeOrStdio::Stdin</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_NOTSUP</span>),
-            <span class="ident">PosixNodeOrStdio::Stdout</span> =&gt; <span class="kw">match</span> <span class="ident">app_io::stdout</span>().<span class="ident">unwrap</span>().<span class="ident">lock</span>().<span class="ident">write_all</span>(<span class="ident">buffer</span>) {
-                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">buffer</span>.<span class="ident">len</span>()),
-                <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_IO</span>),
+<span class="kw">impl </span>PosixNodeOrStdio {
+    <span class="doccomment">/// Writes data from the given `buffer` to this file.
+    ///
+    /// The number of bytes written is dictated by the length of the given `buffer`.
+    ///
+    /// # Arguments
+    /// * `buffer`: the buffer from which data will be written.
+    ///
+    /// # Return
+    /// If successful, returns the number of bytes written to this file.
+    /// Otherwise, returns a wasi::Errno.
+    </span><span class="kw">pub fn </span>write(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buffer: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;usize, wasi::Errno&gt; {
+        <span class="kw">match </span><span class="self">self </span>{
+            PosixNodeOrStdio::Stdin =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_NOTSUP),
+            PosixNodeOrStdio::Stdout =&gt; <span class="kw">match </span>app_io::stdout().unwrap().lock().write_all(buffer) {
+                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Ok</span>(buffer.len()),
+                <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_IO),
             },
-            <span class="ident">PosixNodeOrStdio::Stderr</span> =&gt; <span class="kw">match</span> <span class="ident">app_io::stderr</span>().<span class="ident">unwrap</span>().<span class="ident">lock</span>().<span class="ident">write_all</span>(<span class="ident">buffer</span>) {
-                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">buffer</span>.<span class="ident">len</span>()),
-                <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_IO</span>),
+            PosixNodeOrStdio::Stderr =&gt; <span class="kw">match </span>app_io::stderr().unwrap().lock().write_all(buffer) {
+                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Ok</span>(buffer.len()),
+                <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_IO),
             },
-            <span class="ident">PosixNodeOrStdio::Inode</span>(<span class="ident">posix_node</span>) =&gt; <span class="ident">posix_node</span>.<span class="ident">write</span>(<span class="ident">buffer</span>),
+            PosixNodeOrStdio::Inode(posix_node) =&gt; posix_node.write(buffer),
         }
     }
 
-    <span class="doccomment">/// Reads data from this file into the given `buffer`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The number of bytes read is dictated by the length of the given `buffer`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `buffer`: the buffer into which the data will be read.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// If successful, returns the number of bytes read into this file.</span>
-    <span class="doccomment">/// Otherwise, returns a wasi::Errno.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">wasi::Errno</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">PosixNodeOrStdio::Stdin</span> =&gt; <span class="kw">match</span> <span class="ident">app_io::stdin</span>().<span class="ident">unwrap</span>().<span class="ident">lock</span>().<span class="ident">read</span>(<span class="ident">buffer</span>) {
-                <span class="prelude-val">Ok</span>(<span class="ident">bytes_read</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">bytes_read</span>),
-                <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_IO</span>),
+    <span class="doccomment">/// Reads data from this file into the given `buffer`.
+    ///
+    /// The number of bytes read is dictated by the length of the given `buffer`.
+    ///
+    /// # Arguments
+    /// * `buffer`: the buffer into which the data will be read.
+    ///
+    /// # Return
+    /// If successful, returns the number of bytes read into this file.
+    /// Otherwise, returns a wasi::Errno.
+    </span><span class="kw">pub fn </span>read(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buffer: <span class="kw-2">&amp;mut </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;usize, wasi::Errno&gt; {
+        <span class="kw">match </span><span class="self">self </span>{
+            PosixNodeOrStdio::Stdin =&gt; <span class="kw">match </span>app_io::stdin().unwrap().lock().read(buffer) {
+                <span class="prelude-val">Ok</span>(bytes_read) =&gt; <span class="prelude-val">Ok</span>(bytes_read),
+                <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_IO),
             },
-            <span class="ident">PosixNodeOrStdio::Stdout</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_NOTSUP</span>),
-            <span class="ident">PosixNodeOrStdio::Stderr</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_NOTSUP</span>),
-            <span class="ident">PosixNodeOrStdio::Inode</span>(<span class="ident">posix_node</span>) =&gt; <span class="ident">posix_node</span>.<span class="ident">read</span>(<span class="ident">buffer</span>),
+            PosixNodeOrStdio::Stdout =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_NOTSUP),
+            PosixNodeOrStdio::Stderr =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_NOTSUP),
+            PosixNodeOrStdio::Inode(posix_node) =&gt; posix_node.read(buffer),
         }
     }
 
-    <span class="doccomment">/// Move the offset of this file.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `offset`: the number of bytes to move.</span>
-    <span class="doccomment">/// * `whence`: the base from which the offset is relative.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// If successful, returns the resulting offset of this file.</span>
-    <span class="doccomment">/// Otherwise, returns a wasi::Errno.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">seek</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">offset</span>: <span class="ident">wasi::Filedelta</span>,
-        <span class="ident">whence</span>: <span class="ident">wasi::Whence</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">wasi::Errno</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">PosixNodeOrStdio::Stdin</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_NOTSUP</span>),
-            <span class="ident">PosixNodeOrStdio::Stdout</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_NOTSUP</span>),
-            <span class="ident">PosixNodeOrStdio::Stderr</span> =&gt; <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_NOTSUP</span>),
-            <span class="ident">PosixNodeOrStdio::Inode</span>(<span class="ident">posix_node</span>) =&gt; <span class="ident">posix_node</span>.<span class="ident">seek</span>(<span class="ident">offset</span>, <span class="ident">whence</span>),
+    <span class="doccomment">/// Move the offset of this file.
+    ///
+    /// # Arguments
+    /// * `offset`: the number of bytes to move.
+    /// * `whence`: the base from which the offset is relative.
+    ///
+    /// # Return
+    /// If successful, returns the resulting offset of this file.
+    /// Otherwise, returns a wasi::Errno.
+    </span><span class="kw">pub fn </span>seek(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        offset: wasi::Filedelta,
+        whence: wasi::Whence,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;usize, wasi::Errno&gt; {
+        <span class="kw">match </span><span class="self">self </span>{
+            PosixNodeOrStdio::Stdin =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_NOTSUP),
+            PosixNodeOrStdio::Stdout =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_NOTSUP),
+            PosixNodeOrStdio::Stderr =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_NOTSUP),
+            PosixNodeOrStdio::Inode(posix_node) =&gt; posix_node.seek(offset, whence),
         }
     }
 }
 
-<span class="doccomment">/// A wrapper around Theseus FileOrDir to provide WASI-expected POSIX features.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PosixNode</span> {
-    <span class="doccomment">/// Underlying Theseus FileOrDir.</span>
-    <span class="kw">pub</span> <span class="ident">theseus_file_or_dir</span>: <span class="ident">FileOrDir</span>,
-    <span class="doccomment">/// File system ights that apply to this file descriptor.</span>
-    <span class="ident">fs_rights_base</span>: <span class="ident">wasi::Rights</span>,
-    <span class="doccomment">/// Maximum set of rights applied to file descriptors opened through this file descriptor.</span>
-    <span class="ident">fs_rights_inheriting</span>: <span class="ident">wasi::Rights</span>,
-    <span class="doccomment">/// File descriptor flags.</span>
-    <span class="doccomment">/// NOTE: contains unused flags for synchornized I/O, non-blocking mode.</span>
-    <span class="ident">fs_flags</span>: <span class="ident">wasi::Fdflags</span>,
-    <span class="doccomment">/// Offset of this file descriptor.</span>
-    <span class="ident">offset</span>: <span class="ident">usize</span>,
+<span class="doccomment">/// A wrapper around Theseus FileOrDir to provide WASI-expected POSIX features.
+</span><span class="kw">pub struct </span>PosixNode {
+    <span class="doccomment">/// Underlying Theseus FileOrDir.
+    </span><span class="kw">pub </span>theseus_file_or_dir: FileOrDir,
+    <span class="doccomment">/// File system ights that apply to this file descriptor.
+    </span>fs_rights_base: wasi::Rights,
+    <span class="doccomment">/// Maximum set of rights applied to file descriptors opened through this file descriptor.
+    </span>fs_rights_inheriting: wasi::Rights,
+    <span class="doccomment">/// File descriptor flags.
+    /// NOTE: contains unused flags for synchornized I/O, non-blocking mode.
+    </span>fs_flags: wasi::Fdflags,
+    <span class="doccomment">/// Offset of this file descriptor.
+    </span>offset: usize,
 }
 
-<span class="kw">impl</span> <span class="ident">PosixNode</span> {
-    <span class="doccomment">/// Instantiates a new PosixNode.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `file_or_dir`: underlying Theseus FileOrDir.</span>
-    <span class="doccomment">/// * `fs_rights`: rights applying to this file descriptor.</span>
-    <span class="doccomment">/// * `fs_rights_inheriting`: rights applying to inherting file descriptors.</span>
-    <span class="doccomment">/// * `fs_flags`: file descriptor flags.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// Returns a PosixNode of a FileOrDir with specified permissions.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">file_or_dir</span>: <span class="ident">FileOrDir</span>,
-        <span class="ident">fs_rights_base</span>: <span class="ident">wasi::Rights</span>,
-        <span class="ident">fs_rights_inheriting</span>: <span class="ident">wasi::Rights</span>,
-        <span class="ident">fs_flags</span>: <span class="ident">wasi::Fdflags</span>,
-    ) -&gt; <span class="ident">PosixNode</span> {
-        <span class="ident">PosixNode</span> {
-            <span class="ident">theseus_file_or_dir</span>: <span class="ident">file_or_dir</span>,
-            <span class="ident">fs_rights_base</span>: <span class="ident">fs_rights_base</span>,
-            <span class="ident">fs_rights_inheriting</span>: <span class="ident">fs_rights_inheriting</span>,
-            <span class="ident">fs_flags</span>: <span class="ident">fs_flags</span>,
-            <span class="ident">offset</span>: <span class="number">0</span>,
+<span class="kw">impl </span>PosixNode {
+    <span class="doccomment">/// Instantiates a new PosixNode.
+    ///
+    /// # Arguments
+    /// * `file_or_dir`: underlying Theseus FileOrDir.
+    /// * `fs_rights`: rights applying to this file descriptor.
+    /// * `fs_rights_inheriting`: rights applying to inherting file descriptors.
+    /// * `fs_flags`: file descriptor flags.
+    ///
+    /// # Return
+    /// Returns a PosixNode of a FileOrDir with specified permissions.
+    </span><span class="kw">pub fn </span>new(
+        file_or_dir: FileOrDir,
+        fs_rights_base: wasi::Rights,
+        fs_rights_inheriting: wasi::Rights,
+        fs_flags: wasi::Fdflags,
+    ) -&gt; PosixNode {
+        PosixNode {
+            theseus_file_or_dir: file_or_dir,
+            fs_rights_base: fs_rights_base,
+            fs_rights_inheriting: fs_rights_inheriting,
+            fs_flags: fs_flags,
+            offset: <span class="number">0</span>,
         }
     }
 
-    <span class="doccomment">/// Get path relative to working directory of this file descriptor.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// Returns relative path of file descriptor as a string.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_relative_path</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="kw">let</span> <span class="ident">absolute_path</span> <span class="op">=</span> <span class="ident">Path::new</span>(<span class="self">self</span>.<span class="ident">theseus_file_or_dir</span>.<span class="ident">get_absolute_path</span>());
-        <span class="kw">let</span> <span class="ident">wd_path</span> <span class="op">=</span> <span class="ident">Path::new</span>(
-            <span class="ident">task::get_my_current_task</span>()
-                .<span class="ident">unwrap</span>()
-                .<span class="ident">get_env</span>()
-                .<span class="ident">lock</span>()
-                .<span class="ident">cwd</span>(),
+    <span class="doccomment">/// Get path relative to working directory of this file descriptor.
+    ///
+    /// # Return
+    /// Returns relative path of file descriptor as a string.
+    </span><span class="kw">pub fn </span>get_relative_path(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="kw">let </span>absolute_path = Path::new(<span class="self">self</span>.theseus_file_or_dir.get_absolute_path());
+        <span class="kw">let </span>wd_path = Path::new(
+            task::get_my_current_task()
+                .unwrap()
+                .get_env()
+                .lock()
+                .cwd(),
         );
 
-        <span class="kw">let</span> <span class="ident">relative_path</span>: <span class="ident">Path</span> <span class="op">=</span> <span class="ident">absolute_path</span>.<span class="ident">relative</span>(<span class="kw-2">&amp;</span><span class="ident">wd_path</span>).<span class="ident">unwrap</span>();
-        <span class="ident">String::from</span>(<span class="ident">relative_path</span>)
+        <span class="kw">let </span>relative_path: Path = absolute_path.relative(<span class="kw-2">&amp;</span>wd_path).unwrap();
+        String::from(relative_path)
     }
 
-    <span class="doccomment">/// Get file system rights of this file descriptor.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// Returns file system rights of this file descriptor.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fs_rights_base</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">wasi::Rights</span> {
-        <span class="self">self</span>.<span class="ident">fs_rights_base</span>
+    <span class="doccomment">/// Get file system rights of this file descriptor.
+    ///
+    /// # Return
+    /// Returns file system rights of this file descriptor.
+    </span><span class="kw">pub fn </span>fs_rights_base(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; wasi::Rights {
+        <span class="self">self</span>.fs_rights_base
     }
 
-    <span class="doccomment">/// Get inheriting file system rights of this file descriptor.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// Returns inheriting file system rights of this file descriptor.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fs_rights_inheriting</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">wasi::Rights</span> {
-        <span class="self">self</span>.<span class="ident">fs_rights_inheriting</span>
+    <span class="doccomment">/// Get inheriting file system rights of this file descriptor.
+    ///
+    /// # Return
+    /// Returns inheriting file system rights of this file descriptor.
+    </span><span class="kw">pub fn </span>fs_rights_inheriting(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; wasi::Rights {
+        <span class="self">self</span>.fs_rights_inheriting
     }
 
-    <span class="doccomment">/// Get file descriptor flags of this file descriptor.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// Returns file descriptor flags of this file descriptor.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fs_flags</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">wasi::Fdflags</span> {
-        <span class="self">self</span>.<span class="ident">fs_flags</span>
+    <span class="doccomment">/// Get file descriptor flags of this file descriptor.
+    ///
+    /// # Return
+    /// Returns file descriptor flags of this file descriptor.
+    </span><span class="kw">pub fn </span>fs_flags(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; wasi::Fdflags {
+        <span class="self">self</span>.fs_flags
     }
 
-    <span class="doccomment">/// Set file descriptor flags of this file descriptor if allowed.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// If successful, returns ().</span>
-    <span class="doccomment">/// Otherwise, returns a wasi::Errno.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_fs_flags</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">new_flags</span>: <span class="ident">wasi::Fdflags</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">wasi::Errno</span><span class="op">&gt;</span> {
-        <span class="comment">// Verify that file descriptor has right to set flags.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fs_rights_base</span>() <span class="op">&amp;</span> <span class="ident">wasi::RIGHTS_FD_FDSTAT_SET_FLAGS</span> <span class="op">==</span> <span class="number">0</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_ACCES</span>);
+    <span class="doccomment">/// Set file descriptor flags of this file descriptor if allowed.
+    ///
+    /// # Return
+    /// If successful, returns ().
+    /// Otherwise, returns a wasi::Errno.
+    </span><span class="kw">pub fn </span>set_fs_flags(<span class="kw-2">&amp;mut </span><span class="self">self</span>, new_flags: wasi::Fdflags) -&gt; <span class="prelude-ty">Result</span>&lt;(), wasi::Errno&gt; {
+        <span class="comment">// Verify that file descriptor has right to set flags.
+        </span><span class="kw">if </span><span class="self">self</span>.fs_rights_base() &amp; wasi::RIGHTS_FD_FDSTAT_SET_FLAGS == <span class="number">0 </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(wasi::ERRNO_ACCES);
         }
 
-        <span class="self">self</span>.<span class="ident">fs_flags</span> <span class="op">=</span> <span class="ident">new_flags</span>;
+        <span class="self">self</span>.fs_flags = new_flags;
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Writes data from the given `buffer` to this file system node if allowed.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The number of bytes written is dictated by the length of the given `buffer`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `buffer`: the buffer from which data will be written.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// If successful, returns the number of bytes written to this file system node.</span>
-    <span class="doccomment">/// Otherwise, returns a wasi::Errno.</span>
-    <span class="doccomment">/// NOTE: Returns wasi::ERRNO_NOBUFS on Theseus file write error.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">wasi::Errno</span><span class="op">&gt;</span> {
-        <span class="comment">// Verify that file descriptor has right to write.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fs_rights_base</span>() <span class="op">&amp;</span> <span class="ident">wasi::RIGHTS_FD_WRITE</span> <span class="op">==</span> <span class="number">0</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_ACCES</span>);
+    <span class="doccomment">/// Writes data from the given `buffer` to this file system node if allowed.
+    ///
+    /// The number of bytes written is dictated by the length of the given `buffer`.
+    ///
+    /// # Arguments
+    /// * `buffer`: the buffer from which data will be written.
+    ///
+    /// # Return
+    /// If successful, returns the number of bytes written to this file system node.
+    /// Otherwise, returns a wasi::Errno.
+    /// NOTE: Returns wasi::ERRNO_NOBUFS on Theseus file write error.
+    </span><span class="kw">pub fn </span>write(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buffer: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;usize, wasi::Errno&gt; {
+        <span class="comment">// Verify that file descriptor has right to write.
+        </span><span class="kw">if </span><span class="self">self</span>.fs_rights_base() &amp; wasi::RIGHTS_FD_WRITE == <span class="number">0 </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(wasi::ERRNO_ACCES);
         }
 
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">theseus_file_or_dir</span>.<span class="ident">clone</span>() {
-            <span class="ident">FileOrDir::File</span>(<span class="ident">file_ref</span>) =&gt; {
-                <span class="comment">// Check flags for append mode.</span>
-                <span class="kw">let</span> <span class="ident">is_append_mode</span>: <span class="ident">bool</span> <span class="op">=</span> (<span class="self">self</span>.<span class="ident">fs_flags</span>() <span class="op">&amp;</span> <span class="ident">wasi::FDFLAGS_APPEND</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span>;
+        <span class="kw">match </span><span class="self">self</span>.theseus_file_or_dir.clone() {
+            FileOrDir::File(file_ref) =&gt; {
+                <span class="comment">// Check flags for append mode.
+                </span><span class="kw">let </span>is_append_mode: bool = (<span class="self">self</span>.fs_flags() &amp; wasi::FDFLAGS_APPEND) != <span class="number">0</span>;
 
-                <span class="kw">if</span> <span class="ident">is_append_mode</span> {
-                    <span class="comment">// Write to end of file.</span>
-                    <span class="kw">let</span> <span class="ident">end_of_file_offset</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">file_ref</span>.<span class="ident">lock</span>().<span class="ident">len</span>();
-                    <span class="kw">match</span> <span class="ident">file_ref</span>.<span class="ident">lock</span>().<span class="ident">write_at</span>(<span class="ident">buffer</span>, <span class="ident">end_of_file_offset</span>) {
-                        <span class="prelude-val">Ok</span>(<span class="ident">bytes_written</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">bytes_written</span>),
-                        <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_NOBUFS</span>),
+                <span class="kw">if </span>is_append_mode {
+                    <span class="comment">// Write to end of file.
+                    </span><span class="kw">let </span>end_of_file_offset: usize = file_ref.lock().len();
+                    <span class="kw">match </span>file_ref.lock().write_at(buffer, end_of_file_offset) {
+                        <span class="prelude-val">Ok</span>(bytes_written) =&gt; <span class="prelude-val">Ok</span>(bytes_written),
+                        <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_NOBUFS),
                     }
-                } <span class="kw">else</span> {
-                    <span class="comment">// Write at offset of file and update offset.</span>
-                    <span class="kw">let</span> <span class="ident">offset</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">offset</span>;
-                    <span class="kw">match</span> <span class="ident">file_ref</span>.<span class="ident">lock</span>().<span class="ident">write_at</span>(<span class="ident">buffer</span>, <span class="ident">offset</span>) {
-                        <span class="prelude-val">Ok</span>(<span class="ident">bytes_written</span>) =&gt; {
-                            <span class="self">self</span>.<span class="ident">offset</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">offset</span>.<span class="ident">checked_add</span>(<span class="ident">bytes_written</span>).<span class="ident">unwrap</span>();
-                            <span class="prelude-val">Ok</span>(<span class="ident">bytes_written</span>)
+                } <span class="kw">else </span>{
+                    <span class="comment">// Write at offset of file and update offset.
+                    </span><span class="kw">let </span>offset = <span class="self">self</span>.offset;
+                    <span class="kw">match </span>file_ref.lock().write_at(buffer, offset) {
+                        <span class="prelude-val">Ok</span>(bytes_written) =&gt; {
+                            <span class="self">self</span>.offset = <span class="self">self</span>.offset.checked_add(bytes_written).unwrap();
+                            <span class="prelude-val">Ok</span>(bytes_written)
                         }
-                        <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_NOBUFS</span>),
+                        <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_NOBUFS),
                     }
                 }
             }
-            <span class="ident">FileOrDir::Dir</span> { .. } =&gt; <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_ISDIR</span>),
+            FileOrDir::Dir { .. } =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_ISDIR),
         }
     }
 
-    <span class="doccomment">/// Reads data from this file system node into the given `buffer` if allowed.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The number of bytes read is dictated by the length of the given `buffer`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `buffer`: the buffer into which the data will be read.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// If successful, returns the number of bytes read into this file system node.</span>
-    <span class="doccomment">/// Otherwise, returns a wasi::Errno.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">wasi::Errno</span><span class="op">&gt;</span> {
-        <span class="comment">// Verify that file descriptor has right to read.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fs_rights_base</span>() <span class="op">&amp;</span> <span class="ident">wasi::RIGHTS_FD_READ</span> <span class="op">==</span> <span class="number">0</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_ACCES</span>);
+    <span class="doccomment">/// Reads data from this file system node into the given `buffer` if allowed.
+    ///
+    /// The number of bytes read is dictated by the length of the given `buffer`.
+    ///
+    /// # Arguments
+    /// * `buffer`: the buffer into which the data will be read.
+    ///
+    /// # Return
+    /// If successful, returns the number of bytes read into this file system node.
+    /// Otherwise, returns a wasi::Errno.
+    </span><span class="kw">pub fn </span>read(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buffer: <span class="kw-2">&amp;mut </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;usize, wasi::Errno&gt; {
+        <span class="comment">// Verify that file descriptor has right to read.
+        </span><span class="kw">if </span><span class="self">self</span>.fs_rights_base() &amp; wasi::RIGHTS_FD_READ == <span class="number">0 </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(wasi::ERRNO_ACCES);
         }
 
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">theseus_file_or_dir</span>.<span class="ident">clone</span>() {
-            <span class="ident">FileOrDir::File</span>(<span class="ident">file_ref</span>) =&gt; {
-                <span class="comment">// Read at offset of file and update offset.</span>
-                <span class="kw">let</span> <span class="ident">offset</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">offset</span>;
-                <span class="kw">match</span> <span class="ident">file_ref</span>.<span class="ident">lock</span>().<span class="ident">read_at</span>(<span class="ident">buffer</span>, <span class="ident">offset</span>) {
-                    <span class="prelude-val">Ok</span>(<span class="ident">bytes_read</span>) =&gt; {
-                        <span class="self">self</span>.<span class="ident">offset</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">offset</span>.<span class="ident">checked_add</span>(<span class="ident">bytes_read</span>).<span class="ident">unwrap</span>();
-                        <span class="prelude-val">Ok</span>(<span class="ident">bytes_read</span>)
+        <span class="kw">match </span><span class="self">self</span>.theseus_file_or_dir.clone() {
+            FileOrDir::File(file_ref) =&gt; {
+                <span class="comment">// Read at offset of file and update offset.
+                </span><span class="kw">let </span>offset = <span class="self">self</span>.offset;
+                <span class="kw">match </span>file_ref.lock().read_at(buffer, offset) {
+                    <span class="prelude-val">Ok</span>(bytes_read) =&gt; {
+                        <span class="self">self</span>.offset = <span class="self">self</span>.offset.checked_add(bytes_read).unwrap();
+                        <span class="prelude-val">Ok</span>(bytes_read)
                     }
-                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_NOBUFS</span>),
+                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_NOBUFS),
                 }
             }
-            <span class="ident">FileOrDir::Dir</span> { .. } =&gt; <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_ISDIR</span>),
+            FileOrDir::Dir { .. } =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_ISDIR),
         }
     }
 
-    <span class="doccomment">/// Move the offset of this file system node.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `offset`: the number of bytes to move.</span>
-    <span class="doccomment">/// * `whence`: the base from which the offset is relative.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// If successful, returns the resulting offset of this file system node.</span>
-    <span class="doccomment">/// Otherwise, returns a wasi::Errno.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">seek</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">delta</span>: <span class="ident">wasi::Filedelta</span>,
-        <span class="ident">whence</span>: <span class="ident">wasi::Whence</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">wasi::Errno</span><span class="op">&gt;</span> {
-        <span class="comment">// Verify that file descriptor has right to seek.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fs_rights_base</span>() <span class="op">&amp;</span> <span class="ident">wasi::RIGHTS_FD_SEEK</span> <span class="op">==</span> <span class="number">0</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_ACCES</span>);
+    <span class="doccomment">/// Move the offset of this file system node.
+    ///
+    /// # Arguments
+    /// * `offset`: the number of bytes to move.
+    /// * `whence`: the base from which the offset is relative.
+    ///
+    /// # Return
+    /// If successful, returns the resulting offset of this file system node.
+    /// Otherwise, returns a wasi::Errno.
+    </span><span class="kw">pub fn </span>seek(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        delta: wasi::Filedelta,
+        whence: wasi::Whence,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;usize, wasi::Errno&gt; {
+        <span class="comment">// Verify that file descriptor has right to seek.
+        </span><span class="kw">if </span><span class="self">self</span>.fs_rights_base() &amp; wasi::RIGHTS_FD_SEEK == <span class="number">0 </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(wasi::ERRNO_ACCES);
         }
 
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">theseus_file_or_dir</span>.<span class="ident">clone</span>() {
-            <span class="ident">FileOrDir::File</span>(<span class="ident">file_ref</span>) =&gt; {
-                <span class="kw">let</span> <span class="ident">max_offset</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">file_ref</span>.<span class="ident">lock</span>().<span class="ident">len</span>();
+        <span class="kw">match </span><span class="self">self</span>.theseus_file_or_dir.clone() {
+            FileOrDir::File(file_ref) =&gt; {
+                <span class="kw">let </span>max_offset: usize = file_ref.lock().len();
 
-                <span class="kw">let</span> <span class="ident">signed_to_file_offset</span> <span class="op">=</span> <span class="op">|</span><span class="ident">x</span>: <span class="ident">i64</span><span class="op">|</span> -&gt; <span class="ident">usize</span> {
-                    <span class="ident">cmp::min</span>(<span class="ident">usize::try_from</span>(<span class="ident">cmp::max</span>(<span class="number">0</span>, <span class="ident">x</span>)).<span class="ident">unwrap</span>(), <span class="ident">max_offset</span>)
+                <span class="kw">let </span>signed_to_file_offset = |x: i64| -&gt; usize {
+                    cmp::min(usize::try_from(cmp::max(<span class="number">0</span>, x)).unwrap(), max_offset)
                 };
 
-                <span class="kw">let</span> <span class="ident">new_offset</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">whence</span> {
-                    <span class="ident">wasi::WHENCE_CUR</span> =&gt; {
-                        <span class="ident">signed_to_file_offset</span>(<span class="ident">i64::try_from</span>(<span class="self">self</span>.<span class="ident">offset</span>).<span class="ident">unwrap</span>() <span class="op">+</span> <span class="ident">delta</span>)
+                <span class="kw">let </span>new_offset: usize = <span class="kw">match </span>whence {
+                    wasi::WHENCE_CUR =&gt; {
+                        signed_to_file_offset(i64::try_from(<span class="self">self</span>.offset).unwrap() + delta)
                     }
-                    <span class="ident">wasi::WHENCE_END</span> =&gt; {
-                        <span class="ident">signed_to_file_offset</span>(<span class="ident">i64::try_from</span>(<span class="ident">max_offset</span>).<span class="ident">unwrap</span>() <span class="op">+</span> <span class="ident">delta</span>)
+                    wasi::WHENCE_END =&gt; {
+                        signed_to_file_offset(i64::try_from(max_offset).unwrap() + delta)
                     }
-                    <span class="ident">wasi::WHENCE_SET</span> =&gt; <span class="ident">signed_to_file_offset</span>(<span class="ident">delta</span>),
-                    <span class="kw">_</span> =&gt; {
-                        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_SPIPE</span>);
+                    wasi::WHENCE_SET =&gt; signed_to_file_offset(delta),
+                    <span class="kw">_ </span>=&gt; {
+                        <span class="kw">return </span><span class="prelude-val">Err</span>(wasi::ERRNO_SPIPE);
                     }
                 };
 
-                <span class="self">self</span>.<span class="ident">offset</span> <span class="op">=</span> <span class="ident">new_offset</span>;
-                <span class="prelude-val">Ok</span>(<span class="ident">new_offset</span>)
+                <span class="self">self</span>.offset = new_offset;
+                <span class="prelude-val">Ok</span>(new_offset)
             }
-            <span class="ident">FileOrDir::Dir</span> { .. } =&gt; <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_ISDIR</span>),
+            FileOrDir::Dir { .. } =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_ISDIR),
         }
     }
 }
 
-<span class="doccomment">/// File descriptor table.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FileDescriptorTable</span> {
-    <span class="doccomment">/// HashMap from file descriptor number to POSIX-style file.</span>
-    <span class="ident">fd_table</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">wasi::Fd</span>, <span class="ident">PosixNodeOrStdio</span><span class="op">&gt;</span>,
+<span class="doccomment">/// File descriptor table.
+</span><span class="kw">pub struct </span>FileDescriptorTable {
+    <span class="doccomment">/// HashMap from file descriptor number to POSIX-style file.
+    </span>fd_table: HashMap&lt;wasi::Fd, PosixNodeOrStdio&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">FileDescriptorTable</span> {
-    <span class="doccomment">/// Instantiates a new FileDescriptorTable with stdio entries filled.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Returns</span>
-    <span class="doccomment">/// Returns a new FileDescriptorTable consisting of stdio entries.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">FileDescriptorTable</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fd_table</span> <span class="op">=</span> <span class="ident">HashMap::new</span>();
-        <span class="ident">fd_table</span>.<span class="ident">insert</span>(<span class="ident">wasi::FD_STDIN</span>, <span class="ident">PosixNodeOrStdio::Stdin</span>);
-        <span class="ident">fd_table</span>.<span class="ident">insert</span>(<span class="ident">wasi::FD_STDOUT</span>, <span class="ident">PosixNodeOrStdio::Stdout</span>);
-        <span class="ident">fd_table</span>.<span class="ident">insert</span>(<span class="ident">wasi::FD_STDERR</span>, <span class="ident">PosixNodeOrStdio::Stderr</span>);
-        <span class="ident">FileDescriptorTable</span> { <span class="ident">fd_table</span>: <span class="ident">fd_table</span> }
+<span class="kw">impl </span>FileDescriptorTable {
+    <span class="doccomment">/// Instantiates a new FileDescriptorTable with stdio entries filled.
+    ///
+    /// # Returns
+    /// Returns a new FileDescriptorTable consisting of stdio entries.
+    </span><span class="kw">pub fn </span>new() -&gt; FileDescriptorTable {
+        <span class="kw">let </span><span class="kw-2">mut </span>fd_table = HashMap::new();
+        fd_table.insert(wasi::FD_STDIN, PosixNodeOrStdio::Stdin);
+        fd_table.insert(wasi::FD_STDOUT, PosixNodeOrStdio::Stdout);
+        fd_table.insert(wasi::FD_STDERR, PosixNodeOrStdio::Stderr);
+        FileDescriptorTable { fd_table: fd_table }
     }
 
-    <span class="doccomment">/// Open file or directory at path in accordance to given open flags and insert in fd table.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `path`: &amp;str representing path of file or directory to open.</span>
-    <span class="doccomment">/// * `starting_dir`: Theseus directory from which to search path from.</span>
-    <span class="doccomment">/// * `lookup_flags`: flags determining behavior of path resolution.</span>
-    <span class="doccomment">/// * `open_flags`: flags determining behavior of opening a file or directory.</span>
-    <span class="doccomment">/// * `fs_rights`: rights applying to this file descriptor.</span>
-    <span class="doccomment">/// * `fs_rights_inheriting`: rights applying to inherting file descriptors.</span>
-    <span class="doccomment">/// * `fs_flags`: file descriptor flags.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// If successful, returns resulting file descriptor number.</span>
-    <span class="doccomment">/// Otherwise, returns a wasi::Errno.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">open_path</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-        <span class="ident">starting_dir</span>: <span class="ident">DirRef</span>,
-        <span class="ident">lookup_flags</span>: <span class="ident">wasi::Lookupflags</span>,
-        <span class="ident">open_flags</span>: <span class="ident">wasi::Oflags</span>,
-        <span class="ident">fs_rights_base</span>: <span class="ident">wasi::Rights</span>,
-        <span class="ident">fs_rights_inheriting</span>: <span class="ident">wasi::Rights</span>,
-        <span class="ident">fs_flags</span>: <span class="ident">wasi::Fdflags</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">wasi::Fd</span>, <span class="ident">wasi::Errno</span><span class="op">&gt;</span> {
-        <span class="comment">// NOTE: https://docs.rs/wasi/0.9.0+wasi-snapshot-preview1/wasi/constant.LOOKUPFLAGS_SYMLINK_FOLLOW.html</span>
-        <span class="comment">// Unused as symlinks are currently not implemented.</span>
-        <span class="kw">let</span> <span class="ident">_symlink_follow</span>: <span class="ident">bool</span> <span class="op">=</span> (<span class="ident">lookup_flags</span> <span class="op">&amp;</span> <span class="ident">wasi::LOOKUPFLAGS_SYMLINK_FOLLOW</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span>;
+    <span class="doccomment">/// Open file or directory at path in accordance to given open flags and insert in fd table.
+    ///
+    /// # Arguments
+    /// * `path`: &amp;str representing path of file or directory to open.
+    /// * `starting_dir`: Theseus directory from which to search path from.
+    /// * `lookup_flags`: flags determining behavior of path resolution.
+    /// * `open_flags`: flags determining behavior of opening a file or directory.
+    /// * `fs_rights`: rights applying to this file descriptor.
+    /// * `fs_rights_inheriting`: rights applying to inherting file descriptors.
+    /// * `fs_flags`: file descriptor flags.
+    ///
+    /// # Return
+    /// If successful, returns resulting file descriptor number.
+    /// Otherwise, returns a wasi::Errno.
+    </span><span class="kw">pub fn </span>open_path(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        path: <span class="kw-2">&amp;</span>str,
+        starting_dir: DirRef,
+        lookup_flags: wasi::Lookupflags,
+        open_flags: wasi::Oflags,
+        fs_rights_base: wasi::Rights,
+        fs_rights_inheriting: wasi::Rights,
+        fs_flags: wasi::Fdflags,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;wasi::Fd, wasi::Errno&gt; {
+        <span class="comment">// NOTE: https://docs.rs/wasi/0.9.0+wasi-snapshot-preview1/wasi/constant.LOOKUPFLAGS_SYMLINK_FOLLOW.html
+        // Unused as symlinks are currently not implemented.
+        </span><span class="kw">let </span>_symlink_follow: bool = (lookup_flags &amp; wasi::LOOKUPFLAGS_SYMLINK_FOLLOW) != <span class="number">0</span>;
 
-        <span class="comment">// Parse open flags.</span>
-        <span class="kw">let</span> <span class="ident">create_file_if_no_exist</span>: <span class="ident">bool</span> <span class="op">=</span> (<span class="ident">open_flags</span> <span class="op">&amp;</span> <span class="ident">wasi::OFLAGS_CREAT</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span>;
-        <span class="kw">let</span> <span class="ident">fail_if_not_dir</span>: <span class="ident">bool</span> <span class="op">=</span> (<span class="ident">open_flags</span> <span class="op">&amp;</span> <span class="ident">wasi::OFLAGS_DIRECTORY</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span>;
-        <span class="kw">let</span> <span class="ident">fail_if_file_exists</span>: <span class="ident">bool</span> <span class="op">=</span> (<span class="ident">open_flags</span> <span class="op">&amp;</span> <span class="ident">wasi::OFLAGS_EXCL</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span>;
-        <span class="kw">let</span> <span class="ident">truncate_file_to_size_zero</span>: <span class="ident">bool</span> <span class="op">=</span> (<span class="ident">open_flags</span> <span class="op">&amp;</span> <span class="ident">wasi::OFLAGS_TRUNC</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span>;
+        <span class="comment">// Parse open flags.
+        </span><span class="kw">let </span>create_file_if_no_exist: bool = (open_flags &amp; wasi::OFLAGS_CREAT) != <span class="number">0</span>;
+        <span class="kw">let </span>fail_if_not_dir: bool = (open_flags &amp; wasi::OFLAGS_DIRECTORY) != <span class="number">0</span>;
+        <span class="kw">let </span>fail_if_file_exists: bool = (open_flags &amp; wasi::OFLAGS_EXCL) != <span class="number">0</span>;
+        <span class="kw">let </span>truncate_file_to_size_zero: bool = (open_flags &amp; wasi::OFLAGS_TRUNC) != <span class="number">0</span>;
 
-        <span class="comment">// Find first unused file descriptor number.</span>
-        <span class="comment">// TODO: Potentially can implement a more efficient search data structure.</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fd</span>: <span class="ident">wasi::Fd</span> <span class="op">=</span> <span class="ident">FIRST_NONRESERVED_FD</span>;
-        <span class="kw">while</span> <span class="self">self</span>.<span class="ident">fd_table</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">fd</span>) {
-            <span class="ident">fd</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        <span class="comment">// Find first unused file descriptor number.
+        // TODO: Potentially can implement a more efficient search data structure.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>fd: wasi::Fd = FIRST_NONRESERVED_FD;
+        <span class="kw">while </span><span class="self">self</span>.fd_table.contains_key(<span class="kw-2">&amp;</span>fd) {
+            fd += <span class="number">1</span>;
         }
 
-        <span class="comment">// Split path into parent directory path and base path.</span>
-        <span class="kw">let</span> <span class="ident">file_path</span>: <span class="ident">Path</span> <span class="op">=</span> <span class="ident">Path::new</span>(<span class="ident">String::from</span>(<span class="ident">path</span>));
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file_path_tokens</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">file_path</span>.<span class="ident">components</span>().<span class="ident">collect</span>();
-        <span class="ident">file_path_tokens</span>.<span class="ident">truncate</span>(<span class="ident">file_path_tokens</span>.<span class="ident">len</span>().<span class="ident">saturating_sub</span>(<span class="number">1</span>));
-        <span class="kw">let</span> <span class="ident">parent_dir_path</span>: <span class="ident">Path</span> <span class="op">=</span> <span class="ident">Path::new</span>(<span class="ident">file_path_tokens</span>.<span class="ident">join</span>(<span class="string">&quot;/&quot;</span>));
-        <span class="kw">let</span> <span class="ident">base_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="ident">file_path</span>.<span class="ident">basename</span>();
-        <span class="kw">let</span> <span class="ident">base_path</span>: <span class="ident">Path</span> <span class="op">=</span> <span class="ident">Path::new</span>(<span class="ident">String::from</span>(<span class="ident">base_name</span>));
+        <span class="comment">// Split path into parent directory path and base path.
+        </span><span class="kw">let </span>file_path: Path = Path::new(String::from(path));
+        <span class="kw">let </span><span class="kw-2">mut </span>file_path_tokens: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = file_path.components().collect();
+        file_path_tokens.truncate(file_path_tokens.len().saturating_sub(<span class="number">1</span>));
+        <span class="kw">let </span>parent_dir_path: Path = Path::new(file_path_tokens.join(<span class="string">&quot;/&quot;</span>));
+        <span class="kw">let </span>base_name: <span class="kw-2">&amp;</span>str = file_path.basename();
+        <span class="kw">let </span>base_path: Path = Path::new(String::from(base_name));
 
-        <span class="comment">// Get parent directory.</span>
-        <span class="kw">let</span> <span class="ident">parent_dir</span>: <span class="ident">DirRef</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">parent_dir_path</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">starting_dir</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">file_or_dir</span>) =&gt; <span class="kw">match</span> <span class="ident">file_or_dir</span> {
-                <span class="ident">FileOrDir::File</span> { .. } =&gt; {
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_NOENT</span>);
+        <span class="comment">// Get parent directory.
+        </span><span class="kw">let </span>parent_dir: DirRef = <span class="kw">match </span>parent_dir_path.get(<span class="kw-2">&amp;</span>starting_dir) {
+            <span class="prelude-val">Some</span>(file_or_dir) =&gt; <span class="kw">match </span>file_or_dir {
+                FileOrDir::File { .. } =&gt; {
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(wasi::ERRNO_NOENT);
                 }
-                <span class="ident">FileOrDir::Dir</span>(<span class="ident">dir_ref</span>) =&gt; <span class="ident">dir_ref</span>,
+                FileOrDir::Dir(dir_ref) =&gt; dir_ref,
             },
-            <span class="prelude-val">None</span> =&gt; {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_NOENT</span>);
+            <span class="prelude-val">None </span>=&gt; {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(wasi::ERRNO_NOENT);
             }
         };
 
-        <span class="comment">// Open file or directory at path in accordance to open flags.</span>
-        <span class="kw">let</span> <span class="ident">opened_file_or_dir</span>: <span class="ident">FileOrDir</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">base_path</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">parent_dir</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">file_or_dir</span>) =&gt; <span class="kw">match</span> <span class="ident">file_or_dir</span> {
-                <span class="ident">FileOrDir::File</span> { .. } =&gt; {
-                    <span class="kw">if</span> <span class="ident">fail_if_file_exists</span> {
-                        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_EXIST</span>);
-                    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">fail_if_not_dir</span> {
-                        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_NOTDIR</span>);
-                    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">truncate_file_to_size_zero</span> {
-                        <span class="comment">// HACK: Truncate file by overwriting file.</span>
-                        <span class="kw">let</span> <span class="ident">new_file</span>: <span class="ident">FileRef</span> <span class="op">=</span>
-                            <span class="ident">MemFile::new</span>(<span class="ident">String::from</span>(<span class="ident">base_name</span>), <span class="kw-2">&amp;</span><span class="ident">parent_dir</span>).<span class="ident">unwrap</span>();
-                        <span class="ident">FileOrDir::File</span>(<span class="ident">new_file</span>)
-                    } <span class="kw">else</span> {
-                        <span class="ident">file_or_dir</span>
+        <span class="comment">// Open file or directory at path in accordance to open flags.
+        </span><span class="kw">let </span>opened_file_or_dir: FileOrDir = <span class="kw">match </span>base_path.get(<span class="kw-2">&amp;</span>parent_dir) {
+            <span class="prelude-val">Some</span>(file_or_dir) =&gt; <span class="kw">match </span>file_or_dir {
+                FileOrDir::File { .. } =&gt; {
+                    <span class="kw">if </span>fail_if_file_exists {
+                        <span class="kw">return </span><span class="prelude-val">Err</span>(wasi::ERRNO_EXIST);
+                    } <span class="kw">else if </span>fail_if_not_dir {
+                        <span class="kw">return </span><span class="prelude-val">Err</span>(wasi::ERRNO_NOTDIR);
+                    } <span class="kw">else if </span>truncate_file_to_size_zero {
+                        <span class="comment">// HACK: Truncate file by overwriting file.
+                        </span><span class="kw">let </span>new_file: FileRef =
+                            MemFile::new(String::from(base_name), <span class="kw-2">&amp;</span>parent_dir).unwrap();
+                        FileOrDir::File(new_file)
+                    } <span class="kw">else </span>{
+                        file_or_dir
                     }
                 }
-                <span class="ident">FileOrDir::Dir</span> { .. } =&gt; <span class="ident">file_or_dir</span>,
+                FileOrDir::Dir { .. } =&gt; file_or_dir,
             },
-            <span class="prelude-val">None</span> =&gt; {
-                <span class="kw">if</span> <span class="ident">create_file_if_no_exist</span> {
-                    <span class="kw">let</span> <span class="ident">new_file</span>: <span class="ident">FileRef</span> <span class="op">=</span>
-                        <span class="ident">MemFile::new</span>(<span class="ident">String::from</span>(<span class="ident">base_name</span>), <span class="kw-2">&amp;</span><span class="ident">parent_dir</span>).<span class="ident">unwrap</span>();
-                    <span class="ident">FileOrDir::File</span>(<span class="ident">new_file</span>)
-                } <span class="kw">else</span> {
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_NOENT</span>);
+            <span class="prelude-val">None </span>=&gt; {
+                <span class="kw">if </span>create_file_if_no_exist {
+                    <span class="kw">let </span>new_file: FileRef =
+                        MemFile::new(String::from(base_name), <span class="kw-2">&amp;</span>parent_dir).unwrap();
+                    FileOrDir::File(new_file)
+                } <span class="kw">else </span>{
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(wasi::ERRNO_NOENT);
                 }
             }
         };
 
-        <span class="comment">// Insert POSIX-style file in file descriptor table with given rights and flags.</span>
-        <span class="self">self</span>.<span class="ident">fd_table</span>.<span class="ident">insert</span>(
-            <span class="ident">fd</span>,
-            <span class="ident">PosixNodeOrStdio::Inode</span>(<span class="ident">PosixNode::new</span>(
-                <span class="ident">opened_file_or_dir</span>,
-                <span class="ident">fs_rights_base</span>,
-                <span class="ident">fs_rights_inheriting</span>,
-                <span class="ident">fs_flags</span>,
+        <span class="comment">// Insert POSIX-style file in file descriptor table with given rights and flags.
+        </span><span class="self">self</span>.fd_table.insert(
+            fd,
+            PosixNodeOrStdio::Inode(PosixNode::new(
+                opened_file_or_dir,
+                fs_rights_base,
+                fs_rights_inheriting,
+                fs_flags,
             )),
         );
 
-        <span class="prelude-val">Ok</span>(<span class="ident">fd</span>)
+        <span class="prelude-val">Ok</span>(fd)
     }
 
-    <span class="doccomment">/// Close a given file descriptor if not standard I/O.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `fd`: file descriptor number to be closed.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// If successful, returns ().</span>
-    <span class="doccomment">/// Otherwise, returns a wasi::Errno.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">close_fd</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">fd</span>: <span class="ident">wasi::Fd</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">wasi::Errno</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">fd_table</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">fd</span>)
-            <span class="op">&amp;&amp;</span> <span class="ident">fd</span> <span class="op">!</span><span class="op">=</span> <span class="ident">wasi::FD_STDIN</span>
-            <span class="op">&amp;&amp;</span> <span class="ident">fd</span> <span class="op">!</span><span class="op">=</span> <span class="ident">wasi::FD_STDOUT</span>
-            <span class="op">&amp;&amp;</span> <span class="ident">fd</span> <span class="op">!</span><span class="op">=</span> <span class="ident">wasi::FD_STDERR</span>
+    <span class="doccomment">/// Close a given file descriptor if not standard I/O.
+    ///
+    /// # Arguments
+    /// * `fd`: file descriptor number to be closed.
+    ///
+    /// # Return
+    /// If successful, returns ().
+    /// Otherwise, returns a wasi::Errno.
+    </span><span class="kw">pub fn </span>close_fd(<span class="kw-2">&amp;mut </span><span class="self">self</span>, fd: wasi::Fd) -&gt; <span class="prelude-ty">Result</span>&lt;(), wasi::Errno&gt; {
+        <span class="kw">if </span><span class="self">self</span>.fd_table.contains_key(<span class="kw-2">&amp;</span>fd)
+            &amp;&amp; fd != wasi::FD_STDIN
+            &amp;&amp; fd != wasi::FD_STDOUT
+            &amp;&amp; fd != wasi::FD_STDERR
         {
-            <span class="self">self</span>.<span class="ident">fd_table</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">fd</span>);
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+            <span class="self">self</span>.fd_table.remove(<span class="kw-2">&amp;</span>fd);
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(());
         }
-        <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_BADF</span>)
+        <span class="prelude-val">Err</span>(wasi::ERRNO_BADF)
     }
 
-    <span class="doccomment">/// Get POSIX-style file from file descriptor number.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `fd`: file descriptor number to access.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// Returns corresponding POSIX-style file if exists.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_posix_node_or_stdio</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">fd</span>: <span class="ident">wasi::Fd</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;mut</span> <span class="ident">PosixNodeOrStdio</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">fd_table</span>.<span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="ident">fd</span>)
+    <span class="doccomment">/// Get POSIX-style file from file descriptor number.
+    ///
+    /// # Arguments
+    /// * `fd`: file descriptor number to access.
+    ///
+    /// # Return
+    /// Returns corresponding POSIX-style file if exists.
+    </span><span class="kw">pub fn </span>get_posix_node_or_stdio(<span class="kw-2">&amp;mut </span><span class="self">self</span>, fd: wasi::Fd) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;mut </span>PosixNodeOrStdio&gt; {
+        <span class="self">self</span>.fd_table.get_mut(<span class="kw-2">&amp;</span>fd)
     }
 
-    <span class="doccomment">/// Get file system node from file descriptor number.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This method makes it easier to access an underlying file system node from a fd number.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `fd`: file descriptor number to access.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// Returns corresponding file system node if exists.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_posix_node</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">fd</span>: <span class="ident">wasi::Fd</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;mut</span> <span class="ident">PosixNode</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">get_posix_node_or_stdio</span>(<span class="ident">fd</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">posix_node_or_stdio</span>) =&gt; <span class="kw">match</span> <span class="ident">posix_node_or_stdio</span> {
-                <span class="ident">PosixNodeOrStdio::Inode</span>(<span class="ident">posix_node</span>) =&gt; <span class="prelude-val">Some</span>(<span class="ident">posix_node</span>),
-                <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
+    <span class="doccomment">/// Get file system node from file descriptor number.
+    ///
+    /// This method makes it easier to access an underlying file system node from a fd number.
+    ///
+    /// # Arguments
+    /// * `fd`: file descriptor number to access.
+    ///
+    /// # Return
+    /// Returns corresponding file system node if exists.
+    </span><span class="kw">pub fn </span>get_posix_node(<span class="kw-2">&amp;mut </span><span class="self">self</span>, fd: wasi::Fd) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;mut </span>PosixNode&gt; {
+        <span class="kw">match </span><span class="self">self</span>.get_posix_node_or_stdio(fd) {
+            <span class="prelude-val">Some</span>(posix_node_or_stdio) =&gt; <span class="kw">match </span>posix_node_or_stdio {
+                PosixNodeOrStdio::Inode(posix_node) =&gt; <span class="prelude-val">Some</span>(posix_node),
+                <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
             },
-            <span class="prelude-val">None</span> =&gt; <span class="prelude-val">None</span>,
+            <span class="prelude-val">None </span>=&gt; <span class="prelude-val">None</span>,
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="wasi_interpreter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="wasi_interpreter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

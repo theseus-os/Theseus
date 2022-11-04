@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/framebuffer/src/pixel.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>pixel.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../framebuffer/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../framebuffer/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../framebuffer/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/framebuffer/src/pixel.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>pixel.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../framebuffer/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -152,154 +146,153 @@
 <span id="146">146</span>
 <span id="147">147</span>
 <span id="148">148</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Defines the `Pixel` trait as well as basic pixel formats, like RBG/RBGA. </span>
+</pre><pre class="rust"><code><span class="doccomment">//! Defines the `Pixel` trait as well as basic pixel formats, like RBG/RBGA. 
 
-<span class="kw">use</span> <span class="ident">core::hash::Hash</span>;
-<span class="kw">use</span> <span class="ident">color::Color</span>;
-<span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
+</span><span class="kw">use </span>core::hash::Hash;
+<span class="kw">use </span>color::Color;
+<span class="kw">use </span>zerocopy::FromBytes;
 
-<span class="doccomment">/// A pixel provides methods to blend with others.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Pixel</span>: <span class="ident">Copy</span> <span class="op">+</span> <span class="ident">Hash</span> <span class="op">+</span> <span class="ident">FromBytes</span> {
-    <span class="doccomment">/// Composites the `src` pixel slice to the `dest` pixel slice.</span>
-    <span class="kw">fn</span> <span class="ident">composite_buffer</span>(<span class="ident">src</span>: <span class="kw-2">&amp;</span>[<span class="self">Self</span>], <span class="ident">dest</span>: <span class="kw-2">&amp;mut</span>[<span class="self">Self</span>]);
+<span class="doccomment">/// A pixel provides methods to blend with others.
+</span><span class="kw">pub trait </span>Pixel: Copy + Hash + FromBytes {
+    <span class="doccomment">/// Composites the `src` pixel slice to the `dest` pixel slice.
+    </span><span class="kw">fn </span>composite_buffer(src: <span class="kw-2">&amp;</span>[<span class="self">Self</span>], dest: <span class="kw-2">&amp;mut</span>[<span class="self">Self</span>]);
     
-    <span class="doccomment">/// blend with another pixel considering their extra channel.</span>
-    <span class="kw">fn</span> <span class="ident">blend</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="self">Self</span>) -&gt; <span class="self">Self</span>;
+    <span class="doccomment">/// blend with another pixel considering their extra channel.
+    </span><span class="kw">fn </span>blend(<span class="self">self</span>, other: <span class="self">Self</span>) -&gt; <span class="self">Self</span>;
 
-    <span class="doccomment">/// Blend two pixels linearly with weights, as `blend` for `origin` and (1-`blend`) for `other`.</span>
-    <span class="kw">fn</span> <span class="ident">weight_blend</span>(<span class="ident">origin</span>: <span class="self">Self</span>, <span class="ident">other</span>: <span class="self">Self</span>, <span class="ident">blend</span>: <span class="ident">f32</span>) -&gt; <span class="self">Self</span>;
+    <span class="doccomment">/// Blend two pixels linearly with weights, as `blend` for `origin` and (1-`blend`) for `other`.
+    </span><span class="kw">fn </span>weight_blend(origin: <span class="self">Self</span>, other: <span class="self">Self</span>, blend: f32) -&gt; <span class="self">Self</span>;
 }
 
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Hash</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="doccomment">/// An RGB Pixel is a pixel with no extra channel.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RGBPixel</span> {
-    <span class="kw">pub</span> <span class="ident">blue</span>: <span class="ident">u8</span>,
-    <span class="kw">pub</span> <span class="ident">green</span>: <span class="ident">u8</span>,
-    <span class="kw">pub</span> <span class="ident">red</span>: <span class="ident">u8</span>,
-    <span class="ident">_channel</span>: <span class="ident">u8</span>,
+<span class="attr">#[derive(Hash, Debug, Clone, Copy, FromBytes)]
+</span><span class="doccomment">/// An RGB Pixel is a pixel with no extra channel.
+</span><span class="kw">pub struct </span>RGBPixel {
+    <span class="kw">pub </span>blue: u8,
+    <span class="kw">pub </span>green: u8,
+    <span class="kw">pub </span>red: u8,
+    _channel: u8,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Hash</span>, <span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="doccomment">/// An Alpha Pixel is a pixel with an alpha channel</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AlphaPixel</span> {
-    <span class="kw">pub</span> <span class="ident">blue</span>: <span class="ident">u8</span>,
-    <span class="kw">pub</span> <span class="ident">green</span>: <span class="ident">u8</span>,
-    <span class="kw">pub</span> <span class="ident">red</span>: <span class="ident">u8</span>,
-    <span class="kw">pub</span> <span class="ident">alpha</span>: <span class="ident">u8</span>
+<span class="attr">#[derive(Hash, Debug, Clone, Copy, FromBytes)]
+</span><span class="doccomment">/// An Alpha Pixel is a pixel with an alpha channel
+</span><span class="kw">pub struct </span>AlphaPixel {
+    <span class="kw">pub </span>blue: u8,
+    <span class="kw">pub </span>green: u8,
+    <span class="kw">pub </span>red: u8,
+    <span class="kw">pub </span>alpha: u8
 }
 
-<span class="kw">impl</span> <span class="ident">Pixel</span> <span class="kw">for</span> <span class="ident">RGBPixel</span> {
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">composite_buffer</span>(<span class="ident">src</span>: <span class="kw-2">&amp;</span>[<span class="self">Self</span>], <span class="ident">dest</span>: <span class="kw-2">&amp;mut</span>[<span class="self">Self</span>]) {
-        <span class="ident">dest</span>.<span class="ident">copy_from_slice</span>(<span class="ident">src</span>)
+<span class="kw">impl </span>Pixel <span class="kw">for </span>RGBPixel {
+    <span class="attr">#[inline]
+    </span><span class="kw">fn </span>composite_buffer(src: <span class="kw-2">&amp;</span>[<span class="self">Self</span>], dest: <span class="kw-2">&amp;mut</span>[<span class="self">Self</span>]) {
+        dest.copy_from_slice(src)
     }
     
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">blend</span>(<span class="self">self</span>, <span class="ident">_other</span>: <span class="self">Self</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">self</span>
-    }
+    <span class="attr">#[inline]
+    </span><span class="kw">fn </span>blend(<span class="self">self</span>, _other: <span class="self">Self</span>) -&gt; <span class="self">Self </span>{
+        <span class="self">self
+    </span>}
 
-    <span class="kw">fn</span> <span class="ident">weight_blend</span>(<span class="ident">origin</span>: <span class="self">Self</span>, <span class="ident">other</span>: <span class="self">Self</span>, <span class="ident">blend</span>: <span class="ident">f32</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">blend</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">blend</span> <span class="op">&lt;</span> <span class="number">0f32</span> {
-            <span class="number">0f32</span>
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">blend</span> <span class="op">&gt;</span> <span class="number">1f32</span> {
-            <span class="number">1f32</span>
-        } <span class="kw">else</span> {
-            <span class="ident">blend</span>
+    <span class="kw">fn </span>weight_blend(origin: <span class="self">Self</span>, other: <span class="self">Self</span>, blend: f32) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>blend = <span class="kw">if </span>blend &lt; <span class="number">0f32 </span>{
+            <span class="number">0f32
+        </span>} <span class="kw">else if </span>blend &gt; <span class="number">1f32 </span>{
+            <span class="number">1f32
+        </span>} <span class="kw">else </span>{
+            blend
         };
 
-        <span class="kw">let</span> <span class="ident">new_red</span> <span class="op">=</span>
-            ((<span class="ident">origin</span>.<span class="ident">red</span> <span class="kw">as</span> <span class="ident">f32</span>) <span class="op">*</span> <span class="ident">blend</span> <span class="op">+</span> (<span class="ident">other</span>.<span class="ident">red</span> <span class="kw">as</span> <span class="ident">f32</span>) <span class="op">*</span> (<span class="number">1f32</span> <span class="op">-</span> <span class="ident">blend</span>)) <span class="kw">as</span> <span class="ident">u8</span>;
-        <span class="kw">let</span> <span class="ident">new_green</span> <span class="op">=</span>
-            ((<span class="ident">origin</span>.<span class="ident">green</span> <span class="kw">as</span> <span class="ident">f32</span>) <span class="op">*</span> <span class="ident">blend</span> <span class="op">+</span> (<span class="ident">other</span>.<span class="ident">green</span> <span class="kw">as</span> <span class="ident">f32</span>) <span class="op">*</span> (<span class="number">1f32</span> <span class="op">-</span> <span class="ident">blend</span>)) <span class="kw">as</span> <span class="ident">u8</span>;
-        <span class="kw">let</span> <span class="ident">new_blue</span> <span class="op">=</span>
-            ((<span class="ident">origin</span>.<span class="ident">blue</span> <span class="kw">as</span> <span class="ident">f32</span>) <span class="op">*</span> <span class="ident">blend</span> <span class="op">+</span> (<span class="ident">other</span>.<span class="ident">blue</span> <span class="kw">as</span> <span class="ident">f32</span>) <span class="op">*</span> (<span class="number">1f32</span> <span class="op">-</span> <span class="ident">blend</span>)) <span class="kw">as</span> <span class="ident">u8</span>;
+        <span class="kw">let </span>new_red =
+            ((origin.red <span class="kw">as </span>f32) * blend + (other.red <span class="kw">as </span>f32) * (<span class="number">1f32 </span>- blend)) <span class="kw">as </span>u8;
+        <span class="kw">let </span>new_green =
+            ((origin.green <span class="kw">as </span>f32) * blend + (other.green <span class="kw">as </span>f32) * (<span class="number">1f32 </span>- blend)) <span class="kw">as </span>u8;
+        <span class="kw">let </span>new_blue =
+            ((origin.blue <span class="kw">as </span>f32) * blend + (other.blue <span class="kw">as </span>f32) * (<span class="number">1f32 </span>- blend)) <span class="kw">as </span>u8;
         
-        <span class="ident">RGBPixel</span>{
-            <span class="ident">_channel</span>: <span class="number">0</span>,
-            <span class="ident">red</span>: <span class="ident">new_red</span>,
-            <span class="ident">green</span>: <span class="ident">new_green</span>,
-            <span class="ident">blue</span>: <span class="ident">new_blue</span>
+        RGBPixel{
+            _channel: <span class="number">0</span>,
+            red: new_red,
+            green: new_green,
+            blue: new_blue
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Color</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">RGBPixel</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">color</span>: <span class="ident">Color</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">RGBPixel</span> {
-            <span class="ident">_channel</span>: <span class="number">0</span>,
-            <span class="ident">red</span>: <span class="ident">color</span>.<span class="ident">red</span>(),
-            <span class="ident">green</span>: <span class="ident">color</span>.<span class="ident">green</span>(),
-            <span class="ident">blue</span>: <span class="ident">color</span>.<span class="ident">blue</span>(),
+<span class="kw">impl </span>From&lt;Color&gt; <span class="kw">for </span>RGBPixel {
+    <span class="kw">fn </span>from(color: Color) -&gt; <span class="self">Self </span>{
+        RGBPixel {
+            _channel: <span class="number">0</span>,
+            red: color.red(),
+            green: color.green(),
+            blue: color.blue(),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Pixel</span> <span class="kw">for</span> <span class="ident">AlphaPixel</span> {   
-    <span class="kw">fn</span> <span class="ident">composite_buffer</span>(<span class="ident">src</span>: <span class="kw-2">&amp;</span>[<span class="self">Self</span>], <span class="ident">dest</span>: <span class="kw-2">&amp;mut</span>[<span class="self">Self</span>]) {
-        <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">src</span>.<span class="ident">len</span>() {
-            <span class="ident">dest</span>[<span class="ident">i</span>] <span class="op">=</span> <span class="ident">AlphaPixel::from</span>(<span class="ident">src</span>[<span class="ident">i</span>]).<span class="ident">blend</span>(<span class="ident">AlphaPixel::from</span>(<span class="ident">dest</span>[<span class="ident">i</span>])).<span class="ident">into</span>();
+<span class="kw">impl </span>Pixel <span class="kw">for </span>AlphaPixel {   
+    <span class="kw">fn </span>composite_buffer(src: <span class="kw-2">&amp;</span>[<span class="self">Self</span>], dest: <span class="kw-2">&amp;mut</span>[<span class="self">Self</span>]) {
+        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..src.len() {
+            dest[i] = AlphaPixel::from(src[i]).blend(AlphaPixel::from(dest[i])).into();
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">blend</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="self">Self</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">alpha</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">alpha</span> <span class="kw">as</span> <span class="ident">u16</span>;
-        <span class="kw">let</span> <span class="ident">red</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">red</span>;
-        <span class="kw">let</span> <span class="ident">green</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">green</span>;
-        <span class="kw">let</span> <span class="ident">blue</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">blue</span>;
-        <span class="comment">// let ori_alpha = other.alpha;</span>
-        <span class="kw">let</span> <span class="ident">ori_red</span> <span class="op">=</span> <span class="ident">other</span>.<span class="ident">red</span>;
-        <span class="kw">let</span> <span class="ident">ori_green</span> <span class="op">=</span> <span class="ident">other</span>.<span class="ident">green</span>;
-        <span class="kw">let</span> <span class="ident">ori_blue</span> <span class="op">=</span> <span class="ident">other</span>.<span class="ident">blue</span>;
-        <span class="comment">// let new_alpha = (((alpha as u16) * (255 - alpha) + (ori_alpha as u16) * alpha) / 255) as u8;</span>
-        <span class="kw">let</span> <span class="ident">new_red</span> <span class="op">=</span> (((<span class="ident">red</span> <span class="kw">as</span> <span class="ident">u16</span>) <span class="op">*</span> (<span class="number">255</span> <span class="op">-</span> <span class="ident">alpha</span>) <span class="op">+</span> (<span class="ident">ori_red</span> <span class="kw">as</span> <span class="ident">u16</span>) <span class="op">*</span> <span class="ident">alpha</span>) <span class="op">/</span> <span class="number">255</span>) <span class="kw">as</span> <span class="ident">u8</span>;
-        <span class="kw">let</span> <span class="ident">new_green</span> <span class="op">=</span> (((<span class="ident">green</span> <span class="kw">as</span> <span class="ident">u16</span>) <span class="op">*</span> (<span class="number">255</span> <span class="op">-</span> <span class="ident">alpha</span>) <span class="op">+</span> (<span class="ident">ori_green</span> <span class="kw">as</span> <span class="ident">u16</span>) <span class="op">*</span> <span class="ident">alpha</span>) <span class="op">/</span> <span class="number">255</span>) <span class="kw">as</span> <span class="ident">u8</span>;
-        <span class="kw">let</span> <span class="ident">new_blue</span> <span class="op">=</span> (((<span class="ident">blue</span> <span class="kw">as</span> <span class="ident">u16</span>) <span class="op">*</span> (<span class="number">255</span> <span class="op">-</span> <span class="ident">alpha</span>) <span class="op">+</span> (<span class="ident">ori_blue</span> <span class="kw">as</span> <span class="ident">u16</span>) <span class="op">*</span> <span class="ident">alpha</span>) <span class="op">/</span> <span class="number">255</span>) <span class="kw">as</span> <span class="ident">u8</span>;
-        <span class="ident">AlphaPixel</span> {
-            <span class="ident">alpha</span>: <span class="ident">alpha</span> <span class="kw">as</span> <span class="ident">u8</span>,
-            <span class="ident">red</span>: <span class="ident">new_red</span>,
-            <span class="ident">green</span>: <span class="ident">new_green</span>,
-            <span class="ident">blue</span>: <span class="ident">new_blue</span>
+    <span class="kw">fn </span>blend(<span class="self">self</span>, other: <span class="self">Self</span>) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>alpha = <span class="self">self</span>.alpha <span class="kw">as </span>u16;
+        <span class="kw">let </span>red = <span class="self">self</span>.red;
+        <span class="kw">let </span>green = <span class="self">self</span>.green;
+        <span class="kw">let </span>blue = <span class="self">self</span>.blue;
+        <span class="comment">// let ori_alpha = other.alpha;
+        </span><span class="kw">let </span>ori_red = other.red;
+        <span class="kw">let </span>ori_green = other.green;
+        <span class="kw">let </span>ori_blue = other.blue;
+        <span class="comment">// let new_alpha = (((alpha as u16) * (255 - alpha) + (ori_alpha as u16) * alpha) / 255) as u8;
+        </span><span class="kw">let </span>new_red = (((red <span class="kw">as </span>u16) * (<span class="number">255 </span>- alpha) + (ori_red <span class="kw">as </span>u16) * alpha) / <span class="number">255</span>) <span class="kw">as </span>u8;
+        <span class="kw">let </span>new_green = (((green <span class="kw">as </span>u16) * (<span class="number">255 </span>- alpha) + (ori_green <span class="kw">as </span>u16) * alpha) / <span class="number">255</span>) <span class="kw">as </span>u8;
+        <span class="kw">let </span>new_blue = (((blue <span class="kw">as </span>u16) * (<span class="number">255 </span>- alpha) + (ori_blue <span class="kw">as </span>u16) * alpha) / <span class="number">255</span>) <span class="kw">as </span>u8;
+        AlphaPixel {
+            alpha: alpha <span class="kw">as </span>u8,
+            red: new_red,
+            green: new_green,
+            blue: new_blue
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">weight_blend</span>(<span class="ident">origin</span>: <span class="self">Self</span>, <span class="ident">other</span>: <span class="self">Self</span>, <span class="ident">blend</span>: <span class="ident">f32</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">blend</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">blend</span> <span class="op">&lt;</span> <span class="number">0f32</span> {
-            <span class="number">0f32</span>
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">blend</span> <span class="op">&gt;</span> <span class="number">1f32</span> {
-            <span class="number">1f32</span>
-        } <span class="kw">else</span> {
-            <span class="ident">blend</span>
+    <span class="kw">fn </span>weight_blend(origin: <span class="self">Self</span>, other: <span class="self">Self</span>, blend: f32) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>blend = <span class="kw">if </span>blend &lt; <span class="number">0f32 </span>{
+            <span class="number">0f32
+        </span>} <span class="kw">else if </span>blend &gt; <span class="number">1f32 </span>{
+            <span class="number">1f32
+        </span>} <span class="kw">else </span>{
+            blend
         };
 
-        <span class="kw">let</span> <span class="ident">new_channel</span> <span class="op">=</span>
-            ((<span class="ident">origin</span>.<span class="ident">alpha</span> <span class="kw">as</span> <span class="ident">f32</span>) <span class="op">*</span> <span class="ident">blend</span> <span class="op">+</span> (<span class="ident">other</span>.<span class="ident">alpha</span> <span class="kw">as</span> <span class="ident">f32</span>) <span class="op">*</span> (<span class="number">1f32</span> <span class="op">-</span> <span class="ident">blend</span>)) <span class="kw">as</span> <span class="ident">u8</span>;
-        <span class="kw">let</span> <span class="ident">new_red</span> <span class="op">=</span>
-            ((<span class="ident">origin</span>.<span class="ident">red</span> <span class="kw">as</span> <span class="ident">f32</span>) <span class="op">*</span> <span class="ident">blend</span> <span class="op">+</span> (<span class="ident">other</span>.<span class="ident">red</span> <span class="kw">as</span> <span class="ident">f32</span>) <span class="op">*</span> (<span class="number">1f32</span> <span class="op">-</span> <span class="ident">blend</span>)) <span class="kw">as</span> <span class="ident">u8</span>;
-        <span class="kw">let</span> <span class="ident">new_green</span> <span class="op">=</span>
-            ((<span class="ident">origin</span>.<span class="ident">green</span> <span class="kw">as</span> <span class="ident">f32</span>) <span class="op">*</span> <span class="ident">blend</span> <span class="op">+</span> (<span class="ident">other</span>.<span class="ident">green</span> <span class="kw">as</span> <span class="ident">f32</span>) <span class="op">*</span> (<span class="number">1f32</span> <span class="op">-</span> <span class="ident">blend</span>)) <span class="kw">as</span> <span class="ident">u8</span>;
-        <span class="kw">let</span> <span class="ident">new_blue</span> <span class="op">=</span>
-            ((<span class="ident">origin</span>.<span class="ident">blue</span> <span class="kw">as</span> <span class="ident">f32</span>) <span class="op">*</span> <span class="ident">blend</span> <span class="op">+</span> (<span class="ident">other</span>.<span class="ident">blue</span> <span class="kw">as</span> <span class="ident">f32</span>) <span class="op">*</span> (<span class="number">1f32</span> <span class="op">-</span> <span class="ident">blend</span>)) <span class="kw">as</span> <span class="ident">u8</span>;
-        <span class="ident">AlphaPixel</span> {
-            <span class="ident">alpha</span>: <span class="ident">new_channel</span>,
-            <span class="ident">red</span>: <span class="ident">new_red</span>,
-            <span class="ident">green</span>: <span class="ident">new_green</span>,
-            <span class="ident">blue</span>: <span class="ident">new_blue</span>
+        <span class="kw">let </span>new_channel =
+            ((origin.alpha <span class="kw">as </span>f32) * blend + (other.alpha <span class="kw">as </span>f32) * (<span class="number">1f32 </span>- blend)) <span class="kw">as </span>u8;
+        <span class="kw">let </span>new_red =
+            ((origin.red <span class="kw">as </span>f32) * blend + (other.red <span class="kw">as </span>f32) * (<span class="number">1f32 </span>- blend)) <span class="kw">as </span>u8;
+        <span class="kw">let </span>new_green =
+            ((origin.green <span class="kw">as </span>f32) * blend + (other.green <span class="kw">as </span>f32) * (<span class="number">1f32 </span>- blend)) <span class="kw">as </span>u8;
+        <span class="kw">let </span>new_blue =
+            ((origin.blue <span class="kw">as </span>f32) * blend + (other.blue <span class="kw">as </span>f32) * (<span class="number">1f32 </span>- blend)) <span class="kw">as </span>u8;
+        AlphaPixel {
+            alpha: new_channel,
+            red: new_red,
+            green: new_green,
+            blue: new_blue
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Color</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">AlphaPixel</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">color</span>: <span class="ident">Color</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">AlphaPixel</span> {
-            <span class="ident">alpha</span>: <span class="ident">color</span>.<span class="ident">transparency</span>(),
-            <span class="ident">red</span>: <span class="ident">color</span>.<span class="ident">red</span>(),
-            <span class="ident">green</span>: <span class="ident">color</span>.<span class="ident">green</span>(),
-            <span class="ident">blue</span>: <span class="ident">color</span>.<span class="ident">blue</span>(),
+<span class="kw">impl </span>From&lt;Color&gt; <span class="kw">for </span>AlphaPixel {
+    <span class="kw">fn </span>from(color: Color) -&gt; <span class="self">Self </span>{
+        AlphaPixel {
+            alpha: color.transparency(),
+            red: color.red(),
+            green: color.green(),
+            blue: color.blue(),
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="framebuffer" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="framebuffer" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

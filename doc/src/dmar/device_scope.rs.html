@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/acpi/dmar/src/device_scope.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>device_scope.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../dmar/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../dmar/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../dmar/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/acpi/dmar/src/device_scope.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>device_scope.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../dmar/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -120,122 +114,121 @@
 <span id="114">114</span>
 <span id="115">115</span>
 <span id="116">116</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Support for the DMAR Device Scope Structure.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Support for the DMAR Device Scope Structure.
 
-<span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+</span><span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-<span class="doccomment">/// DMAR Device Scope Structure.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This structure is described in Section 8.3.1 of the VT Directed I/O Spec.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">DeviceScope</span> {
-    <span class="ident">typ</span>: <span class="ident">u8</span>,
-    <span class="ident">length</span>: <span class="ident">u8</span>,
-    <span class="ident">_reserved</span>: <span class="ident">u16</span>,
-    <span class="ident">enumeration_id</span>: <span class="ident">u8</span>,
-    <span class="ident">start_bus_number</span>: <span class="ident">u8</span>,
-    <span class="comment">// Following this is a variable-sized `Path` field,</span>
-    <span class="comment">// so we cannot include it here in the static struct definition.</span>
-    <span class="comment">// It would look something like:</span>
-    <span class="comment">// path: [u16],</span>
+<span class="doccomment">/// DMAR Device Scope Structure.
+///
+/// This structure is described in Section 8.3.1 of the VT Directed I/O Spec.
+</span><span class="attr">#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(packed)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>DeviceScope {
+    typ: u8,
+    length: u8,
+    _reserved: u16,
+    enumeration_id: u8,
+    start_bus_number: u8,
+    <span class="comment">// Following this is a variable-sized `Path` field,
+    // so we cannot include it here in the static struct definition.
+    // It would look something like:
+    // path: [u16],
+</span>}
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;DeviceScope&gt;(), <span class="number">6</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;DeviceScope&gt;(), <span class="number">1</span>);
+
+
+<span class="doccomment">/// DMAR Device Scope Structure.
+///
+/// This structure is described in Section 8.3.1 of the VT Directed I/O Spec.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>DmarDeviceScope&lt;<span class="lifetime">&#39;t</span>&gt; {
+    <span class="doccomment">/// The fixed-size part of the [`DeviceScope`] structure.
+    </span>table: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>DeviceScope,
+    <span class="doccomment">/// The underlying MappedPages that cover this structure.
+    </span>mapped_pages: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>MappedPages,
+    <span class="doccomment">/// The offset into the above `mapped_pages` at which 
+    /// the dynamic part (the Path) of the [`DeviceScope`] structure begins.
+    </span>path_starting_offset: usize,
+    <span class="doccomment">/// The total size in bytes of all dynamic Path entries.
+    /// The number of Path entries is `path_total_size / 2`.
+    </span><span class="attr">#[allow(dead_code)]
+    </span>path_total_size: usize,
 }
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DeviceScope</span><span class="op">&gt;</span>(), <span class="number">6</span>);
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DeviceScope</span><span class="op">&gt;</span>(), <span class="number">1</span>);
 
-
-<span class="doccomment">/// DMAR Device Scope Structure.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This structure is described in Section 8.3.1 of the VT Directed I/O Spec.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DmarDeviceScope</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// The fixed-size part of the [`DeviceScope`] structure.</span>
-    <span class="ident">table</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">DeviceScope</span>,
-    <span class="doccomment">/// The underlying MappedPages that cover this structure.</span>
-    <span class="ident">mapped_pages</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">MappedPages</span>,
-    <span class="doccomment">/// The offset into the above `mapped_pages` at which </span>
-    <span class="doccomment">/// the dynamic part (the Path) of the [`DeviceScope`] structure begins.</span>
-    <span class="ident">path_starting_offset</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// The total size in bytes of all dynamic Path entries.</span>
-    <span class="doccomment">/// The number of Path entries is `path_total_size / 2`.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-    <span class="ident">path_total_size</span>: <span class="ident">usize</span>,
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> <span class="ident">DmarDeviceScope</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">from_entry</span>(
-        <span class="ident">mp</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">MappedPages</span>,
-        <span class="ident">mp_offset</span>: <span class="ident">usize</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DmarDeviceScope</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">dev_scope</span>: <span class="kw-2">&amp;</span><span class="ident">DeviceScope</span> <span class="op">=</span> <span class="ident">mp</span>.<span class="ident">as_type</span>(<span class="ident">mp_offset</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">DmarDeviceScope</span> {
-            <span class="ident">table</span>: <span class="ident">dev_scope</span>,
-            <span class="ident">mapped_pages</span>: <span class="ident">mp</span>,
-            <span class="ident">path_starting_offset</span>: <span class="ident">mp_offset</span> <span class="op">+</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">DeviceScope</span><span class="op">&gt;</span>(), 
-            <span class="ident">path_total_size</span>: <span class="ident">dev_scope</span>.<span class="ident">length</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">DeviceScope</span><span class="op">&gt;</span>(),
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;t</span>&gt; DmarDeviceScope&lt;<span class="lifetime">&#39;t</span>&gt; {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>from_entry(
+        mp: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>MappedPages,
+        mp_offset: usize,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;DmarDeviceScope&lt;<span class="lifetime">&#39;t</span>&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>dev_scope: <span class="kw-2">&amp;</span>DeviceScope = mp.as_type(mp_offset)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(DmarDeviceScope {
+            table: dev_scope,
+            mapped_pages: mp,
+            path_starting_offset: mp_offset + size_of::&lt;DeviceScope&gt;(), 
+            path_total_size: dev_scope.length <span class="kw">as </span>usize - size_of::&lt;DeviceScope&gt;(),
         })
     }
 
-    <span class="doccomment">/// Returns the type of this device scope structure.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// TODO: use an enum to represent possible device types.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// * `1`: PCI Endpoint Device - The device identified by the ‘Path’ field is</span>
-    <span class="doccomment">///   a PCI endpoint device. This type must not be used in Device Scope of</span>
-    <span class="doccomment">///   DRHD structures with INCLUDE_PCI_ALL flag Set.</span>
-    <span class="doccomment">/// * `2`: PCI Sub-hierarchy - The device identified by the ‘Path’ field is a</span>
-    <span class="doccomment">///   PCI-PCI bridge. In this case, the specified bridge device and all its</span>
-    <span class="doccomment">///   downstream devices are included in the scope. This type must not be</span>
-    <span class="doccomment">///   in Device Scope of DRHD structures with INCLUDE_PCI_ALL flag Set.</span>
-    <span class="doccomment">/// * `3`: IOAPIC - The device identified by the ‘Path’ field is an I/O APIC</span>
-    <span class="doccomment">///   (or I/O SAPIC) device, enumerated through the ACPI MADT I/O APIC</span>
-    <span class="doccomment">///   (or I/O SAPIC) structure.</span>
-    <span class="doccomment">/// * `4`: MSI_CAPABLE_HPET1 - The device identified by the ‘Path’ field</span>
-    <span class="doccomment">///   is an HPET Timer Block capable of generating MSI (Message Signaled</span>
-    <span class="doccomment">///   interrupts). HPET hardware is reported through ACPI HPET structure.</span>
-    <span class="doccomment">/// * `5`: ACPI_NAMESPACE_DEVICE - The device identified by the ‘Path’</span>
-    <span class="doccomment">///   field is an ACPI name-space enumerated</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">device_type</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> {
-        <span class="self">self</span>.<span class="ident">table</span>.<span class="ident">typ</span>
+    <span class="doccomment">/// Returns the type of this device scope structure.
+    /// 
+    /// TODO: use an enum to represent possible device types.
+    ///
+    /// * `1`: PCI Endpoint Device - The device identified by the ‘Path’ field is
+    ///   a PCI endpoint device. This type must not be used in Device Scope of
+    ///   DRHD structures with INCLUDE_PCI_ALL flag Set.
+    /// * `2`: PCI Sub-hierarchy - The device identified by the ‘Path’ field is a
+    ///   PCI-PCI bridge. In this case, the specified bridge device and all its
+    ///   downstream devices are included in the scope. This type must not be
+    ///   in Device Scope of DRHD structures with INCLUDE_PCI_ALL flag Set.
+    /// * `3`: IOAPIC - The device identified by the ‘Path’ field is an I/O APIC
+    ///   (or I/O SAPIC) device, enumerated through the ACPI MADT I/O APIC
+    ///   (or I/O SAPIC) structure.
+    /// * `4`: MSI_CAPABLE_HPET1 - The device identified by the ‘Path’ field
+    ///   is an HPET Timer Block capable of generating MSI (Message Signaled
+    ///   interrupts). HPET hardware is reported through ACPI HPET structure.
+    /// * `5`: ACPI_NAMESPACE_DEVICE - The device identified by the ‘Path’
+    ///   field is an ACPI name-space enumerated
+    </span><span class="kw">pub fn </span>device_type(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 {
+        <span class="self">self</span>.table.typ
     }
 
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">length</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> { <span class="self">self</span>.<span class="ident">table</span>.<span class="ident">length</span> }
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>length(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 { <span class="self">self</span>.table.length }
 
-    <span class="doccomment">/// Returns the Enumeration ID, which differs in meaning based on the type</span>
-    <span class="doccomment">/// of this [`DmarDeviceScope`] structure.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enumeration_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> {
-        <span class="self">self</span>.<span class="ident">table</span>.<span class="ident">enumeration_id</span>
+    <span class="doccomment">/// Returns the Enumeration ID, which differs in meaning based on the type
+    /// of this [`DmarDeviceScope`] structure.
+    </span><span class="kw">pub fn </span>enumeration_id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 {
+        <span class="self">self</span>.table.enumeration_id
     }
 
-    <span class="doccomment">/// Returns the PCI bus number under which the device identified</span>
-    <span class="doccomment">/// by this [`DmarDeviceScope`] exists.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_bus_number</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> {
-        <span class="self">self</span>.<span class="ident">table</span>.<span class="ident">start_bus_number</span>
+    <span class="doccomment">/// Returns the PCI bus number under which the device identified
+    /// by this [`DmarDeviceScope`] exists.
+    </span><span class="kw">pub fn </span>start_bus_number(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 {
+        <span class="self">self</span>.table.start_bus_number
     }
 
-    <span class="doccomment">/// Calculates and returns the hierarchical path (along the PCI bus)</span>
-    <span class="doccomment">/// to the device specified by this [`DmarDeviceScope`] structure.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Warning -- incomplete!</span>
-    <span class="doccomment">/// TODO: finish this function, it is not yet complete. It only returns the first path. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">path</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">DeviceScopePath</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Calculates and returns the hierarchical path (along the PCI bus)
+    /// to the device specified by this [`DmarDeviceScope`] structure.
+    /// 
+    /// # Warning -- incomplete!
+    /// TODO: finish this function, it is not yet complete. It only returns the first path. 
+    </span><span class="kw">pub fn </span>path(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>DeviceScopePath, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="macro">log::warn!</span>(<span class="string">&quot;The DmarDeviceScope::path() function is incomplete! Its value may be incorrect.&quot;</span>);
-        <span class="kw">let</span> <span class="comment">/* mut */</span> <span class="ident">offset</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">path_starting_offset</span>;
-        <span class="kw">let</span> <span class="ident">starting_path</span>: <span class="kw-2">&amp;</span><span class="ident">DeviceScopePath</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">mapped_pages</span>.<span class="ident">as_type</span>(<span class="ident">offset</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span><span class="comment">/* mut */ </span>offset = <span class="self">self</span>.path_starting_offset;
+        <span class="kw">let </span>starting_path: <span class="kw-2">&amp;</span>DeviceScopePath = <span class="self">self</span>.mapped_pages.as_type(offset)<span class="question-mark">?</span>;
 
-        <span class="comment">// TODO: complete the path iteration algorithm described in Section 8.3.1</span>
-        <span class="prelude-val">Ok</span>(<span class="ident">starting_path</span>)
+        <span class="comment">// TODO: complete the path iteration algorithm described in Section 8.3.1
+        </span><span class="prelude-val">Ok</span>(starting_path)
     }   
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DeviceScopePath</span> {
-    <span class="kw">pub</span> <span class="ident">device</span>: <span class="ident">u8</span>,
-    <span class="kw">pub</span> <span class="ident">function</span>: <span class="ident">u8</span>,
+<span class="attr">#[derive(Debug, Clone, Copy, FromBytes)]
+#[repr(packed)]
+</span><span class="kw">pub struct </span>DeviceScopePath {
+    <span class="kw">pub </span>device: u8,
+    <span class="kw">pub </span>function: u8,
 }
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DeviceScopePath</span><span class="op">&gt;</span>(), <span class="number">2</span>);
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DeviceScopePath</span><span class="op">&gt;</span>(), <span class="number">1</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;DeviceScopePath&gt;(), <span class="number">2</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;DeviceScopePath&gt;(), <span class="number">1</span>);
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="dmar" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="dmar" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

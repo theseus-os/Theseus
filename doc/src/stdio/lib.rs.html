@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../stdio/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../stdio/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../stdio/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../stdio/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -417,419 +411,418 @@
 <span id="411">411</span>
 <span id="412">412</span>
 <span id="413">413</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This crate creates the abstraction of `stdio`. They are essentially ring buffer of bytes.</span>
-<span class="doccomment">//! It also creates the queue for `KeyEvent`, which allows applications to have direct access</span>
-<span class="doccomment">//! to keyboard events.</span>
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate creates the abstraction of `stdio`. They are essentially ring buffer of bytes.
+//! It also creates the queue for `KeyEvent`, which allows applications to have direct access
+//! to keyboard events.
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">core2</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">keycodes_ascii</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>core2;
+<span class="kw">extern crate </span>keycodes_ascii;
 
-<span class="kw">use</span> <span class="ident">alloc::collections::VecDeque</span>;
-<span class="kw">use</span> <span class="ident">alloc::sync::Arc</span>;
-<span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
-<span class="kw">use</span> <span class="ident">alloc::string::String</span>;
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
-<span class="kw">use</span> <span class="ident">core2::io</span>::{<span class="ident">Read</span>, <span class="ident">Write</span>};
-<span class="kw">use</span> <span class="ident">keycodes_ascii::KeyEvent</span>;
-<span class="kw">use</span> <span class="ident">core::ops::Deref</span>;
+<span class="kw">use </span>alloc::collections::VecDeque;
+<span class="kw">use </span>alloc::sync::Arc;
+<span class="kw">use </span>alloc::boxed::Box;
+<span class="kw">use </span>alloc::string::String;
+<span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>spin::{Mutex, MutexGuard};
+<span class="kw">use </span>core2::io::{Read, Write};
+<span class="kw">use </span>keycodes_ascii::KeyEvent;
+<span class="kw">use </span>core::ops::Deref;
 
-<span class="doccomment">/// A ring buffer with an EOF mark.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RingBufferEof</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// The ring buffer.</span>
-    <span class="ident">queue</span>: <span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The EOF mark. We meet EOF when it equals `true`.</span>
-    <span class="ident">end</span>: <span class="ident">bool</span>
+<span class="doccomment">/// A ring buffer with an EOF mark.
+</span><span class="kw">pub struct </span>RingBufferEof&lt;T&gt; {
+    <span class="doccomment">/// The ring buffer.
+    </span>queue: VecDeque&lt;T&gt;,
+    <span class="doccomment">/// The EOF mark. We meet EOF when it equals `true`.
+    </span>end: bool
 }
 
-<span class="doccomment">/// A reference to a ring buffer with an EOF mark with mutex protection.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">RingBufferEofRef</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">RingBufferEof</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+<span class="doccomment">/// A reference to a ring buffer with an EOF mark with mutex protection.
+</span><span class="kw">pub type </span>RingBufferEofRef&lt;T&gt; = Arc&lt;Mutex&lt;RingBufferEof&lt;T&gt;&gt;&gt;;
 
-<span class="doccomment">/// A ring buffer containing bytes. It forms `stdin`, `stdout` and `stderr`.</span>
-<span class="doccomment">/// The two `Arc`s actually point to the same ring buffer. It is designed to prevent</span>
-<span class="doccomment">/// interleaved reading but at the same time allow writing to the ring buffer while</span>
-<span class="doccomment">/// the reader is holding its lock, and vice versa.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Stdio</span> {
-    <span class="doccomment">/// This prevents interleaved reading.</span>
-    <span class="ident">read_access</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">RingBufferEofRef</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// This prevents interleaved writing.</span>
-    <span class="ident">write_access</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">RingBufferEofRef</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>
+<span class="doccomment">/// A ring buffer containing bytes. It forms `stdin`, `stdout` and `stderr`.
+/// The two `Arc`s actually point to the same ring buffer. It is designed to prevent
+/// interleaved reading but at the same time allow writing to the ring buffer while
+/// the reader is holding its lock, and vice versa.
+</span><span class="kw">pub struct </span>Stdio {
+    <span class="doccomment">/// This prevents interleaved reading.
+    </span>read_access: Arc&lt;Mutex&lt;RingBufferEofRef&lt;u8&gt;&gt;&gt;,
+    <span class="doccomment">/// This prevents interleaved writing.
+    </span>write_access: Arc&lt;Mutex&lt;RingBufferEofRef&lt;u8&gt;&gt;&gt;
 }
 
-<span class="doccomment">/// A reader to stdio buffers.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">StdioReader</span> {
-    <span class="doccomment">/// Inner buffer to support buffered read.</span>
-    <span class="ident">inner_buf</span>: <span class="ident">Box</span><span class="op">&lt;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span>,
-    <span class="doccomment">/// The length of actual buffered bytes.</span>
-    <span class="ident">inner_content_len</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// Points to the ring buffer.</span>
-    <span class="ident">read_access</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">RingBufferEofRef</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>
+<span class="doccomment">/// A reader to stdio buffers.
+</span><span class="attr">#[derive(Clone)]
+</span><span class="kw">pub struct </span>StdioReader {
+    <span class="doccomment">/// Inner buffer to support buffered read.
+    </span>inner_buf: Box&lt;[u8]&gt;,
+    <span class="doccomment">/// The length of actual buffered bytes.
+    </span>inner_content_len: usize,
+    <span class="doccomment">/// Points to the ring buffer.
+    </span>read_access: Arc&lt;Mutex&lt;RingBufferEofRef&lt;u8&gt;&gt;&gt;
 }
 
-<span class="doccomment">/// A writer to stdio buffers.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">StdioWriter</span> {
-    <span class="doccomment">/// Points to the ring buffer.</span>
-    <span class="ident">write_access</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">RingBufferEofRef</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>
+<span class="doccomment">/// A writer to stdio buffers.
+</span><span class="attr">#[derive(Clone)]
+</span><span class="kw">pub struct </span>StdioWriter {
+    <span class="doccomment">/// Points to the ring buffer.
+    </span>write_access: Arc&lt;Mutex&lt;RingBufferEofRef&lt;u8&gt;&gt;&gt;
 }
 
-<span class="doccomment">/// `StdioReadGuard` acts like `MutexGuard`, it locks the underlying ring buffer during its</span>
-<span class="doccomment">/// lifetime, and provides reading methods to the ring buffer. The lock will be automatically</span>
-<span class="doccomment">/// released on dropping of this structure.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">StdioReadGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="ident">guard</span>: <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">RingBufferEofRef</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>
+<span class="doccomment">/// `StdioReadGuard` acts like `MutexGuard`, it locks the underlying ring buffer during its
+/// lifetime, and provides reading methods to the ring buffer. The lock will be automatically
+/// released on dropping of this structure.
+</span><span class="kw">pub struct </span>StdioReadGuard&lt;<span class="lifetime">&#39;a</span>&gt; {
+    guard: MutexGuard&lt;<span class="lifetime">&#39;a</span>, RingBufferEofRef&lt;u8&gt;&gt;
 }
 
-<span class="doccomment">/// `StdioReadGuard` acts like `MutexGuard`, it locks the underlying ring buffer during its</span>
-<span class="doccomment">/// lifetime, and provides writing methods to the ring buffer. The lock will be automatically</span>
-<span class="doccomment">/// released on dropping of this structure.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">StdioWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="ident">guard</span>: <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">RingBufferEofRef</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span>
+<span class="doccomment">/// `StdioReadGuard` acts like `MutexGuard`, it locks the underlying ring buffer during its
+/// lifetime, and provides writing methods to the ring buffer. The lock will be automatically
+/// released on dropping of this structure.
+</span><span class="kw">pub struct </span>StdioWriteGuard&lt;<span class="lifetime">&#39;a</span>&gt; {
+    guard: MutexGuard&lt;<span class="lifetime">&#39;a</span>, RingBufferEofRef&lt;u8&gt;&gt;
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">RingBufferEof</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Create a new ring buffer.</span>
-    <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">RingBufferEof</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">RingBufferEof</span> {
-            <span class="ident">queue</span>: <span class="ident">VecDeque::new</span>(),
-            <span class="ident">end</span>: <span class="bool-val">false</span>
+<span class="kw">impl</span>&lt;T&gt; RingBufferEof&lt;T&gt; {
+    <span class="doccomment">/// Create a new ring buffer.
+    </span><span class="kw">fn </span>new() -&gt; RingBufferEof&lt;T&gt; {
+        RingBufferEof {
+            queue: VecDeque::new(),
+            end: <span class="bool-val">false
+        </span>}
+    }
+}
+
+<span class="kw">impl </span>Stdio {
+    <span class="doccomment">/// Create a new stdio buffer.
+    </span><span class="kw">pub fn </span>new() -&gt; Stdio {
+        <span class="kw">let </span>ring_buffer = Arc::new(Mutex::new(RingBufferEof::new()));
+        Stdio {
+            read_access: Arc::new(Mutex::new(Arc::clone(<span class="kw-2">&amp;</span>ring_buffer))),
+            write_access: Arc::new(Mutex::new(ring_buffer))
+        }
+    }
+
+    <span class="doccomment">/// Get a reader to the stdio buffer. Note that each reader has its own
+    /// inner buffer. The buffer size is set to be 256 bytes. Resort to
+    /// `get_reader_with_buf_capacity` if one needs a different buffer size.
+    </span><span class="kw">pub fn </span>get_reader(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; StdioReader {
+        StdioReader {
+            inner_buf: Box::new([<span class="number">0u8</span>; <span class="number">256</span>]),
+            inner_content_len: <span class="number">0</span>,
+            read_access: Arc::clone(<span class="kw-2">&amp;</span><span class="self">self</span>.read_access)
+        }
+    }
+
+    <span class="doccomment">/// Get a reader to the stdio buffer with a customized buffer size.
+    /// Note that each reader has its own inner buffer.
+    </span><span class="kw">pub fn </span>get_reader_with_buf_capacity(<span class="kw-2">&amp;</span><span class="self">self</span>, capacity: usize) -&gt; StdioReader {
+        <span class="kw">let </span><span class="kw-2">mut </span>inner_buf = Vec::with_capacity(capacity);
+        inner_buf.resize(capacity, <span class="number">0u8</span>);
+        StdioReader {
+            inner_buf: inner_buf.into_boxed_slice(),
+            inner_content_len: <span class="number">0</span>,
+            read_access: Arc::clone(<span class="kw-2">&amp;</span><span class="self">self</span>.read_access)
+        }
+    }
+
+    <span class="doccomment">/// Get a writer to the stdio buffer.
+    </span><span class="kw">pub fn </span>get_writer(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; StdioWriter {
+        StdioWriter {
+            write_access: Arc::clone(<span class="kw-2">&amp;</span><span class="self">self</span>.write_access)
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Stdio</span> {
-    <span class="doccomment">/// Create a new stdio buffer.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">Stdio</span> {
-        <span class="kw">let</span> <span class="ident">ring_buffer</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">RingBufferEof::new</span>()));
-        <span class="ident">Stdio</span> {
-            <span class="ident">read_access</span>: <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">ring_buffer</span>))),
-            <span class="ident">write_access</span>: <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">ring_buffer</span>))
+<span class="kw">impl </span>StdioReader {
+    <span class="doccomment">/// Lock the reader and return a guard that can perform reading operation to that buffer.
+    /// Note that this lock does not lock the underlying ring buffer. It only excludes other
+    /// readr from performing simultaneous read, but does *not* prevent a writer to perform
+    /// writing to the underlying ring buffer.
+    </span><span class="kw">pub fn </span>lock(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; StdioReadGuard {
+        StdioReadGuard {
+            guard: <span class="self">self</span>.read_access.lock()
         }
     }
 
-    <span class="doccomment">/// Get a reader to the stdio buffer. Note that each reader has its own</span>
-    <span class="doccomment">/// inner buffer. The buffer size is set to be 256 bytes. Resort to</span>
-    <span class="doccomment">/// `get_reader_with_buf_capacity` if one needs a different buffer size.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_reader</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">StdioReader</span> {
-        <span class="ident">StdioReader</span> {
-            <span class="ident">inner_buf</span>: <span class="ident">Box::new</span>([<span class="number">0u8</span>; <span class="number">256</span>]),
-            <span class="ident">inner_content_len</span>: <span class="number">0</span>,
-            <span class="ident">read_access</span>: <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">read_access</span>)
-        }
-    }
+    <span class="doccomment">/// Read a line from the ring buffer and return. Remaining bytes are stored in the inner
+    /// buffer. Do NOT use this function alternatively with `read()` method defined in
+    /// `StdioReadGuard`. This function returns the number of bytes read. It will return
+    /// zero only upon EOF.
+    </span><span class="kw">pub fn </span>read_line(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buf: <span class="kw-2">&amp;mut </span>String) -&gt; <span class="prelude-ty">Result</span>&lt;usize, core2::io::Error&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>total_cnt = <span class="number">0usize</span>;    <span class="comment">// total number of bytes read this time
+        </span><span class="kw">let </span><span class="kw-2">mut </span>new_cnt;               <span class="comment">// number of bytes returned from a `read()` invocation
+        </span><span class="kw">let </span><span class="kw-2">mut </span>tmp_buf = Vec::new();  <span class="comment">// temporary buffer
+        </span><span class="kw">let </span><span class="kw-2">mut </span>line_finished = <span class="bool-val">false</span>; <span class="comment">// mark if we have finished a line
 
-    <span class="doccomment">/// Get a reader to the stdio buffer with a customized buffer size.</span>
-    <span class="doccomment">/// Note that each reader has its own inner buffer.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_reader_with_buf_capacity</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">capacity</span>: <span class="ident">usize</span>) -&gt; <span class="ident">StdioReader</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner_buf</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">capacity</span>);
-        <span class="ident">inner_buf</span>.<span class="ident">resize</span>(<span class="ident">capacity</span>, <span class="number">0u8</span>);
-        <span class="ident">StdioReader</span> {
-            <span class="ident">inner_buf</span>: <span class="ident">inner_buf</span>.<span class="ident">into_boxed_slice</span>(),
-            <span class="ident">inner_content_len</span>: <span class="number">0</span>,
-            <span class="ident">read_access</span>: <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">read_access</span>)
-        }
-    }
+        // Copy from the inner buffer. Process the remaining characters from last read first.
+        </span>tmp_buf.resize(<span class="self">self</span>.inner_buf.len(), <span class="number">0</span>);
+        tmp_buf[<span class="number">0</span>..<span class="self">self</span>.inner_content_len].clone_from_slice(<span class="kw-2">&amp;</span><span class="self">self</span>.inner_buf[<span class="number">0</span>..<span class="self">self</span>.inner_content_len]);
+        new_cnt = <span class="self">self</span>.inner_content_len;
+        <span class="self">self</span>.inner_content_len = <span class="number">0</span>;
 
-    <span class="doccomment">/// Get a writer to the stdio buffer.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_writer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">StdioWriter</span> {
-        <span class="ident">StdioWriter</span> {
-            <span class="ident">write_access</span>: <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">write_access</span>)
-        }
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">StdioReader</span> {
-    <span class="doccomment">/// Lock the reader and return a guard that can perform reading operation to that buffer.</span>
-    <span class="doccomment">/// Note that this lock does not lock the underlying ring buffer. It only excludes other</span>
-    <span class="doccomment">/// readr from performing simultaneous read, but does *not* prevent a writer to perform</span>
-    <span class="doccomment">/// writing to the underlying ring buffer.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">StdioReadGuard</span> {
-        <span class="ident">StdioReadGuard</span> {
-            <span class="ident">guard</span>: <span class="self">self</span>.<span class="ident">read_access</span>.<span class="ident">lock</span>()
-        }
-    }
-
-    <span class="doccomment">/// Read a line from the ring buffer and return. Remaining bytes are stored in the inner</span>
-    <span class="doccomment">/// buffer. Do NOT use this function alternatively with `read()` method defined in</span>
-    <span class="doccomment">/// `StdioReadGuard`. This function returns the number of bytes read. It will return</span>
-    <span class="doccomment">/// zero only upon EOF.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read_line</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;mut</span> <span class="ident">String</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">core2::io::Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">total_cnt</span> <span class="op">=</span> <span class="number">0usize</span>;    <span class="comment">// total number of bytes read this time</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_cnt</span>;               <span class="comment">// number of bytes returned from a `read()` invocation</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tmp_buf</span> <span class="op">=</span> <span class="ident">Vec::new</span>();  <span class="comment">// temporary buffer</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">line_finished</span> <span class="op">=</span> <span class="bool-val">false</span>; <span class="comment">// mark if we have finished a line</span>
-
-        <span class="comment">// Copy from the inner buffer. Process the remaining characters from last read first.</span>
-        <span class="ident">tmp_buf</span>.<span class="ident">resize</span>(<span class="self">self</span>.<span class="ident">inner_buf</span>.<span class="ident">len</span>(), <span class="number">0</span>);
-        <span class="ident">tmp_buf</span>[<span class="number">0</span>..<span class="self">self</span>.<span class="ident">inner_content_len</span>].<span class="ident">clone_from_slice</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner_buf</span>[<span class="number">0</span>..<span class="self">self</span>.<span class="ident">inner_content_len</span>]);
-        <span class="ident">new_cnt</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner_content_len</span>;
-        <span class="self">self</span>.<span class="ident">inner_content_len</span> <span class="op">=</span> <span class="number">0</span>;
-
-        <span class="kw">loop</span> {
-            <span class="comment">// Try to find an &#39;\n&#39; character.</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cnt_before_new_line</span> <span class="op">=</span> <span class="ident">new_cnt</span>;
-            <span class="kw">for</span> (<span class="ident">idx</span>, <span class="ident">c</span>) <span class="kw">in</span> <span class="ident">tmp_buf</span>[<span class="number">0</span>..<span class="ident">new_cnt</span>].<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
-                <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">c</span> <span class="kw">as</span> <span class="ident">char</span> <span class="op">==</span> <span class="string">&#39;\n&#39;</span> {
-                    <span class="ident">cnt_before_new_line</span> <span class="op">=</span> <span class="ident">idx</span> <span class="op">+</span> <span class="number">1</span>;
-                    <span class="ident">line_finished</span> <span class="op">=</span> <span class="bool-val">true</span>;
+        <span class="kw">loop </span>{
+            <span class="comment">// Try to find an &#39;\n&#39; character.
+            </span><span class="kw">let </span><span class="kw-2">mut </span>cnt_before_new_line = new_cnt;
+            <span class="kw">for </span>(idx, c) <span class="kw">in </span>tmp_buf[<span class="number">0</span>..new_cnt].iter().enumerate() {
+                <span class="kw">if </span><span class="kw-2">*</span>c <span class="kw">as </span>char == <span class="string">&#39;\n&#39; </span>{
+                    cnt_before_new_line = idx + <span class="number">1</span>;
+                    line_finished = <span class="bool-val">true</span>;
                     <span class="kw">break</span>;
                 }
             }
 
-            <span class="comment">// Append new characters to output buffer (until &#39;\n&#39;).</span>
-            <span class="ident">total_cnt</span> <span class="op">+</span><span class="op">=</span> <span class="ident">cnt_before_new_line</span>;
-            <span class="kw">let</span> <span class="ident">new_str</span> <span class="op">=</span> <span class="ident">String::from_utf8_lossy</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_buf</span>[<span class="number">0</span>..<span class="ident">cnt_before_new_line</span>]);
-            <span class="ident">buf</span>.<span class="ident">push_str</span>(<span class="kw-2">&amp;</span><span class="ident">new_str</span>);
+            <span class="comment">// Append new characters to output buffer (until &#39;\n&#39;).
+            </span>total_cnt += cnt_before_new_line;
+            <span class="kw">let </span>new_str = String::from_utf8_lossy(<span class="kw-2">&amp;</span>tmp_buf[<span class="number">0</span>..cnt_before_new_line]);
+            buf.push_str(<span class="kw-2">&amp;</span>new_str);
 
-            <span class="comment">// If we have read a whole line, copy any byte left to inner buffer, and then return.</span>
-            <span class="kw">if</span> <span class="ident">line_finished</span> {
-                <span class="self">self</span>.<span class="ident">inner_buf</span>[<span class="number">0</span>..<span class="ident">new_cnt</span><span class="op">-</span><span class="ident">cnt_before_new_line</span>].<span class="ident">clone_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">tmp_buf</span>[<span class="ident">cnt_before_new_line</span>..<span class="ident">new_cnt</span>]);
-                <span class="self">self</span>.<span class="ident">inner_content_len</span> <span class="op">=</span> <span class="ident">new_cnt</span> <span class="op">-</span> <span class="ident">cnt_before_new_line</span>;
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">total_cnt</span>);
+            <span class="comment">// If we have read a whole line, copy any byte left to inner buffer, and then return.
+            </span><span class="kw">if </span>line_finished {
+                <span class="self">self</span>.inner_buf[<span class="number">0</span>..new_cnt-cnt_before_new_line].clone_from_slice(<span class="kw-2">&amp;</span>tmp_buf[cnt_before_new_line..new_cnt]);
+                <span class="self">self</span>.inner_content_len = new_cnt - cnt_before_new_line;
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(total_cnt);
             }
 
-            <span class="comment">// We have not finished a whole line. Try to read more from the ring buffer, until</span>
-            <span class="comment">// we hit EOF.</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">locked</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">lock</span>();
-            <span class="ident">new_cnt</span> <span class="op">=</span> <span class="ident">locked</span>.<span class="ident">read</span>(<span class="kw-2">&amp;mut</span> <span class="ident">tmp_buf</span>[..])<span class="question-mark">?</span>;
-            <span class="kw">if</span> <span class="ident">new_cnt</span> <span class="op">==</span> <span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="ident">locked</span>.<span class="ident">is_eof</span>() { <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">total_cnt</span>); }
+            <span class="comment">// We have not finished a whole line. Try to read more from the ring buffer, until
+            // we hit EOF.
+            </span><span class="kw">let </span><span class="kw-2">mut </span>locked = <span class="self">self</span>.lock();
+            new_cnt = locked.read(<span class="kw-2">&amp;mut </span>tmp_buf[..])<span class="question-mark">?</span>;
+            <span class="kw">if </span>new_cnt == <span class="number">0 </span>&amp;&amp; locked.is_eof() { <span class="kw">return </span><span class="prelude-val">Ok</span>(total_cnt); }
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">StdioWriter</span> {
-    <span class="doccomment">/// Lock the writer and return a guard that can perform writing operation to that buffer.</span>
-    <span class="doccomment">/// Note that this lock does not lock the underlying ring buffer. It only excludes other</span>
-    <span class="doccomment">/// writer from performing simultaneous write, but does *not* prevent a reader to perform</span>
-    <span class="doccomment">/// reading to the underlying ring buffer.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">StdioWriteGuard</span> {
-        <span class="ident">StdioWriteGuard</span> {
-            <span class="ident">guard</span>: <span class="self">self</span>.<span class="ident">write_access</span>.<span class="ident">lock</span>()
+<span class="kw">impl </span>StdioWriter {
+    <span class="doccomment">/// Lock the writer and return a guard that can perform writing operation to that buffer.
+    /// Note that this lock does not lock the underlying ring buffer. It only excludes other
+    /// writer from performing simultaneous write, but does *not* prevent a reader to perform
+    /// reading to the underlying ring buffer.
+    </span><span class="kw">pub fn </span>lock(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; StdioWriteGuard {
+        StdioWriteGuard {
+            guard: <span class="self">self</span>.write_access.lock()
         }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">Read</span> <span class="kw">for</span> <span class="ident">StdioReadGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Read from the ring buffer. Returns the number of bytes read. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Currently it is not possible to return an error, </span>
-    <span class="doccomment">/// but one should *not* assume that because it is subject to change in the future.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Note that this method will block until at least one byte is available to be read.</span>
-    <span class="doccomment">/// It will only return zero under one of two scenarios:</span>
-    <span class="doccomment">/// 1. The EOF flag has been set.</span>
-    <span class="doccomment">/// 2. The buffer specified was 0 bytes in length.</span>
-    <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">core2::io::Error</span><span class="op">&gt;</span> {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Read <span class="kw">for </span>StdioReadGuard&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="doccomment">/// Read from the ring buffer. Returns the number of bytes read. 
+    /// 
+    /// Currently it is not possible to return an error, 
+    /// but one should *not* assume that because it is subject to change in the future.
+    /// 
+    /// Note that this method will block until at least one byte is available to be read.
+    /// It will only return zero under one of two scenarios:
+    /// 1. The EOF flag has been set.
+    /// 2. The buffer specified was 0 bytes in length.
+    </span><span class="kw">fn </span>read(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buf: <span class="kw-2">&amp;mut </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;usize, core2::io::Error&gt; {
 
-        <span class="comment">// Deal with the edge case that the buffer specified was 0 bytes in length.</span>
-        <span class="kw">if</span> <span class="ident">buf</span>.<span class="ident">len</span>() <span class="op">==</span> <span class="number">0</span> { <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="number">0</span>); }
+        <span class="comment">// Deal with the edge case that the buffer specified was 0 bytes in length.
+        </span><span class="kw">if </span>buf.len() == <span class="number">0 </span>{ <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="number">0</span>); }
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cnt</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="kw">loop</span> {
-            <span class="kw">let</span> <span class="ident">end</span>; <span class="comment">// EOF flag</span>
-            {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">locked_ring_buf</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">guard</span>.<span class="ident">lock</span>();
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf_iter</span> <span class="op">=</span> <span class="ident">buf</span>[<span class="ident">cnt</span>..].<span class="ident">iter_mut</span>();
+        <span class="kw">let </span><span class="kw-2">mut </span>cnt: usize = <span class="number">0</span>;
+        <span class="kw">loop </span>{
+            <span class="kw">let </span>end; <span class="comment">// EOF flag
+            </span>{
+                <span class="kw">let </span><span class="kw-2">mut </span>locked_ring_buf = <span class="self">self</span>.guard.lock();
+                <span class="kw">let </span><span class="kw-2">mut </span>buf_iter = buf[cnt..].iter_mut();
 
-                <span class="comment">// Keep reading if we have empty space in the output buffer</span>
-                <span class="comment">// and available byte in the ring buffer.</span>
-                <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">buf_entry</span>) <span class="op">=</span> <span class="ident">buf_iter</span>.<span class="ident">next</span>() {
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">queue_elem</span>) <span class="op">=</span> <span class="ident">locked_ring_buf</span>.<span class="ident">queue</span>.<span class="ident">pop_front</span>() {
-                        <span class="kw-2">*</span><span class="ident">buf_entry</span> <span class="op">=</span> <span class="ident">queue_elem</span>;
-                        <span class="ident">cnt</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-                    } <span class="kw">else</span> {
+                <span class="comment">// Keep reading if we have empty space in the output buffer
+                // and available byte in the ring buffer.
+                </span><span class="kw">while let </span><span class="prelude-val">Some</span>(buf_entry) = buf_iter.next() {
+                    <span class="kw">if let </span><span class="prelude-val">Some</span>(queue_elem) = locked_ring_buf.queue.pop_front() {
+                        <span class="kw-2">*</span>buf_entry = queue_elem;
+                        cnt += <span class="number">1</span>;
+                    } <span class="kw">else </span>{
                         <span class="kw">break</span>;
                     }
                 }
 
-                <span class="ident">end</span> <span class="op">=</span> <span class="ident">locked_ring_buf</span>.<span class="ident">end</span>;
-            } <span class="comment">// the lock on the ring buffer is guaranteed to be dropped here</span>
+                end = locked_ring_buf.end;
+            } <span class="comment">// the lock on the ring buffer is guaranteed to be dropped here
 
-            <span class="comment">// Break if we have read something or we encounter EOF.</span>
-            <span class="kw">if</span> <span class="ident">cnt</span> <span class="op">&gt;</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">end</span> { <span class="kw">break</span>; }
+            // Break if we have read something or we encounter EOF.
+            </span><span class="kw">if </span>cnt &gt; <span class="number">0 </span>|| end { <span class="kw">break</span>; }
         }
-        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">cnt</span>);
+        <span class="kw">return </span><span class="prelude-val">Ok</span>(cnt);
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">StdioReadGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Same as `read()`, but is non-blocking.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Returns `Ok(0)` when the underlying buffer is empty.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_read</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">core2::io::Error</span><span class="op">&gt;</span> {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; StdioReadGuard&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="doccomment">/// Same as `read()`, but is non-blocking.
+    /// 
+    /// Returns `Ok(0)` when the underlying buffer is empty.
+    </span><span class="kw">pub fn </span>try_read(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buf: <span class="kw-2">&amp;mut </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;usize, core2::io::Error&gt; {
 
-        <span class="comment">// Deal with the edge case that the buffer specified was 0 bytes in length.</span>
-        <span class="kw">if</span> <span class="ident">buf</span>.<span class="ident">len</span>() <span class="op">==</span> <span class="number">0</span> { <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="number">0</span>); }
+        <span class="comment">// Deal with the edge case that the buffer specified was 0 bytes in length.
+        </span><span class="kw">if </span>buf.len() == <span class="number">0 </span>{ <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="number">0</span>); }
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf_iter</span> <span class="op">=</span> <span class="ident">buf</span>.<span class="ident">iter_mut</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cnt</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">locked_ring_buf</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">guard</span>.<span class="ident">lock</span>();
+        <span class="kw">let </span><span class="kw-2">mut </span>buf_iter = buf.iter_mut();
+        <span class="kw">let </span><span class="kw-2">mut </span>cnt: usize = <span class="number">0</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>locked_ring_buf = <span class="self">self</span>.guard.lock();
 
-        <span class="comment">// Keep reading if we have empty space in the output buffer</span>
-        <span class="comment">// and available byte(s) in the ring buffer.</span>
-        <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">buf_entry</span>) <span class="op">=</span> <span class="ident">buf_iter</span>.<span class="ident">next</span>() {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">queue_elem</span>) <span class="op">=</span> <span class="ident">locked_ring_buf</span>.<span class="ident">queue</span>.<span class="ident">pop_front</span>() {
-                <span class="kw-2">*</span><span class="ident">buf_entry</span> <span class="op">=</span> <span class="ident">queue_elem</span>;
-                <span class="ident">cnt</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-            } <span class="kw">else</span> {
+        <span class="comment">// Keep reading if we have empty space in the output buffer
+        // and available byte(s) in the ring buffer.
+        </span><span class="kw">while let </span><span class="prelude-val">Some</span>(buf_entry) = buf_iter.next() {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(queue_elem) = locked_ring_buf.queue.pop_front() {
+                <span class="kw-2">*</span>buf_entry = queue_elem;
+                cnt += <span class="number">1</span>;
+            } <span class="kw">else </span>{
                 <span class="kw">break</span>;
             }
         }
 
-        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">cnt</span>);
+        <span class="kw">return </span><span class="prelude-val">Ok</span>(cnt);
     }
 
-    <span class="doccomment">/// Returns the number of bytes still in the read buffer.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">remaining_bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="kw">return</span> <span class="self">self</span>.<span class="ident">guard</span>.<span class="ident">lock</span>().<span class="ident">queue</span>.<span class="ident">len</span>();
+    <span class="doccomment">/// Returns the number of bytes still in the read buffer.
+    </span><span class="kw">pub fn </span>remaining_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="kw">return </span><span class="self">self</span>.guard.lock().queue.len();
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">Write</span> <span class="kw">for</span> <span class="ident">StdioWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Write to the ring buffer, returniong the number of bytes written.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// When this method is called after setting the EOF flag, it returns error with `ErrorKind`</span>
-    <span class="doccomment">/// set to `UnexpectedEof`.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Also note that this method does *not* guarantee to write all given bytes, although it currently</span>
-    <span class="doccomment">/// does so. Always check the return value when using this method. Otherwise, use `write_all` to</span>
-    <span class="doccomment">/// ensure that all given bytes are written.</span>
-    <span class="kw">fn</span> <span class="ident">write</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">core2::io::Error</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">guard</span>.<span class="ident">lock</span>().<span class="ident">end</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">core2::io::Error::new</span>(<span class="ident">core2::io::ErrorKind::UnexpectedEof</span>,
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Write <span class="kw">for </span>StdioWriteGuard&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="doccomment">/// Write to the ring buffer, returniong the number of bytes written.
+    /// 
+    /// When this method is called after setting the EOF flag, it returns error with `ErrorKind`
+    /// set to `UnexpectedEof`.
+    /// 
+    /// Also note that this method does *not* guarantee to write all given bytes, although it currently
+    /// does so. Always check the return value when using this method. Otherwise, use `write_all` to
+    /// ensure that all given bytes are written.
+    </span><span class="kw">fn </span>write(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buf: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;usize, core2::io::Error&gt; {
+        <span class="kw">if </span><span class="self">self</span>.guard.lock().end {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(core2::io::Error::new(core2::io::ErrorKind::UnexpectedEof,
                                            <span class="string">&quot;cannot write to a stream with EOF set&quot;</span>));
         }
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">locked_ring_buf</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">guard</span>.<span class="ident">lock</span>();
-        <span class="kw">for</span> <span class="ident">byte</span> <span class="kw">in</span> <span class="ident">buf</span> {
-            <span class="ident">locked_ring_buf</span>.<span class="ident">queue</span>.<span class="ident">push_back</span>(<span class="kw-2">*</span><span class="ident">byte</span>)
+        <span class="kw">let </span><span class="kw-2">mut </span>locked_ring_buf = <span class="self">self</span>.guard.lock();
+        <span class="kw">for </span>byte <span class="kw">in </span>buf {
+            locked_ring_buf.queue.push_back(<span class="kw-2">*</span>byte)
         }
-        <span class="prelude-val">Ok</span>(<span class="ident">buf</span>.<span class="ident">len</span>())
+        <span class="prelude-val">Ok</span>(buf.len())
     }
-    <span class="doccomment">/// The function required by `Write` trait. Currently it performs nothing,</span>
-    <span class="doccomment">/// since everything is write directly to the ring buffer in `write` method.</span>
-    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">core2::io::Error</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// The function required by `Write` trait. Currently it performs nothing,
+    /// since everything is write directly to the ring buffer in `write` method.
+    </span><span class="kw">fn </span>flush(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), core2::io::Error&gt; {
         <span class="prelude-val">Ok</span>(())
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">StdioReadGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Check if the EOF flag of the queue has been set.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_eof</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">guard</span>.<span class="ident">lock</span>().<span class="ident">end</span>
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; StdioReadGuard&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="doccomment">/// Check if the EOF flag of the queue has been set.
+    </span><span class="kw">pub fn </span>is_eof(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.guard.lock().end
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">StdioWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Set the EOF flag of the queue to true.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_eof</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">guard</span>.<span class="ident">lock</span>().<span class="ident">end</span> <span class="op">=</span> <span class="bool-val">true</span>;
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; StdioWriteGuard&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="doccomment">/// Set the EOF flag of the queue to true.
+    </span><span class="kw">pub fn </span>set_eof(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.guard.lock().end = <span class="bool-val">true</span>;
     }
 }
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">KeyEventQueue</span> {
-    <span class="doccomment">/// A ring buffer storing `KeyEvent`.</span>
-    <span class="ident">key_event_queue</span>: <span class="ident">RingBufferEofRef</span><span class="op">&lt;</span><span class="ident">KeyEvent</span><span class="op">&gt;</span>
+<span class="kw">pub struct </span>KeyEventQueue {
+    <span class="doccomment">/// A ring buffer storing `KeyEvent`.
+    </span>key_event_queue: RingBufferEofRef&lt;KeyEvent&gt;
 }
 
-<span class="doccomment">/// A reader to keyevent ring buffer.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">KeyEventQueueReader</span> {
-    <span class="doccomment">/// Points to the ring buffer storing `KeyEvent`.</span>
-    <span class="ident">key_event_queue</span>: <span class="ident">RingBufferEofRef</span><span class="op">&lt;</span><span class="ident">KeyEvent</span><span class="op">&gt;</span>
+<span class="doccomment">/// A reader to keyevent ring buffer.
+</span><span class="attr">#[derive(Clone)]
+</span><span class="kw">pub struct </span>KeyEventQueueReader {
+    <span class="doccomment">/// Points to the ring buffer storing `KeyEvent`.
+    </span>key_event_queue: RingBufferEofRef&lt;KeyEvent&gt;
 }
 
-<span class="doccomment">/// A writer to keyevent ring buffer.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">KeyEventQueueWriter</span> {
-    <span class="doccomment">/// Points to the ring buffer storing `KeyEvent`.</span>
-    <span class="ident">key_event_queue</span>: <span class="ident">RingBufferEofRef</span><span class="op">&lt;</span><span class="ident">KeyEvent</span><span class="op">&gt;</span>
+<span class="doccomment">/// A writer to keyevent ring buffer.
+</span><span class="attr">#[derive(Clone)]
+</span><span class="kw">pub struct </span>KeyEventQueueWriter {
+    <span class="doccomment">/// Points to the ring buffer storing `KeyEvent`.
+    </span>key_event_queue: RingBufferEofRef&lt;KeyEvent&gt;
 }
 
-<span class="kw">impl</span> <span class="ident">KeyEventQueue</span> {
-    <span class="doccomment">/// Create a new ring buffer storing `KeyEvent`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">KeyEventQueue</span> {
-        <span class="ident">KeyEventQueue</span> {
-            <span class="ident">key_event_queue</span>: <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">RingBufferEof::new</span>()))
+<span class="kw">impl </span>KeyEventQueue {
+    <span class="doccomment">/// Create a new ring buffer storing `KeyEvent`.
+    </span><span class="kw">pub fn </span>new() -&gt; KeyEventQueue {
+        KeyEventQueue {
+            key_event_queue: Arc::new(Mutex::new(RingBufferEof::new()))
         }
     }
 
-    <span class="doccomment">/// Get a reader to the ring buffer.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_reader</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">KeyEventQueueReader</span> {
-        <span class="ident">KeyEventQueueReader</span> {
-            <span class="ident">key_event_queue</span>: <span class="self">self</span>.<span class="ident">key_event_queue</span>.<span class="ident">clone</span>()
+    <span class="doccomment">/// Get a reader to the ring buffer.
+    </span><span class="kw">pub fn </span>get_reader(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; KeyEventQueueReader {
+        KeyEventQueueReader {
+            key_event_queue: <span class="self">self</span>.key_event_queue.clone()
         }
     }
 
-    <span class="doccomment">/// Get a writer to the ring buffer.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_writer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">KeyEventQueueWriter</span> {
-        <span class="ident">KeyEventQueueWriter</span> {
-            <span class="ident">key_event_queue</span>: <span class="self">self</span>.<span class="ident">key_event_queue</span>.<span class="ident">clone</span>()
-        }
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">KeyEventQueueReader</span> {
-    <span class="doccomment">/// Try to read a keyevent from the ring buffer. It returns `None` if currently</span>
-    <span class="doccomment">/// the ring buffer is empty.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read_one</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">KeyEvent</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">locked_queue</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">key_event_queue</span>.<span class="ident">lock</span>();
-        <span class="ident">locked_queue</span>.<span class="ident">queue</span>.<span class="ident">pop_front</span>()
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">KeyEventQueueWriter</span> {
-    <span class="doccomment">/// Push a keyevent into the ring buffer.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_one</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key_event</span>: <span class="ident">KeyEvent</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">locked_queue</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">key_event_queue</span>.<span class="ident">lock</span>();
-        <span class="ident">locked_queue</span>.<span class="ident">queue</span>.<span class="ident">push_back</span>(<span class="ident">key_event</span>);
-    }
-}
-
-<span class="doccomment">/// A structure that allows applications to access keyboard events directly. </span>
-<span class="doccomment">/// When it gets instantiated, it `take`s the reader of the `KeyEventQueue` away from the `shell`, </span>
-<span class="doccomment">/// or whichever entity previously owned the queue.</span>
-<span class="doccomment">/// When it goes out of the scope, the taken reader will be automatically returned</span>
-<span class="doccomment">/// back to the `shell` or the original owner in its `Drop` routine.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">KeyEventReadGuard</span> {
-    <span class="doccomment">/// The taken reader of the `KeyEventQueue`.</span>
-    <span class="ident">reader</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">KeyEventQueueReader</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The closure to be excuted on dropping.</span>
-    <span class="ident">closure</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Fn</span>(<span class="kw-2">&amp;mut</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">KeyEventQueueReader</span><span class="op">&gt;</span>)<span class="op">&gt;</span>
-}
-
-<span class="kw">impl</span> <span class="ident">KeyEventReadGuard</span> {
-    <span class="doccomment">/// Create a new `KeyEventReadGuard`. This function *takes* a reader</span>
-    <span class="doccomment">/// to `KeyEventQueue`. Thus, the `reader` will never be `None` until the</span>
-    <span class="doccomment">/// `drop()` method.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">reader</span>: <span class="ident">KeyEventQueueReader</span>,
-        <span class="ident">closure</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Fn</span>(<span class="kw-2">&amp;mut</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">KeyEventQueueReader</span><span class="op">&gt;</span>)<span class="op">&gt;</span>
-    ) -&gt; <span class="ident">KeyEventReadGuard</span> {
-        <span class="ident">KeyEventReadGuard</span> {
-            <span class="ident">reader</span>: <span class="prelude-val">Some</span>(<span class="ident">reader</span>),
-            <span class="ident">closure</span>
+    <span class="doccomment">/// Get a writer to the ring buffer.
+    </span><span class="kw">pub fn </span>get_writer(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; KeyEventQueueWriter {
+        KeyEventQueueWriter {
+            key_event_queue: <span class="self">self</span>.key_event_queue.clone()
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">KeyEventReadGuard</span> {
-    <span class="doccomment">/// Returns the reader of `KeyEventQueue` back to the previous owner by executing the closure.</span>
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        (<span class="self">self</span>.<span class="ident">closure</span>)(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">reader</span>);
+<span class="kw">impl </span>KeyEventQueueReader {
+    <span class="doccomment">/// Try to read a keyevent from the ring buffer. It returns `None` if currently
+    /// the ring buffer is empty.
+    </span><span class="kw">pub fn </span>read_one(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;KeyEvent&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>locked_queue = <span class="self">self</span>.key_event_queue.lock();
+        locked_queue.queue.pop_front()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">KeyEventReadGuard</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">KeyEventQueueReader</span><span class="op">&gt;</span>;
+<span class="kw">impl </span>KeyEventQueueWriter {
+    <span class="doccomment">/// Push a keyevent into the ring buffer.
+    </span><span class="kw">pub fn </span>write_one(<span class="kw-2">&amp;</span><span class="self">self</span>, key_event: KeyEvent) {
+        <span class="kw">let </span><span class="kw-2">mut </span>locked_queue = <span class="self">self</span>.key_event_queue.lock();
+        locked_queue.queue.push_back(key_event);
+    }
+}
 
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Target</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">reader</span>
+<span class="doccomment">/// A structure that allows applications to access keyboard events directly. 
+/// When it gets instantiated, it `take`s the reader of the `KeyEventQueue` away from the `shell`, 
+/// or whichever entity previously owned the queue.
+/// When it goes out of the scope, the taken reader will be automatically returned
+/// back to the `shell` or the original owner in its `Drop` routine.
+</span><span class="kw">pub struct </span>KeyEventReadGuard {
+    <span class="doccomment">/// The taken reader of the `KeyEventQueue`.
+    </span>reader: <span class="prelude-ty">Option</span>&lt;KeyEventQueueReader&gt;,
+    <span class="doccomment">/// The closure to be excuted on dropping.
+    </span>closure: Box&lt;<span class="kw">dyn </span>Fn(<span class="kw-2">&amp;mut </span><span class="prelude-ty">Option</span>&lt;KeyEventQueueReader&gt;)&gt;
+}
+
+<span class="kw">impl </span>KeyEventReadGuard {
+    <span class="doccomment">/// Create a new `KeyEventReadGuard`. This function *takes* a reader
+    /// to `KeyEventQueue`. Thus, the `reader` will never be `None` until the
+    /// `drop()` method.
+    </span><span class="kw">pub fn </span>new(
+        reader: KeyEventQueueReader,
+        closure: Box&lt;<span class="kw">dyn </span>Fn(<span class="kw-2">&amp;mut </span><span class="prelude-ty">Option</span>&lt;KeyEventQueueReader&gt;)&gt;
+    ) -&gt; KeyEventReadGuard {
+        KeyEventReadGuard {
+            reader: <span class="prelude-val">Some</span>(reader),
+            closure
+        }
+    }
+}
+
+<span class="kw">impl </span>Drop <span class="kw">for </span>KeyEventReadGuard {
+    <span class="doccomment">/// Returns the reader of `KeyEventQueue` back to the previous owner by executing the closure.
+    </span><span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        (<span class="self">self</span>.closure)(<span class="kw-2">&amp;mut </span><span class="self">self</span>.reader);
+    }
+}
+
+<span class="kw">impl </span>Deref <span class="kw">for </span>KeyEventReadGuard {
+    <span class="kw">type </span>Target = <span class="prelude-ty">Option</span>&lt;KeyEventQueueReader&gt;;
+
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.reader
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="stdio" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="stdio" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/memfs/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../memfs/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../memfs/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../memfs/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/memfs/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../memfs/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -166,168 +160,167 @@
 <span id="160">160</span>
 <span id="161">161</span>
 <span id="162">162</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
+</pre><pre class="rust"><code><span class="attr">#![no_std]
 
-<span class="doccomment">//! This crate contains an implementation of an in-memory filesystem backed by MappedPages from the memory crate</span>
-<span class="doccomment">//! This crate allocates memory at page-size granularity, so it&#39;s inefficient with memory when creating small files</span>
-<span class="doccomment">//! Currently, the read and write operations of the RamFile follows the interface of the std::io read/write operations of the Rust standard library</span>
+</span><span class="doccomment">//! This crate contains an implementation of an in-memory filesystem backed by MappedPages from the memory crate
+//! This crate allocates memory at page-size granularity, so it&#39;s inefficient with memory when creating small files
+//! Currently, the read and write operations of the RamFile follows the interface of the std::io read/write operations of the Rust standard library
 
-<span class="comment">// #[macro_use] extern crate log;</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fs_node</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">io</span>;
+</span><span class="comment">// #[macro_use] extern crate log;
+</span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>fs_node;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>io;
 
 
-<span class="kw">use</span> <span class="ident">alloc::string::String</span>;
-<span class="kw">use</span> <span class="ident">fs_node</span>::{<span class="ident">DirRef</span>, <span class="ident">WeakDirRef</span>, <span class="ident">File</span>, <span class="ident">FsNode</span>};
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">MappedPages</span>, <span class="ident">get_kernel_mmi_ref</span>, <span class="ident">allocate_pages_by_bytes</span>, <span class="ident">EntryFlags</span>};
-<span class="kw">use</span> <span class="ident">alloc::sync::Arc</span>;
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">fs_node</span>::{<span class="ident">FileOrDir</span>, <span class="ident">FileRef</span>};
-<span class="kw">use</span> <span class="ident">io</span>::{<span class="ident">ByteReader</span>, <span class="ident">ByteWriter</span>, <span class="ident">IoError</span>, <span class="ident">KnownLength</span>};
+<span class="kw">use </span>alloc::string::String;
+<span class="kw">use </span>fs_node::{DirRef, WeakDirRef, File, FsNode};
+<span class="kw">use </span>memory::{MappedPages, get_kernel_mmi_ref, allocate_pages_by_bytes, EntryFlags};
+<span class="kw">use </span>alloc::sync::Arc;
+<span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>fs_node::{FileOrDir, FileRef};
+<span class="kw">use </span>io::{ByteReader, ByteWriter, IoError, KnownLength};
 
-<span class="doccomment">/// The struct that represents a file in memory that is backed by MappedPages</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MemFile</span> {
-    <span class="doccomment">/// The name of the file.</span>
-    <span class="ident">name</span>: <span class="ident">String</span>,
-    <span class="doccomment">/// The length in bytes of the file.</span>
-    <span class="doccomment">/// Note that this is not the same as the capacity of its underlying MappedPages object. </span>
-    <span class="ident">len</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// The underlying contents of this file in memory.</span>
-    <span class="ident">mp</span>: <span class="ident">MappedPages</span>,
-    <span class="doccomment">/// The parent directory that contains this file.</span>
-    <span class="ident">parent</span>: <span class="ident">WeakDirRef</span>,
+<span class="doccomment">/// The struct that represents a file in memory that is backed by MappedPages
+</span><span class="kw">pub struct </span>MemFile {
+    <span class="doccomment">/// The name of the file.
+    </span>name: String,
+    <span class="doccomment">/// The length in bytes of the file.
+    /// Note that this is not the same as the capacity of its underlying MappedPages object. 
+    </span>len: usize,
+    <span class="doccomment">/// The underlying contents of this file in memory.
+    </span>mp: MappedPages,
+    <span class="doccomment">/// The parent directory that contains this file.
+    </span>parent: WeakDirRef,
 }
 
-<span class="kw">impl</span> <span class="ident">MemFile</span> {
-    <span class="doccomment">/// Allocates writable memory space for the given `contents` and creates a new file containing that content in the given `parent` directory.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">name</span>: <span class="ident">String</span>, <span class="ident">parent</span>: <span class="kw-2">&amp;</span><span class="ident">DirRef</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">FileRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">new_file</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::from_mapped_pages</span>(<span class="ident">MappedPages::empty</span>(), <span class="ident">name</span>, <span class="number">0</span>, <span class="ident">parent</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">new_file</span>)
+<span class="kw">impl </span>MemFile {
+    <span class="doccomment">/// Allocates writable memory space for the given `contents` and creates a new file containing that content in the given `parent` directory.
+    </span><span class="kw">pub fn </span>new(name: String, parent: <span class="kw-2">&amp;</span>DirRef) -&gt; <span class="prelude-ty">Result</span>&lt;FileRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>new_file = <span class="self">Self</span>::from_mapped_pages(MappedPages::empty(), name, <span class="number">0</span>, parent)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(new_file)
     }
 
-    <span class="doccomment">/// Creates a new `MemFile` in the given `parent` directory with the contents of the given `mapped_pages`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_mapped_pages</span>(<span class="ident">mapped_pages</span>: <span class="ident">MappedPages</span>, <span class="ident">name</span>: <span class="ident">String</span>, <span class="ident">len</span>: <span class="ident">usize</span>, <span class="ident">parent</span>: <span class="kw-2">&amp;</span><span class="ident">DirRef</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">FileRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">memfile</span> <span class="op">=</span> <span class="ident">MemFile</span> {
-            <span class="ident">name</span>,
-            <span class="ident">len</span>,
-            <span class="ident">mp</span>: <span class="ident">mapped_pages</span>, 
-            <span class="ident">parent</span>: <span class="ident">Arc::downgrade</span>(<span class="ident">parent</span>), 
+    <span class="doccomment">/// Creates a new `MemFile` in the given `parent` directory with the contents of the given `mapped_pages`.
+    </span><span class="kw">pub fn </span>from_mapped_pages(mapped_pages: MappedPages, name: String, len: usize, parent: <span class="kw-2">&amp;</span>DirRef) -&gt; <span class="prelude-ty">Result</span>&lt;FileRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>memfile = MemFile {
+            name,
+            len,
+            mp: mapped_pages, 
+            parent: Arc::downgrade(parent), 
         };
-        <span class="kw">let</span> <span class="ident">file_ref</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">memfile</span>)) <span class="kw">as</span> <span class="ident">FileRef</span>;
-        <span class="ident">parent</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="ident">FileOrDir::File</span>(<span class="ident">file_ref</span>.<span class="ident">clone</span>()))<span class="question-mark">?</span>; <span class="comment">// adds the newly created file to the tree</span>
-        <span class="prelude-val">Ok</span>(<span class="ident">file_ref</span>)
+        <span class="kw">let </span>file_ref = Arc::new(Mutex::new(memfile)) <span class="kw">as </span>FileRef;
+        parent.lock().insert(FileOrDir::File(file_ref.clone()))<span class="question-mark">?</span>; <span class="comment">// adds the newly created file to the tree
+        </span><span class="prelude-val">Ok</span>(file_ref)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">ByteReader</span> <span class="kw">for</span> <span class="ident">MemFile</span> {
-    <span class="comment">// read will throw an error if the read offset extends past the end of the file</span>
-    <span class="kw">fn</span> <span class="ident">read_at</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>], <span class="ident">offset</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">IoError</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">offset</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">len</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">IoError::InvalidInput</span>);
+<span class="kw">impl </span>ByteReader <span class="kw">for </span>MemFile {
+    <span class="comment">// read will throw an error if the read offset extends past the end of the file
+    </span><span class="kw">fn </span>read_at(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buffer: <span class="kw-2">&amp;mut </span>[u8], offset: usize) -&gt; <span class="prelude-ty">Result</span>&lt;usize, IoError&gt; {
+        <span class="kw">if </span>offset &gt;= <span class="self">self</span>.len {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(IoError::InvalidInput);
         }
-        <span class="comment">// read from the offset until the end of the file, but not more than the buffer length</span>
-        <span class="kw">let</span> <span class="ident">read_bytes</span> <span class="op">=</span> <span class="ident">core::cmp::min</span>(<span class="self">self</span>.<span class="ident">len</span> <span class="op">-</span> <span class="ident">offset</span>, <span class="ident">buffer</span>.<span class="ident">len</span>());
-        <span class="ident">buffer</span>[..<span class="ident">read_bytes</span>].<span class="ident">copy_from_slice</span>(
-            <span class="self">self</span>.<span class="ident">mp</span>.<span class="ident">as_slice</span>(<span class="ident">offset</span>, <span class="ident">read_bytes</span>).<span class="ident">map_err</span>(<span class="ident">IoError::from</span>)<span class="question-mark">?</span>
-        ); 
-        <span class="prelude-val">Ok</span>(<span class="ident">read_bytes</span>) 
+        <span class="comment">// read from the offset until the end of the file, but not more than the buffer length
+        </span><span class="kw">let </span>read_bytes = core::cmp::min(<span class="self">self</span>.len - offset, buffer.len());
+        buffer[..read_bytes].copy_from_slice(
+            <span class="self">self</span>.mp.as_slice(offset, read_bytes).map_err(IoError::from)<span class="question-mark">?
+        </span>); 
+        <span class="prelude-val">Ok</span>(read_bytes) 
     }
 }
 
-<span class="kw">impl</span> <span class="ident">ByteWriter</span> <span class="kw">for</span> <span class="ident">MemFile</span> {
-    <span class="kw">fn</span> <span class="ident">write_at</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">offset</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">IoError</span><span class="op">&gt;</span> {
-        <span class="comment">// error out if the underlying mapped pages are already allocated and not writeable</span>
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">mp</span>.<span class="ident">flags</span>().<span class="ident">is_writable</span>() <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">mp</span>.<span class="ident">size_in_bytes</span>() <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">IoError::from</span>(<span class="string">&quot;MemFile::write(): existing MappedPages were not writable&quot;</span>));
+<span class="kw">impl </span>ByteWriter <span class="kw">for </span>MemFile {
+    <span class="kw">fn </span>write_at(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buffer: <span class="kw-2">&amp;</span>[u8], offset: usize) -&gt; <span class="prelude-ty">Result</span>&lt;usize, IoError&gt; {
+        <span class="comment">// error out if the underlying mapped pages are already allocated and not writeable
+        </span><span class="kw">if </span>!<span class="self">self</span>.mp.flags().is_writable() &amp;&amp; <span class="self">self</span>.mp.size_in_bytes() != <span class="number">0 </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(IoError::from(<span class="string">&quot;MemFile::write(): existing MappedPages were not writable&quot;</span>));
         }
         
-        <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">buffer</span>.<span class="ident">len</span>() <span class="op">+</span> <span class="ident">offset</span>;
-        <span class="comment">// check to see if we can fit the write buffer into the existing mapped pages region</span>
-        <span class="kw">if</span> <span class="ident">end</span> <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">mp</span>.<span class="ident">size_in_bytes</span>() {
-            <span class="kw">let</span> <span class="ident">dest_slice</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">mp</span>.<span class="ident">as_slice_mut</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">offset</span>, <span class="ident">buffer</span>.<span class="ident">len</span>())<span class="question-mark">?</span>;
-            <span class="comment">// actually perform the write operation</span>
-            <span class="ident">dest_slice</span>.<span class="ident">copy_from_slice</span>(<span class="ident">buffer</span>);
-            <span class="comment">// if the buffer written into the mapped pages exceeds the current size, we set the new size equal to </span>
-            <span class="comment">// this value, otherwise, the size remains the same</span>
-            <span class="kw">if</span> <span class="ident">end</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">len</span> { 
-                <span class="self">self</span>.<span class="ident">len</span> <span class="op">=</span> <span class="ident">end</span>; 
+        <span class="kw">let </span>end = buffer.len() + offset;
+        <span class="comment">// check to see if we can fit the write buffer into the existing mapped pages region
+        </span><span class="kw">if </span>end &lt;= <span class="self">self</span>.mp.size_in_bytes() {
+            <span class="kw">let </span>dest_slice = <span class="self">self</span>.mp.as_slice_mut::&lt;u8&gt;(offset, buffer.len())<span class="question-mark">?</span>;
+            <span class="comment">// actually perform the write operation
+            </span>dest_slice.copy_from_slice(buffer);
+            <span class="comment">// if the buffer written into the mapped pages exceeds the current size, we set the new size equal to 
+            // this value, otherwise, the size remains the same
+            </span><span class="kw">if </span>end &gt; <span class="self">self</span>.len { 
+                <span class="self">self</span>.len = end; 
             }
-            <span class="prelude-val">Ok</span>(<span class="ident">buffer</span>.<span class="ident">len</span>()) <span class="comment">// we wrote all of the requested bytes successfully</span>
-        } 
-        <span class="comment">// if not, we need to reallocate a new mapped pages </span>
-        <span class="kw">else</span> {
-            <span class="comment">// If the mapped pages are empty (this is the first allocation), we make them writable</span>
-            <span class="kw">let</span> <span class="ident">prev_flags</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">mp</span>.<span class="ident">size_in_bytes</span>() <span class="op">==</span> <span class="number">0</span> {
-                <span class="ident">EntryFlags::WRITABLE</span>
+            <span class="prelude-val">Ok</span>(buffer.len()) <span class="comment">// we wrote all of the requested bytes successfully
+        </span>} 
+        <span class="comment">// if not, we need to reallocate a new mapped pages 
+        </span><span class="kw">else </span>{
+            <span class="comment">// If the mapped pages are empty (this is the first allocation), we make them writable
+            </span><span class="kw">let </span>prev_flags = <span class="kw">if </span><span class="self">self</span>.mp.size_in_bytes() == <span class="number">0 </span>{
+                EntryFlags::WRITABLE
             } 
-            <span class="comment">// Otherwise, use the existing mapped pages flags</span>
-            <span class="kw">else</span> {
-                <span class="self">self</span>.<span class="ident">mp</span>.<span class="ident">flags</span>()
+            <span class="comment">// Otherwise, use the existing mapped pages flags
+            </span><span class="kw">else </span>{
+                <span class="self">self</span>.mp.flags()
             };
             
-            <span class="kw">let</span> <span class="ident">kernel_mmi_ref</span> <span class="op">=</span> <span class="ident">get_kernel_mmi_ref</span>().<span class="ident">ok_or</span>(<span class="string">&quot;KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
-            <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="ident">allocate_pages_by_bytes</span>(<span class="ident">end</span>).<span class="ident">ok_or</span>(<span class="string">&quot;could not allocate pages&quot;</span>)<span class="question-mark">?</span>;
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_mapped_pages</span> <span class="op">=</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>().<span class="ident">page_table</span>.<span class="ident">map_allocated_pages</span>(<span class="ident">pages</span>, <span class="ident">prev_flags</span>)<span class="question-mark">?</span>;
+            <span class="kw">let </span>kernel_mmi_ref = get_kernel_mmi_ref().ok_or(<span class="string">&quot;KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
+            <span class="kw">let </span>pages = allocate_pages_by_bytes(end).ok_or(<span class="string">&quot;could not allocate pages&quot;</span>)<span class="question-mark">?</span>;
+            <span class="kw">let </span><span class="kw-2">mut </span>new_mapped_pages = kernel_mmi_ref.lock().page_table.map_allocated_pages(pages, prev_flags)<span class="question-mark">?</span>;
             
-            <span class="comment">// first, we need to copy over the bytes from the previous mapped pages</span>
-            {
-                <span class="comment">// this copies bytes to min(the write offset, all the bytes of the existing mapped pages)</span>
-                <span class="kw">let</span> <span class="ident">copy_limit</span>;
-                <span class="comment">// The write does not overlap with existing content, so we copy all existing content</span>
-                <span class="kw">if</span> <span class="ident">offset</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">len</span> { 
-                    <span class="ident">copy_limit</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">len</span>;
-                } <span class="kw">else</span> { <span class="comment">// Otherwise, we only copy up to where the overlap begins</span>
-                    <span class="ident">copy_limit</span> <span class="op">=</span> <span class="ident">offset</span>;
+            <span class="comment">// first, we need to copy over the bytes from the previous mapped pages
+            </span>{
+                <span class="comment">// this copies bytes to min(the write offset, all the bytes of the existing mapped pages)
+                </span><span class="kw">let </span>copy_limit;
+                <span class="comment">// The write does not overlap with existing content, so we copy all existing content
+                </span><span class="kw">if </span>offset &gt; <span class="self">self</span>.len { 
+                    copy_limit = <span class="self">self</span>.len;
+                } <span class="kw">else </span>{ <span class="comment">// Otherwise, we only copy up to where the overlap begins
+                    </span>copy_limit = offset;
                 }
-                <span class="kw">let</span> <span class="ident">existing_bytes</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">mp</span>.<span class="ident">as_slice</span>(<span class="number">0</span>, <span class="ident">copy_limit</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">copy_slice</span> <span class="op">=</span> <span class="ident">new_mapped_pages</span>.<span class="ident">as_slice_mut</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="number">0</span>, <span class="ident">copy_limit</span>)<span class="question-mark">?</span>;
-                <span class="ident">copy_slice</span>.<span class="ident">copy_from_slice</span>(<span class="ident">existing_bytes</span>);
+                <span class="kw">let </span>existing_bytes = <span class="self">self</span>.mp.as_slice(<span class="number">0</span>, copy_limit)<span class="question-mark">?</span>;
+                <span class="kw">let </span>copy_slice = new_mapped_pages.as_slice_mut::&lt;u8&gt;(<span class="number">0</span>, copy_limit)<span class="question-mark">?</span>;
+                copy_slice.copy_from_slice(existing_bytes);
             } 
             
-            <span class="comment">// second, we write the new content into the reallocated mapped pages</span>
-            {
-                <span class="kw">let</span> <span class="ident">dest_slice</span> <span class="op">=</span> <span class="ident">new_mapped_pages</span>.<span class="ident">as_slice_mut</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">offset</span>, <span class="ident">buffer</span>.<span class="ident">len</span>())<span class="question-mark">?</span>;
-                <span class="ident">dest_slice</span>.<span class="ident">copy_from_slice</span>(<span class="ident">buffer</span>); <span class="comment">// writes the desired contents into the correct area in the mapped page</span>
-            }
-            <span class="self">self</span>.<span class="ident">mp</span> <span class="op">=</span> <span class="ident">new_mapped_pages</span>;
-            <span class="self">self</span>.<span class="ident">len</span> <span class="op">=</span> <span class="ident">end</span>;
-            <span class="prelude-val">Ok</span>(<span class="ident">buffer</span>.<span class="ident">len</span>())
+            <span class="comment">// second, we write the new content into the reallocated mapped pages
+            </span>{
+                <span class="kw">let </span>dest_slice = new_mapped_pages.as_slice_mut::&lt;u8&gt;(offset, buffer.len())<span class="question-mark">?</span>;
+                dest_slice.copy_from_slice(buffer); <span class="comment">// writes the desired contents into the correct area in the mapped page
+            </span>}
+            <span class="self">self</span>.mp = new_mapped_pages;
+            <span class="self">self</span>.len = end;
+            <span class="prelude-val">Ok</span>(buffer.len())
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">IoError</span><span class="op">&gt;</span> { <span class="prelude-val">Ok</span>(()) }
+    <span class="kw">fn </span>flush(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), IoError&gt; { <span class="prelude-val">Ok</span>(()) }
 }
 
 
-<span class="kw">impl</span> <span class="ident">KnownLength</span> <span class="kw">for</span> <span class="ident">MemFile</span> {
-    <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">len</span>
+<span class="kw">impl </span>KnownLength <span class="kw">for </span>MemFile {
+    <span class="kw">fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.len
     }
 }
 
-<span class="kw">impl</span> <span class="ident">File</span> <span class="kw">for</span> <span class="ident">MemFile</span> {
-    <span class="kw">fn</span> <span class="ident">as_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">MappedPages</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Ok</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mp</span>)
+<span class="kw">impl </span>File <span class="kw">for </span>MemFile {
+    <span class="kw">fn </span>as_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="prelude-val">Ok</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.mp)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">FsNode</span> <span class="kw">for</span> <span class="ident">MemFile</span> {
-    <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="self">self</span>.<span class="ident">name</span>.<span class="ident">clone</span>()
+<span class="kw">impl </span>FsNode <span class="kw">for </span>MemFile {
+    <span class="kw">fn </span>get_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="self">self</span>.name.clone()
     }
     
-    <span class="kw">fn</span> <span class="ident">get_parent_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DirRef</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">parent</span>.<span class="ident">upgrade</span>()
+    <span class="kw">fn </span>get_parent_dir(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DirRef&gt; {
+        <span class="self">self</span>.parent.upgrade()
     }
 
-    <span class="kw">fn</span> <span class="ident">set_parent_dir</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">new_parent</span>: <span class="ident">WeakDirRef</span>) {
-        <span class="self">self</span>.<span class="ident">parent</span> <span class="op">=</span> <span class="ident">new_parent</span>;
+    <span class="kw">fn </span>set_parent_dir(<span class="kw-2">&amp;mut </span><span class="self">self</span>, new_parent: WeakDirRef) {
+        <span class="self">self</span>.parent = new_parent;
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="memfs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="memfs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

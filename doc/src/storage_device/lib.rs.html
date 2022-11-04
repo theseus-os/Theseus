@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/storage_device/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../storage_device/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../storage_device/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../storage_device/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/storage_device/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../storage_device/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -112,114 +106,113 @@
 <span id="106">106</span>
 <span id="107">107</span>
 <span id="108">108</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Trait definitions for storage devices and storage controllers. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! All storage devices should implement the `StorageDevice` trait, </span>
-<span class="doccomment">//! such as hard disk drives, optical discs, SSDs, etc. </span>
-<span class="doccomment">//! All storage controllers should implement the `StorageController` trait,</span>
-<span class="doccomment">//! such as AHCI controllers and IDE controllers.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Below is a quick example of how to iterate through available `StorageDevice`s on the system</span>
-<span class="doccomment">//! and usage of the `StorageDevice` trait methods, as well as how to downcast it</span>
-<span class="doccomment">//! into a specific concrete type, such as an `AtaDrive`.</span>
-<span class="doccomment">//! ```rust</span>
-<span class="doccomment">//! if let Some(controller) = storage_manager::storage_controllers().next() {</span>
-<span class="doccomment">//!     if let Some(sd) = controller.lock().devices().next() {</span>
-<span class="doccomment">//!         {</span>
-<span class="doccomment">//!             // Call `StorageDevice` trait methods directly</span>
-<span class="doccomment">//!             let mut locked_sd = sd.lock();</span>
-<span class="doccomment">//!             debug!(&quot;Found drive with size {}, {} sectors&quot;, locked_sd.size_in_bytes(), locked_sd.size_in_blocks());</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//!             // Here we downcast the `StorageDevice` into an `AtaDrive` so we can call `AtaDrive` methods.</span>
-<span class="doccomment">//!             if let Some(ata_drive) = locked_sd.as_any_mut().downcast_mut() {</span>
-<span class="doccomment">//!                 debug!(&quot;      drive was master? {}&quot;, ata_drive.is_master());</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//!                 // Read 10 sectors from the beginning of the drive (at offset 0)</span>
-<span class="doccomment">//!                 let mut initial_buf: [u8; 5120] = [0; 5120]; // 10 sectors of bytes</span>
-<span class="doccomment">//!                 let sectors_read = ata_drive.read_pio(&amp;mut initial_buf[..], 0).unwrap();</span>
-<span class="doccomment">//!                 debug!(&quot;[SUCCESS] sectors_read: {:?}&quot;, sectors_read);</span>
-<span class="doccomment">//!                 debug!(&quot;{:?}&quot;, core::str::from_utf8(&amp;initial_buf));</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//!                 // Write 3 sectors to the drive</span>
-<span class="doccomment">//!                 let mut write_buf = [0u8; 512*3];</span>
-<span class="doccomment">//!                 for b in write_buf.chunks_exact_mut(16) {</span>
-<span class="doccomment">//!                     b.copy_from_slice(b&quot;QWERTYUIOPASDFJK&quot;);</span>
-<span class="doccomment">//!                 }</span>
-<span class="doccomment">//!                 let bytes_written = ata_drive.write_pio(&amp;write_buf[..], 2).unwrap();</span>
-<span class="doccomment">//!                 debug!(&quot;WRITE_PIO {:?}&quot;, bytes_written);</span>
-<span class="doccomment">//!             }</span>
-<span class="doccomment">//!         }</span>
-<span class="doccomment">//!         // Read 10 sectors from the drive using the `StorageDevice` trait methods.</span>
-<span class="doccomment">//!         let mut after_buf: [u8; 5120] = [0; 5120];</span>
-<span class="doccomment">//!         let sectors_read = sd.lock().read_blocks(&amp;mut after_buf[..], 0).unwrap();</span>
-<span class="doccomment">//!         debug!(&quot;{:X?}&quot;, &amp;after_buf[..]);</span>
-<span class="doccomment">//!         debug!(&quot;{:?}&quot;, core::str::from_utf8(&amp;after_buf));</span>
-<span class="doccomment">//!         trace!(&quot;POST-WRITE READ_BLOCKS {} sectors&quot;, sectors_read);</span>
-<span class="doccomment">//!     }</span>
-<span class="doccomment">//! }</span>
-<span class="doccomment">//! ```</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! # Limitations</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Note that if other crates are using a storage device through a block cache, </span>
-<span class="doccomment">//! the cache does not own the storage device and cache validity is questionable.</span>
-<span class="doccomment">//! Be careful in that case. See the warning in the [block_cache](../block_cache/index.html) module.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Trait definitions for storage devices and storage controllers. 
+//! 
+//! All storage devices should implement the `StorageDevice` trait, 
+//! such as hard disk drives, optical discs, SSDs, etc. 
+//! All storage controllers should implement the `StorageController` trait,
+//! such as AHCI controllers and IDE controllers.
+//! 
+//! Below is a quick example of how to iterate through available `StorageDevice`s on the system
+//! and usage of the `StorageDevice` trait methods, as well as how to downcast it
+//! into a specific concrete type, such as an `AtaDrive`.
+//! ```rust
+//! if let Some(controller) = storage_manager::storage_controllers().next() {
+//!     if let Some(sd) = controller.lock().devices().next() {
+//!         {
+//!             // Call `StorageDevice` trait methods directly
+//!             let mut locked_sd = sd.lock();
+//!             debug!(&quot;Found drive with size {}, {} sectors&quot;, locked_sd.size_in_bytes(), locked_sd.size_in_blocks());
+//! 
+//!             // Here we downcast the `StorageDevice` into an `AtaDrive` so we can call `AtaDrive` methods.
+//!             if let Some(ata_drive) = locked_sd.as_any_mut().downcast_mut() {
+//!                 debug!(&quot;      drive was master? {}&quot;, ata_drive.is_master());
+//! 
+//!                 // Read 10 sectors from the beginning of the drive (at offset 0)
+//!                 let mut initial_buf: [u8; 5120] = [0; 5120]; // 10 sectors of bytes
+//!                 let sectors_read = ata_drive.read_pio(&amp;mut initial_buf[..], 0).unwrap();
+//!                 debug!(&quot;[SUCCESS] sectors_read: {:?}&quot;, sectors_read);
+//!                 debug!(&quot;{:?}&quot;, core::str::from_utf8(&amp;initial_buf));
+//! 
+//!                 // Write 3 sectors to the drive
+//!                 let mut write_buf = [0u8; 512*3];
+//!                 for b in write_buf.chunks_exact_mut(16) {
+//!                     b.copy_from_slice(b&quot;QWERTYUIOPASDFJK&quot;);
+//!                 }
+//!                 let bytes_written = ata_drive.write_pio(&amp;write_buf[..], 2).unwrap();
+//!                 debug!(&quot;WRITE_PIO {:?}&quot;, bytes_written);
+//!             }
+//!         }
+//!         // Read 10 sectors from the drive using the `StorageDevice` trait methods.
+//!         let mut after_buf: [u8; 5120] = [0; 5120];
+//!         let sectors_read = sd.lock().read_blocks(&amp;mut after_buf[..], 0).unwrap();
+//!         debug!(&quot;{:X?}&quot;, &amp;after_buf[..]);
+//!         debug!(&quot;{:?}&quot;, core::str::from_utf8(&amp;after_buf));
+//!         trace!(&quot;POST-WRITE READ_BLOCKS {} sectors&quot;, sectors_read);
+//!     }
+//! }
+//! ```
+//! 
+//! # Limitations
+//! 
+//! Note that if other crates are using a storage device through a block cache, 
+//! the cache does not own the storage device and cache validity is questionable.
+//! Be careful in that case. See the warning in the [block_cache](../block_cache/index.html) module.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">downcast_rs</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">io</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>spin;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>downcast_rs;
+<span class="kw">extern crate </span>io;
 
-<span class="kw">use</span> <span class="ident">alloc</span>::{
-    <span class="ident">boxed::Box</span>,
-    <span class="ident">sync::Arc</span>,
+<span class="kw">use </span>alloc::{
+    boxed::Box,
+    sync::Arc,
 };
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">downcast_rs::Downcast</span>;
-<span class="kw">use</span> <span class="ident">io</span>::{<span class="ident">BlockIo</span>, <span class="ident">KnownLength</span>, <span class="ident">BlockReader</span>, <span class="ident">BlockWriter</span>};
+<span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>downcast_rs::Downcast;
+<span class="kw">use </span>io::{BlockIo, KnownLength, BlockReader, BlockWriter};
 
 
-<span class="doccomment">/// A trait that represents a storage controller,</span>
-<span class="doccomment">/// such as an AHCI controller or IDE controller.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">StorageController</span> {
-    <span class="doccomment">/// Returns an iterator of references to all `StorageDevice`s attached to this controller.</span>
-    <span class="doccomment">/// The lifetime of the iterator and the device references it returns are both bound</span>
-    <span class="doccomment">/// by the lifetime of this `StorageController`.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Note</span>
-    <span class="doccomment">/// I would prefer to have this Iterator return a `&amp;StorageDeviceRef`,</span>
-    <span class="doccomment">/// but Rust does not permit casts from `&amp;Arc&lt;Mutex&lt;Struct&gt;&gt;` to `&amp;Arc&lt;Mutex&lt;Trait&gt;&gt;`,</span>
-    <span class="doccomment">/// it only supports casts from `Arc&lt;Mutex&lt;Struct&gt;&gt;` to `Arc&lt;Mutex&lt;Trait&gt;&gt;`.</span>
-    <span class="kw">fn</span> <span class="ident">devices</span><span class="op">&lt;</span><span class="lifetime">&#39;c</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;c</span> <span class="self">self</span>) -&gt; <span class="ident">Box</span><span class="op">&lt;</span>(<span class="ident">dyn</span> <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">StorageDeviceRef</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;c</span>)<span class="op">&gt;</span>;
+<span class="doccomment">/// A trait that represents a storage controller,
+/// such as an AHCI controller or IDE controller.
+</span><span class="kw">pub trait </span>StorageController {
+    <span class="doccomment">/// Returns an iterator of references to all `StorageDevice`s attached to this controller.
+    /// The lifetime of the iterator and the device references it returns are both bound
+    /// by the lifetime of this `StorageController`.
+    /// 
+    /// # Note
+    /// I would prefer to have this Iterator return a `&amp;StorageDeviceRef`,
+    /// but Rust does not permit casts from `&amp;Arc&lt;Mutex&lt;Struct&gt;&gt;` to `&amp;Arc&lt;Mutex&lt;Trait&gt;&gt;`,
+    /// it only supports casts from `Arc&lt;Mutex&lt;Struct&gt;&gt;` to `Arc&lt;Mutex&lt;Trait&gt;&gt;`.
+    </span><span class="kw">fn </span>devices&lt;<span class="lifetime">&#39;c</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;c </span><span class="self">self</span>) -&gt; Box&lt;(<span class="kw">dyn </span>Iterator&lt;Item = StorageDeviceRef&gt; + <span class="lifetime">&#39;c</span>)&gt;;
 }
 
-<span class="doccomment">/// A trait object wrapped in an Arc and Mutex that allows </span>
-<span class="doccomment">/// arbitrary storage controllers to be shared in a thread-safe manner.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">StorageControllerRef</span> <span class="op">=</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">StorageController</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+<span class="doccomment">/// A trait object wrapped in an Arc and Mutex that allows 
+/// arbitrary storage controllers to be shared in a thread-safe manner.
+</span><span class="kw">pub type </span>StorageControllerRef = Arc&lt;Mutex&lt;<span class="kw">dyn </span>StorageController + Send&gt;&gt;;
 
 
-<span class="doccomment">/// A trait that represents a storage device,</span>
-<span class="doccomment">/// such as hard disks, removable drives, SSDs, etc.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// A `StorageDevice` must implement the following traits:</span>
-<span class="doccomment">/// * `BlockIo`: to specify its block size.</span>
-<span class="doccomment">/// * `BlockReader` and `BlockWriter`: to enable reading and writing data </span>
-<span class="doccomment">///   from/to the device at block granularity. </span>
-<span class="doccomment">/// * `KnownLength`: to specify the size in bytes (length) of the entire device. </span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This trait includes additional functions to query device info, e.g.,</span>
-<span class="doccomment">/// the device&#39;s total size in number of blocks.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">StorageDevice</span>: <span class="ident">BlockIo</span> <span class="op">+</span> <span class="ident">BlockReader</span> <span class="op">+</span> <span class="ident">BlockWriter</span> <span class="op">+</span> <span class="ident">KnownLength</span> <span class="op">+</span> <span class="ident">Downcast</span> {
-	<span class="doccomment">/// Returns the total size of this device, given in number of blocks (sectors).</span>
-    <span class="kw">fn</span> <span class="ident">size_in_blocks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span>;
+<span class="doccomment">/// A trait that represents a storage device,
+/// such as hard disks, removable drives, SSDs, etc.
+/// 
+/// A `StorageDevice` must implement the following traits:
+/// * `BlockIo`: to specify its block size.
+/// * `BlockReader` and `BlockWriter`: to enable reading and writing data 
+///   from/to the device at block granularity. 
+/// * `KnownLength`: to specify the size in bytes (length) of the entire device. 
+///
+/// This trait includes additional functions to query device info, e.g.,
+/// the device&#39;s total size in number of blocks.
+</span><span class="kw">pub trait </span>StorageDevice: BlockIo + BlockReader + BlockWriter + KnownLength + Downcast {
+	<span class="doccomment">/// Returns the total size of this device, given in number of blocks (sectors).
+    </span><span class="kw">fn </span>size_in_blocks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize;
 }
-<span class="macro">impl_downcast!</span>(<span class="ident">StorageDevice</span>);
+<span class="macro">impl_downcast!</span>(StorageDevice);
 
-<span class="doccomment">/// A trait object wrapped in an Arc and Mutex that allows </span>
-<span class="doccomment">/// arbitrary storage devices to be shared in a thread-safe manner.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">StorageDeviceRef</span> <span class="op">=</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">StorageDevice</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+<span class="doccomment">/// A trait object wrapped in an Arc and Mutex that allows 
+/// arbitrary storage devices to be shared in a thread-safe manner.
+</span><span class="kw">pub type </span>StorageDeviceRef = Arc&lt;Mutex&lt;<span class="kw">dyn </span>StorageDevice + Send&gt;&gt;;
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="storage_device" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="storage_device" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

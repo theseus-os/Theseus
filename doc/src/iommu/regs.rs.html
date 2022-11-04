@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/iommu/src/regs.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>regs.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../iommu/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../iommu/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../iommu/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/iommu/src/regs.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>regs.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../iommu/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -210,212 +204,211 @@
 <span id="204">204</span>
 <span id="205">205</span>
 <span id="206">206</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Structures needed for interacting with the IOMMU.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Structures needed for interacting with the IOMMU.
 
-<span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
-<span class="kw">use</span> <span class="ident">volatile</span>::{<span class="ident">ReadOnly</span>, <span class="ident">WriteOnly</span>};
-<span class="kw">use</span> <span class="ident">bitflags::bitflags</span>;
-<span class="kw">use</span> <span class="ident">core::fmt</span>;
+</span><span class="kw">use </span>zerocopy::FromBytes;
+<span class="kw">use </span>volatile::{ReadOnly, WriteOnly};
+<span class="kw">use </span>bitflags::bitflags;
+<span class="kw">use </span>core::fmt;
 
-<span class="doccomment">/// The layout of the IOMMU&#39;s MMIO registers.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IntelIommuRegisters</span> {
-    <span class="doccomment">/// Version register</span>
-    <span class="kw">pub</span> <span class="ident">version</span>:            <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,     <span class="comment">// 0x00</span>
-    <span class="doccomment">/// Reserved</span>
-    <span class="ident">_reserved0</span>:             [<span class="ident">u8</span>; <span class="number">4</span>],           <span class="comment">// 0x04 - 0x07</span>
-    <span class="doccomment">/// Capability register</span>
-    <span class="kw">pub</span> <span class="ident">cap</span>:                <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,     <span class="comment">// 0x08</span>
-    <span class="doccomment">/// Extended Capability register</span>
-    <span class="kw">pub</span> <span class="ident">ecap</span>:               <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,     <span class="comment">// 0x10</span>
-    <span class="doccomment">/// Global command register</span>
-    <span class="kw">pub</span> <span class="ident">gcommand</span>:           <span class="ident">WriteOnly</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,    <span class="comment">// 0x18</span>
-    <span class="doccomment">/// Global status register</span>
-    <span class="kw">pub</span> <span class="ident">gstatus</span>:            <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,     <span class="comment">// 0x1c</span>
-    <span class="doccomment">/// Unimplemented (may be architecturally defined)</span>
-    <span class="ident">_unimplemented</span>:         [<span class="ident">u8</span>; <span class="number">4096</span><span class="op">-</span><span class="number">0x20</span>],   <span class="comment">// 0x20-0xFFF</span>
+<span class="doccomment">/// The layout of the IOMMU&#39;s MMIO registers.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>IntelIommuRegisters {
+    <span class="doccomment">/// Version register
+    </span><span class="kw">pub </span>version:            ReadOnly&lt;u32&gt;,     <span class="comment">// 0x00
+    </span><span class="doccomment">/// Reserved
+    </span>_reserved0:             [u8; <span class="number">4</span>],           <span class="comment">// 0x04 - 0x07
+    </span><span class="doccomment">/// Capability register
+    </span><span class="kw">pub </span>cap:                ReadOnly&lt;u64&gt;,     <span class="comment">// 0x08
+    </span><span class="doccomment">/// Extended Capability register
+    </span><span class="kw">pub </span>ecap:               ReadOnly&lt;u64&gt;,     <span class="comment">// 0x10
+    </span><span class="doccomment">/// Global command register
+    </span><span class="kw">pub </span>gcommand:           WriteOnly&lt;u32&gt;,    <span class="comment">// 0x18
+    </span><span class="doccomment">/// Global status register
+    </span><span class="kw">pub </span>gstatus:            ReadOnly&lt;u32&gt;,     <span class="comment">// 0x1c
+    </span><span class="doccomment">/// Unimplemented (may be architecturally defined)
+    </span>_unimplemented:         [u8; <span class="number">4096</span>-<span class="number">0x20</span>],   <span class="comment">// 0x20-0xFFF
+</span>}
+<span class="comment">// TODO: Hardware may use more than 4kB, which means the registers may occupy
+//       more than one contiguous page.
+//       Currently we assume the IOMMU registers occupy only a single page.
+</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIommuRegisters&gt;(), <span class="number">4096</span>);
+
+<span class="doccomment">/// Helper struct for decoding and printing capability register
+</span><span class="kw">pub struct </span>Capability(<span class="kw">pub </span>u64);
+
+<span class="kw">impl </span>Capability {
+    <span class="kw">fn </span>esrtps(<span class="kw-2">&amp;</span><span class="self">self</span>)  -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">63</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>esirtps(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">62</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>fl5lp(<span class="kw-2">&amp;</span><span class="self">self</span>)   -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">60</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>pi(<span class="kw-2">&amp;</span><span class="self">self</span>)      -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">59</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>fl1gp(<span class="kw-2">&amp;</span><span class="self">self</span>)   -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">56</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>drd(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">55</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>dwd(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">54</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>mamv(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; u64  { (<span class="self">self</span>.<span class="number">0 </span>&gt;&gt; <span class="number">48</span>) &amp; <span class="number">0x3f </span>}
+    <span class="kw">fn </span>nfr(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; u64  { ((<span class="self">self</span>.<span class="number">0 </span>&gt;&gt; <span class="number">40</span>) &amp; <span class="number">0xff</span>) + <span class="number">1 </span>}
+    <span class="kw">fn </span>psi(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">39</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>sllps(<span class="kw-2">&amp;</span><span class="self">self</span>)   -&gt; u64  { (<span class="self">self</span>.<span class="number">0 </span>&gt;&gt; <span class="number">34</span>) &amp; <span class="number">0xf </span>}
+    <span class="kw">fn </span>fro(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; u64  { (<span class="self">self</span>.<span class="number">0 </span>&gt;&gt; <span class="number">24</span>) &amp; <span class="number">0x3ff </span>}
+    <span class="kw">fn </span>zlr(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">22</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>mgaw(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; u64  { ((<span class="self">self</span>.<span class="number">0 </span>&gt;&gt; <span class="number">16</span>) &amp; <span class="number">0x3f</span>) + <span class="number">1 </span>}
+    <span class="kw">fn </span>sagaw(<span class="kw-2">&amp;</span><span class="self">self</span>)   -&gt; u64  { (<span class="self">self</span>.<span class="number">0 </span>&gt;&gt; <span class="number">8</span>) &amp; <span class="number">0x1f </span>}
+    <span class="kw">fn </span>cm(<span class="kw-2">&amp;</span><span class="self">self</span>)      -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">7</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>phmr(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">6</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>plmr(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">5</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>rwbf(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">4</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>afl(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">3</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>nd(<span class="kw-2">&amp;</span><span class="self">self</span>)      -&gt; u64  { <span class="self">self</span>.<span class="number">0 </span>&amp; <span class="number">0x7 </span>}
 }
-<span class="comment">// TODO: Hardware may use more than 4kB, which means the registers may occupy</span>
-<span class="comment">//       more than one contiguous page.</span>
-<span class="comment">//       Currently we assume the IOMMU registers occupy only a single page.</span>
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">IntelIommuRegisters</span><span class="op">&gt;</span>(), <span class="number">4096</span>);
 
-<span class="doccomment">/// Helper struct for decoding and printing capability register</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Capability</span>(<span class="kw">pub</span> <span class="ident">u64</span>);
-
-<span class="kw">impl</span> <span class="ident">Capability</span> {
-    <span class="kw">fn</span> <span class="ident">esrtps</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)  -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">63</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">esirtps</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">62</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">fl5lp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)   -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">60</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">pi</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)      -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">59</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">fl1gp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)   -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">56</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">drd</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">55</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">dwd</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">54</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">mamv</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; <span class="ident">u64</span>  { (<span class="self">self</span>.<span class="number">0</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">48</span>) <span class="op">&amp;</span> <span class="number">0x3f</span> }
-    <span class="kw">fn</span> <span class="ident">nfr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">u64</span>  { ((<span class="self">self</span>.<span class="number">0</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">40</span>) <span class="op">&amp;</span> <span class="number">0xff</span>) <span class="op">+</span> <span class="number">1</span> }
-    <span class="kw">fn</span> <span class="ident">psi</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">39</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">sllps</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)   -&gt; <span class="ident">u64</span>  { (<span class="self">self</span>.<span class="number">0</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">34</span>) <span class="op">&amp;</span> <span class="number">0xf</span> }
-    <span class="kw">fn</span> <span class="ident">fro</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">u64</span>  { (<span class="self">self</span>.<span class="number">0</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">24</span>) <span class="op">&amp;</span> <span class="number">0x3ff</span> }
-    <span class="kw">fn</span> <span class="ident">zlr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">22</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">mgaw</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; <span class="ident">u64</span>  { ((<span class="self">self</span>.<span class="number">0</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">16</span>) <span class="op">&amp;</span> <span class="number">0x3f</span>) <span class="op">+</span> <span class="number">1</span> }
-    <span class="kw">fn</span> <span class="ident">sagaw</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)   -&gt; <span class="ident">u64</span>  { (<span class="self">self</span>.<span class="number">0</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">8</span>) <span class="op">&amp;</span> <span class="number">0x1f</span> }
-    <span class="kw">fn</span> <span class="ident">cm</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)      -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">7</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">phmr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">6</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">plmr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">5</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">rwbf</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">4</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">afl</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">3</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">nd</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)      -&gt; <span class="ident">u64</span>  { <span class="self">self</span>.<span class="number">0</span> <span class="op">&amp;</span> <span class="number">0x7</span> }
-}
-
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">Capability</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;Capability&quot;</span>)
-            .<span class="ident">field</span>(<span class="string">&quot;ND&quot;</span>,       <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">nd</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;AFL&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">afl</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;RWBF&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">rwbf</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;PLMR&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">plmr</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;PHMR&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">phmr</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;CM&quot;</span>,       <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">cm</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;SAGAW&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">sagaw</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;MGAW&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mgaw</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;ZLR&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">zlr</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;FRO&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">fro</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;SLLPS&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">sllps</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;PSI&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">psi</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;NFR&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">nfr</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;MAMV&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mamv</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;DWD&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">dwd</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;DRD&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">drd</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;FL1GP&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">fl1gp</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;PI&quot;</span>,       <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pi</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;FL5LP&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">fl5lp</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;ESIRTPS&quot;</span>,  <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">esirtps</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;ESRTPS&quot;</span>,   <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">esrtps</span>())
-            .<span class="ident">finish</span>()
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>Capability {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        f.debug_struct(<span class="string">&quot;Capability&quot;</span>)
+            .field(<span class="string">&quot;ND&quot;</span>,       <span class="kw-2">&amp;</span><span class="self">self</span>.nd())
+            .field(<span class="string">&quot;AFL&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.afl())
+            .field(<span class="string">&quot;RWBF&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.rwbf())
+            .field(<span class="string">&quot;PLMR&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.plmr())
+            .field(<span class="string">&quot;PHMR&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.phmr())
+            .field(<span class="string">&quot;CM&quot;</span>,       <span class="kw-2">&amp;</span><span class="self">self</span>.cm())
+            .field(<span class="string">&quot;SAGAW&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.sagaw())
+            .field(<span class="string">&quot;MGAW&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.mgaw())
+            .field(<span class="string">&quot;ZLR&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.zlr())
+            .field(<span class="string">&quot;FRO&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.fro())
+            .field(<span class="string">&quot;SLLPS&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.sllps())
+            .field(<span class="string">&quot;PSI&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.psi())
+            .field(<span class="string">&quot;NFR&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.nfr())
+            .field(<span class="string">&quot;MAMV&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.mamv())
+            .field(<span class="string">&quot;DWD&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.dwd())
+            .field(<span class="string">&quot;DRD&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.drd())
+            .field(<span class="string">&quot;FL1GP&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.fl1gp())
+            .field(<span class="string">&quot;PI&quot;</span>,       <span class="kw-2">&amp;</span><span class="self">self</span>.pi())
+            .field(<span class="string">&quot;FL5LP&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.fl5lp())
+            .field(<span class="string">&quot;ESIRTPS&quot;</span>,  <span class="kw-2">&amp;</span><span class="self">self</span>.esirtps())
+            .field(<span class="string">&quot;ESRTPS&quot;</span>,   <span class="kw-2">&amp;</span><span class="self">self</span>.esrtps())
+            .finish()
     }
 }
 
-<span class="doccomment">/// Helper struct for decoding and printing extended capability register</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ExtendedCapability</span>(<span class="kw">pub</span> <span class="ident">u64</span>);
+<span class="doccomment">/// Helper struct for decoding and printing extended capability register
+</span><span class="kw">pub struct </span>ExtendedCapability(<span class="kw">pub </span>u64);
 
-<span class="kw">impl</span> <span class="ident">ExtendedCapability</span> {
-    <span class="kw">fn</span> <span class="ident">rprivs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)  -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">53</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">adms</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">52</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">rps</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">49</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">smpwcs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)  -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">48</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">flts</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">47</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">slts</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">46</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">slads</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)   -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">45</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">vcs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">44</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">smts</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">43</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">pds</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">42</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">dit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">41</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">pasid</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)   -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">40</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">pss</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">u64</span>  { ((<span class="self">self</span>.<span class="number">0</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">35</span>) <span class="op">&amp;</span> <span class="number">0x1f</span>) <span class="op">+</span> <span class="number">1</span> }
-    <span class="kw">fn</span> <span class="ident">eafs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">34</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">nwfs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">33</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">srs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">31</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">ers</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">30</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">prs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">29</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">nest</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">26</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">mts</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">25</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">mhmv</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; <span class="ident">u64</span>  { (<span class="self">self</span>.<span class="number">0</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">20</span>) <span class="op">&amp;</span> <span class="number">0xf</span> }
-    <span class="kw">fn</span> <span class="ident">iro</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">u64</span>  { (<span class="self">self</span>.<span class="number">0</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">8</span>) <span class="op">&amp;</span> <span class="number">0x3ff</span> }
-    <span class="kw">fn</span> <span class="ident">sc</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)      -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">7</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">pt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)      -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">6</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">eim</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">4</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">ir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)      -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">3</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">dt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)      -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">2</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">qi</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)      -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
-    <span class="kw">fn</span> <span class="ident">c</span>(<span class="kw-2">&amp;</span><span class="self">self</span>)       -&gt; <span class="ident">bool</span> { (<span class="self">self</span>.<span class="number">0</span>) <span class="op">&amp;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">0</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0</span> }
+<span class="kw">impl </span>ExtendedCapability {
+    <span class="kw">fn </span>rprivs(<span class="kw-2">&amp;</span><span class="self">self</span>)  -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">53</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>adms(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">52</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>rps(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">49</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>smpwcs(<span class="kw-2">&amp;</span><span class="self">self</span>)  -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">48</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>flts(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">47</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>slts(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">46</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>slads(<span class="kw-2">&amp;</span><span class="self">self</span>)   -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">45</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>vcs(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">44</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>smts(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">43</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>pds(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">42</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>dit(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">41</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>pasid(<span class="kw-2">&amp;</span><span class="self">self</span>)   -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">40</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>pss(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; u64  { ((<span class="self">self</span>.<span class="number">0 </span>&gt;&gt; <span class="number">35</span>) &amp; <span class="number">0x1f</span>) + <span class="number">1 </span>}
+    <span class="kw">fn </span>eafs(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">34</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>nwfs(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">33</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>srs(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">31</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>ers(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">30</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>prs(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">29</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>nest(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">26</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>mts(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">25</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>mhmv(<span class="kw-2">&amp;</span><span class="self">self</span>)    -&gt; u64  { (<span class="self">self</span>.<span class="number">0 </span>&gt;&gt; <span class="number">20</span>) &amp; <span class="number">0xf </span>}
+    <span class="kw">fn </span>iro(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; u64  { (<span class="self">self</span>.<span class="number">0 </span>&gt;&gt; <span class="number">8</span>) &amp; <span class="number">0x3ff </span>}
+    <span class="kw">fn </span>sc(<span class="kw-2">&amp;</span><span class="self">self</span>)      -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">7</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>pt(<span class="kw-2">&amp;</span><span class="self">self</span>)      -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">6</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>eim(<span class="kw-2">&amp;</span><span class="self">self</span>)     -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">4</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>ir(<span class="kw-2">&amp;</span><span class="self">self</span>)      -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">3</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>dt(<span class="kw-2">&amp;</span><span class="self">self</span>)      -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">2</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>qi(<span class="kw-2">&amp;</span><span class="self">self</span>)      -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">1</span>) != <span class="number">0 </span>}
+    <span class="kw">fn </span>c(<span class="kw-2">&amp;</span><span class="self">self</span>)       -&gt; bool { (<span class="self">self</span>.<span class="number">0</span>) &amp; (<span class="number">1 </span>&lt;&lt; <span class="number">0</span>) != <span class="number">0 </span>}
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">ExtendedCapability</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;ExtendedCapability&quot;</span>)
-            .<span class="ident">field</span>(<span class="string">&quot;C&quot;</span>,       <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">c</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;QI&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">qi</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;DT&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">dt</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;IR&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">ir</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;EIM&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">eim</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;PT&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pt</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;SC&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">sc</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;IRO&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">iro</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;MHMV&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mhmv</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;MTS&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mts</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;NEST&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">nest</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;PRS&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">prs</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;ERS&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">ers</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;SRS&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">srs</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;NWFS&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">nwfs</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;EAFS&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">eafs</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;PSS&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pss</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;PASID&quot;</span>,   <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pasid</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;DIT&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">dit</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;PDS&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pds</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;SMTS&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">smts</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;VCS&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">vcs</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;SLADS&quot;</span>,   <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">slads</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;SLTS&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">slts</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;FLTS&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">flts</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;SMPWCS&quot;</span>,  <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">smpwcs</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;RPS&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">rps</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;ADMS&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">adms</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;RPRIVS&quot;</span>,  <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">rprivs</span>())
-            .<span class="ident">finish</span>()
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>ExtendedCapability {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        f.debug_struct(<span class="string">&quot;ExtendedCapability&quot;</span>)
+            .field(<span class="string">&quot;C&quot;</span>,       <span class="kw-2">&amp;</span><span class="self">self</span>.c())
+            .field(<span class="string">&quot;QI&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.qi())
+            .field(<span class="string">&quot;DT&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.dt())
+            .field(<span class="string">&quot;IR&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.ir())
+            .field(<span class="string">&quot;EIM&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.eim())
+            .field(<span class="string">&quot;PT&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.pt())
+            .field(<span class="string">&quot;SC&quot;</span>,      <span class="kw-2">&amp;</span><span class="self">self</span>.sc())
+            .field(<span class="string">&quot;IRO&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.iro())
+            .field(<span class="string">&quot;MHMV&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.mhmv())
+            .field(<span class="string">&quot;MTS&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.mts())
+            .field(<span class="string">&quot;NEST&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.nest())
+            .field(<span class="string">&quot;PRS&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.prs())
+            .field(<span class="string">&quot;ERS&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.ers())
+            .field(<span class="string">&quot;SRS&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.srs())
+            .field(<span class="string">&quot;NWFS&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.nwfs())
+            .field(<span class="string">&quot;EAFS&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.eafs())
+            .field(<span class="string">&quot;PSS&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.pss())
+            .field(<span class="string">&quot;PASID&quot;</span>,   <span class="kw-2">&amp;</span><span class="self">self</span>.pasid())
+            .field(<span class="string">&quot;DIT&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.dit())
+            .field(<span class="string">&quot;PDS&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.pds())
+            .field(<span class="string">&quot;SMTS&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.smts())
+            .field(<span class="string">&quot;VCS&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.vcs())
+            .field(<span class="string">&quot;SLADS&quot;</span>,   <span class="kw-2">&amp;</span><span class="self">self</span>.slads())
+            .field(<span class="string">&quot;SLTS&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.slts())
+            .field(<span class="string">&quot;FLTS&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.flts())
+            .field(<span class="string">&quot;SMPWCS&quot;</span>,  <span class="kw-2">&amp;</span><span class="self">self</span>.smpwcs())
+            .field(<span class="string">&quot;RPS&quot;</span>,     <span class="kw-2">&amp;</span><span class="self">self</span>.rps())
+            .field(<span class="string">&quot;ADMS&quot;</span>,    <span class="kw-2">&amp;</span><span class="self">self</span>.adms())
+            .field(<span class="string">&quot;RPRIVS&quot;</span>,  <span class="kw-2">&amp;</span><span class="self">self</span>.rprivs())
+            .finish()
     }
 }
 
-<span class="doccomment">/// Bits corresponding to commands in the Global Command register.</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u32</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">GlobalCommand</span> {
-    <span class="doccomment">/// Compatibility Format Interrupt</span>
-    <span class="ident">CFI</span>   <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">23</span>,
-    <span class="doccomment">/// Set Interrupt Remap Table Pointer</span>
-    <span class="ident">SIRTP</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">24</span>,
-    <span class="doccomment">/// Interrupt Remapping Enable</span>
-    <span class="ident">IRE</span>   <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">25</span>,
-    <span class="doccomment">/// Queued Invalidation Enable</span>
-    <span class="ident">QIE</span>   <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">26</span>,
-    <span class="doccomment">/// Write Buffer Flush</span>
-    <span class="ident">WBF</span>   <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">27</span>,
-    <span class="doccomment">/// Enable Advanced Fault Logging</span>
-    <span class="ident">EAFL</span>  <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">28</span>,
-    <span class="doccomment">/// Set Fault Log</span>
-    <span class="ident">SFL</span>   <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">29</span>,
-    <span class="doccomment">/// Set Root Table Pointer</span>
-    <span class="ident">SRTP</span>  <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">30</span>,
-    <span class="doccomment">/// Translation Enable</span>
-    <span class="ident">TE</span>    <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">31</span>,
+<span class="doccomment">/// Bits corresponding to commands in the Global Command register.
+</span><span class="attr">#[repr(u32)]
+</span><span class="kw">pub enum </span>GlobalCommand {
+    <span class="doccomment">/// Compatibility Format Interrupt
+    </span>CFI   = <span class="number">1 </span>&lt;&lt; <span class="number">23</span>,
+    <span class="doccomment">/// Set Interrupt Remap Table Pointer
+    </span>SIRTP = <span class="number">1 </span>&lt;&lt; <span class="number">24</span>,
+    <span class="doccomment">/// Interrupt Remapping Enable
+    </span>IRE   = <span class="number">1 </span>&lt;&lt; <span class="number">25</span>,
+    <span class="doccomment">/// Queued Invalidation Enable
+    </span>QIE   = <span class="number">1 </span>&lt;&lt; <span class="number">26</span>,
+    <span class="doccomment">/// Write Buffer Flush
+    </span>WBF   = <span class="number">1 </span>&lt;&lt; <span class="number">27</span>,
+    <span class="doccomment">/// Enable Advanced Fault Logging
+    </span>EAFL  = <span class="number">1 </span>&lt;&lt; <span class="number">28</span>,
+    <span class="doccomment">/// Set Fault Log
+    </span>SFL   = <span class="number">1 </span>&lt;&lt; <span class="number">29</span>,
+    <span class="doccomment">/// Set Root Table Pointer
+    </span>SRTP  = <span class="number">1 </span>&lt;&lt; <span class="number">30</span>,
+    <span class="doccomment">/// Translation Enable
+    </span>TE    = <span class="number">1 </span>&lt;&lt; <span class="number">31</span>,
 }
 
-<span class="macro">bitflags!</span> {
-    <span class="doccomment">/// Global status register flags.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The least significant bits `[22:0]` are `RsvdZ`,</span>
-    <span class="doccomment">/// meaning that they are reserved for future usage and must be set to 0.</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GlobalStatus</span>: <span class="ident">u32</span> {
-        <span class="doccomment">/// Compatibility Format Interrupt Status</span>
-        <span class="kw">const</span> <span class="ident">CFIS</span>  <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">23</span>;
-        <span class="doccomment">/// Interrupt Remapping Table Pointer Status</span>
-        <span class="kw">const</span> <span class="ident">IRTPS</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">24</span>;
-        <span class="doccomment">/// Interrupt Remapping Enable Status</span>
-        <span class="kw">const</span> <span class="ident">IRES</span>  <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">25</span>;
-        <span class="doccomment">/// Queued Invalidation Enable Status</span>
-        <span class="kw">const</span> <span class="ident">QIES</span>  <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">26</span>;
-        <span class="doccomment">/// Write Buffer Flush Status</span>
-        <span class="kw">const</span> <span class="ident">WBFS</span>  <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">27</span>;
-        <span class="doccomment">/// Advanced Fault Logging Status</span>
-        <span class="kw">const</span> <span class="ident">AFLS</span>  <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">28</span>;
-        <span class="doccomment">/// Fault Log Status</span>
-        <span class="kw">const</span> <span class="ident">FLS</span>   <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">29</span>;
-        <span class="doccomment">/// Root Table Pointer Status</span>
-        <span class="kw">const</span> <span class="ident">RTPS</span>  <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">30</span>;
-        <span class="doccomment">/// Translation Enable Status</span>
-        <span class="kw">const</span> <span class="ident">TES</span>   <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">31</span>;
+<span class="macro">bitflags! </span>{
+    <span class="doccomment">/// Global status register flags.
+    ///
+    /// The least significant bits `[22:0]` are `RsvdZ`,
+    /// meaning that they are reserved for future usage and must be set to 0.
+    </span><span class="kw">pub struct </span>GlobalStatus: u32 {
+        <span class="doccomment">/// Compatibility Format Interrupt Status
+        </span><span class="kw">const </span>CFIS  = <span class="number">1 </span>&lt;&lt; <span class="number">23</span>;
+        <span class="doccomment">/// Interrupt Remapping Table Pointer Status
+        </span><span class="kw">const </span>IRTPS = <span class="number">1 </span>&lt;&lt; <span class="number">24</span>;
+        <span class="doccomment">/// Interrupt Remapping Enable Status
+        </span><span class="kw">const </span>IRES  = <span class="number">1 </span>&lt;&lt; <span class="number">25</span>;
+        <span class="doccomment">/// Queued Invalidation Enable Status
+        </span><span class="kw">const </span>QIES  = <span class="number">1 </span>&lt;&lt; <span class="number">26</span>;
+        <span class="doccomment">/// Write Buffer Flush Status
+        </span><span class="kw">const </span>WBFS  = <span class="number">1 </span>&lt;&lt; <span class="number">27</span>;
+        <span class="doccomment">/// Advanced Fault Logging Status
+        </span><span class="kw">const </span>AFLS  = <span class="number">1 </span>&lt;&lt; <span class="number">28</span>;
+        <span class="doccomment">/// Fault Log Status
+        </span><span class="kw">const </span>FLS   = <span class="number">1 </span>&lt;&lt; <span class="number">29</span>;
+        <span class="doccomment">/// Root Table Pointer Status
+        </span><span class="kw">const </span>RTPS  = <span class="number">1 </span>&lt;&lt; <span class="number">30</span>;
+        <span class="doccomment">/// Translation Enable Status
+        </span><span class="kw">const </span>TES   = <span class="number">1 </span>&lt;&lt; <span class="number">31</span>;
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="iommu" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="iommu" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

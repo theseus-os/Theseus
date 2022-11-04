@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/slabmalloc_safe/src/zone.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>zone.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../slabmalloc_safe/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../slabmalloc_safe/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../slabmalloc_safe/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/slabmalloc_safe/src/zone.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>zone.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../slabmalloc_safe/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -210,212 +204,211 @@
 <span id="204">204</span>
 <span id="205">205</span>
 <span id="206">206</span>
-</pre><pre class="rust"><code><span class="doccomment">//! A ZoneAllocator to allocate arbitrary object sizes (up to `ZoneAllocator::MAX_ALLOC_SIZE`)</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The ZoneAllocator achieves this by having many `SCAllocator`</span>
+</pre><pre class="rust"><code><span class="doccomment">//! A ZoneAllocator to allocate arbitrary object sizes (up to `ZoneAllocator::MAX_ALLOC_SIZE`)
+//!
+//! The ZoneAllocator achieves this by having many `SCAllocator`
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::sc</span>::<span class="kw-2">*</span>;
+</span><span class="kw">use crate</span>::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::sc::<span class="kw-2">*</span>;
 
-<span class="doccomment">/// Creates an instance of a zone, we do this in a macro because we</span>
-<span class="doccomment">/// re-use the code in const and non-const functions</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// We can get rid of this once the const fn feature is fully stabilized.</span>
-<span class="macro">macro_rules!</span> <span class="ident">new_zone</span> {
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">x</span>:<span class="ident">expr</span>) =&gt; {
-        <span class="ident">ZoneAllocator</span> {
-            <span class="ident">heap_id</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">x</span>,
-            <span class="comment">// TODO(perf): We should probably pick better classes</span>
-            <span class="comment">// rather than powers-of-two (see SuperMalloc etc.)</span>
-            <span class="ident">small_slabs</span>: [
-                <span class="ident">SCAllocator::new</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">3</span>),  <span class="comment">// 8</span>
-                <span class="ident">SCAllocator::new</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">4</span>),  <span class="comment">// 16</span>
-                <span class="ident">SCAllocator::new</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">5</span>),  <span class="comment">// 32</span>
-                <span class="ident">SCAllocator::new</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">6</span>),  <span class="comment">// 64</span>
-                <span class="ident">SCAllocator::new</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">7</span>),  <span class="comment">// 128</span>
-                <span class="ident">SCAllocator::new</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">8</span>),  <span class="comment">// 256</span>
-                <span class="ident">SCAllocator::new</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">9</span>),  <span class="comment">// 512</span>
-                <span class="ident">SCAllocator::new</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">10</span>), <span class="comment">// 1024 (TODO: maybe get rid of this class?)</span>
-                <span class="ident">SCAllocator::new</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">11</span>), <span class="comment">// 2048 (TODO: maybe get rid of this class?)</span>
-                <span class="ident">SCAllocator::new</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">12</span>), <span class="comment">// 4096 </span>
-                <span class="ident">SCAllocator::new</span>(<span class="ident">ZoneAllocator::MAX_ALLOC_SIZE</span>),    <span class="comment">//(can&#39;t do 8192 because of metadata in ObjectPage)</span>
-            ]
+<span class="doccomment">/// Creates an instance of a zone, we do this in a macro because we
+/// re-use the code in const and non-const functions
+///
+/// We can get rid of this once the const fn feature is fully stabilized.
+</span><span class="macro">macro_rules! </span>new_zone {
+    (<span class="macro-nonterminal">$x</span>:expr) =&gt; {
+        ZoneAllocator {
+            heap_id: <span class="macro-nonterminal">$x</span>,
+            <span class="comment">// TODO(perf): We should probably pick better classes
+            // rather than powers-of-two (see SuperMalloc etc.)
+            </span>small_slabs: [
+                SCAllocator::new(<span class="number">1 </span>&lt;&lt; <span class="number">3</span>),  <span class="comment">// 8
+                </span>SCAllocator::new(<span class="number">1 </span>&lt;&lt; <span class="number">4</span>),  <span class="comment">// 16
+                </span>SCAllocator::new(<span class="number">1 </span>&lt;&lt; <span class="number">5</span>),  <span class="comment">// 32
+                </span>SCAllocator::new(<span class="number">1 </span>&lt;&lt; <span class="number">6</span>),  <span class="comment">// 64
+                </span>SCAllocator::new(<span class="number">1 </span>&lt;&lt; <span class="number">7</span>),  <span class="comment">// 128
+                </span>SCAllocator::new(<span class="number">1 </span>&lt;&lt; <span class="number">8</span>),  <span class="comment">// 256
+                </span>SCAllocator::new(<span class="number">1 </span>&lt;&lt; <span class="number">9</span>),  <span class="comment">// 512
+                </span>SCAllocator::new(<span class="number">1 </span>&lt;&lt; <span class="number">10</span>), <span class="comment">// 1024 (TODO: maybe get rid of this class?)
+                </span>SCAllocator::new(<span class="number">1 </span>&lt;&lt; <span class="number">11</span>), <span class="comment">// 2048 (TODO: maybe get rid of this class?)
+                </span>SCAllocator::new(<span class="number">1 </span>&lt;&lt; <span class="number">12</span>), <span class="comment">// 4096 
+                </span>SCAllocator::new(ZoneAllocator::MAX_ALLOC_SIZE),    <span class="comment">//(can&#39;t do 8192 because of metadata in ObjectPage)
+            </span>]
         }
     };
 }
 
-<span class="doccomment">/// A zone allocator for arbitrary sized allocations.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Has a bunch of `SCAllocator` and through that can serve allocation</span>
-<span class="doccomment">/// requests for many different object sizes up to (MAX_SIZE_CLASSES) by selecting</span>
-<span class="doccomment">/// the right `SCAllocator` for allocation and deallocation.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The allocator provides the refill function `refill`</span>
-<span class="doccomment">/// to provide the underlying `SCAllocator` with memory.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ZoneAllocator</span> {
-    <span class="kw">pub</span> <span class="ident">heap_id</span>: <span class="ident">usize</span>,
-    <span class="ident">small_slabs</span>: [<span class="ident">SCAllocator</span>; <span class="ident">ZoneAllocator::MAX_BASE_SIZE_CLASSES</span>],
+<span class="doccomment">/// A zone allocator for arbitrary sized allocations.
+///
+/// Has a bunch of `SCAllocator` and through that can serve allocation
+/// requests for many different object sizes up to (MAX_SIZE_CLASSES) by selecting
+/// the right `SCAllocator` for allocation and deallocation.
+///
+/// The allocator provides the refill function `refill`
+/// to provide the underlying `SCAllocator` with memory.
+</span><span class="kw">pub struct </span>ZoneAllocator {
+    <span class="kw">pub </span>heap_id: usize,
+    small_slabs: [SCAllocator; ZoneAllocator::MAX_BASE_SIZE_CLASSES],
 }
 
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">ZoneAllocator</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="ident">ZoneAllocator</span> {
+<span class="kw">impl </span>Default <span class="kw">for </span>ZoneAllocator {
+    <span class="kw">fn </span>default() -&gt; ZoneAllocator {
         <span class="macro">new_zone!</span>(<span class="number">0</span>)
     }
 }
 
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="kw">enum</span> <span class="ident">Slab</span> {
-    <span class="ident">Base</span>(<span class="ident">usize</span>),
-    <span class="ident">Large</span>(<span class="ident">usize</span>),
-    <span class="ident">Unsupported</span>,
+<span class="attr">#[allow(dead_code)]
+</span><span class="kw">enum </span>Slab {
+    Base(usize),
+    Large(usize),
+    Unsupported,
 }
 
 
-<span class="kw">impl</span> <span class="ident">ZoneAllocator</span> {
-    <span class="doccomment">/// Maximum size that allocated within 2 pages. (8 KiB - metadata)</span>
-    <span class="doccomment">/// This is also the maximum object size that this allocator can handle.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MAX_ALLOC_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">MappedPages8k::SIZE</span> <span class="op">-</span> <span class="ident">MappedPages8k::METADATA_SIZE</span>;
+<span class="kw">impl </span>ZoneAllocator {
+    <span class="doccomment">/// Maximum size that allocated within 2 pages. (8 KiB - metadata)
+    /// This is also the maximum object size that this allocator can handle.
+    </span><span class="kw">pub const </span>MAX_ALLOC_SIZE: usize = MappedPages8k::SIZE - MappedPages8k::METADATA_SIZE;
 
-    <span class="doccomment">/// Maximum size which is allocated with ObjectPages8k (8 KiB).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// e.g. this is 8 KiB - bytes of meta-data.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MAX_BASE_ALLOC_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">ZoneAllocator::MAX_ALLOC_SIZE</span>;
+    <span class="doccomment">/// Maximum size which is allocated with ObjectPages8k (8 KiB).
+    ///
+    /// e.g. this is 8 KiB - bytes of meta-data.
+    </span><span class="kw">pub const </span>MAX_BASE_ALLOC_SIZE: usize = ZoneAllocator::MAX_ALLOC_SIZE;
 
-    <span class="doccomment">/// How many allocators of type SCAllocator we have.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MAX_BASE_SIZE_CLASSES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">11</span>;
+    <span class="doccomment">/// How many allocators of type SCAllocator we have.
+    </span><span class="kw">pub const </span>MAX_BASE_SIZE_CLASSES: usize = <span class="number">11</span>;
 
-    <span class="doccomment">/// The set of sizes the allocator has lists for.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BASE_ALLOC_SIZES</span>: [<span class="ident">usize</span>; <span class="ident">ZoneAllocator::MAX_BASE_SIZE_CLASSES</span>] <span class="op">=</span> [<span class="number">8</span>, <span class="number">16</span>, <span class="number">32</span>, <span class="number">64</span>, <span class="number">128</span>, <span class="number">256</span>, <span class="number">512</span>, <span class="number">1024</span>, <span class="number">2048</span>, <span class="number">4096</span>, <span class="ident">ZoneAllocator::MAX_BASE_ALLOC_SIZE</span>];
+    <span class="doccomment">/// The set of sizes the allocator has lists for.
+    </span><span class="kw">pub const </span>BASE_ALLOC_SIZES: [usize; ZoneAllocator::MAX_BASE_SIZE_CLASSES] = [<span class="number">8</span>, <span class="number">16</span>, <span class="number">32</span>, <span class="number">64</span>, <span class="number">128</span>, <span class="number">256</span>, <span class="number">512</span>, <span class="number">1024</span>, <span class="number">2048</span>, <span class="number">4096</span>, ZoneAllocator::MAX_BASE_ALLOC_SIZE];
 
-    <span class="doccomment">/// A slab must have greater than this number of empty pages to return one.</span>
-    <span class="kw">const</span> <span class="ident">SLAB_EMPTY_PAGES_THRESHOLD</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
+    <span class="doccomment">/// A slab must have greater than this number of empty pages to return one.
+    </span><span class="kw">const </span>SLAB_EMPTY_PAGES_THRESHOLD: usize = <span class="number">0</span>;
 
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">heap_id</span>: <span class="ident">usize</span>) -&gt; <span class="ident">ZoneAllocator</span> {
-        <span class="macro">new_zone!</span>(<span class="ident">heap_id</span>)
+    <span class="kw">pub fn </span>new(heap_id: usize) -&gt; ZoneAllocator {
+        <span class="macro">new_zone!</span>(heap_id)
     }
 
 
-    <span class="doccomment">/// Return maximum size an object of size `current_size` can use.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Used to optimize `realloc`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_max_size</span>(<span class="ident">current_size</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="ident">current_size</span> {
-            <span class="number">0</span>..<span class="op">=</span><span class="number">8</span> =&gt; <span class="prelude-val">Some</span>(<span class="number">8</span>),
-            <span class="number">9</span>..<span class="op">=</span><span class="number">16</span> =&gt; <span class="prelude-val">Some</span>(<span class="number">16</span>),
-            <span class="number">17</span>..<span class="op">=</span><span class="number">32</span> =&gt; <span class="prelude-val">Some</span>(<span class="number">32</span>),
-            <span class="number">33</span>..<span class="op">=</span><span class="number">64</span> =&gt; <span class="prelude-val">Some</span>(<span class="number">64</span>),
-            <span class="number">65</span>..<span class="op">=</span><span class="number">128</span> =&gt; <span class="prelude-val">Some</span>(<span class="number">128</span>),
-            <span class="number">129</span>..<span class="op">=</span><span class="number">256</span> =&gt; <span class="prelude-val">Some</span>(<span class="number">256</span>),
-            <span class="number">257</span>..<span class="op">=</span><span class="number">512</span> =&gt; <span class="prelude-val">Some</span>(<span class="number">512</span>),
-            <span class="number">513</span>..<span class="op">=</span><span class="number">1024</span> =&gt; <span class="prelude-val">Some</span>(<span class="number">1024</span>),
-            <span class="number">1025</span>..<span class="op">=</span><span class="number">2048</span> =&gt; <span class="prelude-val">Some</span>(<span class="number">2048</span>),
-            <span class="number">2049</span>..<span class="op">=</span><span class="number">4096</span> =&gt; <span class="prelude-val">Some</span>(<span class="number">4096</span>),
-            <span class="number">4097</span>..<span class="op">=</span><span class="ident">ZoneAllocator::MAX_ALLOC_SIZE</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">ZoneAllocator::MAX_ALLOC_SIZE</span>),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
+    <span class="doccomment">/// Return maximum size an object of size `current_size` can use.
+    ///
+    /// Used to optimize `realloc`.
+    </span><span class="kw">pub fn </span>get_max_size(current_size: usize) -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt; {
+        <span class="kw">match </span>current_size {
+            <span class="number">0</span>..=<span class="number">8 </span>=&gt; <span class="prelude-val">Some</span>(<span class="number">8</span>),
+            <span class="number">9</span>..=<span class="number">16 </span>=&gt; <span class="prelude-val">Some</span>(<span class="number">16</span>),
+            <span class="number">17</span>..=<span class="number">32 </span>=&gt; <span class="prelude-val">Some</span>(<span class="number">32</span>),
+            <span class="number">33</span>..=<span class="number">64 </span>=&gt; <span class="prelude-val">Some</span>(<span class="number">64</span>),
+            <span class="number">65</span>..=<span class="number">128 </span>=&gt; <span class="prelude-val">Some</span>(<span class="number">128</span>),
+            <span class="number">129</span>..=<span class="number">256 </span>=&gt; <span class="prelude-val">Some</span>(<span class="number">256</span>),
+            <span class="number">257</span>..=<span class="number">512 </span>=&gt; <span class="prelude-val">Some</span>(<span class="number">512</span>),
+            <span class="number">513</span>..=<span class="number">1024 </span>=&gt; <span class="prelude-val">Some</span>(<span class="number">1024</span>),
+            <span class="number">1025</span>..=<span class="number">2048 </span>=&gt; <span class="prelude-val">Some</span>(<span class="number">2048</span>),
+            <span class="number">2049</span>..=<span class="number">4096 </span>=&gt; <span class="prelude-val">Some</span>(<span class="number">4096</span>),
+            <span class="number">4097</span>..=ZoneAllocator::MAX_ALLOC_SIZE =&gt; <span class="prelude-val">Some</span>(ZoneAllocator::MAX_ALLOC_SIZE),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
         }
     }
 
-    <span class="doccomment">/// Figure out index into zone array to get the correct slab allocator for that size.</span>
-    <span class="kw">fn</span> <span class="ident">get_slab</span>(<span class="ident">requested_size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Slab</span> {
-        <span class="kw">match</span> <span class="ident">requested_size</span> {
-            <span class="number">0</span>..<span class="op">=</span><span class="number">8</span> =&gt; <span class="ident">Slab::Base</span>(<span class="number">0</span>),
-            <span class="number">9</span>..<span class="op">=</span><span class="number">16</span> =&gt; <span class="ident">Slab::Base</span>(<span class="number">1</span>),
-            <span class="number">17</span>..<span class="op">=</span><span class="number">32</span> =&gt; <span class="ident">Slab::Base</span>(<span class="number">2</span>),
-            <span class="number">33</span>..<span class="op">=</span><span class="number">64</span> =&gt; <span class="ident">Slab::Base</span>(<span class="number">3</span>),
-            <span class="number">65</span>..<span class="op">=</span><span class="number">128</span> =&gt; <span class="ident">Slab::Base</span>(<span class="number">4</span>),
-            <span class="number">129</span>..<span class="op">=</span><span class="number">256</span> =&gt; <span class="ident">Slab::Base</span>(<span class="number">5</span>),
-            <span class="number">257</span>..<span class="op">=</span><span class="number">512</span> =&gt; <span class="ident">Slab::Base</span>(<span class="number">6</span>),
-            <span class="number">513</span>..<span class="op">=</span><span class="number">1024</span> =&gt; <span class="ident">Slab::Base</span>(<span class="number">7</span>),
-            <span class="number">1025</span>..<span class="op">=</span><span class="number">2048</span> =&gt; <span class="ident">Slab::Base</span>(<span class="number">8</span>),
-            <span class="number">2049</span>..<span class="op">=</span><span class="number">4096</span> =&gt; <span class="ident">Slab::Base</span>(<span class="number">9</span>),
-            <span class="number">4097</span>..<span class="op">=</span><span class="ident">ZoneAllocator::MAX_ALLOC_SIZE</span> =&gt; <span class="ident">Slab::Base</span>(<span class="number">10</span>),
-            <span class="kw">_</span> =&gt; <span class="ident">Slab::Unsupported</span>,
+    <span class="doccomment">/// Figure out index into zone array to get the correct slab allocator for that size.
+    </span><span class="kw">fn </span>get_slab(requested_size: usize) -&gt; Slab {
+        <span class="kw">match </span>requested_size {
+            <span class="number">0</span>..=<span class="number">8 </span>=&gt; Slab::Base(<span class="number">0</span>),
+            <span class="number">9</span>..=<span class="number">16 </span>=&gt; Slab::Base(<span class="number">1</span>),
+            <span class="number">17</span>..=<span class="number">32 </span>=&gt; Slab::Base(<span class="number">2</span>),
+            <span class="number">33</span>..=<span class="number">64 </span>=&gt; Slab::Base(<span class="number">3</span>),
+            <span class="number">65</span>..=<span class="number">128 </span>=&gt; Slab::Base(<span class="number">4</span>),
+            <span class="number">129</span>..=<span class="number">256 </span>=&gt; Slab::Base(<span class="number">5</span>),
+            <span class="number">257</span>..=<span class="number">512 </span>=&gt; Slab::Base(<span class="number">6</span>),
+            <span class="number">513</span>..=<span class="number">1024 </span>=&gt; Slab::Base(<span class="number">7</span>),
+            <span class="number">1025</span>..=<span class="number">2048 </span>=&gt; Slab::Base(<span class="number">8</span>),
+            <span class="number">2049</span>..=<span class="number">4096 </span>=&gt; Slab::Base(<span class="number">9</span>),
+            <span class="number">4097</span>..=ZoneAllocator::MAX_ALLOC_SIZE =&gt; Slab::Base(<span class="number">10</span>),
+            <span class="kw">_ </span>=&gt; Slab::Unsupported,
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">ZoneAllocator</span> {
-    <span class="doccomment">/// Returns a MappedPages8k from the SCAllocator with the maximum number of empty pages,</span>
-    <span class="doccomment">/// if there are more empty pages than the threshold.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">retrieve_empty_page</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">heap_empty_page_threshold</span>: <span class="ident">usize</span>
-    ) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MappedPages8k</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">empty_pages</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">heap_empty_page_threshold</span> {
-            <span class="kw">return</span> <span class="prelude-val">None</span>;
+<span class="kw">impl </span>ZoneAllocator {
+    <span class="doccomment">/// Returns a MappedPages8k from the SCAllocator with the maximum number of empty pages,
+    /// if there are more empty pages than the threshold.
+    </span><span class="kw">pub fn </span>retrieve_empty_page(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        heap_empty_page_threshold: usize
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;MappedPages8k&gt; {
+        <span class="kw">if </span><span class="self">self</span>.empty_pages() &lt;= heap_empty_page_threshold {
+            <span class="kw">return </span><span class="prelude-val">None</span>;
         }
-        <span class="kw">else</span> {
-            <span class="kw">for</span> <span class="ident">slab</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">small_slabs</span>.<span class="ident">iter_mut</span>() {
-                <span class="kw">let</span> <span class="ident">empty_pages</span> <span class="op">=</span> <span class="ident">slab</span>.<span class="ident">empty_count</span>;
-                <span class="kw">if</span> <span class="ident">empty_pages</span> <span class="op">&gt;</span> <span class="ident">ZoneAllocator::SLAB_EMPTY_PAGES_THRESHOLD</span> {
-                    <span class="kw">return</span> <span class="ident">slab</span>.<span class="ident">retrieve_empty_page</span>()
+        <span class="kw">else </span>{
+            <span class="kw">for </span>slab <span class="kw">in </span><span class="self">self</span>.small_slabs.iter_mut() {
+                <span class="kw">let </span>empty_pages = slab.empty_count;
+                <span class="kw">if </span>empty_pages &gt; ZoneAllocator::SLAB_EMPTY_PAGES_THRESHOLD {
+                    <span class="kw">return </span>slab.retrieve_empty_page()
                 }
             }
         }
-        <span class="prelude-val">None</span>
-    }
+        <span class="prelude-val">None
+    </span>}
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">exchange_pages_within_heap</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">mp</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">retrieve_empty_page</span>(<span class="number">0</span>).<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find an empty page to exchange within the heap&quot;</span>)<span class="question-mark">?</span>;
-        <span class="self">self</span>.<span class="ident">refill</span>(<span class="ident">layout</span>, <span class="ident">mp</span>)
+    <span class="kw">pub fn </span>exchange_pages_within_heap(<span class="kw-2">&amp;mut </span><span class="self">self</span>, layout: Layout) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>mp = <span class="self">self</span>.retrieve_empty_page(<span class="number">0</span>).ok_or(<span class="string">&quot;Couldn&#39;t find an empty page to exchange within the heap&quot;</span>)<span class="question-mark">?</span>;
+        <span class="self">self</span>.refill(layout, mp)
     }  
 
-    <span class="doccomment">/// The total number of empty pages in this zone allocator</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">empty_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">empty_pages</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="kw">for</span> <span class="ident">sca</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">small_slabs</span> {
-            <span class="ident">empty_pages</span> <span class="op">+</span><span class="op">=</span> <span class="ident">sca</span>.<span class="ident">empty_count</span>;
+    <span class="doccomment">/// The total number of empty pages in this zone allocator
+    </span><span class="kw">pub fn </span>empty_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="kw">let </span><span class="kw-2">mut </span>empty_pages = <span class="number">0</span>;
+        <span class="kw">for </span>sca <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.small_slabs {
+            empty_pages += sca.empty_count;
         }
-        <span class="ident">empty_pages</span>
+        empty_pages
     }
 
-    <span class="doccomment">/// Allocate a pointer to a block of memory described by `layout`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">NonNull</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="ident">ZoneAllocator::get_slab</span>(<span class="ident">layout</span>.<span class="ident">size</span>()) {
-            <span class="ident">Slab::Base</span>(<span class="ident">idx</span>) =&gt; <span class="self">self</span>.<span class="ident">small_slabs</span>[<span class="ident">idx</span>].<span class="ident">allocate</span>(<span class="ident">layout</span>), 
-            <span class="ident">Slab::Large</span>(<span class="ident">_idx</span>) =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;AllocationError::InvalidLayout&quot;</span>),
-            <span class="ident">Slab::Unsupported</span> =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;AllocationError::InvalidLayout&quot;</span>),
-        }
-    }
-
-    <span class="doccomment">/// Deallocates a pointer to a block of memory, which was</span>
-    <span class="doccomment">/// previously allocated by `allocate`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">///  * `ptr` - Address of the memory location to free.</span>
-    <span class="doccomment">///  * `layout` - Memory layout of the block pointed to by `ptr`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// The caller must ensure that `ptr` argument is returned from [`Self::allocate()`]</span>
-    <span class="doccomment">/// and `layout` argument is correct.</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">deallocate</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">ptr</span>: <span class="ident">NonNull</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="ident">ZoneAllocator::get_slab</span>(<span class="ident">layout</span>.<span class="ident">size</span>()) {
-            <span class="ident">Slab::Base</span>(<span class="ident">idx</span>) =&gt; <span class="self">self</span>.<span class="ident">small_slabs</span>[<span class="ident">idx</span>].<span class="ident">deallocate</span>(<span class="ident">ptr</span>, <span class="ident">layout</span>),
-            <span class="ident">Slab::Large</span>(<span class="ident">_idx</span>) =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;AllocationError::InvalidLayout&quot;</span>),
-            <span class="ident">Slab::Unsupported</span> =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;AllocationError::InvalidLayout&quot;</span>),
+    <span class="doccomment">/// Allocate a pointer to a block of memory described by `layout`.
+    </span><span class="kw">pub fn </span>allocate(<span class="kw-2">&amp;mut </span><span class="self">self</span>, layout: Layout) -&gt; <span class="prelude-ty">Result</span>&lt;NonNull&lt;u8&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">match </span>ZoneAllocator::get_slab(layout.size()) {
+            Slab::Base(idx) =&gt; <span class="self">self</span>.small_slabs[idx].allocate(layout), 
+            Slab::Large(_idx) =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;AllocationError::InvalidLayout&quot;</span>),
+            Slab::Unsupported =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;AllocationError::InvalidLayout&quot;</span>),
         }
     }
 
-    <span class="doccomment">/// Refills the SCAllocator for a given Layout with a MappedPages8k.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// MappedPages should not be in use by any other heap.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">refill</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">layout</span>: <span class="ident">Layout</span>,
-        <span class="ident">mp</span>: <span class="ident">MappedPages8k</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="ident">ZoneAllocator::get_slab</span>(<span class="ident">layout</span>.<span class="ident">size</span>()) {
-            <span class="ident">Slab::Base</span>(<span class="ident">idx</span>) =&gt; {
-                <span class="self">self</span>.<span class="ident">small_slabs</span>[<span class="ident">idx</span>].<span class="ident">refill</span>(<span class="ident">mp</span>, <span class="self">self</span>.<span class="ident">heap_id</span>)
+    <span class="doccomment">/// Deallocates a pointer to a block of memory, which was
+    /// previously allocated by `allocate`.
+    ///
+    /// # Arguments
+    ///  * `ptr` - Address of the memory location to free.
+    ///  * `layout` - Memory layout of the block pointed to by `ptr`.
+    ///
+    /// # Safety
+    /// The caller must ensure that `ptr` argument is returned from [`Self::allocate()`]
+    /// and `layout` argument is correct.
+    </span><span class="kw">pub unsafe fn </span>deallocate(<span class="kw-2">&amp;mut </span><span class="self">self</span>, ptr: NonNull&lt;u8&gt;, layout: Layout) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">match </span>ZoneAllocator::get_slab(layout.size()) {
+            Slab::Base(idx) =&gt; <span class="self">self</span>.small_slabs[idx].deallocate(ptr, layout),
+            Slab::Large(_idx) =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;AllocationError::InvalidLayout&quot;</span>),
+            Slab::Unsupported =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;AllocationError::InvalidLayout&quot;</span>),
+        }
+    }
+
+    <span class="doccomment">/// Refills the SCAllocator for a given Layout with a MappedPages8k.
+    ///
+    /// # Safety
+    /// MappedPages should not be in use by any other heap.
+    </span><span class="kw">pub fn </span>refill(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        layout: Layout,
+        mp: MappedPages8k,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">match </span>ZoneAllocator::get_slab(layout.size()) {
+            Slab::Base(idx) =&gt; {
+                <span class="self">self</span>.small_slabs[idx].refill(mp, <span class="self">self</span>.heap_id)
             }
-            <span class="ident">Slab::Large</span>(<span class="ident">_idx</span>) =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;AllocationError::InvalidLayout&quot;</span>),
-            <span class="ident">Slab::Unsupported</span> =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;AllocationError::InvalidLayout&quot;</span>),
+            Slab::Large(_idx) =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;AllocationError::InvalidLayout&quot;</span>),
+            Slab::Unsupported =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;AllocationError::InvalidLayout&quot;</span>),
         }
     }
 }
 
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="slabmalloc_safe" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="slabmalloc_safe" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

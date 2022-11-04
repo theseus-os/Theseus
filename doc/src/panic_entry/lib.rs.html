@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/panic_entry/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../panic_entry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../panic_entry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../panic_entry/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/panic_entry/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../panic_entry/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -132,134 +126,133 @@
 <span id="126">126</span>
 <span id="127">127</span>
 <span id="128">128</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Provides the default entry points and lang items for panics and unwinding. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! These lang items are required by the Rust compiler. </span>
-<span class="doccomment">//! They should never be directly invoked by developers, only by the compiler. </span>
-<span class="doccomment">//! </span>
+</pre><pre class="rust"><code><span class="doccomment">//! Provides the default entry points and lang items for panics and unwinding. 
+//! 
+//! These lang items are required by the Rust compiler. 
+//! They should never be directly invoked by developers, only by the compiler. 
+//! 
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">alloc_error_handler</span>)]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">lang_items</span>)]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">panic_info_message</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(alloc_error_handler)]
+#![feature(lang_items)]
+#![feature(panic_info_message)]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">vga_buffer</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mod_mgmt</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">loadable</span>))]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">panic_wrapper</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">loadable</span>))]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">unwind</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>vga_buffer;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>mod_mgmt;
+<span class="attr">#[cfg(not(loadable))] </span><span class="kw">extern crate </span>panic_wrapper;
+<span class="attr">#[cfg(not(loadable))] </span><span class="kw">extern crate </span>unwind;
 
-<span class="kw">use</span> <span class="ident">core::panic::PanicInfo</span>;
+<span class="kw">use </span>core::panic::PanicInfo;
 
-<span class="doccomment">/// The singular entry point for a language-level panic.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// The Rust compiler will rename this to &quot;rust_begin_unwind&quot;.</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">test</span>))]</span>
-<span class="attribute">#[<span class="ident">panic_handler</span>]</span> <span class="comment">// same as:  #[lang = &quot;panic_impl&quot;]</span>
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-<span class="kw">fn</span> <span class="ident">panic_entry_point</span>(<span class="ident">info</span>: <span class="kw-2">&amp;</span><span class="ident">PanicInfo</span>) -&gt; <span class="op">!</span> {
-    <span class="comment">// Since a panic could occur before the memory subsystem is initialized,</span>
-    <span class="comment">// we must check before using alloc types or other functions that depend on the memory system (the heap).</span>
-    <span class="comment">// We can check that by seeing if the kernel mmi has been initialized.</span>
-    <span class="kw">let</span> <span class="ident">kernel_mmi_ref</span> <span class="op">=</span> <span class="ident">memory::get_kernel_mmi_ref</span>();  
-    <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">is_some</span>() {
-        <span class="comment">// proceed with calling the panic_wrapper, but don&#39;t shutdown with try_exit() if errors occur here</span>
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">loadable</span>))]</span> {
-            <span class="ident">panic_wrapper::panic_wrapper</span>(<span class="ident">info</span>)
+<span class="doccomment">/// The singular entry point for a language-level panic.
+/// 
+/// The Rust compiler will rename this to &quot;rust_begin_unwind&quot;.
+</span><span class="attr">#[cfg(not(test))]
+#[panic_handler] </span><span class="comment">// same as:  #[lang = &quot;panic_impl&quot;]
+</span><span class="attr">#[doc(hidden)]
+</span><span class="kw">fn </span>panic_entry_point(info: <span class="kw-2">&amp;</span>PanicInfo) -&gt; ! {
+    <span class="comment">// Since a panic could occur before the memory subsystem is initialized,
+    // we must check before using alloc types or other functions that depend on the memory system (the heap).
+    // We can check that by seeing if the kernel mmi has been initialized.
+    </span><span class="kw">let </span>kernel_mmi_ref = memory::get_kernel_mmi_ref();  
+    <span class="kw">let </span>res = <span class="kw">if </span>kernel_mmi_ref.is_some() {
+        <span class="comment">// proceed with calling the panic_wrapper, but don&#39;t shutdown with try_exit() if errors occur here
+        </span><span class="attr">#[cfg(not(loadable))] </span>{
+            panic_wrapper::panic_wrapper(info)
         }
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">loadable</span>)]</span> {
-            <span class="comment">// An internal function for calling the panic_wrapper, but returning errors along the way.</span>
-            <span class="comment">// We must make sure to not hold any locks when invoking the panic_wrapper function.</span>
-            <span class="kw">fn</span> <span class="ident">invoke_panic_wrapper</span>(<span class="ident">info</span>: <span class="kw-2">&amp;</span><span class="ident">PanicInfo</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-                <span class="kw">type</span> <span class="ident">PanicWrapperFunc</span> <span class="op">=</span> <span class="kw">fn</span>(<span class="kw-2">&amp;</span><span class="ident">PanicInfo</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>;
-                <span class="kw">const</span> <span class="ident">PANIC_WRAPPER_SYMBOL</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;panic_wrapper::panic_wrapper::&quot;</span>;
-                <span class="kw">let</span> <span class="ident">section</span> <span class="op">=</span> {
-                    <span class="ident">mod_mgmt::get_initial_kernel_namespace</span>()
-                        .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">namespace</span><span class="op">|</span> <span class="ident">namespace</span>.<span class="ident">get_symbol_starting_with</span>(<span class="ident">PANIC_WRAPPER_SYMBOL</span>).<span class="ident">upgrade</span>())
-                        .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t get single symbol matching \&quot;panic_wrapper::panic_wrapper::\&quot;&quot;</span>)<span class="question-mark">?</span>
-                };
-                <span class="kw">let</span> <span class="ident">func</span>: <span class="kw-2">&amp;</span><span class="ident">PanicWrapperFunc</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">section</span>.<span class="ident">as_func</span>() }<span class="question-mark">?</span>;
-                <span class="ident">func</span>(<span class="ident">info</span>)
+        <span class="attr">#[cfg(loadable)] </span>{
+            <span class="comment">// An internal function for calling the panic_wrapper, but returning errors along the way.
+            // We must make sure to not hold any locks when invoking the panic_wrapper function.
+            </span><span class="kw">fn </span>invoke_panic_wrapper(info: <span class="kw-2">&amp;</span>PanicInfo) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+                <span class="kw">type </span>PanicWrapperFunc = <span class="kw">fn</span>(<span class="kw-2">&amp;</span>PanicInfo) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
+                <span class="kw">const </span>PANIC_WRAPPER_SYMBOL: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;panic_wrapper::panic_wrapper::&quot;</span>;
+                <span class="kw">let </span>section = {
+                    mod_mgmt::get_initial_kernel_namespace()
+                        .and_then(|namespace| namespace.get_symbol_starting_with(PANIC_WRAPPER_SYMBOL).upgrade())
+                        .ok_or(<span class="string">&quot;Couldn&#39;t get single symbol matching \&quot;panic_wrapper::panic_wrapper::\&quot;&quot;</span>)<span class="question-mark">?
+                </span>};
+                <span class="kw">let </span>func: <span class="kw-2">&amp;</span>PanicWrapperFunc = <span class="kw">unsafe </span>{ section.as_func() }<span class="question-mark">?</span>;
+                func(info)
             }
 
-            <span class="comment">// call the above internal function</span>
-            <span class="ident">invoke_panic_wrapper</span>(<span class="ident">info</span>)
+            <span class="comment">// call the above internal function
+            </span>invoke_panic_wrapper(info)
         }
     }
-    <span class="kw">else</span> {
+    <span class="kw">else </span>{
         <span class="prelude-val">Err</span>(<span class="string">&quot;memory subsystem not yet initialized, cannot call panic_wrapper because it requires alloc types&quot;</span>)
     };
 
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">res</span> {
-        <span class="comment">// basic early panic printing with no dependencies</span>
-        <span class="macro">println_raw!</span>(<span class="string">&quot;\nPANIC: {}&quot;</span>, <span class="ident">info</span>);
-        <span class="macro">error!</span>(<span class="string">&quot;PANIC: {}&quot;</span>, <span class="ident">info</span>);
+    <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = res {
+        <span class="comment">// basic early panic printing with no dependencies
+        </span><span class="macro">println_raw!</span>(<span class="string">&quot;\nPANIC: {}&quot;</span>, info);
+        <span class="macro">error!</span>(<span class="string">&quot;PANIC: {}&quot;</span>, info);
     }
 
-    <span class="comment">// If we failed to handle the panic, there&#39;s not really much we can do about it,</span>
-    <span class="comment">// other than just let the thread spin endlessly (which doesn&#39;t hurt correctness but is inefficient). </span>
-    <span class="comment">// But in general, this task should be killed by the panic_wrapper, so it shouldn&#39;t reach this point.</span>
-    <span class="comment">// Only panics early on in the initialization process will get here, meaning that the OS will basically stop.</span>
-    <span class="kw">loop</span> { }
+    <span class="comment">// If we failed to handle the panic, there&#39;s not really much we can do about it,
+    // other than just let the thread spin endlessly (which doesn&#39;t hurt correctness but is inefficient). 
+    // But in general, this task should be killed by the panic_wrapper, so it shouldn&#39;t reach this point.
+    // Only panics early on in the initialization process will get here, meaning that the OS will basically stop.
+    </span><span class="kw">loop </span>{ }
 }
 
 
 
-<span class="doccomment">/// Typically this would be an entry point in the unwinding procedure, in which a stack frame is unwound. </span>
-<span class="doccomment">/// However, in Theseus we use our own unwinding flow which is simpler.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This function will always be renamed to &quot;rust_eh_personality&quot; no matter what function name we give it here.</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">test</span>))]</span>
-<span class="attribute">#[<span class="ident">lang</span> <span class="op">=</span> <span class="string">&quot;eh_personality&quot;</span>]</span>
-<span class="attribute">#[<span class="ident">no_mangle</span>]</span>
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-<span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">rust_eh_personality</span>() -&gt; <span class="op">!</span> {
+<span class="doccomment">/// Typically this would be an entry point in the unwinding procedure, in which a stack frame is unwound. 
+/// However, in Theseus we use our own unwinding flow which is simpler.
+/// 
+/// This function will always be renamed to &quot;rust_eh_personality&quot; no matter what function name we give it here.
+</span><span class="attr">#[cfg(not(test))]
+#[lang = <span class="string">&quot;eh_personality&quot;</span>]
+#[no_mangle]
+#[doc(hidden)]
+</span><span class="kw">extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>rust_eh_personality() -&gt; ! {
     <span class="macro">error!</span>(<span class="string">&quot;BUG: Theseus does not use rust_eh_personality. Why has it been invoked?&quot;</span>);
-    <span class="kw">loop</span> { }
+    <span class="kw">loop </span>{ }
 }
 
-<span class="doccomment">/// This function is automatically jumped to after each unwinding cleanup routine finishes executing,</span>
-<span class="doccomment">/// so it&#39;s basically the return address of every cleanup routine.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Just like the panic_entry_point() above, this is effectively just an entry point</span>
-<span class="doccomment">/// that invokes the real `unwind_resume()` function in the `unwind` crate, </span>
-<span class="doccomment">/// but does so dynamically in loadable mode.</span>
-<span class="attribute">#[<span class="ident">no_mangle</span>]</span>
-<span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">_Unwind_Resume</span>(<span class="ident">arg</span>: <span class="ident">usize</span>) -&gt; <span class="op">!</span> {
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">loadable</span>))]</span> {
-        <span class="ident">unwind::unwind_resume</span>(<span class="ident">arg</span>)
+<span class="doccomment">/// This function is automatically jumped to after each unwinding cleanup routine finishes executing,
+/// so it&#39;s basically the return address of every cleanup routine.
+///
+/// Just like the panic_entry_point() above, this is effectively just an entry point
+/// that invokes the real `unwind_resume()` function in the `unwind` crate, 
+/// but does so dynamically in loadable mode.
+</span><span class="attr">#[no_mangle]
+</span><span class="kw">extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>_Unwind_Resume(arg: usize) -&gt; ! {
+    <span class="attr">#[cfg(not(loadable))] </span>{
+        unwind::unwind_resume(arg)
     }
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">loadable</span>)]</span> {
-        <span class="comment">// An internal function for calling the real unwind_resume function, but returning errors along the way.</span>
-        <span class="comment">// We must make sure to not hold any locks when invoking the function.</span>
-        <span class="kw">fn</span> <span class="ident">invoke_unwind_resume</span>(<span class="ident">arg</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-            <span class="kw">type</span> <span class="ident">UnwindResumeFunc</span> <span class="op">=</span> <span class="kw">fn</span>(<span class="ident">usize</span>) -&gt; <span class="op">!</span>;
-            <span class="kw">const</span> <span class="ident">UNWIND_RESUME_SYMBOL</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;unwind::unwind_resume::&quot;</span>;
-            <span class="kw">let</span> <span class="ident">section</span> <span class="op">=</span> {
-                <span class="ident">mod_mgmt::get_initial_kernel_namespace</span>()
-                    .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">namespace</span><span class="op">|</span> <span class="ident">namespace</span>.<span class="ident">get_symbol_starting_with</span>(<span class="ident">UNWIND_RESUME_SYMBOL</span>).<span class="ident">upgrade</span>())
-                    .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t get single symbol matching \&quot;unwind::unwind_resume::\&quot;&quot;</span>)<span class="question-mark">?</span>
-            };
-            <span class="kw">let</span> <span class="ident">func</span>: <span class="kw-2">&amp;</span><span class="ident">UnwindResumeFunc</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">section</span>.<span class="ident">as_func</span>() }<span class="question-mark">?</span>;
-            <span class="ident">func</span>(<span class="ident">arg</span>)
+    <span class="attr">#[cfg(loadable)] </span>{
+        <span class="comment">// An internal function for calling the real unwind_resume function, but returning errors along the way.
+        // We must make sure to not hold any locks when invoking the function.
+        </span><span class="kw">fn </span>invoke_unwind_resume(arg: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+            <span class="kw">type </span>UnwindResumeFunc = <span class="kw">fn</span>(usize) -&gt; !;
+            <span class="kw">const </span>UNWIND_RESUME_SYMBOL: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;unwind::unwind_resume::&quot;</span>;
+            <span class="kw">let </span>section = {
+                mod_mgmt::get_initial_kernel_namespace()
+                    .and_then(|namespace| namespace.get_symbol_starting_with(UNWIND_RESUME_SYMBOL).upgrade())
+                    .ok_or(<span class="string">&quot;Couldn&#39;t get single symbol matching \&quot;unwind::unwind_resume::\&quot;&quot;</span>)<span class="question-mark">?
+            </span>};
+            <span class="kw">let </span>func: <span class="kw-2">&amp;</span>UnwindResumeFunc = <span class="kw">unsafe </span>{ section.as_func() }<span class="question-mark">?</span>;
+            func(arg)
         }
-        <span class="kw">match</span> <span class="ident">invoke_unwind_resume</span>(<span class="ident">arg</span>) {
+        <span class="kw">match </span>invoke_unwind_resume(arg) {
             <span class="prelude-val">Ok</span>(()) =&gt; <span class="macro">error!</span>(<span class="string">&quot;BUG: _Unwind_Resume: unexpectedly returned Ok(()) from unwind::unwind_resume()&quot;</span>),
-            <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; <span class="macro">error!</span>(<span class="string">&quot;_Unwind_Resume: failed to dynamically invoke unwind::unwind_resume! Error: {}&quot;</span>, <span class="ident">e</span>),
+            <span class="prelude-val">Err</span>(e) =&gt; <span class="macro">error!</span>(<span class="string">&quot;_Unwind_Resume: failed to dynamically invoke unwind::unwind_resume! Error: {}&quot;</span>, e),
         }
-        <span class="kw">loop</span> { }
+        <span class="kw">loop </span>{ }
     }
 }
 
-<span class="doccomment">/// This is the callback entry point that gets invoked when the heap allocator runs out of memory.</span>
-<span class="attribute">#[<span class="ident">alloc_error_handler</span>]</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">test</span>))]</span>
-<span class="kw">fn</span> <span class="ident">oom</span>(<span class="ident">_layout</span>: <span class="ident">core::alloc::Layout</span>) -&gt; <span class="op">!</span> {
-    <span class="macro">error!</span>(<span class="string">&quot;\n(oom) Out of Heap Memory! requested allocation: {:?}&quot;</span>, <span class="ident">_layout</span>);
-    <span class="macro">panic!</span>(<span class="string">&quot;\n(oom) Out of Heap Memory! requested allocation: {:?}&quot;</span>, <span class="ident">_layout</span>);
+<span class="doccomment">/// This is the callback entry point that gets invoked when the heap allocator runs out of memory.
+</span><span class="attr">#[alloc_error_handler]
+#[cfg(not(test))]
+</span><span class="kw">fn </span>oom(_layout: core::alloc::Layout) -&gt; ! {
+    <span class="macro">error!</span>(<span class="string">&quot;\n(oom) Out of Heap Memory! requested allocation: {:?}&quot;</span>, _layout);
+    <span class="macro">panic!</span>(<span class="string">&quot;\n(oom) Out of Heap Memory! requested allocation: {:?}&quot;</span>, _layout);
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="panic_entry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="panic_entry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/multiple_heaps/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../multiple_heaps/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../multiple_heaps/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../multiple_heaps/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/multiple_heaps/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../multiple_heaps/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -648,650 +642,649 @@
 <span id="642">642</span>
 <span id="643">643</span>
 <span id="644">644</span>
-</pre><pre class="rust"><code><span class="doccomment">//! An implementation of an allocator that uses multiple heaps. The heap that will be used on each allocation is determined by a key.</span>
-<span class="doccomment">//! Right now we use the apic id as the key, so that we have per-core heaps.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! The heaps are ZoneAllocators (given in the slabmalloc crate). Each ZoneAllocator maintains 11 separate &quot;slab allocators&quot; for sizes</span>
-<span class="doccomment">//! 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 and (8KiB - bytes of metadata) bytes. The maximum allocation size is given by `ZoneAllocator::MAX_ALLOC_SIZE`.</span>
-<span class="doccomment">//! The slab allocator maintains linked lists of allocable pages from which it allocates objects of the same size. </span>
-<span class="doccomment">//! The allocable pages are 8 KiB (`ObjectPage8k::SIZE`), and have metadata stored in the ending bytes (`ObjectPage8k::METADATA_SIZE`).</span>
-<span class="doccomment">//! The metadata includes a heap id, MappedPages object this allocable page belongs to, forward and back pointers to pages stored in a linked list and a</span>
-<span class="doccomment">//! bitmap to keep track of allocations. The maximum allocation size can change if the size of the objects in the metadata change. If that happens it will be automatically</span>
-<span class="doccomment">//! reflected in the constants `ZoneAllocator::MAX_ALLOC_SIZE` and `ObjectPage8k::METADATA_SIZE`</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Any memory request greater than maximum allocation size, a large allocation, is satisfied through a request for pages from the kernel.</span>
-<span class="doccomment">//! All other requests are satisfied through the per-core heaps.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! The per-core heap which will be used on allocation is determined by the cpu that the task is running on.</span>
-<span class="doccomment">//! On deallocation of a block, the heap id is retrieved from metadata at the end of the allocable page which contains the block.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! When a per-core heap runs out of memory, pages are first moved between the slab allocators of the per-core heap, then requested from other per-core heaps.</span>
-<span class="doccomment">//! If no empty pages are available within any of the per-core heaps, then more virtual pages are allocated from the range of virtual addresses dedicated to the heap</span>
-<span class="doccomment">//! [KERNEL_HEAP_START](../kernel_config/memory/constant.KERNEL_HEAP_START.html) and dynamically mapped to physical memory frames.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! An implementation of an allocator that uses multiple heaps. The heap that will be used on each allocation is determined by a key.
+//! Right now we use the apic id as the key, so that we have per-core heaps.
+//! 
+//! The heaps are ZoneAllocators (given in the slabmalloc crate). Each ZoneAllocator maintains 11 separate &quot;slab allocators&quot; for sizes
+//! 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 and (8KiB - bytes of metadata) bytes. The maximum allocation size is given by `ZoneAllocator::MAX_ALLOC_SIZE`.
+//! The slab allocator maintains linked lists of allocable pages from which it allocates objects of the same size. 
+//! The allocable pages are 8 KiB (`ObjectPage8k::SIZE`), and have metadata stored in the ending bytes (`ObjectPage8k::METADATA_SIZE`).
+//! The metadata includes a heap id, MappedPages object this allocable page belongs to, forward and back pointers to pages stored in a linked list and a
+//! bitmap to keep track of allocations. The maximum allocation size can change if the size of the objects in the metadata change. If that happens it will be automatically
+//! reflected in the constants `ZoneAllocator::MAX_ALLOC_SIZE` and `ObjectPage8k::METADATA_SIZE`
+//! 
+//! Any memory request greater than maximum allocation size, a large allocation, is satisfied through a request for pages from the kernel.
+//! All other requests are satisfied through the per-core heaps.
+//! 
+//! The per-core heap which will be used on allocation is determined by the cpu that the task is running on.
+//! On deallocation of a block, the heap id is retrieved from metadata at the end of the allocable page which contains the block.
+//! 
+//! When a per-core heap runs out of memory, pages are first moved between the slab allocators of the per-core heap, then requested from other per-core heaps.
+//! If no empty pages are available within any of the per-core heaps, then more virtual pages are allocated from the range of virtual addresses dedicated to the heap
+//! [KERNEL_HEAP_START](../kernel_config/memory/constant.KERNEL_HEAP_START.html) and dynamically mapped to physical memory frames.
 
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">allocator_api</span>)]</span>
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![feature(allocator_api)]
+#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>; 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">page_allocator</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">apic</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">heap</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">hashbrown</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">cfg_if</span>;
+</span><span class="kw">extern crate </span>irq_safety; 
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>page_allocator;
+<span class="kw">extern crate </span>kernel_config;
+<span class="kw">extern crate </span>apic;
+<span class="kw">extern crate </span>heap;
+<span class="kw">extern crate </span>hashbrown;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>cfg_if;
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">all</span>(<span class="ident">not</span>(<span class="ident">unsafe_heap</span>), <span class="ident">not</span>(<span class="ident">safe_heap</span>)))]</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">slabmalloc</span>;
+<span class="attr">#[cfg(all(not(unsafe_heap), not(safe_heap)))]
+</span><span class="kw">extern crate </span>slabmalloc;
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">unsafe_heap</span>)]</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">slabmalloc_unsafe</span>;
+<span class="attr">#[cfg(unsafe_heap)]
+</span><span class="kw">extern crate </span>slabmalloc_unsafe;
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">safe_heap</span>)]</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">slabmalloc_safe</span>;
+<span class="attr">#[cfg(safe_heap)]
+</span><span class="kw">extern crate </span>slabmalloc_safe;
 
-<span class="kw">use</span> <span class="ident">core::ptr::NonNull</span>;
-<span class="kw">use</span> <span class="ident">alloc::alloc</span>::{<span class="ident">GlobalAlloc</span>, <span class="ident">Layout</span>};
-<span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
-<span class="kw">use</span> <span class="ident">hashbrown::HashMap</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">MappedPages</span>, <span class="ident">VirtualAddress</span>, <span class="ident">get_kernel_mmi_ref</span>, <span class="ident">create_mapping</span>};
-<span class="kw">use</span> <span class="ident">kernel_config::memory</span>::{<span class="ident">PAGE_SIZE</span>, <span class="ident">KERNEL_HEAP_START</span>, <span class="ident">KERNEL_HEAP_INITIAL_SIZE</span>};
-<span class="kw">use</span> <span class="ident">core::ops::Deref</span>;
-<span class="kw">use</span> <span class="ident">core::ptr</span>;
-<span class="kw">use</span> <span class="ident">heap::HEAP_FLAGS</span>;
-<span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
-<span class="kw">use</span> <span class="ident">page_allocator</span>::{<span class="ident">DeferredAllocAction</span>, <span class="ident">allocate_pages_by_bytes_deferred</span>};
+<span class="kw">use </span>core::ptr::NonNull;
+<span class="kw">use </span>alloc::alloc::{GlobalAlloc, Layout};
+<span class="kw">use </span>alloc::boxed::Box;
+<span class="kw">use </span>hashbrown::HashMap;
+<span class="kw">use </span>memory::{MappedPages, VirtualAddress, get_kernel_mmi_ref, create_mapping};
+<span class="kw">use </span>kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
+<span class="kw">use </span>core::ops::Deref;
+<span class="kw">use </span>core::ptr;
+<span class="kw">use </span>heap::HEAP_FLAGS;
+<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>page_allocator::{DeferredAllocAction, allocate_pages_by_bytes_deferred};
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">all</span>(<span class="ident">not</span>(<span class="ident">unsafe_heap</span>), <span class="ident">not</span>(<span class="ident">safe_heap</span>)))]</span>
-<span class="kw">use</span> <span class="ident">slabmalloc</span>::{<span class="ident">ZoneAllocator</span>, <span class="ident">ObjectPage8k</span>, <span class="ident">AllocablePage</span>, <span class="ident">MappedPages8k</span>};
+<span class="attr">#[cfg(all(not(unsafe_heap), not(safe_heap)))]
+</span><span class="kw">use </span>slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage, MappedPages8k};
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">unsafe_heap</span>)]</span>
-<span class="kw">use</span> <span class="ident">slabmalloc_unsafe</span>::{<span class="ident">ZoneAllocator</span>, <span class="ident">ObjectPage8k</span>, <span class="ident">AllocablePage</span>};
+<span class="attr">#[cfg(unsafe_heap)]
+</span><span class="kw">use </span>slabmalloc_unsafe::{ZoneAllocator, ObjectPage8k, AllocablePage};
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">safe_heap</span>)]</span>
-<span class="kw">use</span> <span class="ident">slabmalloc_safe</span>::{<span class="ident">ZoneAllocator</span>, <span class="ident">ObjectPage8k</span>, <span class="ident">AllocablePage</span>, <span class="ident">MappedPages8k</span>};
+<span class="attr">#[cfg(safe_heap)]
+</span><span class="kw">use </span>slabmalloc_safe::{ZoneAllocator, ObjectPage8k, AllocablePage, MappedPages8k};
 
-<span class="doccomment">/// The size in bytes of each &quot;group&quot; or &quot;set&quot; of MappedPages objects that is allocated for each heap&#39;s slab.</span>
-<span class="doccomment">/// We curently work with 8KiB sets, such that the per-core heaps can allocate objects up to `ZoneAllocator::MAX_ALLOC_SIZE`.  </span>
-<span class="kw">const</span> <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">ObjectPage8k::SIZE</span>;
+<span class="doccomment">/// The size in bytes of each &quot;group&quot; or &quot;set&quot; of MappedPages objects that is allocated for each heap&#39;s slab.
+/// We curently work with 8KiB sets, such that the per-core heaps can allocate objects up to `ZoneAllocator::MAX_ALLOC_SIZE`.  
+</span><span class="kw">const </span>HEAP_MAPPED_PAGES_SIZE_IN_BYTES: usize = ObjectPage8k::SIZE;
 
-<span class="doccomment">/// The size in pages of each heap&#39;s page set, see `HEAP_MAPPED_PAGES_SIZE_IN_BYTES`.</span>
-<span class="kw">const</span> <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_PAGES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_BYTES</span> <span class="op">/</span> <span class="ident">PAGE_SIZE</span>;
+<span class="doccomment">/// The size in pages of each heap&#39;s page set, see `HEAP_MAPPED_PAGES_SIZE_IN_BYTES`.
+</span><span class="kw">const </span>HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = HEAP_MAPPED_PAGES_SIZE_IN_BYTES / PAGE_SIZE;
 
-<span class="doccomment">/// When an OOM error occurs, before allocating more memory from the OS, we first try to see if there are unused(empty) pages </span>
-<span class="doccomment">/// within the per-core heaps that can be moved to other heaps. To prevent any heap from completely running out of memory we </span>
-<span class="doccomment">/// set this threshold value. A heap must have greater than this number of empty mapped pages to return one for use by other heaps.</span>
-<span class="kw">const</span> <span class="ident">EMPTY_PAGES_THRESHOLD</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">ZoneAllocator::MAX_BASE_SIZE_CLASSES</span> <span class="op">*</span> <span class="number">2</span>;
+<span class="doccomment">/// When an OOM error occurs, before allocating more memory from the OS, we first try to see if there are unused(empty) pages 
+/// within the per-core heaps that can be moved to other heaps. To prevent any heap from completely running out of memory we 
+/// set this threshold value. A heap must have greater than this number of empty mapped pages to return one for use by other heaps.
+</span><span class="kw">const </span>EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * <span class="number">2</span>;
 
-<span class="doccomment">/// The number of pages each size class in the ZoneAllocator is initialized with. It is approximately 512 KiB.</span>
-<span class="kw">const</span> <span class="ident">PAGES_PER_SIZE_CLASS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">128</span>; <span class="comment">// was 24 </span>
+<span class="doccomment">/// The number of pages each size class in the ZoneAllocator is initialized with. It is approximately 512 KiB.
+</span><span class="kw">const </span>PAGES_PER_SIZE_CLASS: usize = <span class="number">128</span>; <span class="comment">// was 24 
 
-<span class="doccomment">/// Starting size of each per-core heap. </span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PER_CORE_HEAP_INITIAL_SIZE_PAGES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">ZoneAllocator::MAX_BASE_SIZE_CLASSES</span> <span class="op">*</span>  <span class="ident">PAGES_PER_SIZE_CLASS</span>;
+</span><span class="doccomment">/// Starting size of each per-core heap. 
+</span><span class="kw">pub const </span>PER_CORE_HEAP_INITIAL_SIZE_PAGES: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES *  PAGES_PER_SIZE_CLASS;
 
-<span class="doccomment">/// The number of heap page sets that are requested from the OS whenever the heap is grown.</span>
-<span class="doccomment">/// This should be minimum `2` in order to ensure that there is at least:</span>
-<span class="doccomment">/// * one empty page for the requested allocation, and</span>
-<span class="doccomment">/// * one empty page for the deferred allocations to occur. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Important Note</span>
-<span class="doccomment">/// The total size of heap objects allocated during/by the deferred alloc actions must be able to fit </span>
-<span class="doccomment">/// into the additional page(s) here, which is currently just one extra heap page set (currently 8KiB). </span>
-<span class="doccomment">/// Currently, each `DeferredAllocAction` creates 3 chunks, so that means that the current calculation is:</span>
-<span class="doccomment">/// `(3 * HEAP_GROWTH_AMOUNT * sizeof(Chunk)` bytes must fit within one 8KiB heap page set.</span>
-<span class="kw">const</span> <span class="ident">HEAP_GROWTH_AMOUNT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">2</span>;
+<span class="doccomment">/// The number of heap page sets that are requested from the OS whenever the heap is grown.
+/// This should be minimum `2` in order to ensure that there is at least:
+/// * one empty page for the requested allocation, and
+/// * one empty page for the deferred allocations to occur. 
+/// 
+/// # Important Note
+/// The total size of heap objects allocated during/by the deferred alloc actions must be able to fit 
+/// into the additional page(s) here, which is currently just one extra heap page set (currently 8KiB). 
+/// Currently, each `DeferredAllocAction` creates 3 chunks, so that means that the current calculation is:
+/// `(3 * HEAP_GROWTH_AMOUNT * sizeof(Chunk)` bytes must fit within one 8KiB heap page set.
+</span><span class="kw">const </span>HEAP_GROWTH_AMOUNT: usize = <span class="number">2</span>;
 
-<span class="doccomment">/// Creates and initializes the multiple heaps using the apic id as the key, which is mapped to a heap.</span>
-<span class="doccomment">/// If we want to change the value the heap id is based on, we would substitute </span>
-<span class="doccomment">/// the lapic iterator with an iterator containing the desired keys.</span>
-<span class="kw">fn</span> <span class="ident">initialize_multiple_heaps</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">MultipleHeaps</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">multiple_heaps</span> <span class="op">=</span> <span class="ident">MultipleHeaps::empty</span>();
+<span class="doccomment">/// Creates and initializes the multiple heaps using the apic id as the key, which is mapped to a heap.
+/// If we want to change the value the heap id is based on, we would substitute 
+/// the lapic iterator with an iterator containing the desired keys.
+</span><span class="kw">fn </span>initialize_multiple_heaps() -&gt; <span class="prelude-ty">Result</span>&lt;MultipleHeaps, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>multiple_heaps = MultipleHeaps::empty();
 
-    <span class="kw">for</span> (<span class="ident">apic_id</span>, <span class="ident">_lapic</span>) <span class="kw">in</span> <span class="ident">apic::get_lapics</span>().<span class="ident">iter</span>() {
-        <span class="ident">init_individual_heap</span>(<span class="kw-2">*</span><span class="ident">apic_id</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="kw-2">&amp;mut</span> <span class="ident">multiple_heaps</span>)<span class="question-mark">?</span>;
+    <span class="kw">for </span>(apic_id, _lapic) <span class="kw">in </span>apic::get_lapics().iter() {
+        init_individual_heap(<span class="kw-2">*</span>apic_id <span class="kw">as </span>usize, <span class="kw-2">&amp;mut </span>multiple_heaps)<span class="question-mark">?</span>;
     }
 
-    <span class="prelude-val">Ok</span>(<span class="ident">multiple_heaps</span>)       
+    <span class="prelude-val">Ok</span>(multiple_heaps)       
 }
 
 
-<span class="doccomment">/// The setup routine for multiple heaps. It creates and initializes the multiple heaps,</span>
-<span class="doccomment">/// then sets the multiple heaps as the default allocator.</span>
-<span class="doccomment">/// Only call this function when the multiple heaps are ready to be used.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">switch_to_multiple_heaps</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">multiple_heaps</span> <span class="op">=</span> <span class="ident">Box::new</span>(<span class="ident">initialize_multiple_heaps</span>()<span class="question-mark">?</span>);
-    <span class="comment">//set the multiple heaps as the default allocator</span>
-    <span class="ident">heap::set_allocator</span>(<span class="ident">multiple_heaps</span>);
+<span class="doccomment">/// The setup routine for multiple heaps. It creates and initializes the multiple heaps,
+/// then sets the multiple heaps as the default allocator.
+/// Only call this function when the multiple heaps are ready to be used.
+</span><span class="kw">pub fn </span>switch_to_multiple_heaps() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>multiple_heaps = Box::new(initialize_multiple_heaps()<span class="question-mark">?</span>);
+    <span class="comment">//set the multiple heaps as the default allocator
+    </span>heap::set_allocator(multiple_heaps);
 
     <span class="prelude-val">Ok</span>(())
 }
 
 
 
-<span class="doccomment">/// Allocates pages from the given starting address and maps them to frames.</span>
-<span class="doccomment">/// Returns the new mapped pages or an error if the heap memory limit is reached.</span>
-<span class="kw">fn</span> <span class="ident">create_heap_mapping</span>(
-    <span class="ident">starting_address</span>: <span class="ident">VirtualAddress</span>, 
-    <span class="ident">size_in_bytes</span>: <span class="ident">usize</span>
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">MappedPages</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">kernel_mmi_ref</span> <span class="op">=</span> <span class="ident">get_kernel_mmi_ref</span>().<span class="ident">ok_or</span>(<span class="string">&quot;create_heap_mapping(): KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> (<span class="ident">pages</span>, <span class="ident">action</span>) <span class="op">=</span> <span class="ident">allocate_pages_by_bytes_deferred</span>(<span class="prelude-val">Some</span>(<span class="ident">starting_address</span>), <span class="ident">size_in_bytes</span>)
-        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;create_heap_mapping(): failed to allocate pages at the starting address&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">if</span> <span class="ident">pages</span>.<span class="ident">start_address</span>().<span class="ident">value</span>() <span class="op">%</span> <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_BYTES</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;multiple_heaps: the allocated pages for the heap wasn&#39;t properly aligned&quot;</span>);
+<span class="doccomment">/// Allocates pages from the given starting address and maps them to frames.
+/// Returns the new mapped pages or an error if the heap memory limit is reached.
+</span><span class="kw">fn </span>create_heap_mapping(
+    starting_address: VirtualAddress, 
+    size_in_bytes: usize
+) -&gt; <span class="prelude-ty">Result</span>&lt;(MappedPages, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>kernel_mmi_ref = get_kernel_mmi_ref().ok_or(<span class="string">&quot;create_heap_mapping(): KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>(pages, action) = allocate_pages_by_bytes_deferred(<span class="prelude-val">Some</span>(starting_address), size_in_bytes)
+        .map_err(|_e| <span class="string">&quot;create_heap_mapping(): failed to allocate pages at the starting address&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">if </span>pages.start_address().value() % HEAP_MAPPED_PAGES_SIZE_IN_BYTES != <span class="number">0 </span>{
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;multiple_heaps: the allocated pages for the heap wasn&#39;t properly aligned&quot;</span>);
     }
-    <span class="kw">let</span> <span class="ident">mp</span> <span class="op">=</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>().<span class="ident">page_table</span>.<span class="ident">map_allocated_pages</span>(<span class="ident">pages</span>, <span class="ident">HEAP_FLAGS</span>)<span class="question-mark">?</span>;
-    <span class="comment">// trace!(&quot;Allocated heap pages at: {:#X}&quot;, starting_address);</span>
-    <span class="prelude-val">Ok</span>((<span class="ident">mp</span>, <span class="ident">action</span>))
+    <span class="kw">let </span>mp = kernel_mmi_ref.lock().page_table.map_allocated_pages(pages, HEAP_FLAGS)<span class="question-mark">?</span>;
+    <span class="comment">// trace!(&quot;Allocated heap pages at: {:#X}&quot;, starting_address);
+    </span><span class="prelude-val">Ok</span>((mp, action))
 }
 
 
-<span class="comment">// Initialization function for the heap differs depending on the slabmalloc version used.</span>
-<span class="comment">//</span>
-<span class="comment">// For the unsafe version, the new heap mapping is merged into the heap MappedPages object in the kernel mmi</span>
-<span class="comment">// and then a reference to the starting address is passed to the ZoneAllocator.</span>
-<span class="comment">//</span>
-<span class="comment">// For the default and safe versions, MappedPages8k objects are created from the new heap mapping and passed to the ZoneAllocator.</span>
-<span class="macro">cfg_if!</span> {
-<span class="kw">if</span> <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">unsafe_heap</span>)]</span> {
-    <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-    <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
+<span class="comment">// Initialization function for the heap differs depending on the slabmalloc version used.
+//
+// For the unsafe version, the new heap mapping is merged into the heap MappedPages object in the kernel mmi
+// and then a reference to the starting address is passed to the ZoneAllocator.
+//
+// For the default and safe versions, MappedPages8k objects are created from the new heap mapping and passed to the ZoneAllocator.
+</span><span class="macro">cfg_if! </span>{
+<span class="kw">if </span><span class="attr">#[cfg(unsafe_heap)] </span>{
+    <span class="kw">extern crate </span>alloc;
+    <span class="kw">extern crate </span>spin;
 
-    <span class="kw">use</span> <span class="ident">spin::Once</span>;
+    <span class="kw">use </span>spin::Once;
 
-    <span class="doccomment">/// Initializes the heap given by `key`.</span>
-    <span class="doccomment">/// There are 11 size classes in each heap ranging from [8,16,32,64 ..`ZoneAllocator::MAX_ALLOC_SIZE`].</span>
-    <span class="doccomment">/// We evenly distribute the pages allocated for each heap between the size classes. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_individual_heap</span>(<span class="ident">key</span>: <span class="ident">usize</span>, <span class="ident">multiple_heaps</span>: <span class="kw-2">&amp;mut</span> <span class="ident">MultipleHeaps</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Initializes the heap given by `key`.
+    /// There are 11 size classes in each heap ranging from [8,16,32,64 ..`ZoneAllocator::MAX_ALLOC_SIZE`].
+    /// We evenly distribute the pages allocated for each heap between the size classes. 
+    </span><span class="kw">pub fn </span>init_individual_heap(key: usize, multiple_heaps: <span class="kw-2">&amp;mut </span>MultipleHeaps) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap_end</span> <span class="op">=</span> <span class="ident">multiple_heaps</span>.<span class="ident">end</span>.<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap_end_addr</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">heap_end</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>heap_end = multiple_heaps.end.lock();
+        <span class="kw">let </span><span class="kw-2">mut </span>heap_end_addr = <span class="kw-2">*</span>heap_end;
 
-        <span class="kw">let</span> <span class="ident">mapped_pages_per_size_class</span> <span class="op">=</span> <span class="ident">PER_CORE_HEAP_INITIAL_SIZE_PAGES</span> <span class="op">/</span> (<span class="ident">ZoneAllocator::MAX_BASE_SIZE_CLASSES</span> <span class="op">*</span> <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_PAGES</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">zone_allocator</span> <span class="op">=</span> <span class="ident">ZoneAllocator::new</span>(<span class="ident">key</span>);
+        <span class="kw">let </span>mapped_pages_per_size_class = PER_CORE_HEAP_INITIAL_SIZE_PAGES / (ZoneAllocator::MAX_BASE_SIZE_CLASSES * HEAP_MAPPED_PAGES_SIZE_IN_PAGES);
+        <span class="kw">let </span><span class="kw-2">mut </span>zone_allocator = ZoneAllocator::new(key);
 
-        <span class="kw">let</span> <span class="ident">alloc_sizes</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">ZoneAllocator::BASE_ALLOC_SIZES</span>;
-        <span class="kw">for</span> <span class="ident">size</span> <span class="kw">in</span> <span class="ident">alloc_sizes</span> {
-            <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">mapped_pages_per_size_class</span> {
-                <span class="comment">// the alignment is equal to the size unless the size is not a multiple of 2</span>
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">alignment</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">size</span>;
-                <span class="kw">if</span> <span class="ident">alignment</span> <span class="op">==</span> <span class="ident">ZoneAllocator::MAX_BASE_ALLOC_SIZE</span> {
-                    <span class="ident">alignment</span> <span class="op">=</span> <span class="number">8</span>;
+        <span class="kw">let </span>alloc_sizes = <span class="kw-2">&amp;</span>ZoneAllocator::BASE_ALLOC_SIZES;
+        <span class="kw">for </span>size <span class="kw">in </span>alloc_sizes {
+            <span class="kw">for _ in </span><span class="number">0</span>..mapped_pages_per_size_class {
+                <span class="comment">// the alignment is equal to the size unless the size is not a multiple of 2
+                </span><span class="kw">let </span><span class="kw-2">mut </span>alignment = <span class="kw-2">*</span>size;
+                <span class="kw">if </span>alignment == ZoneAllocator::MAX_BASE_ALLOC_SIZE {
+                    alignment = <span class="number">8</span>;
                 }
-                <span class="kw">let</span> <span class="ident">layout</span> <span class="op">=</span> <span class="ident">Layout::from_size_align</span>(<span class="kw-2">*</span><span class="ident">size</span>, <span class="ident">alignment</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;Incorrect layout&quot;</span>)<span class="question-mark">?</span>;
+                <span class="kw">let </span>layout = Layout::from_size_align(<span class="kw-2">*</span>size, alignment).map_err(|_e| <span class="string">&quot;Incorrect layout&quot;</span>)<span class="question-mark">?</span>;
 
-                <span class="comment">// create the mapped pages starting from the previous end of the heap</span>
-                <span class="kw">let</span> (<span class="ident">mp</span>, <span class="ident">_action</span>) <span class="op">=</span> <span class="ident">create_heap_mapping</span>(<span class="ident">heap_end_addr</span>, <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_BYTES</span>)<span class="question-mark">?</span>;
+                <span class="comment">// create the mapped pages starting from the previous end of the heap
+                </span><span class="kw">let </span>(mp, _action) = create_heap_mapping(heap_end_addr, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)<span class="question-mark">?</span>;
 
-                <span class="kw">let</span> <span class="ident">start_addr</span> <span class="op">=</span> <span class="ident">mp</span>.<span class="ident">start_address</span>().<span class="ident">value</span>();
-                <span class="kw">if</span> <span class="ident">start_addr</span> <span class="op">%</span> <span class="ident">ObjectPage8k::SIZE</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;MappedPages allocated for heap are not aligned on an 8k boundary&quot;</span>);
+                <span class="kw">let </span>start_addr = mp.start_address().value();
+                <span class="kw">if </span>start_addr % ObjectPage8k::SIZE != <span class="number">0 </span>{
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;MappedPages allocated for heap are not aligned on an 8k boundary&quot;</span>);
                 }
-                <span class="ident">multiple_heaps</span>.<span class="ident">extend_heap_mp</span>(<span class="ident">mp</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">page</span> <span class="op">=</span> <span class="kw">unsafe</span>{ <span class="ident">core::mem::transmute</span>(<span class="ident">start_addr</span>) };
-                <span class="ident">zone_allocator</span>.<span class="ident">refill</span>(<span class="ident">layout</span>, <span class="ident">page</span>)<span class="question-mark">?</span>;
+                multiple_heaps.extend_heap_mp(mp)<span class="question-mark">?</span>;
+                <span class="kw">let </span>page = <span class="kw">unsafe</span>{ core::mem::transmute(start_addr) };
+                zone_allocator.refill(layout, page)<span class="question-mark">?</span>;
 
-                <span class="comment">// update the end address of the heap</span>
-                <span class="ident">heap_end_addr</span> <span class="op">+</span><span class="op">=</span> <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_BYTES</span>;
-                <span class="comment">// trace!(&quot;Added an object page {:#X} to slab of size {}&quot;, addr, sizes[slab]);</span>
-            }
+                <span class="comment">// update the end address of the heap
+                </span>heap_end_addr += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
+                <span class="comment">// trace!(&quot;Added an object page {:#X} to slab of size {}&quot;, addr, sizes[slab]);
+            </span>}
         }
 
-        <span class="comment">// store the new end of the heap after this core has been initialized</span>
-        <span class="kw-2">*</span><span class="ident">heap_end</span> <span class="op">=</span> <span class="ident">heap_end_addr</span>;
+        <span class="comment">// store the new end of the heap after this core has been initialized
+        </span><span class="kw-2">*</span>heap_end = heap_end_addr;
 
-        <span class="comment">// store the newly created allocator in the multiple heaps object</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">_heap</span>) <span class="op">=</span> <span class="ident">multiple_heaps</span>.<span class="ident">heaps</span>.<span class="ident">insert</span>(<span class="ident">key</span>, <span class="ident">LockedHeap</span>(<span class="ident">MutexIrqSafe::new</span>(<span class="ident">zone_allocator</span>))) {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;New heap created with a previously used id&quot;</span>);
+        <span class="comment">// store the newly created allocator in the multiple heaps object
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(_heap) = multiple_heaps.heaps.insert(key, LockedHeap(MutexIrqSafe::new(zone_allocator))) {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;New heap created with a previously used id&quot;</span>);
         }
-        <span class="macro">trace!</span>(<span class="string">&quot;Created heap {} with max alloc size: {} bytes&quot;</span>, <span class="ident">key</span>, <span class="ident">ZoneAllocator::MAX_ALLOC_SIZE</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;Created heap {} with max alloc size: {} bytes&quot;</span>, key, ZoneAllocator::MAX_ALLOC_SIZE);
 
         <span class="prelude-val">Ok</span>(())
     }
 
-} <span class="kw">else</span> {
-    <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
+} <span class="kw">else </span>{
+    <span class="kw">extern crate </span>alloc;
 
-    <span class="doccomment">/// Initializes the heap given by `key`.</span>
-    <span class="doccomment">/// There are 11 size classes in each heap ranging from [8,16,32,64 ..`ZoneAllocator::MAX_ALLOC_SIZE`].</span>
-    <span class="doccomment">/// We evenly distribute the pages allocated for each heap between the size classes. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_individual_heap</span>(<span class="ident">key</span>: <span class="ident">usize</span>, <span class="ident">multiple_heaps</span>: <span class="kw-2">&amp;mut</span> <span class="ident">MultipleHeaps</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Initializes the heap given by `key`.
+    /// There are 11 size classes in each heap ranging from [8,16,32,64 ..`ZoneAllocator::MAX_ALLOC_SIZE`].
+    /// We evenly distribute the pages allocated for each heap between the size classes. 
+    </span><span class="kw">pub fn </span>init_individual_heap(key: usize, multiple_heaps: <span class="kw-2">&amp;mut </span>MultipleHeaps) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap_end</span> <span class="op">=</span> <span class="ident">multiple_heaps</span>.<span class="ident">end</span>.<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap_end_addr</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">heap_end</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>heap_end = multiple_heaps.end.lock();
+        <span class="kw">let </span><span class="kw-2">mut </span>heap_end_addr = <span class="kw-2">*</span>heap_end;
 
-        <span class="kw">let</span> <span class="ident">mapped_pages_per_size_class</span> <span class="op">=</span> <span class="ident">PER_CORE_HEAP_INITIAL_SIZE_PAGES</span> <span class="op">/</span> (<span class="ident">ZoneAllocator::MAX_BASE_SIZE_CLASSES</span> <span class="op">*</span> <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_PAGES</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">zone_allocator</span> <span class="op">=</span> <span class="ident">ZoneAllocator::new</span>(<span class="ident">key</span>);
+        <span class="kw">let </span>mapped_pages_per_size_class = PER_CORE_HEAP_INITIAL_SIZE_PAGES / (ZoneAllocator::MAX_BASE_SIZE_CLASSES * HEAP_MAPPED_PAGES_SIZE_IN_PAGES);
+        <span class="kw">let </span><span class="kw-2">mut </span>zone_allocator = ZoneAllocator::new(key);
 
-        <span class="kw">let</span> <span class="ident">alloc_sizes</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">ZoneAllocator::BASE_ALLOC_SIZES</span>;
-        <span class="kw">for</span> <span class="ident">size</span> <span class="kw">in</span> <span class="ident">alloc_sizes</span> {
-            <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">mapped_pages_per_size_class</span> {
-                <span class="comment">// the alignment is equal to the size unless the size is not a multiple of 2</span>
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">alignment</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">size</span>;
-                <span class="kw">if</span> <span class="ident">alignment</span> <span class="op">==</span> <span class="ident">ZoneAllocator::MAX_BASE_ALLOC_SIZE</span> {
-                    <span class="ident">alignment</span> <span class="op">=</span> <span class="number">8</span>;
+        <span class="kw">let </span>alloc_sizes = <span class="kw-2">&amp;</span>ZoneAllocator::BASE_ALLOC_SIZES;
+        <span class="kw">for </span>size <span class="kw">in </span>alloc_sizes {
+            <span class="kw">for _ in </span><span class="number">0</span>..mapped_pages_per_size_class {
+                <span class="comment">// the alignment is equal to the size unless the size is not a multiple of 2
+                </span><span class="kw">let </span><span class="kw-2">mut </span>alignment = <span class="kw-2">*</span>size;
+                <span class="kw">if </span>alignment == ZoneAllocator::MAX_BASE_ALLOC_SIZE {
+                    alignment = <span class="number">8</span>;
                 }
-                <span class="kw">let</span> <span class="ident">layout</span> <span class="op">=</span> <span class="ident">Layout::from_size_align</span>(<span class="kw-2">*</span><span class="ident">size</span>, <span class="ident">alignment</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;Incorrect layout&quot;</span>)<span class="question-mark">?</span>;
+                <span class="kw">let </span>layout = Layout::from_size_align(<span class="kw-2">*</span>size, alignment).map_err(|_e| <span class="string">&quot;Incorrect layout&quot;</span>)<span class="question-mark">?</span>;
 
-                <span class="comment">// create the mapped pages starting from the previous end of the heap</span>
-                <span class="kw">let</span> (<span class="ident">mp</span>, <span class="ident">_action</span>) <span class="op">=</span> <span class="ident">create_heap_mapping</span>(<span class="ident">heap_end_addr</span>, <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_BYTES</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">mapping</span> <span class="op">=</span> <span class="ident">MappedPages8k::new</span>(<span class="ident">mp</span>)<span class="question-mark">?</span>;
-                <span class="comment">// add page to the allocator</span>
-                <span class="ident">zone_allocator</span>.<span class="ident">refill</span>(<span class="ident">layout</span>, <span class="ident">mapping</span>)<span class="question-mark">?</span>;
+                <span class="comment">// create the mapped pages starting from the previous end of the heap
+                </span><span class="kw">let </span>(mp, _action) = create_heap_mapping(heap_end_addr, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)<span class="question-mark">?</span>;
+                <span class="kw">let </span>mapping = MappedPages8k::new(mp)<span class="question-mark">?</span>;
+                <span class="comment">// add page to the allocator
+                </span>zone_allocator.refill(layout, mapping)<span class="question-mark">?</span>;
 
-                <span class="comment">// update the end address of the heap</span>
-                <span class="comment">// trace!(&quot;Added an object page {:#X} to slab of size {}&quot;, heap_end_addr, size);</span>
-                <span class="ident">heap_end_addr</span> <span class="op">+</span><span class="op">=</span> <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_BYTES</span>;
+                <span class="comment">// update the end address of the heap
+                // trace!(&quot;Added an object page {:#X} to slab of size {}&quot;, heap_end_addr, size);
+                </span>heap_end_addr += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
             }
         }
 
-        <span class="comment">// store the new end of the heap after this core has been initialized</span>
-        <span class="kw-2">*</span><span class="ident">heap_end</span> <span class="op">=</span> <span class="ident">heap_end_addr</span>;
+        <span class="comment">// store the new end of the heap after this core has been initialized
+        </span><span class="kw-2">*</span>heap_end = heap_end_addr;
 
-        <span class="comment">// store the newly created allocator in the multiple heaps object</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">_heap</span>) <span class="op">=</span> <span class="ident">multiple_heaps</span>.<span class="ident">heaps</span>.<span class="ident">insert</span>(<span class="ident">key</span>, <span class="ident">LockedHeap</span>(<span class="ident">MutexIrqSafe::new</span>(<span class="ident">zone_allocator</span>))) {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;New heap created with a previously used id&quot;</span>);
+        <span class="comment">// store the newly created allocator in the multiple heaps object
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(_heap) = multiple_heaps.heaps.insert(key, LockedHeap(MutexIrqSafe::new(zone_allocator))) {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;New heap created with a previously used id&quot;</span>);
         }
-        <span class="macro">trace!</span>(<span class="string">&quot;Created heap {} with max alloc size: {} bytes&quot;</span>, <span class="ident">key</span>, <span class="ident">ZoneAllocator::MAX_ALLOC_SIZE</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;Created heap {} with max alloc size: {} bytes&quot;</span>, key, ZoneAllocator::MAX_ALLOC_SIZE);
 
         <span class="prelude-val">Ok</span>(())
     }
 }
-} <span class="comment">// end cfg_if for initialization functions</span>
+} <span class="comment">// end cfg_if for initialization functions
 
 
-<span class="doccomment">/// Returns the key which determines the heap that will be used.</span>
-<span class="doccomment">/// Currently we use the apic id as the key, but we can replace it with some</span>
-<span class="doccomment">/// other value e.g. task id</span>
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span> 
-<span class="kw">fn</span> <span class="ident">get_key</span>() -&gt; <span class="ident">usize</span> {
-    <span class="ident">apic::get_my_apic_id</span>() <span class="kw">as</span> <span class="ident">usize</span>
+</span><span class="doccomment">/// Returns the key which determines the heap that will be used.
+/// Currently we use the apic id as the key, but we can replace it with some
+/// other value e.g. task id
+</span><span class="attr">#[inline(always)] 
+</span><span class="kw">fn </span>get_key() -&gt; usize {
+    apic::get_my_apic_id() <span class="kw">as </span>usize
 }
 
-<span class="comment">// The LockedHeap struct definition changes depending on the slabmalloc version used.</span>
-<span class="comment">// The safe version does not pass any lifetime parameter to the ZoneAllocator, while the unsafe and default versions do.</span>
-<span class="macro">cfg_if!</span> {
-<span class="kw">if</span> <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">safe_heap</span>)]</span> {
-    <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">align</span>(<span class="number">64</span>))]</span>
-    <span class="kw">struct</span> <span class="ident">LockedHeap</span> (<span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">ZoneAllocator</span><span class="op">&gt;</span>);
+<span class="comment">// The LockedHeap struct definition changes depending on the slabmalloc version used.
+// The safe version does not pass any lifetime parameter to the ZoneAllocator, while the unsafe and default versions do.
+</span><span class="macro">cfg_if! </span>{
+<span class="kw">if </span><span class="attr">#[cfg(safe_heap)] </span>{
+    <span class="attr">#[repr(align(<span class="number">64</span>))]
+    </span><span class="kw">struct </span>LockedHeap (MutexIrqSafe&lt;ZoneAllocator&gt;);
 
-    <span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">LockedHeap</span> {
-        <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">ZoneAllocator</span><span class="op">&gt;</span>;
-        <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">ZoneAllocator</span><span class="op">&gt;</span> {
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
-        }
+    <span class="kw">impl </span>Deref <span class="kw">for </span>LockedHeap {
+        <span class="kw">type </span>Target = MutexIrqSafe&lt;ZoneAllocator&gt;;
+        <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>MutexIrqSafe&lt;ZoneAllocator&gt; {
+            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
+        </span>}
     }
-} <span class="kw">else</span> {
-    <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">align</span>(<span class="number">64</span>))]</span>
-    <span class="kw">struct</span> <span class="ident">LockedHeap</span> (<span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">ZoneAllocator</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span><span class="op">&gt;</span>);
+} <span class="kw">else </span>{
+    <span class="attr">#[repr(align(<span class="number">64</span>))]
+    </span><span class="kw">struct </span>LockedHeap (MutexIrqSafe&lt;ZoneAllocator&lt;<span class="lifetime">&#39;static</span>&gt;&gt;);
 
-    <span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">LockedHeap</span> {
-        <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">ZoneAllocator</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span><span class="op">&gt;</span>;
-        <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">ZoneAllocator</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
-        }
+    <span class="kw">impl </span>Deref <span class="kw">for </span>LockedHeap {
+        <span class="kw">type </span>Target = MutexIrqSafe&lt;ZoneAllocator&lt;<span class="lifetime">&#39;static</span>&gt;&gt;;
+        <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>MutexIrqSafe&lt;ZoneAllocator&lt;<span class="lifetime">&#39;static</span>&gt;&gt; {
+            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
+        </span>}
     }
 }
-} <span class="comment">// end cfg_if for LockedHeap versions</span>
+} <span class="comment">// end cfg_if for LockedHeap versions
 
 
-<span class="doccomment">/// An allocator that contains multiple heaps. The heap that is used on each allocation is</span>
-<span class="doccomment">/// determined by a key. Currently the apic id is used as the key.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MultipleHeaps</span>{
-    <span class="doccomment">/// the per-core heaps</span>
-    <span class="ident">heaps</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">usize</span>,<span class="ident">LockedHeap</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Red-black tree to store large allocations</span>
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">unsafe_large_allocations</span>))]</span>    
-    <span class="ident">large_allocations</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">RBTree</span><span class="op">&lt;</span><span class="ident">LargeAllocationAdapter</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// We currently don&#39;t return memory back to the OS. Because of this all memory in the heap is contiguous</span>
-    <span class="doccomment">/// and extra memory for the heap is always allocated from the end.</span>
-    <span class="doccomment">/// The Mutex also serves the purpose of helping to synchronize new allocations.</span>
-    <span class="ident">end</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span>, 
-    <span class="doccomment">/// The mapped pages for the unsafe heap are stored here so that they are not dropped and unmapped.</span>
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">unsafe_heap</span>)]</span>    
-    <span class="ident">mp</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>
+</span><span class="doccomment">/// An allocator that contains multiple heaps. The heap that is used on each allocation is
+/// determined by a key. Currently the apic id is used as the key.
+</span><span class="kw">pub struct </span>MultipleHeaps{
+    <span class="doccomment">/// the per-core heaps
+    </span>heaps: HashMap&lt;usize,LockedHeap&gt;,
+    <span class="doccomment">/// Red-black tree to store large allocations
+    </span><span class="attr">#[cfg(not(unsafe_large_allocations))]    
+    </span>large_allocations: MutexIrqSafe&lt;RBTree&lt;LargeAllocationAdapter&gt;&gt;,
+    <span class="doccomment">/// We currently don&#39;t return memory back to the OS. Because of this all memory in the heap is contiguous
+    /// and extra memory for the heap is always allocated from the end.
+    /// The Mutex also serves the purpose of helping to synchronize new allocations.
+    </span>end: MutexIrqSafe&lt;VirtualAddress&gt;, 
+    <span class="doccomment">/// The mapped pages for the unsafe heap are stored here so that they are not dropped and unmapped.
+    </span><span class="attr">#[cfg(unsafe_heap)]    
+    </span>mp: Once&lt;MutexIrqSafe&lt;MappedPages&gt;&gt;
 }
 
-<span class="comment">// The grow_heap() function for the MultipleHeaps changes depending on the slabmalloc version used.</span>
-<span class="comment">//</span>
-<span class="comment">// In the default version, MappedPages8k objects are passed to the heap that needs to be grown.</span>
-<span class="comment">// In the unsafe version, the new heap mapping is merged into the heap MappedPages object in the kernel mmi</span>
-<span class="comment">// and then a reference to the starting address is passed to the heap that needs to be grown.</span>
-<span class="comment">// In the safe version, an Err is returned since the heap is statically sized.</span>
-<span class="macro">cfg_if!</span> {
-<span class="kw">if</span> <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">unsafe_heap</span>)]</span> {
-    <span class="kw">impl</span> <span class="ident">MultipleHeaps</span> {
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="ident">MultipleHeaps</span> {
-            <span class="ident">MultipleHeaps</span>{
-                <span class="ident">heaps</span>: <span class="ident">HashMap::new</span>(),
+<span class="comment">// The grow_heap() function for the MultipleHeaps changes depending on the slabmalloc version used.
+//
+// In the default version, MappedPages8k objects are passed to the heap that needs to be grown.
+// In the unsafe version, the new heap mapping is merged into the heap MappedPages object in the kernel mmi
+// and then a reference to the starting address is passed to the heap that needs to be grown.
+// In the safe version, an Err is returned since the heap is statically sized.
+</span><span class="macro">cfg_if! </span>{
+<span class="kw">if </span><span class="attr">#[cfg(unsafe_heap)] </span>{
+    <span class="kw">impl </span>MultipleHeaps {
+        <span class="kw">pub fn </span>empty() -&gt; MultipleHeaps {
+            MultipleHeaps{
+                heaps: HashMap::new(),
 
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">unsafe_large_allocations</span>))]</span>
-                <span class="ident">large_allocations</span>: <span class="ident">MutexIrqSafe::new</span>(<span class="ident">RBTree::new</span>(<span class="ident">LargeAllocationAdapter::new</span>())),
+                <span class="attr">#[cfg(not(unsafe_large_allocations))]
+                </span>large_allocations: MutexIrqSafe::new(RBTree::new(LargeAllocationAdapter::new())),
 
-                <span class="ident">end</span>: <span class="ident">MutexIrqSafe::new</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">KERNEL_HEAP_START</span> <span class="op">+</span> <span class="ident">KERNEL_HEAP_INITIAL_SIZE</span>)),
+                end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE)),
 
-                <span class="ident">mp</span>: <span class="ident">Once::new</span>()
+                mp: Once::new()
             }
         }
 
-        <span class="doccomment">/// Called when a call to allocate() returns a null pointer. The following steps are used to recover memory:</span>
-        <span class="doccomment">/// (1) Pages are first taken from another heap.</span>
-        <span class="doccomment">/// (2) If the above fails, then more pages are allocated from the OS.</span>
-        <span class="doccomment">/// </span>
-        <span class="doccomment">/// An Err is returned if there is no more memory to be allocated in the heap memory area.</span>
-        <span class="doccomment">/// </span>
-        <span class="doccomment">/// # Arguments</span>
-        <span class="doccomment">/// * `layout`: layout.size will determine which allocation size the retrieved pages will be used for. </span>
-        <span class="doccomment">/// * `heap_to_grow`: heap that needs to grow.</span>
-        <span class="kw">fn</span> <span class="ident">grow_heap</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>, <span class="ident">heap_to_grow</span>: <span class="kw-2">&amp;</span><span class="ident">LockedHeap</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-            <span class="comment">// (1) Try to retrieve a page from the another heap</span>
-            <span class="kw">for</span> <span class="ident">heap_ref</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">heaps</span>.<span class="ident">values</span>() {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">mp</span>, <span class="ident">_giving_heap_id</span>)) <span class="op">=</span> <span class="ident">heap_ref</span>.<span class="ident">try_lock</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="kw-2">mut</span> <span class="ident">giving_heap</span><span class="op">|</span> 
-                    <span class="ident">giving_heap</span>.<span class="ident">retrieve_empty_page</span>(<span class="ident">EMPTY_PAGES_THRESHOLD</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> (<span class="ident">mp</span>, <span class="ident">giving_heap</span>.<span class="ident">heap_id</span>))
+        <span class="doccomment">/// Called when a call to allocate() returns a null pointer. The following steps are used to recover memory:
+        /// (1) Pages are first taken from another heap.
+        /// (2) If the above fails, then more pages are allocated from the OS.
+        /// 
+        /// An Err is returned if there is no more memory to be allocated in the heap memory area.
+        /// 
+        /// # Arguments
+        /// * `layout`: layout.size will determine which allocation size the retrieved pages will be used for. 
+        /// * `heap_to_grow`: heap that needs to grow.
+        </span><span class="kw">fn </span>grow_heap(<span class="kw-2">&amp;</span><span class="self">self</span>, layout: Layout, heap_to_grow: <span class="kw-2">&amp;</span>LockedHeap) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+            <span class="comment">// (1) Try to retrieve a page from the another heap
+            </span><span class="kw">for </span>heap_ref <span class="kw">in </span><span class="self">self</span>.heaps.values() {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>((mp, _giving_heap_id)) = heap_ref.try_lock().and_then(|<span class="kw-2">mut </span>giving_heap| 
+                    giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD).map(|mp| (mp, giving_heap.heap_id))
                 ) {
-                    <span class="macro">info!</span>(<span class="string">&quot;Added page from another heap {} to heap {}&quot;</span>, <span class="ident">_giving_heap_id</span>, <span class="ident">heap_to_grow</span>.<span class="ident">lock</span>().<span class="ident">heap_id</span>);
-                    <span class="kw">return</span> <span class="ident">heap_to_grow</span>.<span class="ident">lock</span>().<span class="ident">refill</span>(<span class="ident">layout</span>, <span class="ident">mp</span>);
+                    <span class="macro">info!</span>(<span class="string">&quot;Added page from another heap {} to heap {}&quot;</span>, _giving_heap_id, heap_to_grow.lock().heap_id);
+                    <span class="kw">return </span>heap_to_grow.lock().refill(layout, mp);
                 }
             }
 
-            <span class="comment">// (2) Allocate page from the OS</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap_end</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span>.<span class="ident">lock</span>();
-            <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">HEAP_GROWTH_AMOUNT</span> {
-                <span class="kw">let</span> (<span class="ident">mp</span>, <span class="ident">_action</span>) <span class="op">=</span> <span class="ident">create_heap_mapping</span>(<span class="kw-2">*</span><span class="ident">heap_end</span>, <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_BYTES</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">start_addr</span> <span class="op">=</span> <span class="ident">mp</span>.<span class="ident">start_address</span>().<span class="ident">value</span>();
-                <span class="self">self</span>.<span class="ident">extend_heap_mp</span>(<span class="ident">mp</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">page</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">core::mem::transmute</span>(<span class="ident">start_addr</span>) };
+            <span class="comment">// (2) Allocate page from the OS
+            </span><span class="kw">let </span><span class="kw-2">mut </span>heap_end = <span class="self">self</span>.end.lock();
+            <span class="kw">for _ in </span><span class="number">0</span>..HEAP_GROWTH_AMOUNT {
+                <span class="kw">let </span>(mp, _action) = create_heap_mapping(<span class="kw-2">*</span>heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)<span class="question-mark">?</span>;
+                <span class="kw">let </span>start_addr = mp.start_address().value();
+                <span class="self">self</span>.extend_heap_mp(mp)<span class="question-mark">?</span>;
+                <span class="kw">let </span>page = <span class="kw">unsafe </span>{ core::mem::transmute(start_addr) };
                 <span class="macro">info!</span>(<span class="string">&quot;grow_heap:: Allocated page(s) at {:X?} to refill heap {} for layout size: {}, prior heap_end: {:#X}&quot;</span>, 
-                    <span class="ident">start_addr</span>, <span class="ident">heap_to_grow</span>.<span class="ident">lock</span>().<span class="ident">heap_id</span>, <span class="ident">layout</span>.<span class="ident">size</span>(), <span class="kw-2">*</span><span class="ident">heap_end</span>
+                    start_addr, heap_to_grow.lock().heap_id, layout.size(), <span class="kw-2">*</span>heap_end
                 );
-                <span class="kw-2">*</span><span class="ident">heap_end</span> <span class="op">+</span><span class="op">=</span> <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_BYTES</span>;
-                <span class="ident">heap_to_grow</span>.<span class="ident">lock</span>().<span class="ident">refill</span>(<span class="ident">layout</span>, <span class="ident">page</span>)<span class="question-mark">?</span>;
+                <span class="kw-2">*</span>heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
+                heap_to_grow.lock().refill(layout, page)<span class="question-mark">?</span>;
             }
             <span class="prelude-val">Ok</span>(())
         } 
 
-        <span class="doccomment">/// Merge mapped pages `mp` with the heap mapped pages.</span>
-        <span class="doccomment">/// </span>
-        <span class="doccomment">/// # Warning</span>
-        <span class="doccomment">/// The new mapped pages must start from the virtual address that the current heap mapped pages end at.</span>
-        <span class="kw">fn</span> <span class="ident">extend_heap_mp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mp</span>: <span class="ident">MappedPages</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">heap_mp</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">mp</span>.<span class="ident">get</span>() {
-                <span class="ident">heap_mp</span>.<span class="ident">lock</span>().<span class="ident">merge</span>(<span class="ident">mp</span>).<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">e</span>, <span class="ident">_mp</span>)<span class="op">|</span> <span class="ident">e</span>)<span class="question-mark">?</span>;
-            } <span class="kw">else</span> {
-                <span class="self">self</span>.<span class="ident">mp</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">mp</span>));
+        <span class="doccomment">/// Merge mapped pages `mp` with the heap mapped pages.
+        /// 
+        /// # Warning
+        /// The new mapped pages must start from the virtual address that the current heap mapped pages end at.
+        </span><span class="kw">fn </span>extend_heap_mp(<span class="kw-2">&amp;</span><span class="self">self</span>, mp: MappedPages) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(heap_mp) = <span class="self">self</span>.mp.get() {
+                heap_mp.lock().merge(mp).map_err(|(e, _mp)| e)<span class="question-mark">?</span>;
+            } <span class="kw">else </span>{
+                <span class="self">self</span>.mp.call_once(|| MutexIrqSafe::new(mp));
             }
             <span class="prelude-val">Ok</span>(())
         }
     }
-} <span class="kw">else</span> <span class="kw">if</span> <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">safe_heap</span>)]</span> {
-    <span class="kw">impl</span> <span class="ident">MultipleHeaps</span> {
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="ident">MultipleHeaps</span> {
-            <span class="ident">MultipleHeaps</span>{
-                <span class="ident">heaps</span>: <span class="ident">HashMap::new</span>(),
+} <span class="kw">else if </span><span class="attr">#[cfg(safe_heap)] </span>{
+    <span class="kw">impl </span>MultipleHeaps {
+        <span class="kw">pub fn </span>empty() -&gt; MultipleHeaps {
+            MultipleHeaps{
+                heaps: HashMap::new(),
 
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">unsafe_large_allocations</span>))]</span>
-                <span class="ident">large_allocations</span>: <span class="ident">MutexIrqSafe::new</span>(<span class="ident">RBTree::new</span>(<span class="ident">LargeAllocationAdapter::new</span>())),
+                <span class="attr">#[cfg(not(unsafe_large_allocations))]
+                </span>large_allocations: MutexIrqSafe::new(RBTree::new(LargeAllocationAdapter::new())),
 
-                <span class="ident">end</span>: <span class="ident">MutexIrqSafe::new</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">KERNEL_HEAP_START</span> <span class="op">+</span> <span class="ident">KERNEL_HEAP_INITIAL_SIZE</span>))
+                end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE))
             }
         }
 
-        <span class="doccomment">/// Called when a call to allocate() returns a null pointer. The following steps are used to recover memory:</span>
-        <span class="doccomment">/// (1) Pages are first taken from another heap.</span>
-        <span class="doccomment">/// (2) If the above fails, then more pages are allocated from the OS.</span>
-        <span class="doccomment">/// </span>
-        <span class="doccomment">/// An Err is returned if there is no more memory to be allocated in the heap memory area or if the heap page limit is reached.</span>
-        <span class="doccomment">/// </span>
-        <span class="doccomment">/// # Arguments</span>
-        <span class="doccomment">/// * `layout`: layout.size will determine which allocation size the retrieved pages will be used for. </span>
-        <span class="doccomment">/// * `heap_to_grow`: heap that needs to grow.</span>
-        <span class="kw">fn</span> <span class="ident">grow_heap</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>, <span class="ident">heap_to_grow</span>: <span class="kw-2">&amp;</span><span class="ident">LockedHeap</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-            <span class="comment">// (1) Try to retrieve a page from the another heap</span>
-            <span class="kw">for</span> <span class="ident">heap_ref</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">heaps</span>.<span class="ident">values</span>() {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">mp</span>, <span class="ident">_giving_heap_id</span>)) <span class="op">=</span> <span class="ident">heap_ref</span>.<span class="ident">try_lock</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="kw-2">mut</span> <span class="ident">giving_heap</span><span class="op">|</span> 
-                    <span class="ident">giving_heap</span>.<span class="ident">retrieve_empty_page</span>(<span class="ident">EMPTY_PAGES_THRESHOLD</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> (<span class="ident">mp</span>, <span class="ident">giving_heap</span>.<span class="ident">heap_id</span>))
+        <span class="doccomment">/// Called when a call to allocate() returns a null pointer. The following steps are used to recover memory:
+        /// (1) Pages are first taken from another heap.
+        /// (2) If the above fails, then more pages are allocated from the OS.
+        /// 
+        /// An Err is returned if there is no more memory to be allocated in the heap memory area or if the heap page limit is reached.
+        /// 
+        /// # Arguments
+        /// * `layout`: layout.size will determine which allocation size the retrieved pages will be used for. 
+        /// * `heap_to_grow`: heap that needs to grow.
+        </span><span class="kw">fn </span>grow_heap(<span class="kw-2">&amp;</span><span class="self">self</span>, layout: Layout, heap_to_grow: <span class="kw-2">&amp;</span>LockedHeap) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+            <span class="comment">// (1) Try to retrieve a page from the another heap
+            </span><span class="kw">for </span>heap_ref <span class="kw">in </span><span class="self">self</span>.heaps.values() {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>((mp, _giving_heap_id)) = heap_ref.try_lock().and_then(|<span class="kw-2">mut </span>giving_heap| 
+                    giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD).map(|mp| (mp, giving_heap.heap_id))
                 ) {
-                    <span class="macro">info!</span>(<span class="string">&quot;Added page from another heap {} to heap {}&quot;</span>, <span class="ident">_giving_heap_id</span>, <span class="ident">heap_to_grow</span>.<span class="ident">lock</span>().<span class="ident">heap_id</span>);
-                    <span class="kw">return</span> <span class="ident">heap_to_grow</span>.<span class="ident">lock</span>().<span class="ident">refill</span>(<span class="ident">layout</span>, <span class="ident">mp</span>);
+                    <span class="macro">info!</span>(<span class="string">&quot;Added page from another heap {} to heap {}&quot;</span>, _giving_heap_id, heap_to_grow.lock().heap_id);
+                    <span class="kw">return </span>heap_to_grow.lock().refill(layout, mp);
                 }
             }
 
-            <span class="comment">// (2) Allocate page from the OS</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap_end</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span>.<span class="ident">lock</span>();
-            <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">HEAP_GROWTH_AMOUNT</span> {
-                <span class="kw">let</span> (<span class="ident">mp</span>, <span class="ident">_action</span>) <span class="op">=</span> <span class="ident">create_heap_mapping</span>(<span class="kw-2">*</span><span class="ident">heap_end</span>, <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_BYTES</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">mp</span> <span class="op">=</span> <span class="ident">MappedPages8k::new</span>(<span class="ident">mp</span>)<span class="question-mark">?</span>;
+            <span class="comment">// (2) Allocate page from the OS
+            </span><span class="kw">let </span><span class="kw-2">mut </span>heap_end = <span class="self">self</span>.end.lock();
+            <span class="kw">for _ in </span><span class="number">0</span>..HEAP_GROWTH_AMOUNT {
+                <span class="kw">let </span>(mp, _action) = create_heap_mapping(<span class="kw-2">*</span>heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)<span class="question-mark">?</span>;
+                <span class="kw">let </span>mp = MappedPages8k::new(mp)<span class="question-mark">?</span>;
                 <span class="macro">info!</span>(<span class="string">&quot;grow_heap:: Allocated page(s) at {:X?} to refill heap {} for layout size: {}, prior heap_end: {:#X}&quot;</span>, 
-                    <span class="ident">mp</span>.<span class="ident">start_address</span>(), <span class="ident">heap_to_grow</span>.<span class="ident">lock</span>().<span class="ident">heap_id</span>, <span class="ident">layout</span>.<span class="ident">size</span>(), <span class="kw-2">*</span><span class="ident">heap_end</span>
+                    mp.start_address(), heap_to_grow.lock().heap_id, layout.size(), <span class="kw-2">*</span>heap_end
                 );
-                <span class="kw-2">*</span><span class="ident">heap_end</span> <span class="op">+</span><span class="op">=</span> <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_BYTES</span>;
-                <span class="ident">heap_to_grow</span>.<span class="ident">lock</span>().<span class="ident">refill</span>(<span class="ident">layout</span>, <span class="ident">mp</span>)<span class="question-mark">?</span>;
+                <span class="kw-2">*</span>heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
+                heap_to_grow.lock().refill(layout, mp)<span class="question-mark">?</span>;
             }
             <span class="prelude-val">Ok</span>(())
         }  
     }
 
-} <span class="kw">else</span> {
-    <span class="kw">impl</span> <span class="ident">MultipleHeaps</span> {
-        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="ident">MultipleHeaps</span> {
-            <span class="ident">MultipleHeaps</span>{
-                <span class="ident">heaps</span>: <span class="ident">HashMap::new</span>(),
+} <span class="kw">else </span>{
+    <span class="kw">impl </span>MultipleHeaps {
+        <span class="kw">pub fn </span>empty() -&gt; MultipleHeaps {
+            MultipleHeaps{
+                heaps: HashMap::new(),
 
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">unsafe_large_allocations</span>))]</span>
-                <span class="ident">large_allocations</span>: <span class="ident">MutexIrqSafe::new</span>(<span class="ident">RBTree::new</span>(<span class="ident">LargeAllocationAdapter::new</span>())),
+                <span class="attr">#[cfg(not(unsafe_large_allocations))]
+                </span>large_allocations: MutexIrqSafe::new(RBTree::new(LargeAllocationAdapter::new())),
 
-                <span class="ident">end</span>: <span class="ident">MutexIrqSafe::new</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">KERNEL_HEAP_START</span> <span class="op">+</span> <span class="ident">KERNEL_HEAP_INITIAL_SIZE</span>))
+                end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE))
             }
         }
 
-        <span class="doccomment">/// Called when a call to allocate() returns a null pointer. The following steps are used to recover memory:</span>
-        <span class="doccomment">/// (1) Pages are first taken from another heap.</span>
-        <span class="doccomment">/// (2) If the above fails, then more pages are allocated from the OS.</span>
-        <span class="doccomment">/// </span>
-        <span class="doccomment">/// An Err is returned if there is no more memory to be allocated in the heap memory area.</span>
-        <span class="doccomment">/// </span>
-        <span class="doccomment">/// # Arguments</span>
-        <span class="doccomment">/// * `layout`: layout.size will determine which allocation size the retrieved pages will be used for. </span>
-        <span class="doccomment">/// * `heap_to_grow`: heap that needs to grow.</span>
-        <span class="kw">fn</span> <span class="ident">grow_heap</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>, <span class="ident">heap_to_grow</span>: <span class="kw-2">&amp;</span><span class="ident">LockedHeap</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-            <span class="comment">// (1) Try to retrieve a page from the another heap</span>
-            <span class="kw">for</span> <span class="ident">heap_ref</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">heaps</span>.<span class="ident">values</span>() {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">mp</span>, <span class="ident">_giving_heap_id</span>)) <span class="op">=</span> <span class="ident">heap_ref</span>.<span class="ident">try_lock</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="kw-2">mut</span> <span class="ident">giving_heap</span><span class="op">|</span> 
-                    <span class="ident">giving_heap</span>.<span class="ident">retrieve_empty_page</span>(<span class="ident">EMPTY_PAGES_THRESHOLD</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> (<span class="ident">mp</span>, <span class="ident">giving_heap</span>.<span class="ident">heap_id</span>))
+        <span class="doccomment">/// Called when a call to allocate() returns a null pointer. The following steps are used to recover memory:
+        /// (1) Pages are first taken from another heap.
+        /// (2) If the above fails, then more pages are allocated from the OS.
+        /// 
+        /// An Err is returned if there is no more memory to be allocated in the heap memory area.
+        /// 
+        /// # Arguments
+        /// * `layout`: layout.size will determine which allocation size the retrieved pages will be used for. 
+        /// * `heap_to_grow`: heap that needs to grow.
+        </span><span class="kw">fn </span>grow_heap(<span class="kw-2">&amp;</span><span class="self">self</span>, layout: Layout, heap_to_grow: <span class="kw-2">&amp;</span>LockedHeap) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+            <span class="comment">// (1) Try to retrieve a page from the another heap
+            </span><span class="kw">for </span>heap_ref <span class="kw">in </span><span class="self">self</span>.heaps.values() {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>((mp, _giving_heap_id)) = heap_ref.try_lock().and_then(|<span class="kw-2">mut </span>giving_heap| 
+                    giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD).map(|mp| (mp, giving_heap.heap_id))
                 ) {
-                    <span class="macro">info!</span>(<span class="string">&quot;Added page from another heap {} to heap {}&quot;</span>, <span class="ident">_giving_heap_id</span>, <span class="ident">heap_to_grow</span>.<span class="ident">lock</span>().<span class="ident">heap_id</span>);
-                    <span class="kw">return</span> <span class="ident">heap_to_grow</span>.<span class="ident">lock</span>().<span class="ident">refill</span>(<span class="ident">layout</span>, <span class="ident">mp</span>);
+                    <span class="macro">info!</span>(<span class="string">&quot;Added page from another heap {} to heap {}&quot;</span>, _giving_heap_id, heap_to_grow.lock().heap_id);
+                    <span class="kw">return </span>heap_to_grow.lock().refill(layout, mp);
                 }
             }
 
-            <span class="comment">// (2) Allocate page from the OS</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap_end</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">end</span>.<span class="ident">lock</span>();
-            <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">HEAP_GROWTH_AMOUNT</span> {
-                <span class="kw">let</span> (<span class="ident">mp</span>, <span class="ident">_action</span>) <span class="op">=</span> <span class="ident">create_heap_mapping</span>(<span class="kw-2">*</span><span class="ident">heap_end</span>, <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_BYTES</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">mp</span> <span class="op">=</span> <span class="ident">MappedPages8k::new</span>(<span class="ident">mp</span>)<span class="question-mark">?</span>;
+            <span class="comment">// (2) Allocate page from the OS
+            </span><span class="kw">let </span><span class="kw-2">mut </span>heap_end = <span class="self">self</span>.end.lock();
+            <span class="kw">for _ in </span><span class="number">0</span>..HEAP_GROWTH_AMOUNT {
+                <span class="kw">let </span>(mp, _action) = create_heap_mapping(<span class="kw-2">*</span>heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)<span class="question-mark">?</span>;
+                <span class="kw">let </span>mp = MappedPages8k::new(mp)<span class="question-mark">?</span>;
                 <span class="macro">info!</span>(<span class="string">&quot;grow_heap:: Allocated page(s) at {:X?} to refill heap {} for layout size: {}, prior heap_end: {:#X}&quot;</span>, 
-                    <span class="ident">mp</span>.<span class="ident">start_address</span>(), <span class="ident">heap_to_grow</span>.<span class="ident">lock</span>().<span class="ident">heap_id</span>, <span class="ident">layout</span>.<span class="ident">size</span>(), <span class="kw-2">*</span><span class="ident">heap_end</span>
+                    mp.start_address(), heap_to_grow.lock().heap_id, layout.size(), <span class="kw-2">*</span>heap_end
                 );
-                <span class="kw-2">*</span><span class="ident">heap_end</span> <span class="op">+</span><span class="op">=</span> <span class="ident">HEAP_MAPPED_PAGES_SIZE_IN_BYTES</span>;
-                <span class="ident">heap_to_grow</span>.<span class="ident">lock</span>().<span class="ident">refill</span>(<span class="ident">layout</span>, <span class="ident">mp</span>)<span class="question-mark">?</span>;
+                <span class="kw-2">*</span>heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
+                heap_to_grow.lock().refill(layout, mp)<span class="question-mark">?</span>;
             }
             <span class="prelude-val">Ok</span>(())
         }  
     }
 }
-} <span class="comment">// end cfg_if for MultipleHeaps impl</span>
+} <span class="comment">// end cfg_if for MultipleHeaps impl
 
 
-<span class="kw">unsafe</span> <span class="kw">impl</span> <span class="ident">GlobalAlloc</span> <span class="kw">for</span> <span class="ident">MultipleHeaps</span> {
+</span><span class="kw">unsafe impl </span>GlobalAlloc <span class="kw">for </span>MultipleHeaps {
 
-    <span class="doccomment">/// Allocates the given `layout` from the heap of the core the task is currently running on.</span>
-    <span class="doccomment">/// If the per-core heap is not initialized, then an error is returned.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">alloc</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) -&gt; <span class="kw-2">*mut</span> <span class="ident">u8</span> {
-        <span class="comment">// allocate a large object by directly obtaining mapped pages from the OS</span>
-        <span class="kw">if</span> <span class="ident">layout</span>.<span class="ident">size</span>() <span class="op">&gt;</span> <span class="ident">ZoneAllocator::MAX_ALLOC_SIZE</span> {
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">unsafe_large_allocations</span>))]</span>
-            <span class="kw">return</span> <span class="ident">allocate_large_object</span>(
-                <span class="ident">layout</span>, 
-                <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">large_allocations</span>.<span class="ident">lock</span>()
+    <span class="doccomment">/// Allocates the given `layout` from the heap of the core the task is currently running on.
+    /// If the per-core heap is not initialized, then an error is returned.
+    </span><span class="kw">unsafe fn </span>alloc(<span class="kw-2">&amp;</span><span class="self">self</span>, layout: Layout) -&gt; <span class="kw-2">*mut </span>u8 {
+        <span class="comment">// allocate a large object by directly obtaining mapped pages from the OS
+        </span><span class="kw">if </span>layout.size() &gt; ZoneAllocator::MAX_ALLOC_SIZE {
+            <span class="attr">#[cfg(not(unsafe_large_allocations))]
+            </span><span class="kw">return </span>allocate_large_object(
+                layout, 
+                <span class="kw-2">&amp;mut </span><span class="self">self</span>.large_allocations.lock()
             );
 
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">unsafe_large_allocations</span>)]</span>
-            <span class="kw">return</span> <span class="ident">allocate_large_object</span>(<span class="ident">layout</span>);
+            <span class="attr">#[cfg(unsafe_large_allocations)]
+            </span><span class="kw">return </span>allocate_large_object(layout);
         }
 
-        <span class="comment">// For regular-sized allocations, we first try to allocated from &quot;our&quot; heap, </span>
-        <span class="comment">// which is currently the per-core heap for the current CPU core. </span>
-        <span class="kw">let</span> <span class="ident">our_heap</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">heaps</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">get_key</span>()).<span class="ident">expect</span>(<span class="string">&quot;Multiple Heaps: heap is not initialized!&quot;</span>);
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">ptr</span>) <span class="op">=</span> { <span class="ident">our_heap</span>.<span class="ident">lock</span>().<span class="ident">allocate</span>(<span class="ident">layout</span>) } {
-            <span class="kw">return</span> <span class="ident">ptr</span>.<span class="ident">as_ptr</span>();
+        <span class="comment">// For regular-sized allocations, we first try to allocated from &quot;our&quot; heap, 
+        // which is currently the per-core heap for the current CPU core. 
+        </span><span class="kw">let </span>our_heap = <span class="self">self</span>.heaps.get(<span class="kw-2">&amp;</span>get_key()).expect(<span class="string">&quot;Multiple Heaps: heap is not initialized!&quot;</span>);
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(ptr) = { our_heap.lock().allocate(layout) } {
+            <span class="kw">return </span>ptr.as_ptr();
         };
-        <span class="comment">// If it fails the first time, we try to grow the heap and then try again. </span>
-        <span class="comment">// We must not hold any heap locks while doing so, since growing the heap may result in</span>
-        <span class="comment">// additional heap allocation by virtue of allocating more pages. </span>
-        <span class="self">self</span>.<span class="ident">grow_heap</span>(<span class="ident">layout</span>, <span class="ident">our_heap</span>)
-            .<span class="ident">and_then</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">our_heap</span>.<span class="ident">lock</span>().<span class="ident">allocate</span>(<span class="ident">layout</span>))    <span class="comment">// try again</span>
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">nn</span><span class="op">|</span> <span class="ident">nn</span>.<span class="ident">as_ptr</span>())                             <span class="comment">// convert to raw ptr</span>
-            .<span class="ident">unwrap_or</span>(<span class="ident">ptr::null_mut</span>())
+        <span class="comment">// If it fails the first time, we try to grow the heap and then try again. 
+        // We must not hold any heap locks while doing so, since growing the heap may result in
+        // additional heap allocation by virtue of allocating more pages. 
+        </span><span class="self">self</span>.grow_heap(layout, our_heap)
+            .and_then(|<span class="kw">_</span>| our_heap.lock().allocate(layout))    <span class="comment">// try again
+            </span>.map(|nn| nn.as_ptr())                             <span class="comment">// convert to raw ptr
+            </span>.unwrap_or(ptr::null_mut())
     }
 
-    <span class="doccomment">/// Deallocates the memory at the address given by `ptr`.</span>
-    <span class="doccomment">/// Memory is returned to the per-core heap it was allocated from.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">dealloc</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">ptr</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) {   
-        <span class="comment">// deallocate a large object by directly returning mapped pages to the OS</span>
-        <span class="kw">if</span> <span class="ident">layout</span>.<span class="ident">size</span>() <span class="op">&gt;</span> <span class="ident">ZoneAllocator::MAX_ALLOC_SIZE</span> {
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">unsafe_large_allocations</span>))]</span>
-            <span class="kw">return</span> <span class="ident">deallocate_large_object</span>(
-                <span class="ident">ptr</span>, 
-                <span class="ident">layout</span>, 
-                <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">large_allocations</span>.<span class="ident">lock</span>()
+    <span class="doccomment">/// Deallocates the memory at the address given by `ptr`.
+    /// Memory is returned to the per-core heap it was allocated from.
+    </span><span class="kw">unsafe fn </span>dealloc(<span class="kw-2">&amp;</span><span class="self">self</span>, ptr: <span class="kw-2">*mut </span>u8, layout: Layout) {   
+        <span class="comment">// deallocate a large object by directly returning mapped pages to the OS
+        </span><span class="kw">if </span>layout.size() &gt; ZoneAllocator::MAX_ALLOC_SIZE {
+            <span class="attr">#[cfg(not(unsafe_large_allocations))]
+            </span><span class="kw">return </span>deallocate_large_object(
+                ptr, 
+                layout, 
+                <span class="kw-2">&amp;mut </span><span class="self">self</span>.large_allocations.lock()
             );
 
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">unsafe_large_allocations</span>)]</span>
-            <span class="kw">return</span> <span class="ident">deallocate_large_object</span>(
-                <span class="ident">ptr</span>, 
-                <span class="ident">layout</span>
+            <span class="attr">#[cfg(unsafe_large_allocations)]
+            </span><span class="kw">return </span>deallocate_large_object(
+                ptr, 
+                layout
             );
 
         }     
-        <span class="comment">// find the starting address of the object page this block belongs to</span>
-        <span class="kw">let</span> <span class="ident">page_addr</span> <span class="op">=</span> (<span class="ident">ptr</span> <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">&amp;</span> <span class="op">!</span>(<span class="ident">ObjectPage8k::SIZE</span> <span class="op">-</span> <span class="number">1</span>);
-        <span class="comment">// find the heap id</span>
-        <span class="kw">let</span> <span class="ident">id</span> <span class="op">=</span> <span class="kw-2">*</span>((<span class="ident">page_addr</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">u8</span>).<span class="ident">offset</span>(<span class="ident">ObjectPage8k::HEAP_ID_OFFSET</span> <span class="kw">as</span> <span class="ident">isize</span>) <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">usize</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">heaps</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">id</span>).<span class="ident">expect</span>(<span class="string">&quot;Multiple Heaps: Heap not initialized&quot;</span>).<span class="ident">lock</span>();
-        <span class="ident">heap</span>.<span class="ident">deallocate</span>(<span class="ident">NonNull::new_unchecked</span>(<span class="ident">ptr</span>), <span class="ident">layout</span>).<span class="ident">expect</span>(<span class="string">&quot;Couldn&#39;t deallocate&quot;</span>);
+        <span class="comment">// find the starting address of the object page this block belongs to
+        </span><span class="kw">let </span>page_addr = (ptr <span class="kw">as </span>usize) &amp; !(ObjectPage8k::SIZE - <span class="number">1</span>);
+        <span class="comment">// find the heap id
+        </span><span class="kw">let </span>id = <span class="kw-2">*</span>((page_addr <span class="kw">as </span><span class="kw-2">*mut </span>u8).offset(ObjectPage8k::HEAP_ID_OFFSET <span class="kw">as </span>isize) <span class="kw">as </span><span class="kw-2">*mut </span>usize);
+        <span class="kw">let </span><span class="kw-2">mut </span>heap = <span class="self">self</span>.heaps.get(<span class="kw-2">&amp;</span>id).expect(<span class="string">&quot;Multiple Heaps: Heap not initialized&quot;</span>).lock();
+        heap.deallocate(NonNull::new_unchecked(ptr), layout).expect(<span class="string">&quot;Couldn&#39;t deallocate&quot;</span>);
     }
 }
 
 
 
-<span class="macro">cfg_if!</span> {
-<span class="kw">if</span> <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">unsafe_large_allocations</span>)]</span> {
-    <span class="doccomment">/// Any memory request greater than MAX_ALLOC_SIZE is satisfied through a request to the OS.</span>
-    <span class="doccomment">/// The pointer to the beginning of the newly allocated pages is returned.</span>
-    <span class="doccomment">/// The MappedPages object returned by that request is written to the end of the memory allocated.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Warning</span>
-    <span class="doccomment">/// This function should only be used by an allocator in conjunction with [`deallocate_large_object()`](fn.deallocate_large_object.html)</span>
-    <span class="kw">fn</span> <span class="ident">allocate_large_object</span>(<span class="ident">layout</span>: <span class="ident">Layout</span>) -&gt; <span class="kw-2">*mut</span> <span class="ident">u8</span> {
-        <span class="comment">// the mapped pages must have additional memory on the end where we can store the mapped pages object</span>
-        <span class="kw">let</span> <span class="ident">allocation_size</span> <span class="op">=</span> <span class="ident">layout</span>.<span class="ident">size</span>() <span class="op">+</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>();
+<span class="macro">cfg_if! </span>{
+<span class="kw">if </span><span class="attr">#[cfg(unsafe_large_allocations)] </span>{
+    <span class="doccomment">/// Any memory request greater than MAX_ALLOC_SIZE is satisfied through a request to the OS.
+    /// The pointer to the beginning of the newly allocated pages is returned.
+    /// The MappedPages object returned by that request is written to the end of the memory allocated.
+    /// 
+    /// # Warning
+    /// This function should only be used by an allocator in conjunction with [`deallocate_large_object()`](fn.deallocate_large_object.html)
+    </span><span class="kw">fn </span>allocate_large_object(layout: Layout) -&gt; <span class="kw-2">*mut </span>u8 {
+        <span class="comment">// the mapped pages must have additional memory on the end where we can store the mapped pages object
+        </span><span class="kw">let </span>allocation_size = layout.size() + core::mem::size_of::&lt;MappedPages&gt;();
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">mapping</span>) <span class="op">=</span> <span class="ident">create_mapping</span>(<span class="ident">allocation_size</span>, <span class="ident">HEAP_FLAGS</span>) {
-            <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="ident">mapping</span>.<span class="ident">start_address</span>().<span class="ident">value</span>() <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">u8</span>;
-            <span class="comment">// This is safe since we ensure that the memory allocated includes space for the MappedPages object,</span>
-            <span class="comment">// and since the corresponding deallocate function makes sure to retrieve the MappedPages object and drop it.</span>
-            <span class="kw">unsafe</span>{ (<span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="ident">layout</span>.<span class="ident">size</span>() <span class="kw">as</span> <span class="ident">isize</span>) <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">MappedPages</span>).<span class="ident">write</span>(<span class="ident">mapping</span>); }
-            <span class="comment">// trace!(&quot;Allocated a large object of {} bytes at address: {:#X}&quot;, layout.size(), ptr as usize);</span>
-            <span class="ident">ptr</span>
-        } <span class="kw">else</span> {
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(mapping) = create_mapping(allocation_size, HEAP_FLAGS) {
+            <span class="kw">let </span>ptr = mapping.start_address().value() <span class="kw">as </span><span class="kw-2">*mut </span>u8;
+            <span class="comment">// This is safe since we ensure that the memory allocated includes space for the MappedPages object,
+            // and since the corresponding deallocate function makes sure to retrieve the MappedPages object and drop it.
+            </span><span class="kw">unsafe</span>{ (ptr.offset(layout.size() <span class="kw">as </span>isize) <span class="kw">as </span><span class="kw-2">*mut </span>MappedPages).write(mapping); }
+            <span class="comment">// trace!(&quot;Allocated a large object of {} bytes at address: {:#X}&quot;, layout.size(), ptr as usize);
+            </span>ptr
+        } <span class="kw">else </span>{
             <span class="macro">error!</span>(<span class="string">&quot;Could not create mapping for a large object in the heap&quot;</span>);
-            <span class="ident">ptr::null_mut</span>()
+            ptr::null_mut()
         }
         
     }
 
-    <span class="doccomment">/// Any memory request greater than MAX_ALLOC_SIZE was created by requesting a MappedPages object from the OS,</span>
-    <span class="doccomment">/// and now the MappedPages object will be retrieved and dropped to deallocate the memory referenced by `ptr`.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Warning</span>
-    <span class="doccomment">/// This function should only be used by an allocator in conjunction with [`allocate_large_object()`](fn.allocate_large_object.html) </span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">deallocate_large_object</span>(<span class="ident">ptr</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) {
-        <span class="comment">// retrieve the mapped pages and drop them</span>
-        <span class="comment">// This is safe since we ensure that the MappedPages object is read from the offset where it was written</span>
-        <span class="comment">// by the corresponding allocate function, and the allocate function allocated extra memory for this object in addition to the layout size.</span>
-        <span class="kw">let</span> <span class="ident">_mp</span> <span class="op">=</span> <span class="ident">core::ptr::read</span>(<span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="ident">layout</span>.<span class="ident">size</span>() <span class="kw">as</span> <span class="ident">isize</span>) <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">MappedPages</span>); 
-        <span class="comment">// trace!(&quot;Deallocated a large object of {} bytes at address: {:#X}&quot;, layout.size(), ptr as usize);</span>
+    <span class="doccomment">/// Any memory request greater than MAX_ALLOC_SIZE was created by requesting a MappedPages object from the OS,
+    /// and now the MappedPages object will be retrieved and dropped to deallocate the memory referenced by `ptr`.
+    /// 
+    /// # Warning
+    /// This function should only be used by an allocator in conjunction with [`allocate_large_object()`](fn.allocate_large_object.html) 
+    </span><span class="kw">unsafe fn </span>deallocate_large_object(ptr: <span class="kw-2">*mut </span>u8, layout: Layout) {
+        <span class="comment">// retrieve the mapped pages and drop them
+        // This is safe since we ensure that the MappedPages object is read from the offset where it was written
+        // by the corresponding allocate function, and the allocate function allocated extra memory for this object in addition to the layout size.
+        </span><span class="kw">let </span>_mp = core::ptr::read(ptr.offset(layout.size() <span class="kw">as </span>isize) <span class="kw">as </span><span class="kw-2">*const </span>MappedPages); 
+        <span class="comment">// trace!(&quot;Deallocated a large object of {} bytes at address: {:#X}&quot;, layout.size(), ptr as usize);
+    </span>}
+
+} <span class="kw">else </span>{
+    <span class="kw">extern crate </span>intrusive_collections;
+    <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
+
+    <span class="kw">use </span>intrusive_collections::{intrusive_adapter,RBTree, RBTreeLink, KeyAdapter, PointerOps};
+
+
+    <span class="doccomment">/// The links for the RBTree used to store large allocations
+    </span><span class="kw">struct </span>LargeAllocation {
+        link: RBTreeLink,
+        mp: MappedPages
     }
 
-} <span class="kw">else</span> {
-    <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">intrusive_collections</span>;
-    <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">static_assertions</span>;
+    <span class="comment">// Our design depends on the fact that on the large allocation path, only objects smaller than the max allocation size will be allocated from the heap.
+    // Otherwise we will have a recursive loop of large allocations.
+    </span><span class="macro">const_assert!</span>(core::mem::size_of::&lt;LargeAllocation&gt;() &lt; ZoneAllocator::MAX_ALLOC_SIZE); 
 
-    <span class="kw">use</span> <span class="ident">intrusive_collections</span>::{<span class="ident">intrusive_adapter</span>,<span class="ident">RBTree</span>, <span class="ident">RBTreeLink</span>, <span class="ident">KeyAdapter</span>, <span class="ident">PointerOps</span>};
+    <span class="macro">intrusive_adapter!</span>(LargeAllocationAdapter = Box&lt;LargeAllocation&gt;: LargeAllocation { link: RBTreeLink });
 
-
-    <span class="doccomment">/// The links for the RBTree used to store large allocations</span>
-    <span class="kw">struct</span> <span class="ident">LargeAllocation</span> {
-        <span class="ident">link</span>: <span class="ident">RBTreeLink</span>,
-        <span class="ident">mp</span>: <span class="ident">MappedPages</span>
-    }
-
-    <span class="comment">// Our design depends on the fact that on the large allocation path, only objects smaller than the max allocation size will be allocated from the heap.</span>
-    <span class="comment">// Otherwise we will have a recursive loop of large allocations.</span>
-    <span class="macro">const_assert!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">LargeAllocation</span><span class="op">&gt;</span>() <span class="op">&lt;</span> <span class="ident">ZoneAllocator::MAX_ALLOC_SIZE</span>); 
-
-    <span class="macro">intrusive_adapter!</span>(<span class="ident">LargeAllocationAdapter</span> <span class="op">=</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">LargeAllocation</span><span class="op">&gt;</span>: <span class="ident">LargeAllocation</span> { <span class="ident">link</span>: <span class="ident">RBTreeLink</span> });
-
-    <span class="doccomment">/// Defines the key which will be used to search for elements in the RBTree.</span>
-    <span class="doccomment">/// Here it is the starting address of the allocation.</span>
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">KeyAdapter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">LargeAllocationAdapter</span> {
-        <span class="kw">type</span> <span class="ident">Key</span> <span class="op">=</span> <span class="ident">usize</span>;
-        <span class="kw">fn</span> <span class="ident">get_key</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">value</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::PointerOps</span> <span class="kw">as</span> <span class="ident">PointerOps</span><span class="op">&gt;</span><span class="ident">::Value</span>) -&gt; <span class="ident">usize</span> {
-            <span class="ident">value</span>.<span class="ident">mp</span>.<span class="ident">start_address</span>().<span class="ident">value</span>()
+    <span class="doccomment">/// Defines the key which will be used to search for elements in the RBTree.
+    /// Here it is the starting address of the allocation.
+    </span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; KeyAdapter&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>LargeAllocationAdapter {
+        <span class="kw">type </span>Key = usize;
+        <span class="kw">fn </span>get_key(<span class="kw-2">&amp;</span><span class="self">self</span>, value: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>&lt;<span class="self">Self</span>::PointerOps <span class="kw">as </span>PointerOps&gt;::Value) -&gt; usize {
+            value.mp.start_address().value()
         }
     }
 
-    <span class="doccomment">/// Any memory request greater than `ZoneAllocator::MAX_ALLOC_SIZE` is satisfied through a request to the OS.</span>
-    <span class="doccomment">/// The pointer to the beginning of the newly allocated pages is returned.</span>
-    <span class="doccomment">/// The MappedPages object returned by that request is stored in an RB-tree</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Warning</span>
-    <span class="doccomment">/// This function should only be used by an allocator in conjunction with [`deallocate_large_object()`](fn.deallocate_large_object.html)</span>
-    <span class="kw">fn</span> <span class="ident">allocate_large_object</span>(<span class="ident">layout</span>: <span class="ident">Layout</span>, <span class="ident">map</span>: <span class="kw-2">&amp;mut</span> <span class="ident">RBTree</span><span class="op">&lt;</span><span class="ident">LargeAllocationAdapter</span><span class="op">&gt;</span>) -&gt; <span class="kw-2">*mut</span> <span class="ident">u8</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">mp</span>) <span class="op">=</span> <span class="ident">create_mapping</span>(<span class="ident">layout</span>.<span class="ident">size</span>(), <span class="ident">HEAP_FLAGS</span>) {
-            <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="ident">mp</span>.<span class="ident">start_address</span>().<span class="ident">value</span>();
-            <span class="kw">let</span> <span class="ident">link</span> <span class="op">=</span> <span class="ident">Box::new</span>(<span class="ident">LargeAllocation</span> {
-                <span class="ident">link</span>: <span class="ident">RBTreeLink::new</span>(),
-                <span class="ident">mp</span>: <span class="ident">mp</span>
+    <span class="doccomment">/// Any memory request greater than `ZoneAllocator::MAX_ALLOC_SIZE` is satisfied through a request to the OS.
+    /// The pointer to the beginning of the newly allocated pages is returned.
+    /// The MappedPages object returned by that request is stored in an RB-tree
+    /// 
+    /// # Warning
+    /// This function should only be used by an allocator in conjunction with [`deallocate_large_object()`](fn.deallocate_large_object.html)
+    </span><span class="kw">fn </span>allocate_large_object(layout: Layout, map: <span class="kw-2">&amp;mut </span>RBTree&lt;LargeAllocationAdapter&gt;) -&gt; <span class="kw-2">*mut </span>u8 {
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(mp) = create_mapping(layout.size(), HEAP_FLAGS) {
+            <span class="kw">let </span>ptr = mp.start_address().value();
+            <span class="kw">let </span>link = Box::new(LargeAllocation {
+                link: RBTreeLink::new(),
+                mp: mp
             });
-            <span class="ident">map</span>.<span class="ident">insert</span>(<span class="ident">link</span>);
-            <span class="comment">// trace!(&quot;Allocated a large object of {} bytes at address: {:#X}&quot;, layout.size(), ptr as usize);</span>
-            <span class="ident">ptr</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">u8</span>
+            map.insert(link);
+            <span class="comment">// trace!(&quot;Allocated a large object of {} bytes at address: {:#X}&quot;, layout.size(), ptr as usize);
+            </span>ptr <span class="kw">as </span><span class="kw-2">*mut </span>u8
 
-        } <span class="kw">else</span> {
+        } <span class="kw">else </span>{
             <span class="macro">error!</span>(<span class="string">&quot;Could not create mapping for a large object in the heap&quot;</span>);
-            <span class="ident">ptr::null_mut</span>()
+            ptr::null_mut()
         }
         
     }
 
-    <span class="doccomment">/// Any memory request greater than `ZoneAllocator::MAX_ALLOC_SIZE` was created by requesting a MappedPages object from the OS,</span>
-    <span class="doccomment">/// and now the MappedPages object will be retrieved from the RB-tree and dropped to deallocate the memory referenced by `ptr`.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Warning</span>
-    <span class="doccomment">/// This function should only be used by an allocator in conjunction with [`allocate_large_object()`](fn.allocate_large_object.html) </span>
-    <span class="kw">fn</span> <span class="ident">deallocate_large_object</span>(<span class="ident">ptr</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>, <span class="ident">_layout</span>: <span class="ident">Layout</span>, <span class="ident">map</span>: <span class="kw-2">&amp;mut</span> <span class="ident">RBTree</span><span class="op">&lt;</span><span class="ident">LargeAllocationAdapter</span><span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="ident">_mp</span> <span class="op">=</span> <span class="ident">map</span>.<span class="ident">find_mut</span>(<span class="kw-2">&amp;</span>(<span class="ident">ptr</span> <span class="kw">as</span> <span class="ident">usize</span>)).<span class="ident">remove</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;Invalid ptr was passed to deallocate_large_object. There is no such mapping stored&quot;</span>);
-        <span class="comment">// trace!(&quot;Deallocated a large object of {} bytes at address: {:#X} {:#X}&quot;, _layout.size(), ptr as usize, _mp.mp.start_address());</span>
-    }
+    <span class="doccomment">/// Any memory request greater than `ZoneAllocator::MAX_ALLOC_SIZE` was created by requesting a MappedPages object from the OS,
+    /// and now the MappedPages object will be retrieved from the RB-tree and dropped to deallocate the memory referenced by `ptr`.
+    /// 
+    /// # Warning
+    /// This function should only be used by an allocator in conjunction with [`allocate_large_object()`](fn.allocate_large_object.html) 
+    </span><span class="kw">fn </span>deallocate_large_object(ptr: <span class="kw-2">*mut </span>u8, _layout: Layout, map: <span class="kw-2">&amp;mut </span>RBTree&lt;LargeAllocationAdapter&gt;) {
+        <span class="kw">let </span>_mp = map.find_mut(<span class="kw-2">&amp;</span>(ptr <span class="kw">as </span>usize)).remove()
+            .expect(<span class="string">&quot;Invalid ptr was passed to deallocate_large_object. There is no such mapping stored&quot;</span>);
+        <span class="comment">// trace!(&quot;Deallocated a large object of {} bytes at address: {:#X} {:#X}&quot;, _layout.size(), ptr as usize, _mp.mp.start_address());
+    </span>}
 
 }
-} <span class="comment">// end cfg_if for large allocation variations</span>
+} <span class="comment">// end cfg_if for large allocation variations
 
 
 
-</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="multiple_heaps" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</span></code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="multiple_heaps" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

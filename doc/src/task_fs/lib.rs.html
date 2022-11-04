@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/task_fs/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../task_fs/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../task_fs/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../task_fs/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/task_fs/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../task_fs/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -469,315 +463,315 @@
 <span id="463">463</span>
 <span id="464">464</span>
 <span id="465">465</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
+</pre><pre class="rust"><code><span class="attr">#![no_std]
 
-<span class="doccomment">//! This crate contains the direcotires and files that comprise the taskfs, which is similar</span>
-<span class="doccomment">//! to the /proc directory in linux. There are four main sections in this code:</span>
-<span class="doccomment">//! 1) TaskFs: the top level directory that holds the individual TaskDirs</span>
-<span class="doccomment">//! 2) TaskDir: the lazily computed directory that contains files and directories </span>
-<span class="doccomment">//!     relevant to that task</span>
-<span class="doccomment">//! 3) TaskFile: lazily computed file that holds information about the task</span>
-<span class="doccomment">//! 4) MmiDir: lazily computed directory that holds subdirectories and files</span>
-<span class="doccomment">//!     about the task&#39;s memory management information</span>
-<span class="doccomment">//! 5) MmiFile: lazily computed file that contains information about the task&#39;s</span>
-<span class="doccomment">//!     memory management information</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! * Note that all the structs here are NOT persistent in the filesystem EXCEPT</span>
-<span class="doccomment">//! for the TaskFs struct, which contains all the individual TaskDirs. This means </span>
-<span class="doccomment">//! that when a terminal cd&#39;s into a TaskDir or one of the subdirectories, it is the </span>
-<span class="doccomment">//! only entity that has a reference to that directory. When the terminal drops that </span>
-<span class="doccomment">//! reference (i.e. backs out of the directory), that directory is dropped from scope</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! The hierarchy (tree) is as follows:</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//!             TaskDir</span>
-<span class="doccomment">//!         TaskFile    MmiDir</span>
-<span class="doccomment">//!                         MmiFile</span>
-<span class="doccomment">//! </span>
+</span><span class="doccomment">//! This crate contains the direcotires and files that comprise the taskfs, which is similar
+//! to the /proc directory in linux. There are four main sections in this code:
+//! 1) TaskFs: the top level directory that holds the individual TaskDirs
+//! 2) TaskDir: the lazily computed directory that contains files and directories 
+//!     relevant to that task
+//! 3) TaskFile: lazily computed file that holds information about the task
+//! 4) MmiDir: lazily computed directory that holds subdirectories and files
+//!     about the task&#39;s memory management information
+//! 5) MmiFile: lazily computed file that contains information about the task&#39;s
+//!     memory management information
+//! 
+//! * Note that all the structs here are NOT persistent in the filesystem EXCEPT
+//! for the TaskFs struct, which contains all the individual TaskDirs. This means 
+//! that when a terminal cd&#39;s into a TaskDir or one of the subdirectories, it is the 
+//! only entity that has a reference to that directory. When the terminal drops that 
+//! reference (i.e. backs out of the directory), that directory is dropped from scope
+//! 
+//! The hierarchy (tree) is as follows:
+//! 
+//!             TaskDir
+//!         TaskFile    MmiDir
+//!                         MmiFile
+//! 
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
+</span><span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fs_node</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">path</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">root</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">io</span>;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>fs_node;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>task;
+<span class="kw">extern crate </span>path;
+<span class="kw">extern crate </span>root;
+<span class="kw">extern crate </span>io;
 
-<span class="kw">use</span> <span class="ident">alloc::string</span>::{<span class="ident">String</span>, <span class="ident">ToString</span>};
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">alloc::sync::Arc</span>;
-<span class="kw">use</span> <span class="ident">fs_node</span>::{<span class="ident">DirRef</span>, <span class="ident">WeakDirRef</span>, <span class="ident">Directory</span>, <span class="ident">FileOrDir</span>, <span class="ident">File</span>, <span class="ident">FileRef</span>, <span class="ident">FsNode</span>};
-<span class="kw">use</span> <span class="ident">memory::MappedPages</span>;
-<span class="kw">use</span> <span class="ident">task</span>::{<span class="ident">TaskRef</span>, <span class="ident">TASKLIST</span>};
-<span class="kw">use</span> <span class="ident">path::Path</span>;
-<span class="kw">use</span> <span class="ident">io</span>::{<span class="ident">ByteReader</span>, <span class="ident">ByteWriter</span>, <span class="ident">KnownLength</span>, <span class="ident">IoError</span>};
-
-
-<span class="doccomment">/// The name of the VFS directory that exposes task info in the root. </span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TASKS_DIRECTORY_NAME</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;tasks&quot;</span>;
-<span class="doccomment">/// The absolute path of the tasks directory, which is currently below the root</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TASKS_DIRECTORY_PATH</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;/tasks&quot;</span>; 
+<span class="kw">use </span>alloc::string::{String, ToString};
+<span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>alloc::sync::Arc;
+<span class="kw">use </span>fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, File, FileRef, FsNode};
+<span class="kw">use </span>memory::MappedPages;
+<span class="kw">use </span>task::{TaskRef, TASKLIST};
+<span class="kw">use </span>path::Path;
+<span class="kw">use </span>io::{ByteReader, ByteWriter, KnownLength, IoError};
 
 
-<span class="doccomment">/// Initializes the tasks virtual filesystem directory within the root directory.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="ident">TaskFs::new</span>()<span class="question-mark">?</span>;
+<span class="doccomment">/// The name of the VFS directory that exposes task info in the root. 
+</span><span class="kw">pub const </span>TASKS_DIRECTORY_NAME: <span class="kw-2">&amp;</span>str = <span class="string">&quot;tasks&quot;</span>;
+<span class="doccomment">/// The absolute path of the tasks directory, which is currently below the root
+</span><span class="kw">pub const </span>TASKS_DIRECTORY_PATH: <span class="kw-2">&amp;</span>str = <span class="string">&quot;/tasks&quot;</span>; 
+
+
+<span class="doccomment">/// Initializes the tasks virtual filesystem directory within the root directory.
+</span><span class="kw">pub fn </span>init() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    TaskFs::new()<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>(())
 }
 
 
-<span class="doccomment">/// The top level directory that includes a dynamically-generated list of all `Task`s,</span>
-<span class="doccomment">/// each comprising a `TaskDir`.</span>
-<span class="doccomment">/// This directory exists in the root directory.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TaskFs</span> { }
+<span class="doccomment">/// The top level directory that includes a dynamically-generated list of all `Task`s,
+/// each comprising a `TaskDir`.
+/// This directory exists in the root directory.
+</span><span class="kw">pub struct </span>TaskFs { }
 
-<span class="kw">impl</span> <span class="ident">TaskFs</span> {
-    <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DirRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">root</span> <span class="op">=</span> <span class="ident">root::get_root</span>();
-        <span class="kw">let</span> <span class="ident">dir_ref</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">TaskFs</span> { })) <span class="kw">as</span> <span class="ident">DirRef</span>;
-        <span class="ident">root</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="ident">FileOrDir::Dir</span>(<span class="ident">dir_ref</span>.<span class="ident">clone</span>()))<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">dir_ref</span>)
+<span class="kw">impl </span>TaskFs {
+    <span class="kw">fn </span>new() -&gt; <span class="prelude-ty">Result</span>&lt;DirRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>root = root::get_root();
+        <span class="kw">let </span>dir_ref = Arc::new(Mutex::new(TaskFs { })) <span class="kw">as </span>DirRef;
+        root.lock().insert(FileOrDir::Dir(dir_ref.clone()))<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(dir_ref)
     }
 
-    <span class="kw">fn</span> <span class="ident">get_self_pointer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DirRef</span><span class="op">&gt;</span> {
-        <span class="ident">root::get_root</span>().<span class="ident">lock</span>().<span class="ident">get_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">get_name</span>())
+    <span class="kw">fn </span>get_self_pointer(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DirRef&gt; {
+        root::get_root().lock().get_dir(<span class="kw-2">&amp;</span><span class="self">self</span>.get_name())
     }
 
-    <span class="kw">fn</span> <span class="ident">get_internal</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">node</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">FileOrDir</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">id</span> <span class="op">=</span> <span class="ident">node</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;could not parse Task id as usize&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">task_ref</span> <span class="op">=</span> <span class="ident">task::get_task</span>(<span class="ident">id</span>).<span class="ident">ok_or</span>(<span class="string">&quot;could not get taskref from TASKLIST&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">parent_dir</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_self_pointer</span>().<span class="ident">ok_or</span>(<span class="string">&quot;BUG: tasks directory wasn&#39;t in root&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">dir_name</span> <span class="op">=</span> <span class="ident">task_ref</span>.<span class="ident">id</span>.<span class="ident">to_string</span>(); 
-        <span class="comment">// lazily compute a new TaskDir everytime the caller wants to get a TaskDir</span>
-        <span class="kw">let</span> <span class="ident">task_dir</span> <span class="op">=</span> <span class="ident">TaskDir::new</span>(<span class="ident">dir_name</span>, <span class="kw-2">&amp;</span><span class="ident">parent_dir</span>, <span class="ident">task_ref</span>)<span class="question-mark">?</span>;        
-        <span class="kw">let</span> <span class="ident">boxed_task_dir</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">task_dir</span>)) <span class="kw">as</span> <span class="ident">DirRef</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">FileOrDir::Dir</span>(<span class="ident">boxed_task_dir</span>))
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">FsNode</span> <span class="kw">for</span> <span class="ident">TaskFs</span> {
-    <span class="kw">fn</span> <span class="ident">get_absolute_path</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="ident">String::from</span>(<span class="ident">TASKS_DIRECTORY_PATH</span>)
-    }
-
-    <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="ident">String::from</span>(<span class="ident">TASKS_DIRECTORY_NAME</span>)
-    }
-
-    <span class="kw">fn</span> <span class="ident">get_parent_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DirRef</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">root::get_root</span>().<span class="ident">clone</span>())
-    }
-
-    <span class="kw">fn</span> <span class="ident">set_parent_dir</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_new_parent</span>: <span class="ident">WeakDirRef</span>) {
-        <span class="comment">// do nothing</span>
+    <span class="kw">fn </span>get_internal(<span class="kw-2">&amp;</span><span class="self">self</span>, node: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;FileOrDir, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>id = node.parse::&lt;usize&gt;().map_err(|_e| <span class="string">&quot;could not parse Task id as usize&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>task_ref = task::get_task(id).ok_or(<span class="string">&quot;could not get taskref from TASKLIST&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>parent_dir = <span class="self">self</span>.get_self_pointer().ok_or(<span class="string">&quot;BUG: tasks directory wasn&#39;t in root&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>dir_name = task_ref.id.to_string(); 
+        <span class="comment">// lazily compute a new TaskDir everytime the caller wants to get a TaskDir
+        </span><span class="kw">let </span>task_dir = TaskDir::new(dir_name, <span class="kw-2">&amp;</span>parent_dir, task_ref)<span class="question-mark">?</span>;        
+        <span class="kw">let </span>boxed_task_dir = Arc::new(Mutex::new(task_dir)) <span class="kw">as </span>DirRef;
+        <span class="prelude-val">Ok</span>(FileOrDir::Dir(boxed_task_dir))
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Directory</span> <span class="kw">for</span> <span class="ident">TaskFs</span> {
-    <span class="doccomment">/// This function adds a newly created fs node (the argument) to the TASKS directory&#39;s children map  </span>
-    <span class="kw">fn</span> <span class="ident">insert</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_node</span>: <span class="ident">FileOrDir</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">impl </span>FsNode <span class="kw">for </span>TaskFs {
+    <span class="kw">fn </span>get_absolute_path(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        String::from(TASKS_DIRECTORY_PATH)
+    }
+
+    <span class="kw">fn </span>get_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        String::from(TASKS_DIRECTORY_NAME)
+    }
+
+    <span class="kw">fn </span>get_parent_dir(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DirRef&gt; {
+        <span class="prelude-val">Some</span>(root::get_root().clone())
+    }
+
+    <span class="kw">fn </span>set_parent_dir(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _new_parent: WeakDirRef) {
+        <span class="comment">// do nothing
+    </span>}
+}
+
+<span class="kw">impl </span>Directory <span class="kw">for </span>TaskFs {
+    <span class="doccomment">/// This function adds a newly created fs node (the argument) to the TASKS directory&#39;s children map  
+    </span><span class="kw">fn </span>insert(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _node: FileOrDir) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FileOrDir&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="prelude-val">Err</span>(<span class="string">&quot;cannot insert node into read-only TaskFs&quot;</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">node</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">get_internal</span>(<span class="ident">node</span>) {
-            <span class="prelude-val">Ok</span>(<span class="ident">d</span>) =&gt; <span class="prelude-val">Some</span>(<span class="ident">d</span>),
-            <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
-                <span class="macro">error!</span>(<span class="string">&quot;TaskFs::get() error: {:?}&quot;</span>, <span class="ident">e</span>);
-                <span class="prelude-val">None</span>
-            }
+    <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, node: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;FileOrDir&gt; {
+        <span class="kw">match </span><span class="self">self</span>.get_internal(node) {
+            <span class="prelude-val">Ok</span>(d) =&gt; <span class="prelude-val">Some</span>(d),
+            <span class="prelude-val">Err</span>(e) =&gt; {
+                <span class="macro">error!</span>(<span class="string">&quot;TaskFs::get() error: {:?}&quot;</span>, e);
+                <span class="prelude-val">None
+            </span>}
         }
     }
 
-    <span class="doccomment">/// Returns a string listing all the children in the directory</span>
-    <span class="kw">fn</span> <span class="ident">list</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tasks_string</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-        <span class="kw">for</span> (<span class="ident">id</span>, <span class="ident">_taskref</span>) <span class="kw">in</span> <span class="ident">TASKLIST</span>.<span class="ident">lock</span>().<span class="ident">iter</span>() {
-            <span class="ident">tasks_string</span>.<span class="ident">push</span>(<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">id</span>));
+    <span class="doccomment">/// Returns a string listing all the children in the directory
+    </span><span class="kw">fn </span>list(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;String&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>tasks_string = Vec::new();
+        <span class="kw">for </span>(id, _taskref) <span class="kw">in </span>TASKLIST.lock().iter() {
+            tasks_string.push(<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, id));
         }
-        <span class="ident">tasks_string</span>
+        tasks_string
     }
 
-    <span class="kw">fn</span> <span class="ident">remove</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_node</span>: <span class="kw-2">&amp;</span><span class="ident">FileOrDir</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span> {
-        <span class="prelude-val">None</span>
-    }
+    <span class="kw">fn </span>remove(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _node: <span class="kw-2">&amp;</span>FileOrDir) -&gt; <span class="prelude-ty">Option</span>&lt;FileOrDir&gt; {
+        <span class="prelude-val">None
+    </span>}
 
 }
 
 
 
 
-<span class="doccomment">/// A lazily computed directory that holds files and subdirectories related</span>
-<span class="doccomment">/// to information about this Task</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TaskDir</span> {
-    <span class="doccomment">/// The name of the directory</span>
-    <span class="kw">pub</span> <span class="ident">name</span>: <span class="ident">String</span>,
-    <span class="doccomment">/// The absolute path of the TaskDir</span>
-    <span class="ident">path</span>: <span class="ident">Path</span>,
-    <span class="ident">taskref</span>: <span class="ident">TaskRef</span>,
-    <span class="doccomment">/// We can store the parent (TaskFs) because it is a persistent directory</span>
-    <span class="ident">parent</span>: <span class="ident">DirRef</span>,
+<span class="doccomment">/// A lazily computed directory that holds files and subdirectories related
+/// to information about this Task
+</span><span class="kw">pub struct </span>TaskDir {
+    <span class="doccomment">/// The name of the directory
+    </span><span class="kw">pub </span>name: String,
+    <span class="doccomment">/// The absolute path of the TaskDir
+    </span>path: Path,
+    taskref: TaskRef,
+    <span class="doccomment">/// We can store the parent (TaskFs) because it is a persistent directory
+    </span>parent: DirRef,
 }
 
-<span class="kw">impl</span> <span class="ident">TaskDir</span> {
-    <span class="doccomment">/// Creates a new directory and passes a pointer to the new directory created as output</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">name</span>: <span class="ident">String</span>, <span class="ident">parent</span>: <span class="kw-2">&amp;</span><span class="ident">DirRef</span>, <span class="ident">taskref</span>: <span class="ident">TaskRef</span>)  -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">TaskDir</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">id</span>;
-        <span class="kw">let</span> <span class="ident">directory</span> <span class="op">=</span> <span class="ident">TaskDir</span> {
-            <span class="ident">name</span>: <span class="ident">name</span>,
-            <span class="ident">path</span>: <span class="ident">Path::new</span>(<span class="macro">format!</span>(<span class="string">&quot;{}/{}&quot;</span>, <span class="ident">TASKS_DIRECTORY_PATH</span>, <span class="ident">task_id</span>)),
-            <span class="ident">taskref</span>: <span class="ident">taskref</span>,
-            <span class="ident">parent</span>: <span class="ident">Arc::clone</span>(<span class="ident">parent</span>),
+<span class="kw">impl </span>TaskDir {
+    <span class="doccomment">/// Creates a new directory and passes a pointer to the new directory created as output
+    </span><span class="kw">pub fn </span>new(name: String, parent: <span class="kw-2">&amp;</span>DirRef, taskref: TaskRef)  -&gt; <span class="prelude-ty">Result</span>&lt;TaskDir, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>task_id = taskref.id;
+        <span class="kw">let </span>directory = TaskDir {
+            name: name,
+            path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{}/{}&quot;</span>, TASKS_DIRECTORY_PATH, task_id)),
+            taskref: taskref,
+            parent: Arc::clone(parent),
         };
-        <span class="prelude-val">Ok</span>(<span class="ident">directory</span>)
+        <span class="prelude-val">Ok</span>(directory)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Directory</span> <span class="kw">for</span> <span class="ident">TaskDir</span> {
-    <span class="kw">fn</span> <span class="ident">insert</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_node</span>: <span class="ident">FileOrDir</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">impl </span>Directory <span class="kw">for </span>TaskDir {
+    <span class="kw">fn </span>insert(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _node: FileOrDir) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FileOrDir&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="prelude-val">Err</span>(<span class="string">&quot;cannot insert node into read-only TaskFs&quot;</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">child_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">child_name</span> <span class="op">==</span> <span class="string">&quot;taskInfo&quot;</span> {
-            <span class="kw">let</span> <span class="ident">task_file</span> <span class="op">=</span> <span class="ident">TaskFile::new</span>(<span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">clone</span>());
-            <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::File</span>(<span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">task_file</span>)) <span class="kw">as</span> <span class="ident">FileRef</span>));
+    <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, child_name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;FileOrDir&gt; {
+        <span class="kw">if </span>child_name == <span class="string">&quot;taskInfo&quot; </span>{
+            <span class="kw">let </span>task_file = TaskFile::new(<span class="self">self</span>.taskref.clone());
+            <span class="kw">return </span><span class="prelude-val">Some</span>(FileOrDir::File(Arc::new(Mutex::new(task_file)) <span class="kw">as </span>FileRef));
         }
 
-        <span class="kw">if</span> <span class="ident">child_name</span> <span class="op">==</span> <span class="string">&quot;mmi&quot;</span> {
-            <span class="kw">let</span> <span class="ident">mmi_dir</span> <span class="op">=</span> <span class="ident">MmiDir::new</span>(<span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">clone</span>());
-            <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::Dir</span>(<span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">mmi_dir</span>)) <span class="kw">as</span> <span class="ident">DirRef</span>));
+        <span class="kw">if </span>child_name == <span class="string">&quot;mmi&quot; </span>{
+            <span class="kw">let </span>mmi_dir = MmiDir::new(<span class="self">self</span>.taskref.clone());
+            <span class="kw">return </span><span class="prelude-val">Some</span>(FileOrDir::Dir(Arc::new(Mutex::new(mmi_dir)) <span class="kw">as </span>DirRef));
         }
 
-        <span class="prelude-val">None</span>
+        <span class="prelude-val">None
+    </span>}
+
+    <span class="doccomment">/// Returns a string listing all the children in the directory
+    </span><span class="kw">fn </span>list(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;String&gt; {
+        <span class="kw">let </span>children = <span class="macro">vec!</span>[<span class="string">&quot;mmi&quot;</span>.to_string(), <span class="string">&quot;taskInfo&quot;</span>.to_string()];
+        children
     }
 
-    <span class="doccomment">/// Returns a string listing all the children in the directory</span>
-    <span class="kw">fn</span> <span class="ident">list</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">children</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="string">&quot;mmi&quot;</span>.<span class="ident">to_string</span>(), <span class="string">&quot;taskInfo&quot;</span>.<span class="ident">to_string</span>()];
-        <span class="ident">children</span>
-    }
-
-    <span class="kw">fn</span> <span class="ident">remove</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="ident">FileOrDir</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span> { 
-        <span class="prelude-val">None</span>
-    }
+    <span class="kw">fn </span>remove(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span>FileOrDir) -&gt; <span class="prelude-ty">Option</span>&lt;FileOrDir&gt; { 
+        <span class="prelude-val">None
+    </span>}
 }
 
-<span class="kw">impl</span> <span class="ident">FsNode</span> <span class="kw">for</span> <span class="ident">TaskDir</span> {
-    <span class="kw">fn</span> <span class="ident">get_absolute_path</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="self">self</span>.<span class="ident">path</span>.<span class="ident">clone</span>().<span class="ident">into</span>()
+<span class="kw">impl </span>FsNode <span class="kw">for </span>TaskDir {
+    <span class="kw">fn </span>get_absolute_path(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="self">self</span>.path.clone().into()
     }
 
-    <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="self">self</span>.<span class="ident">name</span>.<span class="ident">clone</span>()
+    <span class="kw">fn </span>get_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="self">self</span>.name.clone()
     }
 
-    <span class="kw">fn</span> <span class="ident">get_parent_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DirRef</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">parent</span>.<span class="ident">clone</span>())
+    <span class="kw">fn </span>get_parent_dir(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DirRef&gt; {
+        <span class="prelude-val">Some</span>(<span class="self">self</span>.parent.clone())
     }
 
-    <span class="kw">fn</span> <span class="ident">set_parent_dir</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="ident">WeakDirRef</span>) {
-        <span class="comment">// do nothing</span>
-    }
+    <span class="kw">fn </span>set_parent_dir(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw">_</span>: WeakDirRef) {
+        <span class="comment">// do nothing
+    </span>}
 }
 
 
 
-<span class="doccomment">/// Lazily computed file that holds information about this task. This taskfile</span>
-<span class="doccomment">/// does not exist witin the actual filesystem. </span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TaskFile</span> {
-    <span class="ident">taskref</span>: <span class="ident">TaskRef</span>,
-    <span class="ident">task_id</span>: <span class="ident">usize</span>,
-    <span class="ident">path</span>: <span class="ident">Path</span>, 
+<span class="doccomment">/// Lazily computed file that holds information about this task. This taskfile
+/// does not exist witin the actual filesystem. 
+</span><span class="kw">pub struct </span>TaskFile {
+    taskref: TaskRef,
+    task_id: usize,
+    path: Path, 
 }
 
-<span class="kw">impl</span> <span class="ident">TaskFile</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">taskref</span>: <span class="ident">TaskRef</span>) -&gt; <span class="ident">TaskFile</span> {
-        <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">id</span>;
-        <span class="ident">TaskFile</span> {
-            <span class="ident">taskref</span>,
-            <span class="ident">task_id</span>,
-            <span class="ident">path</span>: <span class="ident">Path::new</span>(<span class="macro">format!</span>(<span class="string">&quot;{}/{}/task_info&quot;</span>, <span class="ident">TASKS_DIRECTORY_PATH</span>, <span class="ident">task_id</span>)), 
+<span class="kw">impl </span>TaskFile {
+    <span class="kw">pub fn </span>new(taskref: TaskRef) -&gt; TaskFile {
+        <span class="kw">let </span>task_id = taskref.id;
+        TaskFile {
+            taskref,
+            task_id,
+            path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{}/{}/task_info&quot;</span>, TASKS_DIRECTORY_PATH, task_id)), 
         }
     }
 
-    <span class="doccomment">/// Generates the task info string.</span>
-    <span class="kw">fn</span> <span class="ident">generate</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="comment">// Print all tasks</span>
-        <span class="kw">let</span> <span class="ident">cpu</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">running_on_cpu</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">cpu</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">cpu</span>)).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">String::from</span>(<span class="string">&quot;-&quot;</span>));
-        <span class="kw">let</span> <span class="ident">pinned</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">pinned_core</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">pin</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">pin</span>)).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">String::from</span>(<span class="string">&quot;-&quot;</span>));
-        <span class="kw">let</span> <span class="ident">task_type</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">is_an_idle_task</span> {
-            <span class="string">&quot;I&quot;</span>
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">is_application</span>() {
-            <span class="string">&quot;A&quot;</span>
-        } <span class="kw">else</span> {
-            <span class="string">&quot; &quot;</span>
-        };  
+    <span class="doccomment">/// Generates the task info string.
+    </span><span class="kw">fn </span>generate(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="comment">// Print all tasks
+        </span><span class="kw">let </span>cpu = <span class="self">self</span>.taskref.running_on_cpu().map(|cpu| <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, cpu)).unwrap_or_else(|| String::from(<span class="string">&quot;-&quot;</span>));
+        <span class="kw">let </span>pinned = <span class="kw-2">&amp;</span><span class="self">self</span>.taskref.pinned_core().map(|pin| <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, pin)).unwrap_or_else(|| String::from(<span class="string">&quot;-&quot;</span>));
+        <span class="kw">let </span>task_type = <span class="kw">if </span><span class="self">self</span>.taskref.is_an_idle_task {
+            <span class="string">&quot;I&quot;
+        </span>} <span class="kw">else if </span><span class="self">self</span>.taskref.is_application() {
+            <span class="string">&quot;A&quot;
+        </span>} <span class="kw">else </span>{
+            <span class="string">&quot; &quot;
+        </span>};  
 
         <span class="macro">format!</span>(<span class="string">&quot;{0:&lt;10} {1}\n{2:&lt;10} {3}\n{4:&lt;10} {5:?}\n{6:&lt;10} {7}\n{8:&lt;10} {9}\n{10:&lt;10} {11:&lt;10}&quot;</span>, 
-            <span class="string">&quot;name&quot;</span>, <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">name</span>,
-            <span class="string">&quot;task id&quot;</span>, <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">id</span>,
-            <span class="string">&quot;runstate&quot;</span>, <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">runstate</span>(),
-            <span class="string">&quot;cpu&quot;</span>, <span class="ident">cpu</span>,
-            <span class="string">&quot;pinned&quot;</span>, <span class="ident">pinned</span>,
-            <span class="string">&quot;task type&quot;</span>, <span class="ident">task_type</span>
+            <span class="string">&quot;name&quot;</span>, <span class="self">self</span>.taskref.name,
+            <span class="string">&quot;task id&quot;</span>, <span class="self">self</span>.taskref.id,
+            <span class="string">&quot;runstate&quot;</span>, <span class="self">self</span>.taskref.runstate(),
+            <span class="string">&quot;cpu&quot;</span>, cpu,
+            <span class="string">&quot;pinned&quot;</span>, pinned,
+            <span class="string">&quot;task type&quot;</span>, task_type
         )
     }
 }
 
-<span class="kw">impl</span> <span class="ident">FsNode</span> <span class="kw">for</span> <span class="ident">TaskFile</span> {
-    <span class="kw">fn</span> <span class="ident">get_absolute_path</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="self">self</span>.<span class="ident">path</span>.<span class="ident">clone</span>().<span class="ident">into</span>()
+<span class="kw">impl </span>FsNode <span class="kw">for </span>TaskFile {
+    <span class="kw">fn </span>get_absolute_path(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="self">self</span>.path.clone().into()
     }
 
-    <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">name</span>.<span class="ident">clone</span>()
+    <span class="kw">fn </span>get_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="self">self</span>.taskref.name.clone()
     }
 
-    <span class="kw">fn</span> <span class="ident">get_parent_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DirRef</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">path</span> <span class="op">=</span> <span class="ident">Path::new</span>(<span class="macro">format!</span>(<span class="string">&quot;{}/{}&quot;</span>, <span class="ident">TASKS_DIRECTORY_PATH</span>, <span class="self">self</span>.<span class="ident">task_id</span>));
-        <span class="kw">match</span> <span class="ident">Path::get_absolute</span>(<span class="kw-2">&amp;</span><span class="ident">path</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::Dir</span>(<span class="ident">d</span>)) =&gt; <span class="prelude-val">Some</span>(<span class="ident">d</span>),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
+    <span class="kw">fn </span>get_parent_dir(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DirRef&gt; {
+        <span class="kw">let </span>path = Path::new(<span class="macro">format!</span>(<span class="string">&quot;{}/{}&quot;</span>, TASKS_DIRECTORY_PATH, <span class="self">self</span>.task_id));
+        <span class="kw">match </span>Path::get_absolute(<span class="kw-2">&amp;</span>path) {
+            <span class="prelude-val">Some</span>(FileOrDir::Dir(d)) =&gt; <span class="prelude-val">Some</span>(d),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">set_parent_dir</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="ident">WeakDirRef</span>) {
-        <span class="comment">// do nothing</span>
-    }
+    <span class="kw">fn </span>set_parent_dir(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw">_</span>: WeakDirRef) {
+        <span class="comment">// do nothing
+    </span>}
 }
 
-<span class="kw">impl</span> <span class="ident">ByteReader</span> <span class="kw">for</span> <span class="ident">TaskFile</span> {
-    <span class="kw">fn</span> <span class="ident">read_at</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>], <span class="ident">offset</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">IoError</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">generate</span>();
-        <span class="kw">if</span> <span class="ident">offset</span> <span class="op">&gt;</span> <span class="ident">output</span>.<span class="ident">len</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">IoError::InvalidInput</span>);
+<span class="kw">impl </span>ByteReader <span class="kw">for </span>TaskFile {
+    <span class="kw">fn </span>read_at(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buf: <span class="kw-2">&amp;mut </span>[u8], offset: usize) -&gt; <span class="prelude-ty">Result</span>&lt;usize, IoError&gt; {
+        <span class="kw">let </span>output = <span class="self">self</span>.generate();
+        <span class="kw">if </span>offset &gt; output.len() {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(IoError::InvalidInput);
         }
-        <span class="kw">let</span> <span class="ident">count</span> <span class="op">=</span> <span class="ident">core::cmp::min</span>(<span class="ident">buf</span>.<span class="ident">len</span>(), <span class="ident">output</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="ident">offset</span>);
-        <span class="ident">buf</span>[..<span class="ident">count</span>].<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">output</span>.<span class="ident">as_bytes</span>()[<span class="ident">offset</span>..(<span class="ident">offset</span> <span class="op">+</span> <span class="ident">count</span>)]);
-        <span class="prelude-val">Ok</span>(<span class="ident">count</span>)
+        <span class="kw">let </span>count = core::cmp::min(buf.len(), output.len() - offset);
+        buf[..count].copy_from_slice(<span class="kw-2">&amp;</span>output.as_bytes()[offset..(offset + count)]);
+        <span class="prelude-val">Ok</span>(count)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">ByteWriter</span> <span class="kw">for</span> <span class="ident">TaskFile</span> {
-    <span class="kw">fn</span> <span class="ident">write_at</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_buffer</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_offset</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">IoError</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Err</span>(<span class="ident">IoError::from</span>(<span class="string">&quot;not permitted to write task contents through the task VFS&quot;</span>))
+<span class="kw">impl </span>ByteWriter <span class="kw">for </span>TaskFile {
+    <span class="kw">fn </span>write_at(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _buffer: <span class="kw-2">&amp;</span>[u8], _offset: usize) -&gt; <span class="prelude-ty">Result</span>&lt;usize, IoError&gt; {
+        <span class="prelude-val">Err</span>(IoError::from(<span class="string">&quot;not permitted to write task contents through the task VFS&quot;</span>))
     } 
-    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">IoError</span><span class="op">&gt;</span> { <span class="prelude-val">Ok</span>(()) }
+    <span class="kw">fn </span>flush(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), IoError&gt; { <span class="prelude-val">Ok</span>(()) }
 }
 
-<span class="kw">impl</span> <span class="ident">KnownLength</span> <span class="kw">for</span> <span class="ident">TaskFile</span> {
-    <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">generate</span>().<span class="ident">len</span>() 
+<span class="kw">impl </span>KnownLength <span class="kw">for </span>TaskFile {
+    <span class="kw">fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.generate().len() 
     }
 }
 
-<span class="kw">impl</span> <span class="ident">File</span> <span class="kw">for</span> <span class="ident">TaskFile</span> {
-    <span class="kw">fn</span> <span class="ident">as_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">MappedPages</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">impl </span>File <span class="kw">for </span>TaskFile {
+    <span class="kw">fn </span>as_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="prelude-val">Err</span>(<span class="string">&quot;task files are autogenerated, cannot be memory mapped&quot;</span>)
     }
 }
@@ -787,153 +781,152 @@
 
 
 
-<span class="doccomment">/// Lazily computed directory that contains subfiles and directories </span>
-<span class="doccomment">/// relevant to the task&#39;s memory management information. </span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MmiDir</span> {
-    <span class="ident">taskref</span>: <span class="ident">TaskRef</span>,
-    <span class="ident">task_id</span>: <span class="ident">usize</span>,
-    <span class="ident">path</span>: <span class="ident">Path</span>, 
+<span class="doccomment">/// Lazily computed directory that contains subfiles and directories 
+/// relevant to the task&#39;s memory management information. 
+</span><span class="kw">pub struct </span>MmiDir {
+    taskref: TaskRef,
+    task_id: usize,
+    path: Path, 
 }
 
-<span class="kw">impl</span> <span class="ident">MmiDir</span> {
-    <span class="doccomment">/// Creates a new directory and passes a pointer to the new directory created as output</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">taskref</span>: <span class="ident">TaskRef</span>) -&gt; <span class="ident">MmiDir</span> {
-        <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">id</span>;
-        <span class="ident">MmiDir</span> {
-            <span class="ident">taskref</span>,
-            <span class="ident">task_id</span>,
-            <span class="ident">path</span>: <span class="ident">Path::new</span>(<span class="macro">format!</span>(<span class="string">&quot;{}/{}/mmi&quot;</span>, <span class="ident">TASKS_DIRECTORY_PATH</span>, <span class="ident">task_id</span>)),
+<span class="kw">impl </span>MmiDir {
+    <span class="doccomment">/// Creates a new directory and passes a pointer to the new directory created as output
+    </span><span class="kw">pub fn </span>new(taskref: TaskRef) -&gt; MmiDir {
+        <span class="kw">let </span>task_id = taskref.id;
+        MmiDir {
+            taskref,
+            task_id,
+            path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{}/{}/mmi&quot;</span>, TASKS_DIRECTORY_PATH, task_id)),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Directory</span> <span class="kw">for</span> <span class="ident">MmiDir</span> {
-    <span class="kw">fn</span> <span class="ident">insert</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_node</span>: <span class="ident">FileOrDir</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">impl </span>Directory <span class="kw">for </span>MmiDir {
+    <span class="kw">fn </span>insert(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _node: FileOrDir) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FileOrDir&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="prelude-val">Err</span>(<span class="string">&quot;cannot insert node into read-only TaskFs&quot;</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">child_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">child_name</span> <span class="op">==</span> <span class="string">&quot;MmiInfo&quot;</span> {
-            <span class="comment">// create the new mmi dir here on demand</span>
-            <span class="kw">let</span> <span class="ident">task_file</span> <span class="op">=</span> <span class="ident">MmiFile::new</span>(<span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">clone</span>());
-            <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::File</span>(<span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">task_file</span>)) <span class="kw">as</span> <span class="ident">FileRef</span>))
-        } <span class="kw">else</span> {
-            <span class="prelude-val">None</span>
-        }
+    <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, child_name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;FileOrDir&gt; {
+        <span class="kw">if </span>child_name == <span class="string">&quot;MmiInfo&quot; </span>{
+            <span class="comment">// create the new mmi dir here on demand
+            </span><span class="kw">let </span>task_file = MmiFile::new(<span class="self">self</span>.taskref.clone());
+            <span class="prelude-val">Some</span>(FileOrDir::File(Arc::new(Mutex::new(task_file)) <span class="kw">as </span>FileRef))
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
     }
 
-    <span class="doccomment">/// Returns a string listing all the children in the directory</span>
-    <span class="kw">fn</span> <span class="ident">list</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">children</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="string">&quot;MmiInfo&quot;</span>.<span class="ident">to_string</span>()];
-        <span class="ident">children</span>
+    <span class="doccomment">/// Returns a string listing all the children in the directory
+    </span><span class="kw">fn </span>list(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;String&gt; {
+        <span class="kw">let </span>children = <span class="macro">vec!</span>[<span class="string">&quot;MmiInfo&quot;</span>.to_string()];
+        children
     }
 
-    <span class="kw">fn</span> <span class="ident">remove</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="ident">FileOrDir</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span> {
-        <span class="prelude-val">None</span>
-    }
+    <span class="kw">fn </span>remove(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw">_</span>: <span class="kw-2">&amp;</span>FileOrDir) -&gt; <span class="prelude-ty">Option</span>&lt;FileOrDir&gt; {
+        <span class="prelude-val">None
+    </span>}
 }
 
-<span class="kw">impl</span> <span class="ident">FsNode</span> <span class="kw">for</span> <span class="ident">MmiDir</span> {
-    <span class="kw">fn</span> <span class="ident">get_absolute_path</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="self">self</span>.<span class="ident">path</span>.<span class="ident">clone</span>().<span class="ident">into</span>()
+<span class="kw">impl </span>FsNode <span class="kw">for </span>MmiDir {
+    <span class="kw">fn </span>get_absolute_path(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="self">self</span>.path.clone().into()
     }
     
-    <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="string">&quot;mmi&quot;</span>.<span class="ident">to_string</span>()
+    <span class="kw">fn </span>get_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="string">&quot;mmi&quot;</span>.to_string()
     }
 
-    <span class="kw">fn</span> <span class="ident">get_parent_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DirRef</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">path</span> <span class="op">=</span> <span class="ident">Path::new</span>(<span class="macro">format!</span>(<span class="string">&quot;{}/{}&quot;</span>, <span class="ident">TASKS_DIRECTORY_PATH</span>, <span class="self">self</span>.<span class="ident">task_id</span>));
-        <span class="kw">match</span> <span class="ident">Path::get_absolute</span>(<span class="kw-2">&amp;</span><span class="ident">path</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::Dir</span>(<span class="ident">d</span>)) =&gt; <span class="prelude-val">Some</span>(<span class="ident">d</span>),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
+    <span class="kw">fn </span>get_parent_dir(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DirRef&gt; {
+        <span class="kw">let </span>path = Path::new(<span class="macro">format!</span>(<span class="string">&quot;{}/{}&quot;</span>, TASKS_DIRECTORY_PATH, <span class="self">self</span>.task_id));
+        <span class="kw">match </span>Path::get_absolute(<span class="kw-2">&amp;</span>path) {
+            <span class="prelude-val">Some</span>(FileOrDir::Dir(d)) =&gt; <span class="prelude-val">Some</span>(d),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">set_parent_dir</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="ident">WeakDirRef</span>) {
-        <span class="comment">// do nothing</span>
-    }
+    <span class="kw">fn </span>set_parent_dir(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw">_</span>: WeakDirRef) {
+        <span class="comment">// do nothing
+    </span>}
 }
 
 
 
-<span class="doccomment">/// Lazily computed file that contains information </span>
-<span class="doccomment">/// about a task&#39;s memory management information. </span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MmiFile</span> {
-    <span class="ident">taskref</span>: <span class="ident">TaskRef</span>,
-    <span class="ident">task_id</span>: <span class="ident">usize</span>,
-    <span class="ident">path</span>: <span class="ident">Path</span>, 
+<span class="doccomment">/// Lazily computed file that contains information 
+/// about a task&#39;s memory management information. 
+</span><span class="kw">pub struct </span>MmiFile {
+    taskref: TaskRef,
+    task_id: usize,
+    path: Path, 
 }
 
-<span class="kw">impl</span> <span class="ident">MmiFile</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">taskref</span>: <span class="ident">TaskRef</span>) -&gt; <span class="ident">MmiFile</span> {
-        <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">id</span>;
-        <span class="ident">MmiFile</span> {
-            <span class="ident">taskref</span>,
-            <span class="ident">task_id</span>,
-            <span class="ident">path</span>: <span class="ident">Path::new</span>(<span class="macro">format!</span>(<span class="string">&quot;{}/{}/mmi/MmiInfo&quot;</span>, <span class="ident">TASKS_DIRECTORY_PATH</span>, <span class="ident">task_id</span>)), 
+<span class="kw">impl </span>MmiFile {
+    <span class="kw">pub fn </span>new(taskref: TaskRef) -&gt; MmiFile {
+        <span class="kw">let </span>task_id = taskref.id;
+        MmiFile {
+            taskref,
+            task_id,
+            path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{}/{}/mmi/MmiInfo&quot;</span>, TASKS_DIRECTORY_PATH, task_id)), 
         }
     }
 
-    <span class="doccomment">/// Generates the mmi info string.</span>
-    <span class="kw">fn</span> <span class="ident">generate</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="macro">format!</span>(<span class="string">&quot;Page table: {:?}\n&quot;</span>, <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">mmi</span>.<span class="ident">lock</span>().<span class="ident">page_table</span>)
+    <span class="doccomment">/// Generates the mmi info string.
+    </span><span class="kw">fn </span>generate(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="macro">format!</span>(<span class="string">&quot;Page table: {:?}\n&quot;</span>, <span class="self">self</span>.taskref.mmi.lock().page_table)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">FsNode</span> <span class="kw">for</span> <span class="ident">MmiFile</span> {
-    <span class="kw">fn</span> <span class="ident">get_absolute_path</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="self">self</span>.<span class="ident">path</span>.<span class="ident">clone</span>().<span class="ident">into</span>()
+<span class="kw">impl </span>FsNode <span class="kw">for </span>MmiFile {
+    <span class="kw">fn </span>get_absolute_path(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="self">self</span>.path.clone().into()
     }
 
-    <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="string">&quot;MmiInfo&quot;</span>.<span class="ident">to_string</span>()
+    <span class="kw">fn </span>get_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="string">&quot;MmiInfo&quot;</span>.to_string()
     }
 
-    <span class="kw">fn</span> <span class="ident">get_parent_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DirRef</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">path</span> <span class="op">=</span> <span class="ident">Path::new</span>(<span class="macro">format!</span>(<span class="string">&quot;{}/{}/mmi&quot;</span>, <span class="ident">TASKS_DIRECTORY_PATH</span>, <span class="self">self</span>.<span class="ident">task_id</span>));
-        <span class="kw">match</span> <span class="ident">Path::get_absolute</span>(<span class="kw-2">&amp;</span><span class="ident">path</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::Dir</span>(<span class="ident">d</span>)) =&gt; <span class="prelude-val">Some</span>(<span class="ident">d</span>),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
+    <span class="kw">fn </span>get_parent_dir(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DirRef&gt; {
+        <span class="kw">let </span>path = Path::new(<span class="macro">format!</span>(<span class="string">&quot;{}/{}/mmi&quot;</span>, TASKS_DIRECTORY_PATH, <span class="self">self</span>.task_id));
+        <span class="kw">match </span>Path::get_absolute(<span class="kw-2">&amp;</span>path) {
+            <span class="prelude-val">Some</span>(FileOrDir::Dir(d)) =&gt; <span class="prelude-val">Some</span>(d),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">set_parent_dir</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="kw">_</span>: <span class="ident">WeakDirRef</span>) {
-        <span class="comment">// do nothing</span>
-    }
+    <span class="kw">fn </span>set_parent_dir(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw">_</span>: WeakDirRef) {
+        <span class="comment">// do nothing
+    </span>}
 }
 
-<span class="kw">impl</span> <span class="ident">ByteReader</span> <span class="kw">for</span> <span class="ident">MmiFile</span> {
-    <span class="kw">fn</span> <span class="ident">read_at</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>], <span class="ident">offset</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">IoError</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">output</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">generate</span>();
-        <span class="kw">if</span> <span class="ident">offset</span> <span class="op">&gt;</span> <span class="ident">output</span>.<span class="ident">len</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">IoError::InvalidInput</span>);
+<span class="kw">impl </span>ByteReader <span class="kw">for </span>MmiFile {
+    <span class="kw">fn </span>read_at(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buf: <span class="kw-2">&amp;mut </span>[u8], offset: usize) -&gt; <span class="prelude-ty">Result</span>&lt;usize, IoError&gt; {
+        <span class="kw">let </span>output = <span class="self">self</span>.generate();
+        <span class="kw">if </span>offset &gt; output.len() {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(IoError::InvalidInput);
         }
-        <span class="kw">let</span> <span class="ident">count</span> <span class="op">=</span> <span class="ident">core::cmp::min</span>(<span class="ident">buf</span>.<span class="ident">len</span>(), <span class="ident">output</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="ident">offset</span>);
-        <span class="ident">buf</span>[..<span class="ident">count</span>].<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">output</span>.<span class="ident">as_bytes</span>()[<span class="ident">offset</span>..(<span class="ident">offset</span> <span class="op">+</span> <span class="ident">count</span>)]);
-        <span class="prelude-val">Ok</span>(<span class="ident">count</span>)
+        <span class="kw">let </span>count = core::cmp::min(buf.len(), output.len() - offset);
+        buf[..count].copy_from_slice(<span class="kw-2">&amp;</span>output.as_bytes()[offset..(offset + count)]);
+        <span class="prelude-val">Ok</span>(count)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">ByteWriter</span> <span class="kw">for</span> <span class="ident">MmiFile</span> {
-    <span class="kw">fn</span> <span class="ident">write_at</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_buffer</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">_offset</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">IoError</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Err</span>(<span class="ident">IoError::from</span>(<span class="string">&quot;not permitted to write task contents through the task VFS&quot;</span>))
+<span class="kw">impl </span>ByteWriter <span class="kw">for </span>MmiFile {
+    <span class="kw">fn </span>write_at(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _buffer: <span class="kw-2">&amp;</span>[u8], _offset: usize) -&gt; <span class="prelude-ty">Result</span>&lt;usize, IoError&gt; {
+        <span class="prelude-val">Err</span>(IoError::from(<span class="string">&quot;not permitted to write task contents through the task VFS&quot;</span>))
     } 
-    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">IoError</span><span class="op">&gt;</span> { <span class="prelude-val">Ok</span>(()) }
+    <span class="kw">fn </span>flush(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), IoError&gt; { <span class="prelude-val">Ok</span>(()) }
 }
 
-<span class="kw">impl</span> <span class="ident">KnownLength</span> <span class="kw">for</span> <span class="ident">MmiFile</span> {
-    <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">generate</span>().<span class="ident">len</span>() 
+<span class="kw">impl </span>KnownLength <span class="kw">for </span>MmiFile {
+    <span class="kw">fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.generate().len() 
     }
 }
 
-<span class="kw">impl</span> <span class="ident">File</span> <span class="kw">for</span> <span class="ident">MmiFile</span> {
-    <span class="kw">fn</span> <span class="ident">as_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">MappedPages</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">impl </span>File <span class="kw">for </span>MmiFile {
+    <span class="kw">fn </span>as_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="prelude-val">Err</span>(<span class="string">&quot;task files are autogenerated, cannot be memory mapped&quot;</span>)
     }
 }
 
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="task_fs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="task_fs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

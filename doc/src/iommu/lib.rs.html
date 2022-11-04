@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/iommu/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../iommu/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../iommu/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../iommu/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/iommu/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../iommu/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -149,151 +143,150 @@
 <span id="143">143</span>
 <span id="144">144</span>
 <span id="145">145</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Intel VT-d (IOMMU) implementation.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! [Specification](https://software.intel.com/content/dam/develop/external/us/en/documents-tps/vt-directed-io-spec.pdf)</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Intel VT-d (IOMMU) implementation.
+//!
+//! [Specification](https://software.intel.com/content/dam/develop/external/us/en/documents-tps/vt-directed-io-spec.pdf)
 
-<span class="attribute">#![<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![allow(dead_code)]
+#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">static_assertions</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">volatile</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">zerocopy</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bitflags</span>;
+</span><span class="kw">extern crate </span>irq_safety;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>volatile;
+<span class="kw">extern crate </span>zerocopy;
+<span class="kw">extern crate </span>bitflags;
 
-<span class="kw">use</span> <span class="ident">spin::Once</span>;
-<span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PageTable</span>, <span class="ident">EntryFlags</span>, <span class="ident">PhysicalAddress</span>, <span class="ident">allocate_frames_at</span>, <span class="ident">allocate_pages</span>, <span class="ident">BorrowedMappedPages</span>, <span class="ident">Mutable</span>};
+<span class="kw">use </span>spin::Once;
+<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>memory::{PageTable, EntryFlags, PhysicalAddress, allocate_frames_at, allocate_pages, BorrowedMappedPages, Mutable};
 
-<span class="kw">mod</span> <span class="ident">regs</span>;
-<span class="kw">use</span> <span class="ident">regs</span>::<span class="kw-2">*</span>;
+<span class="kw">mod </span>regs;
+<span class="kw">use </span>regs::<span class="kw-2">*</span>;
 
-<span class="doccomment">/// Struct representing IOMMU (TODO: rename since this is specific to Intel VT-d)</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IntelIommu</span> {
-    <span class="doccomment">/// Width of host addresses available for DMA</span>
-    <span class="ident">host_address_width</span>: <span class="ident">u8</span>,
-    <span class="doccomment">/// PCI segment number associated with this IOMMU</span>
-    <span class="ident">pci_segment_number</span>: <span class="ident">u16</span>,
-    <span class="doccomment">/// Register set base address</span>
-    <span class="ident">register_base_address</span>: <span class="ident">PhysicalAddress</span>,
-    <span class="doccomment">/// Memory mapped control registers</span>
-    <span class="ident">regs</span>: <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">IntelIommuRegisters</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
+<span class="doccomment">/// Struct representing IOMMU (TODO: rename since this is specific to Intel VT-d)
+</span><span class="kw">pub struct </span>IntelIommu {
+    <span class="doccomment">/// Width of host addresses available for DMA
+    </span>host_address_width: u8,
+    <span class="doccomment">/// PCI segment number associated with this IOMMU
+    </span>pci_segment_number: u16,
+    <span class="doccomment">/// Register set base address
+    </span>register_base_address: PhysicalAddress,
+    <span class="doccomment">/// Memory mapped control registers
+    </span>regs: BorrowedMappedPages&lt;IntelIommuRegisters, Mutable&gt;,
 }
 
-<span class="doccomment">/// Singleton representing IOMMU (TODO: could there be more than one IOMMU?)</span>
-<span class="kw">static</span> <span class="ident">IOMMU</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">IntelIommu</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+<span class="doccomment">/// Singleton representing IOMMU (TODO: could there be more than one IOMMU?)
+</span><span class="kw">static </span>IOMMU: Once&lt;MutexIrqSafe&lt;IntelIommu&gt;&gt; = Once::new();
 
-<span class="doccomment">/// Initialize the IOMMU hardware.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Currently this just sets up basic structures and prints out information about the IOMMU;</span>
-<span class="doccomment">/// it doesn&#39;t actually create any I/O device page tables.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `host_address_width`: number of address bits available for DMA</span>
-<span class="doccomment">/// * `pci_segment_number`: PCI segment associated with this IOMMU</span>
-<span class="doccomment">/// * `register_base_address`: base address of register set</span>
-<span class="doccomment">/// * `page_table`: page table to install mapping</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">host_address_width</span>: <span class="ident">u8</span>,
-    <span class="ident">pci_segment_number</span>: <span class="ident">u16</span>,
-    <span class="ident">register_base_address</span>: <span class="ident">PhysicalAddress</span>,
-    <span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="doccomment">/// Initialize the IOMMU hardware.
+///
+/// Currently this just sets up basic structures and prints out information about the IOMMU;
+/// it doesn&#39;t actually create any I/O device page tables.
+///
+/// # Arguments
+/// * `host_address_width`: number of address bits available for DMA
+/// * `pci_segment_number`: PCI segment associated with this IOMMU
+/// * `register_base_address`: base address of register set
+/// * `page_table`: page table to install mapping
+</span><span class="kw">pub fn </span>init(host_address_width: u8,
+    pci_segment_number: u16,
+    register_base_address: PhysicalAddress,
+    page_table: <span class="kw-2">&amp;mut </span>PageTable
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 
     <span class="macro">info!</span>(<span class="string">&quot;IOMMU Init stage 1 begin.&quot;</span>);
 
-    <span class="comment">// map memory-mapped registers into virtual address space</span>
-    <span class="kw">let</span> <span class="ident">mp</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="ident">frames</span> <span class="op">=</span> <span class="ident">allocate_frames_at</span>(<span class="ident">register_base_address</span>, <span class="number">1</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="ident">allocate_pages</span>(<span class="number">1</span>).<span class="ident">ok_or</span>(<span class="string">&quot;Unable to find virtual page!&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="ident">EntryFlags::WRITABLE</span> <span class="op">|</span> <span class="ident">EntryFlags::NO_CACHE</span> <span class="op">|</span> <span class="ident">EntryFlags::NO_EXECUTE</span>;
-        <span class="ident">page_table</span>.<span class="ident">map_allocated_pages_to</span>(<span class="ident">pages</span>, <span class="ident">frames</span>, <span class="ident">flags</span>)<span class="question-mark">?</span>
+    <span class="comment">// map memory-mapped registers into virtual address space
+    </span><span class="kw">let </span>mp = {
+        <span class="kw">let </span>frames = allocate_frames_at(register_base_address, <span class="number">1</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>pages = allocate_pages(<span class="number">1</span>).ok_or(<span class="string">&quot;Unable to find virtual page!&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>flags = EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
+        page_table.map_allocated_pages_to(pages, frames, flags)<span class="question-mark">?
+    </span>};
+
+    <span class="kw">let </span>regs = mp.into_borrowed_mut::&lt;IntelIommuRegisters&gt;(<span class="number">0</span>)
+        .map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
+
+    <span class="comment">// get the version number
+    </span>{
+        <span class="kw">let </span>contents = regs.version.read();
+        <span class="kw">let </span>major_ver = (contents &gt;&gt; <span class="number">4</span>) &amp; <span class="number">0xf</span>;
+        <span class="kw">let </span>minor_ver = (contents) &amp; <span class="number">0xf</span>;
+        <span class="macro">info!</span>(<span class="string">&quot;IOMMU Major Version = {} Minor Version = {}&quot;</span>, major_ver, minor_ver);
+    }
+
+    <span class="comment">// check IOMMU capabilities/extended capabilities
+    </span>{
+        <span class="kw">let </span>c = Capability(regs.cap.read());
+        <span class="kw">let </span>ec = ExtendedCapability(regs.ecap.read());
+
+        <span class="comment">// List capabilities and extended capabilities
+        </span><span class="macro">info!</span>(<span class="string">&quot;IOMMU Capabilities: {:?}&quot;</span>, c);
+        <span class="macro">info!</span>(<span class="string">&quot;IOMMU Extended Capabilities: {:?}&quot;</span>, ec);
+    }
+
+    <span class="comment">// try reading the status register
+    </span>{
+        <span class="kw">let </span>status = GlobalStatus::from_bits_truncate(regs.gstatus.read());
+        <span class="macro">info!</span>(<span class="string">&quot;IOMMU Global Status: {:?}&quot;</span>, status);
+    }
+
+    <span class="comment">// create the &quot;iommu&quot; object
+    </span><span class="kw">let </span>iommu = IntelIommu {
+        host_address_width,
+        pci_segment_number,
+        register_base_address,
+        regs,
     };
 
-    <span class="kw">let</span> <span class="ident">regs</span> <span class="op">=</span> <span class="ident">mp</span>.<span class="ident">into_borrowed_mut</span>::<span class="op">&lt;</span><span class="ident">IntelIommuRegisters</span><span class="op">&gt;</span>(<span class="number">0</span>)
-        .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
+    <span class="comment">// initialize the iommu singleton with this object
+    </span>IOMMU.call_once(|| {MutexIrqSafe::new(iommu)});
 
-    <span class="comment">// get the version number</span>
-    {
-        <span class="kw">let</span> <span class="ident">contents</span> <span class="op">=</span> <span class="ident">regs</span>.<span class="ident">version</span>.<span class="ident">read</span>();
-        <span class="kw">let</span> <span class="ident">major_ver</span> <span class="op">=</span> (<span class="ident">contents</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">4</span>) <span class="op">&amp;</span> <span class="number">0xf</span>;
-        <span class="kw">let</span> <span class="ident">minor_ver</span> <span class="op">=</span> (<span class="ident">contents</span>) <span class="op">&amp;</span> <span class="number">0xf</span>;
-        <span class="macro">info!</span>(<span class="string">&quot;IOMMU Major Version = {} Minor Version = {}&quot;</span>, <span class="ident">major_ver</span>, <span class="ident">minor_ver</span>);
-    }
-
-    <span class="comment">// check IOMMU capabilities/extended capabilities</span>
-    {
-        <span class="kw">let</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">Capability</span>(<span class="ident">regs</span>.<span class="ident">cap</span>.<span class="ident">read</span>());
-        <span class="kw">let</span> <span class="ident">ec</span> <span class="op">=</span> <span class="ident">ExtendedCapability</span>(<span class="ident">regs</span>.<span class="ident">ecap</span>.<span class="ident">read</span>());
-
-        <span class="comment">// List capabilities and extended capabilities</span>
-        <span class="macro">info!</span>(<span class="string">&quot;IOMMU Capabilities: {:?}&quot;</span>, <span class="ident">c</span>);
-        <span class="macro">info!</span>(<span class="string">&quot;IOMMU Extended Capabilities: {:?}&quot;</span>, <span class="ident">ec</span>);
-    }
-
-    <span class="comment">// try reading the status register</span>
-    {
-        <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">GlobalStatus::from_bits_truncate</span>(<span class="ident">regs</span>.<span class="ident">gstatus</span>.<span class="ident">read</span>());
-        <span class="macro">info!</span>(<span class="string">&quot;IOMMU Global Status: {:?}&quot;</span>, <span class="ident">status</span>);
-    }
-
-    <span class="comment">// create the &quot;iommu&quot; object</span>
-    <span class="kw">let</span> <span class="ident">iommu</span> <span class="op">=</span> <span class="ident">IntelIommu</span> {
-        <span class="ident">host_address_width</span>,
-        <span class="ident">pci_segment_number</span>,
-        <span class="ident">register_base_address</span>,
-        <span class="ident">regs</span>,
-    };
-
-    <span class="comment">// initialize the iommu singleton with this object</span>
-    <span class="ident">IOMMU</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> {<span class="ident">MutexIrqSafe::new</span>(<span class="ident">iommu</span>)});
-
-    <span class="comment">// Ensure translation is disabled.</span>
-    <span class="comment">//</span>
-    <span class="comment">// TODO: This can be removed, its only purpose is to test that set_command_bit works</span>
-    <span class="ident">set_command_bit</span>(<span class="ident">GlobalCommand::TE</span>, <span class="bool-val">false</span>, <span class="op">|</span><span class="ident">x</span>: <span class="ident">GlobalStatus</span><span class="op">|</span> { <span class="op">!</span> <span class="ident">x</span>.<span class="ident">intersects</span>(<span class="ident">GlobalStatus::TES</span>) })<span class="question-mark">?</span>;
+    <span class="comment">// Ensure translation is disabled.
+    //
+    // TODO: This can be removed, its only purpose is to test that set_command_bit works
+    </span>set_command_bit(GlobalCommand::TE, <span class="bool-val">false</span>, |x: GlobalStatus| { ! x.intersects(GlobalStatus::TES) })<span class="question-mark">?</span>;
 
     <span class="macro">info!</span>(<span class="string">&quot;IOMMU Init stage 1 complete.&quot;</span>);
 
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="doccomment">/// Returns `true` if an IOMMU exists and has been initialized.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">iommu_present</span>() -&gt; <span class="ident">bool</span> {
-    <span class="ident">IOMMU</span>.<span class="ident">is_completed</span>()
+<span class="doccomment">/// Returns `true` if an IOMMU exists and has been initialized.
+</span><span class="kw">pub fn </span>iommu_present() -&gt; bool {
+    IOMMU.is_completed()
 }
 
-<span class="doccomment">/// This function writes a command to the IOMMU Global Command register using</span>
-<span class="doccomment">/// the algorithm described in the Intel documentation:</span>
-<span class="doccomment">/// 1. Read global status register into temporary variable.</span>
-<span class="doccomment">/// 2. Clear all bits in temporary variable that have no effect on command register.</span>
-<span class="doccomment">/// 3. Set or clear the corresponding command bit depending on `x`.</span>
-<span class="doccomment">/// 4. Write the variable to the command register.</span>
-<span class="doccomment">/// 5. Wait until `condition` is met, where `condition` is a function that </span>
-<span class="doccomment">///    can test the value of the status register.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Arguments:</span>
-<span class="doccomment">/// * `command`: command bit to set/clear</span>
-<span class="doccomment">/// * `bit_value`: value to set command bit to</span>
-<span class="doccomment">/// * `condition`: function which interprets status register and returns true when</span>
-<span class="doccomment">///    command has completed.</span>
-<span class="kw">fn</span> <span class="ident">set_command_bit</span>(
-    <span class="ident">command</span>: <span class="ident">GlobalCommand</span>, 
-    <span class="ident">bit_value</span>: <span class="ident">bool</span>,
-    <span class="ident">condition</span>: <span class="kw">impl</span> <span class="ident">Fn</span>(<span class="ident">GlobalStatus</span>) -&gt; <span class="ident">bool</span>
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">iommu</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">IOMMU</span>.<span class="ident">get</span>().<span class="ident">ok_or</span>(<span class="string">&quot;IOMMU not initialized!&quot;</span>)<span class="question-mark">?</span>.<span class="ident">lock</span>();
-    <span class="kw">let</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">iommu</span>.<span class="ident">regs</span>.<span class="ident">gstatus</span>.<span class="ident">read</span>();
-    <span class="kw">let</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">tmp</span> <span class="op">&amp;</span> <span class="number">0x96ffffff</span>;
-    <span class="kw">let</span> <span class="ident">bits</span> <span class="op">=</span> <span class="ident">command</span> <span class="kw">as</span> <span class="ident">u32</span>;
-    <span class="kw">let</span> <span class="ident">cmd</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">bit_value</span> { <span class="ident">tmp</span> <span class="op">|</span> <span class="ident">bits</span> } <span class="kw">else</span> { <span class="ident">tmp</span> <span class="op">&amp;</span> (<span class="op">!</span><span class="ident">bits</span>) };
-    <span class="ident">iommu</span>.<span class="ident">regs</span>.<span class="ident">gcommand</span>.<span class="ident">write</span>(<span class="ident">cmd</span>);
-    <span class="kw">while</span> <span class="op">!</span><span class="ident">condition</span>(<span class="ident">GlobalStatus::from_bits_truncate</span>(<span class="ident">iommu</span>.<span class="ident">regs</span>.<span class="ident">gstatus</span>.<span class="ident">read</span>())) {}
+<span class="doccomment">/// This function writes a command to the IOMMU Global Command register using
+/// the algorithm described in the Intel documentation:
+/// 1. Read global status register into temporary variable.
+/// 2. Clear all bits in temporary variable that have no effect on command register.
+/// 3. Set or clear the corresponding command bit depending on `x`.
+/// 4. Write the variable to the command register.
+/// 5. Wait until `condition` is met, where `condition` is a function that 
+///    can test the value of the status register.
+///
+/// # Arguments:
+/// * `command`: command bit to set/clear
+/// * `bit_value`: value to set command bit to
+/// * `condition`: function which interprets status register and returns true when
+///    command has completed.
+</span><span class="kw">fn </span>set_command_bit(
+    command: GlobalCommand, 
+    bit_value: bool,
+    condition: <span class="kw">impl </span>Fn(GlobalStatus) -&gt; bool
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>iommu = <span class="kw-2">&amp;mut </span>IOMMU.get().ok_or(<span class="string">&quot;IOMMU not initialized!&quot;</span>)<span class="question-mark">?</span>.lock();
+    <span class="kw">let </span>tmp = iommu.regs.gstatus.read();
+    <span class="kw">let </span>tmp = tmp &amp; <span class="number">0x96ffffff</span>;
+    <span class="kw">let </span>bits = command <span class="kw">as </span>u32;
+    <span class="kw">let </span>cmd = <span class="kw">if </span>bit_value { tmp | bits } <span class="kw">else </span>{ tmp &amp; (!bits) };
+    iommu.regs.gcommand.write(cmd);
+    <span class="kw">while </span>!condition(GlobalStatus::from_bits_truncate(iommu.regs.gstatus.read())) {}
     <span class="prelude-val">Ok</span>(())
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="iommu" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="iommu" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

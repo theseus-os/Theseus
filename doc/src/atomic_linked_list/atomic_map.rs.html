@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/atomic_map.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>atomic_map.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../atomic_linked_list/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../atomic_linked_list/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../atomic_linked_list/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/atomic_map.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>atomic_map.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../atomic_linked_list/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -247,249 +241,248 @@
 <span id="241">241</span>
 <span id="242">242</span>
 <span id="243">243</span>
-</pre><pre class="rust"><code><span class="doccomment">/// A generic map based on a singly-linked list data structure that is lock-free </span>
-<span class="doccomment">/// and uses `AtomicPtr`s to ensure safety in the face of multithreaded access.</span>
-<span class="doccomment">/// Each node remains in the same spot in memory once it is allocated,</span>
-<span class="doccomment">/// and will not be reallocated,</span>
-<span class="doccomment">/// which allows an external thread to maintain a reference to it safely.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Currently we do not allow nodes to be deleted, so it&#39;s only useful for certain purposes.</span>
-<span class="doccomment">/// Later on, once deletions are supported, it will not be safe to maintain out-of-band references</span>
-<span class="doccomment">/// to items in the data structure, rather only weak references. </span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// New elements are inserted at the head of the list, and then the head&#39;s next pointer </span>
-<span class="doccomment">/// is set up to the point to the node that was previously the head. </span>
-<span class="doccomment">/// Thus, the head always points to the most recently added node. </span>
+</pre><pre class="rust"><code><span class="doccomment">/// A generic map based on a singly-linked list data structure that is lock-free 
+/// and uses `AtomicPtr`s to ensure safety in the face of multithreaded access.
+/// Each node remains in the same spot in memory once it is allocated,
+/// and will not be reallocated,
+/// which allows an external thread to maintain a reference to it safely.
+///
+/// Currently we do not allow nodes to be deleted, so it&#39;s only useful for certain purposes.
+/// Later on, once deletions are supported, it will not be safe to maintain out-of-band references
+/// to items in the data structure, rather only weak references. 
+///
+/// New elements are inserted at the head of the list, and then the head&#39;s next pointer 
+/// is set up to the point to the node that was previously the head. 
+/// Thus, the head always points to the most recently added node. 
 
 
-<span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
-<span class="kw">use</span> <span class="ident">core::sync::atomic</span>::{<span class="ident">AtomicPtr</span>, <span class="ident">Ordering</span>};
+</span><span class="kw">use </span>alloc::boxed::Box;
+<span class="kw">use </span>core::sync::atomic::{AtomicPtr, Ordering};
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">struct</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">K</span>: <span class="ident">PartialEq</span> {
-    <span class="ident">key</span>: <span class="ident">K</span>,
-	<span class="ident">value</span>: <span class="ident">V</span>,
-    <span class="ident">next</span>: <span class="ident">AtomicPtr</span><span class="op">&lt;</span><span class="ident">Node</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="attr">#[derive(Debug)]
+</span><span class="kw">struct </span>Node&lt;K, V&gt; <span class="kw">where </span>K: PartialEq {
+    key: K,
+	value: V,
+    next: AtomicPtr&lt;Node&lt;K, V&gt;&gt;,
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">K</span>: <span class="ident">PartialEq</span> {
-    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">k</span>: <span class="ident">K</span>, <span class="ident">v</span>: <span class="ident">V</span>) -&gt; <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-        <span class="ident">Node</span> { 
-            <span class="ident">key</span>: <span class="ident">k</span>,
-			<span class="ident">value</span>: <span class="ident">v</span>,
-            <span class="ident">next</span>: <span class="ident">AtomicPtr::default</span>(), <span class="comment">// null ptr by default</span>
-        }
+<span class="kw">impl</span>&lt;K, V&gt; Node&lt;K, V&gt; <span class="kw">where </span>K: PartialEq {
+    <span class="kw">fn </span>new(k: K, v: V) -&gt; Node&lt;K, V&gt; {
+        Node { 
+            key: k,
+			value: v,
+            next: AtomicPtr::default(), <span class="comment">// null ptr by default
+        </span>}
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">K</span>: <span class="ident">PartialEq</span> {
-    <span class="ident">head</span>: <span class="ident">AtomicPtr</span><span class="op">&lt;</span><span class="ident">Node</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>AtomicMap&lt;K, V&gt; <span class="kw">where </span>K: PartialEq {
+    head: AtomicPtr&lt;Node&lt;K, V&gt;&gt;,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">K</span>: <span class="ident">PartialEq</span> {
-    <span class="doccomment">/// Create a new empty AtomicMap.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Does not perform any allocation until a new node is created.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-        <span class="ident">AtomicMap</span> {
-            <span class="ident">head</span>: <span class="ident">AtomicPtr::new</span>(<span class="ident">core::ptr::null_mut</span>()), <span class="comment">// null ptr</span>
-        }
+<span class="kw">impl</span>&lt;K, V&gt; AtomicMap&lt;K, V&gt; <span class="kw">where </span>K: PartialEq {
+    <span class="doccomment">/// Create a new empty AtomicMap.
+    /// 
+    /// Does not perform any allocation until a new node is created.
+    </span><span class="kw">pub const fn </span>new() -&gt; AtomicMap&lt;K, V&gt; {
+        AtomicMap {
+            head: AtomicPtr::new(core::ptr::null_mut()), <span class="comment">// null ptr
+        </span>}
     }
 
-    <span class="doccomment">/// Adds a new key-value pair to the map. </span>
-	<span class="doccomment">/// If the given key is already present, its corresponding value will be overwritten.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">insert</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="ident">K</span>, <span class="ident">value</span>: <span class="ident">V</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">V</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">insert_timeout</span>(<span class="ident">key</span>, <span class="ident">value</span>, <span class="ident">u64::max_value</span>());
-        <span class="ident">res</span>.<span class="ident">unwrap_or</span>(<span class="prelude-val">None</span>) <span class="comment">// return the Option&lt;V&gt; in Ok(), or None if Err()</span>
-    }
+    <span class="doccomment">/// Adds a new key-value pair to the map. 
+	/// If the given key is already present, its corresponding value will be overwritten.
+    </span><span class="kw">pub fn </span>insert(<span class="kw-2">&amp;</span><span class="self">self</span>, key: K, value: V) -&gt; <span class="prelude-ty">Option</span>&lt;V&gt; {
+        <span class="kw">let </span>res = <span class="self">self</span>.insert_timeout(key, value, u64::max_value());
+        res.unwrap_or(<span class="prelude-val">None</span>) <span class="comment">// return the Option&lt;V&gt; in Ok(), or None if Err()
+    </span>}
 
     
-	<span class="doccomment">/// Adds a new key-value pair to the map. </span>
-	<span class="doccomment">/// If the given key is already present, its corresponding value will be overwritten.</span>
-	<span class="doccomment">/// If it fails to do so atomically after the given number of attempts, it will abort and return Err.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">insert_timeout</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="ident">K</span>, <span class="ident">value</span>: <span class="ident">V</span>, <span class="ident">max_attempts</span>: <span class="ident">u64</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">V</span><span class="op">&gt;</span>, <span class="ident">V</span><span class="op">&gt;</span> {
+	<span class="doccomment">/// Adds a new key-value pair to the map. 
+	/// If the given key is already present, its corresponding value will be overwritten.
+	/// If it fails to do so atomically after the given number of attempts, it will abort and return Err.
+    </span><span class="kw">pub fn </span>insert_timeout(<span class="kw-2">&amp;</span><span class="self">self</span>, key: K, value: V, max_attempts: u64) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;V&gt;, V&gt; {
 
-		<span class="comment">// first, we check to see if the key exists in the list already.</span>
-		<span class="comment">// if it does, simply update the corresponding value.</span>
-		<span class="kw">for</span> <span class="ident">pair</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">iter_mut</span>() {
-			<span class="kw">if</span> <span class="ident">key</span> <span class="op">==</span> <span class="kw-2">*</span><span class="ident">pair</span>.<span class="number">0</span> {
-                <span class="kw">let</span> <span class="ident">old_val</span> <span class="op">=</span> <span class="ident">::core::mem::replace</span>(<span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">pair</span>.<span class="number">1</span>, <span class="ident">value</span>);
-				<span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">old_val</span>));
+		<span class="comment">// first, we check to see if the key exists in the list already.
+		// if it does, simply update the corresponding value.
+		</span><span class="kw">for </span>pair <span class="kw">in </span><span class="self">self</span>.iter_mut() {
+			<span class="kw">if </span>key == <span class="kw-2">*</span>pair.<span class="number">0 </span>{
+                <span class="kw">let </span>old_val = ::core::mem::replace(<span class="kw-2">&amp;mut *</span>pair.<span class="number">1</span>, value);
+				<span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(old_val));
 			}
 		}
         
-		<span class="comment">// Here, the key did not exist, so we must add a new node to hold that key-value pair.</span>
-        <span class="kw">let</span> <span class="ident">node_ptr</span> <span class="op">=</span> <span class="ident">Box::into_raw</span>(<span class="ident">Box::new</span>(<span class="ident">Node::new</span>(<span class="ident">key</span>, <span class="ident">value</span>)));
-        <span class="kw">let</span> <span class="ident">max_attempts</span> <span class="op">=</span> <span class="ident">core::cmp::max</span>(<span class="ident">max_attempts</span>, <span class="number">1</span>); <span class="comment">// ensure we try at least once </span>
+		<span class="comment">// Here, the key did not exist, so we must add a new node to hold that key-value pair.
+        </span><span class="kw">let </span>node_ptr = Box::into_raw(Box::new(Node::new(key, value)));
+        <span class="kw">let </span>max_attempts = core::cmp::max(max_attempts, <span class="number">1</span>); <span class="comment">// ensure we try at least once 
 
-        <span class="comment">// start the first attempt by obtaining the current head pointer</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">orig_head_ptr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">head</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>);
-        <span class="kw">for</span> <span class="ident">_attempt</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">max_attempts</span> {
+        // start the first attempt by obtaining the current head pointer
+        </span><span class="kw">let </span><span class="kw-2">mut </span>orig_head_ptr = <span class="self">self</span>.head.load(Ordering::Acquire);
+        <span class="kw">for </span>_attempt <span class="kw">in </span><span class="number">0</span>..max_attempts {
 
-            <span class="comment">// the new &quot;node&quot; will become the new head, so set the node&#39;s `next` pointer to `orig_head_ptr`</span>
-            <span class="comment">// SAFE: we know the node_ptr is valid since we just created it above.</span>
-            <span class="kw">unsafe</span> {
-                (<span class="kw-2">*</span><span class="ident">node_ptr</span>).<span class="ident">next</span> <span class="op">=</span> <span class="ident">AtomicPtr::new</span>(<span class="ident">orig_head_ptr</span>);
+            <span class="comment">// the new &quot;node&quot; will become the new head, so set the node&#39;s `next` pointer to `orig_head_ptr`
+            // SAFE: we know the node_ptr is valid since we just created it above.
+            </span><span class="kw">unsafe </span>{
+                (<span class="kw-2">*</span>node_ptr).next = AtomicPtr::new(orig_head_ptr);
             }
 
-            <span class="comment">// now try to atomically swap the new `node_ptr` into the current `head` ptr</span>
-            <span class="kw">match</span> <span class="self">self</span>.<span class="ident">head</span>.<span class="ident">compare_exchange_weak</span>(<span class="ident">orig_head_ptr</span>, <span class="ident">node_ptr</span>, <span class="ident">Ordering::AcqRel</span>, <span class="ident">Ordering::Acquire</span>) {
-                <span class="comment">// If compare_exchange succeeds, then the `head` ptr was properly updated, i.e.,</span>
-                <span class="comment">// no other thread was interleaved and snuck in to change `head` since we last loaded it.</span>
-                <span class="prelude-val">Ok</span>(<span class="ident">_old_head_ptr</span>) =&gt; <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>),
-                <span class="prelude-val">Err</span>(<span class="ident">changed_head_ptr</span>) =&gt; <span class="ident">orig_head_ptr</span> <span class="op">=</span> <span class="ident">changed_head_ptr</span>,
+            <span class="comment">// now try to atomically swap the new `node_ptr` into the current `head` ptr
+            </span><span class="kw">match </span><span class="self">self</span>.head.compare_exchange_weak(orig_head_ptr, node_ptr, Ordering::AcqRel, Ordering::Acquire) {
+                <span class="comment">// If compare_exchange succeeds, then the `head` ptr was properly updated, i.e.,
+                // no other thread was interleaved and snuck in to change `head` since we last loaded it.
+                </span><span class="prelude-val">Ok</span>(_old_head_ptr) =&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>),
+                <span class="prelude-val">Err</span>(changed_head_ptr) =&gt; orig_head_ptr = changed_head_ptr,
             }
             
-            <span class="comment">// Here, it didn&#39;t work, the head value wasn&#39;t updated, meaning that another process updated it before we could</span>
-            <span class="comment">// so we need to start over by reading the head ptr again and trying to swap it in again</span>
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span> 
-            <span class="macro">println!</span>(<span class="string">&quot;        attempt {}&quot;</span>, <span class="ident">_attempt</span>);
+            <span class="comment">// Here, it didn&#39;t work, the head value wasn&#39;t updated, meaning that another process updated it before we could
+            // so we need to start over by reading the head ptr again and trying to swap it in again
+            </span><span class="attr">#[cfg(test)] 
+            </span><span class="macro">println!</span>(<span class="string">&quot;        attempt {}&quot;</span>, _attempt);
         }
 
-        <span class="comment">// Here, we exceeded the number of max attempts, so we failed. </span>
-        <span class="comment">// Reclaim the Boxed `Node`, drop the Box, and return the inner data of type `V`.</span>
-        <span class="comment">// SAFE: no one has touched this node except for us when we created it above.</span>
-        <span class="kw">let</span> <span class="ident">reclaimed_node</span> <span class="op">=</span> <span class="kw">unsafe</span> {
-            <span class="ident">Box::from_raw</span>(<span class="ident">node_ptr</span>)
+        <span class="comment">// Here, we exceeded the number of max attempts, so we failed. 
+        // Reclaim the Boxed `Node`, drop the Box, and return the inner data of type `V`.
+        // SAFE: no one has touched this node except for us when we created it above.
+        </span><span class="kw">let </span>reclaimed_node = <span class="kw">unsafe </span>{
+            Box::from_raw(node_ptr)
         };
 
-        <span class="prelude-val">Err</span>(<span class="ident">reclaimed_node</span>.<span class="ident">value</span>)
+        <span class="prelude-val">Err</span>(reclaimed_node.value)
     }
 
-	<span class="doccomment">/// Returns a reference to the value matching the given key, if present. </span>
-	<span class="doccomment">/// Otherwise, returns None. </span>
-	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">K</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">V</span><span class="op">&gt;</span> {
-		<span class="kw">for</span> <span class="ident">pair</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">iter</span>() {
-			<span class="kw">if</span> <span class="ident">key</span> <span class="op">==</span> <span class="ident">pair</span>.<span class="number">0</span> {
-				<span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">pair</span>.<span class="number">1</span>);
+	<span class="doccomment">/// Returns a reference to the value matching the given key, if present. 
+	/// Otherwise, returns None. 
+	</span><span class="kw">pub fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>K) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>V&gt; {
+		<span class="kw">for </span>pair <span class="kw">in </span><span class="self">self</span>.iter() {
+			<span class="kw">if </span>key == pair.<span class="number">0 </span>{
+				<span class="kw">return </span><span class="prelude-val">Some</span>(pair.<span class="number">1</span>);
 			}
 		}
-		<span class="prelude-val">None</span>
-	}
+		<span class="prelude-val">None
+	</span>}
 
 
-    <span class="doccomment">/// Returns a mutable reference to the value matching the given key, if present.</span>
-    <span class="doccomment">/// Otherwise, returns None.</span>
-    <span class="doccomment">/// In order to maintain memory safety (to ensure atomicity), getting a value as mutable</span>
-    <span class="doccomment">/// requires `self` (this `AtomicMap` instance) to be borrowed mutably. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="ident">K</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;mut</span> <span class="ident">V</span><span class="op">&gt;</span> {
-        <span class="kw">for</span> <span class="ident">pair</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">iter_mut</span>() {
-                <span class="kw">if</span> <span class="ident">key</span> <span class="op">==</span> <span class="kw-2">*</span><span class="ident">pair</span>.<span class="number">0</span> {
-                        <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">pair</span>.<span class="number">1</span>);
+    <span class="doccomment">/// Returns a mutable reference to the value matching the given key, if present.
+    /// Otherwise, returns None.
+    /// In order to maintain memory safety (to ensure atomicity), getting a value as mutable
+    /// requires `self` (this `AtomicMap` instance) to be borrowed mutably. 
+    </span><span class="kw">pub fn </span>get_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>, key: K) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;mut </span>V&gt; {
+        <span class="kw">for </span>pair <span class="kw">in </span><span class="self">self</span>.iter_mut() {
+                <span class="kw">if </span>key == <span class="kw-2">*</span>pair.<span class="number">0 </span>{
+                        <span class="kw">return </span><span class="prelude-val">Some</span>(pair.<span class="number">1</span>);
                 }
         }
-        <span class="prelude-val">None</span>
+        <span class="prelude-val">None
+    </span>}
+
+
+    <span class="doccomment">/// Returns a forward iterator through this map. 
+    </span><span class="kw">pub fn </span>iter(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AtomicMapIter&lt;K, V&gt; {
+        AtomicMapIter {
+            curr: <span class="kw-2">&amp;</span><span class="self">self</span>.head, <span class="comment">//load(Ordering::Acquire),
+            // _phantom: PhantomData,
+        </span>}
     }
 
+    <span class="doccomment">/// This should only be used internally, as we don&#39;t want outside entities
+    /// holding mutable references to data here.
+    /// Returns a forward iterator through this map,
+    /// allowing mutation of inner values but not keys.
+    /// This is safe because we do not permit deletion from this map type.
+    </span><span class="kw">fn </span>iter_mut(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AtomicMapIterMut&lt;K, V&gt; {
+        AtomicMapIterMut {
+            curr: <span class="kw-2">&amp;</span><span class="self">self</span>.head, <span class="comment">//load(Ordering::Acquire),
+            // _phantom: PhantomData,
+        </span>}
+    }
+}
 
-    <span class="doccomment">/// Returns a forward iterator through this map. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">iter</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">AtomicMapIter</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-        <span class="ident">AtomicMapIter</span> {
-            <span class="ident">curr</span>: <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">head</span>, <span class="comment">//load(Ordering::Acquire),</span>
-            <span class="comment">// _phantom: PhantomData,</span>
+<span class="kw">impl</span>&lt;K, V&gt; Drop <span class="kw">for </span>AtomicMap&lt;K, V&gt; <span class="kw">where </span>K: PartialEq {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">let </span><span class="kw-2">mut </span>curr_ptr = <span class="self">self</span>.head.load(Ordering::Acquire);
+        <span class="kw">while </span>!curr_ptr.is_null() {
+            <span class="comment">// SAFE: checked for null above
+            </span><span class="kw">let </span>next_ptr = <span class="kw">unsafe </span>{<span class="kw-2">&amp;*</span>curr_ptr}.next.load(Ordering::Acquire);
+            <span class="kw">let _ </span>= <span class="kw">unsafe </span>{ Box::from_raw(curr_ptr) }; <span class="comment">// drop the actual Node
+            </span>curr_ptr = next_ptr;
         }
     }
-
-    <span class="doccomment">/// This should only be used internally, as we don&#39;t want outside entities</span>
-    <span class="doccomment">/// holding mutable references to data here.</span>
-    <span class="doccomment">/// Returns a forward iterator through this map,</span>
-    <span class="doccomment">/// allowing mutation of inner values but not keys.</span>
-    <span class="doccomment">/// This is safe because we do not permit deletion from this map type.</span>
-    <span class="kw">fn</span> <span class="ident">iter_mut</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">AtomicMapIterMut</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-        <span class="ident">AtomicMapIterMut</span> {
-            <span class="ident">curr</span>: <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">head</span>, <span class="comment">//load(Ordering::Acquire),</span>
-            <span class="comment">// _phantom: PhantomData,</span>
-        }
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">K</span>: <span class="ident">PartialEq</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">curr_ptr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">head</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>);
-        <span class="kw">while</span> <span class="op">!</span><span class="ident">curr_ptr</span>.<span class="ident">is_null</span>() {
-            <span class="comment">// SAFE: checked for null above</span>
-            <span class="kw">let</span> <span class="ident">next_ptr</span> <span class="op">=</span> <span class="kw">unsafe</span> {<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">curr_ptr</span>}.<span class="ident">next</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>);
-            <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Box::from_raw</span>(<span class="ident">curr_ptr</span>) }; <span class="comment">// drop the actual Node</span>
-            <span class="ident">curr_ptr</span> <span class="op">=</span> <span class="ident">next_ptr</span>;
-        }
-    }
 }
 
 
 
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AtomicMapIter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>: <span class="ident">PartialEq</span> <span class="op">+</span> <span class="lifetime">&#39;a</span>, <span class="ident">V</span>: <span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="ident">curr</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">AtomicPtr</span><span class="op">&lt;</span><span class="ident">Node</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="comment">// _phantom: PhantomData&lt;&amp;&#39;a K, V&gt;, // we don&#39;t need this with the &amp;&#39;a above</span>
-}
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>: <span class="ident">PartialEq</span> <span class="op">+</span> <span class="lifetime">&#39;a</span>, <span class="ident">V</span>: <span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">Iterator</span> <span class="kw">for</span> <span class="ident">AtomicMapIter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> (<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">K</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">V</span>); 
+<span class="kw">pub struct </span>AtomicMapIter&lt;<span class="lifetime">&#39;a</span>, K: PartialEq + <span class="lifetime">&#39;a</span>, V: <span class="lifetime">&#39;a</span>&gt; {
+    curr: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>AtomicPtr&lt;Node&lt;K, V&gt;&gt;,
+    <span class="comment">// _phantom: PhantomData&lt;&amp;&#39;a K, V&gt;, // we don&#39;t need this with the &amp;&#39;a above
+</span>}
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, K: PartialEq + <span class="lifetime">&#39;a</span>, V: <span class="lifetime">&#39;a</span>&gt; Iterator <span class="kw">for </span>AtomicMapIter&lt;<span class="lifetime">&#39;a</span>, K, V&gt; {
+    <span class="kw">type </span>Item = (<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>K, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>V); 
 
-    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">K</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">V</span>)<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">curr_ptr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">curr</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>);
-        <span class="kw">if</span> <span class="ident">curr_ptr</span> <span class="op">==</span> (<span class="number">0</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span>) {
-            <span class="kw">return</span> <span class="prelude-val">None</span>;
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>K, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>V)&gt; {
+        <span class="kw">let </span>curr_ptr = <span class="self">self</span>.curr.load(Ordering::Acquire);
+        <span class="kw">if </span>curr_ptr == (<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>) {
+            <span class="kw">return </span><span class="prelude-val">None</span>;
         }
-        <span class="comment">// SAFE: curr_ptr was checked for null</span>
-        <span class="kw">let</span> <span class="ident">curr_node</span>: <span class="kw-2">&amp;</span><span class="ident">Node</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">curr_ptr</span> };
-        <span class="self">self</span>.<span class="ident">curr</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">curr_node</span>.<span class="ident">next</span>; <span class="comment">// advance the iterator</span>
-        <span class="prelude-val">Some</span>((<span class="kw-2">&amp;</span><span class="ident">curr_node</span>.<span class="ident">key</span>, <span class="kw-2">&amp;</span><span class="ident">curr_node</span>.<span class="ident">value</span>))
+        <span class="comment">// SAFE: curr_ptr was checked for null
+        </span><span class="kw">let </span>curr_node: <span class="kw-2">&amp;</span>Node&lt;K, V&gt; = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;*</span>curr_ptr };
+        <span class="self">self</span>.curr = <span class="kw-2">&amp;</span>curr_node.next; <span class="comment">// advance the iterator
+        </span><span class="prelude-val">Some</span>((<span class="kw-2">&amp;</span>curr_node.key, <span class="kw-2">&amp;</span>curr_node.value))
     }
 }
 
 
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AtomicMapIterMut</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>: <span class="ident">PartialEq</span> <span class="op">+</span> <span class="lifetime">&#39;a</span>, <span class="ident">V</span>: <span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="ident">curr</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">AtomicPtr</span><span class="op">&lt;</span><span class="ident">Node</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="comment">// _phantom: PhantomData&lt;&amp;&#39;a K, V&gt;, // we don&#39;t need this with the &amp;&#39;a above</span>
-}
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>: <span class="ident">PartialEq</span> <span class="op">+</span> <span class="lifetime">&#39;a</span>, <span class="ident">V</span>: <span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">Iterator</span> <span class="kw">for</span> <span class="ident">AtomicMapIterMut</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> (<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">K</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">V</span>); 
+<span class="kw">pub struct </span>AtomicMapIterMut&lt;<span class="lifetime">&#39;a</span>, K: PartialEq + <span class="lifetime">&#39;a</span>, V: <span class="lifetime">&#39;a</span>&gt; {
+    curr: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>AtomicPtr&lt;Node&lt;K, V&gt;&gt;,
+    <span class="comment">// _phantom: PhantomData&lt;&amp;&#39;a K, V&gt;, // we don&#39;t need this with the &amp;&#39;a above
+</span>}
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, K: PartialEq + <span class="lifetime">&#39;a</span>, V: <span class="lifetime">&#39;a</span>&gt; Iterator <span class="kw">for </span>AtomicMapIterMut&lt;<span class="lifetime">&#39;a</span>, K, V&gt; {
+    <span class="kw">type </span>Item = (<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>K, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>V); 
 
-    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">K</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">V</span>)<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">curr_ptr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">curr</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>);
-        <span class="kw">if</span> <span class="ident">curr_ptr</span> <span class="op">==</span> (<span class="number">0</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span>) {
-            <span class="kw">return</span> <span class="prelude-val">None</span>;
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>K, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>V)&gt; {
+        <span class="kw">let </span>curr_ptr = <span class="self">self</span>.curr.load(Ordering::Acquire);
+        <span class="kw">if </span>curr_ptr == (<span class="number">0 </span><span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>) {
+            <span class="kw">return </span><span class="prelude-val">None</span>;
         }
-        <span class="comment">// SAFE: curr_ptr was checked for null</span>
-        <span class="kw">let</span> <span class="ident">curr_node</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">K</span>, <span class="ident">V</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">curr_ptr</span> };
-        <span class="self">self</span>.<span class="ident">curr</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">curr_node</span>.<span class="ident">next</span>; <span class="comment">// advance the iterator</span>
-        <span class="prelude-val">Some</span>((<span class="kw-2">&amp;</span><span class="ident">curr_node</span>.<span class="ident">key</span>, <span class="kw-2">&amp;mut</span> <span class="ident">curr_node</span>.<span class="ident">value</span>))
+        <span class="comment">// SAFE: curr_ptr was checked for null
+        </span><span class="kw">let </span>curr_node: <span class="kw-2">&amp;mut </span>Node&lt;K, V&gt; = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>curr_ptr };
+        <span class="self">self</span>.curr = <span class="kw-2">&amp;</span>curr_node.next; <span class="comment">// advance the iterator
+        </span><span class="prelude-val">Some</span>((<span class="kw-2">&amp;</span>curr_node.key, <span class="kw-2">&amp;mut </span>curr_node.value))
     }
 }
 
 
-<span class="attribute">#[<span class="ident">test</span>]</span>
-<span class="doccomment">/// To run this test, execute: `cargo test test_map -- --nocapture`</span>
-<span class="kw">fn</span> <span class="ident">test_map</span>() {
-    <span class="kw">let</span> <span class="ident">map</span>: <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>, <span class="ident">u64</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicMap::new</span>();
+<span class="attr">#[test]
+</span><span class="doccomment">/// To run this test, execute: `cargo test test_map -- --nocapture`
+</span><span class="kw">fn </span>test_map() {
+    <span class="kw">let </span>map: AtomicMap&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str, u64&gt; = AtomicMap::new();
     
-	<span class="kw">let</span> <span class="ident">should_be_none</span> <span class="op">=</span> <span class="ident">map</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="string">&quot;yo&quot;</span>);
-	<span class="macro">println!</span>(<span class="string">&quot;should_be_none = {:?}&quot;</span>, <span class="ident">should_be_none</span>);
+	<span class="kw">let </span>should_be_none = map.get(<span class="kw-2">&amp;</span><span class="string">&quot;yo&quot;</span>);
+	<span class="macro">println!</span>(<span class="string">&quot;should_be_none = {:?}&quot;</span>, should_be_none);
 
-	<span class="ident">map</span>.<span class="ident">insert</span>(<span class="string">&quot;yo&quot;</span>, <span class="number">2</span>); 
+	map.insert(<span class="string">&quot;yo&quot;</span>, <span class="number">2</span>); 
 
 	<span class="macro">println!</span>(<span class="string">&quot;after yo 2&quot;</span>);
-    <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="ident">map</span>.<span class="ident">iter</span>() {
-        <span class="macro">println!</span>(<span class="string">&quot;    {:?}&quot;</span>, <span class="ident">i</span>);
+    <span class="kw">for </span>i <span class="kw">in </span>map.iter() {
+        <span class="macro">println!</span>(<span class="string">&quot;    {:?}&quot;</span>, i);
     }
 
-	<span class="ident">map</span>.<span class="ident">insert</span>(<span class="string">&quot;hi&quot;</span>, <span class="number">45</span>);
-	<span class="kw">let</span> <span class="ident">old_yo</span> <span class="op">=</span> <span class="ident">map</span>.<span class="ident">insert</span>(<span class="string">&quot;yo&quot;</span>, <span class="number">1234</span>); 
-    <span class="macro">println!</span>(<span class="string">&quot;old_yo = {:?}&quot;</span>, <span class="ident">old_yo</span>);
+	map.insert(<span class="string">&quot;hi&quot;</span>, <span class="number">45</span>);
+	<span class="kw">let </span>old_yo = map.insert(<span class="string">&quot;yo&quot;</span>, <span class="number">1234</span>); 
+    <span class="macro">println!</span>(<span class="string">&quot;old_yo = {:?}&quot;</span>, old_yo);
 
 	<span class="macro">println!</span>(<span class="string">&quot;after yo 4&quot;</span>);
-    <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="ident">map</span>.<span class="ident">iter</span>() {
-        <span class="macro">println!</span>(<span class="string">&quot;    {:?}&quot;</span>, <span class="ident">i</span>);
+    <span class="kw">for </span>i <span class="kw">in </span>map.iter() {
+        <span class="macro">println!</span>(<span class="string">&quot;    {:?}&quot;</span>, i);
     }
 
-	<span class="kw">let</span> <span class="ident">should_be_45</span> <span class="op">=</span> <span class="ident">map</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="string">&quot;hi&quot;</span>);
-	<span class="macro">println!</span>(<span class="string">&quot;should_be_45 = {:?}&quot;</span>, <span class="ident">should_be_45</span>);
+	<span class="kw">let </span>should_be_45 = map.get(<span class="kw-2">&amp;</span><span class="string">&quot;hi&quot;</span>);
+	<span class="macro">println!</span>(<span class="string">&quot;should_be_45 = {:?}&quot;</span>, should_be_45);
 
-    <span class="kw">let</span> <span class="ident">should_now_be_1234</span> <span class="op">=</span> <span class="ident">map</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="string">&quot;yo&quot;</span>);
-    <span class="macro">println!</span>(<span class="string">&quot;should_now_be_1234 = {:?}&quot;</span>, <span class="ident">should_now_be_1234</span>);
+    <span class="kw">let </span>should_now_be_1234 = map.get(<span class="kw-2">&amp;</span><span class="string">&quot;yo&quot;</span>);
+    <span class="macro">println!</span>(<span class="string">&quot;should_now_be_1234 = {:?}&quot;</span>, should_now_be_1234);
     
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="atomic_linked_list" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="atomic_linked_list" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

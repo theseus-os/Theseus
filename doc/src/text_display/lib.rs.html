@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/displayable/text_display/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../text_display/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../text_display/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../text_display/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/displayable/text_display/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../text_display/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -151,153 +145,152 @@
 <span id="145">145</span>
 <span id="146">146</span>
 <span id="147">147</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This crate defines a text displayable.</span>
-<span class="doccomment">//! A text displayable profiles a block of text to be displayed onto a framebuffer.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate defines a text displayable.
+//! A text displayable profiles a block of text to be displayed onto a framebuffer.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">displayable</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">font</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">framebuffer</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">framebuffer_printer</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">shapes</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">color</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>displayable;
+<span class="kw">extern crate </span>font;
+<span class="kw">extern crate </span>framebuffer;
+<span class="kw">extern crate </span>framebuffer_printer;
+<span class="kw">extern crate </span>shapes;
+<span class="kw">extern crate </span>color;
 
-<span class="kw">use</span> <span class="ident">alloc::string::String</span>;
-<span class="kw">use</span> <span class="ident">displayable</span>::{<span class="ident">Displayable</span>};
-<span class="kw">use</span> <span class="ident">font</span>::{<span class="ident">CHARACTER_HEIGHT</span>, <span class="ident">CHARACTER_WIDTH</span>};
-<span class="kw">use</span> <span class="ident">framebuffer</span>::{<span class="ident">Pixel</span>, <span class="ident">Framebuffer</span>};
-<span class="kw">use</span> <span class="ident">color::Color</span>;
-<span class="kw">use</span> <span class="ident">shapes</span>::{<span class="ident">Coord</span>, <span class="ident">Rectangle</span>};
+<span class="kw">use </span>alloc::string::String;
+<span class="kw">use </span>displayable::{Displayable};
+<span class="kw">use </span>font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
+<span class="kw">use </span>framebuffer::{Pixel, Framebuffer};
+<span class="kw">use </span>color::Color;
+<span class="kw">use </span>shapes::{Coord, Rectangle};
 
 
-<span class="doccomment">/// A text displayable profiles the size and color of a block of text. It can display in a framebuffer.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TextDisplay</span> {
-    <span class="ident">width</span>: <span class="ident">usize</span>,
-    <span class="ident">height</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// The position where the next character will be displayed. </span>
-    <span class="doccomment">/// This is updated after each `display()` invocation, and is useful for optimization.</span>
-    <span class="ident">next_col</span>: <span class="ident">usize</span>,
-    <span class="ident">next_line</span>: <span class="ident">usize</span>,
-    <span class="ident">text</span>: <span class="ident">String</span>,
-    <span class="ident">fg_color</span>: <span class="ident">Color</span>,
-    <span class="ident">bg_color</span>: <span class="ident">Color</span>,
-    <span class="doccomment">/// The cache of the text that was last displayed.</span>
-    <span class="ident">cache</span>: <span class="ident">String</span>,
+<span class="doccomment">/// A text displayable profiles the size and color of a block of text. It can display in a framebuffer.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>TextDisplay {
+    width: usize,
+    height: usize,
+    <span class="doccomment">/// The position where the next character will be displayed. 
+    /// This is updated after each `display()` invocation, and is useful for optimization.
+    </span>next_col: usize,
+    next_line: usize,
+    text: String,
+    fg_color: Color,
+    bg_color: Color,
+    <span class="doccomment">/// The cache of the text that was last displayed.
+    </span>cache: String,
 }
 
-<span class="kw">impl</span> <span class="ident">Displayable</span> <span class="kw">for</span> <span class="ident">TextDisplay</span> {
-    <span class="kw">fn</span> <span class="ident">display</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Pixel</span><span class="op">+</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Color</span><span class="op">&gt;</span><span class="op">&gt;</span> (
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">coordinate</span>: <span class="ident">Coord</span>,
-        <span class="ident">framebuffer</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">P</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Rectangle</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> (<span class="ident">string</span>, <span class="ident">col</span>, <span class="ident">line</span>) <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">cache</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">text</span>.<span class="ident">starts_with</span>(<span class="self">self</span>.<span class="ident">cache</span>.<span class="ident">as_str</span>()) {
+<span class="kw">impl </span>Displayable <span class="kw">for </span>TextDisplay {
+    <span class="kw">fn </span>display&lt;P: Pixel+ From&lt;Color&gt;&gt; (
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        coordinate: Coord,
+        framebuffer: <span class="kw-2">&amp;mut </span>Framebuffer&lt;P&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Rectangle, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>(string, col, line) = <span class="kw">if </span><span class="self">self</span>.cache.len() &gt; <span class="number">0 </span>&amp;&amp; <span class="self">self</span>.text.starts_with(<span class="self">self</span>.cache.as_str()) {
             (
-                <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">text</span>.<span class="ident">as_str</span>()[<span class="self">self</span>.<span class="ident">cache</span>.<span class="ident">len</span>()..<span class="self">self</span>.<span class="ident">text</span>.<span class="ident">len</span>()],
-                <span class="self">self</span>.<span class="ident">next_col</span>,
-                <span class="self">self</span>.<span class="ident">next_line</span>,
+                <span class="kw-2">&amp;</span><span class="self">self</span>.text.as_str()[<span class="self">self</span>.cache.len()..<span class="self">self</span>.text.len()],
+                <span class="self">self</span>.next_col,
+                <span class="self">self</span>.next_line,
             )
-        } <span class="kw">else</span> {
-            (<span class="self">self</span>.<span class="ident">text</span>.<span class="ident">as_str</span>(), <span class="number">0</span>, <span class="number">0</span>)
+        } <span class="kw">else </span>{
+            (<span class="self">self</span>.text.as_str(), <span class="number">0</span>, <span class="number">0</span>)
         };
 
-        <span class="kw">let</span> (<span class="ident">next_col</span>, <span class="ident">next_line</span>, <span class="kw-2">mut</span> <span class="ident">bounding_box</span>) <span class="op">=</span> <span class="ident">framebuffer_printer::print_string</span>(
-            <span class="ident">framebuffer</span>,
-            <span class="ident">coordinate</span>,
-            <span class="self">self</span>.<span class="ident">width</span>,
-            <span class="self">self</span>.<span class="ident">height</span>,
-            <span class="ident">string</span>,
-            <span class="self">self</span>.<span class="ident">fg_color</span>.<span class="ident">into</span>(),
-            <span class="self">self</span>.<span class="ident">bg_color</span>.<span class="ident">into</span>(),
-            <span class="ident">col</span>,
-            <span class="ident">line</span>,
+        <span class="kw">let </span>(next_col, next_line, <span class="kw-2">mut </span>bounding_box) = framebuffer_printer::print_string(
+            framebuffer,
+            coordinate,
+            <span class="self">self</span>.width,
+            <span class="self">self</span>.height,
+            string,
+            <span class="self">self</span>.fg_color.into(),
+            <span class="self">self</span>.bg_color.into(),
+            col,
+            line,
         );
 
-        <span class="kw">if</span> <span class="ident">next_line</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">next_line</span> {
-            <span class="ident">bounding_box</span>.<span class="ident">bottom_right</span>.<span class="ident">y</span> <span class="op">=</span> ((<span class="self">self</span>.<span class="ident">next_line</span> <span class="op">+</span> <span class="number">1</span> ) <span class="op">*</span> <span class="ident">CHARACTER_HEIGHT</span>) <span class="kw">as</span> <span class="ident">isize</span>
+        <span class="kw">if </span>next_line &lt; <span class="self">self</span>.next_line {
+            bounding_box.bottom_right.y = ((<span class="self">self</span>.next_line + <span class="number">1 </span>) * CHARACTER_HEIGHT) <span class="kw">as </span>isize
         }
 
-        <span class="self">self</span>.<span class="ident">next_col</span> <span class="op">=</span> <span class="ident">next_col</span>;
-        <span class="self">self</span>.<span class="ident">next_line</span> <span class="op">=</span> <span class="ident">next_line</span>;
-        <span class="self">self</span>.<span class="ident">cache</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">text</span>.<span class="ident">clone</span>();
+        <span class="self">self</span>.next_col = next_col;
+        <span class="self">self</span>.next_line = next_line;
+        <span class="self">self</span>.cache = <span class="self">self</span>.text.clone();
 
-        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">bounding_box</span> <span class="op">+</span> <span class="ident">coordinate</span>);
+        <span class="kw">return </span><span class="prelude-val">Ok</span>(bounding_box + coordinate);
     }
 
-    <span class="kw">fn</span> <span class="ident">set_size</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">width</span>: <span class="ident">usize</span>, <span class="ident">height</span>: <span class="ident">usize</span>) {
-        <span class="self">self</span>.<span class="ident">width</span> <span class="op">=</span> <span class="ident">width</span>;
-        <span class="self">self</span>.<span class="ident">height</span> <span class="op">=</span> <span class="ident">height</span>;
+    <span class="kw">fn </span>set_size(<span class="kw-2">&amp;mut </span><span class="self">self</span>, width: usize, height: usize) {
+        <span class="self">self</span>.width = width;
+        <span class="self">self</span>.height = height;
     }
 
-    <span class="kw">fn</span> <span class="ident">get_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (<span class="ident">usize</span>, <span class="ident">usize</span>) {
-        (<span class="self">self</span>.<span class="ident">width</span>, <span class="self">self</span>.<span class="ident">height</span>)
+    <span class="kw">fn </span>get_size(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (usize, usize) {
+        (<span class="self">self</span>.width, <span class="self">self</span>.height)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">TextDisplay</span> {
-    <span class="doccomment">/// Creates a new text displayable.</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `width`, `height`: the dimensions of the text area, in number of characters.</span>
-    <span class="doccomment">/// * `fg_color`, `bg_color`: the color of the text and the background behind the text, respectively.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">width</span>: <span class="ident">usize</span>,
-        <span class="ident">height</span>: <span class="ident">usize</span>,
-        <span class="ident">fg_color</span>: <span class="ident">Color</span>,
-        <span class="ident">bg_color</span>: <span class="ident">Color</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">TextDisplay</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Ok</span>(<span class="ident">TextDisplay</span> {
-            <span class="ident">width</span>: <span class="ident">width</span>,
-            <span class="ident">height</span>: <span class="ident">height</span>,
-            <span class="ident">next_col</span>: <span class="number">0</span>,
-            <span class="ident">next_line</span>: <span class="number">0</span>,
-            <span class="ident">text</span>: <span class="ident">String::new</span>(),
-            <span class="ident">fg_color</span>: <span class="ident">fg_color</span>,
-            <span class="ident">bg_color</span>: <span class="ident">bg_color</span>,
-            <span class="ident">cache</span>: <span class="ident">String::new</span>(),
+<span class="kw">impl </span>TextDisplay {
+    <span class="doccomment">/// Creates a new text displayable.
+    /// # Arguments
+    /// * `width`, `height`: the dimensions of the text area, in number of characters.
+    /// * `fg_color`, `bg_color`: the color of the text and the background behind the text, respectively.
+    </span><span class="kw">pub fn </span>new(
+        width: usize,
+        height: usize,
+        fg_color: Color,
+        bg_color: Color,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;TextDisplay, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="prelude-val">Ok</span>(TextDisplay {
+            width: width,
+            height: height,
+            next_col: <span class="number">0</span>,
+            next_line: <span class="number">0</span>,
+            text: String::new(),
+            fg_color: fg_color,
+            bg_color: bg_color,
+            cache: String::new(),
         })
     }
 
-    <span class="doccomment">/// Gets the background color of the text area</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_bg_color</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Color</span> {
-        <span class="self">self</span>.<span class="ident">bg_color</span>
+    <span class="doccomment">/// Gets the background color of the text area
+    </span><span class="kw">pub fn </span>get_bg_color(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Color {
+        <span class="self">self</span>.bg_color
     }
     
-    <span class="doccomment">/// Clear the cache of the text displayable.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset_cache</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">cache</span> <span class="op">=</span> <span class="ident">String::new</span>();
+    <span class="doccomment">/// Clear the cache of the text displayable.
+    </span><span class="kw">pub fn </span>reset_cache(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.cache = String::new();
     }
 
-    <span class="doccomment">/// Translate the index of a character in the text to the location of the text displayable. Return (column, line).</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_location</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">index</span>: <span class="ident">usize</span>) -&gt; (<span class="ident">usize</span>, <span class="ident">usize</span>) {
-        <span class="kw">let</span> <span class="ident">text_width</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">width</span> <span class="op">/</span> <span class="ident">CHARACTER_WIDTH</span>;
-        (<span class="ident">index</span> <span class="op">%</span> <span class="ident">text_width</span>, <span class="ident">index</span> <span class="op">/</span> <span class="ident">text_width</span>)
+    <span class="doccomment">/// Translate the index of a character in the text to the location of the text displayable. Return (column, line).
+    </span><span class="kw">pub fn </span>get_location(<span class="kw-2">&amp;</span><span class="self">self</span>, index: usize) -&gt; (usize, usize) {
+        <span class="kw">let </span>text_width = <span class="self">self</span>.width / CHARACTER_WIDTH;
+        (index % text_width, index / text_width)
     }
 
-    <span class="doccomment">/// Translate the location of a character to its index in the text.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">column</span>: <span class="ident">usize</span>, <span class="ident">line</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-        <span class="kw">let</span> <span class="ident">text_width</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">width</span> <span class="op">/</span> <span class="ident">CHARACTER_WIDTH</span>;
-        <span class="ident">line</span> <span class="op">*</span> <span class="ident">text_width</span> <span class="op">+</span> <span class="ident">column</span>
+    <span class="doccomment">/// Translate the location of a character to its index in the text.
+    </span><span class="kw">pub fn </span>get_index(<span class="kw-2">&amp;</span><span class="self">self</span>, column: usize, line: usize) -&gt; usize {
+        <span class="kw">let </span>text_width = <span class="self">self</span>.width / CHARACTER_WIDTH;
+        line * text_width + column
     }
 
-    <span class="doccomment">/// Gets the size of a text displayable in number of characters.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_dimensions</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (<span class="ident">usize</span>, <span class="ident">usize</span>) {
-        (<span class="self">self</span>.<span class="ident">width</span> <span class="op">/</span> <span class="ident">CHARACTER_WIDTH</span>, <span class="self">self</span>.<span class="ident">height</span> <span class="op">/</span> <span class="ident">CHARACTER_HEIGHT</span>)
+    <span class="doccomment">/// Gets the size of a text displayable in number of characters.
+    </span><span class="kw">pub fn </span>get_dimensions(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (usize, usize) {
+        (<span class="self">self</span>.width / CHARACTER_WIDTH, <span class="self">self</span>.height / CHARACTER_HEIGHT)
     }
 
-    <span class="doccomment">/// Gets the index of next character to be displayabled. It is the position next to existing printed characters in the text displayable.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_next_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="kw">let</span> <span class="ident">col_num</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">width</span> <span class="op">/</span> <span class="ident">CHARACTER_WIDTH</span>;
-        <span class="self">self</span>.<span class="ident">next_line</span> <span class="op">*</span> <span class="ident">col_num</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">next_col</span>
+    <span class="doccomment">/// Gets the index of next character to be displayabled. It is the position next to existing printed characters in the text displayable.
+    </span><span class="kw">pub fn </span>get_next_index(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="kw">let </span>col_num = <span class="self">self</span>.width / CHARACTER_WIDTH;
+        <span class="self">self</span>.next_line * col_num + <span class="self">self</span>.next_col
     }
 
-    <span class="doccomment">/// Sets the text of the text displayable</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_text</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">text</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
-        <span class="self">self</span>.<span class="ident">text</span> <span class="op">=</span> <span class="ident">String::from</span>(<span class="ident">text</span>);
+    <span class="doccomment">/// Sets the text of the text displayable
+    </span><span class="kw">pub fn </span>set_text(<span class="kw-2">&amp;mut </span><span class="self">self</span>, text: <span class="kw-2">&amp;</span>str) {
+        <span class="self">self</span>.text = String::from(text);
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="text_display" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="text_display" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

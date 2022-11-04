@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/intel_ethernet/src/descriptors.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>descriptors.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../intel_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../intel_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../intel_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/intel_ethernet/src/descriptors.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>descriptors.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../intel_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -402,404 +396,403 @@
 <span id="396">396</span>
 <span id="397">397</span>
 <span id="398">398</span>
-</pre><pre class="rust"><code><span class="doccomment">//! The different descriptor types used by Intel NICs.</span>
-<span class="doccomment">//! Usually the newer NICs use more advanced descriptor types but retain support for older ones.</span>
-<span class="doccomment">//! The difference in the types is the amount of packet information that is included in the descriptor, and the format.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! The different descriptor types used by Intel NICs.
+//! Usually the newer NICs use more advanced descriptor types but retain support for older ones.
+//! The difference in the types is the amount of packet information that is included in the descriptor, and the format.
 
-<span class="kw">use</span> <span class="ident">memory::PhysicalAddress</span>;
-<span class="kw">use</span> <span class="ident">volatile</span>::{<span class="ident">Volatile</span>, <span class="ident">ReadOnly</span>};
-<span class="kw">use</span> <span class="ident">bit_field::BitField</span>;
-<span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
+</span><span class="kw">use </span>memory::PhysicalAddress;
+<span class="kw">use </span>volatile::{Volatile, ReadOnly};
+<span class="kw">use </span>bit_field::BitField;
+<span class="kw">use </span>zerocopy::FromBytes;
 
-<span class="comment">// Transmit descriptor bits</span>
-<span class="doccomment">/// Tx Command: End of Packet</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TX_CMD_EOP</span>:                      <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">0</span>;     
-<span class="doccomment">/// Tx Command: Insert MAC FCS</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TX_CMD_IFCS</span>:                     <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>;     
-<span class="doccomment">/// Tx Command: Insert Checksum</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TX_CMD_IC</span>:                       <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">2</span>;     
-<span class="doccomment">/// Tx Command: Report Status</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TX_CMD_RS</span>:                       <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">3</span>;     
-<span class="doccomment">/// Tx Command: Report Packet Sent</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TX_CMD_RPS</span>:                      <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">4</span>;     
-<span class="doccomment">/// Tx Command: Descriptor Extension (Advanced format)</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TX_CMD_DEXT</span>:                     <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">5</span>;  
-<span class="doccomment">/// Tx Command: VLAN Packet Enable</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TX_CMD_VLE</span>:                      <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">6</span>;     
-<span class="doccomment">/// Tx Command: Interrupt Delay Enable</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TX_CMD_IDE</span>:                      <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">7</span>;     
-<span class="doccomment">/// Tx Status: descriptor Done</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TX_STATUS_DD</span>:                    <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">0</span>;
-<span class="doccomment">/// Tx Descriptor Type: advanced</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TX_DTYP_ADV</span>:                     <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x3</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">4</span>;
-<span class="doccomment">/// Tx Descriptor paylen shift</span>
-<span class="doccomment">/// The paylen is located at bit 46 in the upper 64 bits of the advanced Tx descriptor.</span>
-<span class="doccomment">/// Since we have divided the upper 64 bits into 4 parts (u16,u8,u8,u32),</span>
-<span class="doccomment">/// the paylen is then located at bit 14 of the upper 32 bits of the descriptor.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TX_PAYLEN_SHIFT</span>:                 <span class="ident">u8</span> <span class="op">=</span> <span class="number">46</span> <span class="op">-</span> <span class="number">32</span>; <span class="comment">//(actual offset - offset of variable) </span>
+<span class="comment">// Transmit descriptor bits
+</span><span class="doccomment">/// Tx Command: End of Packet
+</span><span class="kw">pub const </span>TX_CMD_EOP:                      u8 = <span class="number">1 </span>&lt;&lt; <span class="number">0</span>;     
+<span class="doccomment">/// Tx Command: Insert MAC FCS
+</span><span class="kw">pub const </span>TX_CMD_IFCS:                     u8 = <span class="number">1 </span>&lt;&lt; <span class="number">1</span>;     
+<span class="doccomment">/// Tx Command: Insert Checksum
+</span><span class="kw">pub const </span>TX_CMD_IC:                       u8 = <span class="number">1 </span>&lt;&lt; <span class="number">2</span>;     
+<span class="doccomment">/// Tx Command: Report Status
+</span><span class="kw">pub const </span>TX_CMD_RS:                       u8 = <span class="number">1 </span>&lt;&lt; <span class="number">3</span>;     
+<span class="doccomment">/// Tx Command: Report Packet Sent
+</span><span class="kw">pub const </span>TX_CMD_RPS:                      u8 = <span class="number">1 </span>&lt;&lt; <span class="number">4</span>;     
+<span class="doccomment">/// Tx Command: Descriptor Extension (Advanced format)
+</span><span class="kw">pub const </span>TX_CMD_DEXT:                     u8 = <span class="number">1 </span>&lt;&lt; <span class="number">5</span>;  
+<span class="doccomment">/// Tx Command: VLAN Packet Enable
+</span><span class="kw">pub const </span>TX_CMD_VLE:                      u8 = <span class="number">1 </span>&lt;&lt; <span class="number">6</span>;     
+<span class="doccomment">/// Tx Command: Interrupt Delay Enable
+</span><span class="kw">pub const </span>TX_CMD_IDE:                      u8 = <span class="number">1 </span>&lt;&lt; <span class="number">7</span>;     
+<span class="doccomment">/// Tx Status: descriptor Done
+</span><span class="kw">pub const </span>TX_STATUS_DD:                    u8 = <span class="number">1 </span>&lt;&lt; <span class="number">0</span>;
+<span class="doccomment">/// Tx Descriptor Type: advanced
+</span><span class="kw">pub const </span>TX_DTYP_ADV:                     u8 = <span class="number">0x3 </span>&lt;&lt; <span class="number">4</span>;
+<span class="doccomment">/// Tx Descriptor paylen shift
+/// The paylen is located at bit 46 in the upper 64 bits of the advanced Tx descriptor.
+/// Since we have divided the upper 64 bits into 4 parts (u16,u8,u8,u32),
+/// the paylen is then located at bit 14 of the upper 32 bits of the descriptor.
+</span><span class="kw">pub const </span>TX_PAYLEN_SHIFT:                 u8 = <span class="number">46 </span>- <span class="number">32</span>; <span class="comment">//(actual offset - offset of variable) 
 
-<span class="comment">// Receive descriptor bits </span>
-<span class="doccomment">/// Rx Status: Descriptor Done</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RX_STATUS_DD</span>:                    <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">0</span>;
-<span class="doccomment">/// Rx Status: End of Packet</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RX_STATUS_EOP</span>:                   <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>;
+// Receive descriptor bits 
+</span><span class="doccomment">/// Rx Status: Descriptor Done
+</span><span class="kw">pub const </span>RX_STATUS_DD:                    u8 = <span class="number">1 </span>&lt;&lt; <span class="number">0</span>;
+<span class="doccomment">/// Rx Status: End of Packet
+</span><span class="kw">pub const </span>RX_STATUS_EOP:                   u8 = <span class="number">1 </span>&lt;&lt; <span class="number">1</span>;
 
 
-<span class="doccomment">/// A trait for the minimum set of functions needed to receive a packet using one of Intel&#39;s receive descriptor types.</span>
-<span class="doccomment">/// Receive descriptors contain the physical address where an incoming packet should be stored by the NIC,</span>
-<span class="doccomment">/// as well as bits that are updated by the HW once the packet is received.</span>
-<span class="doccomment">/// There is one receive descriptor per receive buffer. </span>
-<span class="doccomment">/// Receive functions defined in the Network_Interface_Card crate expect a receive descriptor to implement this trait.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">RxDescriptor</span>: <span class="ident">FromBytes</span> {
-    <span class="doccomment">/// Initializes a receive descriptor by clearing its status </span>
-    <span class="doccomment">/// and setting the descriptor&#39;s physical address.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `packet_buffer_address`: starting physical address of the receive buffer.</span>
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>);
+<span class="doccomment">/// A trait for the minimum set of functions needed to receive a packet using one of Intel&#39;s receive descriptor types.
+/// Receive descriptors contain the physical address where an incoming packet should be stored by the NIC,
+/// as well as bits that are updated by the HW once the packet is received.
+/// There is one receive descriptor per receive buffer. 
+/// Receive functions defined in the Network_Interface_Card crate expect a receive descriptor to implement this trait.
+</span><span class="kw">pub trait </span>RxDescriptor: FromBytes {
+    <span class="doccomment">/// Initializes a receive descriptor by clearing its status 
+    /// and setting the descriptor&#39;s physical address.
+    /// 
+    /// # Arguments
+    /// * `packet_buffer_address`: starting physical address of the receive buffer.
+    </span><span class="kw">fn </span>init(<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet_buffer_address: PhysicalAddress);
 
-    <span class="doccomment">/// Updates the descriptor&#39;s physical address.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `packet_buffer_address`: starting physical address of the receive buffer.</span>
-    <span class="kw">fn</span> <span class="ident">set_packet_address</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>);
+    <span class="doccomment">/// Updates the descriptor&#39;s physical address.
+    /// 
+    /// # Arguments
+    /// * `packet_buffer_address`: starting physical address of the receive buffer.
+    </span><span class="kw">fn </span>set_packet_address(<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet_buffer_address: PhysicalAddress);
 
-    <span class="doccomment">/// Clears the status bits of the descriptor.</span>
-    <span class="kw">fn</span> <span class="ident">reset_status</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>);
+    <span class="doccomment">/// Clears the status bits of the descriptor.
+    </span><span class="kw">fn </span>reset_status(<span class="kw-2">&amp;mut </span><span class="self">self</span>);
 
-    <span class="doccomment">/// Returns true if the descriptor has a received packet copied to its buffer.</span>
-    <span class="kw">fn</span> <span class="ident">descriptor_done</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>;
+    <span class="doccomment">/// Returns true if the descriptor has a received packet copied to its buffer.
+    </span><span class="kw">fn </span>descriptor_done(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool;
 
-    <span class="doccomment">/// Returns true if the descriptor&#39;s packet buffer is the last in a frame.</span>
-    <span class="kw">fn</span> <span class="ident">end_of_packet</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>;
+    <span class="doccomment">/// Returns true if the descriptor&#39;s packet buffer is the last in a frame.
+    </span><span class="kw">fn </span>end_of_packet(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool;
 
-    <span class="doccomment">/// The length of the packet in the descriptor&#39;s packet buffer.</span>
-    <span class="kw">fn</span> <span class="ident">length</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>;
+    <span class="doccomment">/// The length of the packet in the descriptor&#39;s packet buffer.
+    </span><span class="kw">fn </span>length(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64;
 }
 
-<span class="doccomment">/// A trait for the minimum set of functions needed to transmit a packet using one of Intel&#39;s transmit descriptor types.</span>
-<span class="doccomment">/// Transmit descriptors contain the physical address where an outgoing packet is stored,</span>
-<span class="doccomment">/// as well as bits that are updated by the HW once the packet is sent.</span>
-<span class="doccomment">/// There is one transmit descriptor per transmit buffer.</span>
-<span class="doccomment">/// Transmit functions defined in the Network_Interface_Card crate expect a transmit descriptor to implement this trait.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">TxDescriptor</span>: <span class="ident">FromBytes</span> {
-    <span class="doccomment">/// Initializes a transmit descriptor by clearing all of its values.</span>
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>);
+<span class="doccomment">/// A trait for the minimum set of functions needed to transmit a packet using one of Intel&#39;s transmit descriptor types.
+/// Transmit descriptors contain the physical address where an outgoing packet is stored,
+/// as well as bits that are updated by the HW once the packet is sent.
+/// There is one transmit descriptor per transmit buffer.
+/// Transmit functions defined in the Network_Interface_Card crate expect a transmit descriptor to implement this trait.
+</span><span class="kw">pub trait </span>TxDescriptor: FromBytes {
+    <span class="doccomment">/// Initializes a transmit descriptor by clearing all of its values.
+    </span><span class="kw">fn </span>init(<span class="kw-2">&amp;mut </span><span class="self">self</span>);
 
-    <span class="doccomment">/// Updates the transmit descriptor to send the packet.</span>
-    <span class="doccomment">/// We assume that one transmit descriptor will be used to send one packet.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `transmit_buffer_addr`: physical address of the transmit buffer. </span>
-    <span class="doccomment">/// * `transmit_buffer_length`: length of packet we want to send.</span>
-    <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">transmit_buffer_addr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">transmit_buffer_length</span>: <span class="ident">u16</span>);
+    <span class="doccomment">/// Updates the transmit descriptor to send the packet.
+    /// We assume that one transmit descriptor will be used to send one packet.
+    /// 
+    /// # Arguments
+    /// * `transmit_buffer_addr`: physical address of the transmit buffer. 
+    /// * `transmit_buffer_length`: length of packet we want to send.
+    </span><span class="kw">fn </span>send(<span class="kw-2">&amp;mut </span><span class="self">self</span>, transmit_buffer_addr: PhysicalAddress, transmit_buffer_length: u16);
 
-    <span class="doccomment">/// Polls the Descriptor Done bit until the packet has been sent.</span>
-    <span class="kw">fn</span> <span class="ident">wait_for_packet_tx</span>(<span class="kw-2">&amp;</span><span class="self">self</span>);
-}
-
-
-
-<span class="doccomment">/// This struct is a Legacy Transmit Descriptor. </span>
-<span class="doccomment">/// It&#39;s the descriptor type used in older Intel NICs and the E1000 driver.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LegacyTxDescriptor</span> {
-    <span class="doccomment">/// The starting physical address of the transmit buffer</span>
-    <span class="kw">pub</span> <span class="ident">phys_addr</span>:  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Length of the transmit buffer in bytes</span>
-    <span class="kw">pub</span> <span class="ident">length</span>:     <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Checksum offset: where to insert the checksum from the start of the packet if enabled</span>
-    <span class="kw">pub</span> <span class="ident">cso</span>:        <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Command bits</span>
-    <span class="kw">pub</span> <span class="ident">cmd</span>:        <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Status bits</span>
-    <span class="kw">pub</span> <span class="ident">status</span>:     <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Checksum start: where to begin computing the checksum, if enabled</span>
-    <span class="kw">pub</span> <span class="ident">css</span>:        <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Vlan tags </span>
-    <span class="kw">pub</span> <span class="ident">vlan</span> :      <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
-}
-
-<span class="kw">impl</span> <span class="ident">TxDescriptor</span> <span class="kw">for</span> <span class="ident">LegacyTxDescriptor</span> {
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">phys_addr</span>.<span class="ident">write</span>(<span class="number">0</span>);
-        <span class="self">self</span>.<span class="ident">length</span>.<span class="ident">write</span>(<span class="number">0</span>);
-        <span class="self">self</span>.<span class="ident">cso</span>.<span class="ident">write</span>(<span class="number">0</span>);
-        <span class="self">self</span>.<span class="ident">cmd</span>.<span class="ident">write</span>(<span class="number">0</span>);
-        <span class="self">self</span>.<span class="ident">status</span>.<span class="ident">write</span>(<span class="number">0</span>);
-        <span class="self">self</span>.<span class="ident">css</span>.<span class="ident">write</span>(<span class="number">0</span>);
-        <span class="self">self</span>.<span class="ident">vlan</span>.<span class="ident">write</span>(<span class="number">0</span>);
-    }
-
-    <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">transmit_buffer_addr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">transmit_buffer_length</span>: <span class="ident">u16</span>) {
-        <span class="self">self</span>.<span class="ident">phys_addr</span>.<span class="ident">write</span>(<span class="ident">transmit_buffer_addr</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
-        <span class="self">self</span>.<span class="ident">length</span>.<span class="ident">write</span>(<span class="ident">transmit_buffer_length</span>);
-        <span class="self">self</span>.<span class="ident">cmd</span>.<span class="ident">write</span>(<span class="ident">TX_CMD_EOP</span> <span class="op">|</span> <span class="ident">TX_CMD_IFCS</span> <span class="op">|</span> <span class="ident">TX_CMD_RPS</span> <span class="op">|</span> <span class="ident">TX_CMD_RS</span>); 
-        <span class="self">self</span>.<span class="ident">status</span>.<span class="ident">write</span>(<span class="number">0</span>);
-    }
-
-    <span class="kw">fn</span> <span class="ident">wait_for_packet_tx</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">while</span> (<span class="self">self</span>.<span class="ident">status</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="ident">TX_STATUS_DD</span>) <span class="op">==</span> <span class="number">0</span> {
-            <span class="comment">// debug!(&quot;tx desc status: {}&quot;, self.status.read());</span>
-        } 
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">LegacyTxDescriptor</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-            <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{{addr: {:#X}, length: {}, cso: {}, cmd: {}, status: {}, css: {}, special: {}}}&quot;</span>,
-                    <span class="self">self</span>.<span class="ident">phys_addr</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">length</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">cso</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">cmd</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">status</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">css</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">vlan</span>.<span class="ident">read</span>())
-    }
+    <span class="doccomment">/// Polls the Descriptor Done bit until the packet has been sent.
+    </span><span class="kw">fn </span>wait_for_packet_tx(<span class="kw-2">&amp;</span><span class="self">self</span>);
 }
 
 
 
-<span class="doccomment">/// This struct is a Legacy Receive Descriptor. </span>
-<span class="doccomment">/// The driver writes to the upper 64 bits, and the NIC writes to the lower 64 bits.</span>
-<span class="doccomment">/// It&#39;s the descriptor type used in older Intel NICs and the E1000 driver.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LegacyRxDescriptor</span> {
-    <span class="doccomment">/// The starting physical address of the receive buffer</span>
-    <span class="kw">pub</span> <span class="ident">phys_addr</span>:  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,      
-    <span class="doccomment">/// Length of the receive buffer in bytes</span>
-    <span class="kw">pub</span> <span class="ident">length</span>:     <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Checksum value of the packet after the IP header till the end </span>
-    <span class="kw">pub</span> <span class="ident">checksum</span>:   <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Status bits which tell if the descriptor has been used</span>
-    <span class="kw">pub</span> <span class="ident">status</span>:     <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Receive errors</span>
-    <span class="kw">pub</span> <span class="ident">errors</span>:     <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Vlan tags</span>
-    <span class="kw">pub</span> <span class="ident">vlan</span>:       <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
+<span class="doccomment">/// This struct is a Legacy Transmit Descriptor. 
+/// It&#39;s the descriptor type used in older Intel NICs and the E1000 driver.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>LegacyTxDescriptor {
+    <span class="doccomment">/// The starting physical address of the transmit buffer
+    </span><span class="kw">pub </span>phys_addr:  Volatile&lt;u64&gt;,
+    <span class="doccomment">/// Length of the transmit buffer in bytes
+    </span><span class="kw">pub </span>length:     Volatile&lt;u16&gt;,
+    <span class="doccomment">/// Checksum offset: where to insert the checksum from the start of the packet if enabled
+    </span><span class="kw">pub </span>cso:        Volatile&lt;u8&gt;,
+    <span class="doccomment">/// Command bits
+    </span><span class="kw">pub </span>cmd:        Volatile&lt;u8&gt;,
+    <span class="doccomment">/// Status bits
+    </span><span class="kw">pub </span>status:     Volatile&lt;u8&gt;,
+    <span class="doccomment">/// Checksum start: where to begin computing the checksum, if enabled
+    </span><span class="kw">pub </span>css:        Volatile&lt;u8&gt;,
+    <span class="doccomment">/// Vlan tags 
+    </span><span class="kw">pub </span>vlan :      Volatile&lt;u16&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">RxDescriptor</span> <span class="kw">for</span> <span class="ident">LegacyRxDescriptor</span> {
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>) {
-        <span class="self">self</span>.<span class="ident">phys_addr</span>.<span class="ident">write</span>(<span class="ident">packet_buffer_address</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
-        <span class="self">self</span>.<span class="ident">status</span>.<span class="ident">write</span>(<span class="number">0</span>);
+<span class="kw">impl </span>TxDescriptor <span class="kw">for </span>LegacyTxDescriptor {
+    <span class="kw">fn </span>init(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.phys_addr.write(<span class="number">0</span>);
+        <span class="self">self</span>.length.write(<span class="number">0</span>);
+        <span class="self">self</span>.cso.write(<span class="number">0</span>);
+        <span class="self">self</span>.cmd.write(<span class="number">0</span>);
+        <span class="self">self</span>.status.write(<span class="number">0</span>);
+        <span class="self">self</span>.css.write(<span class="number">0</span>);
+        <span class="self">self</span>.vlan.write(<span class="number">0</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">set_packet_address</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>) {
-        <span class="self">self</span>.<span class="ident">phys_addr</span>.<span class="ident">write</span>(<span class="ident">packet_buffer_address</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
+    <span class="kw">fn </span>send(<span class="kw-2">&amp;mut </span><span class="self">self</span>, transmit_buffer_addr: PhysicalAddress, transmit_buffer_length: u16) {
+        <span class="self">self</span>.phys_addr.write(transmit_buffer_addr.value() <span class="kw">as </span>u64);
+        <span class="self">self</span>.length.write(transmit_buffer_length);
+        <span class="self">self</span>.cmd.write(TX_CMD_EOP | TX_CMD_IFCS | TX_CMD_RPS | TX_CMD_RS); 
+        <span class="self">self</span>.status.write(<span class="number">0</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">reset_status</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">status</span>.<span class="ident">write</span>(<span class="number">0</span>);
-    }
-
-    <span class="kw">fn</span> <span class="ident">descriptor_done</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        (<span class="self">self</span>.<span class="ident">status</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="ident">RX_STATUS_DD</span>) <span class="op">==</span> <span class="ident">RX_STATUS_DD</span>
-    }
-
-    <span class="kw">fn</span> <span class="ident">end_of_packet</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        (<span class="self">self</span>.<span class="ident">status</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="ident">RX_STATUS_EOP</span>) <span class="op">==</span> <span class="ident">RX_STATUS_EOP</span>        
-    }
-
-    <span class="kw">fn</span> <span class="ident">length</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span> {
-        <span class="self">self</span>.<span class="ident">length</span>.<span class="ident">read</span>() <span class="kw">as</span> <span class="ident">u64</span>
-    }
-}
-
-<span class="kw">use</span> <span class="ident">core::fmt</span>;
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">LegacyRxDescriptor</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-            <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{{addr: {:#X}, length: {}, checksum: {}, status: {}, errors: {}, special: {}}}&quot;</span>,
-                    <span class="self">self</span>.<span class="ident">phys_addr</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">length</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">checksum</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">status</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">errors</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">vlan</span>.<span class="ident">read</span>())
+    <span class="kw">fn </span>wait_for_packet_tx(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">while </span>(<span class="self">self</span>.status.read() &amp; TX_STATUS_DD) == <span class="number">0 </span>{
+            <span class="comment">// debug!(&quot;tx desc status: {}&quot;, self.status.read());
+        </span>} 
     }
 }
 
-
-<span class="doccomment">/// Advanced Receive Descriptor used in the Ixgbe driver.</span>
-<span class="doccomment">/// It has 2 modes: Read and Write Back, both of which use the whole 128 bits. </span>
-<span class="doccomment">/// There is one receive descriptor per receive buffer that can be converted between these 2 modes.</span>
-<span class="doccomment">/// Read contains the addresses that the driver writes.</span>
-<span class="doccomment">/// Write Back contains information the hardware writes on receiving a packet.</span>
-<span class="doccomment">/// More information can be found in the 82599 datasheet.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AdvancedRxDescriptor</span> {
-    <span class="doccomment">/// Starting physcal address of the receive buffer for the packet.</span>
-    <span class="kw">pub</span> <span class="ident">packet_buffer_address</span>:  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Starting physcal address of the receive buffer for the header.</span>
-    <span class="doccomment">/// This field will only be used if header splitting is enabled. </span>
-    <span class="kw">pub</span> <span class="ident">header_buffer_address</span>:  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
-}
-
-<span class="kw">impl</span> <span class="ident">RxDescriptor</span> <span class="kw">for</span> <span class="ident">AdvancedRxDescriptor</span> {
-    <span class="kw">fn</span> <span class="ident">init</span> (<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>) {
-        <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">write</span>(<span class="ident">packet_buffer_address</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
-        <span class="comment">// set the header address to 0 because packet splitting is not supposed to be enabled in the 82599</span>
-        <span class="self">self</span>.<span class="ident">header_buffer_address</span>.<span class="ident">write</span>(<span class="number">0</span>);
-    }
-
-    <span class="kw">fn</span> <span class="ident">set_packet_address</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>) {
-        <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">write</span>(<span class="ident">packet_buffer_address</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
-    }
-
-    <span class="kw">fn</span> <span class="ident">reset_status</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">header_buffer_address</span>.<span class="ident">write</span>(<span class="number">0</span>);
-    }
-
-    <span class="kw">fn</span> <span class="ident">descriptor_done</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>{
-        (<span class="self">self</span>.<span class="ident">get_ext_status</span>() <span class="op">&amp;</span> <span class="ident">RX_STATUS_DD</span> <span class="kw">as</span> <span class="ident">u64</span>) <span class="op">==</span> <span class="ident">RX_STATUS_DD</span> <span class="kw">as</span> <span class="ident">u64</span>
-    }
-
-    <span class="kw">fn</span> <span class="ident">end_of_packet</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        (<span class="self">self</span>.<span class="ident">get_ext_status</span>() <span class="op">&amp;</span> <span class="ident">RX_STATUS_EOP</span> <span class="kw">as</span> <span class="ident">u64</span>) <span class="op">==</span> <span class="ident">RX_STATUS_EOP</span> <span class="kw">as</span> <span class="ident">u64</span>        
-    }
-
-    <span class="kw">fn</span> <span class="ident">length</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span> {
-        <span class="self">self</span>.<span class="ident">get_pkt_len</span>() <span class="kw">as</span> <span class="ident">u64</span>
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>LegacyTxDescriptor {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+            <span class="macro">write!</span>(f, <span class="string">&quot;{{addr: {:#X}, length: {}, cso: {}, cmd: {}, status: {}, css: {}, special: {}}}&quot;</span>,
+                    <span class="self">self</span>.phys_addr.read(), <span class="self">self</span>.length.read(), <span class="self">self</span>.cso.read(), <span class="self">self</span>.cmd.read(), <span class="self">self</span>.status.read(), <span class="self">self</span>.css.read(), <span class="self">self</span>.vlan.read())
     }
 }
 
-<span class="kw">impl</span> <span class="ident">AdvancedRxDescriptor</span> {
 
-    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
-    <span class="doccomment">/// Returns the packet type that was used for the Receive Side Scaling hash function.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_rss_type</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
-        <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">0</span>..<span class="number">3</span>) 
+
+<span class="doccomment">/// This struct is a Legacy Receive Descriptor. 
+/// The driver writes to the upper 64 bits, and the NIC writes to the lower 64 bits.
+/// It&#39;s the descriptor type used in older Intel NICs and the E1000 driver.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>LegacyRxDescriptor {
+    <span class="doccomment">/// The starting physical address of the receive buffer
+    </span><span class="kw">pub </span>phys_addr:  Volatile&lt;u64&gt;,      
+    <span class="doccomment">/// Length of the receive buffer in bytes
+    </span><span class="kw">pub </span>length:     ReadOnly&lt;u16&gt;,
+    <span class="doccomment">/// Checksum value of the packet after the IP header till the end 
+    </span><span class="kw">pub </span>checksum:   ReadOnly&lt;u16&gt;,
+    <span class="doccomment">/// Status bits which tell if the descriptor has been used
+    </span><span class="kw">pub </span>status:     Volatile&lt;u8&gt;,
+    <span class="doccomment">/// Receive errors
+    </span><span class="kw">pub </span>errors:     ReadOnly&lt;u8&gt;,
+    <span class="doccomment">/// Vlan tags
+    </span><span class="kw">pub </span>vlan:       ReadOnly&lt;u16&gt;,
+}
+
+<span class="kw">impl </span>RxDescriptor <span class="kw">for </span>LegacyRxDescriptor {
+    <span class="kw">fn </span>init(<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet_buffer_address: PhysicalAddress) {
+        <span class="self">self</span>.phys_addr.write(packet_buffer_address.value() <span class="kw">as </span>u64);
+        <span class="self">self</span>.status.write(<span class="number">0</span>);
     }
 
-    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
-    <span class="doccomment">/// Returns the packet type as identified by the hardware.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_packet_type</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
-        <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">4</span>..<span class="number">16</span>) 
+    <span class="kw">fn </span>set_packet_address(<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet_buffer_address: PhysicalAddress) {
+        <span class="self">self</span>.phys_addr.write(packet_buffer_address.value() <span class="kw">as </span>u64);
     }
 
-    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
-    <span class="doccomment">/// Returns the number of Receive Side Coalesced packets that start in this descriptor.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_rsccnt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
-        <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">17</span>..<span class="number">20</span>) 
+    <span class="kw">fn </span>reset_status(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.status.write(<span class="number">0</span>);
     }
 
-    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
-    <span class="doccomment">/// Returns the size of the packet header in bytes.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_hdr_len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
-        <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">21</span>..<span class="number">30</span>) 
+    <span class="kw">fn </span>descriptor_done(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        (<span class="self">self</span>.status.read() &amp; RX_STATUS_DD) == RX_STATUS_DD
     }
 
-    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
-    <span class="doccomment">/// When set to 1b, indicates that the hardware has found the length of the header.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_sph</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>{
-        <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bit</span>(<span class="number">31</span>) 
+    <span class="kw">fn </span>end_of_packet(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        (<span class="self">self</span>.status.read() &amp; RX_STATUS_EOP) == RX_STATUS_EOP        
     }
 
-    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
-    <span class="doccomment">/// Returns the Receive Side Scaling hash.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_rss_hash</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
-        <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">32</span>..<span class="number">63</span>) 
+    <span class="kw">fn </span>length(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64 {
+        <span class="self">self</span>.length.read() <span class="kw">as </span>u64
+    }
+}
+
+<span class="kw">use </span>core::fmt;
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>LegacyRxDescriptor {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+            <span class="macro">write!</span>(f, <span class="string">&quot;{{addr: {:#X}, length: {}, checksum: {}, status: {}, errors: {}, special: {}}}&quot;</span>,
+                    <span class="self">self</span>.phys_addr.read(), <span class="self">self</span>.length.read(), <span class="self">self</span>.checksum.read(), <span class="self">self</span>.status.read(), <span class="self">self</span>.errors.read(), <span class="self">self</span>.vlan.read())
+    }
+}
+
+
+<span class="doccomment">/// Advanced Receive Descriptor used in the Ixgbe driver.
+/// It has 2 modes: Read and Write Back, both of which use the whole 128 bits. 
+/// There is one receive descriptor per receive buffer that can be converted between these 2 modes.
+/// Read contains the addresses that the driver writes.
+/// Write Back contains information the hardware writes on receiving a packet.
+/// More information can be found in the 82599 datasheet.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>AdvancedRxDescriptor {
+    <span class="doccomment">/// Starting physcal address of the receive buffer for the packet.
+    </span><span class="kw">pub </span>packet_buffer_address:  Volatile&lt;u64&gt;,
+    <span class="doccomment">/// Starting physcal address of the receive buffer for the header.
+    /// This field will only be used if header splitting is enabled. 
+    </span><span class="kw">pub </span>header_buffer_address:  Volatile&lt;u64&gt;,
+}
+
+<span class="kw">impl </span>RxDescriptor <span class="kw">for </span>AdvancedRxDescriptor {
+    <span class="kw">fn </span>init (<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet_buffer_address: PhysicalAddress) {
+        <span class="self">self</span>.packet_buffer_address.write(packet_buffer_address.value() <span class="kw">as </span>u64);
+        <span class="comment">// set the header address to 0 because packet splitting is not supposed to be enabled in the 82599
+        </span><span class="self">self</span>.header_buffer_address.write(<span class="number">0</span>);
     }
 
-    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
-    <span class="doccomment">/// Returns the Flow Director Filter ID if the packet matches a filter.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_fdf_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
-        <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">32</span>..<span class="number">63</span>) 
+    <span class="kw">fn </span>set_packet_address(<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet_buffer_address: PhysicalAddress) {
+        <span class="self">self</span>.packet_buffer_address.write(packet_buffer_address.value() <span class="kw">as </span>u64);
     }
 
-    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
-    <span class="doccomment">/// Status information indicates whether a descriptor has been used </span>
-    <span class="doccomment">/// and whether the buffer is the last one for a packet</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_ext_status</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
-        <span class="self">self</span>.<span class="ident">header_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">0</span>..<span class="number">19</span>) 
+    <span class="kw">fn </span>reset_status(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.header_buffer_address.write(<span class="number">0</span>);
+    }
+
+    <span class="kw">fn </span>descriptor_done(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool{
+        (<span class="self">self</span>.get_ext_status() &amp; RX_STATUS_DD <span class="kw">as </span>u64) == RX_STATUS_DD <span class="kw">as </span>u64
+    }
+
+    <span class="kw">fn </span>end_of_packet(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        (<span class="self">self</span>.get_ext_status() &amp; RX_STATUS_EOP <span class="kw">as </span>u64) == RX_STATUS_EOP <span class="kw">as </span>u64        
+    }
+
+    <span class="kw">fn </span>length(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64 {
+        <span class="self">self</span>.get_pkt_len() <span class="kw">as </span>u64
+    }
+}
+
+<span class="kw">impl </span>AdvancedRxDescriptor {
+
+    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.
+    /// Returns the packet type that was used for the Receive Side Scaling hash function.
+    </span><span class="kw">pub fn </span>get_rss_type(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64{
+        <span class="self">self</span>.packet_buffer_address.read().get_bits(<span class="number">0</span>..<span class="number">3</span>) 
+    }
+
+    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.
+    /// Returns the packet type as identified by the hardware.
+    </span><span class="kw">pub fn </span>get_packet_type(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64{
+        <span class="self">self</span>.packet_buffer_address.read().get_bits(<span class="number">4</span>..<span class="number">16</span>) 
+    }
+
+    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.
+    /// Returns the number of Receive Side Coalesced packets that start in this descriptor.
+    </span><span class="kw">pub fn </span>get_rsccnt(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64{
+        <span class="self">self</span>.packet_buffer_address.read().get_bits(<span class="number">17</span>..<span class="number">20</span>) 
+    }
+
+    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.
+    /// Returns the size of the packet header in bytes.
+    </span><span class="kw">pub fn </span>get_hdr_len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64{
+        <span class="self">self</span>.packet_buffer_address.read().get_bits(<span class="number">21</span>..<span class="number">30</span>) 
+    }
+
+    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.
+    /// When set to 1b, indicates that the hardware has found the length of the header.
+    </span><span class="kw">pub fn </span>get_sph(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool{
+        <span class="self">self</span>.packet_buffer_address.read().get_bit(<span class="number">31</span>) 
+    }
+
+    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.
+    /// Returns the Receive Side Scaling hash.
+    </span><span class="kw">pub fn </span>get_rss_hash(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64{
+        <span class="self">self</span>.packet_buffer_address.read().get_bits(<span class="number">32</span>..<span class="number">63</span>) 
+    }
+
+    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.
+    /// Returns the Flow Director Filter ID if the packet matches a filter.
+    </span><span class="kw">pub fn </span>get_fdf_id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64{
+        <span class="self">self</span>.packet_buffer_address.read().get_bits(<span class="number">32</span>..<span class="number">63</span>) 
+    }
+
+    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.
+    /// Status information indicates whether a descriptor has been used 
+    /// and whether the buffer is the last one for a packet
+    </span><span class="kw">pub fn </span>get_ext_status(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64{
+        <span class="self">self</span>.header_buffer_address.read().get_bits(<span class="number">0</span>..<span class="number">19</span>) 
     }
     
-    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
-    <span class="doccomment">/// Returns errors reported by hardware for different packet types</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_ext_error</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
-        <span class="self">self</span>.<span class="ident">header_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">20</span>..<span class="number">31</span>) 
+    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.
+    /// Returns errors reported by hardware for different packet types
+    </span><span class="kw">pub fn </span>get_ext_error(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64{
+        <span class="self">self</span>.header_buffer_address.read().get_bits(<span class="number">20</span>..<span class="number">31</span>) 
     }
     
-    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
-    <span class="doccomment">/// Returns the number of bytes posted to the packet buffer</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_pkt_len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
-        <span class="self">self</span>.<span class="ident">header_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">32</span>..<span class="number">47</span>) 
+    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.
+    /// Returns the number of bytes posted to the packet buffer
+    </span><span class="kw">pub fn </span>get_pkt_len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64{
+        <span class="self">self</span>.header_buffer_address.read().get_bits(<span class="number">32</span>..<span class="number">47</span>) 
     }
     
-    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
-    <span class="doccomment">/// If the vlan header is stripped from the packet, then the 16 bits of the VLAN tag are posted here</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_vlan_tag</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
-        <span class="self">self</span>.<span class="ident">header_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">48</span>..<span class="number">63</span>) 
+    <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.
+    /// If the vlan header is stripped from the packet, then the 16 bits of the VLAN tag are posted here
+    </span><span class="kw">pub fn </span>get_vlan_tag(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64{
+        <span class="self">self</span>.header_buffer_address.read().get_bits(<span class="number">48</span>..<span class="number">63</span>) 
     }    
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">AdvancedRxDescriptor</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{{Packet buffer address: {:#X}, Packet header address: {:#X}}}&quot;</span>,
-            <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">header_buffer_address</span>.<span class="ident">read</span>())
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>AdvancedRxDescriptor {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;{{Packet buffer address: {:#X}, Packet header address: {:#X}}}&quot;</span>,
+            <span class="self">self</span>.packet_buffer_address.read(), <span class="self">self</span>.header_buffer_address.read())
     }
 }
 
 
-<span class="doccomment">/// Advanced Transmit Descriptor used by the `ixgbe` NIC driver.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Two usage modes</span>
-<span class="doccomment">/// It has 2 modes: Read and Write Back, both of which use the whole 128 bits. </span>
-<span class="doccomment">/// There is one transmit descriptor per transmit buffer; it can be converted between these 2 modes.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Read contains the addresses that the driver writes.</span>
-<span class="doccomment">/// Write Back contains information the hardware writes on receiving a packet.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// More information can be found in the 82599 datasheet.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AdvancedTxDescriptor</span> {
-    <span class="doccomment">/// Starting physical address of the receive buffer for the packet.</span>
-    <span class="kw">pub</span> <span class="ident">packet_buffer_address</span>:  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Length of data buffer</span>
-    <span class="kw">pub</span> <span class="ident">data_len</span>: <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `dtyp`: Descriptor Type, occupies bits `[7:4]`,</span>
-    <span class="doccomment">/// * `mac`: options to apply LinkSec and time stamp, occupies bits `[3:2]`.</span>
-    <span class="kw">pub</span> <span class="ident">dtyp_mac_rsv</span> : <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Command bits</span>
-    <span class="kw">pub</span> <span class="ident">dcmd</span>:  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `paylen`: the size in bytes of the data buffer in host memory.</span>
-    <span class="doccomment">///   not including the fields that the hardware adds), occupies bits `[31:14]`.</span>
-    <span class="doccomment">/// * `popts`: options to offload checksum calculation, occupies bits `[13:8]`.</span>
-    <span class="doccomment">/// * `sta`: status of the descriptor (whether it&#39;s in use or not), occupies bits `[3:0]`.</span>
-    <span class="kw">pub</span> <span class="ident">paylen_popts_cc_idx_sta</span>: <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,
+<span class="doccomment">/// Advanced Transmit Descriptor used by the `ixgbe` NIC driver.
+///
+/// # Two usage modes
+/// It has 2 modes: Read and Write Back, both of which use the whole 128 bits. 
+/// There is one transmit descriptor per transmit buffer; it can be converted between these 2 modes.
+///
+/// Read contains the addresses that the driver writes.
+/// Write Back contains information the hardware writes on receiving a packet.
+///
+/// More information can be found in the 82599 datasheet.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>AdvancedTxDescriptor {
+    <span class="doccomment">/// Starting physical address of the receive buffer for the packet.
+    </span><span class="kw">pub </span>packet_buffer_address:  Volatile&lt;u64&gt;,
+    <span class="doccomment">/// Length of data buffer
+    </span><span class="kw">pub </span>data_len: Volatile&lt;u16&gt;,
+    <span class="doccomment">/// A multi-part field:
+    /// * `dtyp`: Descriptor Type, occupies bits `[7:4]`,
+    /// * `mac`: options to apply LinkSec and time stamp, occupies bits `[3:2]`.
+    </span><span class="kw">pub </span>dtyp_mac_rsv : Volatile&lt;u8&gt;,
+    <span class="doccomment">/// Command bits
+    </span><span class="kw">pub </span>dcmd:  Volatile&lt;u8&gt;,
+    <span class="doccomment">/// A multi-part field:
+    /// * `paylen`: the size in bytes of the data buffer in host memory.
+    ///   not including the fields that the hardware adds), occupies bits `[31:14]`.
+    /// * `popts`: options to offload checksum calculation, occupies bits `[13:8]`.
+    /// * `sta`: status of the descriptor (whether it&#39;s in use or not), occupies bits `[3:0]`.
+    </span><span class="kw">pub </span>paylen_popts_cc_idx_sta: Volatile&lt;u32&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">TxDescriptor</span> <span class="kw">for</span> <span class="ident">AdvancedTxDescriptor</span> {
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">write</span>(<span class="number">0</span>);
-        <span class="self">self</span>.<span class="ident">paylen_popts_cc_idx_sta</span>.<span class="ident">write</span>(<span class="number">0</span>);
-        <span class="self">self</span>.<span class="ident">dcmd</span>.<span class="ident">write</span>(<span class="number">0</span>);
-        <span class="self">self</span>.<span class="ident">dtyp_mac_rsv</span>.<span class="ident">write</span>(<span class="number">0</span>);
-        <span class="self">self</span>.<span class="ident">data_len</span>.<span class="ident">write</span>(<span class="number">0</span>);
+<span class="kw">impl </span>TxDescriptor <span class="kw">for </span>AdvancedTxDescriptor {
+    <span class="kw">fn </span>init(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.packet_buffer_address.write(<span class="number">0</span>);
+        <span class="self">self</span>.paylen_popts_cc_idx_sta.write(<span class="number">0</span>);
+        <span class="self">self</span>.dcmd.write(<span class="number">0</span>);
+        <span class="self">self</span>.dtyp_mac_rsv.write(<span class="number">0</span>);
+        <span class="self">self</span>.data_len.write(<span class="number">0</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">transmit_buffer_addr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">transmit_buffer_length</span>: <span class="ident">u16</span>) {
-        <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">write</span>(<span class="ident">transmit_buffer_addr</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
-        <span class="self">self</span>.<span class="ident">data_len</span>.<span class="ident">write</span>(<span class="ident">transmit_buffer_length</span>);
-        <span class="self">self</span>.<span class="ident">dtyp_mac_rsv</span>.<span class="ident">write</span>(<span class="ident">TX_DTYP_ADV</span>);
-        <span class="self">self</span>.<span class="ident">paylen_popts_cc_idx_sta</span>.<span class="ident">write</span>((<span class="ident">transmit_buffer_length</span> <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">TX_PAYLEN_SHIFT</span>);
-        <span class="self">self</span>.<span class="ident">dcmd</span>.<span class="ident">write</span>(<span class="ident">TX_CMD_DEXT</span> <span class="op">|</span> <span class="ident">TX_CMD_RS</span> <span class="op">|</span> <span class="ident">TX_CMD_IFCS</span> <span class="op">|</span> <span class="ident">TX_CMD_EOP</span>);
+    <span class="kw">fn </span>send(<span class="kw-2">&amp;mut </span><span class="self">self</span>, transmit_buffer_addr: PhysicalAddress, transmit_buffer_length: u16) {
+        <span class="self">self</span>.packet_buffer_address.write(transmit_buffer_addr.value() <span class="kw">as </span>u64);
+        <span class="self">self</span>.data_len.write(transmit_buffer_length);
+        <span class="self">self</span>.dtyp_mac_rsv.write(TX_DTYP_ADV);
+        <span class="self">self</span>.paylen_popts_cc_idx_sta.write((transmit_buffer_length <span class="kw">as </span>u32) &lt;&lt; TX_PAYLEN_SHIFT);
+        <span class="self">self</span>.dcmd.write(TX_CMD_DEXT | TX_CMD_RS | TX_CMD_IFCS | TX_CMD_EOP);
     }
 
-    <span class="kw">fn</span> <span class="ident">wait_for_packet_tx</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">while</span> (<span class="self">self</span>.<span class="ident">paylen_popts_cc_idx_sta</span>.<span class="ident">read</span>() <span class="kw">as</span> <span class="ident">u8</span> <span class="op">&amp;</span> <span class="ident">TX_STATUS_DD</span>) <span class="op">==</span> <span class="number">0</span> {
-            <span class="comment">// error!(&quot;tx desc status: {:#X}&quot;, self.paylen_popts_cc_idx_sta.read());</span>
-        } 
+    <span class="kw">fn </span>wait_for_packet_tx(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">while </span>(<span class="self">self</span>.paylen_popts_cc_idx_sta.read() <span class="kw">as </span>u8 &amp; TX_STATUS_DD) == <span class="number">0 </span>{
+            <span class="comment">// error!(&quot;tx desc status: {:#X}&quot;, self.paylen_popts_cc_idx_sta.read());
+        </span>} 
     }
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">AdvancedTxDescriptor</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;AdvancedTxDescriptor&quot;</span>)
-            .<span class="ident">field</span>(<span class="string">&quot;packet buffer address&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;data len&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">data_len</span>.<span class="ident">read</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;dtype_mac_rsv&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">dtyp_mac_rsv</span>.<span class="ident">read</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;dcmd&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">dcmd</span>.<span class="ident">read</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;paylen_popts_cc_idx_sta&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">paylen_popts_cc_idx_sta</span>.<span class="ident">read</span>())
-            .<span class="ident">finish</span>()
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>AdvancedTxDescriptor {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        f.debug_struct(<span class="string">&quot;AdvancedTxDescriptor&quot;</span>)
+            .field(<span class="string">&quot;packet buffer address&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.packet_buffer_address.read())
+            .field(<span class="string">&quot;data len&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.data_len.read())
+            .field(<span class="string">&quot;dtype_mac_rsv&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.dtyp_mac_rsv.read())
+            .field(<span class="string">&quot;dcmd&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.dcmd.read())
+            .field(<span class="string">&quot;paylen_popts_cc_idx_sta&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.paylen_popts_cc_idx_sta.read())
+            .finish()
     }
 }
 
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="intel_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="intel_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

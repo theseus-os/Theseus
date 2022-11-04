@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/simd_personality/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../simd_personality/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../simd_personality/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../simd_personality/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/simd_personality/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../simd_personality/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -213,61 +207,61 @@
 <span id="207">207</span>
 <span id="208">208</span>
 <span id="209">209</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Management of two kernel personalities, one for SIMD-enabled code, and one for regular code. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! This crate is responsible for creating and managing multiple `CrateNamespace`s so that Theseus</span>
-<span class="doccomment">//! can run two instances of code side-by-side, like library OS-style personalities. </span>
-<span class="doccomment">//! This crate itself is part of the regular non-SIMD world, not the SIMD world. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! There are two considerations here to ensure correctness by saving/restoring SIMD registers: </span>
-<span class="doccomment">//! how to deal with it for context switching, and also for interrupt handling.</span>
-<span class="doccomment">//! Both of these policies are determined per-core as follows:</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! # Context Switching </span>
-<span class="doccomment">//! * If there is one or zero SIMD-enabled `Task`s running on a given core, </span>
-<span class="doccomment">//!   then all `Task`s running on that core can use the standard, </span>
-<span class="doccomment">//!   non-SIMD-enabled context switching routine. </span>
-<span class="doccomment">//!   This is because there is no need to save and restore SIMD registers (e.g., xmm),</span>
-<span class="doccomment">//!   as only a single `Task` will ever use them. </span>
-<span class="doccomment">//! * If there are multiple SIMD-enabled `Task`s running on a given core,</span>
-<span class="doccomment">//!   then all of the SIMD `Task`s on that core must use the SIMD-enabled context switching routine,</span>
-<span class="doccomment">//!   which is found in the `context_switch_sse` crate. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Note that there is no danger in forcing all SIMD Tasks to always use the SIMD-enabled context switching routine,</span>
-<span class="doccomment">//! it will always be correct to do so.</span>
-<span class="doccomment">//! Each Task can have its own Context and context_switch routine, based on whether or not it uses SIMD instructions,</span>
-<span class="doccomment">//! and that can be determined statically and independently for each task, without considering which other tasks are running. </span>
-<span class="doccomment">//! We don&#39;t really need personalities for that, since the `context_switch` routines are self-contained.  </span>
-<span class="doccomment">//! However, that static policy misses out on the performance optimization of </span>
-<span class="doccomment">//! not having to save/restore SIMD registers when only a single SIMD Task is running on a given core.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! # Interrupt Handling</span>
-<span class="doccomment">//! * If interrupt handlers are only ever compiled for the regular world, i.e., </span>
-<span class="doccomment">//!   no interrupt handlers exist that are compiled to use SIMD instructions,</span>
-<span class="doccomment">//!   then we do not have to save/restore SIMD registers on an interrupt because</span>
-<span class="doccomment">//!   we&#39;re guaranteed that no interrupt handling code can ever use (overwrite) SIMD registers. </span>
-<span class="doccomment">//!   Thus, even if there are some SIMD enabled tasks running on a given core, an interrupt handler need not save</span>
-<span class="doccomment">//!   those SIMD registers if it cannot possibly ever touch them. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! * If interrupt handlers _are_ compiled for the SIMD world and use SIMD instructions in the handler </span>
-<span class="doccomment">//!   (or any function accessible from the interrupt handler), then they must (and obviously will) save SIMD registers.</span>
-<span class="doccomment">//!   In fact, I don&#39;t believe it&#39;s possible to compile an interrupt handler that uses SIMD instructions but doesn&#39;t save SIMD registers</span>
-<span class="doccomment">//!   (at least while we&#39;re stil using the special x86 interrupt calling convention to have LLVM do it for us).</span>
-<span class="doccomment">//!   </span>
-<span class="doccomment">//! Thus, the best option is just to require that any SIMD-enabled interrupt handlers must save all SIMD registers, </span>
-<span class="doccomment">//! which is a rule determined completely independently of which tasks are running on that core. </span>
-<span class="doccomment">//! In general, this is a good rule, because it&#39;s poor design to have an interrupt handler do a lot of work,</span>
-<span class="doccomment">//! such as processing data in a way that would need SIMD instructions. </span>
-<span class="doccomment">//! Instead, those processing stages should be moved out of the interrupt handler and into a separate Task elsewhere,</span>
-<span class="doccomment">//! i.e., a classic bottom-half/top-half design.</span>
-<span class="doccomment">//!</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Management of two kernel personalities, one for SIMD-enabled code, and one for regular code. 
+//! 
+//! This crate is responsible for creating and managing multiple `CrateNamespace`s so that Theseus
+//! can run two instances of code side-by-side, like library OS-style personalities. 
+//! This crate itself is part of the regular non-SIMD world, not the SIMD world. 
+//! 
+//! There are two considerations here to ensure correctness by saving/restoring SIMD registers: 
+//! how to deal with it for context switching, and also for interrupt handling.
+//! Both of these policies are determined per-core as follows:
+//! 
+//! # Context Switching 
+//! * If there is one or zero SIMD-enabled `Task`s running on a given core, 
+//!   then all `Task`s running on that core can use the standard, 
+//!   non-SIMD-enabled context switching routine. 
+//!   This is because there is no need to save and restore SIMD registers (e.g., xmm),
+//!   as only a single `Task` will ever use them. 
+//! * If there are multiple SIMD-enabled `Task`s running on a given core,
+//!   then all of the SIMD `Task`s on that core must use the SIMD-enabled context switching routine,
+//!   which is found in the `context_switch_sse` crate. 
+//! 
+//! Note that there is no danger in forcing all SIMD Tasks to always use the SIMD-enabled context switching routine,
+//! it will always be correct to do so.
+//! Each Task can have its own Context and context_switch routine, based on whether or not it uses SIMD instructions,
+//! and that can be determined statically and independently for each task, without considering which other tasks are running. 
+//! We don&#39;t really need personalities for that, since the `context_switch` routines are self-contained.  
+//! However, that static policy misses out on the performance optimization of 
+//! not having to save/restore SIMD registers when only a single SIMD Task is running on a given core.
+//! 
+//! # Interrupt Handling
+//! * If interrupt handlers are only ever compiled for the regular world, i.e., 
+//!   no interrupt handlers exist that are compiled to use SIMD instructions,
+//!   then we do not have to save/restore SIMD registers on an interrupt because
+//!   we&#39;re guaranteed that no interrupt handling code can ever use (overwrite) SIMD registers. 
+//!   Thus, even if there are some SIMD enabled tasks running on a given core, an interrupt handler need not save
+//!   those SIMD registers if it cannot possibly ever touch them. 
+//! 
+//! * If interrupt handlers _are_ compiled for the SIMD world and use SIMD instructions in the handler 
+//!   (or any function accessible from the interrupt handler), then they must (and obviously will) save SIMD registers.
+//!   In fact, I don&#39;t believe it&#39;s possible to compile an interrupt handler that uses SIMD instructions but doesn&#39;t save SIMD registers
+//!   (at least while we&#39;re stil using the special x86 interrupt calling convention to have LLVM do it for us).
+//!   
+//! Thus, the best option is just to require that any SIMD-enabled interrupt handlers must save all SIMD registers, 
+//! which is a rule determined completely independently of which tasks are running on that core. 
+//! In general, this is a good rule, because it&#39;s poor design to have an interrupt handler do a lot of work,
+//! such as processing data in a way that would need SIMD instructions. 
+//! Instead, those processing stages should be moved out of the interrupt handler and into a separate Task elsewhere,
+//! i.e., a classic bottom-half/top-half design.
+//!
 
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="comment">// NOTE: the `cfg_if` macro makes the entire file dependent upon the `simd_personality` config.</span>
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">cfg_if</span>;
-<span class="macro">cfg_if!</span> { <span class="kw">if</span> <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">simd_personality</span>)]</span> {
+</span><span class="comment">// NOTE: the `cfg_if` macro makes the entire file dependent upon the `simd_personality` config.
+</span><span class="attr">#[macro_use] </span><span class="kw">extern crate </span>cfg_if;
+<span class="macro">cfg_if! </span>{ <span class="kw">if </span><span class="attr">#[cfg(simd_personality)] </span>{
 
 
 <span class="comment">/* 
@@ -277,151 +271,150 @@
 // so we can resolve symbols that the core lib requires. 
 #[cfg(target_feature = &quot;sse2&quot;)]
 extern crate compiler_builtins as _compiler_builtins; 
-*/</span>
+*/
 
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mod_mgmt</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spawn</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">apic</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fs_node</span>;
+</span><span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>mod_mgmt;
+<span class="kw">extern crate </span>task;
+<span class="kw">extern crate </span>spawn;
+<span class="kw">extern crate </span>apic;
+<span class="kw">extern crate </span>fs_node;
 
 
-<span class="kw">use</span> <span class="ident">alloc</span>::{
-	<span class="ident">string::String</span>,
-	<span class="ident">sync::Arc</span>,
+<span class="kw">use </span>alloc::{
+	string::String,
+	sync::Arc,
 };
-<span class="kw">use</span> <span class="ident">mod_mgmt</span>::{<span class="ident">CrateNamespace</span>, <span class="ident">CrateType</span>, <span class="ident">NamespaceDir</span>, <span class="ident">get_initial_kernel_namespace</span>, <span class="ident">get_namespaces_directory</span>};
-<span class="kw">use</span> <span class="ident">task::SimdExt</span>;
+<span class="kw">use </span>mod_mgmt::{CrateNamespace, CrateType, NamespaceDir, get_initial_kernel_namespace, get_namespaces_directory};
+<span class="kw">use </span>task::SimdExt;
 
 
-<span class="doccomment">/// Initializes a new SIMD personality based on the provided `simd_ext` level of given SIMD extensions, e.g., SSE, AVX.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">setup_simd_personality</span>(<span class="ident">simd_ext</span>: <span class="ident">SimdExt</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-	<span class="kw">match</span> <span class="ident">internal_setup_simd_personality</span>(<span class="ident">simd_ext</span>) {
-		<span class="prelude-val">Ok</span>(<span class="ident">o</span>) =&gt; {
+<span class="doccomment">/// Initializes a new SIMD personality based on the provided `simd_ext` level of given SIMD extensions, e.g., SSE, AVX.
+</span><span class="kw">pub fn </span>setup_simd_personality(simd_ext: SimdExt) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+	<span class="kw">match </span>internal_setup_simd_personality(simd_ext) {
+		<span class="prelude-val">Ok</span>(o) =&gt; {
 			<span class="macro">debug!</span>(<span class="string">&quot;SIMD personality setup completed successfully.&quot;</span>);
-			<span class="prelude-val">Ok</span>(<span class="ident">o</span>)
+			<span class="prelude-val">Ok</span>(o)
 		}
-		<span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
-			<span class="macro">error!</span>(<span class="string">&quot;Error setting up SIMD personality: {}&quot;</span>, <span class="ident">e</span>); 
-			<span class="prelude-val">Err</span>(<span class="ident">e</span>)
+		<span class="prelude-val">Err</span>(e) =&gt; {
+			<span class="macro">error!</span>(<span class="string">&quot;Error setting up SIMD personality: {}&quot;</span>, e); 
+			<span class="prelude-val">Err</span>(e)
 		}
 	}
 }
 
 
-<span class="kw">fn</span> <span class="ident">internal_setup_simd_personality</span>(<span class="ident">simd_ext</span>: <span class="ident">SimdExt</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-	<span class="kw">let</span> <span class="ident">namespace_prefix</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">simd_ext</span> {
-		<span class="ident">SimdExt::AVX</span> =&gt; <span class="string">&quot;avx&quot;</span>,
-		<span class="ident">SimdExt::SSE</span> =&gt; <span class="string">&quot;sse&quot;</span>,
-		<span class="ident">SimdExt::None</span> =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Cannot create a new SIMD personality with SimdExt::None!&quot;</span>),
+<span class="kw">fn </span>internal_setup_simd_personality(simd_ext: SimdExt) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+	<span class="kw">let </span>namespace_prefix = <span class="kw">match </span>simd_ext {
+		SimdExt::AVX =&gt; <span class="string">&quot;avx&quot;</span>,
+		SimdExt::SSE =&gt; <span class="string">&quot;sse&quot;</span>,
+		SimdExt::None =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Cannot create a new SIMD personality with SimdExt::None!&quot;</span>),
 	};
 
-	<span class="kw">let</span> <span class="ident">kernel_mmi_ref</span> <span class="op">=</span> <span class="ident">memory::get_kernel_mmi_ref</span>().<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;couldn&#39;t get kernel mmi&quot;</span>)<span class="question-mark">?</span>;
-	<span class="kw">let</span> <span class="ident">backup_namespace</span> <span class="op">=</span> <span class="ident">get_initial_kernel_namespace</span>().<span class="ident">ok_or</span>(<span class="string">&quot;initial kernel crate namespace wasn&#39;t yet initialized&quot;</span>)<span class="question-mark">?</span>;
+	<span class="kw">let </span>kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| <span class="string">&quot;couldn&#39;t get kernel mmi&quot;</span>)<span class="question-mark">?</span>;
+	<span class="kw">let </span>backup_namespace = get_initial_kernel_namespace().ok_or(<span class="string">&quot;initial kernel crate namespace wasn&#39;t yet initialized&quot;</span>)<span class="question-mark">?</span>;
 
-	<span class="comment">// The `mod_mgmt::init()` function should have initialized the following directories, </span>
-	<span class="comment">// for example, if &#39;sse&#39; was the prefix used to build the SSE versions of each crate:</span>
-	<span class="comment">//     .../namespaces/sse_kernel</span>
-	<span class="comment">//     .../namespaces/sse_application</span>
-	<span class="kw">let</span> <span class="ident">namespaces_dir</span> <span class="op">=</span> <span class="ident">get_namespaces_directory</span>().<span class="ident">ok_or</span>(<span class="string">&quot;top-level namespaces directory wasn&#39;t yet initialized&quot;</span>)<span class="question-mark">?</span>;
+	<span class="comment">// The `mod_mgmt::init()` function should have initialized the following directories, 
+	// for example, if &#39;sse&#39; was the prefix used to build the SSE versions of each crate:
+	//     .../namespaces/sse_kernel
+	//     .../namespaces/sse_application
+	</span><span class="kw">let </span>namespaces_dir = get_namespaces_directory().ok_or(<span class="string">&quot;top-level namespaces directory wasn&#39;t yet initialized&quot;</span>)<span class="question-mark">?</span>;
 	
-	<span class="comment">// Create the SIMD kernel namespace</span>
-	<span class="kw">let</span> <span class="ident">simd_kernel_namespace</span> <span class="op">=</span> {
-		<span class="kw">let</span> <span class="ident">namespace_name</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;{}{}&quot;</span>, <span class="ident">namespace_prefix</span>, <span class="ident">CrateType::Kernel</span>.<span class="ident">default_namespace_name</span>());
-		<span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">namespaces_dir</span>.<span class="ident">lock</span>().<span class="ident">get_dir</span>(<span class="kw-2">&amp;</span><span class="ident">namespace_name</span>).<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t find SIMD kernel namespace directory at given path&quot;</span>)<span class="question-mark">?</span>;
-		<span class="ident">Arc::new</span>(<span class="ident">CrateNamespace::new</span>(
-			<span class="ident">String::from</span>(<span class="ident">namespace_name</span>), 
-			<span class="ident">NamespaceDir::new</span>(<span class="ident">dir</span>),
+	<span class="comment">// Create the SIMD kernel namespace
+	</span><span class="kw">let </span>simd_kernel_namespace = {
+		<span class="kw">let </span>namespace_name = <span class="macro">format!</span>(<span class="string">&quot;{}{}&quot;</span>, namespace_prefix, CrateType::Kernel.default_namespace_name());
+		<span class="kw">let </span>dir = namespaces_dir.lock().get_dir(<span class="kw-2">&amp;</span>namespace_name).ok_or(<span class="string">&quot;couldn&#39;t find SIMD kernel namespace directory at given path&quot;</span>)<span class="question-mark">?</span>;
+		Arc::new(CrateNamespace::new(
+			String::from(namespace_name), 
+			NamespaceDir::new(dir),
 			<span class="prelude-val">None</span>,
 		))
 	};
 
-	<span class="comment">// Then create the SIMD application namespace that is recursively backed by the simd_kernel_namespace</span>
-	<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">simd_app_namespace</span> <span class="op">=</span> {
-		<span class="kw">let</span> <span class="ident">namespace_name</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;{}{}&quot;</span>, <span class="ident">namespace_prefix</span>, <span class="ident">CrateType::Application</span>.<span class="ident">default_namespace_name</span>());
-		<span class="kw">let</span> <span class="ident">dir</span> <span class="op">=</span> <span class="ident">namespaces_dir</span>.<span class="ident">lock</span>().<span class="ident">get_dir</span>(<span class="kw-2">&amp;</span><span class="ident">namespace_name</span>).<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t find SIMD application namespace directory at given path&quot;</span>)<span class="question-mark">?</span>;
-		<span class="ident">CrateNamespace::new</span>(
-			<span class="ident">String::from</span>(<span class="ident">namespace_name</span>), 
-			<span class="ident">NamespaceDir::new</span>(<span class="ident">dir</span>),
-			<span class="prelude-val">Some</span>(<span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">simd_kernel_namespace</span>)),
+	<span class="comment">// Then create the SIMD application namespace that is recursively backed by the simd_kernel_namespace
+	</span><span class="kw">let </span><span class="kw-2">mut </span>simd_app_namespace = {
+		<span class="kw">let </span>namespace_name = <span class="macro">format!</span>(<span class="string">&quot;{}{}&quot;</span>, namespace_prefix, CrateType::Application.default_namespace_name());
+		<span class="kw">let </span>dir = namespaces_dir.lock().get_dir(<span class="kw-2">&amp;</span>namespace_name).ok_or(<span class="string">&quot;couldn&#39;t find SIMD application namespace directory at given path&quot;</span>)<span class="question-mark">?</span>;
+		CrateNamespace::new(
+			String::from(namespace_name), 
+			NamespaceDir::new(dir),
+			<span class="prelude-val">Some</span>(Arc::clone(<span class="kw-2">&amp;</span>simd_kernel_namespace)),
 		)
 	};
 
-	<span class="comment">// Load things that are specific (private) to the SIMD world, like core library and compiler builtins</span>
-	<span class="kw">let</span> (<span class="ident">compiler_builtins_simd</span>, <span class="ident">_ns</span>) <span class="op">=</span> <span class="ident">CrateNamespace::get_crate_object_file_starting_with</span>(<span class="kw-2">&amp;</span><span class="ident">simd_kernel_namespace</span>, <span class="string">&quot;compiler_builtins-&quot;</span>)
-		.<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;couldn&#39;t find a single &#39;compiler_builtins&#39; object file in simd_personality&quot;</span>)<span class="question-mark">?</span>;
-	<span class="kw">let</span> (<span class="ident">core_lib_simd</span>, <span class="ident">_ns</span>) <span class="op">=</span> <span class="ident">CrateNamespace::get_crate_object_file_starting_with</span>(<span class="kw-2">&amp;</span><span class="ident">simd_kernel_namespace</span>, <span class="string">&quot;core-&quot;</span>)
-		.<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;couldn&#39;t find a single &#39;core&#39; object file in simd_personality&quot;</span>)<span class="question-mark">?</span>;
-	<span class="kw">let</span> <span class="ident">crate_files</span> <span class="op">=</span> [<span class="ident">compiler_builtins_simd</span>, <span class="ident">core_lib_simd</span>];
-	<span class="ident">simd_kernel_namespace</span>.<span class="ident">load_crates</span>(<span class="ident">crate_files</span>.<span class="ident">iter</span>(), <span class="prelude-val">Some</span>(<span class="ident">backup_namespace</span>), <span class="ident">kernel_mmi_ref</span>, <span class="bool-val">false</span>)<span class="question-mark">?</span>;
+	<span class="comment">// Load things that are specific (private) to the SIMD world, like core library and compiler builtins
+	</span><span class="kw">let </span>(compiler_builtins_simd, _ns) = CrateNamespace::get_crate_object_file_starting_with(<span class="kw-2">&amp;</span>simd_kernel_namespace, <span class="string">&quot;compiler_builtins-&quot;</span>)
+		.ok_or_else(|| <span class="string">&quot;couldn&#39;t find a single &#39;compiler_builtins&#39; object file in simd_personality&quot;</span>)<span class="question-mark">?</span>;
+	<span class="kw">let </span>(core_lib_simd, _ns) = CrateNamespace::get_crate_object_file_starting_with(<span class="kw-2">&amp;</span>simd_kernel_namespace, <span class="string">&quot;core-&quot;</span>)
+		.ok_or_else(|| <span class="string">&quot;couldn&#39;t find a single &#39;core&#39; object file in simd_personality&quot;</span>)<span class="question-mark">?</span>;
+	<span class="kw">let </span>crate_files = [compiler_builtins_simd, core_lib_simd];
+	simd_kernel_namespace.load_crates(crate_files.iter(), <span class="prelude-val">Some</span>(backup_namespace), kernel_mmi_ref, <span class="bool-val">false</span>)<span class="question-mark">?</span>;
 	
 
-	<span class="comment">// load the actual crate that we want to run in the simd namespace, &quot;simd_test&quot;</span>
-	<span class="kw">let</span> (<span class="ident">simd_test_file</span>, <span class="ident">_ns</span>) <span class="op">=</span> <span class="ident">simd_app_namespace</span>.<span class="ident">method_get_crate_object_file_starting_with</span>(<span class="string">&quot;simd_test-&quot;</span>)
-		.<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;couldn&#39;t find a single &#39;simd_test&#39; object file in simd_personality&quot;</span>)<span class="question-mark">?</span>;
-	<span class="ident">simd_app_namespace</span>.<span class="ident">enable_fuzzy_symbol_matching</span>();
-	<span class="ident">simd_app_namespace</span>.<span class="ident">load_crate</span>(<span class="kw-2">&amp;</span><span class="ident">simd_test_file</span>, <span class="prelude-val">Some</span>(<span class="ident">backup_namespace</span>), <span class="ident">kernel_mmi_ref</span>, <span class="bool-val">false</span>)<span class="question-mark">?</span>;
-	<span class="ident">simd_app_namespace</span>.<span class="ident">disable_fuzzy_symbol_matching</span>();
+	<span class="comment">// load the actual crate that we want to run in the simd namespace, &quot;simd_test&quot;
+	</span><span class="kw">let </span>(simd_test_file, _ns) = simd_app_namespace.method_get_crate_object_file_starting_with(<span class="string">&quot;simd_test-&quot;</span>)
+		.ok_or_else(|| <span class="string">&quot;couldn&#39;t find a single &#39;simd_test&#39; object file in simd_personality&quot;</span>)<span class="question-mark">?</span>;
+	simd_app_namespace.enable_fuzzy_symbol_matching();
+	simd_app_namespace.load_crate(<span class="kw-2">&amp;</span>simd_test_file, <span class="prelude-val">Some</span>(backup_namespace), kernel_mmi_ref, <span class="bool-val">false</span>)<span class="question-mark">?</span>;
+	simd_app_namespace.disable_fuzzy_symbol_matching();
 
 
-	<span class="kw">let</span> <span class="ident">this_core</span> <span class="op">=</span> <span class="ident">apic::get_my_apic_id</span>();
+	<span class="kw">let </span>this_core = apic::get_my_apic_id();
 	
-	<span class="kw">type</span> <span class="ident">SimdTestFunc</span> <span class="op">=</span> <span class="kw">fn</span>(());
-	<span class="kw">let</span> <span class="ident">section_ref1</span> <span class="op">=</span> <span class="ident">simd_app_namespace</span>.<span class="ident">get_symbol_starting_with</span>(<span class="string">&quot;simd_test::test1::&quot;</span>)
-		.<span class="ident">upgrade</span>()
-		.<span class="ident">ok_or</span>(<span class="string">&quot;no single symbol matching \&quot;simd_test::test1\&quot;&quot;</span>)<span class="question-mark">?</span>;
-	<span class="kw">let</span> <span class="ident">func1</span>: <span class="kw-2">&amp;</span><span class="ident">SimdTestFunc</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">section_ref1</span>.<span class="ident">as_func</span>() }<span class="question-mark">?</span>;
-	<span class="kw">let</span> <span class="ident">_task1</span> <span class="op">=</span> <span class="ident">spawn::new_task_builder</span>(<span class="kw-2">*</span><span class="ident">func1</span>, ())
-		.<span class="ident">name</span>(<span class="macro">format!</span>(<span class="string">&quot;simd_test_1-{}&quot;</span>, <span class="ident">simd_app_namespace</span>.<span class="ident">name</span>()))
-		.<span class="ident">pin_on_core</span>(<span class="ident">this_core</span>)
-		.<span class="ident">simd</span>(<span class="ident">simd_ext</span>)
-		.<span class="ident">spawn</span>()<span class="question-mark">?</span>;
+	<span class="kw">type </span>SimdTestFunc = <span class="kw">fn</span>(());
+	<span class="kw">let </span>section_ref1 = simd_app_namespace.get_symbol_starting_with(<span class="string">&quot;simd_test::test1::&quot;</span>)
+		.upgrade()
+		.ok_or(<span class="string">&quot;no single symbol matching \&quot;simd_test::test1\&quot;&quot;</span>)<span class="question-mark">?</span>;
+	<span class="kw">let </span>func1: <span class="kw-2">&amp;</span>SimdTestFunc = <span class="kw">unsafe </span>{ section_ref1.as_func() }<span class="question-mark">?</span>;
+	<span class="kw">let </span>_task1 = spawn::new_task_builder(<span class="kw-2">*</span>func1, ())
+		.name(<span class="macro">format!</span>(<span class="string">&quot;simd_test_1-{}&quot;</span>, simd_app_namespace.name()))
+		.pin_on_core(this_core)
+		.simd(simd_ext)
+		.spawn()<span class="question-mark">?</span>;
 	<span class="macro">debug!</span>(<span class="string">&quot;finished spawning simd_test::test1 task&quot;</span>);
 
 
-	<span class="kw">let</span> <span class="ident">section_ref2</span> <span class="op">=</span> <span class="ident">simd_app_namespace</span>.<span class="ident">get_symbol_starting_with</span>(<span class="string">&quot;simd_test::test2::&quot;</span>)
-		.<span class="ident">upgrade</span>()
-		.<span class="ident">ok_or</span>(<span class="string">&quot;no single symbol matching \&quot;simd_test::test2\&quot;&quot;</span>)<span class="question-mark">?</span>;
-	<span class="kw">let</span> <span class="ident">func2</span>: <span class="kw-2">&amp;</span><span class="ident">SimdTestFunc</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">section_ref2</span>.<span class="ident">as_func</span>() }<span class="question-mark">?</span>;
-	<span class="kw">let</span> <span class="ident">_task2</span> <span class="op">=</span> <span class="ident">spawn::new_task_builder</span>(<span class="kw-2">*</span><span class="ident">func2</span>, ())
-		.<span class="ident">name</span>(<span class="macro">format!</span>(<span class="string">&quot;simd_test_2-{}&quot;</span>, <span class="ident">simd_app_namespace</span>.<span class="ident">name</span>()))
-		.<span class="ident">pin_on_core</span>(<span class="ident">this_core</span>)
-		.<span class="ident">simd</span>(<span class="ident">simd_ext</span>)
-		.<span class="ident">spawn</span>()<span class="question-mark">?</span>;
+	<span class="kw">let </span>section_ref2 = simd_app_namespace.get_symbol_starting_with(<span class="string">&quot;simd_test::test2::&quot;</span>)
+		.upgrade()
+		.ok_or(<span class="string">&quot;no single symbol matching \&quot;simd_test::test2\&quot;&quot;</span>)<span class="question-mark">?</span>;
+	<span class="kw">let </span>func2: <span class="kw-2">&amp;</span>SimdTestFunc = <span class="kw">unsafe </span>{ section_ref2.as_func() }<span class="question-mark">?</span>;
+	<span class="kw">let </span>_task2 = spawn::new_task_builder(<span class="kw-2">*</span>func2, ())
+		.name(<span class="macro">format!</span>(<span class="string">&quot;simd_test_2-{}&quot;</span>, simd_app_namespace.name()))
+		.pin_on_core(this_core)
+		.simd(simd_ext)
+		.spawn()<span class="question-mark">?</span>;
 	<span class="macro">debug!</span>(<span class="string">&quot;finished spawning simd_test::test2 task&quot;</span>);
 
 
-	<span class="kw">let</span> <span class="ident">section_ref3</span> <span class="op">=</span> <span class="ident">simd_app_namespace</span>.<span class="ident">get_symbol_starting_with</span>(<span class="string">&quot;simd_test::test_short::&quot;</span>)
-		.<span class="ident">upgrade</span>()
-		.<span class="ident">ok_or</span>(<span class="string">&quot;no single symbol matching \&quot;simd_test::test_short\&quot;&quot;</span>)<span class="question-mark">?</span>;
-	<span class="kw">let</span> <span class="ident">func3</span>: <span class="kw-2">&amp;</span><span class="ident">SimdTestFunc</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">section_ref3</span>.<span class="ident">as_func</span>() }<span class="question-mark">?</span>;
-	<span class="kw">let</span> <span class="ident">_task3</span> <span class="op">=</span> <span class="ident">spawn::new_task_builder</span>(<span class="kw-2">*</span><span class="ident">func3</span>, ())
-		.<span class="ident">name</span>(<span class="macro">format!</span>(<span class="string">&quot;simd_test_short-{}&quot;</span>, <span class="ident">simd_app_namespace</span>.<span class="ident">name</span>()))
-		.<span class="ident">pin_on_core</span>(<span class="ident">this_core</span>)
-		.<span class="ident">simd</span>(<span class="ident">simd_ext</span>)
-		.<span class="ident">spawn</span>()<span class="question-mark">?</span>;
+	<span class="kw">let </span>section_ref3 = simd_app_namespace.get_symbol_starting_with(<span class="string">&quot;simd_test::test_short::&quot;</span>)
+		.upgrade()
+		.ok_or(<span class="string">&quot;no single symbol matching \&quot;simd_test::test_short\&quot;&quot;</span>)<span class="question-mark">?</span>;
+	<span class="kw">let </span>func3: <span class="kw-2">&amp;</span>SimdTestFunc = <span class="kw">unsafe </span>{ section_ref3.as_func() }<span class="question-mark">?</span>;
+	<span class="kw">let </span>_task3 = spawn::new_task_builder(<span class="kw-2">*</span>func3, ())
+		.name(<span class="macro">format!</span>(<span class="string">&quot;simd_test_short-{}&quot;</span>, simd_app_namespace.name()))
+		.pin_on_core(this_core)
+		.simd(simd_ext)
+		.spawn()<span class="question-mark">?</span>;
 	<span class="macro">debug!</span>(<span class="string">&quot;finished spawning simd_test::test_short task&quot;</span>);
 
 
-	<span class="comment">// we can&#39;t return here because the mapped pages that contain</span>
-	<span class="comment">// the simd_test functions being run must not be dropped </span>
-	<span class="comment">// until the threads are completed.</span>
-	<span class="comment">// TODO FIXME: check for this somehow in the thread spawn code, perhaps by giving the new thread ownership of the MappedPages,</span>
-	<span class="comment">//             just like we do for application Tasks</span>
+	<span class="comment">// we can&#39;t return here because the mapped pages that contain
+	// the simd_test functions being run must not be dropped 
+	// until the threads are completed.
+	// TODO FIXME: check for this somehow in the thread spawn code, perhaps by giving the new thread ownership of the MappedPages,
+	//             just like we do for application Tasks
 
-	<span class="kw">loop</span> { }
+	</span><span class="kw">loop </span>{ }
 	
-	<span class="comment">// _task1.join()?;</span>
-	<span class="comment">// _task2.join()?;</span>
-	<span class="comment">// _task3.join()?;</span>
-	<span class="comment">// Ok(())</span>
-}
+	<span class="comment">// _task1.join()?;
+	// _task2.join()?;
+	// _task3.join()?;
+	// Ok(())
+</span>}
 		
-}} <span class="comment">// end of cfg_if block</span>
-</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="simd_personality" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+}} <span class="comment">// end of cfg_if block
+</span></code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="simd_personality" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

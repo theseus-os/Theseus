@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/crate_name_utils/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../crate_name_utils/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../crate_name_utils/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../crate_name_utils/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/crate_name_utils/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../crate_name_utils/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -149,151 +143,150 @@
 <span id="143">143</span>
 <span id="144">144</span>
 <span id="145">145</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Utility functions for parsing and processing crate names in symbol strings. </span>
+</pre><pre class="rust"><code><span class="doccomment">//! Utility functions for parsing and processing crate names in symbol strings. 
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">itertools</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">path</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">crate_metadata</span>;
+#[macro_use] </span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>itertools;
+<span class="kw">extern crate </span>path;
+<span class="kw">extern crate </span>crate_metadata;
 
-<span class="kw">use</span> <span class="ident">core::ops::Range</span>;
-<span class="kw">use</span> <span class="ident">alloc</span>::{
-    <span class="ident">string::String</span>, 
-    <span class="ident">vec::Vec</span>,
+<span class="kw">use </span>core::ops::Range;
+<span class="kw">use </span>alloc::{
+    string::String, 
+    vec::Vec,
 };
-<span class="kw">use</span> <span class="ident">itertools::Itertools</span>;
-<span class="kw">use</span> <span class="ident">path::Path</span>;
-<span class="kw">use</span> <span class="ident">crate_metadata::CrateType</span>;
+<span class="kw">use </span>itertools::Itertools;
+<span class="kw">use </span>path::Path;
+<span class="kw">use </span>crate_metadata::CrateType;
 
 
 
-<span class="doccomment">/// Returns the crate name that is derived from a crate object file path.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Examples of acceptable paths</span>
-<span class="doccomment">/// Legal paths can:</span>
-<span class="doccomment">/// * be absolute or relative,</span>
-<span class="doccomment">/// * optionally end with an extension, e.g., `&quot;.o&quot;`,   optionally start </span>
-<span class="doccomment">/// * optionally start with a module file prefix, e.g., `&quot;k#my_crate-&lt;hash&gt;.o&quot;`.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crate_name_from_path</span><span class="op">&lt;</span><span class="lifetime">&#39;p</span><span class="op">&gt;</span>(<span class="ident">object_file_path</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;p</span> <span class="ident">Path</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;p</span> <span class="ident">str</span> {
-    <span class="kw">let</span> <span class="ident">stem</span> <span class="op">=</span> <span class="ident">object_file_path</span>.<span class="ident">file_stem</span>();
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>((<span class="ident">_crate_type</span>, <span class="ident">_prefix</span>, <span class="ident">name</span>)) <span class="op">=</span> <span class="ident">CrateType::from_module_name</span>(<span class="ident">stem</span>) {
-        <span class="ident">name</span>
-    } <span class="kw">else</span> {
-        <span class="ident">stem</span>
+<span class="doccomment">/// Returns the crate name that is derived from a crate object file path.
+/// 
+/// # Examples of acceptable paths
+/// Legal paths can:
+/// * be absolute or relative,
+/// * optionally end with an extension, e.g., `&quot;.o&quot;`,   optionally start 
+/// * optionally start with a module file prefix, e.g., `&quot;k#my_crate-&lt;hash&gt;.o&quot;`.
+</span><span class="kw">pub fn </span>crate_name_from_path&lt;<span class="lifetime">&#39;p</span>&gt;(object_file_path: <span class="kw-2">&amp;</span><span class="lifetime">&#39;p </span>Path) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;p </span>str {
+    <span class="kw">let </span>stem = object_file_path.file_stem();
+    <span class="kw">if let </span><span class="prelude-val">Ok</span>((_crate_type, _prefix, name)) = CrateType::from_module_name(stem) {
+        name
+    } <span class="kw">else </span>{
+        stem
     }
 }
 
-<span class="doccomment">/// Crate names must be only alphanumeric characters, an underscore, or a dash.</span>
-<span class="doccomment">///  </span>
-<span class="doccomment">/// See: &lt;https://www.reddit.com/r/rust/comments/4rlom7/what_characters_are_allowed_in_a_crate_name/&gt;</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_valid_crate_name_char</span>(<span class="ident">c</span>: <span class="ident">char</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">char::is_alphanumeric</span>(<span class="ident">c</span>) <span class="op">|</span><span class="op">|</span> 
-    <span class="ident">c</span> <span class="op">==</span> <span class="string">&#39;_&#39;</span> <span class="op">|</span><span class="op">|</span> 
-    <span class="ident">c</span> <span class="op">==</span> <span class="string">&#39;-&#39;</span>
+<span class="doccomment">/// Crate names must be only alphanumeric characters, an underscore, or a dash.
+///  
+/// See: &lt;https://www.reddit.com/r/rust/comments/4rlom7/what_characters_are_allowed_in_a_crate_name/&gt;
+</span><span class="kw">pub fn </span>is_valid_crate_name_char(c: char) -&gt; bool {
+    char::is_alphanumeric(c) || 
+    c == <span class="string">&#39;_&#39; </span>|| 
+    c == <span class="string">&#39;-&#39;
+</span>}
+
+<span class="doccomment">/// Parses the given symbol string to try to find the name of the parent crate
+/// that contains the symbol. 
+/// Depending on the symbol, there may be multiple potential parent crates;
+/// if so, they are returned in order of likeliness: 
+/// the first crate name in the symbol is most likely to contain it.
+/// If the parent crate cannot be determined (e.g., a `no_mangle` symbol),
+/// then an empty `Vec` is returned.
+/// 
+/// # Examples
+/// * `&lt;*const T as core::fmt::Debug&gt;::fmt` -&gt; `[&quot;core&quot;]`
+/// * `&lt;alloc::boxed::Box&lt;T&gt;&gt;::into_unique` -&gt; `[&quot;alloc&quot;]`
+/// * `&lt;framebuffer::VirtualFramebuffer as display::Display&gt;::fill_rectangle` -&gt; `[&quot;framebuffer&quot;, &quot;display&quot;]`
+/// * `keyboard::init` -&gt; `[&quot;keyboard&quot;]`
+</span><span class="kw">pub fn </span>get_containing_crate_name&lt;<span class="lifetime">&#39;a</span>&gt;(demangled_full_symbol: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str) -&gt; Vec&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str&gt; {
+    get_containing_crate_name_ranges(demangled_full_symbol)
+        .into_iter()
+        .filter_map(|range| demangled_full_symbol.get(range))
+        .dedup()
+        .collect()
 }
 
-<span class="doccomment">/// Parses the given symbol string to try to find the name of the parent crate</span>
-<span class="doccomment">/// that contains the symbol. </span>
-<span class="doccomment">/// Depending on the symbol, there may be multiple potential parent crates;</span>
-<span class="doccomment">/// if so, they are returned in order of likeliness: </span>
-<span class="doccomment">/// the first crate name in the symbol is most likely to contain it.</span>
-<span class="doccomment">/// If the parent crate cannot be determined (e.g., a `no_mangle` symbol),</span>
-<span class="doccomment">/// then an empty `Vec` is returned.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Examples</span>
-<span class="doccomment">/// * `&lt;*const T as core::fmt::Debug&gt;::fmt` -&gt; `[&quot;core&quot;]`</span>
-<span class="doccomment">/// * `&lt;alloc::boxed::Box&lt;T&gt;&gt;::into_unique` -&gt; `[&quot;alloc&quot;]`</span>
-<span class="doccomment">/// * `&lt;framebuffer::VirtualFramebuffer as display::Display&gt;::fill_rectangle` -&gt; `[&quot;framebuffer&quot;, &quot;display&quot;]`</span>
-<span class="doccomment">/// * `keyboard::init` -&gt; `[&quot;keyboard&quot;]`</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_containing_crate_name</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="ident">demangled_full_symbol</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="ident">get_containing_crate_name_ranges</span>(<span class="ident">demangled_full_symbol</span>)
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">filter_map</span>(<span class="op">|</span><span class="ident">range</span><span class="op">|</span> <span class="ident">demangled_full_symbol</span>.<span class="ident">get</span>(<span class="ident">range</span>))
-        .<span class="ident">dedup</span>()
-        .<span class="ident">collect</span>()
-}
 
+<span class="doccomment">/// Same as [`get_containing_crate_name()`](#get_containing_crate_name),
+/// but returns the substring `Range`s of where the parent crate names 
+/// are located in the given `demangled_full_symbol` string.
+/// 
+/// # Examples
+/// * `&lt;*const T as core::fmt::Debug&gt;::fmt` -&gt; `[12..16]`
+/// * `&lt;alloc::boxed::Box&lt;T&gt;&gt;::into_unique` -&gt; `[1..6]`
+/// * `&lt;framebuffer::VirtualFramebuffer as display::Display&gt;::fill_rectangle` -&gt; `[1..13, 37..44]`
+/// * `keyboard::init` -&gt; `[0..8]`
+</span><span class="kw">pub fn </span>get_containing_crate_name_ranges(demangled_full_symbol: <span class="kw-2">&amp;</span>str) -&gt; Vec&lt;Range&lt;usize&gt;&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>ranges: Vec&lt;Range&lt;usize&gt;&gt; = Vec::new();
+    <span class="comment">// the separator between independent parts of the symbol string
+    </span><span class="kw">const </span>AS: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot; as &quot;</span>;
+    <span class="comment">// the index at which we are starting our search for a crate name
+    </span><span class="kw">let </span><span class="kw-2">mut </span>beginning_bound = <span class="prelude-val">Some</span>(<span class="number">0</span>);
 
-<span class="doccomment">/// Same as [`get_containing_crate_name()`](#get_containing_crate_name),</span>
-<span class="doccomment">/// but returns the substring `Range`s of where the parent crate names </span>
-<span class="doccomment">/// are located in the given `demangled_full_symbol` string.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Examples</span>
-<span class="doccomment">/// * `&lt;*const T as core::fmt::Debug&gt;::fmt` -&gt; `[12..16]`</span>
-<span class="doccomment">/// * `&lt;alloc::boxed::Box&lt;T&gt;&gt;::into_unique` -&gt; `[1..6]`</span>
-<span class="doccomment">/// * `&lt;framebuffer::VirtualFramebuffer as display::Display&gt;::fill_rectangle` -&gt; `[1..13, 37..44]`</span>
-<span class="doccomment">/// * `keyboard::init` -&gt; `[0..8]`</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_containing_crate_name_ranges</span>(<span class="ident">demangled_full_symbol</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Range</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ranges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Range</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-    <span class="comment">// the separator between independent parts of the symbol string</span>
-    <span class="kw">const</span> <span class="ident">AS</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot; as &quot;</span>;
-    <span class="comment">// the index at which we are starting our search for a crate name</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">beginning_bound</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="number">0</span>);
+    <span class="kw">while let </span><span class="prelude-val">Some</span>(beg) = beginning_bound {
+        <span class="comment">// Find the first occurrence of &quot;::&quot;; the crate name will be right before that.
+        </span><span class="kw">let </span>end = demangled_full_symbol.get(beg..)
+            .and_then(|s| s.find(<span class="string">&quot;::&quot;</span>))
+            .map(|end_idx| beg + end_idx);
 
-    <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">beg</span>) <span class="op">=</span> <span class="ident">beginning_bound</span> {
-        <span class="comment">// Find the first occurrence of &quot;::&quot;; the crate name will be right before that.</span>
-        <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">demangled_full_symbol</span>.<span class="ident">get</span>(<span class="ident">beg</span>..)
-            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">find</span>(<span class="string">&quot;::&quot;</span>))
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">end_idx</span><span class="op">|</span> <span class="ident">beg</span> <span class="op">+</span> <span class="ident">end_idx</span>);
-
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">end</span>) <span class="op">=</span> <span class="ident">end</span> {
-            <span class="comment">// If the above search for &quot;::&quot; passed an &quot; as &quot; substring, </span>
-            <span class="comment">// we skip it and let the next iteration of the loop handle it to avoid doubly counting it.</span>
-            <span class="kw">if</span> <span class="ident">demangled_full_symbol</span>.<span class="ident">get</span>(<span class="ident">beg</span>..<span class="ident">end</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">contains</span>(<span class="ident">AS</span>)) <span class="op">!</span><span class="op">=</span> <span class="prelude-val">Some</span>(<span class="bool-val">true</span>) {
-                <span class="comment">// Find the beginning of the crate name, searching backwards from the &quot;end&quot;</span>
-                <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">demangled_full_symbol</span>.<span class="ident">get</span>(<span class="ident">beg</span>..<span class="ident">end</span>)
-                    .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">rfind</span>(<span class="op">|</span><span class="ident">c</span><span class="op">|</span> <span class="op">!</span><span class="ident">is_valid_crate_name_char</span>(<span class="ident">c</span>))) <span class="comment">// find the first char before the crate name that isn&#39;t part of the crate name</span>
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">start_idx</span><span class="op">|</span> <span class="ident">beg</span> <span class="op">+</span> <span class="ident">start_idx</span> <span class="op">+</span> <span class="number">1</span>) <span class="comment">// move forward to the actual start of the crate name</span>
-                    .<span class="ident">unwrap_or</span>(<span class="ident">beg</span>); <span class="comment">// the crate name might have started at the beginning of the substring (no preceding non-crate-name char)</span>
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(end) = end {
+            <span class="comment">// If the above search for &quot;::&quot; passed an &quot; as &quot; substring, 
+            // we skip it and let the next iteration of the loop handle it to avoid doubly counting it.
+            </span><span class="kw">if </span>demangled_full_symbol.get(beg..end).map(|s| s.contains(AS)) != <span class="prelude-val">Some</span>(<span class="bool-val">true</span>) {
+                <span class="comment">// Find the beginning of the crate name, searching backwards from the &quot;end&quot;
+                </span><span class="kw">let </span>start = demangled_full_symbol.get(beg..end)
+                    .and_then(|s| s.rfind(|c| !is_valid_crate_name_char(c))) <span class="comment">// find the first char before the crate name that isn&#39;t part of the crate name
+                    </span>.map(|start_idx| beg + start_idx + <span class="number">1</span>) <span class="comment">// move forward to the actual start of the crate name
+                    </span>.unwrap_or(beg); <span class="comment">// the crate name might have started at the beginning of the substring (no preceding non-crate-name char)
         
-                <span class="ident">ranges</span>.<span class="ident">push</span>(<span class="ident">start</span>..<span class="ident">end</span>);
+                </span>ranges.push(start..end);
             }
         }
 
-        <span class="comment">// Advance to the next part of the symbol string</span>
-        <span class="ident">beginning_bound</span> <span class="op">=</span> <span class="ident">demangled_full_symbol</span>.<span class="ident">get</span>(<span class="ident">beg</span>..)
-            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">find</span>(<span class="ident">AS</span>))
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">beg_idx</span><span class="op">|</span> <span class="ident">beg</span> <span class="op">+</span> <span class="ident">beg_idx</span> <span class="op">+</span> <span class="ident">AS</span>.<span class="ident">len</span>());
+        <span class="comment">// Advance to the next part of the symbol string
+        </span>beginning_bound = demangled_full_symbol.get(beg..)
+            .and_then(|s| s.find(AS))
+            .map(|beg_idx| beg + beg_idx + AS.len());
     }
 
-    <span class="ident">ranges</span>
+    ranges
 }
 
 
-<span class="doccomment">/// Replaces the `old_crate_name` substring in the given `demangled_full_symbol` with the given `new_crate_name`, </span>
-<span class="doccomment">/// if it can be found, and if the parent crate name matches the `old_crate_name`. </span>
-<span class="doccomment">/// If the parent crate name can be found but does not match the expected `old_crate_name`,</span>
-<span class="doccomment">/// then None is returned.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This creates an entirely new String rather than performing an in-place replacement, </span>
-<span class="doccomment">/// because the `new_crate_name` might be a different length than the original crate name.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// We cannot simply use `str::replace()` because it would replace *all* instances of the `old_crate_name`, </span>
-<span class="doccomment">/// including components of function/symbol names. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Examples</span>
-<span class="doccomment">/// * `replace_containing_crate_name(&quot;keyboard::init&quot;, &quot;keyboard&quot;, &quot;keyboard_new&quot;)  -&gt;  Some(&quot;keyboard_new::init&quot;)`</span>
-<span class="doccomment">/// * `replace_containing_crate_name(&quot;&lt;framebuffer::VirtualFramebuffer as display::Display&gt;::fill_rectangle&quot;, &quot;display&quot;, &quot;display3&quot;)</span>
-<span class="doccomment">///    -&gt;  Some(&quot;&lt;framebuffer::VirtualFramebuffer as display3::Display&gt;::fill_rectangle&quot;)`</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">replace_containing_crate_name</span>(<span class="ident">demangled_full_symbol</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">old_crate_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">new_crate_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_symbol</span> <span class="op">=</span> <span class="ident">String::from</span>(<span class="ident">demangled_full_symbol</span>);
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">addend</span>: <span class="ident">isize</span> <span class="op">=</span> <span class="number">0</span>; <span class="comment">// index compensation for the difference in old vs. new crate name length</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">replaced</span> <span class="op">=</span> <span class="bool-val">false</span>;
-    <span class="kw">for</span> <span class="ident">range</span> <span class="kw">in</span> <span class="ident">get_containing_crate_name_ranges</span>(<span class="ident">demangled_full_symbol</span>) {
-        <span class="kw">if</span> <span class="ident">demangled_full_symbol</span>.<span class="ident">get</span>(<span class="ident">range</span>.<span class="ident">clone</span>()) <span class="op">==</span> <span class="prelude-val">Some</span>(<span class="ident">old_crate_name</span>) {
-            <span class="ident">new_symbol</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;{}{}{}&quot;</span>, 
-                <span class="kw-2">&amp;</span><span class="ident">new_symbol</span>[.. ((<span class="ident">range</span>.<span class="ident">start</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">+</span> <span class="ident">addend</span>) <span class="kw">as</span> <span class="ident">usize</span>)],
-                <span class="ident">new_crate_name</span>,
-                <span class="kw-2">&amp;</span><span class="ident">demangled_full_symbol</span>[<span class="ident">range</span>.<span class="ident">end</span> ..]
+<span class="doccomment">/// Replaces the `old_crate_name` substring in the given `demangled_full_symbol` with the given `new_crate_name`, 
+/// if it can be found, and if the parent crate name matches the `old_crate_name`. 
+/// If the parent crate name can be found but does not match the expected `old_crate_name`,
+/// then None is returned.
+/// 
+/// This creates an entirely new String rather than performing an in-place replacement, 
+/// because the `new_crate_name` might be a different length than the original crate name.
+/// 
+/// We cannot simply use `str::replace()` because it would replace *all* instances of the `old_crate_name`, 
+/// including components of function/symbol names. 
+/// 
+/// # Examples
+/// * `replace_containing_crate_name(&quot;keyboard::init&quot;, &quot;keyboard&quot;, &quot;keyboard_new&quot;)  -&gt;  Some(&quot;keyboard_new::init&quot;)`
+/// * `replace_containing_crate_name(&quot;&lt;framebuffer::VirtualFramebuffer as display::Display&gt;::fill_rectangle&quot;, &quot;display&quot;, &quot;display3&quot;)
+///    -&gt;  Some(&quot;&lt;framebuffer::VirtualFramebuffer as display3::Display&gt;::fill_rectangle&quot;)`
+</span><span class="kw">pub fn </span>replace_containing_crate_name(demangled_full_symbol: <span class="kw-2">&amp;</span>str, old_crate_name: <span class="kw-2">&amp;</span>str, new_crate_name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>new_symbol = String::from(demangled_full_symbol);
+    <span class="kw">let </span><span class="kw-2">mut </span>addend: isize = <span class="number">0</span>; <span class="comment">// index compensation for the difference in old vs. new crate name length
+    </span><span class="kw">let </span><span class="kw-2">mut </span>replaced = <span class="bool-val">false</span>;
+    <span class="kw">for </span>range <span class="kw">in </span>get_containing_crate_name_ranges(demangled_full_symbol) {
+        <span class="kw">if </span>demangled_full_symbol.get(range.clone()) == <span class="prelude-val">Some</span>(old_crate_name) {
+            new_symbol = <span class="macro">format!</span>(<span class="string">&quot;{}{}{}&quot;</span>, 
+                <span class="kw-2">&amp;</span>new_symbol[.. ((range.start <span class="kw">as </span>isize + addend) <span class="kw">as </span>usize)],
+                new_crate_name,
+                <span class="kw-2">&amp;</span>demangled_full_symbol[range.end ..]
             );
-            <span class="ident">replaced</span> <span class="op">=</span> <span class="bool-val">true</span>;
-            <span class="ident">addend</span> <span class="op">+</span><span class="op">=</span> (<span class="ident">new_crate_name</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">isize</span>) <span class="op">-</span> (<span class="ident">old_crate_name</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">isize</span>);
+            replaced = <span class="bool-val">true</span>;
+            addend += (new_crate_name.len() <span class="kw">as </span>isize) - (old_crate_name.len() <span class="kw">as </span>isize);
         }
     }
-    <span class="kw">if</span> <span class="ident">replaced</span> { <span class="prelude-val">Some</span>(<span class="ident">new_symbol</span>) } <span class="kw">else</span> { <span class="prelude-val">None</span> }
+    <span class="kw">if </span>replaced { <span class="prelude-val">Some</span>(new_symbol) } <span class="kw">else </span>{ <span class="prelude-val">None </span>}
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="crate_name_utils" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="crate_name_utils" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

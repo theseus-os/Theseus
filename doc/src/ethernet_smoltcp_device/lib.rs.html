@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ethernet_smoltcp_device/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../ethernet_smoltcp_device/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../ethernet_smoltcp_device/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../ethernet_smoltcp_device/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ethernet_smoltcp_device/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../ethernet_smoltcp_device/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -280,282 +274,281 @@
 <span id="274">274</span>
 <span id="275">275</span>
 <span id="276">276</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This crate implements an interface/glue layer between our ethernet drivers</span>
-<span class="doccomment">//! and the smoltcp network stack.</span>
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate implements an interface/glue layer between our ethernet drivers
+//! and the smoltcp network stack.
+</span><span class="attr">#![no_std]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">smoltcp</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">network_interface_card</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">nic_buffers</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">network_manager</span>;
+#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>smoltcp;
+<span class="kw">extern crate </span>network_interface_card;
+<span class="kw">extern crate </span>nic_buffers;
+<span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>network_manager;
 
 
-<span class="kw">use</span> <span class="ident">alloc::collections::BTreeMap</span>;
-<span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
-<span class="kw">use</span> <span class="ident">smoltcp</span>::{
-    <span class="ident">socket::SocketSet</span>,
-    <span class="ident">time::Instant</span>,
-    <span class="ident">phy::DeviceCapabilities</span>,
-    <span class="ident">wire</span>::{<span class="ident">EthernetAddress</span>, <span class="ident">IpAddress</span>, <span class="ident">IpCidr</span>, <span class="ident">Ipv4Address</span>},
-    <span class="ident">iface</span>::{<span class="ident">EthernetInterface</span>, <span class="ident">EthernetInterfaceBuilder</span>, <span class="ident">NeighborCache</span>, <span class="ident">Routes</span>},
+<span class="kw">use </span>alloc::collections::BTreeMap;
+<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>smoltcp::{
+    socket::SocketSet,
+    time::Instant,
+    phy::DeviceCapabilities,
+    wire::{EthernetAddress, IpAddress, IpCidr, Ipv4Address},
+    iface::{EthernetInterface, EthernetInterfaceBuilder, NeighborCache, Routes},
 };
-<span class="kw">use</span> <span class="ident">network_interface_card::NetworkInterfaceCard</span>;
-<span class="kw">use</span> <span class="ident">nic_buffers</span>::{<span class="ident">TransmitBuffer</span>, <span class="ident">ReceivedFrame</span>};
-<span class="kw">use</span> <span class="ident">network_manager::NetworkInterface</span>;
-<span class="kw">use</span> <span class="ident">core::str::FromStr</span>;
+<span class="kw">use </span>network_interface_card::NetworkInterfaceCard;
+<span class="kw">use </span>nic_buffers::{TransmitBuffer, ReceivedFrame};
+<span class="kw">use </span>network_manager::NetworkInterface;
+<span class="kw">use </span>core::str::FromStr;
 
-<span class="doccomment">/// standard MTU for ethernet cards</span>
-<span class="kw">const</span> <span class="ident">DEFAULT_MTU</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1500</span>;
+<span class="doccomment">/// standard MTU for ethernet cards
+</span><span class="kw">const </span>DEFAULT_MTU: usize = <span class="number">1500</span>;
 
 
-<span class="doccomment">/// A struct that implements the `NetworkInterface` trait for a NIC. </span>
-<span class="doccomment">/// There should be one instance of this struct per interface, i.e., an Ethernet port on the NIC.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">EthernetNetworkInterface</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">NetworkInterfaceCard</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="ident">iface</span>: <span class="ident">EthernetInterface</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span>, <span class="lifetime">&#39;static</span>, <span class="lifetime">&#39;static</span>, <span class="ident">EthernetDevice</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A struct that implements the `NetworkInterface` trait for a NIC. 
+/// There should be one instance of this struct per interface, i.e., an Ethernet port on the NIC.
+</span><span class="kw">pub struct </span>EthernetNetworkInterface&lt;N: NetworkInterfaceCard + <span class="lifetime">&#39;static</span>&gt; {
+    <span class="kw">pub </span>iface: EthernetInterface&lt;<span class="lifetime">&#39;static</span>, <span class="lifetime">&#39;static</span>, <span class="lifetime">&#39;static</span>, EthernetDevice&lt;N&gt;&gt;,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">NetworkInterfaceCard</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">NetworkInterface</span> <span class="kw">for</span> <span class="ident">EthernetNetworkInterface</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span> { 
-    <span class="kw">fn</span> <span class="ident">ethernet_addr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">EthernetAddress</span> {
-        <span class="self">self</span>.<span class="ident">iface</span>.<span class="ident">ethernet_addr</span>()
+<span class="kw">impl</span>&lt;N: NetworkInterfaceCard + <span class="lifetime">&#39;static</span>&gt; NetworkInterface <span class="kw">for </span>EthernetNetworkInterface&lt;N&gt; { 
+    <span class="kw">fn </span>ethernet_addr(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; EthernetAddress {
+        <span class="self">self</span>.iface.ethernet_addr()
     }
 
-    <span class="kw">fn</span> <span class="ident">set_ethernet_addr</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">EthernetAddress</span>) {
-        <span class="self">self</span>.<span class="ident">iface</span>.<span class="ident">set_ethernet_addr</span>(<span class="ident">addr</span>)
+    <span class="kw">fn </span>set_ethernet_addr(<span class="kw-2">&amp;mut </span><span class="self">self</span>, addr: EthernetAddress) {
+        <span class="self">self</span>.iface.set_ethernet_addr(addr)
     }
 
-    <span class="kw">fn</span> <span class="ident">poll</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">sockets</span>: <span class="kw-2">&amp;mut</span> <span class="ident">SocketSet</span>, <span class="ident">timestamp</span>: <span class="ident">Instant</span>) -&gt; <span class="ident">smoltcp::Result</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">iface</span>.<span class="ident">poll</span>(<span class="ident">sockets</span>, <span class="ident">timestamp</span>)
+    <span class="kw">fn </span>poll(<span class="kw-2">&amp;mut </span><span class="self">self</span>, sockets: <span class="kw-2">&amp;mut </span>SocketSet, timestamp: Instant) -&gt; smoltcp::Result&lt;bool&gt; {
+        <span class="self">self</span>.iface.poll(sockets, timestamp)
     }
 
-    <span class="kw">fn</span> <span class="ident">ip_addrs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[<span class="ident">IpCidr</span>] {
-        <span class="self">self</span>.<span class="ident">iface</span>.<span class="ident">ip_addrs</span>()
+    <span class="kw">fn </span>ip_addrs(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[IpCidr] {
+        <span class="self">self</span>.iface.ip_addrs()
     }
 
-    <span class="kw">fn</span> <span class="ident">has_ip_addr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">IpAddress</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">iface</span>.<span class="ident">has_ip_addr</span>(<span class="ident">addr</span>)
+    <span class="kw">fn </span>has_ip_addr(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: IpAddress) -&gt; bool {
+        <span class="self">self</span>.iface.has_ip_addr(addr)
     }
 
-    <span class="kw">fn</span> <span class="ident">routes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Routes</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">iface</span>.<span class="ident">routes</span>()
+    <span class="kw">fn </span>routes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Routes&lt;<span class="lifetime">&#39;static</span>&gt; {
+        <span class="self">self</span>.iface.routes()
     }
 
-    <span class="kw">fn</span> <span class="ident">routes_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">Routes</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">iface</span>.<span class="ident">routes_mut</span>()
+    <span class="kw">fn </span>routes_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>Routes&lt;<span class="lifetime">&#39;static</span>&gt; {
+        <span class="self">self</span>.iface.routes_mut()
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">NetworkInterfaceCard</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> <span class="op">&gt;</span> <span class="ident">EthernetNetworkInterface</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Creates a new instance of an ethernet network interface, which can be used for handling sockets. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Arguments: </span>
-    <span class="doccomment">/// * `nic`:  a reference to an initialized Ethernet NIC, which must implement the `NetworkInterfaceCard` trait.</span>
-    <span class="doccomment">/// * `static_ip`: the IP that this network interface should locally use. If `None`, one will be assigned via DHCP.</span>
-    <span class="doccomment">/// * `gateway_ip`: the IP of this network interface&#39;s local gateway (access point, router). If `None`, will be discovered via DHCP.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Note</span>
-    <span class="doccomment">/// Currently, `static_ip` and `gateway_ip` are required because we don&#39;t yet support DHCP.</span>
-    <span class="doccomment">/// </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">G</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">IpAddress</span><span class="op">&gt;</span><span class="op">&gt;</span>(
-        <span class="ident">nic</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span>,
-        <span class="ident">static_ip</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">IpCidr</span><span class="op">&gt;</span>,
-        <span class="ident">gateway_ip</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">G</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">EthernetNetworkInterface</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> 
+<span class="kw">impl</span>&lt;N: NetworkInterfaceCard + <span class="lifetime">&#39;static </span>&gt; EthernetNetworkInterface&lt;N&gt; {
+    <span class="doccomment">/// Creates a new instance of an ethernet network interface, which can be used for handling sockets. 
+    /// 
+    /// Arguments: 
+    /// * `nic`:  a reference to an initialized Ethernet NIC, which must implement the `NetworkInterfaceCard` trait.
+    /// * `static_ip`: the IP that this network interface should locally use. If `None`, one will be assigned via DHCP.
+    /// * `gateway_ip`: the IP of this network interface&#39;s local gateway (access point, router). If `None`, will be discovered via DHCP.
+    /// 
+    /// # Note
+    /// Currently, `static_ip` and `gateway_ip` are required because we don&#39;t yet support DHCP.
+    /// 
+    </span><span class="kw">pub fn </span>new&lt;G: Into&lt;IpAddress&gt;&gt;(
+        nic: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;N&gt;,
+        static_ip: <span class="prelude-ty">Option</span>&lt;IpCidr&gt;,
+        gateway_ip: <span class="prelude-ty">Option</span>&lt;G&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;EthernetNetworkInterface&lt;N&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; 
     {
-        <span class="comment">// here, we have to create the iface for the first time because it didn&#39;t yet exist</span>
-        <span class="kw">let</span> <span class="ident">static_ip</span> <span class="op">=</span> <span class="ident">static_ip</span>.<span class="ident">ok_or</span>(<span class="string">&quot;static_ip is currently required because we do not yet support DHCP&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">ip_addrs</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">static_ip</span>];
+        <span class="comment">// here, we have to create the iface for the first time because it didn&#39;t yet exist
+        </span><span class="kw">let </span>static_ip = static_ip.ok_or(<span class="string">&quot;static_ip is currently required because we do not yet support DHCP&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>ip_addrs = <span class="macro">vec!</span>[static_ip];
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">routes</span> <span class="op">=</span> <span class="ident">Routes::new</span>(<span class="ident">BTreeMap::new</span>());
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">gateway_ip</span>.<span class="ident">ok_or</span>(<span class="string">&quot;gateway_ip is currently required because we do not yet support DHCP&quot;</span>)<span class="question-mark">?</span>.<span class="ident">into</span>() {
-            <span class="ident">IpAddress::Ipv4</span>(<span class="ident">ipv4</span>) =&gt; <span class="ident">routes</span>.<span class="ident">add_default_ipv4_route</span>(<span class="ident">ipv4</span>),
-            <span class="ident">IpAddress::Ipv6</span>(<span class="ident">ipv6</span>) =&gt; <span class="ident">routes</span>.<span class="ident">add_default_ipv6_route</span>(<span class="ident">ipv6</span>),
-            <span class="kw">_</span> =&gt; {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;gateway_ip must be an Ipv4Address or an Ipv6Address&quot;</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>routes = Routes::new(BTreeMap::new());
+        <span class="kw">let </span>res = <span class="kw">match </span>gateway_ip.ok_or(<span class="string">&quot;gateway_ip is currently required because we do not yet support DHCP&quot;</span>)<span class="question-mark">?</span>.into() {
+            IpAddress::Ipv4(ipv4) =&gt; routes.add_default_ipv4_route(ipv4),
+            IpAddress::Ipv6(ipv6) =&gt; routes.add_default_ipv6_route(ipv6),
+            <span class="kw">_ </span>=&gt; {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;gateway_ip must be an Ipv4Address or an Ipv6Address&quot;</span>);
             }
         };
-        <span class="ident">res</span>.<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;ethernet_smoltcp_device(): couldn&#39;t set default gateway IP address: {:?}&quot;</span>, <span class="ident">_e</span>);
-            <span class="string">&quot;couldn&#39;t set default gateway IP address&quot;</span>
-        })<span class="question-mark">?</span>;
+        res.map_err(|_e| {
+            <span class="macro">error!</span>(<span class="string">&quot;ethernet_smoltcp_device(): couldn&#39;t set default gateway IP address: {:?}&quot;</span>, _e);
+            <span class="string">&quot;couldn&#39;t set default gateway IP address&quot;
+        </span>})<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">device</span> <span class="op">=</span> <span class="ident">EthernetDevice::new</span>(<span class="ident">nic</span>);
-        <span class="kw">let</span> <span class="ident">hardware_mac_addr</span> <span class="op">=</span> <span class="ident">EthernetAddress</span>(<span class="ident">nic</span>.<span class="ident">lock</span>().<span class="ident">mac_address</span>());
-        <span class="comment">// When creating an EthernetInterface, only the `ethernet_addr` and `neighbor_cache` are required.</span>
-        <span class="kw">let</span> <span class="ident">iface</span> <span class="op">=</span> <span class="ident">EthernetInterfaceBuilder::new</span>(<span class="ident">device</span>)
-            .<span class="ident">ethernet_addr</span>(<span class="ident">hardware_mac_addr</span>)
-            .<span class="ident">neighbor_cache</span>(<span class="ident">NeighborCache::new</span>(<span class="ident">BTreeMap::new</span>()))
-            .<span class="ident">ip_addrs</span>(<span class="ident">ip_addrs</span>)
-            .<span class="ident">routes</span>(<span class="ident">routes</span>)
-            .<span class="ident">finalize</span>();
+        <span class="kw">let </span>device = EthernetDevice::new(nic);
+        <span class="kw">let </span>hardware_mac_addr = EthernetAddress(nic.lock().mac_address());
+        <span class="comment">// When creating an EthernetInterface, only the `ethernet_addr` and `neighbor_cache` are required.
+        </span><span class="kw">let </span>iface = EthernetInterfaceBuilder::new(device)
+            .ethernet_addr(hardware_mac_addr)
+            .neighbor_cache(NeighborCache::new(BTreeMap::new()))
+            .ip_addrs(ip_addrs)
+            .routes(routes)
+            .finalize();
 
         <span class="prelude-val">Ok</span>(
-            <span class="ident">EthernetNetworkInterface</span> { <span class="ident">iface</span> }
+            EthernetNetworkInterface { iface }
         )
     }
 
-    <span class="doccomment">/// Creates a new ethernet network interface with an ipv4 gateway address.</span>
-    <span class="doccomment">/// The static and gateway ips are provided because DHCP is not enabled.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `nic_ref`: a reference to an initialized Ethernet NIC, which must implement the `NetworkInterfaceCard` trait.</span>
-    <span class="doccomment">/// * `static_ip`: ip address to be assigned to this interface</span>
-    <span class="doccomment">/// * `gateway_ip`: ipv4 gateway address for this interface</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_ipv4_interface</span>(
-        <span class="ident">nic_ref</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span>,
-        <span class="ident">static_ip</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, 
-        <span class="ident">gateway_ip</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">EthernetNetworkInterface</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> 
+    <span class="doccomment">/// Creates a new ethernet network interface with an ipv4 gateway address.
+    /// The static and gateway ips are provided because DHCP is not enabled.
+    /// 
+    /// # Arguments
+    /// * `nic_ref`: a reference to an initialized Ethernet NIC, which must implement the `NetworkInterfaceCard` trait.
+    /// * `static_ip`: ip address to be assigned to this interface
+    /// * `gateway_ip`: ipv4 gateway address for this interface
+    </span><span class="kw">pub fn </span>new_ipv4_interface(
+        nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;N&gt;,
+        static_ip: <span class="kw-2">&amp;</span>str, 
+        gateway_ip: <span class="kw-2">&amp;</span>[u8]
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;EthernetNetworkInterface&lt;N&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; 
     {
-        <span class="kw">let</span> <span class="ident">static_ip</span> <span class="op">=</span> <span class="ident">IpCidr::from_str</span>(<span class="ident">static_ip</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;couldn&#39;t parse static_ip_address&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">gateway_ip</span> <span class="op">=</span> <span class="ident">Ipv4Address::from_bytes</span>(<span class="ident">gateway_ip</span>);
+        <span class="kw">let </span>static_ip = IpCidr::from_str(static_ip).map_err(|_e| <span class="string">&quot;couldn&#39;t parse static_ip_address&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>gateway_ip = Ipv4Address::from_bytes(gateway_ip);
 
-        <span class="ident"><span class="self">Self</span>::new</span>(<span class="ident">nic_ref</span>, <span class="prelude-val">Some</span>(<span class="ident">static_ip</span>), <span class="prelude-val">Some</span>(<span class="ident">gateway_ip</span>))
+        <span class="self">Self</span>::new(nic_ref, <span class="prelude-val">Some</span>(static_ip), <span class="prelude-val">Some</span>(gateway_ip))
     }
 }
 
 
-<span class="doccomment">/// An implementation of smoltcp&#39;s `Device` trait, which enables smoltcp</span>
-<span class="doccomment">/// to use our existing ethernet driver.</span>
-<span class="doccomment">/// An instance of this `EthernetDevice` can be used in smoltcp&#39;s `EthernetInterface`.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">EthernetDevice</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">NetworkInterfaceCard</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> { 
-    <span class="ident">nic_ref</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span>,
+<span class="doccomment">/// An implementation of smoltcp&#39;s `Device` trait, which enables smoltcp
+/// to use our existing ethernet driver.
+/// An instance of this `EthernetDevice` can be used in smoltcp&#39;s `EthernetInterface`.
+</span><span class="kw">pub struct </span>EthernetDevice&lt;N: NetworkInterfaceCard + <span class="lifetime">&#39;static</span>&gt; { 
+    nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;N&gt;,
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">NetworkInterfaceCard</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">EthernetDevice</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Create a new instance of the `EthernetDevice`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">nic_ref</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span>) -&gt; <span class="ident">EthernetDevice</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span> {
-        <span class="ident">EthernetDevice</span> {
-            <span class="ident">nic_ref</span>: <span class="ident">nic_ref</span>,
+<span class="kw">impl</span>&lt;N: NetworkInterfaceCard + <span class="lifetime">&#39;static</span>&gt; EthernetDevice&lt;N&gt; {
+    <span class="doccomment">/// Create a new instance of the `EthernetDevice`.
+    </span><span class="kw">pub fn </span>new(nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;N&gt;) -&gt; EthernetDevice&lt;N&gt; {
+        EthernetDevice {
+            nic_ref: nic_ref,
         }
     }
 }
 
 
-<span class="doccomment">/// To connect the ethernet driver to smoltcp, </span>
-<span class="doccomment">/// we implement transmit and receive callbacks</span>
-<span class="doccomment">/// that allow smoltcp to interact with the NIC.</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;d</span>, <span class="ident">N</span>: <span class="ident">NetworkInterfaceCard</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">smoltcp::phy::Device</span><span class="op">&lt;</span><span class="lifetime">&#39;d</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">EthernetDevice</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span> {
+<span class="doccomment">/// To connect the ethernet driver to smoltcp, 
+/// we implement transmit and receive callbacks
+/// that allow smoltcp to interact with the NIC.
+</span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;d</span>, N: NetworkInterfaceCard + <span class="lifetime">&#39;static</span>&gt; smoltcp::phy::Device&lt;<span class="lifetime">&#39;d</span>&gt; <span class="kw">for </span>EthernetDevice&lt;N&gt; {
 
-    <span class="doccomment">/// The buffer type returned by the receive callback.</span>
-    <span class="kw">type</span> <span class="ident">RxToken</span> <span class="op">=</span> <span class="ident">RxToken</span>;
-    <span class="doccomment">/// The buffer type returned by the transmit callback.x</span>
-    <span class="kw">type</span> <span class="ident">TxToken</span> <span class="op">=</span> <span class="ident">TxToken</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// The buffer type returned by the receive callback.
+    </span><span class="kw">type </span>RxToken = RxToken;
+    <span class="doccomment">/// The buffer type returned by the transmit callback.x
+    </span><span class="kw">type </span>TxToken = TxToken&lt;N&gt;;
 
-    <span class="kw">fn</span> <span class="ident">capabilities</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">DeviceCapabilities</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">caps</span> <span class="op">=</span> <span class="ident">DeviceCapabilities::default</span>();
-        <span class="ident">caps</span>.<span class="ident">max_transmission_unit</span> <span class="op">=</span> <span class="ident">DEFAULT_MTU</span>;
-        <span class="ident">caps</span>
+    <span class="kw">fn </span>capabilities(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DeviceCapabilities {
+        <span class="kw">let </span><span class="kw-2">mut </span>caps = DeviceCapabilities::default();
+        caps.max_transmission_unit = DEFAULT_MTU;
+        caps
     }
 
-    <span class="kw">fn</span> <span class="ident">receive</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident"><span class="self">Self</span>::RxToken</span>, <span class="ident"><span class="self">Self</span>::TxToken</span>)<span class="op">&gt;</span> {
-        <span class="comment">// According to the smoltcp code, AFAICT, this function should poll the ethernet driver</span>
-        <span class="comment">// to see if a new packet (Ethernet frame) has arrived, and if so, </span>
-        <span class="comment">// take ownership of it and return it inside of an RxToken.</span>
-        <span class="comment">// Otherwise, if no new packets have arrived, return None.</span>
-        <span class="kw">let</span> <span class="ident">received_frame</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">nic</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">nic_ref</span>.<span class="ident">lock</span>();
-            <span class="ident">nic</span>.<span class="ident">poll_receive</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> {
-                <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::receive(): error returned from poll_receive(): {}&quot;</span>, <span class="ident">_e</span>);
-                <span class="ident">_e</span>
-            }).<span class="ident">ok</span>()<span class="question-mark">?</span>;
-            <span class="ident">nic</span>.<span class="ident">get_received_frame</span>()<span class="question-mark">?</span>
-        };
+    <span class="kw">fn </span>receive(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;(<span class="self">Self</span>::RxToken, <span class="self">Self</span>::TxToken)&gt; {
+        <span class="comment">// According to the smoltcp code, AFAICT, this function should poll the ethernet driver
+        // to see if a new packet (Ethernet frame) has arrived, and if so, 
+        // take ownership of it and return it inside of an RxToken.
+        // Otherwise, if no new packets have arrived, return None.
+        </span><span class="kw">let </span>received_frame = {
+            <span class="kw">let </span><span class="kw-2">mut </span>nic = <span class="self">self</span>.nic_ref.lock();
+            nic.poll_receive().map_err(|_e| {
+                <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::receive(): error returned from poll_receive(): {}&quot;</span>, _e);
+                _e
+            }).ok()<span class="question-mark">?</span>;
+            nic.get_received_frame()<span class="question-mark">?
+        </span>};
 
-        <span class="comment">// debug!(&quot;EthernetDevice::receive(): got Ethernet frame, consists of {} ReceiveBuffers.&quot;, received_frame.0.len());</span>
-        <span class="comment">// TODO FIXME: add support for handling a frame that consists of multiple ReceiveBuffers</span>
-        <span class="kw">if</span> <span class="ident">received_frame</span>.<span class="number">0</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="number">1</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::receive(): WARNING: Ethernet frame consists of {} ReceiveBuffers, we currently only handle a single-buffer frame, so this may not work correctly!&quot;</span>,  <span class="ident">received_frame</span>.<span class="number">0</span>.<span class="ident">len</span>());
+        <span class="comment">// debug!(&quot;EthernetDevice::receive(): got Ethernet frame, consists of {} ReceiveBuffers.&quot;, received_frame.0.len());
+        // TODO FIXME: add support for handling a frame that consists of multiple ReceiveBuffers
+        </span><span class="kw">if </span>received_frame.<span class="number">0</span>.len() &gt; <span class="number">1 </span>{
+            <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::receive(): WARNING: Ethernet frame consists of {} ReceiveBuffers, we currently only handle a single-buffer frame, so this may not work correctly!&quot;</span>,  received_frame.<span class="number">0</span>.len());
         }
 
-        <span class="comment">// Just create and return a pair of (receive token, transmit token), </span>
-        <span class="comment">// the actual rx buffer handling is done in the RxToken::consume() function</span>
-        <span class="prelude-val">Some</span>((
-            <span class="ident">RxToken</span>(<span class="ident">received_frame</span>),
-            <span class="ident">TxToken</span> {
-                <span class="ident">nic_ref</span>: <span class="self">self</span>.<span class="ident">nic_ref</span>,
+        <span class="comment">// Just create and return a pair of (receive token, transmit token), 
+        // the actual rx buffer handling is done in the RxToken::consume() function
+        </span><span class="prelude-val">Some</span>((
+            RxToken(received_frame),
+            TxToken {
+                nic_ref: <span class="self">self</span>.nic_ref,
             },
         ))
     }
 
-    <span class="kw">fn</span> <span class="ident">transmit</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::TxToken</span><span class="op">&gt;</span> {
-        <span class="comment">// Just create and return a transmit token, </span>
-        <span class="comment">// the actual tx buffer creation is done in the TxToken::consume() function.</span>
-        <span class="comment">// Also, we can&#39;t accurately create an actual transmit buffer here</span>
-        <span class="comment">// because we don&#39;t yet know its required length.</span>
-        <span class="prelude-val">Some</span>(<span class="ident">TxToken</span> {
-            <span class="ident">nic_ref</span>: <span class="self">self</span>.<span class="ident">nic_ref</span>,
+    <span class="kw">fn </span>transmit(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::TxToken&gt; {
+        <span class="comment">// Just create and return a transmit token, 
+        // the actual tx buffer creation is done in the TxToken::consume() function.
+        // Also, we can&#39;t accurately create an actual transmit buffer here
+        // because we don&#39;t yet know its required length.
+        </span><span class="prelude-val">Some</span>(TxToken {
+            nic_ref: <span class="self">self</span>.nic_ref,
         })
     }
 }
 
 
-<span class="doccomment">/// The transmit token type used by smoltcp, which contains only a reference to the relevant NIC </span>
-<span class="doccomment">/// because the actual transmit buffer is allocated lazily only when it needs to be consumed.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TxToken</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">NetworkInterfaceCard</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> {
-    <span class="ident">nic_ref</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span>,
+<span class="doccomment">/// The transmit token type used by smoltcp, which contains only a reference to the relevant NIC 
+/// because the actual transmit buffer is allocated lazily only when it needs to be consumed.
+</span><span class="kw">pub struct </span>TxToken&lt;N: NetworkInterfaceCard + <span class="lifetime">&#39;static</span>&gt; {
+    nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;N&gt;,
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">N</span>: <span class="ident">NetworkInterfaceCard</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">smoltcp::phy::TxToken</span> <span class="kw">for</span> <span class="ident">TxToken</span><span class="op">&lt;</span><span class="ident">N</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">consume</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">F</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">_timestamp</span>: <span class="ident">Instant</span>, <span class="ident">len</span>: <span class="ident">usize</span>, <span class="ident">f</span>: <span class="ident">F</span>) -&gt; <span class="ident">smoltcp::Result</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>
-        <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>]) -&gt; <span class="ident">smoltcp::Result</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>
+<span class="kw">impl</span>&lt;N: NetworkInterfaceCard + <span class="lifetime">&#39;static</span>&gt; smoltcp::phy::TxToken <span class="kw">for </span>TxToken&lt;N&gt; {
+    <span class="kw">fn </span>consume&lt;R, F&gt;(<span class="self">self</span>, _timestamp: Instant, len: usize, f: F) -&gt; smoltcp::Result&lt;R&gt;
+        <span class="kw">where </span>F: FnOnce(<span class="kw-2">&amp;mut </span>[u8]) -&gt; smoltcp::Result&lt;R&gt;
     {
-        <span class="comment">// According to the smoltcp documentation, this function must obtain a transmit buffer </span>
-        <span class="comment">// with the requested `length` (or one at least that big) and then return it. </span>
-        <span class="comment">// Because we can dynamically allocate transmit buffers, we just do that here.</span>
-        <span class="kw">if</span> <span class="ident">len</span> <span class="op">&gt;</span> (<span class="ident">u16::max_value</span>() <span class="kw">as</span> <span class="ident">usize</span>) {
-            <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::transmit(): requested tx buffer size {} exceeds the max size of u16!&quot;</span>, <span class="ident">len</span>);
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">smoltcp::Error::Exhausted</span>)
+        <span class="comment">// According to the smoltcp documentation, this function must obtain a transmit buffer 
+        // with the requested `length` (or one at least that big) and then return it. 
+        // Because we can dynamically allocate transmit buffers, we just do that here.
+        </span><span class="kw">if </span>len &gt; (u16::max_value() <span class="kw">as </span>usize) {
+            <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::transmit(): requested tx buffer size {} exceeds the max size of u16!&quot;</span>, len);
+            <span class="kw">return </span><span class="prelude-val">Err</span>(smoltcp::Error::Exhausted)
         }
 
-        <span class="comment">// debug!(&quot;EthernetDevice::transmit(): creating new TransmitBuffer of {} bytes, timestamp: {}&quot;, len, _timestamp);</span>
-        <span class="comment">// create a new TransmitBuffer, cast it as a slice of bytes, call the passed `f` closure, and then send it!</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">txbuf</span> <span class="op">=</span> <span class="ident">TransmitBuffer::new</span>(<span class="ident">len</span> <span class="kw">as</span> <span class="ident">u16</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::transmit(): couldn&#39;t allocate TransmitBuffer of length {}, error {:?}&quot;</span>, <span class="ident">len</span>, <span class="ident">e</span>);
-            <span class="ident">smoltcp::Error::Exhausted</span>
+        <span class="comment">// debug!(&quot;EthernetDevice::transmit(): creating new TransmitBuffer of {} bytes, timestamp: {}&quot;, len, _timestamp);
+        // create a new TransmitBuffer, cast it as a slice of bytes, call the passed `f` closure, and then send it!
+        </span><span class="kw">let </span><span class="kw-2">mut </span>txbuf = TransmitBuffer::new(len <span class="kw">as </span>u16).map_err(|e| {
+            <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::transmit(): couldn&#39;t allocate TransmitBuffer of length {}, error {:?}&quot;</span>, len, e);
+            smoltcp::Error::Exhausted
         })<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">closure_retval</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">txbuf_byte_slice</span> <span class="op">=</span> <span class="ident">txbuf</span>.<span class="ident">as_slice_mut</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="number">0</span>, <span class="ident">len</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::transmit(): couldn&#39;t convert TransmitBuffer of length {} into byte slice, error {:?}&quot;</span>, <span class="ident">len</span>, <span class="ident">e</span>);
-                <span class="ident">smoltcp::Error::Exhausted</span>
+        <span class="kw">let </span>closure_retval = {
+            <span class="kw">let </span>txbuf_byte_slice = txbuf.as_slice_mut::&lt;u8&gt;(<span class="number">0</span>, len).map_err(|e| {
+                <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::transmit(): couldn&#39;t convert TransmitBuffer of length {} into byte slice, error {:?}&quot;</span>, len, e);
+                smoltcp::Error::Exhausted
             })<span class="question-mark">?</span>;
-            <span class="ident">f</span>(<span class="ident">txbuf_byte_slice</span>)<span class="question-mark">?</span>
-        };
-        <span class="self">self</span>.<span class="ident">nic_ref</span>.<span class="ident">lock</span>()
-            .<span class="ident">send_packet</span>(<span class="ident">txbuf</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-                <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::transmit(): error sending Ethernet packet: {:?}&quot;</span>, <span class="ident">e</span>);
-                <span class="ident">smoltcp::Error::Exhausted</span>
+            f(txbuf_byte_slice)<span class="question-mark">?
+        </span>};
+        <span class="self">self</span>.nic_ref.lock()
+            .send_packet(txbuf)
+            .map_err(|e| {
+                <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::transmit(): error sending Ethernet packet: {:?}&quot;</span>, e);
+                smoltcp::Error::Exhausted
             })<span class="question-mark">?</span>;
         
-        <span class="prelude-val">Ok</span>(<span class="ident">closure_retval</span>)
+        <span class="prelude-val">Ok</span>(closure_retval)
     }
 }
 
 
-<span class="doccomment">/// The receive token type used by smoltcp, </span>
-<span class="doccomment">/// which contains only a `ReceivedFrame` to be consumed later.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RxToken</span>(<span class="ident">ReceivedFrame</span>);
+<span class="doccomment">/// The receive token type used by smoltcp, 
+/// which contains only a `ReceivedFrame` to be consumed later.
+</span><span class="kw">pub struct </span>RxToken(ReceivedFrame);
 
-<span class="kw">impl</span> <span class="ident">smoltcp::phy::RxToken</span> <span class="kw">for</span> <span class="ident">RxToken</span> {
-    <span class="kw">fn</span> <span class="ident">consume</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">F</span><span class="op">&gt;</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_timestamp</span>: <span class="ident">Instant</span>, <span class="ident">f</span>: <span class="ident">F</span>) -&gt; <span class="ident">smoltcp::Result</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>
-        <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>]) -&gt; <span class="ident">smoltcp::Result</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>
+<span class="kw">impl </span>smoltcp::phy::RxToken <span class="kw">for </span>RxToken {
+    <span class="kw">fn </span>consume&lt;R, F&gt;(<span class="kw-2">mut </span><span class="self">self</span>, _timestamp: Instant, f: F) -&gt; smoltcp::Result&lt;R&gt;
+        <span class="kw">where </span>F: FnOnce(<span class="kw-2">&amp;mut </span>[u8]) -&gt; smoltcp::Result&lt;R&gt;
     {
-        <span class="kw">let</span> <span class="ident">first_buf</span> <span class="op">=</span> <span class="self">self</span>.<span class="number">0.0</span>.<span class="ident">first_mut</span>().<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
+        <span class="kw">let </span>first_buf = <span class="self">self</span>.<span class="number">0.0</span>.first_mut().ok_or_else(|| {
             <span class="macro">error!</span>(<span class="string">&quot;ReceivedFrame contained no receive buffers&quot;</span>);
-            <span class="ident">smoltcp::Error::Exhausted</span>
+            smoltcp::Error::Exhausted
         })<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">first_buf_len</span> <span class="op">=</span> <span class="ident">first_buf</span>.<span class="ident">length</span> <span class="kw">as</span> <span class="ident">usize</span>;
-        <span class="kw">let</span> <span class="ident">slice_mut</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">first_buf</span>.<span class="ident">mp</span>.<span class="ident">as_slice_mut</span>(<span class="number">0</span>, <span class="ident">first_buf_len</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::receive(): couldn&#39;t convert receive buffer of length {} into byte slice, error {:?}&quot;</span>, <span class="ident">first_buf_len</span>, <span class="ident">e</span>);
-            <span class="ident">smoltcp::Error::Exhausted</span>
+        <span class="kw">let </span>first_buf_len = first_buf.length <span class="kw">as </span>usize;
+        <span class="kw">let </span>slice_mut: <span class="kw-2">&amp;mut </span>[u8] = first_buf.mp.as_slice_mut(<span class="number">0</span>, first_buf_len).map_err(|e| {
+            <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::receive(): couldn&#39;t convert receive buffer of length {} into byte slice, error {:?}&quot;</span>, first_buf_len, e);
+            smoltcp::Error::Exhausted
         })<span class="question-mark">?</span>;
 
-        <span class="ident">f</span>(<span class="ident">slice_mut</span>)
+        f(slice_mut)
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ethernet_smoltcp_device" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ethernet_smoltcp_device" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

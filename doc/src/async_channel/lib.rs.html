@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/async_channel/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../async_channel/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../async_channel/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../async_channel/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/async_channel/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../async_channel/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -375,376 +369,375 @@
 <span id="369">369</span>
 <span id="370">370</span>
 <span id="371">371</span>
-</pre><pre class="rust"><code><span class="doccomment">//! An asynchronous channel for Inter-Task Communication (ITC) with an internal queue for buffering messages.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! This crate offers an asynchronous channel that allows multiple tasks</span>
-<span class="doccomment">//! to exchange messages through the use of a bounded-capacity intermediate buffer.</span>
-<span class="doccomment">//! Unlike the `rendezvous` channel, the sender and receiver do not need to rendezvous to send or receive data.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Only `Send` types can be sent or received through the channel.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! This is not a zero-copy channel; </span>
-<span class="doccomment">//! to avoid copying large messages, use a reference (layer of indirection) like `Box`.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! An asynchronous channel for Inter-Task Communication (ITC) with an internal queue for buffering messages.
+//! 
+//! This crate offers an asynchronous channel that allows multiple tasks
+//! to exchange messages through the use of a bounded-capacity intermediate buffer.
+//! Unlike the `rendezvous` channel, the sender and receiver do not need to rendezvous to send or receive data.
+//! 
+//! Only `Send` types can be sent or received through the channel.
+//! 
+//! This is not a zero-copy channel; 
+//! to avoid copying large messages, use a reference (layer of indirection) like `Box`.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">static_assertions</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">trace_channel</span>)]</span> <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">trace_channel</span>)]</span> <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">debugit</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">wait_queue</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mpmc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">crossbeam_utils</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
+<span class="attr">#[cfg(trace_channel)] #[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="attr">#[cfg(trace_channel)] #[macro_use] </span><span class="kw">extern crate </span>debugit;
+<span class="kw">extern crate </span>wait_queue;
+<span class="kw">extern crate </span>mpmc;
+<span class="kw">extern crate </span>crossbeam_utils;
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">downtime_eval</span>)]</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">hpet</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">downtime_eval</span>)]</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
+<span class="attr">#[cfg(downtime_eval)]
+</span><span class="kw">extern crate </span>hpet;
+<span class="attr">#[cfg(downtime_eval)]
+</span><span class="kw">extern crate </span>task;
 
-<span class="kw">use</span> <span class="ident">alloc::sync::Arc</span>;
-<span class="kw">use</span> <span class="ident">mpmc::Queue</span> <span class="kw">as</span> <span class="ident">MpmcQueue</span>;
-<span class="kw">use</span> <span class="ident">wait_queue::WaitQueue</span>;
-<span class="kw">use</span> <span class="ident">crossbeam_utils::atomic::AtomicCell</span>;
+<span class="kw">use </span>alloc::sync::Arc;
+<span class="kw">use </span>mpmc::Queue <span class="kw">as </span>MpmcQueue;
+<span class="kw">use </span>wait_queue::WaitQueue;
+<span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
 
 
-<span class="doccomment">/// Create a new channel that allows senders and receivers to </span>
-<span class="doccomment">/// asynchronously exchange messages via an internal intermediary buffer.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This channel&#39;s buffer has a bounded capacity of minimum size 2 messages,</span>
-<span class="doccomment">/// and it must be a power of 2 due to the restrictions of the current MPMC queue type that is used. </span>
-<span class="doccomment">/// The given `minimum_capacity` will be rounded up to the next largest power of 2, with a minimum value of 2.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// When the number of pending (buffered) messages is larger than the capacity,</span>
-<span class="doccomment">/// the channel is considered full.</span>
-<span class="doccomment">/// Depending on whether a non-blocking or blocking send function is invoked,</span>
-<span class="doccomment">/// future attempts to send another message will either block or return a `Full` error </span>
-<span class="doccomment">/// until the channel&#39;s buffer is drained by a receiver and space in the buffer becomes available.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Returns a tuple of `(Sender, Receiver)`.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_channel</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span>(<span class="ident">minimum_capacity</span>: <span class="ident">usize</span>) -&gt; (<span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) {
-    <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">Channel</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">queue</span>: <span class="ident">MpmcQueue::with_capacity</span>(<span class="ident">minimum_capacity</span>),
-        <span class="ident">waiting_senders</span>: <span class="ident">WaitQueue::new</span>(),
-        <span class="ident">waiting_receivers</span>: <span class="ident">WaitQueue::new</span>(),
-        <span class="ident">channel_status</span>: <span class="ident">AtomicCell::new</span>(<span class="ident">ChannelStatus::Connected</span>)
+<span class="doccomment">/// Create a new channel that allows senders and receivers to 
+/// asynchronously exchange messages via an internal intermediary buffer.
+/// 
+/// This channel&#39;s buffer has a bounded capacity of minimum size 2 messages,
+/// and it must be a power of 2 due to the restrictions of the current MPMC queue type that is used. 
+/// The given `minimum_capacity` will be rounded up to the next largest power of 2, with a minimum value of 2.
+/// 
+/// When the number of pending (buffered) messages is larger than the capacity,
+/// the channel is considered full.
+/// Depending on whether a non-blocking or blocking send function is invoked,
+/// future attempts to send another message will either block or return a `Full` error 
+/// until the channel&#39;s buffer is drained by a receiver and space in the buffer becomes available.
+/// 
+/// Returns a tuple of `(Sender, Receiver)`.
+</span><span class="kw">pub fn </span>new_channel&lt;T: Send&gt;(minimum_capacity: usize) -&gt; (Sender&lt;T&gt;, Receiver&lt;T&gt;) {
+    <span class="kw">let </span>channel = Arc::new(Channel::&lt;T&gt; {
+        queue: MpmcQueue::with_capacity(minimum_capacity),
+        waiting_senders: WaitQueue::new(),
+        waiting_receivers: WaitQueue::new(),
+        channel_status: AtomicCell::new(ChannelStatus::Connected)
     });
     (
-        <span class="ident">Sender</span>   { <span class="ident">channel</span>: <span class="ident">channel</span>.<span class="ident">clone</span>() },
-        <span class="ident">Receiver</span> { <span class="ident">channel</span>: <span class="ident">channel</span> }
+        Sender   { channel: channel.clone() },
+        Receiver { channel: channel }
     )
 }
 
-<span class="doccomment">/// Indicates whether channel is Connected or Disconnected</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ChannelStatus</span> {
-    <span class="doccomment">/// Channel is working. Initially channel is created with Connected status.</span>
-    <span class="ident">Connected</span>,
-    <span class="doccomment">/// Set to Disconnected when Sender end is dropped.</span>
-    <span class="ident">SenderDisconnected</span>,
-    <span class="doccomment">/// Set to Disconnected when Receiver end is dropped.</span>
-    <span class="ident">ReceiverDisconnected</span>,
+<span class="doccomment">/// Indicates whether channel is Connected or Disconnected
+</span><span class="attr">#[derive(Clone, Copy, Debug, PartialEq)]
+</span><span class="kw">pub enum </span>ChannelStatus {
+    <span class="doccomment">/// Channel is working. Initially channel is created with Connected status.
+    </span>Connected,
+    <span class="doccomment">/// Set to Disconnected when Sender end is dropped.
+    </span>SenderDisconnected,
+    <span class="doccomment">/// Set to Disconnected when Receiver end is dropped.
+    </span>ReceiverDisconnected,
 }
 
-<span class="doccomment">/// Error type for tracking different type of errors sender and receiver </span>
-<span class="doccomment">/// can encounter.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ChannelError</span> {
-    <span class="doccomment">/// Occurs when `try_receive` is performed on an empty channel</span>
-    <span class="ident">ChannelEmpty</span>,
-    <span class="doccomment">/// Occurs when `try_send` is performed on a full channel</span>
-    <span class="ident">ChannelFull</span>,
-    <span class="doccomment">/// Occurs when one end of channel is dropped</span>
-    <span class="ident">ChannelDisconnected</span>,
-    <span class="doccomment">/// Occurs when an error occur in `WaitQueue`</span>
-    <span class="ident">WaitError</span>(<span class="ident">wait_queue::WaitError</span>)
+<span class="doccomment">/// Error type for tracking different type of errors sender and receiver 
+/// can encounter.
+</span><span class="attr">#[derive(Debug, PartialEq)]
+</span><span class="kw">pub enum </span>ChannelError {
+    <span class="doccomment">/// Occurs when `try_receive` is performed on an empty channel
+    </span>ChannelEmpty,
+    <span class="doccomment">/// Occurs when `try_send` is performed on a full channel
+    </span>ChannelFull,
+    <span class="doccomment">/// Occurs when one end of channel is dropped
+    </span>ChannelDisconnected,
+    <span class="doccomment">/// Occurs when an error occur in `WaitQueue`
+    </span>WaitError(wait_queue::WaitError)
 }
 
-<span class="doccomment">/// The inner channel for asynchronous communication between `Sender`s and `Receiver`s.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This struct is effectively a wrapper around a MPMC queue </span>
-<span class="doccomment">/// with waitqueues for senders (producers) and receivers (consumers).</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This channel object is not Send/Sync or cloneable itself;</span>
-<span class="doccomment">/// it can be shared across tasks using an `Arc`.</span>
-<span class="kw">struct</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> {
-    <span class="ident">queue</span>: <span class="ident">MpmcQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
-    <span class="ident">waiting_senders</span>: <span class="ident">WaitQueue</span>,
-    <span class="ident">waiting_receivers</span>: <span class="ident">WaitQueue</span>,
-    <span class="ident">channel_status</span>: <span class="ident">AtomicCell</span><span class="op">&lt;</span><span class="ident">ChannelStatus</span><span class="op">&gt;</span>
+<span class="doccomment">/// The inner channel for asynchronous communication between `Sender`s and `Receiver`s.
+///
+/// This struct is effectively a wrapper around a MPMC queue 
+/// with waitqueues for senders (producers) and receivers (consumers).
+/// 
+/// This channel object is not Send/Sync or cloneable itself;
+/// it can be shared across tasks using an `Arc`.
+</span><span class="kw">struct </span>Channel&lt;T: Send&gt; {
+    queue: MpmcQueue&lt;T&gt;,
+    waiting_senders: WaitQueue,
+    waiting_receivers: WaitQueue,
+    channel_status: AtomicCell&lt;ChannelStatus&gt;
 }
 
-<span class="comment">// Ensure that `AtomicCell&lt;ChannelStatus&gt;` is actually a lock-free atomic.</span>
-<span class="macro">const_assert!</span>(<span class="ident">AtomicCell</span>::<span class="op">&lt;</span><span class="ident">ChannelStatus</span><span class="op">&gt;</span><span class="ident">::is_lock_free</span>());
+<span class="comment">// Ensure that `AtomicCell&lt;ChannelStatus&gt;` is actually a lock-free atomic.
+</span><span class="macro">const_assert!</span>(AtomicCell::&lt;ChannelStatus&gt;::is_lock_free());
 
-<span class="kw">impl</span> <span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Returns true if the channel is disconnected.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_disconnected</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">get_channel_status</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">ChannelStatus::Connected</span>
+<span class="kw">impl </span>&lt;T: Send&gt; Channel&lt;T&gt; {
+    <span class="doccomment">/// Returns true if the channel is disconnected.
+    </span><span class="attr">#[inline(always)]
+    </span><span class="kw">fn </span>is_disconnected(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.get_channel_status() != ChannelStatus::Connected
     }
 
-    <span class="doccomment">/// Returns the channel Status</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">get_channel_status</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ChannelStatus</span> {
-        <span class="self">self</span>.<span class="ident">channel_status</span>.<span class="ident">load</span>()
+    <span class="doccomment">/// Returns the channel Status
+    </span><span class="attr">#[inline(always)]
+    </span><span class="kw">fn </span>get_channel_status(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ChannelStatus {
+        <span class="self">self</span>.channel_status.load()
     }
 }
 
-<span class="doccomment">/// The sender (transmit) side of a channel.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> {
-    <span class="ident">channel</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// The sender (transmit) side of a channel.
+</span><span class="attr">#[derive(Clone)]
+</span><span class="kw">pub struct </span>Sender&lt;T: Send&gt; {
+    channel: Arc&lt;Channel&lt;T&gt;&gt;,
 }
-<span class="kw">impl</span> <span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Send a message, blocking until space in the channel&#39;s buffer is available. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Returns `Ok(())` if the message was sent successfully,</span>
-    <span class="doccomment">/// otherwise returns an error of `ChannelError` type. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">msg</span>: <span class="ident">T</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">ChannelError</span><span class="op">&gt;</span> {
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">trace_channel</span>)]</span>
-        <span class="macro">trace!</span>(<span class="string">&quot;async_channel: sending msg: {:?}&quot;</span>, <span class="macro">debugit!</span>(<span class="ident">msg</span>));
-        <span class="comment">// Fast path: attempt to send the message, assuming the buffer isn&#39;t full</span>
-        <span class="kw">let</span> <span class="ident">msg</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">try_send</span>(<span class="ident">msg</span>) {
-            <span class="comment">// if successful return ok</span>
-            <span class="prelude-val">Ok</span>(()) =&gt; <span class="kw">return</span> <span class="prelude-val">Ok</span>(()),
-            <span class="comment">// if unsunccessful check whether it fails due to any other reason than channel being full</span>
-            <span class="prelude-val">Err</span>((<span class="ident">returned_msg</span>, <span class="ident">channel_error</span>)) =&gt; {
-                <span class="kw">if</span> <span class="ident">channel_error</span> <span class="op">!</span><span class="op">=</span> <span class="ident">ChannelError::ChannelFull</span> {
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">channel_error</span>);
+<span class="kw">impl </span>&lt;T: Send&gt; Sender&lt;T&gt; {
+    <span class="doccomment">/// Send a message, blocking until space in the channel&#39;s buffer is available. 
+    /// 
+    /// Returns `Ok(())` if the message was sent successfully,
+    /// otherwise returns an error of `ChannelError` type. 
+    </span><span class="kw">pub fn </span>send(<span class="kw-2">&amp;</span><span class="self">self</span>, msg: T) -&gt; <span class="prelude-ty">Result</span>&lt;(), ChannelError&gt; {
+        <span class="attr">#[cfg(trace_channel)]
+        </span><span class="macro">trace!</span>(<span class="string">&quot;async_channel: sending msg: {:?}&quot;</span>, <span class="macro">debugit!</span>(msg));
+        <span class="comment">// Fast path: attempt to send the message, assuming the buffer isn&#39;t full
+        </span><span class="kw">let </span>msg = <span class="kw">match </span><span class="self">self</span>.try_send(msg) {
+            <span class="comment">// if successful return ok
+            </span><span class="prelude-val">Ok</span>(()) =&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(()),
+            <span class="comment">// if unsunccessful check whether it fails due to any other reason than channel being full
+            </span><span class="prelude-val">Err</span>((returned_msg, channel_error)) =&gt; {
+                <span class="kw">if </span>channel_error != ChannelError::ChannelFull {
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(channel_error);
                 }
-                <span class="ident">returned_msg</span>
+                returned_msg
             },
         };
 
-        <span class="comment">// Slow path: the buffer was full, so now we need to block until space becomes available.</span>
-        <span class="comment">// The code can move to this point only if fast path failed due to channel being full</span>
-        <span class="comment">// trace!(&quot;waiting for space to send...&quot;);</span>
+        <span class="comment">// Slow path: the buffer was full, so now we need to block until space becomes available.
+        // The code can move to this point only if fast path failed due to channel being full
+        // trace!(&quot;waiting for space to send...&quot;);
 
-        <span class="comment">// Here we use an option to store the un-sent message outside of the `closure`</span>
-        <span class="comment">// so that we can repeatedly try to re-send it upon the next invocation of the `closure`</span>
-        <span class="comment">// (which happens when this sender task is notified in the future).</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">msg</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">msg</span>);
+        // Here we use an option to store the un-sent message outside of the `closure`
+        // so that we can repeatedly try to re-send it upon the next invocation of the `closure`
+        // (which happens when this sender task is notified in the future).
+        </span><span class="kw">let </span><span class="kw-2">mut </span>msg = <span class="prelude-val">Some</span>(msg);
 
-        <span class="comment">// This closure is invoked from within a locked context, so we cannot just call `try_send()` here</span>
-        <span class="comment">// because it will notify the receivers which can cause deadlock.</span>
-        <span class="comment">// Therefore, we need to perform the nofity action outside of this closure after it returns.</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">closure</span> <span class="op">=</span> <span class="op">|</span><span class="op">|</span> {
-            <span class="kw">let</span> <span class="ident">owned_msg</span> <span class="op">=</span> <span class="ident">msg</span>.<span class="ident">take</span>();
-            <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">owned_msg</span>.<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">m</span><span class="op">|</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">queue</span>.<span class="ident">push</span>(<span class="ident">m</span>) {
+        <span class="comment">// This closure is invoked from within a locked context, so we cannot just call `try_send()` here
+        // because it will notify the receivers which can cause deadlock.
+        // Therefore, we need to perform the nofity action outside of this closure after it returns.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>closure = || {
+            <span class="kw">let </span>owned_msg = msg.take();
+            <span class="kw">let </span>result = owned_msg.and_then(|m| <span class="kw">match </span><span class="self">self</span>.channel.queue.push(m) {
                 <span class="prelude-val">Ok</span>(()) =&gt; {
-                    <span class="comment">// trace!(&quot;Sending in closure&quot;);</span>
-                    <span class="comment">// We wrap the result in Some() since `wait_until` progresses only when `Some` is returned.</span>
-                    <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(()))
+                    <span class="comment">// trace!(&quot;Sending in closure&quot;);
+                    // We wrap the result in Some() since `wait_until` progresses only when `Some` is returned.
+                    </span><span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(()))
                 },
-                <span class="prelude-val">Err</span>(<span class="ident">returned_msg</span>) =&gt; {
-                    <span class="comment">// Here: we (the sender) woke up and failed to send, </span>
-                    <span class="comment">// so we save the returned message outside of the closure to retry later. </span>
-                    <span class="comment">// trace!(&quot;try_send() failed, saving message {:?} for next retry.&quot;, debugit!(returned_msg));</span>
-                    <span class="ident">msg</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">returned_msg</span>);
-                    <span class="prelude-val">None</span>
-                }
+                <span class="prelude-val">Err</span>(returned_msg) =&gt; {
+                    <span class="comment">// Here: we (the sender) woke up and failed to send, 
+                    // so we save the returned message outside of the closure to retry later. 
+                    // trace!(&quot;try_send() failed, saving message {:?} for next retry.&quot;, debugit!(returned_msg));
+                    </span>msg = <span class="prelude-val">Some</span>(returned_msg);
+                    <span class="prelude-val">None
+                </span>}
             });
 
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">is_disconnected</span>() {
-                 <span class="comment">// trace!(&quot;Receiver Endpoint is dropped&quot;);</span>
-                 <span class="comment">// Here the receiver end has dropped. </span>
-                 <span class="comment">// So we don&#39;t wait anymore in the waitqueue</span>
-                 <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(<span class="ident">ChannelError::ChannelDisconnected</span>))
-            } <span class="kw">else</span> {
-                <span class="ident">result</span>
+            <span class="kw">if </span><span class="self">self</span>.channel.is_disconnected() {
+                 <span class="comment">// trace!(&quot;Receiver Endpoint is dropped&quot;);
+                 // Here the receiver end has dropped. 
+                 // So we don&#39;t wait anymore in the waitqueue
+                 </span><span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(ChannelError::ChannelDisconnected))
+            } <span class="kw">else </span>{
+                result
             }
             
         };
 
-        <span class="comment">// When `wait_until_mut` returns it can be either a successful send marked as  Ok(Ok()), </span>
-        <span class="comment">// Error in the condition (channel disconnection) marked as Ok(Err()),</span>
-        <span class="comment">// or the wait_until runs into error (Err()) </span>
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span>  <span class="kw">match</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">waiting_senders</span>.<span class="ident">wait_until_mut</span>(<span class="kw-2">&amp;mut</span> <span class="ident">closure</span>) {
-            <span class="prelude-val">Ok</span>(<span class="ident">r</span>) =&gt; <span class="ident">r</span>,
-            <span class="prelude-val">Err</span>(<span class="ident">wait_error</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">ChannelError::WaitError</span>(<span class="ident">wait_error</span>)),
+        <span class="comment">// When `wait_until_mut` returns it can be either a successful send marked as  Ok(Ok()), 
+        // Error in the condition (channel disconnection) marked as Ok(Err()),
+        // or the wait_until runs into error (Err()) 
+        </span><span class="kw">let </span>res =  <span class="kw">match </span><span class="self">self</span>.channel.waiting_senders.wait_until_mut(<span class="kw-2">&amp;mut </span>closure) {
+            <span class="prelude-val">Ok</span>(r) =&gt; r,
+            <span class="prelude-val">Err</span>(wait_error) =&gt; <span class="prelude-val">Err</span>(ChannelError::WaitError(wait_error)),
         };
 
-        <span class="comment">// trace!(&quot;... sending space became available.&quot;);</span>
+        <span class="comment">// trace!(&quot;... sending space became available.&quot;);
 
-        <span class="comment">// If we successfully sent a message, we need to notify any waiting receivers.</span>
-        <span class="comment">// As stated above, to avoid deadlock, this must be done here rather than in the above closure.</span>
-        <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_ok</span>() {
-            <span class="comment">// trace!(&quot;successful send() is notifying receivers.&quot;);</span>
-            <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">waiting_receivers</span>.<span class="ident">notify_one</span>();
+        // If we successfully sent a message, we need to notify any waiting receivers.
+        // As stated above, to avoid deadlock, this must be done here rather than in the above closure.
+        </span><span class="kw">if </span>res.is_ok() {
+            <span class="comment">// trace!(&quot;successful send() is notifying receivers.&quot;);
+            </span><span class="self">self</span>.channel.waiting_receivers.notify_one();
         }
-        <span class="ident">res</span>
+        res
     }
 
-    <span class="doccomment">/// Tries to send the message, only succeeding if buffer space is available.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// If no buffer space is available, it returns the `msg`  with `ChannelError` back to the caller without blocking. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_send</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">msg</span>: <span class="ident">T</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), (<span class="ident">T</span>, <span class="ident">ChannelError</span>)<span class="op">&gt;</span> {
-        <span class="comment">// first we&#39;ll check whether the channel is active</span>
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">get_channel_status</span>() {
-            <span class="ident">ChannelStatus::SenderDisconnected</span> =&gt; {
-                <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">channel_status</span>.<span class="ident">store</span>(<span class="ident">ChannelStatus::Connected</span>);
+    <span class="doccomment">/// Tries to send the message, only succeeding if buffer space is available.
+    /// 
+    /// If no buffer space is available, it returns the `msg`  with `ChannelError` back to the caller without blocking. 
+    </span><span class="kw">pub fn </span>try_send(<span class="kw-2">&amp;</span><span class="self">self</span>, msg: T) -&gt; <span class="prelude-ty">Result</span>&lt;(), (T, ChannelError)&gt; {
+        <span class="comment">// first we&#39;ll check whether the channel is active
+        </span><span class="kw">match </span><span class="self">self</span>.channel.get_channel_status() {
+            ChannelStatus::SenderDisconnected =&gt; {
+                <span class="self">self</span>.channel.channel_status.store(ChannelStatus::Connected);
             },
-            <span class="ident">ChannelStatus::ReceiverDisconnected</span>  =&gt; {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>((<span class="ident">msg</span>, <span class="ident">ChannelError::ChannelDisconnected</span>));
+            ChannelStatus::ReceiverDisconnected  =&gt; {
+                <span class="kw">return </span><span class="prelude-val">Err</span>((msg, ChannelError::ChannelDisconnected));
             },
-            <span class="kw">_</span> =&gt; {},
+            <span class="kw">_ </span>=&gt; {},
         }
 
-        <span class="comment">// Injected Randomized fault : Page fault</span>
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">downtime_eval</span>)]</span>
-        {
-            <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">hpet::get_hpet</span>().<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">get_counter</span>();
-            <span class="comment">// debug!(&quot;Value {} {}&quot;, value, value % 1024);</span>
+        <span class="comment">// Injected Randomized fault : Page fault
+        </span><span class="attr">#[cfg(downtime_eval)]
+        </span>{
+            <span class="kw">let </span>value = hpet::get_hpet().as_ref().unwrap().get_counter();
+            <span class="comment">// debug!(&quot;Value {} {}&quot;, value, value % 1024);
 
-            <span class="kw">match</span> <span class="ident">task::get_my_current_task</span>() {
-                <span class="prelude-val">Some</span>(<span class="ident">curr_task</span>) =&gt; {
+            </span><span class="kw">match </span>task::get_my_current_task() {
+                <span class="prelude-val">Some</span>(curr_task) =&gt; {
 
-                    <span class="comment">// We restrict the fault to a specific task to make measurements consistent</span>
-                    <span class="kw">if</span> (<span class="ident">value</span> <span class="op">%</span> <span class="number">4096</span>) <span class="op">==</span> <span class="number">0</span>  <span class="op">&amp;&amp;</span> <span class="ident">curr_task</span>.<span class="ident">is_restartable</span>() {
-                        <span class="comment">// debug!(&quot;Fake error {}&quot;, value);</span>
-                        <span class="kw">unsafe</span> { <span class="kw-2">*</span>(<span class="number">0x5050DEADBEEF</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">usize</span>) <span class="op">=</span> <span class="number">0x5555_5555_5555</span>; }
+                    <span class="comment">// We restrict the fault to a specific task to make measurements consistent
+                    </span><span class="kw">if </span>(value % <span class="number">4096</span>) == <span class="number">0  </span>&amp;&amp; curr_task.is_restartable() {
+                        <span class="comment">// debug!(&quot;Fake error {}&quot;, value);
+                        </span><span class="kw">unsafe </span>{ <span class="kw-2">*</span>(<span class="number">0x5050DEADBEEF </span><span class="kw">as </span><span class="kw-2">*mut </span>usize) = <span class="number">0x5555_5555_5555</span>; }
                     }
                 },
-                <span class="kw">_</span> =&gt; (),
+                <span class="kw">_ </span>=&gt; (),
             }
         }
 
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">queue</span>.<span class="ident">push</span>(<span class="ident">msg</span>) {
-            <span class="comment">// successfully sent</span>
-            <span class="prelude-val">Ok</span>(()) =&gt; {
-                <span class="comment">// trace!(&quot;successful try_send() is notifying receivers.&quot;);</span>
-                <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">waiting_receivers</span>.<span class="ident">notify_one</span>();
+        <span class="kw">match </span><span class="self">self</span>.channel.queue.push(msg) {
+            <span class="comment">// successfully sent
+            </span><span class="prelude-val">Ok</span>(()) =&gt; {
+                <span class="comment">// trace!(&quot;successful try_send() is notifying receivers.&quot;);
+                </span><span class="self">self</span>.channel.waiting_receivers.notify_one();
                 <span class="prelude-val">Ok</span>(())
             }
-            <span class="comment">// queue was full, return message back to caller</span>
-            <span class="prelude-val">Err</span>(<span class="ident">returned_msg</span>) =&gt; <span class="prelude-val">Err</span>((<span class="ident">returned_msg</span>, <span class="ident">ChannelError::ChannelFull</span>)),
+            <span class="comment">// queue was full, return message back to caller
+            </span><span class="prelude-val">Err</span>(returned_msg) =&gt; <span class="prelude-val">Err</span>((returned_msg, ChannelError::ChannelFull)),
         }
     }
 
-    <span class="doccomment">/// Returns true if the channel is disconnected.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_disconnected</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">is_disconnected</span>()
+    <span class="doccomment">/// Returns true if the channel is disconnected.
+    </span><span class="kw">pub fn </span>is_disconnected(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.channel.is_disconnected()
     }
 }
 
-<span class="doccomment">/// The receiver side of a channel.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> {
-    <span class="ident">channel</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// The receiver side of a channel.
+</span><span class="attr">#[derive(Clone)]
+</span><span class="kw">pub struct </span>Receiver&lt;T: Send&gt; {
+    channel: Arc&lt;Channel&lt;T&gt;&gt;,
 }
-<span class="kw">impl</span> <span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Receive a message, blocking until a message is available in the buffer.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Returns the message if it was received properly, otherwise returns an error of `ChannelError` type.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">receive</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">ChannelError</span><span class="op">&gt;</span> {
-        <span class="comment">// trace!(&quot;async_channel: receive() entry&quot;);</span>
-        <span class="comment">// Fast path: attempt to receive a message, assuming the buffer isn&#39;t empty</span>
-        <span class="comment">// The code progresses beyond this match only if try_receive fails due to</span>
-        <span class="comment">// empty channel</span>
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">try_receive</span>() {
-            <span class="prelude-val">Err</span>(<span class="ident">ChannelError::ChannelEmpty</span>) =&gt; {},
-            <span class="ident">x</span> =&gt; {
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">trace_channel</span>)]</span>
-                <span class="macro">trace!</span>(<span class="string">&quot;async_channel: received msg: {:?}&quot;</span>, <span class="macro">debugit!</span>(<span class="ident">x</span>));
-                <span class="kw">return</span> <span class="ident">x</span>;
+<span class="kw">impl </span>&lt;T: Send&gt; Receiver&lt;T&gt; {
+    <span class="doccomment">/// Receive a message, blocking until a message is available in the buffer.
+    /// 
+    /// Returns the message if it was received properly, otherwise returns an error of `ChannelError` type.
+    </span><span class="kw">pub fn </span>receive(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;T, ChannelError&gt; {
+        <span class="comment">// trace!(&quot;async_channel: receive() entry&quot;);
+        // Fast path: attempt to receive a message, assuming the buffer isn&#39;t empty
+        // The code progresses beyond this match only if try_receive fails due to
+        // empty channel
+        </span><span class="kw">match </span><span class="self">self</span>.try_receive() {
+            <span class="prelude-val">Err</span>(ChannelError::ChannelEmpty) =&gt; {},
+            x =&gt; {
+                <span class="attr">#[cfg(trace_channel)]
+                </span><span class="macro">trace!</span>(<span class="string">&quot;async_channel: received msg: {:?}&quot;</span>, <span class="macro">debugit!</span>(x));
+                <span class="kw">return </span>x;
             }
         };
 
-        <span class="comment">// Slow path: the buffer was empty, so we need to block until a message is sent.</span>
-        <span class="comment">// trace!(&quot;waiting to receive a message...&quot;);</span>
+        <span class="comment">// Slow path: the buffer was empty, so we need to block until a message is sent.
+        // trace!(&quot;waiting to receive a message...&quot;);
         
-        <span class="comment">// This closure is invoked from within a locked context, so we cannot just call `try_receive()` here</span>
-        <span class="comment">// because it will notify the receivers which can cause deadlock.</span>
-        <span class="comment">// Therefore, we need to perform the nofity action outside of this closure after it returns</span>
-        <span class="comment">// Closure would output the message if received or an error if channel is disconnected.</span>
-        <span class="comment">// It would output `None` if neither happens, resulting in waiting in the queue. </span>
-        <span class="kw">let</span> <span class="ident">closure</span> <span class="op">=</span> <span class="op">|</span><span class="op">|</span> {
-            <span class="kw">match</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">queue</span>.<span class="ident">pop</span>() {
-                <span class="prelude-val">Some</span>(<span class="ident">msg</span>) =&gt; <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(<span class="ident">msg</span>)),
-                <span class="kw">_</span> =&gt; {
-                    <span class="kw">if</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">is_disconnected</span>() {
-                        <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(<span class="ident">ChannelError::ChannelDisconnected</span>))
-                    } <span class="kw">else</span> {
-                        <span class="prelude-val">None</span>
-                    }
+        // This closure is invoked from within a locked context, so we cannot just call `try_receive()` here
+        // because it will notify the receivers which can cause deadlock.
+        // Therefore, we need to perform the nofity action outside of this closure after it returns
+        // Closure would output the message if received or an error if channel is disconnected.
+        // It would output `None` if neither happens, resulting in waiting in the queue. 
+        </span><span class="kw">let </span>closure = || {
+            <span class="kw">match </span><span class="self">self</span>.channel.queue.pop() {
+                <span class="prelude-val">Some</span>(msg) =&gt; <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(msg)),
+                <span class="kw">_ </span>=&gt; {
+                    <span class="kw">if </span><span class="self">self</span>.channel.is_disconnected() {
+                        <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(ChannelError::ChannelDisconnected))
+                    } <span class="kw">else </span>{
+                        <span class="prelude-val">None
+                    </span>}
                 },
             }
         };
 
-        <span class="comment">// When wait returns it can be either a successful receiver marked as  Ok(Ok(msg)), </span>
-        <span class="comment">// Error in wait condition marked as Ok(Err(error)),</span>
-        <span class="comment">// or the wait_until runs into error (Err()) </span>
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span>  <span class="kw">match</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">waiting_receivers</span>.<span class="ident">wait_until</span>(<span class="op">&amp;</span> <span class="ident">closure</span>) {
-            <span class="prelude-val">Ok</span>(<span class="prelude-val">Ok</span>(<span class="ident">x</span>)) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">x</span>),
-            <span class="prelude-val">Ok</span>(<span class="prelude-val">Err</span>(<span class="ident">error</span>)) =&gt; <span class="prelude-val">Err</span>(<span class="ident">error</span>),
-            <span class="prelude-val">Err</span>(<span class="ident">wait_error</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">ChannelError::WaitError</span>(<span class="ident">wait_error</span>)),
+        <span class="comment">// When wait returns it can be either a successful receiver marked as  Ok(Ok(msg)), 
+        // Error in wait condition marked as Ok(Err(error)),
+        // or the wait_until runs into error (Err()) 
+        </span><span class="kw">let </span>res =  <span class="kw">match </span><span class="self">self</span>.channel.waiting_receivers.wait_until(&amp; closure) {
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Ok</span>(x)) =&gt; <span class="prelude-val">Ok</span>(x),
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Err</span>(error)) =&gt; <span class="prelude-val">Err</span>(error),
+            <span class="prelude-val">Err</span>(wait_error) =&gt; <span class="prelude-val">Err</span>(ChannelError::WaitError(wait_error)),
         };
 
-        <span class="comment">// trace!(&quot;... received msg.&quot;);</span>
+        <span class="comment">// trace!(&quot;... received msg.&quot;);
 
-        <span class="comment">// If we successfully received a message, we need to notify any waiting senders.</span>
-        <span class="comment">// As stated above, to avoid deadlock, this must be done here rather than in the above closure.</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="kw-2">ref</span> <span class="ident">_msg</span>) <span class="op">=</span> <span class="ident">res</span> {
-            <span class="comment">// trace!(&quot;async_channel: successful receive() is notifying senders.&quot;);</span>
-            <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">waiting_senders</span>.<span class="ident">notify_one</span>();
+        // If we successfully received a message, we need to notify any waiting senders.
+        // As stated above, to avoid deadlock, this must be done here rather than in the above closure.
+        </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(<span class="kw-2">ref </span>_msg) = res {
+            <span class="comment">// trace!(&quot;async_channel: successful receive() is notifying senders.&quot;);
+            </span><span class="self">self</span>.channel.waiting_senders.notify_one();
         }
 
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">trace_channel</span>)]</span>
-        <span class="macro">trace!</span>(<span class="string">&quot;async_channel: received msg: {:?}&quot;</span>, <span class="macro">debugit!</span>(<span class="ident">res</span>));
+        <span class="attr">#[cfg(trace_channel)]
+        </span><span class="macro">trace!</span>(<span class="string">&quot;async_channel: received msg: {:?}&quot;</span>, <span class="macro">debugit!</span>(res));
         
-        <span class="ident">res</span>
+        res
     }
 
-    <span class="doccomment">/// Tries to receive a message, only succeeding if a message is already available in the buffer.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// If receive succeeds returns `Some(Ok(T))`. </span>
-    <span class="doccomment">/// If an endpoint is disconnected returns `Some(Err(ChannelStatus::Disconnected))`. </span>
-    <span class="doccomment">/// If no such message exists, it returns `None` without blocking</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_receive</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">ChannelError</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">msg</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">queue</span>.<span class="ident">pop</span>() {
-            <span class="comment">// trace!(&quot;successful try_receive() is notifying senders.&quot;);</span>
-            <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">waiting_senders</span>.<span class="ident">notify_one</span>();
-            <span class="prelude-val">Ok</span>(<span class="ident">msg</span>)
-        } <span class="kw">else</span> {
-            <span class="comment">// We check whther the channel is disconnected</span>
-            <span class="kw">match</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">get_channel_status</span>() {
-                <span class="ident">ChannelStatus::ReceiverDisconnected</span> =&gt; {
-                    <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">channel_status</span>.<span class="ident">store</span>(<span class="ident">ChannelStatus::Connected</span>);
-                    <span class="prelude-val">Err</span>(<span class="ident">ChannelError::ChannelEmpty</span>)
+    <span class="doccomment">/// Tries to receive a message, only succeeding if a message is already available in the buffer.
+    /// 
+    /// If receive succeeds returns `Some(Ok(T))`. 
+    /// If an endpoint is disconnected returns `Some(Err(ChannelStatus::Disconnected))`. 
+    /// If no such message exists, it returns `None` without blocking
+    </span><span class="kw">pub fn </span>try_receive(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;T, ChannelError&gt; {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(msg) = <span class="self">self</span>.channel.queue.pop() {
+            <span class="comment">// trace!(&quot;successful try_receive() is notifying senders.&quot;);
+            </span><span class="self">self</span>.channel.waiting_senders.notify_one();
+            <span class="prelude-val">Ok</span>(msg)
+        } <span class="kw">else </span>{
+            <span class="comment">// We check whther the channel is disconnected
+            </span><span class="kw">match </span><span class="self">self</span>.channel.get_channel_status() {
+                ChannelStatus::ReceiverDisconnected =&gt; {
+                    <span class="self">self</span>.channel.channel_status.store(ChannelStatus::Connected);
+                    <span class="prelude-val">Err</span>(ChannelError::ChannelEmpty)
                 },
-                <span class="ident">ChannelStatus::SenderDisconnected</span>  =&gt; {
-                    <span class="prelude-val">Err</span>(<span class="ident">ChannelError::ChannelDisconnected</span>)
+                ChannelStatus::SenderDisconnected  =&gt; {
+                    <span class="prelude-val">Err</span>(ChannelError::ChannelDisconnected)
                 },
-                <span class="kw">_</span> =&gt; {
-                    <span class="prelude-val">Err</span>(<span class="ident">ChannelError::ChannelEmpty</span>)
+                <span class="kw">_ </span>=&gt; {
+                    <span class="prelude-val">Err</span>(ChannelError::ChannelEmpty)
                 },
             }
         }
     }
 
-    <span class="doccomment">/// Returns true if the channel is disconnected.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_disconnected</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">is_disconnected</span>()
+    <span class="doccomment">/// Returns true if the channel is disconnected.
+    </span><span class="kw">pub fn </span>is_disconnected(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.channel.is_disconnected()
     }
 }
 
 
-<span class="doccomment">/// Drop implementation marks the channel state and notifys the `Sender`</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="comment">// trace!(&quot;Dropping the receiver&quot;);</span>
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">channel_status</span>.<span class="ident">store</span>(<span class="ident">ChannelStatus::ReceiverDisconnected</span>);
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">waiting_senders</span>.<span class="ident">notify_one</span>();
+<span class="doccomment">/// Drop implementation marks the channel state and notifys the `Sender`
+</span><span class="kw">impl</span>&lt;T: Send&gt; Drop <span class="kw">for </span>Receiver&lt;T&gt; {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="comment">// trace!(&quot;Dropping the receiver&quot;);
+        </span><span class="self">self</span>.channel.channel_status.store(ChannelStatus::ReceiverDisconnected);
+        <span class="self">self</span>.channel.waiting_senders.notify_one();
     }
 }
 
-<span class="doccomment">/// Drop implementation marks the channel state and notifys the `Receiver`</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="comment">// trace!(&quot;Dropping the sender&quot;);</span>
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">channel_status</span>.<span class="ident">store</span>(<span class="ident">ChannelStatus::SenderDisconnected</span>);
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">waiting_receivers</span>.<span class="ident">notify_one</span>();
+<span class="doccomment">/// Drop implementation marks the channel state and notifys the `Receiver`
+</span><span class="kw">impl</span>&lt;T: Send&gt; Drop <span class="kw">for </span>Sender&lt;T&gt; {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="comment">// trace!(&quot;Dropping the sender&quot;);
+        </span><span class="self">self</span>.channel.channel_status.store(ChannelStatus::SenderDisconnected);
+        <span class="self">self</span>.channel.waiting_receivers.notify_one();
     }
 }</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="async_channel" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="async_channel" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

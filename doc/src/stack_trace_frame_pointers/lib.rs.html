@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/stack_trace_frame_pointers/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../stack_trace_frame_pointers/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../stack_trace_frame_pointers/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../stack_trace_frame_pointers/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/stack_trace_frame_pointers/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../stack_trace_frame_pointers/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -110,112 +104,111 @@
 <span id="104">104</span>
 <span id="105">105</span>
 <span id="106">106</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Stack trace (backtrace) functionality using frame pointers.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! There are two main ways of obtaining stack traces:</span>
-<span class="doccomment">//! 1. Using the frame pointer register to find the previous stack frame.</span>
-<span class="doccomment">//! 2. Using DWARF debugging information to understand the layout of each stack frame.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! We support both ways, but prefer #2 because it doesn&#39;t suffer from the</span>
-<span class="doccomment">//! compatibility and performance drawbacks of #1. </span>
-<span class="doccomment">//! See the `stack_trace` crate for the #2 functionality. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! This crate offers support for #1. </span>
-<span class="doccomment">//! The advantage of using this is that it doesn&#39;t require any significant dependencies.</span>
-<span class="doccomment">//! However, this crate&#39;s frame pointer-based stack traces are only available</span>
-<span class="doccomment">//! when the compiler has been configured to emit frame pointers,</span>
-<span class="doccomment">//! which in Rust is achieved via the `-C force-frame-pointers=yes` rust flags option.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Stack trace (backtrace) functionality using frame pointers.
+//! 
+//! There are two main ways of obtaining stack traces:
+//! 1. Using the frame pointer register to find the previous stack frame.
+//! 2. Using DWARF debugging information to understand the layout of each stack frame.
+//! 
+//! We support both ways, but prefer #2 because it doesn&#39;t suffer from the
+//! compatibility and performance drawbacks of #1. 
+//! See the `stack_trace` crate for the #2 functionality. 
+//! 
+//! This crate offers support for #1. 
+//! The advantage of using this is that it doesn&#39;t require any significant dependencies.
+//! However, this crate&#39;s frame pointer-based stack traces are only available
+//! when the compiler has been configured to emit frame pointers,
+//! which in Rust is achieved via the `-C force-frame-pointers=yes` rust flags option.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="comment">// This entire crate depends upon the `frame_pointers` config option.</span>
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">cfg_if</span>;
-<span class="macro">cfg_if!</span> { <span class="kw">if</span> <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">frame_pointers</span>)]</span> {
+</span><span class="comment">// This entire crate depends upon the `frame_pointers` config option.
+</span><span class="attr">#[macro_use] </span><span class="kw">extern crate </span>cfg_if;
+<span class="macro">cfg_if! </span>{ <span class="kw">if </span><span class="attr">#[cfg(frame_pointers)] </span>{
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
+<span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>memory;
 
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PageTable</span>, <span class="ident">VirtualAddress</span>};
+<span class="kw">use </span>memory::{PageTable, VirtualAddress};
 
 
-<span class="doccomment">/// Get a stack trace using the frame pointer registers (RBP on x86_64).</span>
-<span class="doccomment">/// This function is only available if the compiler was configured to use frame pointers.</span>
-<span class="doccomment">/// Using frame pointers to navigate up the call stack can only provide very basic information,</span>
-<span class="doccomment">/// i.e., the frame pointer register value and the instruction pointer of the call site. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// For additional, fuller information about each stack frame, use the stack frame iterator</span>
-<span class="doccomment">/// based on DWARF debug info.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `current_page_table`: a reference to the active `PageTable`,</span>
-<span class="doccomment">/// * `on_each_stack_frame`: the function that will be called for each stack frame in the call stack.</span>
-<span class="doccomment">///   The function is called with two arguments: </span>
-<span class="doccomment">///   (1) the frame pointer register value and (2) the instruction pointer </span>
-<span class="doccomment">///   at that point in the call stack; the latter is useful for symbol resolution.</span>
-<span class="doccomment">///   The function should return `true` if it wants to continue iterating up the call stack,</span>
-<span class="doccomment">///   or `false` if it wants the iteration to stop.</span>
-<span class="doccomment">/// * `max_recursion`: an optional maximum number of stack frames to recurse up the call stack.</span>
-<span class="doccomment">///   If not provided, the default maximum will be `64` call stack frames.</span>
-<span class="doccomment">/// </span>
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">stack_trace_using_frame_pointers</span>(
-    <span class="ident">current_page_table</span>: <span class="kw-2">&amp;</span><span class="ident">PageTable</span>,
-    <span class="ident">on_each_stack_frame</span>: <span class="kw-2">&amp;mut</span> <span class="ident">dyn</span> <span class="ident">FnMut</span>(<span class="ident">usize</span>, <span class="ident">VirtualAddress</span>) -&gt; <span class="ident">bool</span>,
-    <span class="ident">max_recursion</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="doccomment">/// Get a stack trace using the frame pointer registers (RBP on x86_64).
+/// This function is only available if the compiler was configured to use frame pointers.
+/// Using frame pointers to navigate up the call stack can only provide very basic information,
+/// i.e., the frame pointer register value and the instruction pointer of the call site. 
+/// 
+/// For additional, fuller information about each stack frame, use the stack frame iterator
+/// based on DWARF debug info.
+/// 
+/// # Arguments
+/// * `current_page_table`: a reference to the active `PageTable`,
+/// * `on_each_stack_frame`: the function that will be called for each stack frame in the call stack.
+///   The function is called with two arguments: 
+///   (1) the frame pointer register value and (2) the instruction pointer 
+///   at that point in the call stack; the latter is useful for symbol resolution.
+///   The function should return `true` if it wants to continue iterating up the call stack,
+///   or `false` if it wants the iteration to stop.
+/// * `max_recursion`: an optional maximum number of stack frames to recurse up the call stack.
+///   If not provided, the default maximum will be `64` call stack frames.
+/// 
+</span><span class="attr">#[inline(never)]
+</span><span class="kw">pub fn </span>stack_trace_using_frame_pointers(
+    current_page_table: <span class="kw-2">&amp;</span>PageTable,
+    on_each_stack_frame: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FnMut(usize, VirtualAddress) -&gt; bool,
+    max_recursion: <span class="prelude-ty">Option</span>&lt;usize&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rbp</span>: <span class="ident">usize</span>;
-    <span class="comment">// SAFE: just reading current register value</span>
-    <span class="kw">unsafe</span> {
-        <span class="macro">core::arch::asm!</span>(<span class="string">&quot;mov {}, rbp&quot;</span>, <span class="ident">out</span>(<span class="ident">reg</span>) <span class="ident">rbp</span>);
+    <span class="kw">let </span><span class="kw-2">mut </span>rbp: usize;
+    <span class="comment">// SAFE: just reading current register value
+    </span><span class="kw">unsafe </span>{
+        <span class="macro">core::arch::asm!</span>(<span class="string">&quot;mov {}, rbp&quot;</span>, out(reg) rbp);
     }
 
-    <span class="kw">for</span> <span class="ident">_i</span> <span class="kw">in</span> <span class="number">0</span> .. <span class="ident">max_recursion</span>.<span class="ident">unwrap_or</span>(<span class="number">64</span>) {
-        <span class="comment">// the stack contains the return address (of the caller) right before the current frame pointer</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">rip_ptr</span>) <span class="op">=</span> <span class="ident">rbp</span>.<span class="ident">checked_add</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>()) {
-            <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Some</span>(<span class="ident">rbp_vaddr</span>), <span class="prelude-val">Some</span>(<span class="ident">rip_ptr</span>)) <span class="op">=</span> (<span class="ident">VirtualAddress::new</span>(<span class="ident">rbp</span>), <span class="ident">VirtualAddress::new</span>(<span class="ident">rip_ptr</span>)) {
-                <span class="kw">if</span> <span class="ident">current_page_table</span>.<span class="ident">translate</span>(<span class="ident">rbp_vaddr</span>).<span class="ident">is_some</span>() <span class="op">&amp;&amp;</span> <span class="ident">current_page_table</span>.<span class="ident">translate</span>(<span class="ident">rip_ptr</span>).<span class="ident">is_some</span>() {
-                    <span class="comment">// SAFE: the address was checked above using page table walks</span>
-                    <span class="kw">let</span> <span class="ident">rip</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">*</span>(<span class="ident">rip_ptr</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">usize</span>) };
-                    <span class="kw">if</span> <span class="ident">rip</span> <span class="op">==</span> <span class="number">0</span> {
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+    <span class="kw">for </span>_i <span class="kw">in </span><span class="number">0 </span>.. max_recursion.unwrap_or(<span class="number">64</span>) {
+        <span class="comment">// the stack contains the return address (of the caller) right before the current frame pointer
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(rip_ptr) = rbp.checked_add(core::mem::size_of::&lt;usize&gt;()) {
+            <span class="kw">if let </span>(<span class="prelude-val">Some</span>(rbp_vaddr), <span class="prelude-val">Some</span>(rip_ptr)) = (VirtualAddress::new(rbp), VirtualAddress::new(rip_ptr)) {
+                <span class="kw">if </span>current_page_table.translate(rbp_vaddr).is_some() &amp;&amp; current_page_table.translate(rip_ptr).is_some() {
+                    <span class="comment">// SAFE: the address was checked above using page table walks
+                    </span><span class="kw">let </span>rip = <span class="kw">unsafe </span>{ <span class="kw-2">*</span>(rip_ptr.value() <span class="kw">as </span><span class="kw-2">*const </span>usize) };
+                    <span class="kw">if </span>rip == <span class="number">0 </span>{
+                        <span class="kw">return </span><span class="prelude-val">Ok</span>(());
                     }
-                    <span class="kw">let</span> <span class="ident">rip</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">rip</span>).<span class="ident">ok_or</span>(<span class="string">&quot;instruction pointer value was an invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
-                    <span class="kw">let</span> <span class="ident">keep_going</span> <span class="op">=</span> <span class="ident">on_each_stack_frame</span>(<span class="ident">rbp</span>, <span class="ident">rip</span>);
-                    <span class="kw">if</span> <span class="op">!</span><span class="ident">keep_going</span> { 
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+                    <span class="kw">let </span>rip = VirtualAddress::new(rip).ok_or(<span class="string">&quot;instruction pointer value was an invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
+                    <span class="kw">let </span>keep_going = on_each_stack_frame(rbp, rip);
+                    <span class="kw">if </span>!keep_going { 
+                        <span class="kw">return </span><span class="prelude-val">Ok</span>(());
                     }
                     
-                    <span class="comment">// move up the call stack to the previous frame</span>
-                    <span class="comment">// SAFE: the address was checked above using page tables</span>
-                    <span class="ident">rbp</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">*</span>(<span class="ident">rbp</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">usize</span>) };
-                } <span class="kw">else</span> {
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;guard page&quot;</span>);
+                    <span class="comment">// move up the call stack to the previous frame
+                    // SAFE: the address was checked above using page tables
+                    </span>rbp = <span class="kw">unsafe </span>{ <span class="kw-2">*</span>(rbp <span class="kw">as </span><span class="kw-2">*const </span>usize) };
+                } <span class="kw">else </span>{
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;guard page&quot;</span>);
                 }
-            } <span class="kw">else</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;frame pointer value in RBP was an invalid virtual address&quot;</span>);
+            } <span class="kw">else </span>{
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;frame pointer value in RBP was an invalid virtual address&quot;</span>);
             }
-        } <span class="kw">else</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;frame pointer value in RBP was too large and overflowed.&quot;</span>);
+        } <span class="kw">else </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;frame pointer value in RBP was too large and overflowed.&quot;</span>);
         }
     }
     <span class="prelude-val">Err</span>(<span class="string">&quot;reached maximum recursion depth of call stack frames&quot;</span>)
 }
 
 
-<span class="comment">// // snippet to get the current instruction pointer RIP, stack pointer RSP, and RBP</span>
-<span class="comment">// let mut rbp: usize;</span>
-<span class="comment">// let mut rsp: usize;</span>
-<span class="comment">// let mut rip: usize;</span>
-<span class="comment">// unsafe {</span>
-<span class="comment">//     // On x86 you cannot directly read the value of the instruction pointer (RIP),</span>
-<span class="comment">//     // so we use a trick that exploits RIP-relateive addressing to read the current value of RIP (also gets RBP and RSP)</span>
-<span class="comment">//     llvm_asm!(&quot;lea $0, [rip]&quot; : &quot;=r&quot;(rip), &quot;={rbp}&quot;(rbp), &quot;={rsp}&quot;(rsp) : : &quot;memory&quot; : &quot;intel&quot;, &quot;volatile&quot;);</span>
-<span class="comment">// }</span>
-<span class="comment">// debug!(&quot;register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}&quot;, rip, rsp, rbp);</span>
-<span class="comment">// let _curr_instruction_pointer = VirtualAddress::new_canonical(rip);</span>
+<span class="comment">// // snippet to get the current instruction pointer RIP, stack pointer RSP, and RBP
+// let mut rbp: usize;
+// let mut rsp: usize;
+// let mut rip: usize;
+// unsafe {
+//     // On x86 you cannot directly read the value of the instruction pointer (RIP),
+//     // so we use a trick that exploits RIP-relateive addressing to read the current value of RIP (also gets RBP and RSP)
+//     llvm_asm!(&quot;lea $0, [rip]&quot; : &quot;=r&quot;(rip), &quot;={rbp}&quot;(rbp), &quot;={rsp}&quot;(rsp) : : &quot;memory&quot; : &quot;intel&quot;, &quot;volatile&quot;);
+// }
+// debug!(&quot;register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}&quot;, rip, rsp, rbp);
+// let _curr_instruction_pointer = VirtualAddress::new_canonical(rip);
 
-}} <span class="comment">// end of cfg_if block</span>
-</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="stack_trace_frame_pointers" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</span>}} <span class="comment">// end of cfg_if block
+</span></code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="stack_trace_frame_pointers" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

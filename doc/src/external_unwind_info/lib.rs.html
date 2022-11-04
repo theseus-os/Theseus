@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/external_unwind_info/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../external_unwind_info/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../external_unwind_info/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../external_unwind_info/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/external_unwind_info/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../external_unwind_info/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -121,89 +115,87 @@
 <span id="115">115</span>
 <span id="116">116</span>
 <span id="117">117</span>
-<span id="118">118</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Registers and stores unwind information from external components.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Typically, Theseus maintains metadata about all crates loaded and linked into system.</span>
-<span class="doccomment">//! Unwind info is part of this (the `.eh_frame` section data).</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! However, for other components compiled outside of Theseus and beyond it&#39;s knowledge,</span>
-<span class="doccomment">//! we don&#39;t necessarily have control over or access to those components&#39; section structure</span>
-<span class="doccomment">//! and miscellaneous internal information.</span>
-<span class="doccomment">//! Nevertheless, we still want to be able to handle their resource management properly</span>
-<span class="doccomment">//! by unwinding through their stack frames and running cleanup handlers as needed.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Hence, this crate allows those external components to register their own </span>
-<span class="doccomment">//! unwind information as needed.</span>
-<span class="doccomment">//! Currently, we use this crate to support [`wasmtime-jit`], which needs to </span>
-<span class="doccomment">//! [register unwinding information] for JIT-compiled native code built from WASM binaries</span>
-<span class="doccomment">//! and then deregister it when those JIT-ted modules are destroyed.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The API here is loosely similar to `libunwind`&#39;s two-part API: </span>
-<span class="doccomment">//! `__register_frame()` and `__deregister_frame()`.</span>
-<span class="doccomment">//! Because it must accept raw pointers to sections, all APIs are inherently unsafe.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! ## Future TODOs</span>
-<span class="doccomment">//! Currently, this crate unsafely assumes that the third party component that registers its unwind info</span>
-<span class="doccomment">//! will ensure that unwind info is valid for the full duration of it being registered.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! In the future, ideally we would redesign this crate to offer a safer API</span>
-<span class="doccomment">//! that obtains shared ownership</span>
-<span class="doccomment">//! However, that would of course require modifying the dependent crates and redesigning them</span>
-<span class="doccomment">//! to utilize this safer API.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! [register unwinding information]: https://github.com/bytecodealliance/wasmtime/blob/7cf5f058303d2ee8c42df658d4ca608771a8561d/crates/jit/src/code_memory.rs#L185</span>
-<span class="doccomment">//! [`wasmtime-jit`]: https://docs.rs/wasmtime-jit/latest/wasmtime_jit/</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Registers and stores unwind information from external components.
+//! 
+//! Typically, Theseus maintains metadata about all crates loaded and linked into system.
+//! Unwind info is part of this (the `.eh_frame` section data).
+//! 
+//! However, for other components compiled outside of Theseus and beyond it&#39;s knowledge,
+//! we don&#39;t necessarily have control over or access to those components&#39; section structure
+//! and miscellaneous internal information.
+//! Nevertheless, we still want to be able to handle their resource management properly
+//! by unwinding through their stack frames and running cleanup handlers as needed.
+//! 
+//! Hence, this crate allows those external components to register their own 
+//! unwind information as needed.
+//! Currently, we use this crate to support [`wasmtime-jit`], which needs to 
+//! [register unwinding information] for JIT-compiled native code built from WASM binaries
+//! and then deregister it when those JIT-ted modules are destroyed.
+//!
+//! The API here is loosely similar to `libunwind`&#39;s two-part API: 
+//! `__register_frame()` and `__deregister_frame()`.
+//! Because it must accept raw pointers to sections, all APIs are inherently unsafe.
+//! 
+//! ## Future TODOs
+//! Currently, this crate unsafely assumes that the third party component that registers its unwind info
+//! will ensure that unwind info is valid for the full duration of it being registered.
+//! 
+//! In the future, ideally we would redesign this crate to offer a safer API
+//! that obtains shared ownership
+//! However, that would of course require modifying the dependent crates and redesigning them
+//! to utilize this safer API.
+//! 
+//! [register unwinding information]: https://github.com/bytecodealliance/wasmtime/blob/7cf5f058303d2ee8c42df658d4ca608771a8561d/crates/jit/src/code_memory.rs#L185
+//! [`wasmtime-jit`]: https://docs.rs/wasmtime-jit/latest/wasmtime_jit/
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">map_try_insert</span>)]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">const_btree_new</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(map_try_insert)]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
+</span><span class="kw">extern crate </span>alloc;
 
-<span class="kw">use</span> <span class="ident">core::ops</span>::{<span class="ident">Range</span>, <span class="ident">Bound</span>::{<span class="ident">Included</span>, <span class="ident">Unbounded</span>}};
-<span class="kw">use</span> <span class="ident">alloc::collections::BTreeMap</span>;
-<span class="kw">use</span> <span class="ident">memory::VirtualAddress</span>;
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">log</span>::<span class="kw-2">*</span>;
+<span class="kw">use </span>core::ops::{Range, Bound::{Included, Unbounded}};
+<span class="kw">use </span>alloc::collections::BTreeMap;
+<span class="kw">use </span>memory::VirtualAddress;
+<span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>log::<span class="kw-2">*</span>;
 
-<span class="doccomment">/// The system-wide set of unwind information registered by external components.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// The map key is the text section&#39;s base `VirtualAddress`.</span>
-<span class="kw">static</span> <span class="ident">EXTERNAL_UNWIND_INFO</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span>, <span class="ident">ExternalUnwindInfo</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">BTreeMap::new</span>());
+<span class="doccomment">/// The system-wide set of unwind information registered by external components.
+/// 
+/// The map key is the text section&#39;s base `VirtualAddress`.
+</span><span class="kw">static </span>EXTERNAL_UNWIND_INFO: Mutex&lt;BTreeMap&lt;VirtualAddress, ExternalUnwindInfo&gt;&gt; = Mutex::new(BTreeMap::new());
 
-<span class="doccomment">/// Unwinding information for an external (non-Theseus) component.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ExternalUnwindInfo</span> {
-    <span class="doccomment">/// The bounds of the text section that this unwinding info pertains to.</span>
-    <span class="kw">pub</span> <span class="ident">text_section</span>: <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The bounds of the unwinding information (e.g., `.eh_frame`) for the above text section.</span>
-    <span class="kw">pub</span> <span class="ident">unwind_info</span>: <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span>,
+<span class="doccomment">/// Unwinding information for an external (non-Theseus) component.
+</span><span class="attr">#[derive(Debug, Clone)]
+</span><span class="kw">pub struct </span>ExternalUnwindInfo {
+    <span class="doccomment">/// The bounds of the text section that this unwinding info pertains to.
+    </span><span class="kw">pub </span>text_section: Range&lt;VirtualAddress&gt;,
+    <span class="doccomment">/// The bounds of the unwinding information (e.g., `.eh_frame`) for the above text section.
+    </span><span class="kw">pub </span>unwind_info: Range&lt;VirtualAddress&gt;,
 }
 
-<span class="doccomment">/// Register  a new section of external unwinding information.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Returns an error if unwinding information has already been registered </span>
-<span class="doccomment">/// for the given `text_section_base_address`.</span>
-<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">register_unwind_info</span>(
-    <span class="ident">text_section_base_address</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>,
-    <span class="ident">text_section_len</span>: <span class="ident">usize</span>,
-    <span class="ident">unwind_info</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>,
-    <span class="ident">unwind_len</span>: <span class="ident">usize</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), ()<span class="op">&gt;</span> {
+<span class="doccomment">/// Register  a new section of external unwinding information.
+/// 
+/// Returns an error if unwinding information has already been registered 
+/// for the given `text_section_base_address`.
+</span><span class="kw">pub unsafe fn </span>register_unwind_info(
+    text_section_base_address: <span class="kw-2">*mut </span>u8,
+    text_section_len: usize,
+    unwind_info: <span class="kw-2">*mut </span>u8,
+    unwind_len: usize,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), ()&gt; {
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">uw</span> <span class="op">=</span> <span class="ident">EXTERNAL_UNWIND_INFO</span>.<span class="ident">lock</span>();
-    <span class="kw">let</span> <span class="ident">text_start</span> <span class="op">=</span> <span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">text_section_base_address</span> <span class="kw">as</span> <span class="ident">usize</span>);
-    <span class="kw">let</span> <span class="ident">text_end</span>   <span class="op">=</span> <span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">text_section_base_address</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">+</span> <span class="ident">text_section_len</span>);
-    <span class="kw">let</span> <span class="ident">uw_start</span>   <span class="op">=</span> <span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">unwind_info</span> <span class="kw">as</span> <span class="ident">usize</span>);
-    <span class="kw">let</span> <span class="ident">uw_end</span>     <span class="op">=</span> <span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">unwind_info</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">+</span> <span class="ident">unwind_len</span>);
+    <span class="kw">let </span><span class="kw-2">mut </span>uw = EXTERNAL_UNWIND_INFO.lock();
+    <span class="kw">let </span>text_start = VirtualAddress::new_canonical(text_section_base_address <span class="kw">as </span>usize);
+    <span class="kw">let </span>text_end   = VirtualAddress::new_canonical(text_section_base_address <span class="kw">as </span>usize + text_section_len);
+    <span class="kw">let </span>uw_start   = VirtualAddress::new_canonical(unwind_info <span class="kw">as </span>usize);
+    <span class="kw">let </span>uw_end     = VirtualAddress::new_canonical(unwind_info <span class="kw">as </span>usize + unwind_len);
 
-    <span class="kw">let</span> <span class="ident">uw_info</span> <span class="op">=</span> <span class="ident">ExternalUnwindInfo</span> {
-        <span class="ident">text_section</span>: <span class="ident">text_start</span> .. <span class="ident">text_end</span>,
-        <span class="ident">unwind_info</span>:  <span class="ident">uw_start</span>   .. <span class="ident">uw_end</span>,
+    <span class="kw">let </span>uw_info = ExternalUnwindInfo {
+        text_section: text_start .. text_end,
+        unwind_info:  uw_start   .. uw_end,
     };
 
-    <span class="ident">uw</span>.<span class="ident">try_insert</span>(<span class="ident">text_start</span>, <span class="ident">uw_info</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> {
+    uw.try_insert(text_start, uw_info).map_err(|_e| {
         <span class="macro">error!</span>(<span class="string">&quot;External unwind info for {text_start:#X} was already registered&quot;</span>);
         ()
     })<span class="question-mark">?</span>;
@@ -212,34 +204,33 @@
 }
 
 
-<span class="doccomment">/// Remove a previously-registered section of external unwinding information.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Returns an error if no unwinding information was registered</span>
-<span class="doccomment">/// for the given `text_section_base_address`.</span>
-<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">deregister_unwind_info</span>(
-    <span class="ident">text_section_base_address</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), ()<span class="op">&gt;</span> {
-    <span class="ident">EXTERNAL_UNWIND_INFO</span>.<span class="ident">lock</span>()
-        .<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">text_section_base_address</span> <span class="kw">as</span> <span class="ident">usize</span>))
-        .<span class="ident">map</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> ())
-        .<span class="ident">ok_or</span>(())
+<span class="doccomment">/// Remove a previously-registered section of external unwinding information.
+/// 
+/// Returns an error if no unwinding information was registered
+/// for the given `text_section_base_address`.
+</span><span class="kw">pub unsafe fn </span>deregister_unwind_info(
+    text_section_base_address: <span class="kw-2">*mut </span>u8
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), ()&gt; {
+    EXTERNAL_UNWIND_INFO.lock()
+        .remove(<span class="kw-2">&amp;</span>VirtualAddress::new_canonical(text_section_base_address <span class="kw">as </span>usize))
+        .map(|<span class="kw">_</span>| ())
+        .ok_or(())
 }
 
 
-<span class="doccomment">/// Returns the registered external unwind information that covers</span>
-<span class="doccomment">/// the given address in its text section.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_unwind_info</span>(
-    <span class="ident">text_section_address</span>: <span class="ident">VirtualAddress</span>
-) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExternalUnwindInfo</span><span class="op">&gt;</span> {
-    <span class="comment">// iterate over the entries in sorted order, up to the given `text_section_address` inclusively.</span>
-    <span class="kw">for</span> (<span class="ident">_text_base_addr</span>, <span class="ident">uw_info</span>) <span class="kw">in</span> <span class="ident">EXTERNAL_UNWIND_INFO</span>.<span class="ident">lock</span>().<span class="ident">range</span>((<span class="ident">Unbounded</span>, <span class="ident">Included</span>(<span class="ident">text_section_address</span>))) {
-        <span class="kw">if</span> <span class="ident">uw_info</span>.<span class="ident">text_section</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">text_section_address</span>) {
-            <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">uw_info</span>.<span class="ident">clone</span>());
+<span class="doccomment">/// Returns the registered external unwind information that covers
+/// the given address in its text section.
+</span><span class="kw">pub fn </span>get_unwind_info(
+    text_section_address: VirtualAddress
+) -&gt; <span class="prelude-ty">Option</span>&lt;ExternalUnwindInfo&gt; {
+    <span class="comment">// iterate over the entries in sorted order, up to the given `text_section_address` inclusively.
+    </span><span class="kw">for </span>(_text_base_addr, uw_info) <span class="kw">in </span>EXTERNAL_UNWIND_INFO.lock().range((Unbounded, Included(text_section_address))) {
+        <span class="kw">if </span>uw_info.text_section.contains(<span class="kw-2">&amp;</span>text_section_address) {
+            <span class="kw">return </span><span class="prelude-val">Some</span>(uw_info.clone());
         }
     }
 
-    <span class="prelude-val">None</span>
-}
+    <span class="prelude-val">None
+</span>}
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="external_unwind_info" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="external_unwind_info" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

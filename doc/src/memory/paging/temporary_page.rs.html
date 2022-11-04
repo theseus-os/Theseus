@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/memory/src/paging/temporary_page.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>temporary_page.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../memory/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../../memory/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../memory/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/memory/src/paging/temporary_page.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>temporary_page.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../../normalize.css"><link rel="stylesheet" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../../ayu.css" disabled><link rel="stylesheet" href="../../../dark.css" disabled><link rel="stylesheet" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../../memory/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -97,99 +91,98 @@
 <span id="91">91</span>
 <span id="92">92</span>
 <span id="93">93</span>
-</pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md</span>
-<span class="comment">// file at the top-level directory of this distribution.</span>
-<span class="comment">//</span>
-<span class="comment">// Licensed under the Apache License, Version 2.0 &lt;LICENSE-APACHE or</span>
-<span class="comment">// http://www.apache.org/licenses/LICENSE-2.0&gt; or the MIT license</span>
-<span class="comment">// &lt;LICENSE-MIT or http://opensource.org/licenses/MIT&gt;, at your</span>
-<span class="comment">// option. This file may not be copied, modified, or distributed</span>
-<span class="comment">// except according to those terms.</span>
+</pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
+// file at the top-level directory of this distribution.
+//
+// Licensed under the Apache License, Version 2.0 &lt;LICENSE-APACHE or
+// http://www.apache.org/licenses/LICENSE-2.0&gt; or the MIT license
+// &lt;LICENSE-MIT or http://opensource.org/licenses/MIT&gt;, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.
 
-<span class="kw">use</span> <span class="ident">core::mem::ManuallyDrop</span>;
-<span class="kw">use</span> <span class="kw">super</span>::{
-    <span class="ident">AllocatedPages</span>, <span class="ident">AllocatedFrames</span>, <span class="ident">PageTable</span>, <span class="ident">MappedPages</span>, <span class="ident">VirtualAddress</span>,
-    <span class="ident">table</span>::{<span class="ident">Table</span>, <span class="ident">Level1</span>},
+</span><span class="kw">use </span>core::mem::ManuallyDrop;
+<span class="kw">use super</span>::{
+    AllocatedPages, AllocatedFrames, PageTable, MappedPages, VirtualAddress,
+    table::{Table, Level1},
 };
-<span class="kw">use</span> <span class="ident">kernel_config::memory</span>::{<span class="ident">TEMPORARY_PAGE_VIRT_ADDR</span>, <span class="ident">PAGE_SIZE</span>};
+<span class="kw">use </span>kernel_config::memory::{TEMPORARY_PAGE_VIRT_ADDR, PAGE_SIZE};
 
 
-<span class="doccomment">/// A page that can be temporarily mapped to the recursive page table frame,</span>
-<span class="doccomment">/// used for purposes of editing a top-level (P4) page table itself.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// See how recursive paging works: &lt;https://wiki.osdev.org/Page_Tables#Recursive_mapping&gt;</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Note </span>
-<span class="doccomment">/// Instead of just dropping a `TemporaryPage` object, </span>
-<span class="doccomment">/// it should be cleaned up (reclaimed) using [`TemporaryPage::unmap_into_parts()`].</span>
+<span class="doccomment">/// A page that can be temporarily mapped to the recursive page table frame,
+/// used for purposes of editing a top-level (P4) page table itself.
+/// 
+/// See how recursive paging works: &lt;https://wiki.osdev.org/Page_Tables#Recursive_mapping&gt;
+///
+/// # Note 
+/// Instead of just dropping a `TemporaryPage` object, 
+/// it should be cleaned up (reclaimed) using [`TemporaryPage::unmap_into_parts()`].
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TemporaryPage</span> {
-    <span class="ident">mapped_page</span>: <span class="ident">MappedPages</span>,
-    <span class="doccomment">/// `ManuallyDrop` is required here in order to prevent this `AllocatedFrames` </span>
-    <span class="doccomment">/// from being dropped twice: once when unmapping the above `mapped_page`, and</span>
-    <span class="doccomment">/// once when dropping this `TemporaryPage`.</span>
-    <span class="doccomment">/// This is because the `AllocatedFrames` object here is the same one that is </span>
-    <span class="doccomment">/// mapped by the above `mapped_page`.</span>
-    <span class="ident">frame</span>: <span class="ident">ManuallyDrop</span><span class="op">&lt;</span><span class="ident">AllocatedFrames</span><span class="op">&gt;</span>,
+</span><span class="kw">pub struct </span>TemporaryPage {
+    mapped_page: MappedPages,
+    <span class="doccomment">/// `ManuallyDrop` is required here in order to prevent this `AllocatedFrames` 
+    /// from being dropped twice: once when unmapping the above `mapped_page`, and
+    /// once when dropping this `TemporaryPage`.
+    /// This is because the `AllocatedFrames` object here is the same one that is 
+    /// mapped by the above `mapped_page`.
+    </span>frame: ManuallyDrop&lt;AllocatedFrames&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">TemporaryPage</span> {
-    <span class="doccomment">/// Creates a new [`TemporaryPage`] and maps it to the given page table `frame`</span>
-    <span class="doccomment">/// in the active table.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `page`: the optional page that will be used for the temporary mapping.</span>
-    <span class="doccomment">///    If `None`, a new page will be allocated.</span>
-    <span class="doccomment">/// * `frame`: the single frame containing the page table that we want to modify,</span>
-    <span class="doccomment">///    which will be mapped to this [`TemporaryPage`].</span>
-    <span class="doccomment">/// * `page_table`: the currently active [`PageTable`].</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_and_map_table_frame</span>(
-        <span class="kw-2">mut</span> <span class="ident">page</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AllocatedPages</span><span class="op">&gt;</span>,
-        <span class="ident">frame</span>: <span class="ident">AllocatedFrames</span>,
-        <span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">TemporaryPage</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">TEMPORARY_PAGE_VIRT_ADDR</span>);
-        <span class="kw">while</span> <span class="ident">page</span>.<span class="ident">is_none</span>() <span class="op">&amp;&amp;</span> <span class="ident">vaddr</span>.<span class="ident">value</span>() <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="ident">page</span> <span class="op">=</span> <span class="ident">page_allocator::allocate_pages_at</span>(<span class="ident">vaddr</span>, <span class="number">1</span>).<span class="ident">ok</span>();
-            <span class="ident">vaddr</span> <span class="op">-</span><span class="op">=</span> <span class="ident">PAGE_SIZE</span>;
+<span class="kw">impl </span>TemporaryPage {
+    <span class="doccomment">/// Creates a new [`TemporaryPage`] and maps it to the given page table `frame`
+    /// in the active table.
+    /// 
+    /// # Arguments
+    /// * `page`: the optional page that will be used for the temporary mapping.
+    ///    If `None`, a new page will be allocated.
+    /// * `frame`: the single frame containing the page table that we want to modify,
+    ///    which will be mapped to this [`TemporaryPage`].
+    /// * `page_table`: the currently active [`PageTable`].
+    </span><span class="kw">pub fn </span>create_and_map_table_frame(
+        <span class="kw-2">mut </span>page: <span class="prelude-ty">Option</span>&lt;AllocatedPages&gt;,
+        frame: AllocatedFrames,
+        page_table: <span class="kw-2">&amp;mut </span>PageTable,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;TemporaryPage, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>vaddr = VirtualAddress::new_canonical(TEMPORARY_PAGE_VIRT_ADDR);
+        <span class="kw">while </span>page.is_none() &amp;&amp; vaddr.value() != <span class="number">0 </span>{
+            page = page_allocator::allocate_pages_at(vaddr, <span class="number">1</span>).ok();
+            vaddr -= PAGE_SIZE;
         }
-        <span class="kw">let</span> (<span class="ident">mapped_page</span>, <span class="ident">frame</span>) <span class="op">=</span> <span class="ident">page_table</span>.<span class="ident">internal_map_to</span>(
-            <span class="ident">page</span>.<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t allocate a new Page for the temporary P4 table frame&quot;</span>)<span class="question-mark">?</span>,
-            <span class="ident">frame</span>,
-            <span class="ident"><span class="kw">super</span>::EntryFlags::WRITABLE</span>,
+        <span class="kw">let </span>(mapped_page, frame) = page_table.internal_map_to(
+            page.ok_or(<span class="string">&quot;Couldn&#39;t allocate a new Page for the temporary P4 table frame&quot;</span>)<span class="question-mark">?</span>,
+            frame,
+            <span class="kw">super</span>::EntryFlags::WRITABLE,
         )<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">TemporaryPage</span> {
-            <span class="ident">mapped_page</span>,
-            <span class="ident">frame</span>: <span class="ident">ManuallyDrop::new</span>(<span class="ident">frame</span>),
+        <span class="prelude-val">Ok</span>(TemporaryPage {
+            mapped_page,
+            frame: ManuallyDrop::new(frame),
         })
     }
 
-    <span class="doccomment">/// Invokes the given closure `f` with a mutable reference to the root P4 page table</span>
-    <span class="doccomment">/// `Table` and `AllocatedFrame` held in this `TemporaryPage`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_table_and_frame</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">R</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">f</span>: <span class="ident">F</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> 
-        <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="kw-2">&amp;mut</span> <span class="ident">Table</span><span class="op">&lt;</span><span class="ident">Level1</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="ident">AllocatedFrames</span>) -&gt; <span class="ident">R</span>
+    <span class="doccomment">/// Invokes the given closure `f` with a mutable reference to the root P4 page table
+    /// `Table` and `AllocatedFrame` held in this `TemporaryPage`.
+    </span><span class="kw">pub fn </span>with_table_and_frame&lt;F, R&gt;(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        f: F,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;R, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; 
+        <span class="kw">where </span>F: FnOnce(<span class="kw-2">&amp;mut </span>Table&lt;Level1&gt;, <span class="kw-2">&amp;</span>AllocatedFrames) -&gt; R
     {
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">f</span>(
-            <span class="self">self</span>.<span class="ident">mapped_page</span>.<span class="ident">as_type_mut</span>(<span class="number">0</span>)<span class="question-mark">?</span>,
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">frame</span>,
+        <span class="kw">let </span>res = f(
+            <span class="self">self</span>.mapped_page.as_type_mut(<span class="number">0</span>)<span class="question-mark">?</span>,
+            <span class="kw-2">&amp;</span><span class="self">self</span>.frame,
         );
-        <span class="prelude-val">Ok</span>(<span class="ident">res</span>)
+        <span class="prelude-val">Ok</span>(res)
     }
 
-    <span class="doccomment">/// Call this to clean up a `TemporaryPage` instead of just letting it be dropped.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// A simple wrapper around [`MappedPages::unmap_into_parts()`].</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unmap_into_parts</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedPages</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AllocatedFrames</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">mp</span> <span class="op">=</span> <span class="ident">core::mem::replace</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">mapped_page</span>, <span class="ident">MappedPages::empty</span>());
-        <span class="ident">mp</span>.<span class="ident">unmap_into_parts</span>(<span class="ident">page_table</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e_mp</span><span class="op">|</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;TemporaryPage::unmap_into_parts(): failed to unmap internal {:?}&quot;</span>, <span class="ident">e_mp</span>);
-            <span class="string">&quot;BUG: TemporaryPage::unmap_into_parts(): failed to unmap internal MappedPages into its parts.&quot;</span>
-        })
+    <span class="doccomment">/// Call this to clean up a `TemporaryPage` instead of just letting it be dropped.
+    ///
+    /// A simple wrapper around [`MappedPages::unmap_into_parts()`].
+    </span><span class="kw">pub fn </span>unmap_into_parts(<span class="kw-2">mut </span><span class="self">self</span>, page_table: <span class="kw-2">&amp;mut </span>PageTable) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages, <span class="prelude-ty">Option</span>&lt;AllocatedFrames&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>mp = core::mem::replace(<span class="kw-2">&amp;mut </span><span class="self">self</span>.mapped_page, MappedPages::empty());
+        mp.unmap_into_parts(page_table).map_err(|e_mp| {
+            <span class="macro">error!</span>(<span class="string">&quot;TemporaryPage::unmap_into_parts(): failed to unmap internal {:?}&quot;</span>, e_mp);
+            <span class="string">&quot;BUG: TemporaryPage::unmap_into_parts(): failed to unmap internal MappedPages into its parts.&quot;
+        </span>})
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="memory" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="memory" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

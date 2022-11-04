@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/text_terminal/src/ansi_colors.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>ansi_colors.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../text_terminal/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../text_terminal/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../text_terminal/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/text_terminal/src/ansi_colors.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>ansi_colors.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../text_terminal/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -245,247 +239,246 @@
 <span id="239">239</span>
 <span id="240">240</span>
 <span id="241">241</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Definitions for ANSI color codes used in terminals.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This defines dedicated types for the foreground colors, background colors,</span>
-<span class="doccomment">//! and underline colors used in terminals.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Includes supports the following color sets:</span>
-<span class="doccomment">//! * 3-bit colors: Black, Red, Green, Yellow, Blue, Magenta, Cyan, White.</span>
-<span class="doccomment">//! * 4-bit colors: the &quot;bright&quot; versions of the above 3-bit colors.</span>
-<span class="doccomment">//! * 8-bit colors: the 256 colors defined by the `xterm-256color` standard.</span>
-<span class="doccomment">//! * 24-bit &quot;TrueColor&quot;: full RGB colors, in which each channel has 8 bits.</span>
-<span class="doccomment">//!</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Definitions for ANSI color codes used in terminals.
+//!
+//! This defines dedicated types for the foreground colors, background colors,
+//! and underline colors used in terminals.
+//!
+//! Includes supports the following color sets:
+//! * 3-bit colors: Black, Red, Green, Yellow, Blue, Magenta, Cyan, White.
+//! * 4-bit colors: the &quot;bright&quot; versions of the above 3-bit colors.
+//! * 8-bit colors: the 256 colors defined by the `xterm-256color` standard.
+//! * 24-bit &quot;TrueColor&quot;: full RGB colors, in which each channel has 8 bits.
+//!
 
-<span class="kw">use</span> <span class="ident">alloc::borrow::Cow</span>;
+</span><span class="kw">use </span>alloc::borrow::Cow;
 
-<span class="doccomment">/// The set of colors that can be displayed by a terminal emulator. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// * The first 8 variants are 3-bit colors, supported on every terminal emulator. </span>
-<span class="doccomment">/// * The next 8 variants are 4-bit colors, which are brightened (or bold) versions of the first 8.</span>
-<span class="doccomment">/// * After that, the 8-bit color variant accepts any value from 0 to 256, </span>
-<span class="doccomment">///   in which values of 0-15 are the same as the first 16 variants of this enum</span>
-<span class="doccomment">/// * Finally, the 24-bit color variant accepts standard RGB values. </span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// See here for the set of colors: &lt;https://en.wikipedia.org/wiki/ANSI_escape_code#Colors&gt;</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Color</span> {
-    <span class="comment">/////////////////////// 2-bit Colors //////////////////////</span>
-    <span class="ident">Black</span>,
-    <span class="ident">Red</span>,
-    <span class="ident">Green</span>,
-    <span class="ident">Yellow</span>,
-    <span class="ident">Blue</span>,
-    <span class="ident">Magenta</span>,
-    <span class="ident">Cyan</span>,
-    <span class="doccomment">/// More of a light gray/grey. Use `BrightWhite` for true white.</span>
-    <span class="ident">White</span>,
+<span class="doccomment">/// The set of colors that can be displayed by a terminal emulator. 
+/// 
+/// * The first 8 variants are 3-bit colors, supported on every terminal emulator. 
+/// * The next 8 variants are 4-bit colors, which are brightened (or bold) versions of the first 8.
+/// * After that, the 8-bit color variant accepts any value from 0 to 256, 
+///   in which values of 0-15 are the same as the first 16 variants of this enum
+/// * Finally, the 24-bit color variant accepts standard RGB values. 
+///
+/// See here for the set of colors: &lt;https://en.wikipedia.org/wiki/ANSI_escape_code#Colors&gt;
+</span><span class="attr">#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+</span><span class="kw">pub enum </span>Color {
+    <span class="comment">/////////////////////// 2-bit Colors //////////////////////
+    </span>Black,
+    Red,
+    Green,
+    Yellow,
+    Blue,
+    Magenta,
+    Cyan,
+    <span class="doccomment">/// More of a light gray/grey. Use `BrightWhite` for true white.
+    </span>White,
 
-    <span class="comment">/////////////////////// 4-bit Colors //////////////////////</span>
-    <span class="doccomment">/// Gray/grey.</span>
-    <span class="ident">BrightBlack</span>,
-    <span class="ident">BrightRed</span>,
-    <span class="ident">BrightGreen</span>,
-    <span class="ident">BrightYellow</span>,
-    <span class="ident">BrightBlue</span>,
-    <span class="ident">BrightMagenta</span>,
-    <span class="ident">BrightCyan</span>,
-    <span class="doccomment">/// True pure white. </span>
-    <span class="ident">BrightWhite</span>,
+    <span class="comment">/////////////////////// 4-bit Colors //////////////////////
+    </span><span class="doccomment">/// Gray/grey.
+    </span>BrightBlack,
+    BrightRed,
+    BrightGreen,
+    BrightYellow,
+    BrightBlue,
+    BrightMagenta,
+    BrightCyan,
+    <span class="doccomment">/// True pure white. 
+    </span>BrightWhite,
 
-    <span class="comment">/////////////////////// 8-bit Colors //////////////////////</span>
-    <span class="doccomment">/// 8-bit color, as introduced in xterm.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// * Values of `0` through `15` are identical to the above 16 color variants. </span>
-    <span class="doccomment">/// * The next 216 colors `16` through `231` are arranged into a 6 x 6 x 6 color cube,</span>
-    <span class="doccomment">///   as shown here: &lt;https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit&gt;.</span>
-    <span class="doccomment">/// * The last 24 colors `232` through `255` are grayscale steps from dark gray to light. </span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This is sometimes referred to as a Palette color lookup table.</span>
-    <span class="ident">Color8Bit</span>(<span class="ident">u8</span>),
+    <span class="comment">/////////////////////// 8-bit Colors //////////////////////
+    </span><span class="doccomment">/// 8-bit color, as introduced in xterm.
+    /// 
+    /// * Values of `0` through `15` are identical to the above 16 color variants. 
+    /// * The next 216 colors `16` through `231` are arranged into a 6 x 6 x 6 color cube,
+    ///   as shown here: &lt;https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit&gt;.
+    /// * The last 24 colors `232` through `255` are grayscale steps from dark gray to light. 
+    ///
+    /// This is sometimes referred to as a Palette color lookup table.
+    </span>Color8Bit(u8),
 
-    <span class="comment">/////////////////////// 24-bit Colors //////////////////////</span>
-    <span class="doccomment">/// True 24-bit RGB color, with 8 bits for each of the red, green, and blue channels.</span>
-    <span class="ident">RGB</span> { <span class="ident">red</span>: <span class="ident">u8</span>, <span class="ident">green</span>: <span class="ident">u8</span>, <span class="ident">blue</span>: <span class="ident">u8</span> },
+    <span class="comment">/////////////////////// 24-bit Colors //////////////////////
+    </span><span class="doccomment">/// True 24-bit RGB color, with 8 bits for each of the red, green, and blue channels.
+    </span>RGB { red: u8, green: u8, blue: u8 },
 
-    <span class="doccomment">/// The default color, which is generally unspecified</span>
-    <span class="doccomment">/// and depends on the context in which it is used.</span>
-    <span class="ident">Default</span>,
+    <span class="doccomment">/// The default color, which is generally unspecified
+    /// and depends on the context in which it is used.
+    </span>Default,
 }
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Color</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">match</span> <span class="ident">value</span> {
-            <span class="number">0</span>  =&gt; <span class="ident"><span class="self">Self</span>::Black</span>,
-            <span class="number">1</span>  =&gt; <span class="ident"><span class="self">Self</span>::Red</span>,
-            <span class="number">2</span>  =&gt; <span class="ident"><span class="self">Self</span>::Green</span>,
-            <span class="number">3</span>  =&gt; <span class="ident"><span class="self">Self</span>::Yellow</span>,
-            <span class="number">4</span>  =&gt; <span class="ident"><span class="self">Self</span>::Blue</span>,
-            <span class="number">5</span>  =&gt; <span class="ident"><span class="self">Self</span>::Magenta</span>,
-            <span class="number">6</span>  =&gt; <span class="ident"><span class="self">Self</span>::Cyan</span>,
-            <span class="number">7</span>  =&gt; <span class="ident"><span class="self">Self</span>::White</span>,
-            <span class="number">8</span>  =&gt; <span class="ident"><span class="self">Self</span>::BrightBlack</span>,
-            <span class="number">9</span>  =&gt; <span class="ident"><span class="self">Self</span>::BrightRed</span>,
-            <span class="number">10</span> =&gt; <span class="ident"><span class="self">Self</span>::BrightGreen</span>,
-            <span class="number">11</span> =&gt; <span class="ident"><span class="self">Self</span>::BrightYellow</span>,
-            <span class="number">12</span> =&gt; <span class="ident"><span class="self">Self</span>::BrightBlue</span>,
-            <span class="number">13</span> =&gt; <span class="ident"><span class="self">Self</span>::BrightMagenta</span>,
-            <span class="number">14</span> =&gt; <span class="ident"><span class="self">Self</span>::BrightCyan</span>,
-            <span class="number">15</span> =&gt; <span class="ident"><span class="self">Self</span>::BrightWhite</span>,
-            <span class="ident">x</span>  =&gt; <span class="ident"><span class="self">Self</span>::Color8Bit</span>(<span class="ident">x</span>),
+<span class="kw">impl </span>From&lt;u8&gt; <span class="kw">for </span>Color {
+    <span class="kw">fn </span>from(value: u8) -&gt; <span class="self">Self </span>{
+        <span class="kw">match </span>value {
+            <span class="number">0  </span>=&gt; <span class="self">Self</span>::Black,
+            <span class="number">1  </span>=&gt; <span class="self">Self</span>::Red,
+            <span class="number">2  </span>=&gt; <span class="self">Self</span>::Green,
+            <span class="number">3  </span>=&gt; <span class="self">Self</span>::Yellow,
+            <span class="number">4  </span>=&gt; <span class="self">Self</span>::Blue,
+            <span class="number">5  </span>=&gt; <span class="self">Self</span>::Magenta,
+            <span class="number">6  </span>=&gt; <span class="self">Self</span>::Cyan,
+            <span class="number">7  </span>=&gt; <span class="self">Self</span>::White,
+            <span class="number">8  </span>=&gt; <span class="self">Self</span>::BrightBlack,
+            <span class="number">9  </span>=&gt; <span class="self">Self</span>::BrightRed,
+            <span class="number">10 </span>=&gt; <span class="self">Self</span>::BrightGreen,
+            <span class="number">11 </span>=&gt; <span class="self">Self</span>::BrightYellow,
+            <span class="number">12 </span>=&gt; <span class="self">Self</span>::BrightBlue,
+            <span class="number">13 </span>=&gt; <span class="self">Self</span>::BrightMagenta,
+            <span class="number">14 </span>=&gt; <span class="self">Self</span>::BrightCyan,
+            <span class="number">15 </span>=&gt; <span class="self">Self</span>::BrightWhite,
+            x  =&gt; <span class="self">Self</span>::Color8Bit(x),
         }
     }
 }
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">Color</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
-        <span class="ident">Color::Default</span>
+<span class="kw">impl </span>Default <span class="kw">for </span>Color {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        Color::Default
     }
 }
 
 
-<span class="doccomment">/// A wrapper type around [`Color`] that is used in [`crate::AnsiStyleCodes`]</span>
-<span class="doccomment">/// to set the foreground color (for displayed text).</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Default</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ForegroundColor</span>(<span class="kw">pub</span> <span class="ident">Color</span>);
-<span class="kw">impl</span> <span class="ident">ForegroundColor</span> {
-    <span class="kw">const</span> <span class="ident">ANSI_ESCAPE_FOREGROUND_COLOR</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;38&quot;</span>;
+<span class="doccomment">/// A wrapper type around [`Color`] that is used in [`crate::AnsiStyleCodes`]
+/// to set the foreground color (for displayed text).
+</span><span class="attr">#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+</span><span class="kw">pub struct </span>ForegroundColor(<span class="kw">pub </span>Color);
+<span class="kw">impl </span>ForegroundColor {
+    <span class="kw">const </span>ANSI_ESCAPE_FOREGROUND_COLOR: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;38&quot;</span>;
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_escape_code</span>(<span class="self">self</span>) -&gt; <span class="ident">Cow</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span>, <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="number">0</span> {
-            <span class="ident">Color::Black</span>                            =&gt; <span class="string">&quot;30&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::Red</span>                              =&gt; <span class="string">&quot;31&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::Green</span>                            =&gt; <span class="string">&quot;32&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::Yellow</span>                           =&gt; <span class="string">&quot;33&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::Blue</span>                             =&gt; <span class="string">&quot;34&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::Magenta</span>                          =&gt; <span class="string">&quot;35&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::Cyan</span>                             =&gt; <span class="string">&quot;36&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::White</span>                            =&gt; <span class="string">&quot;37&quot;</span>.<span class="ident">into</span>(),
-            <span class="comment">// &quot;38&quot; is used by 8-bit and 24-bit colors</span>
-            <span class="ident">Color::Default</span>                          =&gt; <span class="string">&quot;39&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::BrightBlack</span>                      =&gt; <span class="string">&quot;90&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::BrightRed</span>                        =&gt; <span class="string">&quot;91&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::BrightGreen</span>                      =&gt; <span class="string">&quot;92&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::BrightYellow</span>                     =&gt; <span class="string">&quot;93&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::BrightBlue</span>                       =&gt; <span class="string">&quot;94&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::BrightMagenta</span>                    =&gt; <span class="string">&quot;95&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::BrightCyan</span>                       =&gt; <span class="string">&quot;96&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::BrightWhite</span>                      =&gt; <span class="string">&quot;97&quot;</span>.<span class="ident">into</span>(),
+    <span class="kw">pub fn </span>to_escape_code(<span class="self">self</span>) -&gt; Cow&lt;<span class="lifetime">&#39;static</span>, str&gt; {
+        <span class="kw">match </span><span class="self">self</span>.<span class="number">0 </span>{
+            Color::Black                            =&gt; <span class="string">&quot;30&quot;</span>.into(),
+            Color::Red                              =&gt; <span class="string">&quot;31&quot;</span>.into(),
+            Color::Green                            =&gt; <span class="string">&quot;32&quot;</span>.into(),
+            Color::Yellow                           =&gt; <span class="string">&quot;33&quot;</span>.into(),
+            Color::Blue                             =&gt; <span class="string">&quot;34&quot;</span>.into(),
+            Color::Magenta                          =&gt; <span class="string">&quot;35&quot;</span>.into(),
+            Color::Cyan                             =&gt; <span class="string">&quot;36&quot;</span>.into(),
+            Color::White                            =&gt; <span class="string">&quot;37&quot;</span>.into(),
+            <span class="comment">// &quot;38&quot; is used by 8-bit and 24-bit colors
+            </span>Color::Default                          =&gt; <span class="string">&quot;39&quot;</span>.into(),
+            Color::BrightBlack                      =&gt; <span class="string">&quot;90&quot;</span>.into(),
+            Color::BrightRed                        =&gt; <span class="string">&quot;91&quot;</span>.into(),
+            Color::BrightGreen                      =&gt; <span class="string">&quot;92&quot;</span>.into(),
+            Color::BrightYellow                     =&gt; <span class="string">&quot;93&quot;</span>.into(),
+            Color::BrightBlue                       =&gt; <span class="string">&quot;94&quot;</span>.into(),
+            Color::BrightMagenta                    =&gt; <span class="string">&quot;95&quot;</span>.into(),
+            Color::BrightCyan                       =&gt; <span class="string">&quot;96&quot;</span>.into(),
+            Color::BrightWhite                      =&gt; <span class="string">&quot;97&quot;</span>.into(),
 
-            <span class="comment">// For better compatibility, reduce 8-bit color codes to their 4-bit representation if possible.</span>
-            <span class="ident">Color::Color8Bit</span>(<span class="ident">c_4bit</span>) <span class="kw">if</span> <span class="ident">c_4bit</span> <span class="op">&lt;</span> <span class="number">16</span> =&gt; <span class="self">Self</span>(<span class="ident">Color::from</span>(<span class="ident">c_4bit</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::Color8Bit</span>(<span class="ident">c_8bit</span>)                =&gt; <span class="macro">format!</span>(
+            <span class="comment">// For better compatibility, reduce 8-bit color codes to their 4-bit representation if possible.
+            </span>Color::Color8Bit(c_4bit) <span class="kw">if </span>c_4bit &lt; <span class="number">16 </span>=&gt; <span class="self">Self</span>(Color::from(c_4bit)).to_escape_code(),
+            Color::Color8Bit(c_8bit)                =&gt; <span class="macro">format!</span>(
                 <span class="string">&quot;{};{};{}&quot;</span>,
-                <span class="ident"><span class="self">Self</span>::ANSI_ESCAPE_FOREGROUND_COLOR</span>, <span class="ident">ANSI_ESCAPE_8_BIT_COLOR</span>, <span class="ident">c_8bit</span>
-            ).<span class="ident">into</span>(),
-            <span class="ident">Color::RGB</span> { <span class="ident">red</span>, <span class="ident">green</span>, <span class="ident">blue</span> }         =&gt; <span class="macro">format!</span>(
+                <span class="self">Self</span>::ANSI_ESCAPE_FOREGROUND_COLOR, ANSI_ESCAPE_8_BIT_COLOR, c_8bit
+            ).into(),
+            Color::RGB { red, green, blue }         =&gt; <span class="macro">format!</span>(
                 <span class="string">&quot;{};{};{};{};{}&quot;</span>,
-                <span class="ident"><span class="self">Self</span>::ANSI_ESCAPE_FOREGROUND_COLOR</span>, <span class="ident">ANSI_ESCAPE_24_BIT_COLOR</span>, <span class="ident">red</span>, <span class="ident">green</span>, <span class="ident">blue</span>
-            ).<span class="ident">into</span>(),
+                <span class="self">Self</span>::ANSI_ESCAPE_FOREGROUND_COLOR, ANSI_ESCAPE_24_BIT_COLOR, red, green, blue
+            ).into(),
         }
     }
 }
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Color</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ForegroundColor</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">c</span>: <span class="ident">Color</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">ForegroundColor</span>(<span class="ident">c</span>)
+<span class="kw">impl </span>From&lt;Color&gt; <span class="kw">for </span>ForegroundColor {
+    <span class="kw">fn </span>from(c: Color) -&gt; <span class="self">Self </span>{
+        ForegroundColor(c)
     }
 }
 
-<span class="doccomment">/// A wrapper type around [`Color`] that is used in [`crate::AnsiStyleCodes`]</span>
-<span class="doccomment">/// to set the background color (behind displayed text).</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Default</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BackgroundColor</span>(<span class="kw">pub</span> <span class="ident">Color</span>);
-<span class="kw">impl</span> <span class="ident">BackgroundColor</span> {
-    <span class="kw">const</span> <span class="ident">ANSI_ESCAPE_BACKGROUND_COLOR</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;48&quot;</span>;
+<span class="doccomment">/// A wrapper type around [`Color`] that is used in [`crate::AnsiStyleCodes`]
+/// to set the background color (behind displayed text).
+</span><span class="attr">#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+</span><span class="kw">pub struct </span>BackgroundColor(<span class="kw">pub </span>Color);
+<span class="kw">impl </span>BackgroundColor {
+    <span class="kw">const </span>ANSI_ESCAPE_BACKGROUND_COLOR: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;48&quot;</span>;
     
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_escape_code</span>(<span class="self">self</span>) -&gt; <span class="ident">Cow</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span>, <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="number">0</span> {
-            <span class="ident">Color::Black</span>                            =&gt; <span class="string">&quot;40&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::Red</span>                              =&gt; <span class="string">&quot;41&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::Green</span>                            =&gt; <span class="string">&quot;42&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::Yellow</span>                           =&gt; <span class="string">&quot;43&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::Blue</span>                             =&gt; <span class="string">&quot;44&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::Magenta</span>                          =&gt; <span class="string">&quot;45&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::Cyan</span>                             =&gt; <span class="string">&quot;46&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::White</span>                            =&gt; <span class="string">&quot;47&quot;</span>.<span class="ident">into</span>(),
-            <span class="comment">// &quot;48&quot; is used by 8-bit and 24-bit colors</span>
-            <span class="ident">Color::Default</span>                          =&gt; <span class="string">&quot;49&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::BrightBlack</span>                      =&gt; <span class="string">&quot;100&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::BrightRed</span>                        =&gt; <span class="string">&quot;101&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::BrightGreen</span>                      =&gt; <span class="string">&quot;102&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::BrightYellow</span>                     =&gt; <span class="string">&quot;103&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::BrightBlue</span>                       =&gt; <span class="string">&quot;104&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::BrightMagenta</span>                    =&gt; <span class="string">&quot;105&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::BrightCyan</span>                       =&gt; <span class="string">&quot;106&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::BrightWhite</span>                      =&gt; <span class="string">&quot;107&quot;</span>.<span class="ident">into</span>(),
+    <span class="kw">pub fn </span>to_escape_code(<span class="self">self</span>) -&gt; Cow&lt;<span class="lifetime">&#39;static</span>, str&gt; {
+        <span class="kw">match </span><span class="self">self</span>.<span class="number">0 </span>{
+            Color::Black                            =&gt; <span class="string">&quot;40&quot;</span>.into(),
+            Color::Red                              =&gt; <span class="string">&quot;41&quot;</span>.into(),
+            Color::Green                            =&gt; <span class="string">&quot;42&quot;</span>.into(),
+            Color::Yellow                           =&gt; <span class="string">&quot;43&quot;</span>.into(),
+            Color::Blue                             =&gt; <span class="string">&quot;44&quot;</span>.into(),
+            Color::Magenta                          =&gt; <span class="string">&quot;45&quot;</span>.into(),
+            Color::Cyan                             =&gt; <span class="string">&quot;46&quot;</span>.into(),
+            Color::White                            =&gt; <span class="string">&quot;47&quot;</span>.into(),
+            <span class="comment">// &quot;48&quot; is used by 8-bit and 24-bit colors
+            </span>Color::Default                          =&gt; <span class="string">&quot;49&quot;</span>.into(),
+            Color::BrightBlack                      =&gt; <span class="string">&quot;100&quot;</span>.into(),
+            Color::BrightRed                        =&gt; <span class="string">&quot;101&quot;</span>.into(),
+            Color::BrightGreen                      =&gt; <span class="string">&quot;102&quot;</span>.into(),
+            Color::BrightYellow                     =&gt; <span class="string">&quot;103&quot;</span>.into(),
+            Color::BrightBlue                       =&gt; <span class="string">&quot;104&quot;</span>.into(),
+            Color::BrightMagenta                    =&gt; <span class="string">&quot;105&quot;</span>.into(),
+            Color::BrightCyan                       =&gt; <span class="string">&quot;106&quot;</span>.into(),
+            Color::BrightWhite                      =&gt; <span class="string">&quot;107&quot;</span>.into(),
 
-            <span class="comment">// For better compatibility, reduce 8-bit color codes to their 4-bit representation if possible.</span>
-            <span class="ident">Color::Color8Bit</span>(<span class="ident">c_4bit</span>) <span class="kw">if</span> <span class="ident">c_4bit</span> <span class="op">&lt;</span> <span class="number">16</span> =&gt; <span class="self">Self</span>(<span class="ident">Color::from</span>(<span class="ident">c_4bit</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::Color8Bit</span>(<span class="ident">c_8bit</span>)                =&gt; <span class="macro">format!</span>(
+            <span class="comment">// For better compatibility, reduce 8-bit color codes to their 4-bit representation if possible.
+            </span>Color::Color8Bit(c_4bit) <span class="kw">if </span>c_4bit &lt; <span class="number">16 </span>=&gt; <span class="self">Self</span>(Color::from(c_4bit)).to_escape_code(),
+            Color::Color8Bit(c_8bit)                =&gt; <span class="macro">format!</span>(
                 <span class="string">&quot;{};{};{}&quot;</span>,
-                <span class="ident"><span class="self">Self</span>::ANSI_ESCAPE_BACKGROUND_COLOR</span>, <span class="ident">ANSI_ESCAPE_8_BIT_COLOR</span>, <span class="ident">c_8bit</span>
-            ).<span class="ident">into</span>(),
-            <span class="ident">Color::RGB</span> { <span class="ident">red</span>, <span class="ident">green</span>, <span class="ident">blue</span> }         =&gt; <span class="macro">format!</span>(
+                <span class="self">Self</span>::ANSI_ESCAPE_BACKGROUND_COLOR, ANSI_ESCAPE_8_BIT_COLOR, c_8bit
+            ).into(),
+            Color::RGB { red, green, blue }         =&gt; <span class="macro">format!</span>(
                 <span class="string">&quot;{};{};{};{};{}&quot;</span>,
-                <span class="ident"><span class="self">Self</span>::ANSI_ESCAPE_BACKGROUND_COLOR</span>, <span class="ident">ANSI_ESCAPE_24_BIT_COLOR</span>, <span class="ident">red</span>, <span class="ident">green</span>, <span class="ident">blue</span>
-            ).<span class="ident">into</span>(),
+                <span class="self">Self</span>::ANSI_ESCAPE_BACKGROUND_COLOR, ANSI_ESCAPE_24_BIT_COLOR, red, green, blue
+            ).into(),
         }
     }
 }
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Color</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">BackgroundColor</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">c</span>: <span class="ident">Color</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">BackgroundColor</span>(<span class="ident">c</span>)
+<span class="kw">impl </span>From&lt;Color&gt; <span class="kw">for </span>BackgroundColor {
+    <span class="kw">fn </span>from(c: Color) -&gt; <span class="self">Self </span>{
+        BackgroundColor(c)
     }
 }
 
 
-<span class="doccomment">/// A wrapper type around [`Color`] that is used in [`crate::AnsiStyleCodes`]</span>
-<span class="doccomment">/// to set the color of the underline for underlined text.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Default</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">UnderlinedColor</span>(<span class="kw">pub</span> <span class="ident">Color</span>);
-<span class="kw">impl</span> <span class="ident">UnderlinedColor</span> {
-    <span class="kw">const</span> <span class="ident">ANSI_ESCAPE_UDERLINED_COLOR</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;58&quot;</span>;
+<span class="doccomment">/// A wrapper type around [`Color`] that is used in [`crate::AnsiStyleCodes`]
+/// to set the color of the underline for underlined text.
+</span><span class="attr">#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+</span><span class="kw">pub struct </span>UnderlinedColor(<span class="kw">pub </span>Color);
+<span class="kw">impl </span>UnderlinedColor {
+    <span class="kw">const </span>ANSI_ESCAPE_UDERLINED_COLOR: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;58&quot;</span>;
     
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_escape_code</span>(<span class="self">self</span>) -&gt; <span class="ident">Cow</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span>, <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="number">0</span> {
-            <span class="ident">Color::Default</span> =&gt; <span class="string">&quot;59&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident">Color::Color8Bit</span>(<span class="ident">c_8bit</span>) =&gt; <span class="macro">format!</span>(
+    <span class="kw">pub fn </span>to_escape_code(<span class="self">self</span>) -&gt; Cow&lt;<span class="lifetime">&#39;static</span>, str&gt; {
+        <span class="kw">match </span><span class="self">self</span>.<span class="number">0 </span>{
+            Color::Default =&gt; <span class="string">&quot;59&quot;</span>.into(),
+            Color::Color8Bit(c_8bit) =&gt; <span class="macro">format!</span>(
                 <span class="string">&quot;{};{};{}&quot;</span>,
-                <span class="ident"><span class="self">Self</span>::ANSI_ESCAPE_UDERLINED_COLOR</span>, <span class="ident">ANSI_ESCAPE_8_BIT_COLOR</span>, <span class="ident">c_8bit</span>
-            ).<span class="ident">into</span>(),
-            <span class="ident">Color::RGB</span> { <span class="ident">red</span>, <span class="ident">green</span>, <span class="ident">blue</span> } =&gt; <span class="macro">format!</span>(
+                <span class="self">Self</span>::ANSI_ESCAPE_UDERLINED_COLOR, ANSI_ESCAPE_8_BIT_COLOR, c_8bit
+            ).into(),
+            Color::RGB { red, green, blue } =&gt; <span class="macro">format!</span>(
                 <span class="string">&quot;{};{};{};{};{}&quot;</span>,
-                <span class="ident"><span class="self">Self</span>::ANSI_ESCAPE_UDERLINED_COLOR</span>, <span class="ident">ANSI_ESCAPE_24_BIT_COLOR</span>, <span class="ident">red</span>, <span class="ident">green</span>, <span class="ident">blue</span>
-            ).<span class="ident">into</span>(),
+                <span class="self">Self</span>::ANSI_ESCAPE_UDERLINED_COLOR, ANSI_ESCAPE_24_BIT_COLOR, red, green, blue
+            ).into(),
             
-            <span class="comment">// This mode only supports parameters of 8-bit and 24-bit (RBG) colors,</span>
-            <span class="comment">// so we must convert 4-bit colors into 8-bit colors first.</span>
-            <span class="ident">Color::Black</span>         =&gt; <span class="self">Self</span>(<span class="ident">Color::Color8Bit</span>(<span class="number">0</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::Red</span>           =&gt; <span class="self">Self</span>(<span class="ident">Color::Color8Bit</span>(<span class="number">1</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::Green</span>         =&gt; <span class="self">Self</span>(<span class="ident">Color::Color8Bit</span>(<span class="number">2</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::Yellow</span>        =&gt; <span class="self">Self</span>(<span class="ident">Color::Color8Bit</span>(<span class="number">3</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::Blue</span>          =&gt; <span class="self">Self</span>(<span class="ident">Color::Color8Bit</span>(<span class="number">4</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::Magenta</span>       =&gt; <span class="self">Self</span>(<span class="ident">Color::Color8Bit</span>(<span class="number">5</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::Cyan</span>          =&gt; <span class="self">Self</span>(<span class="ident">Color::Color8Bit</span>(<span class="number">6</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::White</span>         =&gt; <span class="self">Self</span>(<span class="ident">Color::Color8Bit</span>(<span class="number">7</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::BrightBlack</span>   =&gt; <span class="self">Self</span>(<span class="ident">Color::Color8Bit</span>(<span class="number">8</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::BrightRed</span>     =&gt; <span class="self">Self</span>(<span class="ident">Color::Color8Bit</span>(<span class="number">9</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::BrightGreen</span>   =&gt; <span class="self">Self</span>(<span class="ident">Color::Color8Bit</span>(<span class="number">10</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::BrightYellow</span>  =&gt; <span class="self">Self</span>(<span class="ident">Color::Color8Bit</span>(<span class="number">11</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::BrightBlue</span>    =&gt; <span class="self">Self</span>(<span class="ident">Color::Color8Bit</span>(<span class="number">12</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::BrightMagenta</span> =&gt; <span class="self">Self</span>(<span class="ident">Color::Color8Bit</span>(<span class="number">13</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::BrightCyan</span>    =&gt; <span class="self">Self</span>(<span class="ident">Color::Color8Bit</span>(<span class="number">14</span>)).<span class="ident">to_escape_code</span>(),
-            <span class="ident">Color::BrightWhite</span>   =&gt; <span class="self">Self</span>(<span class="ident">Color::Color8Bit</span>(<span class="number">15</span>)).<span class="ident">to_escape_code</span>(),
+            <span class="comment">// This mode only supports parameters of 8-bit and 24-bit (RBG) colors,
+            // so we must convert 4-bit colors into 8-bit colors first.
+            </span>Color::Black         =&gt; <span class="self">Self</span>(Color::Color8Bit(<span class="number">0</span>)).to_escape_code(),
+            Color::Red           =&gt; <span class="self">Self</span>(Color::Color8Bit(<span class="number">1</span>)).to_escape_code(),
+            Color::Green         =&gt; <span class="self">Self</span>(Color::Color8Bit(<span class="number">2</span>)).to_escape_code(),
+            Color::Yellow        =&gt; <span class="self">Self</span>(Color::Color8Bit(<span class="number">3</span>)).to_escape_code(),
+            Color::Blue          =&gt; <span class="self">Self</span>(Color::Color8Bit(<span class="number">4</span>)).to_escape_code(),
+            Color::Magenta       =&gt; <span class="self">Self</span>(Color::Color8Bit(<span class="number">5</span>)).to_escape_code(),
+            Color::Cyan          =&gt; <span class="self">Self</span>(Color::Color8Bit(<span class="number">6</span>)).to_escape_code(),
+            Color::White         =&gt; <span class="self">Self</span>(Color::Color8Bit(<span class="number">7</span>)).to_escape_code(),
+            Color::BrightBlack   =&gt; <span class="self">Self</span>(Color::Color8Bit(<span class="number">8</span>)).to_escape_code(),
+            Color::BrightRed     =&gt; <span class="self">Self</span>(Color::Color8Bit(<span class="number">9</span>)).to_escape_code(),
+            Color::BrightGreen   =&gt; <span class="self">Self</span>(Color::Color8Bit(<span class="number">10</span>)).to_escape_code(),
+            Color::BrightYellow  =&gt; <span class="self">Self</span>(Color::Color8Bit(<span class="number">11</span>)).to_escape_code(),
+            Color::BrightBlue    =&gt; <span class="self">Self</span>(Color::Color8Bit(<span class="number">12</span>)).to_escape_code(),
+            Color::BrightMagenta =&gt; <span class="self">Self</span>(Color::Color8Bit(<span class="number">13</span>)).to_escape_code(),
+            Color::BrightCyan    =&gt; <span class="self">Self</span>(Color::Color8Bit(<span class="number">14</span>)).to_escape_code(),
+            Color::BrightWhite   =&gt; <span class="self">Self</span>(Color::Color8Bit(<span class="number">15</span>)).to_escape_code(),
         }
     }
 }
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Color</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">UnderlinedColor</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">c</span>: <span class="ident">Color</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">UnderlinedColor</span>(<span class="ident">c</span>)
+<span class="kw">impl </span>From&lt;Color&gt; <span class="kw">for </span>UnderlinedColor {
+    <span class="kw">fn </span>from(c: Color) -&gt; <span class="self">Self </span>{
+        UnderlinedColor(c)
     }
 }
 
 
-<span class="kw">const</span> <span class="ident">ANSI_ESCAPE_8_BIT_COLOR</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;5&quot;</span>;
-<span class="kw">const</span> <span class="ident">ANSI_ESCAPE_24_BIT_COLOR</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;2&quot;</span>;
+<span class="kw">const </span>ANSI_ESCAPE_8_BIT_COLOR: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;5&quot;</span>;
+<span class="kw">const </span>ANSI_ESCAPE_24_BIT_COLOR: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;2&quot;</span>;
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="text_terminal" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="text_terminal" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

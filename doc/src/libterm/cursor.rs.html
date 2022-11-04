@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/libterm/src/cursor.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>cursor.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../libterm/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../libterm/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../libterm/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/libterm/src/cursor.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>cursor.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../libterm/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -157,159 +151,158 @@
 <span id="151">151</span>
 <span id="152">152</span>
 <span id="153">153</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+</pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-<span class="doccomment">/// The cursor structure used in the terminal.</span>
-<span class="doccomment">/// A cursor is a special symbol shown in the text box of a terminal. It indicates the position of character where the next input would be put or the delete operation works on.</span>
-<span class="doccomment">/// Terminal invokes its `display` method in a loop to let a cursor blink.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Cursor</span> {
-    <span class="doccomment">/// Whether the cursor is enabled in the terminal.</span>
-    <span class="ident">enabled</span>: <span class="ident">bool</span>,
-    <span class="doccomment">/// The blinking frequency.</span>
-    <span class="ident">freq</span>: <span class="ident">u128</span>,
-    <span class="doccomment">/// The last time it blinks.</span>
-    <span class="ident">time</span>: <span class="ident">TscTicks</span>,
-    <span class="doccomment">/// The current blinking state show/hidden</span>
-    <span class="ident">show</span>: <span class="ident">bool</span>,
-    <span class="doccomment">/// The color of the cursor</span>
-    <span class="ident">color</span>: <span class="ident">Color</span>,
-    <span class="doccomment">/// The position of the cursor relative to the end of terminal text in number of characters.</span>
-    <span class="kw">pub</span> <span class="ident">offset_from_end</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// The underlying character at the position of the cursor.</span>
-    <span class="doccomment">/// It is shown when the cursor is unseen.</span>
-    <span class="kw">pub</span> <span class="ident">underlying_char</span>: <span class="ident">u8</span>,
+<span class="doccomment">/// The cursor structure used in the terminal.
+/// A cursor is a special symbol shown in the text box of a terminal. It indicates the position of character where the next input would be put or the delete operation works on.
+/// Terminal invokes its `display` method in a loop to let a cursor blink.
+</span><span class="kw">pub struct </span>Cursor {
+    <span class="doccomment">/// Whether the cursor is enabled in the terminal.
+    </span>enabled: bool,
+    <span class="doccomment">/// The blinking frequency.
+    </span>freq: u128,
+    <span class="doccomment">/// The last time it blinks.
+    </span>time: TscTicks,
+    <span class="doccomment">/// The current blinking state show/hidden
+    </span>show: bool,
+    <span class="doccomment">/// The color of the cursor
+    </span>color: Color,
+    <span class="doccomment">/// The position of the cursor relative to the end of terminal text in number of characters.
+    </span><span class="kw">pub </span>offset_from_end: usize,
+    <span class="doccomment">/// The underlying character at the position of the cursor.
+    /// It is shown when the cursor is unseen.
+    </span><span class="kw">pub </span>underlying_char: u8,
 }
 
-<span class="kw">impl</span> <span class="ident">Cursor</span> {
-    <span class="doccomment">/// Reset the state of the cursor as unseen</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">show</span> <span class="op">=</span> <span class="bool-val">true</span>;
-        <span class="self">self</span>.<span class="ident">time</span> <span class="op">=</span> <span class="ident">tsc_ticks</span>();
+<span class="kw">impl </span>Cursor {
+    <span class="doccomment">/// Reset the state of the cursor as unseen
+    </span><span class="kw">pub fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.show = <span class="bool-val">true</span>;
+        <span class="self">self</span>.time = tsc_ticks();
     }
 
-    <span class="doccomment">/// Enable a cursor</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enable</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">enabled</span> <span class="op">=</span> <span class="bool-val">true</span>;
-        <span class="self">self</span>.<span class="ident">reset</span>();
+    <span class="doccomment">/// Enable a cursor
+    </span><span class="kw">pub fn </span>enable(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.enabled = <span class="bool-val">true</span>;
+        <span class="self">self</span>.reset();
     }
 
-    <span class="doccomment">/// Disable a cursor</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">disable</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">enabled</span> <span class="op">=</span> <span class="bool-val">false</span>;
+    <span class="doccomment">/// Disable a cursor
+    </span><span class="kw">pub fn </span>disable(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.enabled = <span class="bool-val">false</span>;
     }
 
-    <span class="doccomment">/// Let a cursor blink. It is invoked in a loop.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">blink</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">enabled</span> {
-            <span class="kw">let</span> <span class="ident">time</span> <span class="op">=</span> <span class="ident">tsc_ticks</span>();
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">duration</span>) <span class="op">=</span> <span class="ident">time</span>.<span class="ident">sub</span>(<span class="kw-2">&amp;</span>(<span class="self">self</span>.<span class="ident">time</span>)) {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">ns</span>) <span class="op">=</span> <span class="ident">duration</span>.<span class="ident">to_ns</span>() {
-                    <span class="kw">if</span> <span class="ident">ns</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">freq</span> {
-                        <span class="self">self</span>.<span class="ident">time</span> <span class="op">=</span> <span class="ident">time</span>;
-                        <span class="self">self</span>.<span class="ident">show</span> <span class="op">=</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">show</span>;
-                        <span class="kw">return</span> <span class="bool-val">true</span>;
+    <span class="doccomment">/// Let a cursor blink. It is invoked in a loop.
+    </span><span class="kw">pub fn </span>blink(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">if </span><span class="self">self</span>.enabled {
+            <span class="kw">let </span>time = tsc_ticks();
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(duration) = time.sub(<span class="kw-2">&amp;</span>(<span class="self">self</span>.time)) {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(ns) = duration.to_ns() {
+                    <span class="kw">if </span>ns &gt;= <span class="self">self</span>.freq {
+                        <span class="self">self</span>.time = time;
+                        <span class="self">self</span>.show = !<span class="self">self</span>.show;
+                        <span class="kw">return </span><span class="bool-val">true</span>;
                     }
                 }
             }
         }
-        <span class="bool-val">true</span>
+        <span class="bool-val">true
+    </span>}
+
+    <span class="doccomment">/// Whether a cursor is seen
+    </span><span class="kw">pub fn </span>show(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.enabled &amp;&amp; <span class="self">self</span>.show
     }
 
-    <span class="doccomment">/// Whether a cursor is seen</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">show</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">enabled</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">show</span>
-    }
-
-    <span class="doccomment">/// Display a cursor in a framebuffer</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `coordinate`: the start point of a textarea in the framebuffer.</span>
-    <span class="doccomment">/// * `column`: the column of the cursor in the textarea.</span>
-    <span class="doccomment">/// * `line`: the line of the cursor in the textarea.</span>
-    <span class="doccomment">/// * `framebuffer`: the framebuffer to display the cursor in.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Returns a bounding box which wraps the cursor.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">display</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Pixel</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">coordinate</span>: <span class="ident">Coord</span>,
-        <span class="ident">column</span>: <span class="ident">usize</span>,
-        <span class="ident">line</span>: <span class="ident">usize</span>,
-        <span class="ident">framebuffer</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">P</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Rectangle</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">Color</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">P</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">blink</span>() {
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">show</span>() {
-                <span class="ident">framebuffer_drawer::fill_rectangle</span>(
-                    <span class="ident">framebuffer</span>,
-                    <span class="ident">coordinate</span>
-                        <span class="op">+</span> (
-                            (<span class="ident">column</span> <span class="op">*</span> <span class="ident">CHARACTER_WIDTH</span>) <span class="kw">as</span> <span class="ident">isize</span>,
-                            (<span class="ident">line</span> <span class="op">*</span> <span class="ident">CHARACTER_HEIGHT</span>) <span class="kw">as</span> <span class="ident">isize</span>,
+    <span class="doccomment">/// Display a cursor in a framebuffer
+    /// # Arguments
+    /// * `coordinate`: the start point of a textarea in the framebuffer.
+    /// * `column`: the column of the cursor in the textarea.
+    /// * `line`: the line of the cursor in the textarea.
+    /// * `framebuffer`: the framebuffer to display the cursor in.
+    ///
+    /// Returns a bounding box which wraps the cursor.
+    </span><span class="kw">pub fn </span>display&lt;P: Pixel&gt;(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        coordinate: Coord,
+        column: usize,
+        line: usize,
+        framebuffer: <span class="kw-2">&amp;mut </span>Framebuffer&lt;P&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Rectangle, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; <span class="kw">where </span>Color: Into&lt;P&gt; {
+        <span class="kw">if </span><span class="self">self</span>.blink() {
+            <span class="kw">if </span><span class="self">self</span>.show() {
+                framebuffer_drawer::fill_rectangle(
+                    framebuffer,
+                    coordinate
+                        + (
+                            (column * CHARACTER_WIDTH) <span class="kw">as </span>isize,
+                            (line * CHARACTER_HEIGHT) <span class="kw">as </span>isize,
                         )
-                        <span class="op">+</span> (<span class="number">0</span>, <span class="number">1</span>),
-                    <span class="ident">CHARACTER_WIDTH</span>,
-                    <span class="ident">CHARACTER_HEIGHT</span> <span class="op">-</span> <span class="number">2</span>,
-                    <span class="self">self</span>.<span class="ident">color</span>.<span class="ident">into</span>(),
+                        + (<span class="number">0</span>, <span class="number">1</span>),
+                    CHARACTER_WIDTH,
+                    CHARACTER_HEIGHT - <span class="number">2</span>,
+                    <span class="self">self</span>.color.into(),
                 );
-            } <span class="kw">else</span> {
-                <span class="ident">framebuffer_printer::print_ascii_character</span>(
-                    <span class="ident">framebuffer</span>,
-                    <span class="self">self</span>.<span class="ident">underlying_char</span>,
-                    <span class="ident">FONT_FOREGROUND_COLOR</span>.<span class="ident">into</span>(),
-                    <span class="ident">FONT_BACKGROUND_COLOR</span>.<span class="ident">into</span>(),
-                    <span class="ident">coordinate</span>,
-                    <span class="ident">column</span>,
-                    <span class="ident">line</span>,
+            } <span class="kw">else </span>{
+                framebuffer_printer::print_ascii_character(
+                    framebuffer,
+                    <span class="self">self</span>.underlying_char,
+                    FONT_FOREGROUND_COLOR.into(),
+                    FONT_BACKGROUND_COLOR.into(),
+                    coordinate,
+                    column,
+                    line,
                 )
             }
         }
 
-        <span class="kw">let</span> <span class="ident">top_left</span> <span class="op">=</span> <span class="ident">coordinate</span>
-            <span class="op">+</span> (
-                (<span class="ident">column</span> <span class="op">*</span> <span class="ident">CHARACTER_WIDTH</span>) <span class="kw">as</span> <span class="ident">isize</span>,
-                (<span class="ident">line</span> <span class="op">*</span> <span class="ident">CHARACTER_HEIGHT</span>) <span class="kw">as</span> <span class="ident">isize</span>,
+        <span class="kw">let </span>top_left = coordinate
+            + (
+                (column * CHARACTER_WIDTH) <span class="kw">as </span>isize,
+                (line * CHARACTER_HEIGHT) <span class="kw">as </span>isize,
             );
-        <span class="kw">let</span> <span class="ident">bounding_box</span> <span class="op">=</span> <span class="ident">Rectangle</span> {
-            <span class="ident">top_left</span>: <span class="ident">top_left</span>,
-            <span class="ident">bottom_right</span>: <span class="ident">top_left</span> <span class="op">+</span> (<span class="ident">CHARACTER_WIDTH</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">CHARACTER_HEIGHT</span> <span class="kw">as</span> <span class="ident">isize</span>),
+        <span class="kw">let </span>bounding_box = Rectangle {
+            top_left: top_left,
+            bottom_right: top_left + (CHARACTER_WIDTH <span class="kw">as </span>isize, CHARACTER_HEIGHT <span class="kw">as </span>isize),
         };
 
-        <span class="prelude-val">Ok</span>(<span class="ident">bounding_box</span>)
+        <span class="prelude-val">Ok</span>(bounding_box)
     }
 
-    <span class="doccomment">/// Sets the position of the cursor relative to the end of the command</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_offset_from_end</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">offset</span>: <span class="ident">usize</span>) {
-        <span class="self">self</span>.<span class="ident">offset_from_end</span> <span class="op">=</span> <span class="ident">offset</span>;
+    <span class="doccomment">/// Sets the position of the cursor relative to the end of the command
+    </span><span class="kw">pub fn </span>set_offset_from_end(<span class="kw-2">&amp;mut </span><span class="self">self</span>, offset: usize) {
+        <span class="self">self</span>.offset_from_end = offset;
     }
 
-    <span class="doccomment">/// Gets the position of the cursor relative to the end of the command</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">offset_from_end</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">offset_from_end</span>
+    <span class="doccomment">/// Gets the position of the cursor relative to the end of the command
+    </span><span class="kw">pub fn </span>offset_from_end(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.offset_from_end
     }
 
-    <span class="doccomment">/// Sets the character at the position of the cursor</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_underlying_char</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">c</span>: <span class="ident">u8</span>) {
-        <span class="self">self</span>.<span class="ident">underlying_char</span> <span class="op">=</span> <span class="ident">c</span>;
+    <span class="doccomment">/// Sets the character at the position of the cursor
+    </span><span class="kw">pub fn </span>set_underlying_char(<span class="kw-2">&amp;mut </span><span class="self">self</span>, c: u8) {
+        <span class="self">self</span>.underlying_char = c;
     }
 
-    <span class="doccomment">/// Gets the character at the position of the cursor</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">underlying_char</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> {
-        <span class="self">self</span>.<span class="ident">underlying_char</span>
+    <span class="doccomment">/// Gets the character at the position of the cursor
+    </span><span class="kw">pub fn </span>underlying_char(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 {
+        <span class="self">self</span>.underlying_char
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">Cursor</span>  {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
-        <span class="ident">Cursor</span> {
-            <span class="ident">enabled</span>: <span class="bool-val">true</span>,
-            <span class="ident">freq</span>: <span class="ident">DEFAULT_CURSOR_FREQ</span>,
-            <span class="ident">time</span>: <span class="ident">tsc_ticks</span>(),
-            <span class="ident">show</span>: <span class="bool-val">true</span>,
-            <span class="ident">color</span>: <span class="ident">FONT_FOREGROUND_COLOR</span>,
-            <span class="ident">offset_from_end</span>: <span class="number">0</span>,
-            <span class="ident">underlying_char</span>: <span class="number">0</span>,
+<span class="kw">impl </span>Default <span class="kw">for </span>Cursor  {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        Cursor {
+            enabled: <span class="bool-val">true</span>,
+            freq: DEFAULT_CURSOR_FREQ,
+            time: tsc_ticks(),
+            show: <span class="bool-val">true</span>,
+            color: FONT_FOREGROUND_COLOR,
+            offset_from_end: <span class="number">0</span>,
+            underlying_char: <span class="number">0</span>,
         }
     }
 }
 
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="libterm" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="libterm" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

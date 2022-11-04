@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/pit_clock/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../pit_clock/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../pit_clock/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../pit_clock/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/pit_clock/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../pit_clock/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -79,81 +73,80 @@
 <span id="73">73</span>
 <span id="74">74</span>
 <span id="75">75</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Full support for the Programmable Interval Timer (PIT) system clock.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! This crate allows one to enable/configure PIT interrupts.</span>
-<span class="doccomment">//! For a simpler crate that just allows PIT-based waiting, use `pit_clock_basic`.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Full support for the Programmable Interval Timer (PIT) system clock.
+//! 
+//! This crate allows one to enable/configure PIT interrupts.
+//! For a simpler crate that just allows PIT-based waiting, use `pit_clock_basic`.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">abi_x86_interrupt</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(abi_x86_interrupt)]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">port_io</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pit_clock_basic</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">interrupts</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">x86_64</span>;
+#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>port_io;
+<span class="kw">extern crate </span>pit_clock_basic;
+<span class="kw">extern crate </span>interrupts;
+<span class="kw">extern crate </span>x86_64;
 
-<span class="kw">use</span> <span class="ident">port_io::Port</span>;
-<span class="kw">use</span> <span class="ident">core::sync::atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
-<span class="kw">use</span> <span class="ident">x86_64::structures::idt::InterruptStackFrame</span>;
+<span class="kw">use </span>port_io::Port;
+<span class="kw">use </span>core::sync::atomic::{AtomicUsize, Ordering};
+<span class="kw">use </span>x86_64::structures::idt::InterruptStackFrame;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">pit_clock_basic::pit_wait</span>;
-<span class="kw">use</span> <span class="ident">pit_clock_basic</span>::<span class="kw-2">*</span>;
+<span class="kw">pub use </span>pit_clock_basic::pit_wait;
+<span class="kw">use </span>pit_clock_basic::<span class="kw-2">*</span>;
 
-<span class="doccomment">/// The PIT Channel 0 is connected directly to IRQ 0.</span>
-<span class="doccomment">/// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x20.</span>
-<span class="kw">const</span> <span class="ident">PIT_CHANNEL_0_IRQ</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">interrupts::IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0x0</span>;
+<span class="doccomment">/// The PIT Channel 0 is connected directly to IRQ 0.
+/// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x20.
+</span><span class="kw">const </span>PIT_CHANNEL_0_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + <span class="number">0x0</span>;
 
 
-<span class="doccomment">/// Configures the PIT to fire an interrupt at the given frequency (in Hz).</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Only Channel 0 of the PIT is directly connected to an IRQ, so it must be used.</span>
-<span class="doccomment">/// Note that Channel 1 does not exist and Channel 2 is reserved for non-interrupt timer usage.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// ## Arguments</span>
-<span class="doccomment">/// * `freq_hertz`: the frequency in Hz of the desired PIT interrupt.</span>
-<span class="doccomment">///    The minimum value is 19 Hz, which is based on the fact that the timer register</span>
-<span class="doccomment">///    cannot be loaded with a value larger than `u16::MAX` (65535),</span>
-<span class="doccomment">///    and that the value loaded into the register is a divisor value.</span>
-<span class="doccomment">///    That divisor value is the default timer frequency 1193182 divided by `freq_hertz`.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enable_interrupts</span>(<span class="ident">freq_hertz</span>: <span class="ident">u32</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">divisor</span> <span class="op">=</span> <span class="ident">PIT_DEFAULT_DIVIDEND_HZ</span> <span class="op">/</span> <span class="ident">freq_hertz</span>;
-    <span class="kw">if</span> <span class="ident">divisor</span> <span class="op">&gt;</span> <span class="ident">u16::MAX</span> <span class="kw">as</span> <span class="ident">u32</span> {
+<span class="doccomment">/// Configures the PIT to fire an interrupt at the given frequency (in Hz).
+/// 
+/// Only Channel 0 of the PIT is directly connected to an IRQ, so it must be used.
+/// Note that Channel 1 does not exist and Channel 2 is reserved for non-interrupt timer usage.
+/// 
+/// ## Arguments
+/// * `freq_hertz`: the frequency in Hz of the desired PIT interrupt.
+///    The minimum value is 19 Hz, which is based on the fact that the timer register
+///    cannot be loaded with a value larger than `u16::MAX` (65535),
+///    and that the value loaded into the register is a divisor value.
+///    That divisor value is the default timer frequency 1193182 divided by `freq_hertz`.
+</span><span class="kw">pub fn </span>enable_interrupts(freq_hertz: u32) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>divisor = PIT_DEFAULT_DIVIDEND_HZ / freq_hertz;
+    <span class="kw">if </span>divisor &gt; u16::MAX <span class="kw">as </span>u32 {
         <span class="macro">error!</span>(<span class="string">&quot;The chosen PIT frequency ({} Hz) is too small, it must be {} Hz or greater!&quot;</span>, 
-            <span class="ident">freq_hertz</span>, <span class="ident">PIT_MINIMUM_FREQ</span>
+            freq_hertz, PIT_MINIMUM_FREQ
         );
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;The chosen PIT frequency is too small, it must be 19 Hz or greated&quot;</span>)
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;The chosen PIT frequency is too small, it must be 19 Hz or greated&quot;</span>)
     }
 
-    <span class="comment">// Register the interrupt handler</span>
-    <span class="kw">match</span> <span class="ident">interrupts::register_interrupt</span>(<span class="ident">PIT_CHANNEL_0_IRQ</span>, <span class="ident">pit_timer_handler</span>) {
+    <span class="comment">// Register the interrupt handler
+    </span><span class="kw">match </span>interrupts::register_interrupt(PIT_CHANNEL_0_IRQ, pit_timer_handler) {
         <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; { <span class="comment">/* success, do nothing */</span>}
-        <span class="prelude-val">Err</span>(<span class="ident">handler</span>) <span class="kw">if</span> <span class="ident">handler</span> <span class="op">==</span> <span class="ident">pit_timer_handler</span> <span class="kw">as</span> <span class="ident">u64</span> =&gt; { <span class="comment">/* already registered, do nothing */</span> }
-        <span class="prelude-val">Err</span>(<span class="ident">_other</span>) =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot; PIT clock IRQ was already in use; sharing IRQs is currently unsupported&quot;</span>),
+        <span class="prelude-val">Err</span>(handler) <span class="kw">if </span>handler == pit_timer_handler <span class="kw">as </span>u64 =&gt; { <span class="comment">/* already registered, do nothing */ </span>}
+        <span class="prelude-val">Err</span>(_other) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot; PIT clock IRQ was already in use; sharing IRQs is currently unsupported&quot;</span>),
     }
 
-    <span class="comment">// SAFE because we&#39;re simply configuring the PIT clock, and the code below is correct.</span>
-    <span class="kw">unsafe</span> {
-        <span class="ident">PIT_COMMAND</span>.<span class="ident">lock</span>().<span class="ident">write</span>(<span class="number">0x36</span>); <span class="comment">// 0x36: see this: http://www.osdever.net/bkerndev/Docs/pit.htm</span>
+    <span class="comment">// SAFE because we&#39;re simply configuring the PIT clock, and the code below is correct.
+    </span><span class="kw">unsafe </span>{
+        PIT_COMMAND.lock().write(<span class="number">0x36</span>); <span class="comment">// 0x36: see this: http://www.osdever.net/bkerndev/Docs/pit.htm
 
-        <span class="comment">// must write the low byte and then the high byte</span>
-        <span class="ident">PIT_CHANNEL_0</span>.<span class="ident">lock</span>().<span class="ident">write</span>(<span class="ident">divisor</span> <span class="kw">as</span> <span class="ident">u8</span>);
-        <span class="comment">// read from PS/2 port 0x60, which acts as a short delay and acknowledges the status register</span>
-        <span class="kw">let</span> <span class="ident">_ignore</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">Port::new</span>(<span class="number">0x60</span>).<span class="ident">read</span>();
-        <span class="ident">PIT_CHANNEL_0</span>.<span class="ident">lock</span>().<span class="ident">write</span>((<span class="ident">divisor</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">8</span>) <span class="kw">as</span> <span class="ident">u8</span>);
+        // must write the low byte and then the high byte
+        </span>PIT_CHANNEL_0.lock().write(divisor <span class="kw">as </span>u8);
+        <span class="comment">// read from PS/2 port 0x60, which acts as a short delay and acknowledges the status register
+        </span><span class="kw">let </span>_ignore: u8 = Port::new(<span class="number">0x60</span>).read();
+        PIT_CHANNEL_0.lock().write((divisor &gt;&gt; <span class="number">8</span>) <span class="kw">as </span>u8);
     }
 
     <span class="prelude-val">Ok</span>(())
 }
 
 
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">pit_timer_handler</span>(<span class="ident">_stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="kw">static</span> <span class="ident">PIT_TICKS</span>: <span class="ident">AtomicUsize</span> <span class="op">=</span> <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>);
-    <span class="kw">let</span> <span class="ident">ticks</span> <span class="op">=</span> <span class="ident">PIT_TICKS</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::Acquire</span>);
-    <span class="macro">trace!</span>(<span class="string">&quot;PIT timer interrupt, ticks: {}&quot;</span>, <span class="ident">ticks</span>);
+<span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>pit_timer_handler(_stack_frame: InterruptStackFrame) {
+    <span class="kw">static </span>PIT_TICKS: AtomicUsize = AtomicUsize::new(<span class="number">0</span>);
+    <span class="kw">let </span>ticks = PIT_TICKS.fetch_add(<span class="number">1</span>, Ordering::Acquire);
+    <span class="macro">trace!</span>(<span class="string">&quot;PIT timer interrupt, ticks: {}&quot;</span>, ticks);
 
-    <span class="ident">interrupts::eoi</span>(<span class="prelude-val">Some</span>(<span class="ident">PIT_CHANNEL_0_IRQ</span>));
+    interrupts::eoi(<span class="prelude-val">Some</span>(PIT_CHANNEL_0_IRQ));
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="pit_clock" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="pit_clock" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

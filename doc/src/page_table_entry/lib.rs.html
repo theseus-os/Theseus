@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/page_table_entry/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../page_table_entry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../page_table_entry/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../page_table_entry/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/page_table_entry/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../page_table_entry/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -141,143 +135,142 @@
 <span id="135">135</span>
 <span id="136">136</span>
 <span id="137">137</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Defines the structure of Page Table Entries (PTEs) on x86_64.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This crate is also useful for frame deallocation, because it can determine</span>
-<span class="doccomment">//! when a frame is mapped exclusively to only one page table entry,</span>
-<span class="doccomment">//! and therefore when it is safe to deallocate.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Because Theseus ensures a bijective (1-to-1) mapping</span>
-<span class="doccomment">//! between virtual pages and physical frames,</span>
-<span class="doccomment">//! it is almost always the case that the frame pointed to</span>
-<span class="doccomment">//! by a newly-unmapped page table entry can be deallocated.</span>
-<span class="doccomment">//!</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Defines the structure of Page Table Entries (PTEs) on x86_64.
+//!
+//! This crate is also useful for frame deallocation, because it can determine
+//! when a frame is mapped exclusively to only one page table entry,
+//! and therefore when it is safe to deallocate.
+//!
+//! Because Theseus ensures a bijective (1-to-1) mapping
+//! between virtual pages and physical frames,
+//! it is almost always the case that the frame pointed to
+//! by a newly-unmapped page table entry can be deallocated.
+//!
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">use</span> <span class="ident">core::ops::Deref</span>;
-<span class="kw">use</span> <span class="ident">memory_structs</span>::{<span class="ident">Frame</span>, <span class="ident">FrameRange</span>, <span class="ident">PAGE_TABLE_ENTRY_FRAME_MASK</span>, <span class="ident">EntryFlags</span>, <span class="ident">PhysicalAddress</span>};
-<span class="kw">use</span> <span class="ident">bit_field::BitField</span>;
-<span class="kw">use</span> <span class="ident">kernel_config::memory::PAGE_SHIFT</span>;
-<span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
-<span class="kw">use</span> <span class="ident">frame_allocator::AllocatedFrame</span>;
+</span><span class="kw">use </span>core::ops::Deref;
+<span class="kw">use </span>memory_structs::{Frame, FrameRange, PAGE_TABLE_ENTRY_FRAME_MASK, EntryFlags, PhysicalAddress};
+<span class="kw">use </span>bit_field::BitField;
+<span class="kw">use </span>kernel_config::memory::PAGE_SHIFT;
+<span class="kw">use </span>zerocopy::FromBytes;
+<span class="kw">use </span>frame_allocator::AllocatedFrame;
 
-<span class="doccomment">/// A page table entry, which is a `u64` value under the hood.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// It contains a the physical address of the `Frame` being mapped by this entry</span>
-<span class="doccomment">/// and the access bits (encoded `EntryFlags`) that describes how it&#39;s mapped,</span>
-<span class="doccomment">/// e.g., readable, writable, no exec, etc.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// There isn&#39;t and shouldn&#39;t be any way to create/instantiate a new `PageTableEntry` directly.</span>
-<span class="doccomment">/// You can only obtain a reference to an `PageTableEntry` by going through a page table&#39;s `Table` struct itself.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PageTableEntry</span>(<span class="ident">u64</span>);
+<span class="doccomment">/// A page table entry, which is a `u64` value under the hood.
+///
+/// It contains a the physical address of the `Frame` being mapped by this entry
+/// and the access bits (encoded `EntryFlags`) that describes how it&#39;s mapped,
+/// e.g., readable, writable, no exec, etc.
+///
+/// There isn&#39;t and shouldn&#39;t be any way to create/instantiate a new `PageTableEntry` directly.
+/// You can only obtain a reference to an `PageTableEntry` by going through a page table&#39;s `Table` struct itself.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(transparent)]
+</span><span class="kw">pub struct </span>PageTableEntry(u64);
 
-<span class="kw">impl</span> <span class="ident">PageTableEntry</span> {
-    <span class="doccomment">/// Returns `true` if this entry is unused, i.e., cleared/zeroed out.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_unused</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">==</span> <span class="number">0</span>
+<span class="kw">impl </span>PageTableEntry {
+    <span class="doccomment">/// Returns `true` if this entry is unused, i.e., cleared/zeroed out.
+    </span><span class="kw">pub fn </span>is_unused(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.<span class="number">0 </span>== <span class="number">0
+    </span>}
+
+    <span class="doccomment">/// Zeroes out this entry, setting it as &quot;unused&quot;.
+    </span><span class="kw">pub fn </span>zero(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.<span class="number">0 </span>= <span class="number">0</span>;
     }
 
-    <span class="doccomment">/// Zeroes out this entry, setting it as &quot;unused&quot;.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">zero</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">=</span> <span class="number">0</span>;
-    }
+    <span class="doccomment">/// Removes the mapping represented by this page table entry.
+    ///
+    /// If the frame(s) pointed to by this entry were mapped exlusively,
+    /// i.e., owned by this entry and not mapped anywhere else by any other entries,
+    /// then this function returns those frames.
+    /// This is useful because those returned frames can then be safely deallocated.
+    </span><span class="kw">pub fn </span>set_unmapped(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; UnmapResult {
+        <span class="kw">let </span>frame = <span class="self">self</span>.frame_value();
+        <span class="kw">let </span>flags = <span class="self">self</span>.flags();
+        <span class="self">self</span>.zero();
 
-    <span class="doccomment">/// Removes the mapping represented by this page table entry.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If the frame(s) pointed to by this entry were mapped exlusively,</span>
-    <span class="doccomment">/// i.e., owned by this entry and not mapped anywhere else by any other entries,</span>
-    <span class="doccomment">/// then this function returns those frames.</span>
-    <span class="doccomment">/// This is useful because those returned frames can then be safely deallocated.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_unmapped</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">UnmapResult</span> {
-        <span class="kw">let</span> <span class="ident">frame</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">frame_value</span>();
-        <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">flags</span>();
-        <span class="self">self</span>.<span class="ident">zero</span>();
-
-        <span class="comment">// Since we don&#39;t support huge pages, this PTE can only cover one 4KiB frame.</span>
-        <span class="comment">// Once we support huge pages, we can use a type parameter</span>
-        <span class="comment">// to specify whether this is a 4KiB, 2MiB, or 1GiB PTE.</span>
-        <span class="kw">let</span> <span class="ident">frame_range</span> <span class="op">=</span> <span class="ident">FrameRange::new</span>(<span class="ident">frame</span>, <span class="ident">frame</span>);
-        <span class="kw">if</span> <span class="ident">flags</span>.<span class="ident">is_exclusive</span>() {
-            <span class="ident">UnmapResult::Exclusive</span>(<span class="ident">UnmappedFrames</span>(<span class="ident">frame_range</span>))
-        } <span class="kw">else</span> {
-            <span class="ident">UnmapResult::NonExclusive</span>(<span class="ident">frame_range</span>)
+        <span class="comment">// Since we don&#39;t support huge pages, this PTE can only cover one 4KiB frame.
+        // Once we support huge pages, we can use a type parameter
+        // to specify whether this is a 4KiB, 2MiB, or 1GiB PTE.
+        </span><span class="kw">let </span>frame_range = FrameRange::new(frame, frame);
+        <span class="kw">if </span>flags.is_exclusive() {
+            UnmapResult::Exclusive(UnmappedFrames(frame_range))
+        } <span class="kw">else </span>{
+            UnmapResult::NonExclusive(frame_range)
         }
     }
 
-    <span class="doccomment">/// Returns this `PageTableEntry`&#39;s flags.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flags</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">EntryFlags</span> {
-        <span class="ident">EntryFlags::from_bits_truncate</span>(<span class="self">self</span>.<span class="number">0</span>)
+    <span class="doccomment">/// Returns this `PageTableEntry`&#39;s flags.
+    </span><span class="kw">pub fn </span>flags(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; EntryFlags {
+        EntryFlags::from_bits_truncate(<span class="self">self</span>.<span class="number">0</span>)
     }
 
-    <span class="doccomment">/// Returns the physical `Frame` pointed to (mapped by) this `PageTableEntry`.</span>
-    <span class="doccomment">/// If this page table entry is not `PRESENT`, this returns `None`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pointed_frame</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Frame</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">flags</span>().<span class="ident">intersects</span>(<span class="ident">EntryFlags::PRESENT</span>) {
-            <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">frame_value</span>())
-        } <span class="kw">else</span> {
-            <span class="prelude-val">None</span>
-        }
+    <span class="doccomment">/// Returns the physical `Frame` pointed to (mapped by) this `PageTableEntry`.
+    /// If this page table entry is not `PRESENT`, this returns `None`.
+    </span><span class="kw">pub fn </span>pointed_frame(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Frame&gt; {
+        <span class="kw">if </span><span class="self">self</span>.flags().intersects(EntryFlags::PRESENT) {
+            <span class="prelude-val">Some</span>(<span class="self">self</span>.frame_value())
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
     }
 
-    <span class="doccomment">/// Extracts the value of the frame referred to by this page table entry.</span>
-    <span class="kw">fn</span> <span class="ident">frame_value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Frame</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">frame_paddr</span> <span class="op">=</span> <span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">usize</span>;
-        <span class="ident">frame_paddr</span>.<span class="ident">set_bits</span>(<span class="number">0</span> .. (<span class="ident">PAGE_SHIFT</span> <span class="kw">as</span> <span class="ident">u8</span>), <span class="number">0</span>);
-        <span class="ident">Frame::containing_address</span>(<span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">frame_paddr</span>))
+    <span class="doccomment">/// Extracts the value of the frame referred to by this page table entry.
+    </span><span class="kw">fn </span>frame_value(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Frame {
+        <span class="kw">let </span><span class="kw-2">mut </span>frame_paddr = <span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span>usize;
+        frame_paddr.set_bits(<span class="number">0 </span>.. (PAGE_SHIFT <span class="kw">as </span>u8), <span class="number">0</span>);
+        Frame::containing_address(PhysicalAddress::new_canonical(frame_paddr))
     }
 
-    <span class="doccomment">/// Sets this `PageTableEntry` to map the given `frame` with the given `flags`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This is the actual mapping action that informs the MMU of a new mapping.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Note: this performs no checks about the current value of this page table entry.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_entry</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">frame</span>: <span class="ident">AllocatedFrame</span>, <span class="ident">flags</span>: <span class="ident">EntryFlags</span>) {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">=</span> (<span class="ident">frame</span>.<span class="ident">start_address</span>().<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>) <span class="op">|</span> <span class="ident">flags</span>.<span class="ident">bits</span>();
+    <span class="doccomment">/// Sets this `PageTableEntry` to map the given `frame` with the given `flags`.
+    ///
+    /// This is the actual mapping action that informs the MMU of a new mapping.
+    ///
+    /// Note: this performs no checks about the current value of this page table entry.
+    </span><span class="kw">pub fn </span>set_entry(<span class="kw-2">&amp;mut </span><span class="self">self</span>, frame: AllocatedFrame, flags: EntryFlags) {
+        <span class="self">self</span>.<span class="number">0 </span>= (frame.start_address().value() <span class="kw">as </span>u64) | flags.bits();
     }
 
-    <span class="doccomment">/// Sets the flags components of this `PageTableEntry` to `new_flags`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This does not modify the frame part of the page table entry.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_flags</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">new_flags</span>: <span class="ident">EntryFlags</span>) {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">=</span> <span class="self">self</span>.<span class="number">0</span> <span class="op">&amp;</span> <span class="ident">PAGE_TABLE_ENTRY_FRAME_MASK</span> <span class="op">|</span> <span class="ident">new_flags</span>.<span class="ident">bits</span>();
+    <span class="doccomment">/// Sets the flags components of this `PageTableEntry` to `new_flags`.
+    ///
+    /// This does not modify the frame part of the page table entry.
+    </span><span class="kw">pub fn </span>set_flags(<span class="kw-2">&amp;mut </span><span class="self">self</span>, new_flags: EntryFlags) {
+        <span class="self">self</span>.<span class="number">0 </span>= <span class="self">self</span>.<span class="number">0 </span>&amp; PAGE_TABLE_ENTRY_FRAME_MASK | new_flags.bits();
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span> {
-        <span class="self">self</span>.<span class="number">0</span>
-    }
+    <span class="kw">pub fn </span>value(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64 {
+        <span class="self">self</span>.<span class="number">0
+    </span>}
 }
 
-<span class="doccomment">/// The frames returned from the action of unmapping a page table entry.</span>
-<span class="doccomment">/// See the `PageTableEntry::set_unmapped()` function.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// If exclusive, the contained `UnmappedFrames` can be used to deallocate frames.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// If non-exclusive, the contained `FrameRange` is provided just for debugging feedback.</span>
-<span class="doccomment">/// Note that we use `FrameRange` instead of `Frame` because a single page table entry</span>
-<span class="doccomment">/// can map many frames, e.g., using huge pages.</span>
-<span class="attribute">#[<span class="ident">must_use</span>]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">UnmapResult</span> {
-    <span class="ident">Exclusive</span>(<span class="ident">UnmappedFrames</span>),
-    <span class="ident">NonExclusive</span>(<span class="ident">FrameRange</span>)
+<span class="doccomment">/// The frames returned from the action of unmapping a page table entry.
+/// See the `PageTableEntry::set_unmapped()` function.
+///
+/// If exclusive, the contained `UnmappedFrames` can be used to deallocate frames.
+///
+/// If non-exclusive, the contained `FrameRange` is provided just for debugging feedback.
+/// Note that we use `FrameRange` instead of `Frame` because a single page table entry
+/// can map many frames, e.g., using huge pages.
+</span><span class="attr">#[must_use]
+</span><span class="kw">pub enum </span>UnmapResult {
+    Exclusive(UnmappedFrames),
+    NonExclusive(FrameRange)
 }
 
-<span class="doccomment">/// A range of frames that have been unmapped from a `PageTableEntry`</span>
-<span class="doccomment">/// that previously mapped that frame exclusively (i.e., &quot;owned it&quot;).</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// These `UnmappedFrames` can be converted into `UnmappedAllocatedFrames`</span>
-<span class="doccomment">/// and then safely deallocated within the `frame_allocator`.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// See the `PageTableEntry::set_unmapped()` function.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">UnmappedFrames</span>(<span class="ident">FrameRange</span>);
-<span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">UnmappedFrames</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">FrameRange</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">FrameRange</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
-    }
+<span class="doccomment">/// A range of frames that have been unmapped from a `PageTableEntry`
+/// that previously mapped that frame exclusively (i.e., &quot;owned it&quot;).
+///
+/// These `UnmappedFrames` can be converted into `UnmappedAllocatedFrames`
+/// and then safely deallocated within the `frame_allocator`.
+///
+/// See the `PageTableEntry::set_unmapped()` function.
+</span><span class="kw">pub struct </span>UnmappedFrames(FrameRange);
+<span class="kw">impl </span>Deref <span class="kw">for </span>UnmappedFrames {
+    <span class="kw">type </span>Target = FrameRange;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>FrameRange {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0
+    </span>}
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="page_table_entry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="page_table_entry" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

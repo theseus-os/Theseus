@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/smoltcp_helper/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../smoltcp_helper/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../smoltcp_helper/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../smoltcp_helper/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/smoltcp_helper/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../smoltcp_helper/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -134,134 +128,133 @@
 <span id="128">128</span>
 <span id="129">129</span>
 </pre><pre class="rust"><code>
-<span class="doccomment">//! Collection of functions to set up a TCP connection using a smoltcp device</span>
+<span class="doccomment">//! Collection of functions to set up a TCP connection using a smoltcp device
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">smoltcp</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">network_manager</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">hpet</span>;
+#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>smoltcp;
+<span class="kw">extern crate </span>network_manager;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>hpet;
 
-<span class="kw">use</span> <span class="ident">core::convert::TryInto</span>;
-<span class="kw">use</span> <span class="ident">spin::Once</span>;
-<span class="kw">use</span> <span class="ident">hpet::get_hpet</span>;
-<span class="kw">use</span> <span class="ident">smoltcp</span>::{
-    <span class="ident">wire::IpEndpoint</span>,
-    <span class="ident">socket</span>::{<span class="ident">SocketSet</span>, <span class="ident">TcpSocket</span>, <span class="ident">SocketHandle</span>},
-    <span class="ident">time::Instant</span>
+<span class="kw">use </span>core::convert::TryInto;
+<span class="kw">use </span>spin::Once;
+<span class="kw">use </span>hpet::get_hpet;
+<span class="kw">use </span>smoltcp::{
+    wire::IpEndpoint,
+    socket::{SocketSet, TcpSocket, SocketHandle},
+    time::Instant
 };
-<span class="kw">use</span> <span class="ident">network_manager</span>::{<span class="ident">NetworkInterfaceRef</span>, <span class="ident">NETWORK_INTERFACES</span>};
+<span class="kw">use </span>network_manager::{NetworkInterfaceRef, NETWORK_INTERFACES};
 
-<span class="doccomment">/// The starting number for freely-available (non-reserved) standard TCP/UDP ports.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">STARTING_FREE_PORT</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">49152</span>;
+<span class="doccomment">/// The starting number for freely-available (non-reserved) standard TCP/UDP ports.
+</span><span class="kw">pub const </span>STARTING_FREE_PORT: u16 = <span class="number">49152</span>;
 
-<span class="doccomment">/// A simple macro to get the current HPET clock ticks.</span>
-<span class="attribute">#[<span class="ident">macro_export</span>]</span>
-<span class="macro">macro_rules!</span> <span class="ident">hpet_ticks</span> {
+<span class="doccomment">/// A simple macro to get the current HPET clock ticks.
+</span><span class="attr">#[macro_export]
+</span><span class="macro">macro_rules! </span>hpet_ticks {
     () =&gt; {
-        <span class="ident">get_hpet</span>().<span class="ident">as_ref</span>().<span class="ident">ok_or</span>(<span class="string">&quot;coudln&#39;t get HPET timer&quot;</span>)<span class="question-mark">?</span>.<span class="ident">get_counter</span>()
+        get_hpet().as_ref().ok_or(<span class="string">&quot;coudln&#39;t get HPET timer&quot;</span>)<span class="question-mark">?</span>.get_counter()
     };
 }
 
-<span class="doccomment">/// Function to calculate the currently elapsed time (in milliseconds) since the given `start_time` (hpet ticks).</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">millis_since</span>(<span class="ident">start_time</span>: <span class="ident">u64</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">const</span> <span class="ident">FEMTOSECONDS_PER_MILLISECOND</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">1_000_000_000_000</span>;
-    <span class="kw">static</span> <span class="ident">HPET_PERIOD_FEMTOSECONDS</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+<span class="doccomment">/// Function to calculate the currently elapsed time (in milliseconds) since the given `start_time` (hpet ticks).
+</span><span class="kw">pub fn </span>millis_since(start_time: u64) -&gt; <span class="prelude-ty">Result</span>&lt;u64, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">const </span>FEMTOSECONDS_PER_MILLISECOND: u64 = <span class="number">1_000_000_000_000</span>;
+    <span class="kw">static </span>HPET_PERIOD_FEMTOSECONDS: Once&lt;u32&gt; = Once::new();
 
-    <span class="kw">let</span> <span class="ident">hpet_freq</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">HPET_PERIOD_FEMTOSECONDS</span>.<span class="ident">get</span>() {
-        <span class="prelude-val">Some</span>(<span class="ident">period</span>) =&gt; <span class="ident">period</span>,
-        <span class="kw">_</span> =&gt; {
-            <span class="kw">let</span> <span class="ident">freq</span> <span class="op">=</span> <span class="ident">get_hpet</span>().<span class="ident">as_ref</span>().<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t get HPET&quot;</span>)<span class="question-mark">?</span>.<span class="ident">counter_period_femtoseconds</span>();
-            <span class="ident">HPET_PERIOD_FEMTOSECONDS</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">freq</span>)
+    <span class="kw">let </span>hpet_freq = <span class="kw">match </span>HPET_PERIOD_FEMTOSECONDS.get() {
+        <span class="prelude-val">Some</span>(period) =&gt; period,
+        <span class="kw">_ </span>=&gt; {
+            <span class="kw">let </span>freq = get_hpet().as_ref().ok_or(<span class="string">&quot;couldn&#39;t get HPET&quot;</span>)<span class="question-mark">?</span>.counter_period_femtoseconds();
+            HPET_PERIOD_FEMTOSECONDS.call_once(|| freq)
         }
     };
-    <span class="kw">let</span> <span class="ident">hpet_freq</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">hpet_freq</span> <span class="kw">as</span> <span class="ident">u64</span>;
+    <span class="kw">let </span>hpet_freq = <span class="kw-2">*</span>hpet_freq <span class="kw">as </span>u64;
 
-    <span class="kw">let</span> <span class="ident">end_time</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="ident">get_hpet</span>().<span class="ident">as_ref</span>().<span class="ident">ok_or</span>(<span class="string">&quot;coudln&#39;t get HPET timer&quot;</span>)<span class="question-mark">?</span>.<span class="ident">get_counter</span>();
-    <span class="comment">// Convert to ms</span>
-    <span class="kw">let</span> <span class="ident">diff</span> <span class="op">=</span> (<span class="ident">end_time</span> <span class="op">-</span> <span class="ident">start_time</span>) <span class="op">*</span> <span class="ident">hpet_freq</span> <span class="op">/</span> <span class="ident">FEMTOSECONDS_PER_MILLISECOND</span>;
-    <span class="prelude-val">Ok</span>(<span class="ident">diff</span>)
+    <span class="kw">let </span>end_time: u64 = get_hpet().as_ref().ok_or(<span class="string">&quot;coudln&#39;t get HPET timer&quot;</span>)<span class="question-mark">?</span>.get_counter();
+    <span class="comment">// Convert to ms
+    </span><span class="kw">let </span>diff = (end_time - start_time) * hpet_freq / FEMTOSECONDS_PER_MILLISECOND;
+    <span class="prelude-val">Ok</span>(diff)
 }
 
 
-<span class="doccomment">/// Returns the first network interface available in the system.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_default_iface</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">NetworkInterfaceRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="ident">NETWORK_INTERFACES</span>.<span class="ident">lock</span>()
-        .<span class="ident">iter</span>()
-        .<span class="ident">next</span>()
-        .<span class="ident">cloned</span>()
-        .<span class="ident">ok_or</span>(<span class="string">&quot;no network interfaces available&quot;</span>)
+<span class="doccomment">/// Returns the first network interface available in the system.
+</span><span class="kw">pub fn </span>get_default_iface() -&gt; <span class="prelude-ty">Result</span>&lt;NetworkInterfaceRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    NETWORK_INTERFACES.lock()
+        .iter()
+        .next()
+        .cloned()
+        .ok_or(<span class="string">&quot;no network interfaces available&quot;</span>)
 }
 
-<span class="doccomment">/// A convenience function for connecting a socket.</span>
-<span class="doccomment">/// If the given socket is already open, it is forcibly closed immediately and reconnected.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">connect</span>(
-    <span class="ident">iface</span>: <span class="kw-2">&amp;</span><span class="ident">NetworkInterfaceRef</span>,
-    <span class="ident">sockets</span>: <span class="kw-2">&amp;mut</span> <span class="ident">SocketSet</span>, 
-    <span class="ident">tcp_handle</span>: <span class="ident">SocketHandle</span>,
-    <span class="ident">remote_endpoint</span>: <span class="ident">IpEndpoint</span>,
-    <span class="ident">local_port</span>: <span class="ident">u16</span>, 
-    <span class="ident">startup_time</span>: <span class="ident">u64</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">if</span> <span class="ident">sockets</span>.<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">TcpSocket</span><span class="op">&gt;</span>(<span class="ident">tcp_handle</span>).<span class="ident">is_open</span>() {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;smoltcp_helper: when connecting socket, it was already open...&quot;</span>);
+<span class="doccomment">/// A convenience function for connecting a socket.
+/// If the given socket is already open, it is forcibly closed immediately and reconnected.
+</span><span class="kw">pub fn </span>connect(
+    iface: <span class="kw-2">&amp;</span>NetworkInterfaceRef,
+    sockets: <span class="kw-2">&amp;mut </span>SocketSet, 
+    tcp_handle: SocketHandle,
+    remote_endpoint: IpEndpoint,
+    local_port: u16, 
+    startup_time: u64,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">if </span>sockets.get::&lt;TcpSocket&gt;(tcp_handle).is_open() {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;smoltcp_helper: when connecting socket, it was already open...&quot;</span>);
     }
 
-    <span class="kw">let</span> <span class="ident">timeout_millis</span> <span class="op">=</span> <span class="number">3000</span>; <span class="comment">// 3 second timeout</span>
-    <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="macro">hpet_ticks!</span>();
+    <span class="kw">let </span>timeout_millis = <span class="number">3000</span>; <span class="comment">// 3 second timeout
+    </span><span class="kw">let </span>start = <span class="macro">hpet_ticks!</span>();
     
     <span class="macro">debug!</span>(<span class="string">&quot;smoltcp_helper: connecting from {}:{} to {} ...&quot;</span>,
-        <span class="ident">iface</span>.<span class="ident">lock</span>().<span class="ident">ip_addrs</span>().<span class="ident">get</span>(<span class="number">0</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">ip</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">ip</span>)).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;ERROR&quot;</span>)), 
-        <span class="ident">local_port</span>, 
-        <span class="ident">remote_endpoint</span>,
+        iface.lock().ip_addrs().get(<span class="number">0</span>).map(|ip| <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, ip)).unwrap_or_else(|| <span class="macro">format!</span>(<span class="string">&quot;ERROR&quot;</span>)), 
+        local_port, 
+        remote_endpoint,
     );
 
-    <span class="kw">let</span> <span class="ident">_packet_io_occurred</span> <span class="op">=</span> <span class="ident">poll_iface</span>(<span class="kw-2">&amp;</span><span class="ident">iface</span>, <span class="ident">sockets</span>, <span class="ident">startup_time</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>_packet_io_occurred = poll_iface(<span class="kw-2">&amp;</span>iface, sockets, startup_time)<span class="question-mark">?</span>;
 
-    <span class="ident">sockets</span>.<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">TcpSocket</span><span class="op">&gt;</span>(<span class="ident">tcp_handle</span>).<span class="ident">connect</span>(<span class="ident">remote_endpoint</span>, <span class="ident">local_port</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> {
-        <span class="macro">error!</span>(<span class="string">&quot;smoltcp_helper: failed to connect socket, error: {:?}&quot;</span>, <span class="ident">_e</span>);
-        <span class="string">&quot;smoltcp_helper: failed to connect socket&quot;</span>
-    })<span class="question-mark">?</span>;
+    sockets.get::&lt;TcpSocket&gt;(tcp_handle).connect(remote_endpoint, local_port).map_err(|_e| {
+        <span class="macro">error!</span>(<span class="string">&quot;smoltcp_helper: failed to connect socket, error: {:?}&quot;</span>, _e);
+        <span class="string">&quot;smoltcp_helper: failed to connect socket&quot;
+    </span>})<span class="question-mark">?</span>;
 
-    <span class="kw">loop</span> {
-        <span class="kw">let</span> <span class="ident">_packet_io_occurred</span> <span class="op">=</span> <span class="ident">poll_iface</span>(<span class="kw-2">&amp;</span><span class="ident">iface</span>, <span class="ident">sockets</span>, <span class="ident">startup_time</span>)<span class="question-mark">?</span>;
+    <span class="kw">loop </span>{
+        <span class="kw">let </span>_packet_io_occurred = poll_iface(<span class="kw-2">&amp;</span>iface, sockets, startup_time)<span class="question-mark">?</span>;
         
-        <span class="comment">// if the socket actually connected, it should be able to send/recv</span>
-        <span class="kw">let</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">sockets</span>.<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">TcpSocket</span><span class="op">&gt;</span>(<span class="ident">tcp_handle</span>);
-        <span class="kw">if</span> <span class="ident">socket</span>.<span class="ident">may_send</span>() <span class="op">&amp;&amp;</span> <span class="ident">socket</span>.<span class="ident">may_recv</span>() {
+        <span class="comment">// if the socket actually connected, it should be able to send/recv
+        </span><span class="kw">let </span>socket = sockets.get::&lt;TcpSocket&gt;(tcp_handle);
+        <span class="kw">if </span>socket.may_send() &amp;&amp; socket.may_recv() {
             <span class="kw">break</span>;
         }
 
-        <span class="comment">// check to make sure we haven&#39;t timed out</span>
-        <span class="kw">if</span> <span class="ident">millis_since</span>(<span class="ident">start</span>)<span class="question-mark">?</span> <span class="op">&gt;</span> <span class="ident">timeout_millis</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;smoltcp_helper: failed to connect to socket, timed out after {} ms&quot;</span>, <span class="ident">timeout_millis</span>);
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;smoltcp_helper: failed to connect to socket, timed out.&quot;</span>);
+        <span class="comment">// check to make sure we haven&#39;t timed out
+        </span><span class="kw">if </span>millis_since(start)<span class="question-mark">? </span>&gt; timeout_millis {
+            <span class="macro">error!</span>(<span class="string">&quot;smoltcp_helper: failed to connect to socket, timed out after {} ms&quot;</span>, timeout_millis);
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;smoltcp_helper: failed to connect to socket, timed out.&quot;</span>);
         }
     }
 
-    <span class="macro">debug!</span>(<span class="string">&quot;smoltcp_helper: connected!  (took {} ms)&quot;</span>, <span class="ident">millis_since</span>(<span class="ident">start</span>)<span class="question-mark">?</span>);
+    <span class="macro">debug!</span>(<span class="string">&quot;smoltcp_helper: connected!  (took {} ms)&quot;</span>, millis_since(start)<span class="question-mark">?</span>);
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="doccomment">/// A convenience function to poll the given network interface (i.e., flush tx/rx).</span>
-<span class="doccomment">/// Returns true if any packets were sent or received through that interface on the given `sockets`.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">poll_iface</span>(<span class="ident">iface</span>: <span class="kw-2">&amp;</span><span class="ident">NetworkInterfaceRef</span>, <span class="ident">sockets</span>: <span class="kw-2">&amp;mut</span> <span class="ident">SocketSet</span>, <span class="ident">startup_time</span>: <span class="ident">u64</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">timestamp</span>: <span class="ident">i64</span> <span class="op">=</span> <span class="ident">millis_since</span>(<span class="ident">startup_time</span>)<span class="question-mark">?</span>
-        .<span class="ident">try_into</span>()
-        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;millis_since() u64 timestamp was larger than i64&quot;</span>)<span class="question-mark">?</span>;
-    <span class="comment">// debug!(&quot;calling iface.poll() with timestamp: {:?}&quot;, timestamp);</span>
-    <span class="kw">let</span> <span class="ident">packets_were_sent_or_received</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">iface</span>.<span class="ident">lock</span>().<span class="ident">poll</span>(<span class="ident">sockets</span>, <span class="ident">Instant::from_millis</span>(<span class="ident">timestamp</span>)) {
-        <span class="prelude-val">Ok</span>(<span class="ident">b</span>) =&gt; <span class="ident">b</span>,
-        <span class="prelude-val">Err</span>(<span class="ident">err</span>) =&gt; {
-            <span class="macro">warn!</span>(<span class="string">&quot;smoltcp_helper: poll error: {}&quot;</span>, <span class="ident">err</span>);
-            <span class="bool-val">false</span>
-        }
+<span class="doccomment">/// A convenience function to poll the given network interface (i.e., flush tx/rx).
+/// Returns true if any packets were sent or received through that interface on the given `sockets`.
+</span><span class="kw">pub fn </span>poll_iface(iface: <span class="kw-2">&amp;</span>NetworkInterfaceRef, sockets: <span class="kw-2">&amp;mut </span>SocketSet, startup_time: u64) -&gt; <span class="prelude-ty">Result</span>&lt;bool, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>timestamp: i64 = millis_since(startup_time)<span class="question-mark">?
+        </span>.try_into()
+        .map_err(|_e| <span class="string">&quot;millis_since() u64 timestamp was larger than i64&quot;</span>)<span class="question-mark">?</span>;
+    <span class="comment">// debug!(&quot;calling iface.poll() with timestamp: {:?}&quot;, timestamp);
+    </span><span class="kw">let </span>packets_were_sent_or_received = <span class="kw">match </span>iface.lock().poll(sockets, Instant::from_millis(timestamp)) {
+        <span class="prelude-val">Ok</span>(b) =&gt; b,
+        <span class="prelude-val">Err</span>(err) =&gt; {
+            <span class="macro">warn!</span>(<span class="string">&quot;smoltcp_helper: poll error: {}&quot;</span>, err);
+            <span class="bool-val">false
+        </span>}
     };
-    <span class="prelude-val">Ok</span>(<span class="ident">packets_were_sent_or_received</span>)
+    <span class="prelude-val">Ok</span>(packets_were_sent_or_received)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="smoltcp_helper" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="smoltcp_helper" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

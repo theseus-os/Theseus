@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/page_allocator/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../page_allocator/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../page_allocator/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../page_allocator/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/page_allocator/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../page_allocator/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -725,113 +719,113 @@
 <span id="719">719</span>
 <span id="720">720</span>
 <span id="721">721</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Provides an allocator for virtual memory pages.</span>
-<span class="doccomment">//! The minimum unit of allocation is a single page. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! This also supports early allocation of pages (up to 32 separate chunks)</span>
-<span class="doccomment">//! before heap allocation is available, and does so behind the scenes using the same single interface. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Once heap allocation is available, it uses a dynamically-allocated list of page chunks to track allocations.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! The core allocation function is [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html), </span>
-<span class="doccomment">//! but there are several convenience functions that offer simpler interfaces for general usage. </span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! # Notes and Missing Features</span>
-<span class="doccomment">//! This allocator currently does **not** merge freed chunks (de-fragmentation) upon deallocation. </span>
-<span class="doccomment">//! It only merges free chunks lazily upon request, i.e., when we run out of address space</span>
-<span class="doccomment">//! or when a requested address is in a chunk that needs to be merged with a nearby chunk.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Provides an allocator for virtual memory pages.
+//! The minimum unit of allocation is a single page. 
+//! 
+//! This also supports early allocation of pages (up to 32 separate chunks)
+//! before heap allocation is available, and does so behind the scenes using the same single interface. 
+//! 
+//! Once heap allocation is available, it uses a dynamically-allocated list of page chunks to track allocations.
+//! 
+//! The core allocation function is [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html), 
+//! but there are several convenience functions that offer simpler interfaces for general usage. 
+//!
+//! # Notes and Missing Features
+//! This allocator currently does **not** merge freed chunks (de-fragmentation) upon deallocation. 
+//! It only merges free chunks lazily upon request, i.e., when we run out of address space
+//! or when a requested address is in a chunk that needs to be merged with a nearby chunk.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory_structs</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">static_assertions</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">intrusive_collections</span>;
-<span class="kw">use</span> <span class="ident">intrusive_collections::Bound</span>;
-
-
-<span class="kw">mod</span> <span class="ident">static_array_rb_tree</span>;
-<span class="comment">// mod static_array_linked_list;</span>
+</span><span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>kernel_config;
+<span class="kw">extern crate </span>memory_structs;
+<span class="kw">extern crate </span>spin;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
+<span class="kw">extern crate </span>intrusive_collections;
+<span class="kw">use </span>intrusive_collections::Bound;
 
 
-<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">borrow::Borrow</span>, <span class="ident">cmp::Ordering</span>, <span class="ident">fmt</span>, <span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>}};
-<span class="kw">use</span> <span class="ident">kernel_config::memory</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">memory_structs</span>::{<span class="ident">VirtualAddress</span>, <span class="ident">Page</span>, <span class="ident">PageRange</span>};
-<span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">Mutex</span>, <span class="ident">Once</span>};
-<span class="kw">use</span> <span class="ident">static_array_rb_tree</span>::<span class="kw-2">*</span>;
+<span class="kw">mod </span>static_array_rb_tree;
+<span class="comment">// mod static_array_linked_list;
 
 
-<span class="doccomment">/// Certain regions are pre-designated for special usage, specifically the kernel&#39;s initial identity mapping.</span>
-<span class="doccomment">/// They will be allocated from if an address within them is specifically requested;</span>
-<span class="doccomment">/// otherwise, they will only be allocated from as a &quot;last resort&quot; if all other non-designated address ranges are exhausted.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Any virtual addresses **less than or equal** to this address are considered &quot;designated&quot;.</span>
-<span class="doccomment">/// This lower part of the address range that&#39;s designated covers from 0x0 to this address.</span>
-<span class="kw">static</span> <span class="ident">DESIGNATED_PAGES_LOW_END</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">Page</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
-
-<span class="doccomment">/// Defines the upper part of the address space that&#39;s designated, similar to `DESIGNATED_PAGES_LOW_END`. </span>
-<span class="doccomment">/// Any virtual addresses **greater than or equal to** this address is considered &quot;designated&quot;.</span>
-<span class="doccomment">/// This higher part of the address range covers from the beginning of the heap area to the end of the address space.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// TODO: once the heap is fully dynamic and not dependent on constant addresses, we can move this up to KERNEL_TEXT_START (511th entry of P4).</span>
-<span class="kw">static</span> <span class="ident">DESIGNATED_PAGES_HIGH_START</span>: <span class="ident">Page</span> <span class="op">=</span> <span class="ident">Page::containing_address</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">KERNEL_HEAP_START</span>));
-
-<span class="kw">const</span> <span class="ident">MIN_PAGE</span>: <span class="ident">Page</span> <span class="op">=</span> <span class="ident">Page::containing_address</span>(<span class="ident">VirtualAddress::zero</span>());
-<span class="kw">const</span> <span class="ident">MAX_PAGE</span>: <span class="ident">Page</span> <span class="op">=</span> <span class="ident">Page::containing_address</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">MAX_VIRTUAL_ADDRESS</span>));
-
-<span class="doccomment">/// The single, system-wide list of free chunks of virtual memory pages.</span>
-<span class="kw">static</span> <span class="ident">FREE_PAGE_LIST</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">StaticArrayRBTree::empty</span>());
+</span><span class="kw">use </span>core::{borrow::Borrow, cmp::Ordering, fmt, ops::{Deref, DerefMut}};
+<span class="kw">use </span>kernel_config::memory::<span class="kw-2">*</span>;
+<span class="kw">use </span>memory_structs::{VirtualAddress, Page, PageRange};
+<span class="kw">use </span>spin::{Mutex, Once};
+<span class="kw">use </span>static_array_rb_tree::<span class="kw-2">*</span>;
 
 
-<span class="doccomment">/// Initialize the page allocator.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `end_vaddr_of_low_designated_region`: the `VirtualAddress` that marks the end of the </span>
-<span class="doccomment">///   lower designated region, which should be the ending address of the initial kernel image</span>
-<span class="doccomment">///   (a lower-half identity address).</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// The page allocator will only allocate addresses lower than `end_vaddr_of_low_designated_region`</span>
-<span class="doccomment">/// if specifically requested.</span>
-<span class="doccomment">/// General allocation requests for any virtual address will not use any address lower than that,</span>
-<span class="doccomment">/// unless the rest of the entire virtual address space is already in use.</span>
-<span class="doccomment">///</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">end_vaddr_of_low_designated_region</span>: <span class="ident">VirtualAddress</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-	<span class="macro">assert!</span>(<span class="ident">end_vaddr_of_low_designated_region</span> <span class="op">&lt;</span> <span class="ident">DESIGNATED_PAGES_HIGH_START</span>.<span class="ident">start_address</span>());
-	<span class="kw">let</span> <span class="ident">designated_low_end</span> <span class="op">=</span> <span class="ident">DESIGNATED_PAGES_LOW_END</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Page::containing_address</span>(<span class="ident">end_vaddr_of_low_designated_region</span>));
-	<span class="kw">let</span> <span class="ident">designated_low_end</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">designated_low_end</span>;
+<span class="doccomment">/// Certain regions are pre-designated for special usage, specifically the kernel&#39;s initial identity mapping.
+/// They will be allocated from if an address within them is specifically requested;
+/// otherwise, they will only be allocated from as a &quot;last resort&quot; if all other non-designated address ranges are exhausted.
+///
+/// Any virtual addresses **less than or equal** to this address are considered &quot;designated&quot;.
+/// This lower part of the address range that&#39;s designated covers from 0x0 to this address.
+</span><span class="kw">static </span>DESIGNATED_PAGES_LOW_END: Once&lt;Page&gt; = Once::new();
 
-	<span class="kw">let</span> <span class="ident">initial_free_chunks</span> <span class="op">=</span> [
-		<span class="comment">// The first region contains all pages *below* the beginning of the 510th entry of P4. </span>
-		<span class="comment">// We split it up into three chunks just for ease, since it overlaps the designated regions.</span>
-		<span class="prelude-val">Some</span>(<span class="ident">Chunk</span> { 
-			<span class="ident">pages</span>: <span class="ident">PageRange::new</span>(
-				<span class="ident">Page::containing_address</span>(<span class="ident">VirtualAddress::zero</span>()),
-				<span class="ident">designated_low_end</span>,
+<span class="doccomment">/// Defines the upper part of the address space that&#39;s designated, similar to `DESIGNATED_PAGES_LOW_END`. 
+/// Any virtual addresses **greater than or equal to** this address is considered &quot;designated&quot;.
+/// This higher part of the address range covers from the beginning of the heap area to the end of the address space.
+///
+/// TODO: once the heap is fully dynamic and not dependent on constant addresses, we can move this up to KERNEL_TEXT_START (511th entry of P4).
+</span><span class="kw">static </span>DESIGNATED_PAGES_HIGH_START: Page = Page::containing_address(VirtualAddress::new_canonical(KERNEL_HEAP_START));
+
+<span class="kw">const </span>MIN_PAGE: Page = Page::containing_address(VirtualAddress::zero());
+<span class="kw">const </span>MAX_PAGE: Page = Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS));
+
+<span class="doccomment">/// The single, system-wide list of free chunks of virtual memory pages.
+</span><span class="kw">static </span>FREE_PAGE_LIST: Mutex&lt;StaticArrayRBTree&lt;Chunk&gt;&gt; = Mutex::new(StaticArrayRBTree::empty());
+
+
+<span class="doccomment">/// Initialize the page allocator.
+///
+/// # Arguments
+/// * `end_vaddr_of_low_designated_region`: the `VirtualAddress` that marks the end of the 
+///   lower designated region, which should be the ending address of the initial kernel image
+///   (a lower-half identity address).
+/// 
+/// The page allocator will only allocate addresses lower than `end_vaddr_of_low_designated_region`
+/// if specifically requested.
+/// General allocation requests for any virtual address will not use any address lower than that,
+/// unless the rest of the entire virtual address space is already in use.
+///
+</span><span class="kw">pub fn </span>init(end_vaddr_of_low_designated_region: VirtualAddress) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+	<span class="macro">assert!</span>(end_vaddr_of_low_designated_region &lt; DESIGNATED_PAGES_HIGH_START.start_address());
+	<span class="kw">let </span>designated_low_end = DESIGNATED_PAGES_LOW_END.call_once(|| Page::containing_address(end_vaddr_of_low_designated_region));
+	<span class="kw">let </span>designated_low_end = <span class="kw-2">*</span>designated_low_end;
+
+	<span class="kw">let </span>initial_free_chunks = [
+		<span class="comment">// The first region contains all pages *below* the beginning of the 510th entry of P4. 
+		// We split it up into three chunks just for ease, since it overlaps the designated regions.
+		</span><span class="prelude-val">Some</span>(Chunk { 
+			pages: PageRange::new(
+				Page::containing_address(VirtualAddress::zero()),
+				designated_low_end,
 			)
 		}),
-		<span class="prelude-val">Some</span>(<span class="ident">Chunk</span> { 
-			<span class="ident">pages</span>: <span class="ident">PageRange::new</span>(
-				<span class="ident">designated_low_end</span> <span class="op">+</span> <span class="number">1</span>,
-				<span class="ident">DESIGNATED_PAGES_HIGH_START</span> <span class="op">-</span> <span class="number">1</span>,
+		<span class="prelude-val">Some</span>(Chunk { 
+			pages: PageRange::new(
+				designated_low_end + <span class="number">1</span>,
+				DESIGNATED_PAGES_HIGH_START - <span class="number">1</span>,
 			)
 		}),
-		<span class="prelude-val">Some</span>(<span class="ident">Chunk</span> { 
-			<span class="ident">pages</span>: <span class="ident">PageRange::new</span>(
-				<span class="ident">DESIGNATED_PAGES_HIGH_START</span>,
-				<span class="comment">// This is the page right below the beginning of the 510th entry of the top-level P4 page table.</span>
-				<span class="ident">Page::containing_address</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">KERNEL_TEXT_START</span> <span class="op">-</span> <span class="ident">ADDRESSABILITY_PER_P4_ENTRY</span> <span class="op">-</span> <span class="number">1</span>)),
+		<span class="prelude-val">Some</span>(Chunk { 
+			pages: PageRange::new(
+				DESIGNATED_PAGES_HIGH_START,
+				<span class="comment">// This is the page right below the beginning of the 510th entry of the top-level P4 page table.
+				</span>Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START - ADDRESSABILITY_PER_P4_ENTRY - <span class="number">1</span>)),
 			)
 		}),
 
-		<span class="comment">// The second region contains all pages *above* the end of the 510th entry of P4, i.e., starting at the 511th (last) entry of P4.</span>
-		<span class="comment">// This is fully covered by the second (higher) designated region.</span>
-		<span class="prelude-val">Some</span>(<span class="ident">Chunk</span> { 
-			<span class="ident">pages</span>: <span class="ident">PageRange::new</span>(
-				<span class="ident">Page::containing_address</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">KERNEL_TEXT_START</span>)),
-				<span class="ident">Page::containing_address</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">MAX_VIRTUAL_ADDRESS</span>)),
+		<span class="comment">// The second region contains all pages *above* the end of the 510th entry of P4, i.e., starting at the 511th (last) entry of P4.
+		// This is fully covered by the second (higher) designated region.
+		</span><span class="prelude-val">Some</span>(Chunk { 
+			pages: PageRange::new(
+				Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START)),
+				Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS)),
 			)
 		}),
 		<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>,
@@ -840,306 +834,306 @@
 		<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>,
 	];
 
-	<span class="kw-2">*</span><span class="ident">FREE_PAGE_LIST</span>.<span class="ident">lock</span>() <span class="op">=</span> <span class="ident">StaticArrayRBTree::new</span>(<span class="ident">initial_free_chunks</span>);
+	<span class="kw-2">*</span>FREE_PAGE_LIST.lock() = StaticArrayRBTree::new(initial_free_chunks);
 	<span class="prelude-val">Ok</span>(())
 }
 
 
-<span class="doccomment">/// A range of contiguous pages.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Ordering and Equality</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// `Chunk` implements the `Ord` trait, and its total ordering is ONLY based on</span>
-<span class="doccomment">/// its **starting** `Page`. This is useful so we can store `Chunk`s in a sorted collection.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Similarly, `Chunk` implements equality traits, `Eq` and `PartialEq`,</span>
-<span class="doccomment">/// both of which are also based ONLY on the **starting** `Page` of the `Chunk`.</span>
-<span class="doccomment">/// Thus, comparing two `Chunk`s with the `==` or `!=` operators may not work as expected.</span>
-<span class="doccomment">/// since it ignores their actual range of pages.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">struct</span> <span class="ident">Chunk</span> {
-	<span class="doccomment">/// The Pages covered by this chunk, an inclusive range. </span>
-	<span class="ident">pages</span>: <span class="ident">PageRange</span>,
+<span class="doccomment">/// A range of contiguous pages.
+///
+/// # Ordering and Equality
+///
+/// `Chunk` implements the `Ord` trait, and its total ordering is ONLY based on
+/// its **starting** `Page`. This is useful so we can store `Chunk`s in a sorted collection.
+///
+/// Similarly, `Chunk` implements equality traits, `Eq` and `PartialEq`,
+/// both of which are also based ONLY on the **starting** `Page` of the `Chunk`.
+/// Thus, comparing two `Chunk`s with the `==` or `!=` operators may not work as expected.
+/// since it ignores their actual range of pages.
+</span><span class="attr">#[derive(Debug, Clone, Eq)]
+</span><span class="kw">struct </span>Chunk {
+	<span class="doccomment">/// The Pages covered by this chunk, an inclusive range. 
+	</span>pages: PageRange,
 }
-<span class="kw">impl</span> <span class="ident">Chunk</span> {
-	<span class="kw">fn</span> <span class="ident">as_allocated_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">AllocatedPages</span> {
-		<span class="ident">AllocatedPages</span> {
-			<span class="ident">pages</span>: <span class="self">self</span>.<span class="ident">pages</span>.<span class="ident">clone</span>(),
+<span class="kw">impl </span>Chunk {
+	<span class="kw">fn </span>as_allocated_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AllocatedPages {
+		AllocatedPages {
+			pages: <span class="self">self</span>.pages.clone(),
 		}
 	}
 
-	<span class="doccomment">/// Returns a new `Chunk` with an empty range of pages. </span>
-	<span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="ident">Chunk</span> {
-		<span class="ident">Chunk</span> {
-			<span class="ident">pages</span>: <span class="ident">PageRange::empty</span>(),
+	<span class="doccomment">/// Returns a new `Chunk` with an empty range of pages. 
+	</span><span class="kw">fn </span>empty() -&gt; Chunk {
+		Chunk {
+			pages: PageRange::empty(),
 		}
 	}
 }
-<span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">Chunk</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">PageRange</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">PageRange</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pages</span>
+<span class="kw">impl </span>Deref <span class="kw">for </span>Chunk {
+    <span class="kw">type </span>Target = PageRange;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>PageRange {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.pages
     }
 }
-<span class="kw">impl</span> <span class="ident">Ord</span> <span class="kw">for</span> <span class="ident">Chunk</span> {
-    <span class="kw">fn</span> <span class="ident">cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="ident">Ordering</span> {
-        <span class="self">self</span>.<span class="ident">pages</span>.<span class="ident">start</span>().<span class="ident">cmp</span>(<span class="ident">other</span>.<span class="ident">pages</span>.<span class="ident">start</span>())
+<span class="kw">impl </span>Ord <span class="kw">for </span>Chunk {
+    <span class="kw">fn </span>cmp(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; Ordering {
+        <span class="self">self</span>.pages.start().cmp(other.pages.start())
     }
 }
-<span class="kw">impl</span> <span class="ident">PartialOrd</span> <span class="kw">for</span> <span class="ident">Chunk</span> {
-    <span class="kw">fn</span> <span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">cmp</span>(<span class="ident">other</span>))
+<span class="kw">impl </span>PartialOrd <span class="kw">for </span>Chunk {
+    <span class="kw">fn </span>partial_cmp(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Ordering&gt; {
+        <span class="prelude-val">Some</span>(<span class="self">self</span>.cmp(other))
     }
 }
-<span class="kw">impl</span> <span class="ident">PartialEq</span> <span class="kw">for</span> <span class="ident">Chunk</span> {
-    <span class="kw">fn</span> <span class="ident">eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">pages</span>.<span class="ident">start</span>() <span class="op">==</span> <span class="ident">other</span>.<span class="ident">pages</span>.<span class="ident">start</span>()
+<span class="kw">impl </span>PartialEq <span class="kw">for </span>Chunk {
+    <span class="kw">fn </span>eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; bool {
+        <span class="self">self</span>.pages.start() == other.pages.start()
     }
 }
-<span class="kw">impl</span> <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">Page</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;_</span> <span class="ident">Chunk</span> {
-	<span class="kw">fn</span> <span class="ident">borrow</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Page</span> {
-		<span class="self">self</span>.<span class="ident">pages</span>.<span class="ident">start</span>()
+<span class="kw">impl </span>Borrow&lt;Page&gt; <span class="kw">for </span><span class="kw-2">&amp;</span><span class="lifetime">&#39;_ </span>Chunk {
+	<span class="kw">fn </span>borrow(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Page {
+		<span class="self">self</span>.pages.start()
 	}
 }
 
 
-<span class="doccomment">/// Represents a range of allocated `VirtualAddress`es, specified in `Page`s. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// These pages are not initially mapped to any physical memory frames, you must do that separately</span>
-<span class="doccomment">/// in order to actually use their memory; see the `MappedPages` type for more. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This object represents ownership of the allocated virtual pages;</span>
-<span class="doccomment">/// if this object falls out of scope, its allocated pages will be auto-deallocated upon drop. </span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AllocatedPages</span> {
-	<span class="ident">pages</span>: <span class="ident">PageRange</span>,
+<span class="doccomment">/// Represents a range of allocated `VirtualAddress`es, specified in `Page`s. 
+/// 
+/// These pages are not initially mapped to any physical memory frames, you must do that separately
+/// in order to actually use their memory; see the `MappedPages` type for more. 
+/// 
+/// This object represents ownership of the allocated virtual pages;
+/// if this object falls out of scope, its allocated pages will be auto-deallocated upon drop. 
+</span><span class="kw">pub struct </span>AllocatedPages {
+	pages: PageRange,
 }
 
-<span class="comment">// AllocatedPages must not be Cloneable, and it must not expose its inner pages as mutable.</span>
-<span class="macro">assert_not_impl_any!</span>(<span class="ident">AllocatedPages</span>: <span class="ident">DerefMut</span>, <span class="ident">Clone</span>);
+<span class="comment">// AllocatedPages must not be Cloneable, and it must not expose its inner pages as mutable.
+</span><span class="macro">assert_not_impl_any!</span>(AllocatedPages: DerefMut, Clone);
 
-<span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">AllocatedPages</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">PageRange</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">PageRange</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pages</span>
+<span class="kw">impl </span>Deref <span class="kw">for </span>AllocatedPages {
+    <span class="kw">type </span>Target = PageRange;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>PageRange {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.pages
     }
 }
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">AllocatedPages</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-		<span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;AllocatedPages({:?})&quot;</span>, <span class="self">self</span>.<span class="ident">pages</span>)
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>AllocatedPages {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+		<span class="macro">write!</span>(f, <span class="string">&quot;AllocatedPages({:?})&quot;</span>, <span class="self">self</span>.pages)
 	}
 }
 
-<span class="kw">impl</span> <span class="ident">AllocatedPages</span> {
-	<span class="doccomment">/// Returns an empty AllocatedPages object that performs no page allocation. </span>
-    <span class="doccomment">/// Can be used as a placeholder, but will not permit any real usage. </span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="ident">AllocatedPages</span> {
-        <span class="ident">AllocatedPages</span> {
-			<span class="ident">pages</span>: <span class="ident">PageRange::empty</span>()
+<span class="kw">impl </span>AllocatedPages {
+	<span class="doccomment">/// Returns an empty AllocatedPages object that performs no page allocation. 
+    /// Can be used as a placeholder, but will not permit any real usage. 
+    </span><span class="kw">pub const fn </span>empty() -&gt; AllocatedPages {
+        AllocatedPages {
+			pages: PageRange::empty()
 		}
 	}
 
-	<span class="doccomment">/// Merges the given `AllocatedPages` object `ap` into this `AllocatedPages` object (`self`).</span>
-	<span class="doccomment">/// This is just for convenience and usability purposes, it performs no allocation or remapping.</span>
-    <span class="doccomment">///</span>
-	<span class="doccomment">/// The `ap` must be virtually contiguous and come immediately after `self`,</span>
-	<span class="doccomment">/// that is, `self.end` must equal `ap.start`. </span>
-	<span class="doccomment">/// If this condition is met, `self` is modified and `Ok(())` is returned,</span>
-	<span class="doccomment">/// otherwise `Err(ap)` is returned.</span>
-	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">merge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">ap</span>: <span class="ident">AllocatedPages</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">AllocatedPages</span><span class="op">&gt;</span> {
-		<span class="comment">// make sure the pages are contiguous</span>
-		<span class="kw">if</span> <span class="kw-2">*</span><span class="ident">ap</span>.<span class="ident">start</span>() <span class="op">!</span><span class="op">=</span> (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span>) {
-			<span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">ap</span>);
+	<span class="doccomment">/// Merges the given `AllocatedPages` object `ap` into this `AllocatedPages` object (`self`).
+	/// This is just for convenience and usability purposes, it performs no allocation or remapping.
+    ///
+	/// The `ap` must be virtually contiguous and come immediately after `self`,
+	/// that is, `self.end` must equal `ap.start`. 
+	/// If this condition is met, `self` is modified and `Ok(())` is returned,
+	/// otherwise `Err(ap)` is returned.
+	</span><span class="kw">pub fn </span>merge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, ap: AllocatedPages) -&gt; <span class="prelude-ty">Result</span>&lt;(), AllocatedPages&gt; {
+		<span class="comment">// make sure the pages are contiguous
+		</span><span class="kw">if </span><span class="kw-2">*</span>ap.start() != (<span class="kw-2">*</span><span class="self">self</span>.end() + <span class="number">1</span>) {
+			<span class="kw">return </span><span class="prelude-val">Err</span>(ap);
 		}
-		<span class="self">self</span>.<span class="ident">pages</span> <span class="op">=</span> <span class="ident">PageRange::new</span>(<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>(), <span class="kw-2">*</span><span class="ident">ap</span>.<span class="ident">end</span>());
-		<span class="comment">// ensure the now-merged AllocatedPages doesn&#39;t run its drop handler and free its pages.</span>
-		<span class="ident">core::mem::forget</span>(<span class="ident">ap</span>); 
+		<span class="self">self</span>.pages = PageRange::new(<span class="kw-2">*</span><span class="self">self</span>.start(), <span class="kw-2">*</span>ap.end());
+		<span class="comment">// ensure the now-merged AllocatedPages doesn&#39;t run its drop handler and free its pages.
+		</span>core::mem::forget(ap); 
 		<span class="prelude-val">Ok</span>(())
 	}
 
-	<span class="doccomment">/// Splits this `AllocatedPages` into two separate `AllocatedPages` objects:</span>
-    <span class="doccomment">/// * `[beginning : at_page - 1]`</span>
-    <span class="doccomment">/// * `[at_page : end]`</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// This function follows the behavior of [`core::slice::split_at()`],</span>
-    <span class="doccomment">/// thus, either one of the returned `AllocatedPages` objects may be empty. </span>
-    <span class="doccomment">/// * If `at_page == self.start`, the first returned `AllocatedPages` object will be empty.</span>
-    <span class="doccomment">/// * If `at_page == self.end + 1`, the second returned `AllocatedPages` object will be empty.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Returns an `Err` containing this `AllocatedPages` if `at_page` is otherwise out of bounds.</span>
-	<span class="doccomment">/// </span>
-    <span class="doccomment">/// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">split</span>(<span class="self">self</span>, <span class="ident">at_page</span>: <span class="ident">Page</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedPages</span>, <span class="ident">AllocatedPages</span>), <span class="ident">AllocatedPages</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">end_of_first</span> <span class="op">=</span> <span class="ident">at_page</span> <span class="op">-</span> <span class="number">1</span>;
+	<span class="doccomment">/// Splits this `AllocatedPages` into two separate `AllocatedPages` objects:
+    /// * `[beginning : at_page - 1]`
+    /// * `[at_page : end]`
+    /// 
+    /// This function follows the behavior of [`core::slice::split_at()`],
+    /// thus, either one of the returned `AllocatedPages` objects may be empty. 
+    /// * If `at_page == self.start`, the first returned `AllocatedPages` object will be empty.
+    /// * If `at_page == self.end + 1`, the second returned `AllocatedPages` object will be empty.
+    /// 
+    /// Returns an `Err` containing this `AllocatedPages` if `at_page` is otherwise out of bounds.
+	/// 
+    /// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at
+    </span><span class="kw">pub fn </span>split(<span class="self">self</span>, at_page: Page) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages, AllocatedPages), AllocatedPages&gt; {
+        <span class="kw">let </span>end_of_first = at_page - <span class="number">1</span>;
 
-        <span class="kw">let</span> (<span class="ident">first</span>, <span class="ident">second</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">at_page</span> <span class="op">==</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>() <span class="op">&amp;&amp;</span> <span class="ident">at_page</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() {
-            <span class="kw">let</span> <span class="ident">first</span>  <span class="op">=</span> <span class="ident">PageRange::empty</span>();
-            <span class="kw">let</span> <span class="ident">second</span> <span class="op">=</span> <span class="ident">PageRange::new</span>(<span class="ident">at_page</span>, <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>());
-            (<span class="ident">first</span>, <span class="ident">second</span>)
+        <span class="kw">let </span>(first, second) = <span class="kw">if </span>at_page == <span class="kw-2">*</span><span class="self">self</span>.start() &amp;&amp; at_page &lt;= <span class="kw-2">*</span><span class="self">self</span>.end() {
+            <span class="kw">let </span>first  = PageRange::empty();
+            <span class="kw">let </span>second = PageRange::new(at_page, <span class="kw-2">*</span><span class="self">self</span>.end());
+            (first, second)
         } 
-        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">at_page</span> <span class="op">==</span> (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span>) <span class="op">&amp;&amp;</span> <span class="ident">end_of_first</span> <span class="op">&gt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>() {
-            <span class="kw">let</span> <span class="ident">first</span>  <span class="op">=</span> <span class="ident">PageRange::new</span>(<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>(), <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>()); 
-            <span class="kw">let</span> <span class="ident">second</span> <span class="op">=</span> <span class="ident">PageRange::empty</span>();
-            (<span class="ident">first</span>, <span class="ident">second</span>)
+        <span class="kw">else if </span>at_page == (<span class="kw-2">*</span><span class="self">self</span>.end() + <span class="number">1</span>) &amp;&amp; end_of_first &gt;= <span class="kw-2">*</span><span class="self">self</span>.start() {
+            <span class="kw">let </span>first  = PageRange::new(<span class="kw-2">*</span><span class="self">self</span>.start(), <span class="kw-2">*</span><span class="self">self</span>.end()); 
+            <span class="kw">let </span>second = PageRange::empty();
+            (first, second)
         }
-        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">at_page</span> <span class="op">&gt;</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>() <span class="op">&amp;&amp;</span> <span class="ident">end_of_first</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() {
-            <span class="kw">let</span> <span class="ident">first</span>  <span class="op">=</span> <span class="ident">PageRange::new</span>(<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">end_of_first</span>);
-            <span class="kw">let</span> <span class="ident">second</span> <span class="op">=</span> <span class="ident">PageRange::new</span>(<span class="ident">at_page</span>, <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>());
-            (<span class="ident">first</span>, <span class="ident">second</span>)
+        <span class="kw">else if </span>at_page &gt; <span class="kw-2">*</span><span class="self">self</span>.start() &amp;&amp; end_of_first &lt;= <span class="kw-2">*</span><span class="self">self</span>.end() {
+            <span class="kw">let </span>first  = PageRange::new(<span class="kw-2">*</span><span class="self">self</span>.start(), end_of_first);
+            <span class="kw">let </span>second = PageRange::new(at_page, <span class="kw-2">*</span><span class="self">self</span>.end());
+            (first, second)
         }
-        <span class="kw">else</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="self">self</span>);
+        <span class="kw">else </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="self">self</span>);
         };
 
-        <span class="comment">// ensure the original AllocatedPages doesn&#39;t run its drop handler and free its pages.</span>
-        <span class="ident">core::mem::forget</span>(<span class="self">self</span>);   
+        <span class="comment">// ensure the original AllocatedPages doesn&#39;t run its drop handler and free its pages.
+        </span>core::mem::forget(<span class="self">self</span>);   
         <span class="prelude-val">Ok</span>((
-            <span class="ident">AllocatedPages</span> { <span class="ident">pages</span>: <span class="ident">first</span> }, 
-            <span class="ident">AllocatedPages</span> { <span class="ident">pages</span>: <span class="ident">second</span> },
+            AllocatedPages { pages: first }, 
+            AllocatedPages { pages: second },
         ))
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">AllocatedPages</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-		<span class="kw">if</span> <span class="self">self</span>.<span class="ident">size_in_pages</span>() <span class="op">==</span> <span class="number">0</span> { <span class="kw">return</span>; }
-		<span class="comment">// trace!(&quot;page_allocator: deallocating {:?}&quot;, self);</span>
+<span class="kw">impl </span>Drop <span class="kw">for </span>AllocatedPages {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+		<span class="kw">if </span><span class="self">self</span>.size_in_pages() == <span class="number">0 </span>{ <span class="kw">return</span>; }
+		<span class="comment">// trace!(&quot;page_allocator: deallocating {:?}&quot;, self);
 
-		<span class="comment">// Simply add the newly-deallocated chunk to the free pages list.</span>
-		<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">locked_list</span> <span class="op">=</span> <span class="ident">FREE_PAGE_LIST</span>.<span class="ident">lock</span>();
-		<span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">locked_list</span>.<span class="ident">insert</span>(<span class="ident">Chunk</span> {
-			<span class="ident">pages</span>: <span class="self">self</span>.<span class="ident">pages</span>.<span class="ident">clone</span>(),
+		// Simply add the newly-deallocated chunk to the free pages list.
+		</span><span class="kw">let </span><span class="kw-2">mut </span>locked_list = FREE_PAGE_LIST.lock();
+		<span class="kw">let </span>res = locked_list.insert(Chunk {
+			pages: <span class="self">self</span>.pages.clone(),
 		});
-		<span class="kw">match</span> <span class="ident">res</span> {
-			<span class="prelude-val">Ok</span>(<span class="ident">_inserted_free_chunk</span>) =&gt; <span class="kw">return</span>,
-			<span class="prelude-val">Err</span>(<span class="ident">c</span>) =&gt; <span class="macro">error!</span>(<span class="string">&quot;BUG: couldn&#39;t insert deallocated chunk {:?} into free page list&quot;</span>, <span class="ident">c</span>),
+		<span class="kw">match </span>res {
+			<span class="prelude-val">Ok</span>(_inserted_free_chunk) =&gt; <span class="kw">return</span>,
+			<span class="prelude-val">Err</span>(c) =&gt; <span class="macro">error!</span>(<span class="string">&quot;BUG: couldn&#39;t insert deallocated chunk {:?} into free page list&quot;</span>, c),
 		}
 		
-		<span class="comment">// Here, we could optionally use above `_inserted_free_chunk` to merge the adjacent (contiguous) chunks</span>
-		<span class="comment">// before or after the newly-inserted free chunk. </span>
-		<span class="comment">// However, there&#39;s no *need* to do so until we actually run out of address space or until </span>
-		<span class="comment">// a requested address is in a chunk that needs to be merged.</span>
-		<span class="comment">// Thus, for performance, we save that for those future situations.</span>
-    }
+		<span class="comment">// Here, we could optionally use above `_inserted_free_chunk` to merge the adjacent (contiguous) chunks
+		// before or after the newly-inserted free chunk. 
+		// However, there&#39;s no *need* to do so until we actually run out of address space or until 
+		// a requested address is in a chunk that needs to be merged.
+		// Thus, for performance, we save that for those future situations.
+    </span>}
 }
 
 
 
-<span class="doccomment">/// A series of pending actions related to page allocator bookkeeping,</span>
-<span class="doccomment">/// which may result in heap allocation. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// The actions are triggered upon dropping this struct. </span>
-<span class="doccomment">/// This struct can be returned from the `allocate_pages()` family of functions </span>
-<span class="doccomment">/// in order to allow the caller to precisely control when those actions </span>
-<span class="doccomment">/// that may result in heap allocation should occur. </span>
-<span class="doccomment">/// Such actions include adding chunks to lists of free pages or pages in use. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// The vast majority of use cases don&#39;t  care about such precise control, </span>
-<span class="doccomment">/// so you can simply drop this struct at any time or ignore it</span>
-<span class="doccomment">/// with a `let _ = ...` binding to instantly drop it. </span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> {
-	<span class="doccomment">/// A reference to the list into which we will insert the free `Chunk`s.</span>
-	<span class="ident">free_list</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;list</span> <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-	<span class="doccomment">/// A free chunk that needs to be added back to the free list.</span>
-	<span class="ident">free1</span>: <span class="ident">Chunk</span>,
-	<span class="doccomment">/// Another free chunk that needs to be added back to the free list.</span>
-	<span class="ident">free2</span>: <span class="ident">Chunk</span>,
+<span class="doccomment">/// A series of pending actions related to page allocator bookkeeping,
+/// which may result in heap allocation. 
+/// 
+/// The actions are triggered upon dropping this struct. 
+/// This struct can be returned from the `allocate_pages()` family of functions 
+/// in order to allow the caller to precisely control when those actions 
+/// that may result in heap allocation should occur. 
+/// Such actions include adding chunks to lists of free pages or pages in use. 
+/// 
+/// The vast majority of use cases don&#39;t  care about such precise control, 
+/// so you can simply drop this struct at any time or ignore it
+/// with a `let _ = ...` binding to instantly drop it. 
+</span><span class="kw">pub struct </span>DeferredAllocAction&lt;<span class="lifetime">&#39;list</span>&gt; {
+	<span class="doccomment">/// A reference to the list into which we will insert the free `Chunk`s.
+	</span>free_list: <span class="kw-2">&amp;</span><span class="lifetime">&#39;list </span>Mutex&lt;StaticArrayRBTree&lt;Chunk&gt;&gt;,
+	<span class="doccomment">/// A free chunk that needs to be added back to the free list.
+	</span>free1: Chunk,
+	<span class="doccomment">/// Another free chunk that needs to be added back to the free list.
+	</span>free2: Chunk,
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> {
-	<span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">F1</span>, <span class="ident">F2</span><span class="op">&gt;</span>(<span class="ident">free1</span>: <span class="ident">F1</span>, <span class="ident">free2</span>: <span class="ident">F2</span>) -&gt; <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> 
-		<span class="kw">where</span> <span class="ident">F1</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-			  <span class="ident">F2</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;list</span>&gt; DeferredAllocAction&lt;<span class="lifetime">&#39;list</span>&gt; {
+	<span class="kw">fn </span>new&lt;F1, F2&gt;(free1: F1, free2: F2) -&gt; DeferredAllocAction&lt;<span class="lifetime">&#39;list</span>&gt; 
+		<span class="kw">where </span>F1: Into&lt;<span class="prelude-ty">Option</span>&lt;Chunk&gt;&gt;,
+			  F2: Into&lt;<span class="prelude-ty">Option</span>&lt;Chunk&gt;&gt;,
 	{
-		<span class="kw">let</span> <span class="ident">free_list</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">FREE_PAGE_LIST</span>;
-		<span class="kw">let</span> <span class="ident">free1</span> <span class="op">=</span> <span class="ident">free1</span>.<span class="ident">into</span>().<span class="ident">unwrap_or_else</span>(<span class="ident">Chunk::empty</span>);
-		<span class="kw">let</span> <span class="ident">free2</span> <span class="op">=</span> <span class="ident">free2</span>.<span class="ident">into</span>().<span class="ident">unwrap_or_else</span>(<span class="ident">Chunk::empty</span>);
-		<span class="ident">DeferredAllocAction</span> { <span class="ident">free_list</span>, <span class="ident">free1</span>, <span class="ident">free2</span> }
+		<span class="kw">let </span>free_list = <span class="kw-2">&amp;</span>FREE_PAGE_LIST;
+		<span class="kw">let </span>free1 = free1.into().unwrap_or_else(Chunk::empty);
+		<span class="kw">let </span>free2 = free2.into().unwrap_or_else(Chunk::empty);
+		DeferredAllocAction { free_list, free1, free2 }
 	}
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> {
-	<span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-		<span class="comment">// Insert all of the chunks, both allocated and free ones, into the list. </span>
-		<span class="kw">if</span> <span class="self">self</span>.<span class="ident">free1</span>.<span class="ident">size_in_pages</span>() <span class="op">&gt;</span> <span class="number">0</span> {
-			<span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">free1</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>();
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;list</span>&gt; Drop <span class="kw">for </span>DeferredAllocAction&lt;<span class="lifetime">&#39;list</span>&gt; {
+	<span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+		<span class="comment">// Insert all of the chunks, both allocated and free ones, into the list. 
+		</span><span class="kw">if </span><span class="self">self</span>.free1.size_in_pages() &gt; <span class="number">0 </span>{
+			<span class="self">self</span>.free_list.lock().insert(<span class="self">self</span>.free1.clone()).unwrap();
 		}
-		<span class="kw">if</span> <span class="self">self</span>.<span class="ident">free2</span>.<span class="ident">size_in_pages</span>() <span class="op">&gt;</span> <span class="number">0</span> {
-			<span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">free2</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>();
-		}
-	}
-}
-
-
-<span class="doccomment">/// Possible allocation errors.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">enum</span> <span class="ident">AllocationError</span> {
-	<span class="doccomment">/// The requested address was not free: it was already allocated, or is outside the range of this allocator.</span>
-	<span class="ident">AddressNotFree</span>(<span class="ident">Page</span>, <span class="ident">usize</span>),
-	<span class="doccomment">/// The address space was full, or there was not a large-enough chunk </span>
-	<span class="doccomment">/// or enough remaining chunks that could satisfy the requested allocation size.</span>
-	<span class="ident">OutOfAddressSpace</span>(<span class="ident">usize</span>),
-	<span class="doccomment">/// The allocator has not yet been initialized.</span>
-	<span class="ident">NotInitialized</span>,
-}
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">AllocationError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
-	<span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">alloc_err</span>: <span class="ident">AllocationError</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
-		<span class="kw">match</span> <span class="ident">alloc_err</span> {
-			<span class="ident">AllocationError::AddressNotFree</span>(..) =&gt; <span class="string">&quot;address was in use or outside of this page allocator&#39;s range&quot;</span>,
-			<span class="ident">AllocationError::OutOfAddressSpace</span>(..) =&gt; <span class="string">&quot;out of virtual address space&quot;</span>,
-			<span class="ident">AllocationError::NotInitialized</span> =&gt; <span class="string">&quot;the page allocator has not yet been initialized&quot;</span>,
+		<span class="kw">if </span><span class="self">self</span>.free2.size_in_pages() &gt; <span class="number">0 </span>{
+			<span class="self">self</span>.free_list.lock().insert(<span class="self">self</span>.free2.clone()).unwrap();
 		}
 	}
 }
 
 
-<span class="doccomment">/// Searches the given `list` for the chunk that contains the range of pages from</span>
-<span class="doccomment">/// `requested_page` to `requested_page + num_pages`.</span>
-<span class="kw">fn</span> <span class="ident">find_specific_chunk</span>(
-	<span class="ident">list</span>: <span class="kw-2">&amp;mut</span> <span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>,
-	<span class="ident">requested_page</span>: <span class="ident">Page</span>,
-	<span class="ident">num_pages</span>: <span class="ident">usize</span>
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedPages</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="ident">AllocationError</span><span class="op">&gt;</span> {
+<span class="doccomment">/// Possible allocation errors.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">enum </span>AllocationError {
+	<span class="doccomment">/// The requested address was not free: it was already allocated, or is outside the range of this allocator.
+	</span>AddressNotFree(Page, usize),
+	<span class="doccomment">/// The address space was full, or there was not a large-enough chunk 
+	/// or enough remaining chunks that could satisfy the requested allocation size.
+	</span>OutOfAddressSpace(usize),
+	<span class="doccomment">/// The allocator has not yet been initialized.
+	</span>NotInitialized,
+}
+<span class="kw">impl </span>From&lt;AllocationError&gt; <span class="kw">for </span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str {
+	<span class="kw">fn </span>from(alloc_err: AllocationError) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str {
+		<span class="kw">match </span>alloc_err {
+			AllocationError::AddressNotFree(..) =&gt; <span class="string">&quot;address was in use or outside of this page allocator&#39;s range&quot;</span>,
+			AllocationError::OutOfAddressSpace(..) =&gt; <span class="string">&quot;out of virtual address space&quot;</span>,
+			AllocationError::NotInitialized =&gt; <span class="string">&quot;the page allocator has not yet been initialized&quot;</span>,
+		}
+	}
+}
 
-	<span class="comment">// The end page is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.</span>
-	<span class="kw">let</span> <span class="ident">requested_end_page</span> <span class="op">=</span> <span class="ident">requested_page</span> <span class="op">+</span> (<span class="ident">num_pages</span> <span class="op">-</span> <span class="number">1</span>); 
 
-	<span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="ident">list</span>.<span class="number">0</span> {
-		<span class="ident">Inner::Array</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">arr</span>) =&gt; {
-			<span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="ident">arr</span>.<span class="ident">iter_mut</span>() {
-				<span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">elem</span> {
-					<span class="kw">if</span> <span class="ident">requested_page</span> <span class="op">&gt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">start</span>() <span class="op">&amp;&amp;</span> <span class="ident">requested_end_page</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">end</span>() {
-						<span class="comment">// Here: `chunk` was big enough and did contain the requested address.</span>
-						<span class="kw">return</span> <span class="ident">adjust_chosen_chunk</span>(<span class="ident">requested_page</span>, <span class="ident">num_pages</span>, <span class="kw-2">&amp;</span><span class="ident">chunk</span>.<span class="ident">clone</span>(), <span class="ident">ValueRefMut::Array</span>(<span class="ident">elem</span>));
+<span class="doccomment">/// Searches the given `list` for the chunk that contains the range of pages from
+/// `requested_page` to `requested_page + num_pages`.
+</span><span class="kw">fn </span>find_specific_chunk(
+	list: <span class="kw-2">&amp;mut </span>StaticArrayRBTree&lt;Chunk&gt;,
+	requested_page: Page,
+	num_pages: usize
+) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), AllocationError&gt; {
+
+	<span class="comment">// The end page is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
+	</span><span class="kw">let </span>requested_end_page = requested_page + (num_pages - <span class="number">1</span>); 
+
+	<span class="kw">match </span><span class="kw-2">&amp;mut </span>list.<span class="number">0 </span>{
+		Inner::Array(<span class="kw-2">ref mut </span>arr) =&gt; {
+			<span class="kw">for </span>elem <span class="kw">in </span>arr.iter_mut() {
+				<span class="kw">if let </span><span class="prelude-val">Some</span>(chunk) = elem {
+					<span class="kw">if </span>requested_page &gt;= <span class="kw-2">*</span>chunk.start() &amp;&amp; requested_end_page &lt;= <span class="kw-2">*</span>chunk.end() {
+						<span class="comment">// Here: `chunk` was big enough and did contain the requested address.
+						</span><span class="kw">return </span>adjust_chosen_chunk(requested_page, num_pages, <span class="kw-2">&amp;</span>chunk.clone(), ValueRefMut::Array(elem));
 					}
 				}
 			}
 		}
-		<span class="ident">Inner::RBTree</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">tree</span>) =&gt; {
-			<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor_mut</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">upper_bound_mut</span>(<span class="ident">Bound::Included</span>(<span class="kw-2">&amp;</span><span class="ident">requested_page</span>));
-			<span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">cursor_mut</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">deref</span>()) {
-				<span class="kw">if</span> <span class="ident">requested_page</span> <span class="op">&gt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">start</span>() {
-					<span class="kw">if</span> <span class="ident">requested_end_page</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">end</span>() {
-						<span class="kw">return</span> <span class="ident">adjust_chosen_chunk</span>(<span class="ident">requested_page</span>, <span class="ident">num_pages</span>, <span class="kw-2">&amp;</span><span class="ident">chunk</span>.<span class="ident">clone</span>(), <span class="ident">ValueRefMut::RBTree</span>(<span class="ident">cursor_mut</span>));
-					} <span class="kw">else</span> {
-						<span class="comment">// Here, we&#39;ve found a chunk that includes the requested start page, but it&#39;s too small</span>
-						<span class="comment">// to cover the number of requested pages. </span>
-						<span class="comment">// Thus, we attempt to merge this chunk with the next contiguous chunk(s) to create one single larger chunk.</span>
-						<span class="kw">let</span> <span class="ident">chunk</span> <span class="op">=</span> <span class="ident">chunk</span>.<span class="ident">clone</span>(); <span class="comment">// ends the above borrow on `cursor_mut`</span>
-						<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_end_page</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">end</span>();
-						<span class="ident">cursor_mut</span>.<span class="ident">move_next</span>();
-						<span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">next_chunk</span>) <span class="op">=</span> <span class="ident">cursor_mut</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">deref</span>()) {
-							<span class="kw">if</span> <span class="kw-2">*</span><span class="ident">next_chunk</span>.<span class="ident">start</span>() <span class="op">-</span> <span class="number">1</span> <span class="op">==</span> <span class="ident">new_end_page</span> {
-								<span class="ident">new_end_page</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">next_chunk</span>.<span class="ident">end</span>();
-								<span class="ident">cursor_mut</span>.<span class="ident">remove</span>().<span class="ident">expect</span>(<span class="string">&quot;BUG: page_allocator failed to merge contiguous chunks.&quot;</span>);
-								<span class="comment">// The above call to `cursor_mut.remove()` advances the cursor to the next chunk.</span>
-							} <span class="kw">else</span> {
-								<span class="kw">break</span>; <span class="comment">// the next chunk wasn&#39;t contiguous, so stop iterating.</span>
-							}
+		Inner::RBTree(<span class="kw-2">ref mut </span>tree) =&gt; {
+			<span class="kw">let </span><span class="kw-2">mut </span>cursor_mut = tree.upper_bound_mut(Bound::Included(<span class="kw-2">&amp;</span>requested_page));
+			<span class="kw">if let </span><span class="prelude-val">Some</span>(chunk) = cursor_mut.get().map(|w| w.deref()) {
+				<span class="kw">if </span>requested_page &gt;= <span class="kw-2">*</span>chunk.start() {
+					<span class="kw">if </span>requested_end_page &lt;= <span class="kw-2">*</span>chunk.end() {
+						<span class="kw">return </span>adjust_chosen_chunk(requested_page, num_pages, <span class="kw-2">&amp;</span>chunk.clone(), ValueRefMut::RBTree(cursor_mut));
+					} <span class="kw">else </span>{
+						<span class="comment">// Here, we&#39;ve found a chunk that includes the requested start page, but it&#39;s too small
+						// to cover the number of requested pages. 
+						// Thus, we attempt to merge this chunk with the next contiguous chunk(s) to create one single larger chunk.
+						</span><span class="kw">let </span>chunk = chunk.clone(); <span class="comment">// ends the above borrow on `cursor_mut`
+						</span><span class="kw">let </span><span class="kw-2">mut </span>new_end_page = <span class="kw-2">*</span>chunk.end();
+						cursor_mut.move_next();
+						<span class="kw">while let </span><span class="prelude-val">Some</span>(next_chunk) = cursor_mut.get().map(|w| w.deref()) {
+							<span class="kw">if </span><span class="kw-2">*</span>next_chunk.start() - <span class="number">1 </span>== new_end_page {
+								new_end_page = <span class="kw-2">*</span>next_chunk.end();
+								cursor_mut.remove().expect(<span class="string">&quot;BUG: page_allocator failed to merge contiguous chunks.&quot;</span>);
+								<span class="comment">// The above call to `cursor_mut.remove()` advances the cursor to the next chunk.
+							</span>} <span class="kw">else </span>{
+								<span class="kw">break</span>; <span class="comment">// the next chunk wasn&#39;t contiguous, so stop iterating.
+							</span>}
 						}
 
-						<span class="kw">if</span> <span class="ident">new_end_page</span> <span class="op">&gt;</span> <span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">end</span>() {
-							<span class="ident">cursor_mut</span>.<span class="ident">move_prev</span>(); <span class="comment">// move the cursor back to the original chunk</span>
-							<span class="kw">let</span> <span class="ident">_removed_chunk</span> <span class="op">=</span> <span class="ident">cursor_mut</span>.<span class="ident">replace_with</span>(<span class="ident">Wrapper::new_link</span>(<span class="ident">Chunk</span> { <span class="ident">pages</span>: <span class="ident">PageRange::new</span>(<span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">start</span>(), <span class="ident">new_end_page</span>) }))
-								.<span class="ident">expect</span>(<span class="string">&quot;BUG: page_allocator failed to replace the current chunk while merging contiguous chunks.&quot;</span>);
-							<span class="kw">return</span> <span class="ident">adjust_chosen_chunk</span>(<span class="ident">requested_page</span>, <span class="ident">num_pages</span>, <span class="kw-2">&amp;</span><span class="ident">chunk</span>, <span class="ident">ValueRefMut::RBTree</span>(<span class="ident">cursor_mut</span>));
+						<span class="kw">if </span>new_end_page &gt; <span class="kw-2">*</span>chunk.end() {
+							cursor_mut.move_prev(); <span class="comment">// move the cursor back to the original chunk
+							</span><span class="kw">let </span>_removed_chunk = cursor_mut.replace_with(Wrapper::new_link(Chunk { pages: PageRange::new(<span class="kw-2">*</span>chunk.start(), new_end_page) }))
+								.expect(<span class="string">&quot;BUG: page_allocator failed to replace the current chunk while merging contiguous chunks.&quot;</span>);
+							<span class="kw">return </span>adjust_chosen_chunk(requested_page, num_pages, <span class="kw-2">&amp;</span>chunk, ValueRefMut::RBTree(cursor_mut));
 						}
 					}
 				}
@@ -1147,305 +1141,304 @@
 		}
 	}
 
-	<span class="prelude-val">Err</span>(<span class="ident">AllocationError::AddressNotFree</span>(<span class="ident">requested_page</span>, <span class="ident">num_pages</span>))
+	<span class="prelude-val">Err</span>(AllocationError::AddressNotFree(requested_page, num_pages))
 }
 
 
-<span class="doccomment">/// Searches the given `list` for any chunk large enough to hold at least `num_pages`.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// It first attempts to find a suitable chunk **not** in the designated regions,</span>
-<span class="doccomment">/// and only allocates from the designated regions as a backup option.</span>
-<span class="kw">fn</span> <span class="ident">find_any_chunk</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span>(
-	<span class="ident">list</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;list</span> <span class="kw-2">mut</span> <span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>,
-	<span class="ident">num_pages</span>: <span class="ident">usize</span>
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedPages</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="ident">AllocationError</span><span class="op">&gt;</span> {
-	<span class="kw">let</span> <span class="ident">designated_low_end</span> <span class="op">=</span> <span class="ident">DESIGNATED_PAGES_LOW_END</span>.<span class="ident">get</span>().<span class="ident">ok_or</span>(<span class="ident">AllocationError::NotInitialized</span>)<span class="question-mark">?</span>;
+<span class="doccomment">/// Searches the given `list` for any chunk large enough to hold at least `num_pages`.
+///
+/// It first attempts to find a suitable chunk **not** in the designated regions,
+/// and only allocates from the designated regions as a backup option.
+</span><span class="kw">fn </span>find_any_chunk&lt;<span class="lifetime">&#39;list</span>&gt;(
+	list: <span class="kw-2">&amp;</span><span class="lifetime">&#39;list </span><span class="kw-2">mut </span>StaticArrayRBTree&lt;Chunk&gt;,
+	num_pages: usize
+) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), AllocationError&gt; {
+	<span class="kw">let </span>designated_low_end = DESIGNATED_PAGES_LOW_END.get().ok_or(AllocationError::NotInitialized)<span class="question-mark">?</span>;
 
-	<span class="comment">// During the first pass, we ignore designated regions.</span>
-	<span class="kw">match</span> <span class="ident">list</span>.<span class="number">0</span> {
-		<span class="ident">Inner::Array</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">arr</span>) =&gt; {
-			<span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="ident">arr</span>.<span class="ident">iter_mut</span>() {
-				<span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">elem</span> {
-					<span class="comment">// Skip chunks that are too-small or in the designated regions.</span>
-					<span class="kw">if</span>  <span class="ident">chunk</span>.<span class="ident">size_in_pages</span>() <span class="op">&lt;</span> <span class="ident">num_pages</span> <span class="op">|</span><span class="op">|</span> 
-						<span class="ident">chunk</span>.<span class="ident">start</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">designated_low_end</span> <span class="op">|</span><span class="op">|</span> 
-						<span class="ident">chunk</span>.<span class="ident">end</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">DESIGNATED_PAGES_HIGH_START</span>
+	<span class="comment">// During the first pass, we ignore designated regions.
+	</span><span class="kw">match </span>list.<span class="number">0 </span>{
+		Inner::Array(<span class="kw-2">ref mut </span>arr) =&gt; {
+			<span class="kw">for </span>elem <span class="kw">in </span>arr.iter_mut() {
+				<span class="kw">if let </span><span class="prelude-val">Some</span>(chunk) = elem {
+					<span class="comment">// Skip chunks that are too-small or in the designated regions.
+					</span><span class="kw">if  </span>chunk.size_in_pages() &lt; num_pages || 
+						chunk.start() &lt;= <span class="kw-2">&amp;</span>designated_low_end || 
+						chunk.end() &gt;= <span class="kw-2">&amp;</span>DESIGNATED_PAGES_HIGH_START
 					{
 						<span class="kw">continue</span>;
 					} 
-					<span class="kw">else</span> {
-						<span class="kw">return</span> <span class="ident">adjust_chosen_chunk</span>(<span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">start</span>(), <span class="ident">num_pages</span>, <span class="kw-2">&amp;</span><span class="ident">chunk</span>.<span class="ident">clone</span>(), <span class="ident">ValueRefMut::Array</span>(<span class="ident">elem</span>));
+					<span class="kw">else </span>{
+						<span class="kw">return </span>adjust_chosen_chunk(<span class="kw-2">*</span>chunk.start(), num_pages, <span class="kw-2">&amp;</span>chunk.clone(), ValueRefMut::Array(elem));
 					}
 				}
 			}
 		}
-		<span class="ident">Inner::RBTree</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">tree</span>) =&gt; {
-			<span class="comment">// NOTE: if RBTree had a `range_mut()` method, we could simply do the following:</span>
-			<span class="comment">// ```</span>
-			<span class="comment">// let eligible_chunks = tree.range(</span>
-			<span class="comment">// 	Bound::Excluded(&amp;DESIGNATED_PAGES_LOW_END),</span>
-			<span class="comment">// 	Bound::Excluded(&amp;DESIGNATED_PAGES_HIGH_START)</span>
-			<span class="comment">// );</span>
-			<span class="comment">// for c in eligible_chunks { ... }</span>
-			<span class="comment">// ```</span>
-			<span class="comment">//</span>
-			<span class="comment">// However, RBTree doesn&#39;t have a `range_mut()` method, so we use cursors for manual iteration.</span>
-			<span class="comment">//</span>
-			<span class="comment">// Because we allocate new pages by peeling them off from the beginning part of a chunk, </span>
-			<span class="comment">// it&#39;s MUCH faster to start the search for free pages from higher addresses moving down. </span>
-			<span class="comment">// This results in an O(1) allocation time in the general case, until all address ranges are already in use.</span>
-			<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">upper_bound_mut</span>(<span class="ident">Bound::Excluded</span>(<span class="kw-2">&amp;</span><span class="ident">DESIGNATED_PAGES_HIGH_START</span>));
-			<span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">cursor</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">deref</span>()) {
-				<span class="kw">if</span> <span class="ident">chunk</span>.<span class="ident">start</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">designated_low_end</span> {
-					<span class="kw">break</span>; <span class="comment">// move on to searching through the designated regions</span>
+		Inner::RBTree(<span class="kw-2">ref mut </span>tree) =&gt; {
+			<span class="comment">// NOTE: if RBTree had a `range_mut()` method, we could simply do the following:
+			// ```
+			// let eligible_chunks = tree.range(
+			// 	Bound::Excluded(&amp;DESIGNATED_PAGES_LOW_END),
+			// 	Bound::Excluded(&amp;DESIGNATED_PAGES_HIGH_START)
+			// );
+			// for c in eligible_chunks { ... }
+			// ```
+			//
+			// However, RBTree doesn&#39;t have a `range_mut()` method, so we use cursors for manual iteration.
+			//
+			// Because we allocate new pages by peeling them off from the beginning part of a chunk, 
+			// it&#39;s MUCH faster to start the search for free pages from higher addresses moving down. 
+			// This results in an O(1) allocation time in the general case, until all address ranges are already in use.
+			</span><span class="kw">let </span><span class="kw-2">mut </span>cursor = tree.upper_bound_mut(Bound::Excluded(<span class="kw-2">&amp;</span>DESIGNATED_PAGES_HIGH_START));
+			<span class="kw">while let </span><span class="prelude-val">Some</span>(chunk) = cursor.get().map(|w| w.deref()) {
+				<span class="kw">if </span>chunk.start() &lt;= <span class="kw-2">&amp;</span>designated_low_end {
+					<span class="kw">break</span>; <span class="comment">// move on to searching through the designated regions
+				</span>}
+				<span class="kw">if </span>num_pages &lt; chunk.size_in_pages() {
+					<span class="kw">return </span>adjust_chosen_chunk(<span class="kw-2">*</span>chunk.start(), num_pages, <span class="kw-2">&amp;</span>chunk.clone(), ValueRefMut::RBTree(cursor));
 				}
-				<span class="kw">if</span> <span class="ident">num_pages</span> <span class="op">&lt;</span> <span class="ident">chunk</span>.<span class="ident">size_in_pages</span>() {
-					<span class="kw">return</span> <span class="ident">adjust_chosen_chunk</span>(<span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">start</span>(), <span class="ident">num_pages</span>, <span class="kw-2">&amp;</span><span class="ident">chunk</span>.<span class="ident">clone</span>(), <span class="ident">ValueRefMut::RBTree</span>(<span class="ident">cursor</span>));
-				}
-				<span class="macro">warn!</span>(<span class="string">&quot;Page allocator: unlikely scenario: had to search multiple chunks while trying to allocate {} pages at any address.&quot;</span>, <span class="ident">num_pages</span>);
-				<span class="ident">cursor</span>.<span class="ident">move_prev</span>();
+				<span class="macro">warn!</span>(<span class="string">&quot;Page allocator: unlikely scenario: had to search multiple chunks while trying to allocate {} pages at any address.&quot;</span>, num_pages);
+				cursor.move_prev();
 			}
 		}
 	}
 
-	<span class="comment">// If we can&#39;t find any suitable chunks in the non-designated regions, then look in both designated regions.</span>
-	<span class="macro">warn!</span>(<span class="string">&quot;PageAllocator: unlikely scenario: non-designated chunks are all allocated, \
-		  falling back to allocating {} pages from designated regions!&quot;</span>, <span class="ident">num_pages</span>);
-	<span class="kw">match</span> <span class="ident">list</span>.<span class="number">0</span> {
-		<span class="ident">Inner::Array</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">arr</span>) =&gt; {
-			<span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="ident">arr</span>.<span class="ident">iter_mut</span>() {
-				<span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">elem</span> {
-					<span class="kw">if</span> <span class="ident">num_pages</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">chunk</span>.<span class="ident">size_in_pages</span>() {
-						<span class="kw">return</span> <span class="ident">adjust_chosen_chunk</span>(<span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">start</span>(), <span class="ident">num_pages</span>, <span class="kw-2">&amp;</span><span class="ident">chunk</span>.<span class="ident">clone</span>(), <span class="ident">ValueRefMut::Array</span>(<span class="ident">elem</span>));
+	<span class="comment">// If we can&#39;t find any suitable chunks in the non-designated regions, then look in both designated regions.
+	</span><span class="macro">warn!</span>(<span class="string">&quot;PageAllocator: unlikely scenario: non-designated chunks are all allocated, \
+		  falling back to allocating {} pages from designated regions!&quot;</span>, num_pages);
+	<span class="kw">match </span>list.<span class="number">0 </span>{
+		Inner::Array(<span class="kw-2">ref mut </span>arr) =&gt; {
+			<span class="kw">for </span>elem <span class="kw">in </span>arr.iter_mut() {
+				<span class="kw">if let </span><span class="prelude-val">Some</span>(chunk) = elem {
+					<span class="kw">if </span>num_pages &lt;= chunk.size_in_pages() {
+						<span class="kw">return </span>adjust_chosen_chunk(<span class="kw-2">*</span>chunk.start(), num_pages, <span class="kw-2">&amp;</span>chunk.clone(), ValueRefMut::Array(elem));
 					}
 				}
 			}
 		}
-		<span class="ident">Inner::RBTree</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">tree</span>) =&gt; {
-			<span class="comment">// NOTE: if RBTree had a `range_mut()` method, we could simply do the following:</span>
-			<span class="comment">// ```</span>
-			<span class="comment">// let eligible_chunks = tree.range(</span>
-			<span class="comment">// 	Bound::&lt;&amp;Page&gt;::Unbounded,</span>
-			<span class="comment">// 	Bound::Included(&amp;DESIGNATED_PAGES_LOW_END)</span>
-			<span class="comment">// ).chain(tree.range(</span>
-			<span class="comment">// 	Bound::Included(&amp;DESIGNATED_PAGES_HIGH_START),</span>
-			<span class="comment">// 	Bound::&lt;&amp;Page&gt;::Unbounded</span>
-			<span class="comment">// ));</span>
-			<span class="comment">// for c in eligible_chunks { ... }</span>
-			<span class="comment">// ```</span>
-			<span class="comment">//</span>
-			<span class="comment">// However, RBTree doesn&#39;t have a `range_mut()` method, so we use two sets of cursors for manual iteration.</span>
-			<span class="comment">// The first cursor iterates over the lower designated region, from higher addresses to lower, down to zero.</span>
-			<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">upper_bound_mut</span>(<span class="ident">Bound::Included</span>(<span class="ident">designated_low_end</span>));
-			<span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">cursor</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">deref</span>()) {
-				<span class="kw">if</span> <span class="ident">num_pages</span> <span class="op">&lt;</span> <span class="ident">chunk</span>.<span class="ident">size_in_pages</span>() {
-					<span class="kw">return</span> <span class="ident">adjust_chosen_chunk</span>(<span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">start</span>(), <span class="ident">num_pages</span>, <span class="kw-2">&amp;</span><span class="ident">chunk</span>.<span class="ident">clone</span>(), <span class="ident">ValueRefMut::RBTree</span>(<span class="ident">cursor</span>));
+		Inner::RBTree(<span class="kw-2">ref mut </span>tree) =&gt; {
+			<span class="comment">// NOTE: if RBTree had a `range_mut()` method, we could simply do the following:
+			// ```
+			// let eligible_chunks = tree.range(
+			// 	Bound::&lt;&amp;Page&gt;::Unbounded,
+			// 	Bound::Included(&amp;DESIGNATED_PAGES_LOW_END)
+			// ).chain(tree.range(
+			// 	Bound::Included(&amp;DESIGNATED_PAGES_HIGH_START),
+			// 	Bound::&lt;&amp;Page&gt;::Unbounded
+			// ));
+			// for c in eligible_chunks { ... }
+			// ```
+			//
+			// However, RBTree doesn&#39;t have a `range_mut()` method, so we use two sets of cursors for manual iteration.
+			// The first cursor iterates over the lower designated region, from higher addresses to lower, down to zero.
+			</span><span class="kw">let </span><span class="kw-2">mut </span>cursor = tree.upper_bound_mut(Bound::Included(designated_low_end));
+			<span class="kw">while let </span><span class="prelude-val">Some</span>(chunk) = cursor.get().map(|w| w.deref()) {
+				<span class="kw">if </span>num_pages &lt; chunk.size_in_pages() {
+					<span class="kw">return </span>adjust_chosen_chunk(<span class="kw-2">*</span>chunk.start(), num_pages, <span class="kw-2">&amp;</span>chunk.clone(), ValueRefMut::RBTree(cursor));
 				}
-				<span class="ident">cursor</span>.<span class="ident">move_prev</span>();
+				cursor.move_prev();
 			}
 
-			<span class="comment">// The second cursor iterates over the higher designated region, from the highest (max) address down to the designated region boundary.</span>
-			<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">upper_bound_mut</span>::<span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>(<span class="ident">Bound::Unbounded</span>);
-			<span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">cursor</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">deref</span>()) {
-				<span class="kw">if</span> <span class="ident">chunk</span>.<span class="ident">start</span>() <span class="op">&lt;</span> <span class="kw-2">&amp;</span><span class="ident">DESIGNATED_PAGES_HIGH_START</span> {
-					<span class="comment">// we already iterated over non-designated pages in the first match statement above, so we&#39;re out of memory. </span>
-					<span class="kw">break</span>; 
+			<span class="comment">// The second cursor iterates over the higher designated region, from the highest (max) address down to the designated region boundary.
+			</span><span class="kw">let </span><span class="kw-2">mut </span>cursor = tree.upper_bound_mut::&lt;Chunk&gt;(Bound::Unbounded);
+			<span class="kw">while let </span><span class="prelude-val">Some</span>(chunk) = cursor.get().map(|w| w.deref()) {
+				<span class="kw">if </span>chunk.start() &lt; <span class="kw-2">&amp;</span>DESIGNATED_PAGES_HIGH_START {
+					<span class="comment">// we already iterated over non-designated pages in the first match statement above, so we&#39;re out of memory. 
+					</span><span class="kw">break</span>; 
 				}
-				<span class="kw">if</span> <span class="ident">num_pages</span> <span class="op">&lt;</span> <span class="ident">chunk</span>.<span class="ident">size_in_pages</span>() {
-					<span class="kw">return</span> <span class="ident">adjust_chosen_chunk</span>(<span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">start</span>(), <span class="ident">num_pages</span>, <span class="kw-2">&amp;</span><span class="ident">chunk</span>.<span class="ident">clone</span>(), <span class="ident">ValueRefMut::RBTree</span>(<span class="ident">cursor</span>));
+				<span class="kw">if </span>num_pages &lt; chunk.size_in_pages() {
+					<span class="kw">return </span>adjust_chosen_chunk(<span class="kw-2">*</span>chunk.start(), num_pages, <span class="kw-2">&amp;</span>chunk.clone(), ValueRefMut::RBTree(cursor));
 				}
-				<span class="ident">cursor</span>.<span class="ident">move_prev</span>();
+				cursor.move_prev();
 			}
 		}
 	}
 
-	<span class="prelude-val">Err</span>(<span class="ident">AllocationError::OutOfAddressSpace</span>(<span class="ident">num_pages</span>))
+	<span class="prelude-val">Err</span>(AllocationError::OutOfAddressSpace(num_pages))
 }
 
 
-<span class="doccomment">/// The final part of the main allocation routine. </span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The given chunk is the one we&#39;ve chosen to allocate from. </span>
-<span class="doccomment">/// This function breaks up that chunk into multiple ones and returns an `AllocatedPages` </span>
-<span class="doccomment">/// from (part of) that chunk, ranging from `start_page` to `start_page + num_pages`.</span>
-<span class="kw">fn</span> <span class="ident">adjust_chosen_chunk</span>(
-	<span class="ident">start_page</span>: <span class="ident">Page</span>,
-	<span class="ident">num_pages</span>: <span class="ident">usize</span>,
-	<span class="ident">chosen_chunk</span>: <span class="kw-2">&amp;</span><span class="ident">Chunk</span>,
-	<span class="kw-2">mut</span> <span class="ident">chosen_chunk_ref</span>: <span class="ident">ValueRefMut</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedPages</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="ident">AllocationError</span><span class="op">&gt;</span> {
+<span class="doccomment">/// The final part of the main allocation routine. 
+///
+/// The given chunk is the one we&#39;ve chosen to allocate from. 
+/// This function breaks up that chunk into multiple ones and returns an `AllocatedPages` 
+/// from (part of) that chunk, ranging from `start_page` to `start_page + num_pages`.
+</span><span class="kw">fn </span>adjust_chosen_chunk(
+	start_page: Page,
+	num_pages: usize,
+	chosen_chunk: <span class="kw-2">&amp;</span>Chunk,
+	<span class="kw-2">mut </span>chosen_chunk_ref: ValueRefMut&lt;Chunk&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), AllocationError&gt; {
 
-	<span class="comment">// The new allocated chunk might start in the middle of an existing chunk,</span>
-	<span class="comment">// so we need to break up that existing chunk into 3 possible chunks: before, newly-allocated, and after.</span>
-	<span class="comment">//</span>
-	<span class="comment">// Because Pages and VirtualAddresses use saturating add and subtract, we need to double-check that we&#39;re not creating</span>
-	<span class="comment">// an overlapping duplicate Chunk at either the very minimum or the very maximum of the address space.</span>
-	<span class="kw">let</span> <span class="ident">new_allocation</span> <span class="op">=</span> <span class="ident">Chunk</span> {
-		<span class="comment">// The end page is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.</span>
-		<span class="ident">pages</span>: <span class="ident">PageRange::new</span>(<span class="ident">start_page</span>, <span class="ident">start_page</span> <span class="op">+</span> (<span class="ident">num_pages</span> <span class="op">-</span> <span class="number">1</span>)),
+	<span class="comment">// The new allocated chunk might start in the middle of an existing chunk,
+	// so we need to break up that existing chunk into 3 possible chunks: before, newly-allocated, and after.
+	//
+	// Because Pages and VirtualAddresses use saturating add and subtract, we need to double-check that we&#39;re not creating
+	// an overlapping duplicate Chunk at either the very minimum or the very maximum of the address space.
+	</span><span class="kw">let </span>new_allocation = Chunk {
+		<span class="comment">// The end page is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
+		</span>pages: PageRange::new(start_page, start_page + (num_pages - <span class="number">1</span>)),
 	};
-	<span class="kw">let</span> <span class="ident">before</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">start_page</span> <span class="op">==</span> <span class="ident">MIN_PAGE</span> {
-		<span class="prelude-val">None</span>
-	} <span class="kw">else</span> {
-		<span class="prelude-val">Some</span>(<span class="ident">Chunk</span> {
-			<span class="ident">pages</span>: <span class="ident">PageRange::new</span>(<span class="kw-2">*</span><span class="ident">chosen_chunk</span>.<span class="ident">start</span>(), <span class="kw-2">*</span><span class="ident">new_allocation</span>.<span class="ident">start</span>() <span class="op">-</span> <span class="number">1</span>),
+	<span class="kw">let </span>before = <span class="kw">if </span>start_page == MIN_PAGE {
+		<span class="prelude-val">None
+	</span>} <span class="kw">else </span>{
+		<span class="prelude-val">Some</span>(Chunk {
+			pages: PageRange::new(<span class="kw-2">*</span>chosen_chunk.start(), <span class="kw-2">*</span>new_allocation.start() - <span class="number">1</span>),
 		})
 	};
-	<span class="kw">let</span> <span class="ident">after</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">new_allocation</span>.<span class="ident">end</span>() <span class="op">==</span> <span class="kw-2">&amp;</span><span class="ident">MAX_PAGE</span> { 
-		<span class="prelude-val">None</span>
-	} <span class="kw">else</span> {
-		<span class="prelude-val">Some</span>(<span class="ident">Chunk</span> {
-			<span class="ident">pages</span>: <span class="ident">PageRange::new</span>(<span class="kw-2">*</span><span class="ident">new_allocation</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span>, <span class="kw-2">*</span><span class="ident">chosen_chunk</span>.<span class="ident">end</span>()),
+	<span class="kw">let </span>after = <span class="kw">if </span>new_allocation.end() == <span class="kw-2">&amp;</span>MAX_PAGE { 
+		<span class="prelude-val">None
+	</span>} <span class="kw">else </span>{
+		<span class="prelude-val">Some</span>(Chunk {
+			pages: PageRange::new(<span class="kw-2">*</span>new_allocation.end() + <span class="number">1</span>, <span class="kw-2">*</span>chosen_chunk.end()),
 		})
 	};
 
-	<span class="comment">// some sanity checks -- these can be removed or disabled for better performance</span>
-	<span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">b</span>) <span class="op">=</span> <span class="ident">before</span> {
-		<span class="macro">assert!</span>(<span class="op">!</span><span class="ident">new_allocation</span>.<span class="ident">contains</span>(<span class="ident">b</span>.<span class="ident">end</span>()));
-		<span class="macro">assert!</span>(<span class="op">!</span><span class="ident">b</span>.<span class="ident">contains</span>(<span class="ident">new_allocation</span>.<span class="ident">start</span>()));
+	<span class="comment">// some sanity checks -- these can be removed or disabled for better performance
+	</span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>b) = before {
+		<span class="macro">assert!</span>(!new_allocation.contains(b.end()));
+		<span class="macro">assert!</span>(!b.contains(new_allocation.start()));
 	}
-	<span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">a</span>) <span class="op">=</span> <span class="ident">after</span> {
-		<span class="macro">assert!</span>(<span class="op">!</span><span class="ident">new_allocation</span>.<span class="ident">contains</span>(<span class="ident">a</span>.<span class="ident">start</span>()));
-		<span class="macro">assert!</span>(<span class="op">!</span><span class="ident">a</span>.<span class="ident">contains</span>(<span class="ident">new_allocation</span>.<span class="ident">end</span>()));
+	<span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>a) = after {
+		<span class="macro">assert!</span>(!new_allocation.contains(a.start()));
+		<span class="macro">assert!</span>(!a.contains(new_allocation.end()));
 	}
 
-	<span class="comment">// Remove the chosen chunk from the free page list.</span>
-	<span class="kw">let</span> <span class="ident">_removed_chunk</span> <span class="op">=</span> <span class="ident">chosen_chunk_ref</span>.<span class="ident">remove</span>();
-	<span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(<span class="ident">chosen_chunk</span>), <span class="ident">_removed_chunk</span>.<span class="ident">as_ref</span>()); <span class="comment">// sanity check</span>
+	<span class="comment">// Remove the chosen chunk from the free page list.
+	</span><span class="kw">let </span>_removed_chunk = chosen_chunk_ref.remove();
+	<span class="macro">assert_eq!</span>(<span class="prelude-val">Some</span>(chosen_chunk), _removed_chunk.as_ref()); <span class="comment">// sanity check
 
-	<span class="comment">// TODO: Re-use the allocated wrapper if possible, rather than allocate a new one entirely.</span>
-	<span class="comment">// if let RemovedValue::RBTree(Some(wrapper_adapter)) = _removed_chunk { ... }</span>
+	// TODO: Re-use the allocated wrapper if possible, rather than allocate a new one entirely.
+	// if let RemovedValue::RBTree(Some(wrapper_adapter)) = _removed_chunk { ... }
 
-	<span class="prelude-val">Ok</span>((
-		<span class="ident">new_allocation</span>.<span class="ident">as_allocated_pages</span>(),
-		<span class="ident">DeferredAllocAction::new</span>(<span class="ident">before</span>, <span class="ident">after</span>),
+	</span><span class="prelude-val">Ok</span>((
+		new_allocation.as_allocated_pages(),
+		DeferredAllocAction::new(before, after),
 	))
 }
 
 
-<span class="doccomment">/// The core page allocation routine that allocates the given number of virtual pages,</span>
-<span class="doccomment">/// optionally at the requested starting `VirtualAddress`.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This simply reserves a range of virtual addresses, it does not allocate </span>
-<span class="doccomment">/// actual physical memory frames nor do any memory mapping. </span>
-<span class="doccomment">/// Thus, the returned `AllocatedPages` aren&#39;t directly usable until they are mapped to physical frames. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Allocation is based on a red-black tree and is thus `O(log(n))`.</span>
-<span class="doccomment">/// Fragmentation isn&#39;t cleaned up until we&#39;re out of address space, but that&#39;s not really a big deal.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `requested_vaddr`: if `Some`, the returned `AllocatedPages` will start at the `Page`</span>
-<span class="doccomment">///   containing this `VirtualAddress`. </span>
-<span class="doccomment">///   If `None`, the first available `Page` range will be used, starting at any random virtual address.</span>
-<span class="doccomment">/// * `num_pages`: the number of `Page`s to be allocated. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Return</span>
-<span class="doccomment">/// If successful, returns a tuple of two items:</span>
-<span class="doccomment">/// * the pages that were allocated, and</span>
-<span class="doccomment">/// * an opaque struct representing details of bookkeeping-related actions that may cause heap allocation. </span>
-<span class="doccomment">///   Those actions are deferred until this returned `DeferredAllocAction` struct object is dropped, </span>
-<span class="doccomment">///   allowing the caller (such as the heap implementation itself) to control when heap allocation may occur.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_pages_deferred</span>(
-	<span class="ident">requested_vaddr</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span>,
-	<span class="ident">num_pages</span>: <span class="ident">usize</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedPages</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-	<span class="kw">if</span> <span class="ident">num_pages</span> <span class="op">==</span> <span class="number">0</span> {
+<span class="doccomment">/// The core page allocation routine that allocates the given number of virtual pages,
+/// optionally at the requested starting `VirtualAddress`.
+/// 
+/// This simply reserves a range of virtual addresses, it does not allocate 
+/// actual physical memory frames nor do any memory mapping. 
+/// Thus, the returned `AllocatedPages` aren&#39;t directly usable until they are mapped to physical frames. 
+/// 
+/// Allocation is based on a red-black tree and is thus `O(log(n))`.
+/// Fragmentation isn&#39;t cleaned up until we&#39;re out of address space, but that&#39;s not really a big deal.
+/// 
+/// # Arguments
+/// * `requested_vaddr`: if `Some`, the returned `AllocatedPages` will start at the `Page`
+///   containing this `VirtualAddress`. 
+///   If `None`, the first available `Page` range will be used, starting at any random virtual address.
+/// * `num_pages`: the number of `Page`s to be allocated. 
+/// 
+/// # Return
+/// If successful, returns a tuple of two items:
+/// * the pages that were allocated, and
+/// * an opaque struct representing details of bookkeeping-related actions that may cause heap allocation. 
+///   Those actions are deferred until this returned `DeferredAllocAction` struct object is dropped, 
+///   allowing the caller (such as the heap implementation itself) to control when heap allocation may occur.
+</span><span class="kw">pub fn </span>allocate_pages_deferred(
+	requested_vaddr: <span class="prelude-ty">Option</span>&lt;VirtualAddress&gt;,
+	num_pages: usize,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+	<span class="kw">if </span>num_pages == <span class="number">0 </span>{
 		<span class="macro">warn!</span>(<span class="string">&quot;PageAllocator: requested an allocation of 0 pages... stupid!&quot;</span>);
-		<span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;cannot allocate zero pages&quot;</span>);
+		<span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;cannot allocate zero pages&quot;</span>);
 	}
 
-	<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">locked_list</span> <span class="op">=</span> <span class="ident">FREE_PAGE_LIST</span>.<span class="ident">lock</span>();
+	<span class="kw">let </span><span class="kw-2">mut </span>locked_list = FREE_PAGE_LIST.lock();
 
-	<span class="comment">// The main logic of the allocator is to find an appropriate chunk that can satisfy the allocation request.</span>
-	<span class="comment">// An appropriate chunk satisfies the following conditions:</span>
-	<span class="comment">// - Can fit the requested size (starting at the requested address) within the chunk.</span>
-	<span class="comment">// - The chunk can only be within in a designated region if a specific address was requested, </span>
-	<span class="comment">//   or all other non-designated chunks are already in use.</span>
-	<span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">vaddr</span>) <span class="op">=</span> <span class="ident">requested_vaddr</span> {
-		<span class="ident">find_specific_chunk</span>(<span class="kw-2">&amp;mut</span> <span class="ident">locked_list</span>, <span class="ident">Page::containing_address</span>(<span class="ident">vaddr</span>), <span class="ident">num_pages</span>)
-	} <span class="kw">else</span> {
-		<span class="ident">find_any_chunk</span>(<span class="kw-2">&amp;mut</span> <span class="ident">locked_list</span>, <span class="ident">num_pages</span>)
-	}.<span class="ident">map_err</span>(<span class="ident">From::from</span>) <span class="comment">// convert from AllocationError to &amp;str</span>
-}
+	<span class="comment">// The main logic of the allocator is to find an appropriate chunk that can satisfy the allocation request.
+	// An appropriate chunk satisfies the following conditions:
+	// - Can fit the requested size (starting at the requested address) within the chunk.
+	// - The chunk can only be within in a designated region if a specific address was requested, 
+	//   or all other non-designated chunks are already in use.
+	</span><span class="kw">if let </span><span class="prelude-val">Some</span>(vaddr) = requested_vaddr {
+		find_specific_chunk(<span class="kw-2">&amp;mut </span>locked_list, Page::containing_address(vaddr), num_pages)
+	} <span class="kw">else </span>{
+		find_any_chunk(<span class="kw-2">&amp;mut </span>locked_list, num_pages)
+	}.map_err(From::from) <span class="comment">// convert from AllocationError to &amp;str
+</span>}
 
 
-<span class="doccomment">/// Similar to [`allocated_pages_deferred()`](fn.allocate_pages_deferred.html),</span>
-<span class="doccomment">/// but accepts a size value for the allocated pages in number of bytes instead of number of pages. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This function still allocates whole pages by rounding up the number of bytes. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_pages_by_bytes_deferred</span>(
-	<span class="ident">requested_vaddr</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span>,
-	<span class="ident">num_bytes</span>: <span class="ident">usize</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedPages</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-	<span class="kw">let</span> <span class="ident">actual_num_bytes</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">vaddr</span>) <span class="op">=</span> <span class="ident">requested_vaddr</span> {
-		<span class="ident">num_bytes</span> <span class="op">+</span> (<span class="ident">vaddr</span>.<span class="ident">value</span>() <span class="op">%</span> <span class="ident">PAGE_SIZE</span>)
-	} <span class="kw">else</span> {
-		<span class="ident">num_bytes</span>
+<span class="doccomment">/// Similar to [`allocated_pages_deferred()`](fn.allocate_pages_deferred.html),
+/// but accepts a size value for the allocated pages in number of bytes instead of number of pages. 
+/// 
+/// This function still allocates whole pages by rounding up the number of bytes. 
+</span><span class="kw">pub fn </span>allocate_pages_by_bytes_deferred(
+	requested_vaddr: <span class="prelude-ty">Option</span>&lt;VirtualAddress&gt;,
+	num_bytes: usize,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+	<span class="kw">let </span>actual_num_bytes = <span class="kw">if let </span><span class="prelude-val">Some</span>(vaddr) = requested_vaddr {
+		num_bytes + (vaddr.value() % PAGE_SIZE)
+	} <span class="kw">else </span>{
+		num_bytes
 	};
-	<span class="kw">let</span> <span class="ident">num_pages</span> <span class="op">=</span> (<span class="ident">actual_num_bytes</span> <span class="op">+</span> <span class="ident">PAGE_SIZE</span> <span class="op">-</span> <span class="number">1</span>) <span class="op">/</span> <span class="ident">PAGE_SIZE</span>; <span class="comment">// round up</span>
-	<span class="ident">allocate_pages_deferred</span>(<span class="ident">requested_vaddr</span>, <span class="ident">num_pages</span>)
+	<span class="kw">let </span>num_pages = (actual_num_bytes + PAGE_SIZE - <span class="number">1</span>) / PAGE_SIZE; <span class="comment">// round up
+	</span>allocate_pages_deferred(requested_vaddr, num_pages)
 }
 
 
-<span class="doccomment">/// Allocates the given number of pages with no constraints on the starting virtual address.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_pages</span>(<span class="ident">num_pages</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AllocatedPages</span><span class="op">&gt;</span> {
-	<span class="ident">allocate_pages_deferred</span>(<span class="prelude-val">None</span>, <span class="ident">num_pages</span>)
-		.<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">ap</span>, <span class="ident">_action</span>)<span class="op">|</span> <span class="ident">ap</span>)
-		.<span class="ident">ok</span>()
+<span class="doccomment">/// Allocates the given number of pages with no constraints on the starting virtual address.
+/// 
+/// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
+</span><span class="kw">pub fn </span>allocate_pages(num_pages: usize) -&gt; <span class="prelude-ty">Option</span>&lt;AllocatedPages&gt; {
+	allocate_pages_deferred(<span class="prelude-val">None</span>, num_pages)
+		.map(|(ap, _action)| ap)
+		.ok()
 }
 
 
-<span class="doccomment">/// Allocates pages with no constraints on the starting virtual address, </span>
-<span class="doccomment">/// with a size given by the number of bytes. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This function still allocates whole pages by rounding up the number of bytes. </span>
-<span class="doccomment">/// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_pages_by_bytes</span>(<span class="ident">num_bytes</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AllocatedPages</span><span class="op">&gt;</span> {
-	<span class="ident">allocate_pages_by_bytes_deferred</span>(<span class="prelude-val">None</span>, <span class="ident">num_bytes</span>)
-		.<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">ap</span>, <span class="ident">_action</span>)<span class="op">|</span> <span class="ident">ap</span>)
-		.<span class="ident">ok</span>()
+<span class="doccomment">/// Allocates pages with no constraints on the starting virtual address, 
+/// with a size given by the number of bytes. 
+/// 
+/// This function still allocates whole pages by rounding up the number of bytes. 
+/// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
+</span><span class="kw">pub fn </span>allocate_pages_by_bytes(num_bytes: usize) -&gt; <span class="prelude-ty">Option</span>&lt;AllocatedPages&gt; {
+	allocate_pages_by_bytes_deferred(<span class="prelude-val">None</span>, num_bytes)
+		.map(|(ap, _action)| ap)
+		.ok()
 }
 
 
-<span class="doccomment">/// Allocates pages starting at the given `VirtualAddress` with a size given in number of bytes. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This function still allocates whole pages by rounding up the number of bytes. </span>
-<span class="doccomment">/// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_pages_by_bytes_at</span>(<span class="ident">vaddr</span>: <span class="ident">VirtualAddress</span>, <span class="ident">num_bytes</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">AllocatedPages</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-	<span class="ident">allocate_pages_by_bytes_deferred</span>(<span class="prelude-val">Some</span>(<span class="ident">vaddr</span>), <span class="ident">num_bytes</span>)
-		.<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">ap</span>, <span class="ident">_action</span>)<span class="op">|</span> <span class="ident">ap</span>)
+<span class="doccomment">/// Allocates pages starting at the given `VirtualAddress` with a size given in number of bytes. 
+/// 
+/// This function still allocates whole pages by rounding up the number of bytes. 
+/// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
+</span><span class="kw">pub fn </span>allocate_pages_by_bytes_at(vaddr: VirtualAddress, num_bytes: usize) -&gt; <span class="prelude-ty">Result</span>&lt;AllocatedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+	allocate_pages_by_bytes_deferred(<span class="prelude-val">Some</span>(vaddr), num_bytes)
+		.map(|(ap, _action)| ap)
 }
 
 
-<span class="doccomment">/// Allocates the given number of pages starting at (inclusive of) the page containing the given `VirtualAddress`.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_pages_at</span>(<span class="ident">vaddr</span>: <span class="ident">VirtualAddress</span>, <span class="ident">num_pages</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">AllocatedPages</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-	<span class="ident">allocate_pages_deferred</span>(<span class="prelude-val">Some</span>(<span class="ident">vaddr</span>), <span class="ident">num_pages</span>)
-		.<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">ap</span>, <span class="ident">_action</span>)<span class="op">|</span> <span class="ident">ap</span>)
+<span class="doccomment">/// Allocates the given number of pages starting at (inclusive of) the page containing the given `VirtualAddress`.
+/// 
+/// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
+</span><span class="kw">pub fn </span>allocate_pages_at(vaddr: VirtualAddress, num_pages: usize) -&gt; <span class="prelude-ty">Result</span>&lt;AllocatedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+	allocate_pages_deferred(<span class="prelude-val">Some</span>(vaddr), num_pages)
+		.map(|(ap, _action)| ap)
 }
 
 
-<span class="doccomment">/// Converts the page allocator from using static memory (a primitive array) to dynamically-allocated memory.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Call this function once heap allocation is available. </span>
-<span class="doccomment">/// Calling this multiple times is unnecessary but harmless, as it will do nothing after the first invocation.</span>
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span> 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">convert_to_heap_allocated</span>() {
-	<span class="ident">FREE_PAGE_LIST</span>.<span class="ident">lock</span>().<span class="ident">convert_to_heap_allocated</span>();
+<span class="doccomment">/// Converts the page allocator from using static memory (a primitive array) to dynamically-allocated memory.
+/// 
+/// Call this function once heap allocation is available. 
+/// Calling this multiple times is unnecessary but harmless, as it will do nothing after the first invocation.
+</span><span class="attr">#[doc(hidden)] 
+</span><span class="kw">pub fn </span>convert_to_heap_allocated() {
+	FREE_PAGE_LIST.lock().convert_to_heap_allocated();
 }
 
-<span class="doccomment">/// A debugging function used to dump the full internal state of the page allocator. </span>
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span> 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dump_page_allocator_state</span>() {
+<span class="doccomment">/// A debugging function used to dump the full internal state of the page allocator. 
+</span><span class="attr">#[doc(hidden)] 
+</span><span class="kw">pub fn </span>dump_page_allocator_state() {
 	<span class="macro">debug!</span>(<span class="string">&quot;--------------- FREE PAGES LIST ---------------&quot;</span>);
-	<span class="kw">for</span> <span class="ident">c</span> <span class="kw">in</span> <span class="ident">FREE_PAGE_LIST</span>.<span class="ident">lock</span>().<span class="ident">iter</span>() {
-		<span class="macro">debug!</span>(<span class="string">&quot;{:X?}&quot;</span>, <span class="ident">c</span>);
+	<span class="kw">for </span>c <span class="kw">in </span>FREE_PAGE_LIST.lock().iter() {
+		<span class="macro">debug!</span>(<span class="string">&quot;{:X?}&quot;</span>, c);
 	}
 	<span class="macro">debug!</span>(<span class="string">&quot;---------------------------------------------------&quot;</span>);
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="page_allocator" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="page_allocator" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/catch_unwind/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../catch_unwind/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../catch_unwind/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../catch_unwind/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/catch_unwind/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../catch_unwind/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -121,123 +115,122 @@
 <span id="115">115</span>
 <span id="116">116</span>
 <span id="117">117</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Support for catching a panic while a panicked `Task` is being unwound.</span>
-<span class="doccomment">//! </span>
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">core_intrinsics</span>)]</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Support for catching a panic while a panicked `Task` is being unwound.
+//! 
+</span><span class="attr">#![no_std]
+#![feature(core_intrinsics)]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>; 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
+</span><span class="kw">extern crate </span>alloc; 
+<span class="kw">extern crate </span>task;
 
-<span class="kw">use</span> <span class="ident">core::mem::ManuallyDrop</span>;
-<span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
-<span class="kw">use</span> <span class="ident">task::KillReason</span>;
+<span class="kw">use </span>core::mem::ManuallyDrop;
+<span class="kw">use </span>alloc::boxed::Box;
+<span class="kw">use </span>task::KillReason;
 
-<span class="doccomment">/// Invokes the given closure `f`, catching a panic as it is unwinding the stack.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Returns `Ok(R)` if the closure `f` executes and returns successfully,</span>
-<span class="doccomment">/// otherwise returns `Err(cause)` if the closure panics, where `cause` is the original cause of the panic. </span>
-<span class="doccomment">///  </span>
-<span class="doccomment">/// This function behaves similarly to the libstd version, </span>
-<span class="doccomment">/// so please see its documentation here: &lt;https://doc.rust-lang.org/std/panic/fn.catch_unwind.html&gt;.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">catch_unwind_with_arg</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">A</span>, <span class="ident">R</span><span class="op">&gt;</span>(<span class="ident">f</span>: <span class="ident">F</span>, <span class="ident">arg</span>: <span class="ident">A</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">KillReason</span><span class="op">&gt;</span>
-    <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="ident">A</span>) -&gt; <span class="ident">R</span>,
+<span class="doccomment">/// Invokes the given closure `f`, catching a panic as it is unwinding the stack.
+/// 
+/// Returns `Ok(R)` if the closure `f` executes and returns successfully,
+/// otherwise returns `Err(cause)` if the closure panics, where `cause` is the original cause of the panic. 
+///  
+/// This function behaves similarly to the libstd version, 
+/// so please see its documentation here: &lt;https://doc.rust-lang.org/std/panic/fn.catch_unwind.html&gt;.
+</span><span class="kw">pub fn </span>catch_unwind_with_arg&lt;F, A, R&gt;(f: F, arg: A) -&gt; <span class="prelude-ty">Result</span>&lt;R, KillReason&gt;
+    <span class="kw">where </span>F: FnOnce(A) -&gt; R,
 {
-    <span class="comment">// The `try()` intrinsic accepts only one &quot;data&quot; pointer as its only argument.</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ti_arg</span> <span class="op">=</span> <span class="ident">TryIntrinsicArg</span> {
-        <span class="ident">func</span>: <span class="ident">ManuallyDrop::new</span>(<span class="ident">f</span>),
-        <span class="ident">arg</span>:  <span class="ident">ManuallyDrop::new</span>(<span class="ident">arg</span>),
-        <span class="comment">// The initial value of `ret` doesn&#39;t matter. It will get replaced in all code paths. </span>
-        <span class="ident">ret</span>:  <span class="ident">ManuallyDrop::new</span>(<span class="prelude-val">Err</span>(<span class="ident">KillReason::Exception</span>(<span class="number">0</span>))),
+    <span class="comment">// The `try()` intrinsic accepts only one &quot;data&quot; pointer as its only argument.
+    </span><span class="kw">let </span><span class="kw-2">mut </span>ti_arg = TryIntrinsicArg {
+        func: ManuallyDrop::new(f),
+        arg:  ManuallyDrop::new(arg),
+        <span class="comment">// The initial value of `ret` doesn&#39;t matter. It will get replaced in all code paths. 
+        </span>ret:  ManuallyDrop::new(<span class="prelude-val">Err</span>(KillReason::Exception(<span class="number">0</span>))),
     };
 
-    <span class="comment">// Invoke the actual try() intrinsic, which will jump to `call_func_with_arg`</span>
-    <span class="kw">let</span> <span class="ident">_try_val</span> <span class="op">=</span> <span class="kw">unsafe</span> { 
-        <span class="ident">core::intrinsics</span>::<span class="ident">r#try</span>(
-            <span class="ident">try_intrinsic_trampoline</span>::<span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">A</span>, <span class="ident">R</span><span class="op">&gt;</span>,
-            <span class="kw-2">&amp;mut</span> <span class="ident">ti_arg</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">u8</span>,
-            <span class="ident">panic_callback</span>::<span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">A</span>, <span class="ident">R</span><span class="op">&gt;</span>,
+    <span class="comment">// Invoke the actual try() intrinsic, which will jump to `call_func_with_arg`
+    </span><span class="kw">let </span>_try_val = <span class="kw">unsafe </span>{ 
+        core::intrinsics::r#try(
+            try_intrinsic_trampoline::&lt;F, A, R&gt;,
+            <span class="kw-2">&amp;mut </span>ti_arg <span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_ as </span><span class="kw-2">*mut </span>u8,
+            panic_callback::&lt;F, A, R&gt;,
         )
     };
 
-    <span class="comment">// When `try` returns zero, it means the function ran successfully without panicking.</span>
-    <span class="comment">// The `Ok(R)` value was assigned to `ret` at the end of `try_intrinsic_trampoline()` below.</span>
-    <span class="comment">// When `try` returns non-zero, it means the function panicked.</span>
-    <span class="comment">// The `panic_callback()` would have already been invoked, and it would have set `ret` to `Err(KillReason)`.</span>
-    <span class="comment">//</span>
-    <span class="comment">// In both cases, we can just return the value `ret` field, which has been assigned the proper value.</span>
-    <span class="ident">ManuallyDrop::into_inner</span>(<span class="ident">ti_arg</span>.<span class="ident">ret</span>)
+    <span class="comment">// When `try` returns zero, it means the function ran successfully without panicking.
+    // The `Ok(R)` value was assigned to `ret` at the end of `try_intrinsic_trampoline()` below.
+    // When `try` returns non-zero, it means the function panicked.
+    // The `panic_callback()` would have already been invoked, and it would have set `ret` to `Err(KillReason)`.
+    //
+    // In both cases, we can just return the value `ret` field, which has been assigned the proper value.
+    </span>ManuallyDrop::into_inner(ti_arg.ret)
 }
 
 
-<span class="doccomment">/// This function will be automatically invoked by the `try` intrinsic above</span>
-<span class="doccomment">/// upon catching a panic. </span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * a pointer to the </span>
-<span class="doccomment">/// * a pointer to the arbitrary object passed around during the unwinding process,</span>
-<span class="doccomment">///   which in Theseus is a pointer to the `UnwindingContext`. </span>
-<span class="kw">fn</span> <span class="ident">panic_callback</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">A</span>, <span class="ident">R</span><span class="op">&gt;</span>(<span class="ident">data_ptr</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>, <span class="ident">exception_object</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>) <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="ident">A</span>) -&gt; <span class="ident">R</span> {
-    <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span>(<span class="ident">data_ptr</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">TryIntrinsicArg</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">A</span>, <span class="ident">R</span><span class="op">&gt;</span>) };
-    <span class="kw">let</span> <span class="ident">unwinding_context_boxed</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Box::from_raw</span>(<span class="ident">exception_object</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">unwind::UnwindingContext</span>) };
-    <span class="kw">let</span> <span class="ident">unwinding_context</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">unwinding_context_boxed</span>;
-    <span class="kw">let</span> (<span class="ident">_stack_frame_iter</span>, <span class="ident">cause</span>, <span class="ident">_taskref</span>) <span class="op">=</span> <span class="ident">unwinding_context</span>.<span class="ident">into</span>();
-    <span class="ident">data</span>.<span class="ident">ret</span> <span class="op">=</span> <span class="ident">ManuallyDrop::new</span>(<span class="prelude-val">Err</span>(<span class="ident">cause</span>));
+<span class="doccomment">/// This function will be automatically invoked by the `try` intrinsic above
+/// upon catching a panic. 
+/// # Arguments
+/// * a pointer to the 
+/// * a pointer to the arbitrary object passed around during the unwinding process,
+///   which in Theseus is a pointer to the `UnwindingContext`. 
+</span><span class="kw">fn </span>panic_callback&lt;F, A, R&gt;(data_ptr: <span class="kw-2">*mut </span>u8, exception_object: <span class="kw-2">*mut </span>u8) <span class="kw">where </span>F: FnOnce(A) -&gt; R {
+    <span class="kw">let </span>data = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(data_ptr <span class="kw">as </span><span class="kw-2">*mut </span>TryIntrinsicArg&lt;F, A, R&gt;) };
+    <span class="kw">let </span>unwinding_context_boxed = <span class="kw">unsafe </span>{ Box::from_raw(exception_object <span class="kw">as </span><span class="kw-2">*mut </span>unwind::UnwindingContext) };
+    <span class="kw">let </span>unwinding_context = <span class="kw-2">*</span>unwinding_context_boxed;
+    <span class="kw">let </span>(_stack_frame_iter, cause, _taskref) = unwinding_context.into();
+    data.ret = ManuallyDrop::new(<span class="prelude-val">Err</span>(cause));
 }
 
 
-<span class="doccomment">/// A struct to accommodate the weird signature of `core::intrinsics::try`, </span>
-<span class="doccomment">/// which accepts only a single pointer to this structure. </span>
-<span class="doccomment">/// We model this after Rust libstd&#39;s wrappers around gcc-based unwinding, but modify it to contain one argument. </span>
-<span class="kw">struct</span> <span class="ident">TryIntrinsicArg</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">A</span>, <span class="ident">R</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="ident">A</span>) -&gt; <span class="ident">R</span> {
-    <span class="doccomment">/// The function that will be invoked in the `try()` intrinsic.</span>
-    <span class="ident">func</span>: <span class="ident">ManuallyDrop</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The argument that will be passed into the above function.</span>
-    <span class="ident">arg</span>:  <span class="ident">ManuallyDrop</span><span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The return value of the above function, which is an output parameter. </span>
-    <span class="doccomment">/// Note that this is only filled in by the `try()` intrinsic if the function returns successfully.</span>
-    <span class="ident">ret</span>:  <span class="ident">ManuallyDrop</span><span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">KillReason</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A struct to accommodate the weird signature of `core::intrinsics::try`, 
+/// which accepts only a single pointer to this structure. 
+/// We model this after Rust libstd&#39;s wrappers around gcc-based unwinding, but modify it to contain one argument. 
+</span><span class="kw">struct </span>TryIntrinsicArg&lt;F, A, R&gt; <span class="kw">where </span>F: FnOnce(A) -&gt; R {
+    <span class="doccomment">/// The function that will be invoked in the `try()` intrinsic.
+    </span>func: ManuallyDrop&lt;F&gt;,
+    <span class="doccomment">/// The argument that will be passed into the above function.
+    </span>arg:  ManuallyDrop&lt;A&gt;,
+    <span class="doccomment">/// The return value of the above function, which is an output parameter. 
+    /// Note that this is only filled in by the `try()` intrinsic if the function returns successfully.
+    </span>ret:  ManuallyDrop&lt;<span class="prelude-ty">Result</span>&lt;R, KillReason&gt;&gt;,
 }
 
-<span class="doccomment">/// This is the function that the `try()` intrinsic will jump to. </span>
-<span class="doccomment">/// Since that intrinsic requires a `fn` ptr, we can&#39;t just directly call a closure `F` here because it&#39;s a `FnOnce` trait.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This function should not be called directly in our code. </span>
-<span class="kw">fn</span> <span class="ident">try_intrinsic_trampoline</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">A</span>, <span class="ident">R</span><span class="op">&gt;</span>(<span class="ident">try_intrinsic_arg</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>) <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="ident">A</span>) -&gt; <span class="ident">R</span> {
-    <span class="kw">unsafe</span> {
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">try_intrinsic_arg</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">TryIntrinsicArg</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">A</span>, <span class="ident">R</span><span class="op">&gt;</span>;
-        <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">data</span>;
-        <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">ManuallyDrop::take</span>(<span class="kw-2">&amp;mut</span> <span class="ident">data</span>.<span class="ident">func</span>);
-        <span class="kw">let</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">ManuallyDrop::take</span>(<span class="kw-2">&amp;mut</span> <span class="ident">data</span>.<span class="ident">arg</span>);
-        <span class="ident">data</span>.<span class="ident">ret</span> <span class="op">=</span> <span class="ident">ManuallyDrop::new</span>(
-            <span class="prelude-val">Ok</span>(<span class="ident">f</span>(<span class="ident">a</span>)) <span class="comment">// actually invoke the function</span>
-        );
+<span class="doccomment">/// This is the function that the `try()` intrinsic will jump to. 
+/// Since that intrinsic requires a `fn` ptr, we can&#39;t just directly call a closure `F` here because it&#39;s a `FnOnce` trait.
+/// 
+/// This function should not be called directly in our code. 
+</span><span class="kw">fn </span>try_intrinsic_trampoline&lt;F, A, R&gt;(try_intrinsic_arg: <span class="kw-2">*mut </span>u8) <span class="kw">where </span>F: FnOnce(A) -&gt; R {
+    <span class="kw">unsafe </span>{
+        <span class="kw">let </span>data = try_intrinsic_arg <span class="kw">as </span><span class="kw-2">*mut </span>TryIntrinsicArg&lt;F, A, R&gt;;
+        <span class="kw">let </span>data = <span class="kw-2">&amp;mut *</span>data;
+        <span class="kw">let </span>f = ManuallyDrop::take(<span class="kw-2">&amp;mut </span>data.func);
+        <span class="kw">let </span>a = ManuallyDrop::take(<span class="kw-2">&amp;mut </span>data.arg);
+        data.ret = ManuallyDrop::new(
+            <span class="prelude-val">Ok</span>(f(a)) <span class="comment">// actually invoke the function
+        </span>);
     }
 }
 
 
-<span class="doccomment">/// Resumes the unwinding procedure after it was caught with [`catch_unwind_with_arg()`].</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This is analogous to the Rust&#39;s [`std::panic::resume_unwind()`] in that it is</span>
-<span class="doccomment">/// intended to be used to continue unwinding after a panic was caught.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// The argument is a [`KillReason`] instead of a typical Rust panic &quot;payload&quot;</span>
-<span class="doccomment">/// (which is usually `Box&lt;Any + Send&gt;`) for two reasons:</span>
-<span class="doccomment">/// 1. `KillReason` is the type returned by [`catch_unwind_with_arg()`] upon failure, </span>
-<span class="doccomment">///    so it makes sense to continue unwinding with that same error type.</span>
-<span class="doccomment">/// 2. It&#39;s more flexible than the standard Rust panic info type because it must also</span>
-<span class="doccomment">///    represent the possibility of a non-panic failure, e.g., a machine exception.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// [`std::panic::resume_unwind()`]: https://doc.rust-lang.org/std/panic/fn.resume_unwind.html</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">resume_unwind</span>(<span class="ident">caught_panic_reason</span>: <span class="ident">KillReason</span>) -&gt; <span class="op">!</span> {
-    <span class="comment">// We can skip up to 2 frames here: `unwind::start_unwinding` and `resume_unwind` (this function)</span>
-    <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">unwind::start_unwinding</span>(<span class="ident">caught_panic_reason</span>, <span class="number">2</span>);
+<span class="doccomment">/// Resumes the unwinding procedure after it was caught with [`catch_unwind_with_arg()`].
+/// 
+/// This is analogous to the Rust&#39;s [`std::panic::resume_unwind()`] in that it is
+/// intended to be used to continue unwinding after a panic was caught.
+/// 
+/// The argument is a [`KillReason`] instead of a typical Rust panic &quot;payload&quot;
+/// (which is usually `Box&lt;Any + Send&gt;`) for two reasons:
+/// 1. `KillReason` is the type returned by [`catch_unwind_with_arg()`] upon failure, 
+///    so it makes sense to continue unwinding with that same error type.
+/// 2. It&#39;s more flexible than the standard Rust panic info type because it must also
+///    represent the possibility of a non-panic failure, e.g., a machine exception.
+/// 
+/// [`std::panic::resume_unwind()`]: https://doc.rust-lang.org/std/panic/fn.resume_unwind.html
+</span><span class="kw">pub fn </span>resume_unwind(caught_panic_reason: KillReason) -&gt; ! {
+    <span class="comment">// We can skip up to 2 frames here: `unwind::start_unwinding` and `resume_unwind` (this function)
+    </span><span class="kw">let </span>result = unwind::start_unwinding(caught_panic_reason, <span class="number">2</span>);
 
-    <span class="comment">// `start_unwinding` should not return</span>
-    <span class="macro">panic!</span>(<span class="string">&quot;BUG: start_unwinding() returned {:?}. This is an unexpected failure, as no unwinding occurred. Task: {:?}.&quot;</span>,
-        <span class="ident">result</span>,
-        <span class="ident">task::get_my_current_task</span>()
+    <span class="comment">// `start_unwinding` should not return
+    </span><span class="macro">panic!</span>(<span class="string">&quot;BUG: start_unwinding() returned {:?}. This is an unexpected failure, as no unwinding occurred. Task: {:?}.&quot;</span>,
+        result,
+        task::get_my_current_task()
     );
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="catch_unwind" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="catch_unwind" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

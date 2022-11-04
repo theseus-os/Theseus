@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/uar.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>uar.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/uar.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>uar.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -86,88 +80,87 @@
 <span id="80">80</span>
 <span id="81">81</span>
 <span id="82">82</span>
-</pre><pre class="rust"><code><span class="doccomment">//! User Access Regions (UAR) are used to provide isolated and direct access to the HCA HW to multiple processes.</span>
-<span class="doccomment">//! Each UAR is a page within the PCI address space and can be used by a process to post execution and control requests to the HCA.</span>
-<span class="doccomment">//! When creating a control object, a UAR page is associated with it. When executing a control operation, the HCA checks that the</span>
-<span class="doccomment">//! UAR page used to post the command matches the one specified in the object&#39;s context.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! (PRM Section 8.2: User Access Region)</span>
-<span class="kw">use</span> <span class="ident">zerocopy</span>::{<span class="ident">U32</span>, <span class="ident">FromBytes</span>};
-<span class="kw">use</span> <span class="ident">volatile::Volatile</span>;
-<span class="kw">use</span> <span class="ident">byteorder::BigEndian</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::send_queue::CurrentUARDoorbell</span>;
+</pre><pre class="rust"><code><span class="doccomment">//! User Access Regions (UAR) are used to provide isolated and direct access to the HCA HW to multiple processes.
+//! Each UAR is a page within the PCI address space and can be used by a process to post execution and control requests to the HCA.
+//! When creating a control object, a UAR page is associated with it. When executing a control operation, the HCA checks that the
+//! UAR page used to post the command matches the one specified in the object&#39;s context.
+//! 
+//! (PRM Section 8.2: User Access Region)
+</span><span class="kw">use </span>zerocopy::{U32, FromBytes};
+<span class="kw">use </span>volatile::Volatile;
+<span class="kw">use </span>byteorder::BigEndian;
+<span class="kw">use </span><span class="kw">crate</span>::send_queue::CurrentUARDoorbell;
 
-<span class="doccomment">/// The layout of registers within one UAR page.</span>
-<span class="doccomment">/// Send DoorBells are rung by writing the first 8 bytes of the WQE to blueflame register 0</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// (PRM Section 8.2.2: UAR Page Format)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">UserAccessRegion</span> {
-    <span class="ident">_padding0</span>:  [<span class="ident">u8</span>; <span class="number">32</span>],
-    <span class="doccomment">/// consumer index of the CQ</span>
-    <span class="ident">cq_ci</span>: <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// CQ number</span>
-    <span class="ident">cqn</span>: <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding1</span>: [<span class="ident">u8</span>; <span class="number">24</span>],
-    <span class="doccomment">/// EQ number to update its ci and arm </span>
-    <span class="ident">eqn_with_arm</span>: <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding2</span>: [<span class="ident">u8</span>; <span class="number">4</span>],
-    <span class="doccomment">/// EQ number to update its ci</span>
-    <span class="ident">eqn</span>: <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding3</span>: [<span class="ident">u8</span>; <span class="number">1972</span>],
-    <span class="doccomment">/// Doorbell blueflame register of buffer 0 even</span>
-    <span class="ident">db_blueflame_buffer0_even</span>: <span class="ident">Volatile</span><span class="op">&lt;</span>[<span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span>; <span class="number">64</span>]<span class="op">&gt;</span>,
-    <span class="doccomment">/// Doorbell blueflame register of buffer 0 odd</span>
-    <span class="ident">db_blueflame_buffer0_odd</span>: <span class="ident">Volatile</span><span class="op">&lt;</span>[<span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span>; <span class="number">64</span>]<span class="op">&gt;</span>,
-    <span class="doccomment">/// Doorbell blueflame register of buffer 1 even</span>
-    <span class="ident">db_blueflame_buffer1_even</span>: <span class="ident">Volatile</span><span class="op">&lt;</span>[<span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span>; <span class="number">64</span>]<span class="op">&gt;</span>,
-    <span class="doccomment">/// Doorbell blueflame register of buffer 1 odd</span>
-    <span class="ident">db_blueflame_buffer1_odd</span>: <span class="ident">Volatile</span><span class="op">&lt;</span>[<span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span>; <span class="number">64</span>]<span class="op">&gt;</span>,
-    <span class="doccomment">/// Doorbell blueflame register of buffer 2 even</span>
-    <span class="ident">db_blueflame_buffer2_even_fast_path</span>: <span class="ident">Volatile</span><span class="op">&lt;</span>[<span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span>; <span class="number">64</span>]<span class="op">&gt;</span>,
-    <span class="doccomment">/// Doorbell blueflame register of buffer 2 odd</span>
-    <span class="ident">db_blueflame_buffer2_odd_fast_path</span>: <span class="ident">Volatile</span><span class="op">&lt;</span>[<span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span>; <span class="number">64</span>]<span class="op">&gt;</span>,
-    <span class="doccomment">/// Doorbell blueflame register of buffer 3 even</span>
-    <span class="ident">db_blueflame_buffer3_even_fast_path</span>: <span class="ident">Volatile</span><span class="op">&lt;</span>[<span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span>; <span class="number">64</span>]<span class="op">&gt;</span>,
-    <span class="doccomment">/// Doorbell blueflame register of buffer 3 odd</span>
-    <span class="ident">db_blueflame_buffer3_odd_fast_path</span>: <span class="ident">Volatile</span><span class="op">&lt;</span>[<span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span>; <span class="number">64</span>]<span class="op">&gt;</span>,
+<span class="doccomment">/// The layout of registers within one UAR page.
+/// Send DoorBells are rung by writing the first 8 bytes of the WQE to blueflame register 0
+/// 
+/// (PRM Section 8.2.2: UAR Page Format)
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>UserAccessRegion {
+    _padding0:  [u8; <span class="number">32</span>],
+    <span class="doccomment">/// consumer index of the CQ
+    </span>cq_ci: Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// CQ number
+    </span>cqn: Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding1: [u8; <span class="number">24</span>],
+    <span class="doccomment">/// EQ number to update its ci and arm 
+    </span>eqn_with_arm: Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding2: [u8; <span class="number">4</span>],
+    <span class="doccomment">/// EQ number to update its ci
+    </span>eqn: Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding3: [u8; <span class="number">1972</span>],
+    <span class="doccomment">/// Doorbell blueflame register of buffer 0 even
+    </span>db_blueflame_buffer0_even: Volatile&lt;[U32&lt;BigEndian&gt;; <span class="number">64</span>]&gt;,
+    <span class="doccomment">/// Doorbell blueflame register of buffer 0 odd
+    </span>db_blueflame_buffer0_odd: Volatile&lt;[U32&lt;BigEndian&gt;; <span class="number">64</span>]&gt;,
+    <span class="doccomment">/// Doorbell blueflame register of buffer 1 even
+    </span>db_blueflame_buffer1_even: Volatile&lt;[U32&lt;BigEndian&gt;; <span class="number">64</span>]&gt;,
+    <span class="doccomment">/// Doorbell blueflame register of buffer 1 odd
+    </span>db_blueflame_buffer1_odd: Volatile&lt;[U32&lt;BigEndian&gt;; <span class="number">64</span>]&gt;,
+    <span class="doccomment">/// Doorbell blueflame register of buffer 2 even
+    </span>db_blueflame_buffer2_even_fast_path: Volatile&lt;[U32&lt;BigEndian&gt;; <span class="number">64</span>]&gt;,
+    <span class="doccomment">/// Doorbell blueflame register of buffer 2 odd
+    </span>db_blueflame_buffer2_odd_fast_path: Volatile&lt;[U32&lt;BigEndian&gt;; <span class="number">64</span>]&gt;,
+    <span class="doccomment">/// Doorbell blueflame register of buffer 3 even
+    </span>db_blueflame_buffer3_even_fast_path: Volatile&lt;[U32&lt;BigEndian&gt;; <span class="number">64</span>]&gt;,
+    <span class="doccomment">/// Doorbell blueflame register of buffer 3 odd
+    </span>db_blueflame_buffer3_odd_fast_path: Volatile&lt;[U32&lt;BigEndian&gt;; <span class="number">64</span>]&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">UserAccessRegion</span><span class="op">&gt;</span>(), <span class="number">4096</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;UserAccessRegion&gt;(), <span class="number">4096</span>);
 
-<span class="kw">impl</span> <span class="ident">UserAccessRegion</span> {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">write_wqe_to_doorbell</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">current_doorbell</span>: <span class="kw-2">&amp;</span><span class="ident">CurrentUARDoorbell</span>, <span class="ident">wqe_value</span>: [<span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span>; <span class="number">64</span>]) {
-        <span class="kw">match</span> <span class="ident">current_doorbell</span> {
-            <span class="ident">CurrentUARDoorbell::Even</span> =&gt; <span class="self">self</span>.<span class="ident">db_blueflame_buffer0_even</span>.<span class="ident">write</span>(<span class="ident">wqe_value</span>),
-            <span class="ident">CurrentUARDoorbell::Odd</span> =&gt; <span class="self">self</span>.<span class="ident">db_blueflame_buffer0_odd</span>.<span class="ident">write</span>(<span class="ident">wqe_value</span>),
+<span class="kw">impl </span>UserAccessRegion {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>write_wqe_to_doorbell(<span class="kw-2">&amp;mut </span><span class="self">self</span>, current_doorbell: <span class="kw-2">&amp;</span>CurrentUARDoorbell, wqe_value: [U32&lt;BigEndian&gt;; <span class="number">64</span>]) {
+        <span class="kw">match </span>current_doorbell {
+            CurrentUARDoorbell::Even =&gt; <span class="self">self</span>.db_blueflame_buffer0_even.write(wqe_value),
+            CurrentUARDoorbell::Odd =&gt; <span class="self">self</span>.db_blueflame_buffer0_odd.write(wqe_value),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">UserAccessRegion</span> {
-    <span class="doccomment">/// We have to define our own default function since only array sizes up to 32 are supported</span>
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="ident">UserAccessRegion</span> {
-        <span class="ident">UserAccessRegion</span> {
-            <span class="ident">_padding0</span>:  [<span class="number">0</span>; <span class="number">32</span>],
-            <span class="ident">cq_ci</span>: <span class="ident">Volatile::new</span>(<span class="ident">U32::new</span>(<span class="number">0</span>)),
-            <span class="ident">cqn</span>: <span class="ident">Volatile::new</span>(<span class="ident">U32::new</span>(<span class="number">0</span>)),
-            <span class="ident">_padding1</span>: [<span class="number">0</span>; <span class="number">24</span>],
-            <span class="ident">eqn_with_arm</span>: <span class="ident">Volatile::new</span>(<span class="ident">U32::new</span>(<span class="number">0</span>)),
-            <span class="ident">_padding2</span>: [<span class="number">0</span>; <span class="number">4</span>],
-            <span class="ident">eqn</span>: <span class="ident">Volatile::new</span>(<span class="ident">U32::new</span>(<span class="number">0</span>)),
-            <span class="ident">_padding3</span>: [<span class="number">0</span>; <span class="number">1972</span>],
-            <span class="ident">db_blueflame_buffer0_even</span>: <span class="ident">Volatile::new</span>([<span class="ident">U32::new</span>(<span class="number">0</span>); <span class="number">64</span>]),
-            <span class="ident">db_blueflame_buffer0_odd</span>: <span class="ident">Volatile::new</span>([<span class="ident">U32::new</span>(<span class="number">0</span>); <span class="number">64</span>]),
-            <span class="ident">db_blueflame_buffer1_even</span>: <span class="ident">Volatile::new</span>([<span class="ident">U32::new</span>(<span class="number">0</span>); <span class="number">64</span>]),
-            <span class="ident">db_blueflame_buffer1_odd</span>: <span class="ident">Volatile::new</span>([<span class="ident">U32::new</span>(<span class="number">0</span>); <span class="number">64</span>]),
-            <span class="ident">db_blueflame_buffer2_even_fast_path</span>: <span class="ident">Volatile::new</span>([<span class="ident">U32::new</span>(<span class="number">0</span>); <span class="number">64</span>]),
-            <span class="ident">db_blueflame_buffer2_odd_fast_path</span>: <span class="ident">Volatile::new</span>([<span class="ident">U32::new</span>(<span class="number">0</span>); <span class="number">64</span>]),
-            <span class="ident">db_blueflame_buffer3_even_fast_path</span>: <span class="ident">Volatile::new</span>([<span class="ident">U32::new</span>(<span class="number">0</span>); <span class="number">64</span>]),
-            <span class="ident">db_blueflame_buffer3_odd_fast_path</span>: <span class="ident">Volatile::new</span>([<span class="ident">U32::new</span>(<span class="number">0</span>); <span class="number">64</span>]),
+<span class="kw">impl </span>Default <span class="kw">for </span>UserAccessRegion {
+    <span class="doccomment">/// We have to define our own default function since only array sizes up to 32 are supported
+    </span><span class="kw">fn </span>default() -&gt; UserAccessRegion {
+        UserAccessRegion {
+            _padding0:  [<span class="number">0</span>; <span class="number">32</span>],
+            cq_ci: Volatile::new(U32::new(<span class="number">0</span>)),
+            cqn: Volatile::new(U32::new(<span class="number">0</span>)),
+            _padding1: [<span class="number">0</span>; <span class="number">24</span>],
+            eqn_with_arm: Volatile::new(U32::new(<span class="number">0</span>)),
+            _padding2: [<span class="number">0</span>; <span class="number">4</span>],
+            eqn: Volatile::new(U32::new(<span class="number">0</span>)),
+            _padding3: [<span class="number">0</span>; <span class="number">1972</span>],
+            db_blueflame_buffer0_even: Volatile::new([U32::new(<span class="number">0</span>); <span class="number">64</span>]),
+            db_blueflame_buffer0_odd: Volatile::new([U32::new(<span class="number">0</span>); <span class="number">64</span>]),
+            db_blueflame_buffer1_even: Volatile::new([U32::new(<span class="number">0</span>); <span class="number">64</span>]),
+            db_blueflame_buffer1_odd: Volatile::new([U32::new(<span class="number">0</span>); <span class="number">64</span>]),
+            db_blueflame_buffer2_even_fast_path: Volatile::new([U32::new(<span class="number">0</span>); <span class="number">64</span>]),
+            db_blueflame_buffer2_odd_fast_path: Volatile::new([U32::new(<span class="number">0</span>); <span class="number">64</span>]),
+            db_blueflame_buffer3_even_fast_path: Volatile::new([U32::new(<span class="number">0</span>); <span class="number">64</span>]),
+            db_blueflame_buffer3_odd_fast_path: Volatile::new([U32::new(<span class="number">0</span>); <span class="number">64</span>]),
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

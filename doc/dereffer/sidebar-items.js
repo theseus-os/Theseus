@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["DerefsTo","A struct that holds an inner value and a function that is used deref the `Inner` value into a `&Ref`."],["DerefsToMut","Similar to [`DerefsTo`], but supports mutable dereferencing too."]]};

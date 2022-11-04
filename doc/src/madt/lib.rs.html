@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/acpi/madt/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../madt/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../madt/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../madt/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/acpi/madt/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../madt/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -406,367 +400,367 @@
 <span id="400">400</span>
 <span id="401">401</span>
 <span id="402">402</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Support for the MADT ACPI table, </span>
-<span class="doccomment">//! which includes interrupt and multicore info.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Support for the MADT ACPI table, 
+//! which includes interrupt and multicore info.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
+</span><span class="kw">extern crate </span>alloc;
 
-<span class="kw">use</span> <span class="ident">core::mem::size_of</span>;
-<span class="kw">use</span> <span class="ident">alloc</span>::{<span class="ident">boxed::Box</span>, <span class="ident">format</span>};
-<span class="kw">use</span> <span class="ident">log</span>::{<span class="ident">error</span>, <span class="ident">warn</span>, <span class="ident">trace</span>};
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">MappedPages</span>, <span class="ident">PageTable</span>, <span class="ident">PhysicalAddress</span>}; 
-<span class="kw">use</span> <span class="ident">apic</span>::{<span class="ident">LocalApic</span>, <span class="ident">get_bsp_id</span>, <span class="ident">LapicInitError</span>, <span class="ident">get_my_apic_id</span>};
-<span class="kw">use</span> <span class="ident">sdt::Sdt</span>;
-<span class="kw">use</span> <span class="ident">acpi_table</span>::{<span class="ident">AcpiSignature</span>, <span class="ident">AcpiTables</span>};
-<span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
+<span class="kw">use </span>core::mem::size_of;
+<span class="kw">use </span>alloc::{boxed::Box, format};
+<span class="kw">use </span>log::{error, warn, trace};
+<span class="kw">use </span>memory::{MappedPages, PageTable, PhysicalAddress}; 
+<span class="kw">use </span>apic::{LocalApic, get_bsp_id, LapicInitError, get_my_apic_id};
+<span class="kw">use </span>sdt::Sdt;
+<span class="kw">use </span>acpi_table::{AcpiSignature, AcpiTables};
+<span class="kw">use </span>zerocopy::FromBytes;
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MADT_SIGNATURE</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>; <span class="number">4</span>] <span class="op">=</span> <span class="string">b&quot;APIC&quot;</span>;
+<span class="kw">pub const </span>MADT_SIGNATURE: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8; <span class="number">4</span>] = <span class="string">b&quot;APIC&quot;</span>;
 
-<span class="doccomment">/// The handler for parsing the MADT table and adding it to the ACPI tables list.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle</span>(
-    <span class="ident">acpi_tables</span>: <span class="kw-2">&amp;mut</span> <span class="ident">AcpiTables</span>,
-    <span class="ident">signature</span>: <span class="ident">AcpiSignature</span>,
-    <span class="ident">_length</span>: <span class="ident">usize</span>,
-    <span class="ident">phys_addr</span>: <span class="ident">PhysicalAddress</span>
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="comment">// The MADT has a variable number of entries, and each entry is of variable size. </span>
-    <span class="comment">// So we can&#39;t determine the slice_length (just use 0 instead), but we can determine where it starts.</span>
-    <span class="kw">let</span> <span class="ident">slice_start_paddr</span> <span class="op">=</span> <span class="ident">phys_addr</span> <span class="op">+</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">MadtAcpiTable</span><span class="op">&gt;</span>();
-    <span class="ident">acpi_tables</span>.<span class="ident">add_table_location</span>(<span class="ident">signature</span>, <span class="ident">phys_addr</span>, <span class="prelude-val">Some</span>((<span class="ident">slice_start_paddr</span>, <span class="number">0</span>)))
+<span class="doccomment">/// The handler for parsing the MADT table and adding it to the ACPI tables list.
+</span><span class="kw">pub fn </span>handle(
+    acpi_tables: <span class="kw-2">&amp;mut </span>AcpiTables,
+    signature: AcpiSignature,
+    _length: usize,
+    phys_addr: PhysicalAddress
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="comment">// The MADT has a variable number of entries, and each entry is of variable size. 
+    // So we can&#39;t determine the slice_length (just use 0 instead), but we can determine where it starts.
+    </span><span class="kw">let </span>slice_start_paddr = phys_addr + size_of::&lt;MadtAcpiTable&gt;();
+    acpi_tables.add_table_location(signature, phys_addr, <span class="prelude-val">Some</span>((slice_start_paddr, <span class="number">0</span>)))
 }
 
 
-<span class="doccomment">/// The fixed-size components of the MADT ACPI table (Multiple APIC Descriptor Table).</span>
-<span class="doccomment">/// Its layout and total size must exactly match that of the ACPI specification.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Note that this is only the fixed-size part of the MADT table.</span>
-<span class="doccomment">/// At the end, there is an unknown number of table entries, each of variable size. </span>
-<span class="doccomment">/// Thus, we cannot pre-define them here, but only discover/define them in the iterator.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="kw">struct</span> <span class="ident">MadtAcpiTable</span> {
-    <span class="ident">header</span>: <span class="ident">Sdt</span>,
-    <span class="ident">local_apic_phys_addr</span>: <span class="ident">u32</span>,
-    <span class="ident">flags</span>: <span class="ident">u32</span>,
-    <span class="comment">// Following this is a variable number of variable-sized table entries,</span>
-    <span class="comment">// so we cannot include them here.</span>
+<span class="doccomment">/// The fixed-size components of the MADT ACPI table (Multiple APIC Descriptor Table).
+/// Its layout and total size must exactly match that of the ACPI specification.
+/// 
+/// Note that this is only the fixed-size part of the MADT table.
+/// At the end, there is an unknown number of table entries, each of variable size. 
+/// Thus, we cannot pre-define them here, but only discover/define them in the iterator.
+</span><span class="attr">#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(C, packed)]
+</span><span class="kw">struct </span>MadtAcpiTable {
+    header: Sdt,
+    local_apic_phys_addr: u32,
+    flags: u32,
+    <span class="comment">// Following this is a variable number of variable-sized table entries,
+    // so we cannot include them here.
+</span>}
+
+
+<span class="doccomment">/// A wrapper around the MADT ACPI table (Multiple APIC Descriptor Table),
+/// which contains details about multicore and interrupt configuration.
+/// 
+/// You most likely only care about the `iter()` method,
+/// though other fields of the MADT are accessible.
+</span><span class="kw">pub struct </span>Madt&lt;<span class="lifetime">&#39;t</span>&gt; {
+    <span class="doccomment">/// The fixed-size part of the actual MADT ACPI table.
+    </span>table: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>MadtAcpiTable,
+    <span class="doccomment">/// The underlying MappedPages that cover this MADT
+    </span>mapped_pages: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>MappedPages,
+    <span class="doccomment">/// The offset into the above `mapped_pages` at which the dynamic part
+    /// of the MADT table begins.
+    </span>dynamic_entries_starting_offset: usize,
+    <span class="doccomment">/// The total size in bytes of all dynamic entries.
+    /// This is *not* the number of entries.
+    </span>dynamic_entries_total_size: usize,
 }
 
-
-<span class="doccomment">/// A wrapper around the MADT ACPI table (Multiple APIC Descriptor Table),</span>
-<span class="doccomment">/// which contains details about multicore and interrupt configuration.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// You most likely only care about the `iter()` method,</span>
-<span class="doccomment">/// though other fields of the MADT are accessible.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Madt</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// The fixed-size part of the actual MADT ACPI table.</span>
-    <span class="ident">table</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">MadtAcpiTable</span>,
-    <span class="doccomment">/// The underlying MappedPages that cover this MADT</span>
-    <span class="ident">mapped_pages</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">MappedPages</span>,
-    <span class="doccomment">/// The offset into the above `mapped_pages` at which the dynamic part</span>
-    <span class="doccomment">/// of the MADT table begins.</span>
-    <span class="ident">dynamic_entries_starting_offset</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// The total size in bytes of all dynamic entries.</span>
-    <span class="doccomment">/// This is *not* the number of entries.</span>
-    <span class="ident">dynamic_entries_total_size</span>: <span class="ident">usize</span>,
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> <span class="ident">Madt</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Finds the MADT in the given `AcpiTables` and returns a reference to it.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="ident">acpi_tables</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">AcpiTables</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Madt</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">table</span>: <span class="kw-2">&amp;</span><span class="ident">MadtAcpiTable</span> <span class="op">=</span> <span class="ident">acpi_tables</span>.<span class="ident">table</span>(<span class="kw-2">&amp;</span><span class="ident">MADT_SIGNATURE</span>).<span class="ident">ok</span>()<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">total_length</span> <span class="op">=</span> <span class="ident">table</span>.<span class="ident">header</span>.<span class="ident">length</span> <span class="kw">as</span> <span class="ident">usize</span>;
-        <span class="kw">let</span> <span class="ident">dynamic_part_length</span> <span class="op">=</span> <span class="ident">total_length</span> <span class="op">-</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">MadtAcpiTable</span><span class="op">&gt;</span>();
-        <span class="kw">let</span> <span class="ident">loc</span> <span class="op">=</span> <span class="ident">acpi_tables</span>.<span class="ident">table_location</span>(<span class="kw-2">&amp;</span><span class="ident">MADT_SIGNATURE</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Some</span>(<span class="ident">Madt</span> {
-            <span class="ident">table</span>: <span class="ident">table</span>,
-            <span class="ident">mapped_pages</span>: <span class="ident">acpi_tables</span>.<span class="ident">mapping</span>(),
-            <span class="ident">dynamic_entries_starting_offset</span>: <span class="ident">loc</span>.<span class="ident">slice_offset_and_length</span><span class="question-mark">?</span>.<span class="number">0</span>,
-            <span class="ident">dynamic_entries_total_size</span>: <span class="ident">dynamic_part_length</span>,
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;t</span>&gt; Madt&lt;<span class="lifetime">&#39;t</span>&gt; {
+    <span class="doccomment">/// Finds the MADT in the given `AcpiTables` and returns a reference to it.
+    </span><span class="kw">pub fn </span>get(acpi_tables: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>AcpiTables) -&gt; <span class="prelude-ty">Option</span>&lt;Madt&lt;<span class="lifetime">&#39;t</span>&gt;&gt; {
+        <span class="kw">let </span>table: <span class="kw-2">&amp;</span>MadtAcpiTable = acpi_tables.table(<span class="kw-2">&amp;</span>MADT_SIGNATURE).ok()<span class="question-mark">?</span>;
+        <span class="kw">let </span>total_length = table.header.length <span class="kw">as </span>usize;
+        <span class="kw">let </span>dynamic_part_length = total_length - size_of::&lt;MadtAcpiTable&gt;();
+        <span class="kw">let </span>loc = acpi_tables.table_location(<span class="kw-2">&amp;</span>MADT_SIGNATURE)<span class="question-mark">?</span>;
+        <span class="prelude-val">Some</span>(Madt {
+            table: table,
+            mapped_pages: acpi_tables.mapping(),
+            dynamic_entries_starting_offset: loc.slice_offset_and_length<span class="question-mark">?</span>.<span class="number">0</span>,
+            dynamic_entries_total_size: dynamic_part_length,
         })
     }
 
-    <span class="doccomment">/// Performs initialization functions of the IOAPIC and bootstrap processor.</span>
-    <span class="doccomment">/// # Important Note</span>
-    <span class="doccomment">/// This should only be called once from the initial bootstrap processor </span>
-    <span class="doccomment">/// (the first core to run).</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bsp_init</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="ident">handle_ioapic_entries</span>(<span class="self">self</span>.<span class="ident">iter</span>(), <span class="ident">page_table</span>)<span class="question-mark">?</span>;
-        <span class="ident">handle_bsp_lapic_entry</span>(<span class="self">self</span>.<span class="ident">iter</span>(), <span class="ident">page_table</span>)<span class="question-mark">?</span>;
+    <span class="doccomment">/// Performs initialization functions of the IOAPIC and bootstrap processor.
+    /// # Important Note
+    /// This should only be called once from the initial bootstrap processor 
+    /// (the first core to run).
+    </span><span class="kw">pub fn </span>bsp_init(<span class="kw-2">&amp;</span><span class="self">self</span>, page_table: <span class="kw-2">&amp;mut </span>PageTable) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        handle_ioapic_entries(<span class="self">self</span>.iter(), page_table)<span class="question-mark">?</span>;
+        handle_bsp_lapic_entry(<span class="self">self</span>.iter(), page_table)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Returns an [`Iterator`] over the MADT&#39;s entries,</span>
-    <span class="doccomment">/// which are variable in both number and size.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">iter</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">MadtIter</span> {
-        <span class="ident">MadtIter</span> {
-            <span class="ident">mapped_pages</span>: <span class="self">self</span>.<span class="ident">mapped_pages</span>,
-            <span class="ident">offset</span>: <span class="self">self</span>.<span class="ident">dynamic_entries_starting_offset</span>,
-            <span class="ident">end_of_entries</span>: <span class="self">self</span>.<span class="ident">dynamic_entries_starting_offset</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">dynamic_entries_total_size</span>,
+    <span class="doccomment">/// Returns an [`Iterator`] over the MADT&#39;s entries,
+    /// which are variable in both number and size.
+    </span><span class="kw">pub fn </span>iter(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; MadtIter {
+        MadtIter {
+            mapped_pages: <span class="self">self</span>.mapped_pages,
+            offset: <span class="self">self</span>.dynamic_entries_starting_offset,
+            end_of_entries: <span class="self">self</span>.dynamic_entries_starting_offset + <span class="self">self</span>.dynamic_entries_total_size,
         }
     }
 
-    <span class="doccomment">/// Returns a reference to the `Sdt` header in this MADT table.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sdt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Sdt</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">table</span>.<span class="ident">header</span>
+    <span class="doccomment">/// Returns a reference to the `Sdt` header in this MADT table.
+    </span><span class="kw">pub fn </span>sdt(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Sdt {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.table.header
     }
 
-    <span class="doccomment">/// Returns the Local APIC physical address value in this MADT table.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">local_apic_phys_addr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u32</span> {
-        <span class="self">self</span>.<span class="ident">table</span>.<span class="ident">local_apic_phys_addr</span>
+    <span class="doccomment">/// Returns the Local APIC physical address value in this MADT table.
+    </span><span class="kw">pub fn </span>local_apic_phys_addr(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
+        <span class="self">self</span>.table.local_apic_phys_addr
     }
 
-    <span class="doccomment">/// Returns the `flags` value in this MADT table.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flags</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u32</span> {
-        <span class="self">self</span>.<span class="ident">table</span>.<span class="ident">flags</span>
+    <span class="doccomment">/// Returns the `flags` value in this MADT table.
+    </span><span class="kw">pub fn </span>flags(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
+        <span class="self">self</span>.table.flags
     }
 }
 
 
-<span class="doccomment">/// An [`Iterator`] over the dynamic entries of the MADT.</span>
-<span class="doccomment">/// Its lifetime is dependent upon the lifetime of its `Madt` instance,</span>
-<span class="doccomment">/// which itself is bound to the lifetime of the underlying `AcpiTables`. </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MadtIter</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// The underlying MappedPages that contain all ACPI tables.</span>
-    <span class="ident">mapped_pages</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">MappedPages</span>,
-    <span class="doccomment">/// The offset of the next entry, which should point to a `EntryRecord`</span>
-    <span class="doccomment">/// at the start of each iteration.</span>
-    <span class="ident">offset</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// The end bound of all MADT entries. </span>
-    <span class="doccomment">/// This is fixed and should not ever change throughout iteration.</span>
-    <span class="ident">end_of_entries</span>: <span class="ident">usize</span>,
+<span class="doccomment">/// An [`Iterator`] over the dynamic entries of the MADT.
+/// Its lifetime is dependent upon the lifetime of its `Madt` instance,
+/// which itself is bound to the lifetime of the underlying `AcpiTables`. 
+</span><span class="attr">#[derive(Clone)]
+</span><span class="kw">pub struct </span>MadtIter&lt;<span class="lifetime">&#39;t</span>&gt; {
+    <span class="doccomment">/// The underlying MappedPages that contain all ACPI tables.
+    </span>mapped_pages: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>MappedPages,
+    <span class="doccomment">/// The offset of the next entry, which should point to a `EntryRecord`
+    /// at the start of each iteration.
+    </span>offset: usize,
+    <span class="doccomment">/// The end bound of all MADT entries. 
+    /// This is fixed and should not ever change throughout iteration.
+    </span>end_of_entries: usize,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> <span class="ident">Iterator</span> <span class="kw">for</span> <span class="ident">MadtIter</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">MadtEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span>;
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;t</span>&gt; Iterator <span class="kw">for </span>MadtIter&lt;<span class="lifetime">&#39;t</span>&gt; {
+    <span class="kw">type </span>Item = MadtEntry&lt;<span class="lifetime">&#39;t</span>&gt;;
 
-    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> (<span class="self">self</span>.<span class="ident">offset</span> <span class="op">+</span> <span class="ident">ENTRY_RECORD_SIZE</span>) <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">end_of_entries</span> {
-            <span class="comment">// First, we get the next entry record to get the type and size of the actual entry.</span>
-            <span class="kw">let</span> (<span class="ident">entry_type</span>, <span class="ident">entry_size</span>) <span class="op">=</span> { 
-                <span class="kw">let</span> <span class="ident">entry_record</span>: <span class="kw-2">&amp;</span><span class="ident">EntryRecord</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">mapped_pages</span>.<span class="ident">as_type</span>(<span class="self">self</span>.<span class="ident">offset</span>).<span class="ident">ok</span>()<span class="question-mark">?</span>;
-                (<span class="ident">entry_record</span>.<span class="ident">typ</span>, <span class="ident">entry_record</span>.<span class="ident">size</span> <span class="kw">as</span> <span class="ident">usize</span>)
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
+        <span class="kw">if </span>(<span class="self">self</span>.offset + ENTRY_RECORD_SIZE) &lt; <span class="self">self</span>.end_of_entries {
+            <span class="comment">// First, we get the next entry record to get the type and size of the actual entry.
+            </span><span class="kw">let </span>(entry_type, entry_size) = { 
+                <span class="kw">let </span>entry_record: <span class="kw-2">&amp;</span>EntryRecord = <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok()<span class="question-mark">?</span>;
+                (entry_record.typ, entry_record.size <span class="kw">as </span>usize)
             };
-            <span class="comment">// Second, use that entry type and size to return the specific Madt entry struct.</span>
-            <span class="kw">if</span> (<span class="self">self</span>.<span class="ident">offset</span> <span class="op">+</span> <span class="ident">entry_size</span>) <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">end_of_entries</span> {
-                <span class="kw">let</span> <span class="ident">entry</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MadtEntry</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">entry_type</span> {
-                    <span class="ident">ENTRY_TYPE_LOCAL_APIC</span> <span class="kw">if</span> <span class="ident">entry_size</span> <span class="op">==</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">MadtLocalApic</span><span class="op">&gt;</span>() =&gt; {
-                        <span class="self">self</span>.<span class="ident">mapped_pages</span>.<span class="ident">as_type</span>(<span class="self">self</span>.<span class="ident">offset</span>).<span class="ident">ok</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">ent</span><span class="op">|</span> <span class="ident">MadtEntry::LocalApic</span>(<span class="ident">ent</span>))
+            <span class="comment">// Second, use that entry type and size to return the specific Madt entry struct.
+            </span><span class="kw">if </span>(<span class="self">self</span>.offset + entry_size) &lt;= <span class="self">self</span>.end_of_entries {
+                <span class="kw">let </span>entry: <span class="prelude-ty">Option</span>&lt;MadtEntry&gt; = <span class="kw">match </span>entry_type {
+                    ENTRY_TYPE_LOCAL_APIC <span class="kw">if </span>entry_size == size_of::&lt;MadtLocalApic&gt;() =&gt; {
+                        <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok().map(|ent| MadtEntry::LocalApic(ent))
                     },
-                    <span class="ident">ENTRY_TYPE_IO_APIC</span> <span class="kw">if</span> <span class="ident">entry_size</span> <span class="op">==</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">MadtIoApic</span><span class="op">&gt;</span>() =&gt; {
-                        <span class="self">self</span>.<span class="ident">mapped_pages</span>.<span class="ident">as_type</span>(<span class="self">self</span>.<span class="ident">offset</span>).<span class="ident">ok</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">ent</span><span class="op">|</span> <span class="ident">MadtEntry::IoApic</span>(<span class="ident">ent</span>))
+                    ENTRY_TYPE_IO_APIC <span class="kw">if </span>entry_size == size_of::&lt;MadtIoApic&gt;() =&gt; {
+                        <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok().map(|ent| MadtEntry::IoApic(ent))
                     },
-                    <span class="ident">ENTRY_TYPE_INT_SRC_OVERRIDE</span> <span class="kw">if</span> <span class="ident">entry_size</span> <span class="op">==</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">MadtIntSrcOverride</span><span class="op">&gt;</span>() =&gt; {
-                        <span class="self">self</span>.<span class="ident">mapped_pages</span>.<span class="ident">as_type</span>(<span class="self">self</span>.<span class="ident">offset</span>).<span class="ident">ok</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">ent</span><span class="op">|</span> <span class="ident">MadtEntry::IntSrcOverride</span>(<span class="ident">ent</span>))
+                    ENTRY_TYPE_INT_SRC_OVERRIDE <span class="kw">if </span>entry_size == size_of::&lt;MadtIntSrcOverride&gt;() =&gt; {
+                        <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok().map(|ent| MadtEntry::IntSrcOverride(ent))
                     },
-                    <span class="ident">ENTRY_TYPE_NON_MASKABLE_INTERRUPT</span> <span class="kw">if</span> <span class="ident">entry_size</span> <span class="op">==</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">MadtNonMaskableInterrupt</span><span class="op">&gt;</span>() =&gt; {
-                        <span class="self">self</span>.<span class="ident">mapped_pages</span>.<span class="ident">as_type</span>(<span class="self">self</span>.<span class="ident">offset</span>).<span class="ident">ok</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">ent</span><span class="op">|</span> <span class="ident">MadtEntry::NonMaskableInterrupt</span>(<span class="ident">ent</span>))
+                    ENTRY_TYPE_NON_MASKABLE_INTERRUPT <span class="kw">if </span>entry_size == size_of::&lt;MadtNonMaskableInterrupt&gt;() =&gt; {
+                        <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok().map(|ent| MadtEntry::NonMaskableInterrupt(ent))
                     },
-                    <span class="ident">ENTRY_TYPE_LOCAL_APIC_ADDRESS_OVERRIDE</span> <span class="kw">if</span> <span class="ident">entry_size</span> <span class="op">==</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">MadtLocalApicAddressOverride</span><span class="op">&gt;</span>() =&gt; {
-                        <span class="self">self</span>.<span class="ident">mapped_pages</span>.<span class="ident">as_type</span>(<span class="self">self</span>.<span class="ident">offset</span>).<span class="ident">ok</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">ent</span><span class="op">|</span> <span class="ident">MadtEntry::LocalApicAddressOverride</span>(<span class="ident">ent</span>))
+                    ENTRY_TYPE_LOCAL_APIC_ADDRESS_OVERRIDE <span class="kw">if </span>entry_size == size_of::&lt;MadtLocalApicAddressOverride&gt;() =&gt; {
+                        <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok().map(|ent| MadtEntry::LocalApicAddressOverride(ent))
                     },
-                    <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
+                    <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
                 };
-                <span class="comment">// move the offset to the end of this entry, i.e., the beginning of the next entry record</span>
-                <span class="self">self</span>.<span class="ident">offset</span> <span class="op">+</span><span class="op">=</span> <span class="ident">entry_size</span>;
-                <span class="comment">// return the MADT entry if properly formed, or if not, return an unknown/corrupt entry.</span>
-                <span class="ident">entry</span>.<span class="ident">or</span>(<span class="prelude-val">Some</span>(<span class="ident">MadtEntry::UnknownOrCorrupt</span>(<span class="ident">entry_type</span>)))
+                <span class="comment">// move the offset to the end of this entry, i.e., the beginning of the next entry record
+                </span><span class="self">self</span>.offset += entry_size;
+                <span class="comment">// return the MADT entry if properly formed, or if not, return an unknown/corrupt entry.
+                </span>entry.or(<span class="prelude-val">Some</span>(MadtEntry::UnknownOrCorrupt(entry_type)))
             }
-            <span class="kw">else</span> {
-                <span class="prelude-val">None</span>
-            }
+            <span class="kw">else </span>{
+                <span class="prelude-val">None
+            </span>}
         }
-        <span class="kw">else</span> {
-            <span class="prelude-val">None</span>
-        }
+        <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
     }
 }
 
 
-<span class="doccomment">/// A MADT entry record, which precedes each actual MADT entry</span>
-<span class="doccomment">/// and describes its type and size.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
-<span class="kw">struct</span> <span class="ident">EntryRecord</span> {
-    <span class="doccomment">/// The type identifier of a MADT entry.</span>
-    <span class="ident">typ</span>: <span class="ident">u8</span>,
-    <span class="doccomment">/// The size in bytes of a MADT entry.</span>
-    <span class="ident">size</span>: <span class="ident">u8</span>,
+<span class="doccomment">/// A MADT entry record, which precedes each actual MADT entry
+/// and describes its type and size.
+</span><span class="attr">#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(packed)]
+</span><span class="kw">struct </span>EntryRecord {
+    <span class="doccomment">/// The type identifier of a MADT entry.
+    </span>typ: u8,
+    <span class="doccomment">/// The size in bytes of a MADT entry.
+    </span>size: u8,
 }
-<span class="kw">const</span> <span class="ident">ENTRY_RECORD_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">EntryRecord</span><span class="op">&gt;</span>();
+<span class="kw">const </span>ENTRY_RECORD_SIZE: usize = size_of::&lt;EntryRecord&gt;();
 
 
-<span class="comment">// The following list specifies MADT entry type IDs.</span>
-<span class="kw">const</span> <span class="ident">ENTRY_TYPE_LOCAL_APIC</span>:                  <span class="ident">u8</span> <span class="op">=</span> <span class="number">0</span>;
-<span class="kw">const</span> <span class="ident">ENTRY_TYPE_IO_APIC</span>:                     <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span>;
-<span class="kw">const</span> <span class="ident">ENTRY_TYPE_INT_SRC_OVERRIDE</span>:            <span class="ident">u8</span> <span class="op">=</span> <span class="number">2</span>;
-<span class="comment">// entry type 3 doesn&#39;t exist</span>
-<span class="kw">const</span> <span class="ident">ENTRY_TYPE_NON_MASKABLE_INTERRUPT</span>:      <span class="ident">u8</span> <span class="op">=</span> <span class="number">4</span>;
-<span class="kw">const</span> <span class="ident">ENTRY_TYPE_LOCAL_APIC_ADDRESS_OVERRIDE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">5</span>;
+<span class="comment">// The following list specifies MADT entry type IDs.
+</span><span class="kw">const </span>ENTRY_TYPE_LOCAL_APIC:                  u8 = <span class="number">0</span>;
+<span class="kw">const </span>ENTRY_TYPE_IO_APIC:                     u8 = <span class="number">1</span>;
+<span class="kw">const </span>ENTRY_TYPE_INT_SRC_OVERRIDE:            u8 = <span class="number">2</span>;
+<span class="comment">// entry type 3 doesn&#39;t exist
+</span><span class="kw">const </span>ENTRY_TYPE_NON_MASKABLE_INTERRUPT:      u8 = <span class="number">4</span>;
+<span class="kw">const </span>ENTRY_TYPE_LOCAL_APIC_ADDRESS_OVERRIDE: u8 = <span class="number">5</span>;
 
 
-<span class="doccomment">/// The set of possible MADT Entries.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">MadtEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// A Local APIC MADT entry.</span>
-    <span class="ident">LocalApic</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">MadtLocalApic</span>),
-    <span class="doccomment">/// A IOAPIC MADT entry.</span>
-    <span class="ident">IoApic</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">MadtIoApic</span>),
-    <span class="doccomment">/// A Interrupt Source Override MADT entry.</span>
-    <span class="ident">IntSrcOverride</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">MadtIntSrcOverride</span>),
-    <span class="doccomment">/// A Non-Maskable Interrupt MADT entry.</span>
-    <span class="ident">NonMaskableInterrupt</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">MadtNonMaskableInterrupt</span>),
-    <span class="doccomment">/// A Local APIC Address Override MADT entry.</span>
-    <span class="ident">LocalApicAddressOverride</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">MadtLocalApicAddressOverride</span>),
-    <span class="doccomment">/// The MADT table had an entry of an unknown type or mismatched length,</span>
-    <span class="doccomment">/// so the table entry was malformed and unusable.</span>
-    <span class="doccomment">/// The entry type ID is included.</span>
-    <span class="ident">UnknownOrCorrupt</span>(<span class="ident">u8</span>)
-}
-
-<span class="doccomment">/// MADT Local APIC</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MadtLocalApic</span> {
-    <span class="ident">_header</span>: <span class="ident">EntryRecord</span>,
-    <span class="doccomment">/// Processor ID</span>
-    <span class="kw">pub</span> <span class="ident">processor</span>: <span class="ident">u8</span>,
-    <span class="doccomment">/// Local APIC ID</span>
-    <span class="kw">pub</span> <span class="ident">apic_id</span>: <span class="ident">u8</span>,
-    <span class="doccomment">/// Flags. 1 means that the processor is enabled</span>
-    <span class="kw">pub</span> <span class="ident">flags</span>: <span class="ident">u32</span>
+<span class="doccomment">/// The set of possible MADT Entries.
+</span><span class="attr">#[derive(Copy, Clone, Debug)]
+</span><span class="kw">pub enum </span>MadtEntry&lt;<span class="lifetime">&#39;t</span>&gt; {
+    <span class="doccomment">/// A Local APIC MADT entry.
+    </span>LocalApic(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>MadtLocalApic),
+    <span class="doccomment">/// A IOAPIC MADT entry.
+    </span>IoApic(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>MadtIoApic),
+    <span class="doccomment">/// A Interrupt Source Override MADT entry.
+    </span>IntSrcOverride(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>MadtIntSrcOverride),
+    <span class="doccomment">/// A Non-Maskable Interrupt MADT entry.
+    </span>NonMaskableInterrupt(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>MadtNonMaskableInterrupt),
+    <span class="doccomment">/// A Local APIC Address Override MADT entry.
+    </span>LocalApicAddressOverride(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>MadtLocalApicAddressOverride),
+    <span class="doccomment">/// The MADT table had an entry of an unknown type or mismatched length,
+    /// so the table entry was malformed and unusable.
+    /// The entry type ID is included.
+    </span>UnknownOrCorrupt(u8)
 }
 
-<span class="doccomment">/// MADT I/O APIC</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MadtIoApic</span> {
-    <span class="ident">_header</span>: <span class="ident">EntryRecord</span>,
-    <span class="doccomment">/// I/O APIC ID</span>
-    <span class="kw">pub</span> <span class="ident">id</span>: <span class="ident">u8</span>,
-    <span class="ident">_reserved</span>: <span class="ident">u8</span>,
-    <span class="doccomment">/// I/O APIC address</span>
-    <span class="kw">pub</span> <span class="ident">address</span>: <span class="ident">u32</span>,
-    <span class="doccomment">/// Global system interrupt base</span>
-    <span class="kw">pub</span> <span class="ident">gsi_base</span>: <span class="ident">u32</span>
+<span class="doccomment">/// MADT Local APIC
+</span><span class="attr">#[derive(Copy, Clone, Debug, FromBytes)]
+#[repr(packed)]
+</span><span class="kw">pub struct </span>MadtLocalApic {
+    _header: EntryRecord,
+    <span class="doccomment">/// Processor ID
+    </span><span class="kw">pub </span>processor: u8,
+    <span class="doccomment">/// Local APIC ID
+    </span><span class="kw">pub </span>apic_id: u8,
+    <span class="doccomment">/// Flags. 1 means that the processor is enabled
+    </span><span class="kw">pub </span>flags: u32
 }
 
-<span class="doccomment">/// MADT Interrupt Source Override</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MadtIntSrcOverride</span> {
-    <span class="ident">_header</span>: <span class="ident">EntryRecord</span>,
-    <span class="doccomment">/// Bus Source</span>
-    <span class="kw">pub</span> <span class="ident">bus_source</span>: <span class="ident">u8</span>,
-    <span class="doccomment">/// IRQ Source</span>
-    <span class="kw">pub</span> <span class="ident">irq_source</span>: <span class="ident">u8</span>,
-    <span class="doccomment">/// Global system interrupt</span>
-    <span class="kw">pub</span> <span class="ident">gsi</span>: <span class="ident">u32</span>,
-    <span class="doccomment">/// Flags</span>
-    <span class="kw">pub</span> <span class="ident">flags</span>: <span class="ident">u16</span>
+<span class="doccomment">/// MADT I/O APIC
+</span><span class="attr">#[derive(Copy, Clone, Debug, FromBytes)]
+#[repr(packed)]
+</span><span class="kw">pub struct </span>MadtIoApic {
+    _header: EntryRecord,
+    <span class="doccomment">/// I/O APIC ID
+    </span><span class="kw">pub </span>id: u8,
+    _reserved: u8,
+    <span class="doccomment">/// I/O APIC address
+    </span><span class="kw">pub </span>address: u32,
+    <span class="doccomment">/// Global system interrupt base
+    </span><span class="kw">pub </span>gsi_base: u32
 }
 
-<span class="doccomment">/// MADT Non-maskable Interrupt.</span>
-<span class="doccomment">/// Use these to configure the LINT0 and LINT1 entries in the Local vector table</span>
-<span class="doccomment">/// of the relevant processor&#39;s (or processors&#39;) local APIC.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MadtNonMaskableInterrupt</span> {
-    <span class="ident">_header</span>: <span class="ident">EntryRecord</span>,
-    <span class="doccomment">/// which processor this is for, 0xFF means all processors</span>
-    <span class="kw">pub</span> <span class="ident">processor</span>: <span class="ident">u8</span>,
-    <span class="doccomment">/// Flags</span>
-    <span class="kw">pub</span> <span class="ident">flags</span>: <span class="ident">u16</span>,
-    <span class="doccomment">/// LINT (either 0 or 1)</span>
-    <span class="kw">pub</span> <span class="ident">lint</span>: <span class="ident">u8</span>,
+<span class="doccomment">/// MADT Interrupt Source Override
+</span><span class="attr">#[derive(Copy, Clone, Debug, FromBytes)]
+#[repr(packed)]
+</span><span class="kw">pub struct </span>MadtIntSrcOverride {
+    _header: EntryRecord,
+    <span class="doccomment">/// Bus Source
+    </span><span class="kw">pub </span>bus_source: u8,
+    <span class="doccomment">/// IRQ Source
+    </span><span class="kw">pub </span>irq_source: u8,
+    <span class="doccomment">/// Global system interrupt
+    </span><span class="kw">pub </span>gsi: u32,
+    <span class="doccomment">/// Flags
+    </span><span class="kw">pub </span>flags: u16
 }
 
-<span class="doccomment">/// MADT Local APIC Address Override. </span>
-<span class="doccomment">/// If this struct exists, the contained physical address</span>
-<span class="doccomment">/// should be used in place of the local APIC physical address</span>
-<span class="doccomment">/// specified in the MADT ACPI table itself.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MadtLocalApicAddressOverride</span> {
-    <span class="ident">_header</span>: <span class="ident">EntryRecord</span>,
-    <span class="ident">_reserved</span>: <span class="ident">u16</span>,
-    <span class="doccomment">/// Local APIC physical address</span>
-    <span class="kw">pub</span> <span class="ident">phys_addr</span>: <span class="ident">u64</span>,
+<span class="doccomment">/// MADT Non-maskable Interrupt.
+/// Use these to configure the LINT0 and LINT1 entries in the Local vector table
+/// of the relevant processor&#39;s (or processors&#39;) local APIC.
+</span><span class="attr">#[derive(Copy, Clone, Debug, FromBytes)]
+#[repr(packed)]
+</span><span class="kw">pub struct </span>MadtNonMaskableInterrupt {
+    _header: EntryRecord,
+    <span class="doccomment">/// which processor this is for, 0xFF means all processors
+    </span><span class="kw">pub </span>processor: u8,
+    <span class="doccomment">/// Flags
+    </span><span class="kw">pub </span>flags: u16,
+    <span class="doccomment">/// LINT (either 0 or 1)
+    </span><span class="kw">pub </span>lint: u8,
+}
+
+<span class="doccomment">/// MADT Local APIC Address Override. 
+/// If this struct exists, the contained physical address
+/// should be used in place of the local APIC physical address
+/// specified in the MADT ACPI table itself.
+</span><span class="attr">#[derive(Copy, Clone, Debug, FromBytes)]
+#[repr(packed)]
+</span><span class="kw">pub struct </span>MadtLocalApicAddressOverride {
+    _header: EntryRecord,
+    _reserved: u16,
+    <span class="doccomment">/// Local APIC physical address
+    </span><span class="kw">pub </span>phys_addr: u64,
 }
 
 
-<span class="doccomment">/// Handles the BSP&#39;s (bootstrap processor, the first core to boot) entry in the given MADT iterator.</span>
-<span class="doccomment">/// This should be the first function invoked to initialize the BSP information, </span>
-<span class="doccomment">/// and should come before any other entries in the MADT are handled.</span>
-<span class="kw">fn</span> <span class="ident">handle_bsp_lapic_entry</span>(<span class="ident">madt_iter</span>: <span class="ident">MadtIter</span>, <span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">use</span> <span class="ident">pic::IRQ_BASE_OFFSET</span>;
+<span class="doccomment">/// Handles the BSP&#39;s (bootstrap processor, the first core to boot) entry in the given MADT iterator.
+/// This should be the first function invoked to initialize the BSP information, 
+/// and should come before any other entries in the MADT are handled.
+</span><span class="kw">fn </span>handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: <span class="kw-2">&amp;mut </span>PageTable) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">use </span>pic::IRQ_BASE_OFFSET;
 
-    <span class="kw">for</span> <span class="ident">madt_entry</span> <span class="kw">in</span> <span class="ident">madt_iter</span>.<span class="ident">clone</span>() {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">MadtEntry::LocalApic</span>(<span class="ident">lapic_entry</span>) <span class="op">=</span> <span class="ident">madt_entry</span> { 
-            <span class="kw">let</span> (<span class="ident">nmi_lint</span>, <span class="ident">nmi_flags</span>) <span class="op">=</span> <span class="ident">find_nmi_entry_for_processor</span>(<span class="ident">lapic_entry</span>.<span class="ident">processor</span>, <span class="ident">madt_iter</span>.<span class="ident">clone</span>());
+    <span class="kw">for </span>madt_entry <span class="kw">in </span>madt_iter.clone() {
+        <span class="kw">if let </span>MadtEntry::LocalApic(lapic_entry) = madt_entry { 
+            <span class="kw">let </span>(nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
 
-            <span class="kw">match</span> <span class="ident">LocalApic::init</span>(
-                <span class="ident">page_table</span>,
-                <span class="ident">lapic_entry</span>.<span class="ident">processor</span>,
-                <span class="prelude-val">None</span>, <span class="comment">// we don&#39;t know the hardware-assigned APIC ID of the BSP (this CPU) yet</span>
-                <span class="bool-val">true</span>,
-                <span class="ident">nmi_lint</span>,
-                <span class="ident">nmi_flags</span>,
+            <span class="kw">match </span>LocalApic::init(
+                page_table,
+                lapic_entry.processor,
+                <span class="prelude-val">None</span>, <span class="comment">// we don&#39;t know the hardware-assigned APIC ID of the BSP (this CPU) yet
+                </span><span class="bool-val">true</span>,
+                nmi_lint,
+                nmi_flags,
             ) {
-                <span class="comment">// this `lapic_entry` wasn&#39;t for the BSP, try the next one.</span>
-                <span class="prelude-val">Err</span>(<span class="ident">LapicInitError::NotBSP</span>) =&gt; <span class="kw">continue</span>,
-                <span class="prelude-val">Err</span>(<span class="ident">other_err</span>) =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Box::leak</span>(<span class="macro">format!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">other_err</span>).<span class="ident">into_boxed_str</span>())),
-                <span class="prelude-val">Ok</span>(()) =&gt; { } <span class="comment">// fall through</span>
-            };
+                <span class="comment">// this `lapic_entry` wasn&#39;t for the BSP, try the next one.
+                </span><span class="prelude-val">Err</span>(LapicInitError::NotBSP) =&gt; <span class="kw">continue</span>,
+                <span class="prelude-val">Err</span>(other_err) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(Box::leak(<span class="macro">format!</span>(<span class="string">&quot;{:?}&quot;</span>, other_err).into_boxed_str())),
+                <span class="prelude-val">Ok</span>(()) =&gt; { } <span class="comment">// fall through
+            </span>};
 
-            <span class="macro">assert!</span>(<span class="ident">get_my_apic_id</span>() <span class="op">==</span> <span class="ident">lapic_entry</span>.<span class="ident">apic_id</span>);
-            <span class="kw">let</span> <span class="ident">bsp_id</span> <span class="op">=</span> <span class="ident">lapic_entry</span>.<span class="ident">apic_id</span>;
+            <span class="macro">assert!</span>(get_my_apic_id() == lapic_entry.apic_id);
+            <span class="kw">let </span>bsp_id = lapic_entry.apic_id;
 
-            <span class="comment">// redirect every IoApic&#39;s interrupts to the one BSP</span>
-            <span class="comment">// TODO FIXME: I&#39;m unsure if this is actually correct!</span>
-            <span class="kw">for</span> <span class="ident">ioapic</span> <span class="kw">in</span> <span class="ident">ioapic::get_ioapics</span>().<span class="ident">iter</span>() {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ioapic_ref</span> <span class="op">=</span> <span class="ident">ioapic</span>.<span class="number">1</span>.<span class="ident">lock</span>();
+            <span class="comment">// redirect every IoApic&#39;s interrupts to the one BSP
+            // TODO FIXME: I&#39;m unsure if this is actually correct!
+            </span><span class="kw">for </span>ioapic <span class="kw">in </span>ioapic::get_ioapics().iter() {
+                <span class="kw">let </span><span class="kw-2">mut </span>ioapic_ref = ioapic.<span class="number">1</span>.lock();
 
-                <span class="comment">// Set the BSP to receive regular PIC interrupts routed through the IoApic.</span>
-                <span class="comment">// Skip irq 2, since in the PIC that&#39;s the chained one (cascade line from PIC2 to PIC1) that isn&#39;t used.</span>
-                <span class="kw">for</span> <span class="ident">irq</span> <span class="kw">in</span> (<span class="number">0x0</span> ..<span class="op">=</span> <span class="number">0x1</span>).<span class="ident">chain</span>(<span class="number">0x3</span> ..<span class="op">=</span> <span class="number">0xF</span>) {
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="ident">irq</span>, <span class="ident">bsp_id</span>, <span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="ident">irq</span>);
+                <span class="comment">// Set the BSP to receive regular PIC interrupts routed through the IoApic.
+                // Skip irq 2, since in the PIC that&#39;s the chained one (cascade line from PIC2 to PIC1) that isn&#39;t used.
+                </span><span class="kw">for </span>irq <span class="kw">in </span>(<span class="number">0x0 </span>..= <span class="number">0x1</span>).chain(<span class="number">0x3 </span>..= <span class="number">0xF</span>) {
+                    ioapic_ref.set_irq(irq, bsp_id, IRQ_BASE_OFFSET + irq);
                 }
 
-                <span class="comment">// ioapic_ref.set_irq(0x1, 0xFF, IRQ_BASE_OFFSET + 0x1); </span>
-                <span class="comment">// FIXME: the above line does indeed send the interrupt to all cores, but then they all handle it, instead of just one. </span>
-            }
-            <span class="comment">// there&#39;s only ever one BSP, so we can exit the loop here</span>
-            <span class="kw">break</span>;
+                <span class="comment">// ioapic_ref.set_irq(0x1, 0xFF, IRQ_BASE_OFFSET + 0x1); 
+                // FIXME: the above line does indeed send the interrupt to all cores, but then they all handle it, instead of just one. 
+            </span>}
+            <span class="comment">// there&#39;s only ever one BSP, so we can exit the loop here
+            </span><span class="kw">break</span>;
         }
     }
 
-    <span class="kw">let</span> <span class="ident">bsp_id</span> <span class="op">=</span> <span class="ident">get_bsp_id</span>().<span class="ident">ok_or</span>(<span class="string">&quot;handle_bsp_lapic_entry(): Couldn&#39;t find BSP LocalApic in Madt!&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>bsp_id = get_bsp_id().ok_or(<span class="string">&quot;handle_bsp_lapic_entry(): Couldn&#39;t find BSP LocalApic in Madt!&quot;</span>)<span class="question-mark">?</span>;
 
-    <span class="comment">// now that we&#39;ve established the BSP, go through the interrupt source override entries</span>
-    <span class="kw">for</span> <span class="ident">madt_entry</span> <span class="kw">in</span> <span class="ident">madt_iter</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">MadtEntry::IntSrcOverride</span>(<span class="ident">int_src</span>) <span class="op">=</span> <span class="ident">madt_entry</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">handled</span> <span class="op">=</span> <span class="bool-val">false</span>;
+    <span class="comment">// now that we&#39;ve established the BSP, go through the interrupt source override entries
+    </span><span class="kw">for </span>madt_entry <span class="kw">in </span>madt_iter {
+        <span class="kw">if let </span>MadtEntry::IntSrcOverride(int_src) = madt_entry {
+            <span class="kw">let </span><span class="kw-2">mut </span>handled = <span class="bool-val">false</span>;
 
-            <span class="comment">// find the IoApic that should handle this interrupt source override entry</span>
-            <span class="kw">for</span> (<span class="ident">_id</span>, <span class="ident">ioapic</span>) <span class="kw">in</span> <span class="ident">ioapic::get_ioapics</span>().<span class="ident">iter</span>() {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ioapic_ref</span> <span class="op">=</span> <span class="ident">ioapic</span>.<span class="ident">lock</span>();
-                <span class="kw">if</span> <span class="ident">ioapic_ref</span>.<span class="ident">handles_irq</span>(<span class="ident">int_src</span>.<span class="ident">gsi</span>) {
-                    <span class="comment">// using BSP for now, but later we could redirect the IRQ to more (or all) cores</span>
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="ident">int_src</span>.<span class="ident">irq_source</span>, <span class="ident">bsp_id</span>, <span class="ident">int_src</span>.<span class="ident">gsi</span> <span class="kw">as</span> <span class="ident">u8</span> <span class="op">+</span> <span class="ident">IRQ_BASE_OFFSET</span>); 
+            <span class="comment">// find the IoApic that should handle this interrupt source override entry
+            </span><span class="kw">for </span>(_id, ioapic) <span class="kw">in </span>ioapic::get_ioapics().iter() {
+                <span class="kw">let </span><span class="kw-2">mut </span>ioapic_ref = ioapic.lock();
+                <span class="kw">if </span>ioapic_ref.handles_irq(int_src.gsi) {
+                    <span class="comment">// using BSP for now, but later we could redirect the IRQ to more (or all) cores
+                    </span>ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi <span class="kw">as </span>u8 + IRQ_BASE_OFFSET); 
                     <span class="macro">trace!</span>(<span class="string">&quot;MadtIntSrcOverride (bus: {}, irq: {}, gsi: {}, flags {:#X}) handled by IoApic {}&quot;</span>,
-                        <span class="ident">int_src</span>.<span class="ident">bus_source</span>, <span class="ident">int_src</span>.<span class="ident">irq_source</span>, <span class="kw-2">&amp;</span>{ <span class="ident">int_src</span>.<span class="ident">gsi</span> }, <span class="kw-2">&amp;</span>{ <span class="ident">int_src</span>.<span class="ident">flags</span> }, <span class="ident">ioapic_ref</span>.<span class="ident">id</span>
+                        int_src.bus_source, int_src.irq_source, <span class="kw-2">&amp;</span>{ int_src.gsi }, <span class="kw-2">&amp;</span>{ int_src.flags }, ioapic_ref.id
                     );
-                    <span class="ident">handled</span> <span class="op">=</span> <span class="bool-val">true</span>;
+                    handled = <span class="bool-val">true</span>;
                 }
             }
 
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">handled</span> {
+            <span class="kw">if </span>!handled {
                 <span class="macro">error!</span>(<span class="string">&quot;MadtIntSrcOverride (bus: {}, irq: {}, gsi: {}, flags {:#X}) not handled by any IoApic!&quot;</span>,
-                    <span class="ident">int_src</span>.<span class="ident">bus_source</span>, <span class="ident">int_src</span>.<span class="ident">irq_source</span>, <span class="kw-2">&amp;</span>{ <span class="ident">int_src</span>.<span class="ident">gsi</span> }, <span class="kw-2">&amp;</span>{ <span class="ident">int_src</span>.<span class="ident">flags</span>}
+                    int_src.bus_source, int_src.irq_source, <span class="kw-2">&amp;</span>{ int_src.gsi }, <span class="kw-2">&amp;</span>{ int_src.flags}
                 );
             }
         }
@@ -775,39 +769,38 @@
 }
 
 
-<span class="doccomment">/// Handles the IOAPIC entries in the given MADT iterator </span>
-<span class="doccomment">/// by creating IoApic instances for them and initializing them appropriately.</span>
-<span class="kw">fn</span> <span class="ident">handle_ioapic_entries</span>(<span class="ident">madt_iter</span>: <span class="ident">MadtIter</span>, <span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">for</span> <span class="ident">madt_entry</span> <span class="kw">in</span> <span class="ident">madt_iter</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">MadtEntry::IoApic</span>(<span class="ident">ioa</span>) <span class="op">=</span> <span class="ident">madt_entry</span> {
-            <span class="ident">ioapic::IoApic::new</span>(<span class="ident">page_table</span>, <span class="ident">ioa</span>.<span class="ident">id</span>, <span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">ioa</span>.<span class="ident">address</span> <span class="kw">as</span> <span class="ident">usize</span>), <span class="ident">ioa</span>.<span class="ident">gsi_base</span>)<span class="question-mark">?</span>;
+<span class="doccomment">/// Handles the IOAPIC entries in the given MADT iterator 
+/// by creating IoApic instances for them and initializing them appropriately.
+</span><span class="kw">fn </span>handle_ioapic_entries(madt_iter: MadtIter, page_table: <span class="kw-2">&amp;mut </span>PageTable) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">for </span>madt_entry <span class="kw">in </span>madt_iter {
+        <span class="kw">if let </span>MadtEntry::IoApic(ioa) = madt_entry {
+            ioapic::IoApic::new(page_table, ioa.id, PhysicalAddress::new_canonical(ioa.address <span class="kw">as </span>usize), ioa.gsi_base)<span class="question-mark">?</span>;
         }
     }
     <span class="prelude-val">Ok</span>(())
 }
 
 
-<span class="doccomment">/// Finds the Non-Maskable Interrupt (NMI) entry in the MADT ACPI table (i.e., the given `MadtIter`)</span>
-<span class="doccomment">/// corresponding to the given processor. </span>
-<span class="doccomment">/// If no entry exists, it returns the default NMI entry value: `(lint = 1, flags = 0)`.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">find_nmi_entry_for_processor</span>(<span class="ident">processor</span>: <span class="ident">u8</span>, <span class="ident">madt_iter</span>: <span class="ident">MadtIter</span>) -&gt; (<span class="ident">u8</span>, <span class="ident">u16</span>) {
-    <span class="kw">for</span> <span class="ident">madt_entry</span> <span class="kw">in</span> <span class="ident">madt_iter</span> {
-        <span class="kw">match</span> <span class="ident">madt_entry</span> {
-            <span class="ident">MadtEntry::NonMaskableInterrupt</span>(<span class="ident">nmi</span>) =&gt; {
-                <span class="comment">// NMI entries are based on the &quot;processor&quot; id, not the &quot;apic_id&quot;</span>
-                <span class="comment">// Return this Nmi entry if it&#39;s for the given lapic, or if it&#39;s for all lapics</span>
-                <span class="kw">if</span> <span class="ident">nmi</span>.<span class="ident">processor</span> <span class="op">==</span> <span class="ident">processor</span> <span class="op">|</span><span class="op">|</span> <span class="ident">nmi</span>.<span class="ident">processor</span> <span class="op">==</span> <span class="number">0xFF</span>  {
-                    <span class="kw">return</span> (<span class="ident">nmi</span>.<span class="ident">lint</span>, <span class="ident">nmi</span>.<span class="ident">flags</span>);
+<span class="doccomment">/// Finds the Non-Maskable Interrupt (NMI) entry in the MADT ACPI table (i.e., the given `MadtIter`)
+/// corresponding to the given processor. 
+/// If no entry exists, it returns the default NMI entry value: `(lint = 1, flags = 0)`.
+</span><span class="kw">pub fn </span>find_nmi_entry_for_processor(processor: u8, madt_iter: MadtIter) -&gt; (u8, u16) {
+    <span class="kw">for </span>madt_entry <span class="kw">in </span>madt_iter {
+        <span class="kw">match </span>madt_entry {
+            MadtEntry::NonMaskableInterrupt(nmi) =&gt; {
+                <span class="comment">// NMI entries are based on the &quot;processor&quot; id, not the &quot;apic_id&quot;
+                // Return this Nmi entry if it&#39;s for the given lapic, or if it&#39;s for all lapics
+                </span><span class="kw">if </span>nmi.processor == processor || nmi.processor == <span class="number">0xFF  </span>{
+                    <span class="kw">return </span>(nmi.lint, nmi.flags);
                 }
             }
-            <span class="kw">_</span> =&gt; {  }
+            <span class="kw">_ </span>=&gt; {  }
         }
     }
 
-    <span class="kw">let</span> (<span class="ident">lint</span>, <span class="ident">flags</span>) <span class="op">=</span> (<span class="number">1</span>, <span class="number">0</span>);
-    <span class="macro">warn!</span>(<span class="string">&quot;Couldn&#39;t find NMI entry for processor {} (&lt;-- not apic_id). Using default lint {}, flags {}&quot;</span>, <span class="ident">processor</span>, <span class="ident">lint</span>, <span class="ident">flags</span>);
-    (<span class="ident">lint</span>, <span class="ident">flags</span>)
+    <span class="kw">let </span>(lint, flags) = (<span class="number">1</span>, <span class="number">0</span>);
+    <span class="macro">warn!</span>(<span class="string">&quot;Couldn&#39;t find NMI entry for processor {} (&lt;-- not apic_id). Using default lint {}, flags {}&quot;</span>, processor, lint, flags);
+    (lint, flags)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="madt" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="madt" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

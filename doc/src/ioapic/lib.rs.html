@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ioapic/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../ioapic/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../ioapic/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../ioapic/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ioapic/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../ioapic/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -171,172 +165,171 @@
 <span id="165">165</span>
 <span id="166">166</span>
 <span id="167">167</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
+</pre><pre class="rust"><code><span class="attr">#![no_std]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">volatile</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">zerocopy</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">atomic_linked_list</span>;
+#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>volatile;
+<span class="kw">extern crate </span>zerocopy;
+<span class="kw">extern crate </span>atomic_linked_list;
 
-<span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
-<span class="kw">use</span> <span class="ident">volatile</span>::{<span class="ident">Volatile</span>, <span class="ident">WriteOnly</span>};
-<span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PageTable</span>, <span class="ident">PhysicalAddress</span>, <span class="ident">EntryFlags</span>, <span class="ident">allocate_pages</span>, <span class="ident">allocate_frames_at</span>, <span class="ident">BorrowedMappedPages</span>, <span class="ident">Mutable</span>};
-<span class="kw">use</span> <span class="ident">atomic_linked_list::atomic_map::AtomicMap</span>;
-
-
-<span class="doccomment">/// The system-wide list of all `IoApic`s, of which there is usually one, </span>
-<span class="doccomment">/// but larger systems can have multiple IoApic chips.</span>
-<span class="kw">static</span> <span class="ident">IOAPICS</span>: <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">IoApic</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicMap::new</span>();
+<span class="kw">use </span>spin::{Mutex, MutexGuard};
+<span class="kw">use </span>volatile::{Volatile, WriteOnly};
+<span class="kw">use </span>zerocopy::FromBytes;
+<span class="kw">use </span>memory::{PageTable, PhysicalAddress, EntryFlags, allocate_pages, allocate_frames_at, BorrowedMappedPages, Mutable};
+<span class="kw">use </span>atomic_linked_list::atomic_map::AtomicMap;
 
 
-<span class="doccomment">/// Returns a reference to the list of IoApics.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_ioapics</span>() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">IoApic</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-	<span class="kw-2">&amp;</span><span class="ident">IOAPICS</span>
+<span class="doccomment">/// The system-wide list of all `IoApic`s, of which there is usually one, 
+/// but larger systems can have multiple IoApic chips.
+</span><span class="kw">static </span>IOAPICS: AtomicMap&lt;u8, Mutex&lt;IoApic&gt;&gt; = AtomicMap::new();
+
+
+<span class="doccomment">/// Returns a reference to the list of IoApics.
+</span><span class="kw">pub fn </span>get_ioapics() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicMap&lt;u8, Mutex&lt;IoApic&gt;&gt; {
+	<span class="kw-2">&amp;</span>IOAPICS
 }
 
-<span class="doccomment">/// If an `IoApic` with the given `id` exists, then lock it (acquire its Mutex)</span>
-<span class="doccomment">/// and return the locked `IoApic`.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_ioapic</span>(<span class="ident">ioapic_id</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span>, <span class="ident">IoApic</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-	<span class="ident">IOAPICS</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">ioapic_id</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">ioapic</span><span class="op">|</span> <span class="ident">ioapic</span>.<span class="ident">lock</span>())
+<span class="doccomment">/// If an `IoApic` with the given `id` exists, then lock it (acquire its Mutex)
+/// and return the locked `IoApic`.
+</span><span class="kw">pub fn </span>get_ioapic(ioapic_id: u8) -&gt; <span class="prelude-ty">Option</span>&lt;MutexGuard&lt;<span class="lifetime">&#39;static</span>, IoApic&gt;&gt; {
+	IOAPICS.get(<span class="kw-2">&amp;</span>ioapic_id).map(|ioapic| ioapic.lock())
 }
 
-<span class="doccomment">/// Returns the first `IoApic` that was created, if any, after locking it.</span>
-<span class="doccomment">/// This is not necessarily the default one.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_first_ioapic</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span>, <span class="ident">IoApic</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-	<span class="ident">IOAPICS</span>.<span class="ident">iter</span>().<span class="ident">next</span>().<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">_id</span>, <span class="ident">ioapic</span>)<span class="op">|</span> <span class="ident">ioapic</span>.<span class="ident">lock</span>())
-}
-
-
-
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">struct</span> <span class="ident">IoApicRegisters</span> {
-    <span class="doccomment">/// Chooses which IoApic register the following access will write to or read from.</span>
-    <span class="ident">register_index</span>:       <span class="ident">WriteOnly</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,
-    <span class="ident">_padding0</span>:            [<span class="ident">u32</span>; <span class="number">3</span>],
-    <span class="doccomment">/// The register containing the actual data that we want to read or write.</span>
-    <span class="ident">register_data</span>:        <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,
-    <span class="ident">_padding1</span>:            [<span class="ident">u32</span>; <span class="number">3</span>],    
+<span class="doccomment">/// Returns the first `IoApic` that was created, if any, after locking it.
+/// This is not necessarily the default one.
+</span><span class="kw">pub fn </span>get_first_ioapic() -&gt; <span class="prelude-ty">Option</span>&lt;MutexGuard&lt;<span class="lifetime">&#39;static</span>, IoApic&gt;&gt; {
+	IOAPICS.iter().next().map(|(_id, ioapic)| ioapic.lock())
 }
 
 
-<span class="doccomment">/// Each IoApic handles a maximum of 24 interrupt redirection entries. </span>
-<span class="kw">const</span> <span class="ident">INTERRUPT_ENTRIES_PER_IOAPIC</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">24</span>; 
 
-
-<span class="doccomment">/// A representation of an IoApic (x86-specific interrupt chip for I/O devices).</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IoApic</span> {
-    <span class="ident">regs</span>: <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">IoApicRegisters</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The ID of this IoApic.</span>
-    <span class="kw">pub</span> <span class="ident">id</span>: <span class="ident">u8</span>,
-    <span class="doccomment">/// not yet used.</span>
-    <span class="ident">_phys_addr</span>: <span class="ident">PhysicalAddress</span>,
-    <span class="doccomment">/// The first global interrupt number handled by this IoApic.</span>
-    <span class="doccomment">/// Each IoApic only handles 24 interrupts, </span>
-    <span class="doccomment">/// so the last interrupt number supported by thie IoApic is `gsi_base + 23`.</span>
-    <span class="ident">gsi_base</span>: <span class="ident">u32</span>,
+<span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">struct </span>IoApicRegisters {
+    <span class="doccomment">/// Chooses which IoApic register the following access will write to or read from.
+    </span>register_index:       WriteOnly&lt;u32&gt;,
+    _padding0:            [u32; <span class="number">3</span>],
+    <span class="doccomment">/// The register containing the actual data that we want to read or write.
+    </span>register_data:        Volatile&lt;u32&gt;,
+    _padding1:            [u32; <span class="number">3</span>],    
 }
 
-<span class="kw">impl</span> <span class="ident">IoApic</span> {
-    <span class="doccomment">/// Creates a new IoApic struct from the given `id`, `PhysicalAddress`, and `gsi_base`,</span>
-    <span class="doccomment">/// and then adds it to the system-wide list of all IOAPICs.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>, <span class="ident">id</span>: <span class="ident">u8</span>, <span class="ident">phys_addr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">gsi_base</span>: <span class="ident">u32</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">new_page</span> <span class="op">=</span> <span class="ident">allocate_pages</span>(<span class="number">1</span>).<span class="ident">ok_or</span>(<span class="string">&quot;IoApic::new(): couldn&#39;t allocate_pages!&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">frame</span> <span class="op">=</span> <span class="ident">allocate_frames_at</span>(<span class="ident">phys_addr</span>, <span class="number">1</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;Couldn&#39;t allocate physical frame for IOAPIC&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">ioapic_mapped_page</span> <span class="op">=</span> <span class="ident">page_table</span>.<span class="ident">map_allocated_pages_to</span>(
-            <span class="ident">new_page</span>,
-            <span class="ident">frame</span>, 
-            <span class="ident">EntryFlags::PRESENT</span> <span class="op">|</span> <span class="ident">EntryFlags::WRITABLE</span> <span class="op">|</span> <span class="ident">EntryFlags::NO_CACHE</span> <span class="op">|</span> <span class="ident">EntryFlags::NO_EXECUTE</span>, 
+
+<span class="doccomment">/// Each IoApic handles a maximum of 24 interrupt redirection entries. 
+</span><span class="kw">const </span>INTERRUPT_ENTRIES_PER_IOAPIC: u32 = <span class="number">24</span>; 
+
+
+<span class="doccomment">/// A representation of an IoApic (x86-specific interrupt chip for I/O devices).
+</span><span class="kw">pub struct </span>IoApic {
+    regs: BorrowedMappedPages&lt;IoApicRegisters, Mutable&gt;,
+    <span class="doccomment">/// The ID of this IoApic.
+    </span><span class="kw">pub </span>id: u8,
+    <span class="doccomment">/// not yet used.
+    </span>_phys_addr: PhysicalAddress,
+    <span class="doccomment">/// The first global interrupt number handled by this IoApic.
+    /// Each IoApic only handles 24 interrupts, 
+    /// so the last interrupt number supported by thie IoApic is `gsi_base + 23`.
+    </span>gsi_base: u32,
+}
+
+<span class="kw">impl </span>IoApic {
+    <span class="doccomment">/// Creates a new IoApic struct from the given `id`, `PhysicalAddress`, and `gsi_base`,
+    /// and then adds it to the system-wide list of all IOAPICs.
+    </span><span class="kw">pub fn </span>new(page_table: <span class="kw-2">&amp;mut </span>PageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>new_page = allocate_pages(<span class="number">1</span>).ok_or(<span class="string">&quot;IoApic::new(): couldn&#39;t allocate_pages!&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>frame = allocate_frames_at(phys_addr, <span class="number">1</span>).map_err(|_e| <span class="string">&quot;Couldn&#39;t allocate physical frame for IOAPIC&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>ioapic_mapped_page = page_table.map_allocated_pages_to(
+            new_page,
+            frame, 
+            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
         )<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="ident">ioapic_regs</span> <span class="op">=</span> <span class="ident">ioapic_mapped_page</span>.<span class="ident">into_borrowed_mut</span>(<span class="number">0</span>).<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">ioapic</span> <span class="op">=</span> <span class="ident">IoApic</span> {
-            <span class="ident">regs</span>: <span class="ident">ioapic_regs</span>,
-			<span class="ident">id</span>,
-            <span class="ident">_phys_addr</span>: <span class="ident">phys_addr</span>,
-            <span class="ident">gsi_base</span>,
+        <span class="kw">let </span>ioapic_regs = ioapic_mapped_page.into_borrowed_mut(<span class="number">0</span>).map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
+        <span class="kw">let </span>ioapic = IoApic {
+            regs: ioapic_regs,
+			id,
+            _phys_addr: phys_addr,
+            gsi_base,
 		};
 
-        <span class="macro">debug!</span>(<span class="string">&quot;Created new IoApic, id: {}, gsi_base: {}, phys_addr: {:#X}&quot;</span>, <span class="ident">id</span>, <span class="ident">gsi_base</span>, <span class="ident">phys_addr</span>);
-        <span class="ident">IOAPICS</span>.<span class="ident">insert</span>(<span class="ident">id</span>, <span class="ident">Mutex::new</span>(<span class="ident">ioapic</span>));
+        <span class="macro">debug!</span>(<span class="string">&quot;Created new IoApic, id: {}, gsi_base: {}, phys_addr: {:#X}&quot;</span>, id, gsi_base, phys_addr);
+        IOAPICS.insert(id, Mutex::new(ioapic));
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Returns whether this IoApic handles the given `irq_num`, i.e.,</span>
-    <span class="doccomment">/// whether it&#39;s within the range of IRQs handled by this `IoApic`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handles_irq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">irq_num</span>: <span class="ident">u32</span>) -&gt; <span class="ident">bool</span> {
-        (<span class="ident">irq_num</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">gsi_base</span>) <span class="op">&amp;&amp;</span> 
-        (<span class="ident">irq_num</span> <span class="op">&lt;</span> (<span class="self">self</span>.<span class="ident">gsi_base</span> <span class="op">+</span> <span class="ident">INTERRUPT_ENTRIES_PER_IOAPIC</span>))
+    <span class="doccomment">/// Returns whether this IoApic handles the given `irq_num`, i.e.,
+    /// whether it&#39;s within the range of IRQs handled by this `IoApic`.
+    </span><span class="kw">pub fn </span>handles_irq(<span class="kw-2">&amp;</span><span class="self">self</span>, irq_num: u32) -&gt; bool {
+        (irq_num &gt;= <span class="self">self</span>.gsi_base) &amp;&amp; 
+        (irq_num &lt; (<span class="self">self</span>.gsi_base + INTERRUPT_ENTRIES_PER_IOAPIC))
     }
 
-    <span class="kw">fn</span> <span class="ident">read_reg</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">register_index</span>: <span class="ident">u32</span>) -&gt; <span class="ident">u32</span> {
-        <span class="comment">// to read from an IoApic reg, we first write which register we want to read from,</span>
-        <span class="comment">// then we read the value from it in the next register</span>
-        <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">register_index</span>.<span class="ident">write</span>(<span class="ident">register_index</span>);
-        <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">register_data</span>.<span class="ident">read</span>()
+    <span class="kw">fn </span>read_reg(<span class="kw-2">&amp;mut </span><span class="self">self</span>, register_index: u32) -&gt; u32 {
+        <span class="comment">// to read from an IoApic reg, we first write which register we want to read from,
+        // then we read the value from it in the next register
+        </span><span class="self">self</span>.regs.register_index.write(register_index);
+        <span class="self">self</span>.regs.register_data.read()
     }
 
-    <span class="kw">fn</span> <span class="ident">write_reg</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">register_index</span>: <span class="ident">u32</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
-        <span class="comment">// to write to an IoApic reg, we first write which register we want to write to,</span>
-        <span class="comment">// then we write the value to it in the next register</span>
-        <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">register_index</span>.<span class="ident">write</span>(<span class="ident">register_index</span>);
-        <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">register_data</span>.<span class="ident">write</span>(<span class="ident">value</span>);
+    <span class="kw">fn </span>write_reg(<span class="kw-2">&amp;mut </span><span class="self">self</span>, register_index: u32, value: u32) {
+        <span class="comment">// to write to an IoApic reg, we first write which register we want to write to,
+        // then we write the value to it in the next register
+        </span><span class="self">self</span>.regs.register_index.write(register_index);
+        <span class="self">self</span>.regs.register_data.write(value);
     }
 
-    <span class="doccomment">/// gets this IoApic&#39;s id.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">id</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">u32</span> {
-        <span class="self">self</span>.<span class="ident">read_reg</span>(<span class="number">0x0</span>)
+    <span class="doccomment">/// gets this IoApic&#39;s id.
+    </span><span class="kw">pub fn </span>id(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; u32 {
+        <span class="self">self</span>.read_reg(<span class="number">0x0</span>)
     }
 
-    <span class="doccomment">/// gets this IoApic&#39;s version.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">version</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">u32</span> {
-        <span class="self">self</span>.<span class="ident">read_reg</span>(<span class="number">0x1</span>)
+    <span class="doccomment">/// gets this IoApic&#39;s version.
+    </span><span class="kw">pub fn </span>version(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; u32 {
+        <span class="self">self</span>.read_reg(<span class="number">0x1</span>)
     }
 
-    <span class="doccomment">/// gets this IoApic&#39;s arbitration id.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">arbitration_id</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">u32</span> {
-        <span class="self">self</span>.<span class="ident">read_reg</span>(<span class="number">0x2</span>)
+    <span class="doccomment">/// gets this IoApic&#39;s arbitration id.
+    </span><span class="kw">pub fn </span>arbitration_id(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; u32 {
+        <span class="self">self</span>.read_reg(<span class="number">0x2</span>)
     }
 
-    <span class="doccomment">/// Masks (disables) the given IRQ line. </span>
-    <span class="doccomment">/// NOTE: this function is UNTESTED!</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mask_irq</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">irq</span>: <span class="ident">u8</span>) {
-        <span class="kw">let</span> <span class="ident">irq_reg</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x10</span> <span class="op">+</span> (<span class="number">2</span> <span class="op">*</span> <span class="ident">irq</span> <span class="kw">as</span> <span class="ident">u32</span>);
-        <span class="kw">let</span> <span class="ident">direction</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">read_reg</span>(<span class="ident">irq_reg</span>);
-        <span class="self">self</span>.<span class="ident">write_reg</span>(<span class="ident">irq_reg</span>, <span class="ident">direction</span> <span class="op">|</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>));
+    <span class="doccomment">/// Masks (disables) the given IRQ line. 
+    /// NOTE: this function is UNTESTED!
+    </span><span class="kw">pub fn </span>mask_irq(<span class="kw-2">&amp;mut </span><span class="self">self</span>, irq: u8) {
+        <span class="kw">let </span>irq_reg: u32 = <span class="number">0x10 </span>+ (<span class="number">2 </span>* irq <span class="kw">as </span>u32);
+        <span class="kw">let </span>direction = <span class="self">self</span>.read_reg(irq_reg);
+        <span class="self">self</span>.write_reg(irq_reg, direction | (<span class="number">1 </span>&lt;&lt; <span class="number">16</span>));
     }
 
-    <span class="doccomment">/// Set IRQ to an interrupt vector.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `ioapic_irq`: the IRQ number that this interrupt will trigger on this IoApic.</span>
-    <span class="doccomment">/// * `lapic_id`: the id of the LocalApic that should handle this interrupt.</span>
-    <span class="doccomment">/// * `irq_vector`: the system-wide IRQ vector number,</span>
-    <span class="doccomment">///    which after remapping is from 0x20 to 0x2F </span>
-    <span class="doccomment">///    (see [`interrupts::IRQ_BASE_OFFSET`](../interrupts/constant.IRQ_BASE_OFFSET.html)).</span>
-    <span class="doccomment">///    For example, 0x20 is the PIT timer, 0x21 is the PS2 keyboard, etc.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_irq</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">ioapic_irq</span>: <span class="ident">u8</span>, <span class="ident">lapic_id</span>: <span class="ident">u8</span>, <span class="ident">irq_vector</span>: <span class="ident">u8</span>) {
-        <span class="kw">let</span> <span class="ident">vector</span> <span class="op">=</span> <span class="ident">irq_vector</span> <span class="kw">as</span> <span class="ident">u8</span>;
+    <span class="doccomment">/// Set IRQ to an interrupt vector.
+    ///
+    /// # Arguments
+    /// * `ioapic_irq`: the IRQ number that this interrupt will trigger on this IoApic.
+    /// * `lapic_id`: the id of the LocalApic that should handle this interrupt.
+    /// * `irq_vector`: the system-wide IRQ vector number,
+    ///    which after remapping is from 0x20 to 0x2F 
+    ///    (see [`interrupts::IRQ_BASE_OFFSET`](../interrupts/constant.IRQ_BASE_OFFSET.html)).
+    ///    For example, 0x20 is the PIT timer, 0x21 is the PS2 keyboard, etc.
+    </span><span class="kw">pub fn </span>set_irq(<span class="kw-2">&amp;mut </span><span class="self">self</span>, ioapic_irq: u8, lapic_id: u8, irq_vector: u8) {
+        <span class="kw">let </span>vector = irq_vector <span class="kw">as </span>u8;
 
-        <span class="kw">let</span> <span class="ident">low_index</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x10</span> <span class="op">+</span> (<span class="ident">ioapic_irq</span> <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">*</span> <span class="number">2</span>;
-        <span class="kw">let</span> <span class="ident">high_index</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x10</span> <span class="op">+</span> (<span class="ident">ioapic_irq</span> <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">*</span> <span class="number">2</span> <span class="op">+</span> <span class="number">1</span>;
+        <span class="kw">let </span>low_index: u32 = <span class="number">0x10 </span>+ (ioapic_irq <span class="kw">as </span>u32) * <span class="number">2</span>;
+        <span class="kw">let </span>high_index: u32 = <span class="number">0x10 </span>+ (ioapic_irq <span class="kw">as </span>u32) * <span class="number">2 </span>+ <span class="number">1</span>;
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">high</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">read_reg</span>(<span class="ident">high_index</span>);
-        <span class="ident">high</span> <span class="op">&amp;=</span> <span class="op">!</span><span class="number">0xff000000</span>;
-        <span class="ident">high</span> <span class="op">|</span><span class="op">=</span> (<span class="ident">lapic_id</span> <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">24</span>;
-        <span class="self">self</span>.<span class="ident">write_reg</span>(<span class="ident">high_index</span>, <span class="ident">high</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>high = <span class="self">self</span>.read_reg(high_index);
+        high &amp;= !<span class="number">0xff000000</span>;
+        high |= (lapic_id <span class="kw">as </span>u32) &lt;&lt; <span class="number">24</span>;
+        <span class="self">self</span>.write_reg(high_index, high);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">low</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">read_reg</span>(<span class="ident">low_index</span>);
-        <span class="ident">low</span> <span class="op">&amp;=</span> <span class="op">!</span>(<span class="number">1</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="number">16</span>);
-        <span class="ident">low</span> <span class="op">&amp;=</span> <span class="op">!</span>(<span class="number">1</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="number">11</span>);
-        <span class="ident">low</span> <span class="op">&amp;=</span> <span class="op">!</span><span class="number">0x700</span>;
-        <span class="ident">low</span> <span class="op">&amp;=</span> <span class="op">!</span><span class="number">0xff</span>;
-        <span class="ident">low</span> <span class="op">|</span><span class="op">=</span> <span class="ident">vector</span> <span class="kw">as</span> <span class="ident">u32</span>;
-        <span class="self">self</span>.<span class="ident">write_reg</span>(<span class="ident">low_index</span>, <span class="ident">low</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>low = <span class="self">self</span>.read_reg(low_index);
+        low &amp;= !(<span class="number">1</span>&lt;&lt;<span class="number">16</span>);
+        low &amp;= !(<span class="number">1</span>&lt;&lt;<span class="number">11</span>);
+        low &amp;= !<span class="number">0x700</span>;
+        low &amp;= !<span class="number">0xff</span>;
+        low |= vector <span class="kw">as </span>u32;
+        <span class="self">self</span>.write_reg(low_index, low);
     }
 }</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ioapic" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ioapic" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

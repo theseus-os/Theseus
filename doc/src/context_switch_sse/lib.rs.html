@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/context_switch_sse/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../context_switch_sse/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../context_switch_sse/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../context_switch_sse/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/context_switch_sse/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../context_switch_sse/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -152,81 +146,81 @@
 <span id="146">146</span>
 <span id="147">147</span>
 <span id="148">148</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This crate contains structures and routines for context switching </span>
-<span class="doccomment">//! when SSE extensions are enabled. </span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate contains structures and routines for context switching 
+//! when SSE extensions are enabled. 
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">naked_functions</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(naked_functions)]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">zerocopy</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">context_switch_regular</span>;
+</span><span class="kw">extern crate </span>zerocopy;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>context_switch_regular;
 
-<span class="kw">use</span> <span class="ident">context_switch_regular::ContextRegular</span>;
-<span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
+<span class="kw">use </span>context_switch_regular::ContextRegular;
+<span class="kw">use </span>zerocopy::FromBytes;
 
 
-<span class="doccomment">/// The registers saved before a context switch and restored after a context switch</span>
-<span class="doccomment">/// for SSE-enabled Tasks.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Note: the order of the registers here MUST MATCH the order of </span>
-<span class="doccomment">/// registers popped in the [`restore_registers_sse!`] macro. </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ContextSSE</span> {
-    <span class="ident">xmm15</span>: <span class="ident">u128</span>,
-    <span class="ident">xmm14</span>: <span class="ident">u128</span>,   
-    <span class="ident">xmm13</span>: <span class="ident">u128</span>,   
-    <span class="ident">xmm12</span>: <span class="ident">u128</span>,   
-    <span class="ident">xmm11</span>: <span class="ident">u128</span>,   
-    <span class="ident">xmm10</span>: <span class="ident">u128</span>,   
-    <span class="ident">xmm9</span>:  <span class="ident">u128</span>,   
-    <span class="ident">xmm8</span>:  <span class="ident">u128</span>,   
-    <span class="ident">xmm7</span>:  <span class="ident">u128</span>,   
-    <span class="ident">xmm6</span>:  <span class="ident">u128</span>,   
-    <span class="ident">xmm5</span>:  <span class="ident">u128</span>,   
-    <span class="ident">xmm4</span>:  <span class="ident">u128</span>,   
-    <span class="ident">xmm3</span>:  <span class="ident">u128</span>,   
-    <span class="ident">xmm2</span>:  <span class="ident">u128</span>,   
-    <span class="ident">xmm1</span>:  <span class="ident">u128</span>,   
-    <span class="ident">xmm0</span>:  <span class="ident">u128</span>, 
-    <span class="ident">regular</span>: <span class="ident">ContextRegular</span>,
+<span class="doccomment">/// The registers saved before a context switch and restored after a context switch
+/// for SSE-enabled Tasks.
+///
+/// Note: the order of the registers here MUST MATCH the order of 
+/// registers popped in the [`restore_registers_sse!`] macro. 
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C, packed)]
+</span><span class="kw">pub struct </span>ContextSSE {
+    xmm15: u128,
+    xmm14: u128,   
+    xmm13: u128,   
+    xmm12: u128,   
+    xmm11: u128,   
+    xmm10: u128,   
+    xmm9:  u128,   
+    xmm8:  u128,   
+    xmm7:  u128,   
+    xmm6:  u128,   
+    xmm5:  u128,   
+    xmm4:  u128,   
+    xmm3:  u128,   
+    xmm2:  u128,   
+    xmm1:  u128,   
+    xmm0:  u128, 
+    regular: ContextRegular,
 }
 
-<span class="kw">impl</span> <span class="ident">ContextSSE</span> {
-    <span class="doccomment">/// Creates a new ContextSSE struct that will cause the</span>
-    <span class="doccomment">/// SSE-enabled Task containing it to begin its execution at the given `rip`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">rip</span>: <span class="ident">usize</span>) -&gt; <span class="ident">ContextSSE</span> {
-        <span class="ident">ContextSSE</span> {
-            <span class="ident">xmm15</span>: <span class="number">0</span>,
-            <span class="ident">xmm14</span>: <span class="number">0</span>,   
-            <span class="ident">xmm13</span>: <span class="number">0</span>,   
-            <span class="ident">xmm12</span>: <span class="number">0</span>,   
-            <span class="ident">xmm11</span>: <span class="number">0</span>,   
-            <span class="ident">xmm10</span>: <span class="number">0</span>,   
-            <span class="ident">xmm9</span>:  <span class="number">0</span>,   
-            <span class="ident">xmm8</span>:  <span class="number">0</span>,   
-            <span class="ident">xmm7</span>:  <span class="number">0</span>,   
-            <span class="ident">xmm6</span>:  <span class="number">0</span>,   
-            <span class="ident">xmm5</span>:  <span class="number">0</span>,   
-            <span class="ident">xmm4</span>:  <span class="number">0</span>,   
-            <span class="ident">xmm3</span>:  <span class="number">0</span>,   
-            <span class="ident">xmm2</span>:  <span class="number">0</span>,   
-            <span class="ident">xmm1</span>:  <span class="number">0</span>,   
-            <span class="ident">xmm0</span>:  <span class="number">0</span>,   
-            <span class="ident">regular</span>: <span class="ident">ContextRegular::new</span>(<span class="ident">rip</span>),
+<span class="kw">impl </span>ContextSSE {
+    <span class="doccomment">/// Creates a new ContextSSE struct that will cause the
+    /// SSE-enabled Task containing it to begin its execution at the given `rip`.
+    </span><span class="kw">pub fn </span>new(rip: usize) -&gt; ContextSSE {
+        ContextSSE {
+            xmm15: <span class="number">0</span>,
+            xmm14: <span class="number">0</span>,   
+            xmm13: <span class="number">0</span>,   
+            xmm12: <span class="number">0</span>,   
+            xmm11: <span class="number">0</span>,   
+            xmm10: <span class="number">0</span>,   
+            xmm9:  <span class="number">0</span>,   
+            xmm8:  <span class="number">0</span>,   
+            xmm7:  <span class="number">0</span>,   
+            xmm6:  <span class="number">0</span>,   
+            xmm5:  <span class="number">0</span>,   
+            xmm4:  <span class="number">0</span>,   
+            xmm3:  <span class="number">0</span>,   
+            xmm2:  <span class="number">0</span>,   
+            xmm1:  <span class="number">0</span>,   
+            xmm0:  <span class="number">0</span>,   
+            regular: ContextRegular::new(rip),
         }
     }
 }
 
 
-<span class="doccomment">/// An assembly block for saving SSE registers</span>
-<span class="doccomment">/// by pushing them onto the stack.</span>
-<span class="attribute">#[<span class="ident">macro_export</span>]</span>
-<span class="macro">macro_rules!</span> <span class="ident">save_registers_sse</span> {
+<span class="doccomment">/// An assembly block for saving SSE registers
+/// by pushing them onto the stack.
+</span><span class="attr">#[macro_export]
+</span><span class="macro">macro_rules! </span>save_registers_sse {
     () =&gt; (
-        <span class="comment">// Save all of the xmm registers (for SSE).</span>
-        <span class="comment">// Each register is 16 bytes (128 bits), and there are 16 of them.</span>
-        <span class="string">r#&quot;
+        <span class="comment">// Save all of the xmm registers (for SSE).
+        // Each register is 16 bytes (128 bits), and there are 16 of them.
+        </span><span class="string">r#&quot;
             lea rsp, [rsp - 16*16]
             movdqu [rsp + 16*0],  xmm0   # push xmm0
             movdqu [rsp + 16*1],  xmm1   # push xmm1
@@ -244,18 +238,18 @@
             movdqu [rsp + 16*13], xmm13  # push xmm13
             movdqu [rsp + 16*14], xmm14  # push xmm14
             movdqu [rsp + 16*15], xmm15  # push xmm15
-        &quot;#</span>
-    );
+        &quot;#
+    </span>);
 }
 
 
-<span class="doccomment">/// An assembly block for restoring SSE registers</span>
-<span class="doccomment">/// by popping them off of the stack.</span>
-<span class="attribute">#[<span class="ident">macro_export</span>]</span>
-<span class="macro">macro_rules!</span> <span class="ident">restore_registers_sse</span> {
+<span class="doccomment">/// An assembly block for restoring SSE registers
+/// by popping them off of the stack.
+</span><span class="attr">#[macro_export]
+</span><span class="macro">macro_rules! </span>restore_registers_sse {
     () =&gt; (
-        <span class="comment">// restore all of the xmm registers</span>
-        <span class="string">r#&quot;
+        <span class="comment">// restore all of the xmm registers
+        </span><span class="string">r#&quot;
             movdqu xmm15, [rsp + 16*15]   # pop xmm15
             movdqu xmm14, [rsp + 16*14]   # pop xmm14
             movdqu xmm13, [rsp + 16*13]   # pop xmm13
@@ -273,33 +267,32 @@
             movdqu xmm1,  [rsp + 16*1]    # pop xmm1
             movdqu xmm0,  [rsp + 16*0]    # pop xmm0
             lea rsp, [rsp + 16*16]
-        &quot;#</span>
-    );
+        &quot;#
+    </span>);
 }
 
 
-<span class="doccomment">/// Switches context from an SSE Task to another SSE Task.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * First argument  (in `RDI`): mutable pointer to the previous task&#39;s stack pointer</span>
-<span class="doccomment">/// * Second argument (in `RSI`): the value of the next task&#39;s stack pointer</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Safety</span>
-<span class="doccomment">/// This function is unsafe because it changes the content on both task&#39;s stacks. </span>
-<span class="attribute">#[<span class="ident">naked</span>]</span>
-<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">context_switch_sse</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
-    <span class="comment">// Since this is a naked function that expects its arguments in two registers,</span>
-    <span class="comment">// you CANNOT place any log statements or other instructions here</span>
-    <span class="comment">// before, in between, or after anything below.</span>
-    <span class="macro">core::arch::asm!</span>(
+<span class="doccomment">/// Switches context from an SSE Task to another SSE Task.
+/// 
+/// # Arguments
+/// * First argument  (in `RDI`): mutable pointer to the previous task&#39;s stack pointer
+/// * Second argument (in `RSI`): the value of the next task&#39;s stack pointer
+/// 
+/// # Safety
+/// This function is unsafe because it changes the content on both task&#39;s stacks. 
+</span><span class="attr">#[naked]
+</span><span class="kw">pub unsafe extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>context_switch_sse(_prev_stack_pointer: <span class="kw-2">*mut </span>usize, _next_stack_pointer_value: usize) {
+    <span class="comment">// Since this is a naked function that expects its arguments in two registers,
+    // you CANNOT place any log statements or other instructions here
+    // before, in between, or after anything below.
+    </span><span class="macro">core::arch::asm!</span>(
         <span class="macro">save_registers_regular!</span>(),
         <span class="macro">save_registers_sse!</span>(),
         <span class="macro">switch_stacks!</span>(),
         <span class="macro">restore_registers_sse!</span>(),
         <span class="macro">restore_registers_regular!</span>(),
-        <span class="ident">options</span>(<span class="ident">noreturn</span>)
+        options(noreturn)
     );
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="context_switch_sse" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="context_switch_sse" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

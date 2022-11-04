@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mod_mgmt/src/serde.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>serde.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../mod_mgmt/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../mod_mgmt/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../mod_mgmt/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mod_mgmt/src/serde.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>serde.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../mod_mgmt/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -127,129 +121,128 @@
 <span id="121">121</span>
 <span id="122">122</span>
 <span id="123">123</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Routines for converting serializable crate metadata types</span>
-<span class="doccomment">//! into the actual runtime `LoadedCrate` and `LoadedSection` types.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! See [`crate_metadata_serde`] docs for more information.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Routines for converting serializable crate metadata types
+//! into the actual runtime `LoadedCrate` and `LoadedSection` types.
+//! 
+//! See [`crate_metadata_serde`] docs for more information.
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">crate_metadata_serde</span>::{<span class="ident">SerializedCrate</span>, <span class="ident">SerializedSection</span>};
+</span><span class="kw">use crate</span>::<span class="kw-2">*</span>;
+<span class="kw">use </span>crate_metadata_serde::{SerializedCrate, SerializedSection};
 
-<span class="doccomment">/// Converts the given [`SerializedCrate`] into a [`LoadedCrate`]</span>
-<span class="doccomment">/// and its sections into [`LoadedSection`]s.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">into_loaded_crate</span>(
-    <span class="ident">serialized_crate</span>: <span class="ident">SerializedCrate</span>,
-    <span class="ident">object_file</span>: <span class="ident">FileRef</span>,
-    <span class="ident">namespace</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>,
-    <span class="ident">text_pages</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">rodata_pages</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">data_pages</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">verbose_log</span>: <span class="ident">bool</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">StrongCrateRef</span>, <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">usize</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">crate_name</span>: <span class="ident">StrRef</span> <span class="op">=</span> <span class="ident">serialized_crate</span>.<span class="ident">crate_name</span>.<span class="ident">as_str</span>().<span class="ident">into</span>();
+<span class="doccomment">/// Converts the given [`SerializedCrate`] into a [`LoadedCrate`]
+/// and its sections into [`LoadedSection`]s.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>into_loaded_crate(
+    serialized_crate: SerializedCrate,
+    object_file: FileRef,
+    namespace: <span class="kw-2">&amp;</span>Arc&lt;CrateNamespace&gt;,
+    text_pages: <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;MappedPages&gt;&gt;,
+    rodata_pages: <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;MappedPages&gt;&gt;,
+    data_pages: <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;MappedPages&gt;&gt;,
+    verbose_log: bool,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(StrongCrateRef, BTreeMap&lt;String, usize&gt;, usize), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>crate_name: StrRef = serialized_crate.crate_name.as_str().into();
     
-    <span class="comment">// The sections need a weak reference back to the loaded_crate, and so we first create</span>
-    <span class="comment">// the loaded_crate so we have something to reference when loading the sections.</span>
-    <span class="kw">let</span> <span class="ident">loaded_crate</span> <span class="op">=</span> <span class="ident">CowArc::new</span>(<span class="ident">LoadedCrate</span> {
-        <span class="ident">crate_name</span>:          <span class="ident">crate_name</span>.<span class="ident">clone</span>(),
-        <span class="ident">debug_symbols_file</span>:  <span class="ident">Arc::downgrade</span>(<span class="kw-2">&amp;</span><span class="ident">object_file</span>),
-        <span class="ident">object_file</span>,
-        <span class="ident">sections</span>:            <span class="ident">HashMap::new</span>(), <span class="comment">// placeholder</span>
-        <span class="ident">text_pages</span>:          <span class="prelude-val">Some</span>((<span class="ident">Arc::clone</span>(<span class="ident">text_pages</span>), <span class="ident">mp_range</span>(<span class="ident">text_pages</span>))),
-        <span class="ident">rodata_pages</span>:        <span class="prelude-val">Some</span>((<span class="ident">Arc::clone</span>(<span class="ident">rodata_pages</span>), <span class="ident">mp_range</span>(<span class="ident">rodata_pages</span>))),
-        <span class="ident">data_pages</span>:          <span class="prelude-val">Some</span>((<span class="ident">Arc::clone</span>(<span class="ident">data_pages</span>), <span class="ident">mp_range</span>(<span class="ident">data_pages</span>))),
-        <span class="ident">global_sections</span>:     <span class="ident">serialized_crate</span>.<span class="ident">global_sections</span>,
-        <span class="ident">tls_sections</span>:        <span class="ident">serialized_crate</span>.<span class="ident">tls_sections</span>,
-        <span class="ident">data_sections</span>:       <span class="ident">serialized_crate</span>.<span class="ident">data_sections</span>,
-        <span class="ident">reexported_symbols</span>:  <span class="ident">BTreeSet::new</span>(),
+    <span class="comment">// The sections need a weak reference back to the loaded_crate, and so we first create
+    // the loaded_crate so we have something to reference when loading the sections.
+    </span><span class="kw">let </span>loaded_crate = CowArc::new(LoadedCrate {
+        crate_name:          crate_name.clone(),
+        debug_symbols_file:  Arc::downgrade(<span class="kw-2">&amp;</span>object_file),
+        object_file,
+        sections:            HashMap::new(), <span class="comment">// placeholder
+        </span>text_pages:          <span class="prelude-val">Some</span>((Arc::clone(text_pages), mp_range(text_pages))),
+        rodata_pages:        <span class="prelude-val">Some</span>((Arc::clone(rodata_pages), mp_range(rodata_pages))),
+        data_pages:          <span class="prelude-val">Some</span>((Arc::clone(data_pages), mp_range(data_pages))),
+        global_sections:     serialized_crate.global_sections,
+        tls_sections:        serialized_crate.tls_sections,
+        data_sections:       serialized_crate.data_sections,
+        reexported_symbols:  BTreeSet::new(),
     });
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sections</span> <span class="op">=</span> <span class="ident">HashMap::with_capacity</span>(<span class="ident">serialized_crate</span>.<span class="ident">sections</span>.<span class="ident">len</span>());
-    <span class="kw">for</span> (<span class="ident">shndx</span>, <span class="ident">section</span>) <span class="kw">in</span> <span class="ident">serialized_crate</span>.<span class="ident">sections</span> {
-        <span class="ident">sections</span>.<span class="ident">insert</span>(
-            <span class="ident">shndx</span>,
-            <span class="ident">into_loaded_section</span>(
-                <span class="ident">section</span>,
-                <span class="ident">CowArc::downgrade</span>(<span class="kw-2">&amp;</span><span class="ident">loaded_crate</span>),
-                <span class="ident">namespace</span>,
-                <span class="ident">text_pages</span>,
-                <span class="ident">rodata_pages</span>,
-                <span class="ident">data_pages</span>,
+    <span class="kw">let </span><span class="kw-2">mut </span>sections = HashMap::with_capacity(serialized_crate.sections.len());
+    <span class="kw">for </span>(shndx, section) <span class="kw">in </span>serialized_crate.sections {
+        sections.insert(
+            shndx,
+            into_loaded_section(
+                section,
+                CowArc::downgrade(<span class="kw-2">&amp;</span>loaded_crate),
+                namespace,
+                text_pages,
+                rodata_pages,
+                data_pages,
             )<span class="question-mark">?</span>,
         );
     }
 
-    <span class="kw">let</span> <span class="ident">num_new_syms</span> <span class="op">=</span> <span class="ident">namespace</span>.<span class="ident">add_symbols</span>(<span class="ident">sections</span>.<span class="ident">values</span>(), <span class="ident">verbose_log</span>);
+    <span class="kw">let </span>num_new_syms = namespace.add_symbols(sections.values(), verbose_log);
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">loaded_crate_mut</span> <span class="op">=</span> <span class="ident">loaded_crate</span>.<span class="ident">lock_as_mut</span>().<span class="ident">ok_or</span>(
+    <span class="kw">let </span><span class="kw-2">mut </span>loaded_crate_mut = loaded_crate.lock_as_mut().ok_or(
         <span class="string">&quot;BUG: SerializedCrate::into_loaded_crate(): couldn&#39;t get exclusive mutable access to loaded_crate&quot;</span>,
     )<span class="question-mark">?</span>;
-    <span class="ident">loaded_crate_mut</span>.<span class="ident">sections</span> <span class="op">=</span> <span class="ident">sections</span>;
-    <span class="ident">drop</span>(<span class="ident">loaded_crate_mut</span>);
+    loaded_crate_mut.sections = sections;
+    drop(loaded_crate_mut);
 
-    <span class="comment">// Add the newly-parsed nano_core crate to the kernel namespace.</span>
-    <span class="ident">namespace</span>.<span class="ident">crate_tree</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="ident">crate_name</span>, <span class="ident">loaded_crate</span>.<span class="ident">clone_shallow</span>());
-    <span class="macro">info!</span>(<span class="string">&quot;Finished parsing nano_core crate, added {} new symbols.&quot;</span>, <span class="ident">num_new_syms</span>);
+    <span class="comment">// Add the newly-parsed nano_core crate to the kernel namespace.
+    </span>namespace.crate_tree.lock().insert(crate_name, loaded_crate.clone_shallow());
+    <span class="macro">info!</span>(<span class="string">&quot;Finished parsing nano_core crate, added {} new symbols.&quot;</span>, num_new_syms);
     
-    <span class="comment">// // Dump loaded sections for verification. See pull request #542/#559 for more details:</span>
-    <span class="comment">// let loaded_crate_ref = loaded_crate.lock_as_ref();</span>
-    <span class="comment">// for (_, section) in loaded_crate_ref.sections.iter() {</span>
-    <span class="comment">//     trace!(&quot;{:016x} {} {}&quot;, section.address_range.start.value(), section.name, section.mapped_pages_offset);</span>
-    <span class="comment">// }</span>
-    <span class="comment">// drop(loaded_crate_ref);</span>
+    <span class="comment">// // Dump loaded sections for verification. See pull request #542/#559 for more details:
+    // let loaded_crate_ref = loaded_crate.lock_as_ref();
+    // for (_, section) in loaded_crate_ref.sections.iter() {
+    //     trace!(&quot;{:016x} {} {}&quot;, section.address_range.start.value(), section.name, section.mapped_pages_offset);
+    // }
+    // drop(loaded_crate_ref);
 
-    <span class="prelude-val">Ok</span>((<span class="ident">loaded_crate</span>, <span class="ident">serialized_crate</span>.<span class="ident">init_symbols</span>, <span class="ident">num_new_syms</span>))
+    </span><span class="prelude-val">Ok</span>((loaded_crate, serialized_crate.init_symbols, num_new_syms))
 }
 
 
-<span class="doccomment">/// Convert the given [`SerializedSection`] into a [`LoadedSection`].</span>
-<span class="kw">fn</span> <span class="ident">into_loaded_section</span>(
-    <span class="ident">serialized_section</span>: <span class="ident">SerializedSection</span>,
-    <span class="ident">parent_crate</span>: <span class="ident">WeakCrateRef</span>,
-    <span class="ident">namespace</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>,
-    <span class="ident">text_pages</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">rodata_pages</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">data_pages</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">LoadedSection</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">mapped_pages</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">serialized_section</span>.<span class="ident">ty</span> {
-        <span class="ident">SectionType::Text</span> =&gt; <span class="ident">Arc::clone</span>(<span class="ident">text_pages</span>),
-        <span class="ident">SectionType::Rodata</span>
-        <span class="op">|</span> <span class="ident">SectionType::TlsData</span>
-        <span class="op">|</span> <span class="ident">SectionType::TlsBss</span>
-        <span class="op">|</span> <span class="ident">SectionType::GccExceptTable</span>
-        <span class="op">|</span> <span class="ident">SectionType::EhFrame</span> =&gt; <span class="ident">Arc::clone</span>(<span class="ident">rodata_pages</span>),
-        <span class="ident">SectionType::Data</span> <span class="op">|</span> <span class="ident">SectionType::Bss</span> =&gt; <span class="ident">Arc::clone</span>(<span class="ident">data_pages</span>),
+<span class="doccomment">/// Convert the given [`SerializedSection`] into a [`LoadedSection`].
+</span><span class="kw">fn </span>into_loaded_section(
+    serialized_section: SerializedSection,
+    parent_crate: WeakCrateRef,
+    namespace: <span class="kw-2">&amp;</span>Arc&lt;CrateNamespace&gt;,
+    text_pages: <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;MappedPages&gt;&gt;,
+    rodata_pages: <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;MappedPages&gt;&gt;,
+    data_pages: <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;MappedPages&gt;&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Arc&lt;LoadedSection&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>mapped_pages = <span class="kw">match </span>serialized_section.ty {
+        SectionType::Text =&gt; Arc::clone(text_pages),
+        SectionType::Rodata
+        | SectionType::TlsData
+        | SectionType::TlsBss
+        | SectionType::GccExceptTable
+        | SectionType::EhFrame =&gt; Arc::clone(rodata_pages),
+        SectionType::Data | SectionType::Bss =&gt; Arc::clone(data_pages),
     };
-    <span class="kw">let</span> <span class="ident">virtual_address</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">serialized_section</span>.<span class="ident">virtual_address</span>)
-        .<span class="ident">ok_or</span>(<span class="string">&quot;SerializedSection::into_loaded_section(): invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>virtual_address = VirtualAddress::new(serialized_section.virtual_address)
+        .ok_or(<span class="string">&quot;SerializedSection::into_loaded_section(): invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">loaded_section</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">LoadedSection</span> {
-        <span class="ident">name</span>: <span class="kw">match</span> <span class="ident">serialized_section</span>.<span class="ident">ty</span> {
-            <span class="ident">SectionType::EhFrame</span>
-            <span class="op">|</span> <span class="ident">SectionType::GccExceptTable</span> =&gt; <span class="ident"><span class="kw">crate</span>::section_name_str_ref</span>(<span class="kw-2">&amp;</span><span class="ident">serialized_section</span>.<span class="ident">ty</span>),
-            <span class="kw">_</span> =&gt; <span class="ident">serialized_section</span>.<span class="ident">name</span>.<span class="ident">as_str</span>().<span class="ident">into</span>(),
+    <span class="kw">let </span>loaded_section = Arc::new(LoadedSection {
+        name: <span class="kw">match </span>serialized_section.ty {
+            SectionType::EhFrame
+            | SectionType::GccExceptTable =&gt; <span class="kw">crate</span>::section_name_str_ref(<span class="kw-2">&amp;</span>serialized_section.ty),
+            <span class="kw">_ </span>=&gt; serialized_section.name.as_str().into(),
         },
-        <span class="ident">typ</span>: <span class="ident">serialized_section</span>.<span class="ident">ty</span>,
-        <span class="ident">global</span>: <span class="ident">serialized_section</span>.<span class="ident">global</span>,
-        <span class="ident">mapped_pages_offset</span>: <span class="ident">serialized_section</span>.<span class="ident">offset</span>,
-        <span class="ident">mapped_pages</span>,
-        <span class="ident">address_range</span>: <span class="ident">virtual_address</span>..(<span class="ident">virtual_address</span> <span class="op">+</span> <span class="ident">serialized_section</span>.<span class="ident">size</span>),
-        <span class="ident">parent_crate</span>,
-        <span class="ident">inner</span>: <span class="ident">Default::default</span>(),
+        typ: serialized_section.ty,
+        global: serialized_section.global,
+        mapped_pages_offset: serialized_section.offset,
+        mapped_pages,
+        address_range: virtual_address..(virtual_address + serialized_section.size),
+        parent_crate,
+        inner: Default::default(),
     });
 
-    <span class="kw">if</span> <span class="kw">let</span> <span class="ident">SectionType::TlsData</span> <span class="op">|</span> <span class="ident">SectionType::TlsBss</span> <span class="op">=</span> <span class="ident">serialized_section</span>.<span class="ident">ty</span> {
-        <span class="ident">namespace</span>.<span class="ident">tls_initializer</span>.<span class="ident">lock</span>().<span class="ident">add_existing_static_tls_section</span>(
-            <span class="comment">// TLS sections encode their TLS offset in the virtual address field,</span>
-            <span class="comment">// which is necessary to properly calculate relocation entries that depend upon them.</span>
-            <span class="ident">serialized_section</span>.<span class="ident">virtual_address</span>,
-            <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">loaded_section</span>),
+    <span class="kw">if let </span>SectionType::TlsData | SectionType::TlsBss = serialized_section.ty {
+        namespace.tls_initializer.lock().add_existing_static_tls_section(
+            <span class="comment">// TLS sections encode their TLS offset in the virtual address field,
+            // which is necessary to properly calculate relocation entries that depend upon them.
+            </span>serialized_section.virtual_address,
+            Arc::clone(<span class="kw-2">&amp;</span>loaded_section),
         )
-        .<span class="ident">unwrap</span>();
+        .unwrap();
     }
 
-    <span class="prelude-val">Ok</span>(<span class="ident">loaded_section</span>)
+    <span class="prelude-val">Ok</span>(loaded_section)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mod_mgmt" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mod_mgmt" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/pic/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../pic/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../pic/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../pic/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/pic/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../pic/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -261,263 +255,262 @@
 <span id="255">255</span>
 <span id="256">256</span>
 <span id="257">257</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Support for the x86 PIC (8259 Programmable Interrupt Controller),</span>
-<span class="doccomment">//! which handles basic interrupts.</span>
-<span class="doccomment">//! In multicore mode, this isn&#39;t used in favor of the APIC interface.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Support for the x86 PIC (8259 Programmable Interrupt Controller),
+//! which handles basic interrupts.
+//! In multicore mode, this isn&#39;t used in favor of the APIC interface.
 
-<span class="doccomment">//! This was modified from the toyos pic8259_simple crate.</span>
+//! This was modified from the toyos pic8259_simple crate.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">port_io</span>;
+</span><span class="kw">extern crate </span>port_io;
 
-<span class="kw">use</span> <span class="ident">core::fmt</span>;
-
-
-<span class="doccomment">/// The offset added to the first IRQ: `0x20`.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This is needed to shift the start of all IRQ vectors </span>
-<span class="doccomment">/// to after the end of the CPU exception vectors,</span>
-<span class="doccomment">/// which occupy the first 32 IRQ vectors.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">IRQ_BASE_OFFSET</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x20</span>;
-
-<span class="doccomment">/// The IRQ number reserved for spurious PIC interrupts (as recommended by OS dev wiki).</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PIC_SPURIOUS_INTERRUPT_IRQ</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0x7</span>;
-
-<span class="doccomment">/// Command sent to read the Interrupt Request Register.</span>
-<span class="kw">const</span> <span class="ident">CMD_IRR</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x0A</span>;
-
-<span class="doccomment">/// Command sent to read the In-Service Register.</span>
-<span class="kw">const</span> <span class="ident">CMD_ISR</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x0B</span>;
-
-<span class="doccomment">/// Command sent to begin PIC initialization.</span>
-<span class="kw">const</span> <span class="ident">CMD_INIT</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x11</span>;
-
-<span class="doccomment">/// Command sent to acknowledge an interrupt.</span>
-<span class="kw">const</span> <span class="ident">CMD_END_OF_INTERRUPT</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x20</span>;
-
-<span class="comment">// The mode in which we want to run our PICs.</span>
-<span class="kw">const</span> <span class="ident">MODE_8086</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x01</span>;
-
-<span class="kw">const</span> <span class="ident">MASTER_CMD</span>:  <span class="ident">u16</span> <span class="op">=</span> <span class="number">0x20</span>;
-<span class="kw">const</span> <span class="ident">MASTER_DATA</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">0x21</span>;
-<span class="kw">const</span> <span class="ident">SLAVE_CMD</span>:   <span class="ident">u16</span> <span class="op">=</span> <span class="number">0xA0</span>;
-<span class="kw">const</span> <span class="ident">SLAVE_DATA</span>:  <span class="ident">u16</span> <span class="op">=</span> <span class="number">0xA1</span>;
+<span class="kw">use </span>core::fmt;
 
 
-<span class="doccomment">/// The set of status registers for both PIC chips.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Each PIC chip has two interrupt status registers: </span>
-<span class="doccomment">///  * `ISR`: the In-Service Register: specifies which interrupts are currently being serviced,</span>
-<span class="doccomment">///     meaning IRQs sent to the CPU. </span>
-<span class="doccomment">///  * `IRR`: the Interrupt Request Register: specifies which interrupts have been raised</span>
-<span class="doccomment">///     but not necessarily serviced yet.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Based on the interrupt mask, the PIC will send interrupts from the IRR to the CPU, </span>
-<span class="doccomment">/// at which point they are marked in the ISR.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// For more, [see this explanation](http://wiki.osdev.org/8259_PIC#ISR_and_IRR).</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IrqStatusRegisters</span> {
-    <span class="kw">pub</span> <span class="ident">master_isr</span>: <span class="ident">u8</span>,
-    <span class="kw">pub</span> <span class="ident">master_irr</span>: <span class="ident">u8</span>,
-    <span class="kw">pub</span> <span class="ident">slave_isr</span>: <span class="ident">u8</span>,
-    <span class="kw">pub</span> <span class="ident">slave_irr</span>: <span class="ident">u8</span>,
+<span class="doccomment">/// The offset added to the first IRQ: `0x20`.
+/// 
+/// This is needed to shift the start of all IRQ vectors 
+/// to after the end of the CPU exception vectors,
+/// which occupy the first 32 IRQ vectors.
+</span><span class="kw">pub const </span>IRQ_BASE_OFFSET: u8 = <span class="number">0x20</span>;
+
+<span class="doccomment">/// The IRQ number reserved for spurious PIC interrupts (as recommended by OS dev wiki).
+</span><span class="kw">pub const </span>PIC_SPURIOUS_INTERRUPT_IRQ: u8 = IRQ_BASE_OFFSET + <span class="number">0x7</span>;
+
+<span class="doccomment">/// Command sent to read the Interrupt Request Register.
+</span><span class="kw">const </span>CMD_IRR: u8 = <span class="number">0x0A</span>;
+
+<span class="doccomment">/// Command sent to read the In-Service Register.
+</span><span class="kw">const </span>CMD_ISR: u8 = <span class="number">0x0B</span>;
+
+<span class="doccomment">/// Command sent to begin PIC initialization.
+</span><span class="kw">const </span>CMD_INIT: u8 = <span class="number">0x11</span>;
+
+<span class="doccomment">/// Command sent to acknowledge an interrupt.
+</span><span class="kw">const </span>CMD_END_OF_INTERRUPT: u8 = <span class="number">0x20</span>;
+
+<span class="comment">// The mode in which we want to run our PICs.
+</span><span class="kw">const </span>MODE_8086: u8 = <span class="number">0x01</span>;
+
+<span class="kw">const </span>MASTER_CMD:  u16 = <span class="number">0x20</span>;
+<span class="kw">const </span>MASTER_DATA: u16 = <span class="number">0x21</span>;
+<span class="kw">const </span>SLAVE_CMD:   u16 = <span class="number">0xA0</span>;
+<span class="kw">const </span>SLAVE_DATA:  u16 = <span class="number">0xA1</span>;
+
+
+<span class="doccomment">/// The set of status registers for both PIC chips.
+///
+/// Each PIC chip has two interrupt status registers: 
+///  * `ISR`: the In-Service Register: specifies which interrupts are currently being serviced,
+///     meaning IRQs sent to the CPU. 
+///  * `IRR`: the Interrupt Request Register: specifies which interrupts have been raised
+///     but not necessarily serviced yet.
+///
+/// Based on the interrupt mask, the PIC will send interrupts from the IRR to the CPU, 
+/// at which point they are marked in the ISR.
+///
+/// For more, [see this explanation](http://wiki.osdev.org/8259_PIC#ISR_and_IRR).
+</span><span class="kw">pub struct </span>IrqStatusRegisters {
+    <span class="kw">pub </span>master_isr: u8,
+    <span class="kw">pub </span>master_irr: u8,
+    <span class="kw">pub </span>slave_isr: u8,
+    <span class="kw">pub </span>slave_irr: u8,
 }
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">IrqStatusRegisters</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;Master ISR: {:#b}, Master IRR:{:#b}, Slave ISR: {:#b}, Slave IRR: {:#b}&quot;</span>, 
-                <span class="self">self</span>.<span class="ident">master_isr</span>, <span class="self">self</span>.<span class="ident">master_irr</span>, <span class="self">self</span>.<span class="ident">slave_isr</span>, <span class="self">self</span>.<span class="ident">slave_irr</span>)
+<span class="kw">impl </span>fmt::Display <span class="kw">for </span>IrqStatusRegisters {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;Master ISR: {:#b}, Master IRR:{:#b}, Slave ISR: {:#b}, Slave IRR: {:#b}&quot;</span>, 
+                <span class="self">self</span>.master_isr, <span class="self">self</span>.master_irr, <span class="self">self</span>.slave_isr, <span class="self">self</span>.slave_irr)
     }
 }
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">IrqStatusRegisters</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="ident">fmt::Display::fmt</span>(<span class="self">self</span>, <span class="ident">f</span>)
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>IrqStatusRegisters {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        fmt::Display::fmt(<span class="self">self</span>, f)
     }
 }
 
 
-<span class="doccomment">/// An individual PIC chip.  This is not exported, because we always access</span>
-<span class="doccomment">/// it through `Pics` below.</span>
-<span class="kw">struct</span> <span class="ident">Pic</span> {
-    <span class="doccomment">/// The base offset to which our interrupts are mapped.</span>
-    <span class="ident">offset</span>: <span class="ident">u8</span>,
+<span class="doccomment">/// An individual PIC chip.  This is not exported, because we always access
+/// it through `Pics` below.
+</span><span class="kw">struct </span>Pic {
+    <span class="doccomment">/// The base offset to which our interrupts are mapped.
+    </span>offset: u8,
 
-    <span class="doccomment">/// The processor I/O port on which we send commands.</span>
-    <span class="ident">command</span>: <span class="ident">port_io::Port</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// The processor I/O port on which we send commands.
+    </span>command: port_io::Port&lt;u8&gt;,
 
-    <span class="doccomment">/// The processor I/O port on which we send and receive data.</span>
-    <span class="ident">data</span>: <span class="ident">port_io::Port</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// The processor I/O port on which we send and receive data.
+    </span>data: port_io::Port&lt;u8&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">Pic</span> {
-    <span class="doccomment">/// Are we in change of handling the specified interrupt?</span>
-    <span class="doccomment">/// (Each PIC handles 8 interrupts.)</span>
-    <span class="kw">fn</span> <span class="ident">handles_interrupt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">interupt_id</span>: <span class="ident">u8</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">offset</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">interupt_id</span> <span class="op">&amp;&amp;</span> <span class="ident">interupt_id</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">offset</span> <span class="op">+</span> <span class="number">8</span>
-    }
+<span class="kw">impl </span>Pic {
+    <span class="doccomment">/// Are we in change of handling the specified interrupt?
+    /// (Each PIC handles 8 interrupts.)
+    </span><span class="kw">fn </span>handles_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, interupt_id: u8) -&gt; bool {
+        <span class="self">self</span>.offset &lt;= interupt_id &amp;&amp; interupt_id &lt; <span class="self">self</span>.offset + <span class="number">8
+    </span>}
 
-    <span class="doccomment">/// Notify us that an interrupt has been handled and that we&#39;re ready</span>
-    <span class="doccomment">/// for more.</span>
-    <span class="kw">fn</span> <span class="ident">end_of_interrupt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">unsafe</span> {
-            <span class="self">self</span>.<span class="ident">command</span>.<span class="ident">write</span>(<span class="ident">CMD_END_OF_INTERRUPT</span>);
+    <span class="doccomment">/// Notify us that an interrupt has been handled and that we&#39;re ready
+    /// for more.
+    </span><span class="kw">fn </span>end_of_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">unsafe </span>{
+            <span class="self">self</span>.command.write(CMD_END_OF_INTERRUPT);
         }
     }
 }
 
-<span class="doccomment">/// A pair of chained PIC chips, which represents the standard x86 configuration.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ChainedPics</span> {
-    <span class="ident">pics</span>: [<span class="ident">Pic</span>; <span class="number">2</span>],
+<span class="doccomment">/// A pair of chained PIC chips, which represents the standard x86 configuration.
+</span><span class="kw">pub struct </span>ChainedPics {
+    pics: [Pic; <span class="number">2</span>],
 }
 
-<span class="kw">impl</span> <span class="ident">ChainedPics</span> {
-    <span class="doccomment">/// Create a new interface for the standard PIC1 and PIC2 controllers,</span>
-    <span class="doccomment">/// specifying the desired interrupt offsets.</span>
-    <span class="doccomment">/// Then, it initializes the PICs in a standard chained fashion, </span>
-    <span class="doccomment">/// which involved mapping the master PIC to 0x20 and the slave to 0x28 (standard rempaping),</span>
-    <span class="doccomment">/// because even if we don&#39;t use them (and disable them for APIC instead),</span>
-    <span class="doccomment">/// we still need to remap them to avoid a spurious interrupt clashing with an exception.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">master_mask</span>: <span class="ident">u8</span>, <span class="ident">slave_mask</span>: <span class="ident">u8</span>) -&gt; <span class="ident">ChainedPics</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cpic</span> <span class="op">=</span> <span class="ident">ChainedPics</span> {
-            <span class="ident">pics</span>: [
-                <span class="ident">Pic</span> {
-                    <span class="ident">offset</span>: <span class="ident">IRQ_BASE_OFFSET</span>,
-                    <span class="ident">command</span>: <span class="ident">port_io::Port::new</span>(<span class="ident">MASTER_CMD</span>),
-                    <span class="ident">data</span>: <span class="ident">port_io::Port::new</span>(<span class="ident">MASTER_DATA</span>),
+<span class="kw">impl </span>ChainedPics {
+    <span class="doccomment">/// Create a new interface for the standard PIC1 and PIC2 controllers,
+    /// specifying the desired interrupt offsets.
+    /// Then, it initializes the PICs in a standard chained fashion, 
+    /// which involved mapping the master PIC to 0x20 and the slave to 0x28 (standard rempaping),
+    /// because even if we don&#39;t use them (and disable them for APIC instead),
+    /// we still need to remap them to avoid a spurious interrupt clashing with an exception.
+    </span><span class="kw">pub fn </span>init(master_mask: u8, slave_mask: u8) -&gt; ChainedPics {
+        <span class="kw">let </span><span class="kw-2">mut </span>cpic = ChainedPics {
+            pics: [
+                Pic {
+                    offset: IRQ_BASE_OFFSET,
+                    command: port_io::Port::new(MASTER_CMD),
+                    data: port_io::Port::new(MASTER_DATA),
                 },
-                <span class="ident">Pic</span> {
-                    <span class="ident">offset</span>: <span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">8</span>, <span class="comment">// 8 IRQ lines per PIC</span>
-                    <span class="ident">command</span>: <span class="ident">port_io::Port::new</span>(<span class="ident">SLAVE_CMD</span>),
-                    <span class="ident">data</span>: <span class="ident">port_io::Port::new</span>(<span class="ident">SLAVE_DATA</span>),
+                Pic {
+                    offset: IRQ_BASE_OFFSET + <span class="number">8</span>, <span class="comment">// 8 IRQ lines per PIC
+                    </span>command: port_io::Port::new(SLAVE_CMD),
+                    data: port_io::Port::new(SLAVE_DATA),
                 },
             ]
         };
-        <span class="comment">// SAFE: we already checked that we are the only ones to have called this constructor.</span>
-        <span class="kw">unsafe</span> {
-            <span class="ident">cpic</span>.<span class="ident">configure</span>(<span class="ident">master_mask</span>, <span class="ident">slave_mask</span>);
+        <span class="comment">// SAFE: we already checked that we are the only ones to have called this constructor.
+        </span><span class="kw">unsafe </span>{
+            cpic.configure(master_mask, slave_mask);
         }
-        <span class="ident">cpic</span>
+        cpic
     }
 
 
-    <span class="doccomment">/// Initialize both our PICs.  We initialize them together, at the same</span>
-    <span class="doccomment">/// time, because it&#39;s traditional to do so, and because I/O operations</span>
-    <span class="doccomment">/// might not be instantaneous on older processors.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">configure</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">master_mask</span>: <span class="ident">u8</span>, <span class="ident">slave_mask</span>: <span class="ident">u8</span>) {
+    <span class="doccomment">/// Initialize both our PICs.  We initialize them together, at the same
+    /// time, because it&#39;s traditional to do so, and because I/O operations
+    /// might not be instantaneous on older processors.
+    </span><span class="kw">unsafe fn </span>configure(<span class="kw-2">&amp;mut </span><span class="self">self</span>, master_mask: u8, slave_mask: u8) {
       
-        <span class="comment">// mask all interrupts during init</span>
-        <span class="self">self</span>.<span class="ident">mask_irqs</span>(<span class="number">0xFF</span>, <span class="number">0xFF</span>);
+        <span class="comment">// mask all interrupts during init
+        </span><span class="self">self</span>.mask_irqs(<span class="number">0xFF</span>, <span class="number">0xFF</span>);
 
-        <span class="comment">// pre-emptively acknowledge both PICs in case they have pending unhandled irqs</span>
-        <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">0</span>].<span class="ident">command</span>.<span class="ident">write</span>(<span class="ident">CMD_END_OF_INTERRUPT</span>);
-        <span class="ident">io_wait</span>();
-        <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">1</span>].<span class="ident">command</span>.<span class="ident">write</span>(<span class="ident">CMD_END_OF_INTERRUPT</span>);
-        <span class="ident">io_wait</span>();
+        <span class="comment">// pre-emptively acknowledge both PICs in case they have pending unhandled irqs
+        </span><span class="self">self</span>.pics[<span class="number">0</span>].command.write(CMD_END_OF_INTERRUPT);
+        io_wait();
+        <span class="self">self</span>.pics[<span class="number">1</span>].command.write(CMD_END_OF_INTERRUPT);
+        io_wait();
 
-        <span class="comment">// Tell each PIC that we&#39;re going to send it a three-byte</span>
-        <span class="comment">// initialization sequence on its data port.</span>
-        <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">0</span>].<span class="ident">command</span>.<span class="ident">write</span>(<span class="ident">CMD_INIT</span>);
-        <span class="ident">io_wait</span>();
-        <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">1</span>].<span class="ident">command</span>.<span class="ident">write</span>(<span class="ident">CMD_INIT</span>);
-        <span class="ident">io_wait</span>();
+        <span class="comment">// Tell each PIC that we&#39;re going to send it a three-byte
+        // initialization sequence on its data port.
+        </span><span class="self">self</span>.pics[<span class="number">0</span>].command.write(CMD_INIT);
+        io_wait();
+        <span class="self">self</span>.pics[<span class="number">1</span>].command.write(CMD_INIT);
+        io_wait();
 
-        <span class="comment">// Byte 1: Set up our base offsets.</span>
-        <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">0</span>].<span class="ident">data</span>.<span class="ident">write</span>(<span class="self">self</span>.<span class="ident">pics</span>[<span class="number">0</span>].<span class="ident">offset</span>);
-        <span class="ident">io_wait</span>();
-        <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">1</span>].<span class="ident">data</span>.<span class="ident">write</span>(<span class="self">self</span>.<span class="ident">pics</span>[<span class="number">1</span>].<span class="ident">offset</span>);
-        <span class="ident">io_wait</span>();
+        <span class="comment">// Byte 1: Set up our base offsets.
+        </span><span class="self">self</span>.pics[<span class="number">0</span>].data.write(<span class="self">self</span>.pics[<span class="number">0</span>].offset);
+        io_wait();
+        <span class="self">self</span>.pics[<span class="number">1</span>].data.write(<span class="self">self</span>.pics[<span class="number">1</span>].offset);
+        io_wait();
 
-        <span class="comment">// Byte 2: Configure chaining between PIC1 and PIC2.</span>
-        <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">0</span>].<span class="ident">data</span>.<span class="ident">write</span>(<span class="number">4</span>);
-        <span class="ident">io_wait</span>();
-        <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">1</span>].<span class="ident">data</span>.<span class="ident">write</span>(<span class="number">2</span>);
-        <span class="ident">io_wait</span>();
+        <span class="comment">// Byte 2: Configure chaining between PIC1 and PIC2.
+        </span><span class="self">self</span>.pics[<span class="number">0</span>].data.write(<span class="number">4</span>);
+        io_wait();
+        <span class="self">self</span>.pics[<span class="number">1</span>].data.write(<span class="number">2</span>);
+        io_wait();
 
-        <span class="comment">// Byte 3: Set our mode.</span>
-        <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">0</span>].<span class="ident">data</span>.<span class="ident">write</span>(<span class="ident">MODE_8086</span>);
-        <span class="ident">io_wait</span>();
-        <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">1</span>].<span class="ident">data</span>.<span class="ident">write</span>(<span class="ident">MODE_8086</span>);
-        <span class="ident">io_wait</span>();
+        <span class="comment">// Byte 3: Set our mode.
+        </span><span class="self">self</span>.pics[<span class="number">0</span>].data.write(MODE_8086);
+        io_wait();
+        <span class="self">self</span>.pics[<span class="number">1</span>].data.write(MODE_8086);
+        io_wait();
 
-        <span class="self">self</span>.<span class="ident">mask_irqs</span>(<span class="ident">master_mask</span>, <span class="ident">slave_mask</span>);
+        <span class="self">self</span>.mask_irqs(master_mask, slave_mask);
 
-        <span class="comment">// pre-emptively acknowledge both PICs in case they have pending unhandled irqs</span>
-        <span class="comment">// this is generally unnecessary but doesn&#39;t hurt if the interrupt hardware is misbehaving</span>
-        <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">0</span>].<span class="ident">command</span>.<span class="ident">write</span>(<span class="ident">CMD_END_OF_INTERRUPT</span>);
-        <span class="ident">io_wait</span>();
-        <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">1</span>].<span class="ident">command</span>.<span class="ident">write</span>(<span class="ident">CMD_END_OF_INTERRUPT</span>);
-        <span class="ident">io_wait</span>();
+        <span class="comment">// pre-emptively acknowledge both PICs in case they have pending unhandled irqs
+        // this is generally unnecessary but doesn&#39;t hurt if the interrupt hardware is misbehaving
+        </span><span class="self">self</span>.pics[<span class="number">0</span>].command.write(CMD_END_OF_INTERRUPT);
+        io_wait();
+        <span class="self">self</span>.pics[<span class="number">1</span>].command.write(CMD_END_OF_INTERRUPT);
+        io_wait();
 
     }
 
-    <span class="doccomment">/// Each mask is a bitwise mask for each IRQ line, with the master&#39;s IRQ line 2 (0x4) </span>
-    <span class="doccomment">/// affecting the entire slave IRQ mask. So if the master&#39;s IRQ line 2 is masked (disabled),</span>
-    <span class="doccomment">/// all slave IRQs (0x28 to 0x2F) are masked.</span>
-    <span class="doccomment">/// If a bit is set to 1, it is masked (disabled). If set to 0, it is unmasked (enabled).</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mask_irqs</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">master_mask</span>: <span class="ident">u8</span>, <span class="ident">slave_mask</span>: <span class="ident">u8</span>) {
-        <span class="comment">// SAFE: we are guaranteed to have initialized this structure in its constructor.</span>
-        <span class="kw">unsafe</span> {
-            <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">1</span>].<span class="ident">data</span>.<span class="ident">write</span>(<span class="ident">slave_mask</span>);
-            <span class="ident">io_wait</span>();
-            <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">0</span>].<span class="ident">data</span>.<span class="ident">write</span>(<span class="ident">master_mask</span>);
-            <span class="ident">io_wait</span>();
+    <span class="doccomment">/// Each mask is a bitwise mask for each IRQ line, with the master&#39;s IRQ line 2 (0x4) 
+    /// affecting the entire slave IRQ mask. So if the master&#39;s IRQ line 2 is masked (disabled),
+    /// all slave IRQs (0x28 to 0x2F) are masked.
+    /// If a bit is set to 1, it is masked (disabled). If set to 0, it is unmasked (enabled).
+    </span><span class="kw">pub fn </span>mask_irqs(<span class="kw-2">&amp;</span><span class="self">self</span>, master_mask: u8, slave_mask: u8) {
+        <span class="comment">// SAFE: we are guaranteed to have initialized this structure in its constructor.
+        </span><span class="kw">unsafe </span>{
+            <span class="self">self</span>.pics[<span class="number">1</span>].data.write(slave_mask);
+            io_wait();
+            <span class="self">self</span>.pics[<span class="number">0</span>].data.write(master_mask);
+            io_wait();
         }
     }
  
 
-    <span class="doccomment">/// Do we handle this interrupt?</span>
-    <span class="kw">fn</span> <span class="ident">handles_interrupt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">interrupt_id</span>: <span class="ident">u8</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">pics</span>.<span class="ident">iter</span>().<span class="ident">any</span>(<span class="op">|</span><span class="ident">p</span><span class="op">|</span> <span class="ident">p</span>.<span class="ident">handles_interrupt</span>(<span class="ident">interrupt_id</span>))
+    <span class="doccomment">/// Do we handle this interrupt?
+    </span><span class="kw">fn </span>handles_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, interrupt_id: u8) -&gt; bool {
+        <span class="self">self</span>.pics.iter().any(|p| p.handles_interrupt(interrupt_id))
     }
 
-    <span class="doccomment">/// Figure out which (if any) PICs in our chain need to know about this</span>
-    <span class="doccomment">/// interrupt.  This is tricky, because all interrupts from `pics[1]`</span>
-    <span class="doccomment">/// get chained through `pics[0]`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">notify_end_of_interrupt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">interrupt_id</span>: <span class="ident">u8</span>) {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">handles_interrupt</span>(<span class="ident">interrupt_id</span>) {
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">1</span>].<span class="ident">handles_interrupt</span>(<span class="ident">interrupt_id</span>) {
-                <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">1</span>].<span class="ident">end_of_interrupt</span>();
+    <span class="doccomment">/// Figure out which (if any) PICs in our chain need to know about this
+    /// interrupt.  This is tricky, because all interrupts from `pics[1]`
+    /// get chained through `pics[0]`.
+    </span><span class="kw">pub fn </span>notify_end_of_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, interrupt_id: u8) {
+        <span class="kw">if </span><span class="self">self</span>.handles_interrupt(interrupt_id) {
+            <span class="kw">if </span><span class="self">self</span>.pics[<span class="number">1</span>].handles_interrupt(interrupt_id) {
+                <span class="self">self</span>.pics[<span class="number">1</span>].end_of_interrupt();
             }
-            <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">0</span>].<span class="ident">end_of_interrupt</span>();
+            <span class="self">self</span>.pics[<span class="number">0</span>].end_of_interrupt();
         }
     }
 
 
-    <span class="doccomment">/// Reads the ISR and IRR registers of both the master and slave PIC.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read_isr_irr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">IrqStatusRegisters</span> {
-        <span class="comment">// SAFE: just reading PIC registers, no harm can be done.</span>
-        <span class="kw">unsafe</span> {
-            <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">0</span>].<span class="ident">command</span>.<span class="ident">write</span>(<span class="ident">CMD_ISR</span>);
-            <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">1</span>].<span class="ident">command</span>.<span class="ident">write</span>(<span class="ident">CMD_ISR</span>);
-            <span class="kw">let</span> <span class="ident">master_isr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">0</span>].<span class="ident">command</span>.<span class="ident">read</span>();
-            <span class="kw">let</span> <span class="ident">slave_isr</span>  <span class="op">=</span> <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">1</span>].<span class="ident">command</span>.<span class="ident">read</span>();
+    <span class="doccomment">/// Reads the ISR and IRR registers of both the master and slave PIC.
+    </span><span class="kw">pub fn </span>read_isr_irr(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; IrqStatusRegisters {
+        <span class="comment">// SAFE: just reading PIC registers, no harm can be done.
+        </span><span class="kw">unsafe </span>{
+            <span class="self">self</span>.pics[<span class="number">0</span>].command.write(CMD_ISR);
+            <span class="self">self</span>.pics[<span class="number">1</span>].command.write(CMD_ISR);
+            <span class="kw">let </span>master_isr = <span class="self">self</span>.pics[<span class="number">0</span>].command.read();
+            <span class="kw">let </span>slave_isr  = <span class="self">self</span>.pics[<span class="number">1</span>].command.read();
 
-            <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">0</span>].<span class="ident">command</span>.<span class="ident">write</span>(<span class="ident">CMD_IRR</span>);
-            <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">1</span>].<span class="ident">command</span>.<span class="ident">write</span>(<span class="ident">CMD_IRR</span>);
-            <span class="kw">let</span> <span class="ident">master_irr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">0</span>].<span class="ident">command</span>.<span class="ident">read</span>();
-            <span class="kw">let</span> <span class="ident">slave_irr</span>  <span class="op">=</span> <span class="self">self</span>.<span class="ident">pics</span>[<span class="number">1</span>].<span class="ident">command</span>.<span class="ident">read</span>();
+            <span class="self">self</span>.pics[<span class="number">0</span>].command.write(CMD_IRR);
+            <span class="self">self</span>.pics[<span class="number">1</span>].command.write(CMD_IRR);
+            <span class="kw">let </span>master_irr = <span class="self">self</span>.pics[<span class="number">0</span>].command.read();
+            <span class="kw">let </span>slave_irr  = <span class="self">self</span>.pics[<span class="number">1</span>].command.read();
 
-            <span class="ident">IrqStatusRegisters</span> {
-                <span class="ident">master_isr</span>: <span class="ident">master_isr</span>,
-                <span class="ident">master_irr</span>: <span class="ident">master_irr</span>,
-                <span class="ident">slave_isr</span>: <span class="ident">slave_isr</span>,
-                <span class="ident">slave_irr</span>: <span class="ident">slave_irr</span>,
+            IrqStatusRegisters {
+                master_isr: master_isr,
+                master_irr: master_irr,
+                slave_isr: slave_isr,
+                slave_irr: slave_irr,
             }
         }
     }
 }
 
 
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">fn</span> <span class="ident">io_wait</span>() {
-    <span class="comment">// We need to add a short delay between writes to our PICs, especially on</span>
-    <span class="comment">// older motherboards.  But we don&#39;t necessarily have any kind of</span>
-    <span class="comment">// timers yet, because most of them require interrupts.  Various</span>
-    <span class="comment">// older versions of Linux and other PC operating systems have</span>
-    <span class="comment">// worked around this by writing garbage data to port 0x80, which</span>
-    <span class="comment">// allegedly takes long enough to make everything work on most hardware.</span>
-    <span class="kw">unsafe</span> { <span class="ident">port_io::Port</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="number">0x80</span>).<span class="ident">write</span>(<span class="number">0</span>); }
+<span class="attr">#[inline(always)]
+</span><span class="kw">fn </span>io_wait() {
+    <span class="comment">// We need to add a short delay between writes to our PICs, especially on
+    // older motherboards.  But we don&#39;t necessarily have any kind of
+    // timers yet, because most of them require interrupts.  Various
+    // older versions of Linux and other PC operating systems have
+    // worked around this by writing garbage data to port 0x80, which
+    // allegedly takes long enough to make everything work on most hardware.
+    </span><span class="kw">unsafe </span>{ port_io::Port::&lt;u8&gt;::new(<span class="number">0x80</span>).write(<span class="number">0</span>); }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="pic" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="pic" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

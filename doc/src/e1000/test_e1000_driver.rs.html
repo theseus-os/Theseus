@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/e1000/src/test_e1000_driver.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>test_e1000_driver.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../e1000/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../e1000/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../e1000/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/e1000/src/test_e1000_driver.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>test_e1000_driver.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../e1000/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -83,55 +77,55 @@
 <span id="77">77</span>
 <span id="78">78</span>
 <span id="79">79</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">E1000_NIC</span>, <span class="ident">NetworkInterfaceCard</span>, <span class="ident">TransmitBuffer</span>};
+</pre><pre class="rust"><code><span class="kw">use super</span>::{E1000_NIC, NetworkInterfaceCard, TransmitBuffer};
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">test_e1000_nic_driver</span>(<span class="kw">_</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>) {
-    <span class="kw">match</span> <span class="ident">dhcp_request_packet</span>() {
+<span class="kw">pub fn </span>test_e1000_nic_driver(<span class="kw">_</span>: <span class="prelude-ty">Option</span>&lt;u64&gt;) {
+    <span class="kw">match </span>dhcp_request_packet() {
         <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="macro">debug!</span>(<span class="string">&quot;test_e1000_nic_driver(): sent DHCP request packet successfully!&quot;</span>),
-        <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; <span class="macro">error!</span>(<span class="string">&quot;test_e1000_nic_driver(): failed to send DHCP request packet: error {:?}&quot;</span>, <span class="ident">e</span>),
+        <span class="prelude-val">Err</span>(e) =&gt; <span class="macro">error!</span>(<span class="string">&quot;test_e1000_nic_driver(): failed to send DHCP request packet: error {:?}&quot;</span>, e),
     };
 }
 
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">arp_packet</span> {
-    <span class="kw">pub</span> <span class="ident">dest1</span>: <span class="ident">u16</span>, <span class="comment">//set to broadcast ff:ff:...</span>
-    <span class="kw">pub</span> <span class="ident">dest2</span>: <span class="ident">u16</span>,
-    <span class="kw">pub</span> <span class="ident">dest3</span>: <span class="ident">u16</span>,
-    <span class="kw">pub</span> <span class="ident">source1</span>: <span class="ident">u16</span>,
-    <span class="kw">pub</span> <span class="ident">source2</span>: <span class="ident">u16</span>,
-    <span class="kw">pub</span> <span class="ident">source3</span>: <span class="ident">u16</span>,
-    <span class="kw">pub</span> <span class="ident">packet_type</span>: <span class="ident">u16</span>,
-    <span class="kw">pub</span> <span class="ident">h_type</span>: <span class="ident">u16</span>,
-    <span class="kw">pub</span> <span class="ident">p_type</span>: <span class="ident">u16</span>,
-    <span class="kw">pub</span> <span class="ident">hlen</span>: <span class="ident">u8</span>,
-    <span class="kw">pub</span> <span class="ident">plen</span>: <span class="ident">u8</span>,
-    <span class="kw">pub</span> <span class="ident">oper</span>: <span class="ident">u16</span>,
-    <span class="kw">pub</span> <span class="ident">sha1</span>: <span class="ident">u16</span>, <span class="comment">//sender hw address, first 2 bytes</span>
-    <span class="kw">pub</span> <span class="ident">sha2</span>: <span class="ident">u16</span>, <span class="comment">// &quot;, next 2 bytes</span>
-    <span class="kw">pub</span> <span class="ident">sha3</span>: <span class="ident">u16</span>, <span class="comment">// &quot;, last 2 bytes</span>
-    <span class="kw">pub</span> <span class="ident">spa1</span>: <span class="ident">u16</span>, <span class="comment">// sender protocol address, first 2 B</span>
-    <span class="kw">pub</span> <span class="ident">spa2</span>: <span class="ident">u16</span>, <span class="comment">// &quot;, last 2 B</span>
-    <span class="kw">pub</span> <span class="ident">tha1</span>: <span class="ident">u16</span>, <span class="comment">//target &quot;, first</span>
-    <span class="kw">pub</span> <span class="ident">tha2</span>: <span class="ident">u16</span>, <span class="comment">// &quot;, next</span>
-    <span class="kw">pub</span> <span class="ident">tha3</span>: <span class="ident">u16</span>, <span class="comment">// &quot;, last</span>
-    <span class="kw">pub</span> <span class="ident">tpa1</span>: <span class="ident">u16</span>, <span class="comment">// &quot;, first</span>
-    <span class="kw">pub</span> <span class="ident">tpa2</span>: <span class="ident">u16</span>, <span class="comment">// &quot;, last</span>
-}
+<span class="attr">#[repr(C, packed)]
+</span><span class="kw">pub struct </span>arp_packet {
+    <span class="kw">pub </span>dest1: u16, <span class="comment">//set to broadcast ff:ff:...
+    </span><span class="kw">pub </span>dest2: u16,
+    <span class="kw">pub </span>dest3: u16,
+    <span class="kw">pub </span>source1: u16,
+    <span class="kw">pub </span>source2: u16,
+    <span class="kw">pub </span>source3: u16,
+    <span class="kw">pub </span>packet_type: u16,
+    <span class="kw">pub </span>h_type: u16,
+    <span class="kw">pub </span>p_type: u16,
+    <span class="kw">pub </span>hlen: u8,
+    <span class="kw">pub </span>plen: u8,
+    <span class="kw">pub </span>oper: u16,
+    <span class="kw">pub </span>sha1: u16, <span class="comment">//sender hw address, first 2 bytes
+    </span><span class="kw">pub </span>sha2: u16, <span class="comment">// &quot;, next 2 bytes
+    </span><span class="kw">pub </span>sha3: u16, <span class="comment">// &quot;, last 2 bytes
+    </span><span class="kw">pub </span>spa1: u16, <span class="comment">// sender protocol address, first 2 B
+    </span><span class="kw">pub </span>spa2: u16, <span class="comment">// &quot;, last 2 B
+    </span><span class="kw">pub </span>tha1: u16, <span class="comment">//target &quot;, first
+    </span><span class="kw">pub </span>tha2: u16, <span class="comment">// &quot;, next
+    </span><span class="kw">pub </span>tha3: u16, <span class="comment">// &quot;, last
+    </span><span class="kw">pub </span>tpa1: u16, <span class="comment">// &quot;, first
+    </span><span class="kw">pub </span>tpa2: u16, <span class="comment">// &quot;, last
+</span>}
 
-<span class="comment">//should test packet transmission and reception as QEMU DHCP server will respond</span>
+<span class="comment">//should test packet transmission and reception as QEMU DHCP server will respond
 
-<span class="comment">//will only b able to see this Tx message in netdump.pcap if user is not mentioned in QEMU flags of Makefile</span>
-<span class="comment">//QEMU_FLAGS += -net nic,vlan=0,model=e1000,macaddr=00:0b:82:01:fc:42 -net dump,file=netdump.pcap</span>
+//will only b able to see this Tx message in netdump.pcap if user is not mentioned in QEMU flags of Makefile
+//QEMU_FLAGS += -net nic,vlan=0,model=e1000,macaddr=00:0b:82:01:fc:42 -net dump,file=netdump.pcap
 
-<span class="comment">//will only receive a response if user is mentioned in qemu flags</span>
-<span class="comment">//QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:0b:82:01:fc:42 -net user,vlan=1 -net dump,file=netdump.pcap</span>
+//will only receive a response if user is mentioned in qemu flags
+//QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:0b:82:01:fc:42 -net user,vlan=1 -net dump,file=netdump.pcap
 
-<span class="comment">//or else use a tap interface (default)</span>
-<span class="comment">//QEMU_FLAGS += -device e1000,netdev=network0,mac=52:55:00:d1:55:01 -netdev tap,id=network0,ifname=tap0,script=no,downscript=no</span>
-<span class="comment">//will receive a DHCP messgae from 00:1f:c6:9c:89:4c</span>
+//or else use a tap interface (default)
+//QEMU_FLAGS += -device e1000,netdev=network0,mac=52:55:00:d1:55:01 -netdev tap,id=network0,ifname=tap0,script=no,downscript=no
+//will receive a DHCP messgae from 00:1f:c6:9c:89:4c
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dhcp_request_packet</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">packet</span>: [<span class="ident">u8</span>; <span class="number">314</span>] <span class="op">=</span> [
+</span><span class="kw">pub fn </span>dhcp_request_packet() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>packet: [u8; <span class="number">314</span>] = [
         <span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0x00</span>, <span class="number">0x1f</span>, <span class="number">0xc6</span>, <span class="number">0x9c</span>, <span class="number">0x89</span>, <span class="number">0x4c</span>, <span class="number">0x08</span>, <span class="number">0x00</span>, <span class="number">0x45</span>,
         <span class="number">0x00</span>, <span class="number">0x01</span>, <span class="number">0x2c</span>, <span class="number">0xa8</span>, <span class="number">0x36</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0xfa</span>, <span class="number">0x11</span>, <span class="number">0x17</span>, <span class="number">0x8b</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>,
         <span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0x00</span>, <span class="number">0x44</span>, <span class="number">0x00</span>, <span class="number">0x43</span>, <span class="number">0x01</span>, <span class="number">0x18</span>, <span class="number">0x59</span>, <span class="number">0x1f</span>, <span class="number">0x01</span>, <span class="number">0x01</span>, <span class="number">0x06</span>,
@@ -154,14 +148,13 @@
         <span class="number">0x3d</span>, <span class="number">0x07</span>, <span class="number">0x01</span>, <span class="number">0x00</span>, <span class="number">0x1f</span>, <span class="number">0xc6</span>, <span class="number">0x9c</span>, <span class="number">0x89</span>, <span class="number">0x4c</span>, <span class="number">0x32</span>, <span class="number">0x04</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>,
         <span class="number">0x37</span>, <span class="number">0x04</span>, <span class="number">0x01</span>, <span class="number">0x03</span>, <span class="number">0x06</span>, <span class="number">0x2a</span>, <span class="number">0xff</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>,
     ];
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">transmit_buffer</span> <span class="op">=</span> <span class="ident">TransmitBuffer::new</span>(<span class="ident">packet</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u16</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>transmit_buffer = TransmitBuffer::new(packet.len() <span class="kw">as </span>u16)<span class="question-mark">?</span>;
     { 
-        <span class="kw">let</span> <span class="ident">buffer</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">transmit_buffer</span>.<span class="ident">as_slice_mut</span>(<span class="number">0</span>, <span class="number">314</span>)<span class="question-mark">?</span>;
-        <span class="ident">buffer</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">packet</span>);
+        <span class="kw">let </span>buffer: <span class="kw-2">&amp;mut </span>[u8] = transmit_buffer.as_slice_mut(<span class="number">0</span>, <span class="number">314</span>)<span class="question-mark">?</span>;
+        buffer.copy_from_slice(<span class="kw-2">&amp;</span>packet);
     }
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">e1000_nc</span> <span class="op">=</span> <span class="ident">E1000_NIC</span>.<span class="ident">get</span>().<span class="ident">ok_or</span>(<span class="string">&quot;e1000 NIC hasn&#39;t been initialized yet&quot;</span>)<span class="question-mark">?</span>.<span class="ident">lock</span>();
-    <span class="ident">e1000_nc</span>.<span class="ident">send_packet</span>(<span class="ident">transmit_buffer</span>)
+    <span class="kw">let </span><span class="kw-2">mut </span>e1000_nc = E1000_NIC.get().ok_or(<span class="string">&quot;e1000 NIC hasn&#39;t been initialized yet&quot;</span>)<span class="question-mark">?</span>.lock();
+    e1000_nc.send_packet(transmit_buffer)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="e1000" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="e1000" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

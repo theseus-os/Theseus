@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/page_allocator/src/static_array_rb_tree.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>static_array_rb_tree.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../page_allocator/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../page_allocator/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../page_allocator/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/page_allocator/src/static_array_rb_tree.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>static_array_rb_tree.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../page_allocator/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -223,77 +217,77 @@
 <span id="217">217</span>
 <span id="218">218</span>
 <span id="219">219</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
-<span class="kw">use</span> <span class="ident">core::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
-<span class="kw">use</span> <span class="ident">intrusive_collections</span>::{
-    <span class="ident">intrusive_adapter</span>,
-    <span class="ident">rbtree</span>::{<span class="ident">RBTree</span>, <span class="ident">CursorMut</span>},
-    <span class="ident">RBTreeLink</span>,
-	<span class="ident">KeyAdapter</span>,
+</pre><pre class="rust"><code><span class="kw">use </span>alloc::boxed::Box;
+<span class="kw">use </span>core::ops::{Deref, DerefMut};
+<span class="kw">use </span>intrusive_collections::{
+    intrusive_adapter,
+    rbtree::{RBTree, CursorMut},
+    RBTreeLink,
+	KeyAdapter,
 };
 
-<span class="doccomment">/// A wrapper for the type stored in the `StaticArrayRBTree::Inner::RBTree` variant.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Wrapper</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Ord</span><span class="op">&gt;</span> {
-    <span class="ident">link</span>: <span class="ident">RBTreeLink</span>,
-    <span class="ident">inner</span>: <span class="ident">T</span>,
+<span class="doccomment">/// A wrapper for the type stored in the `StaticArrayRBTree::Inner::RBTree` variant.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>Wrapper&lt;T: Ord&gt; {
+    link: RBTreeLink,
+    inner: T,
 }
-<span class="macro">intrusive_adapter!</span>(<span class="kw">pub</span> <span class="ident">WrapperAdapter</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">Wrapper</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>: <span class="ident">Wrapper</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> { <span class="ident">link</span>: <span class="ident">RBTreeLink</span> } <span class="kw">where</span> <span class="ident">T</span>: <span class="ident">Ord</span>);
+<span class="macro">intrusive_adapter!</span>(<span class="kw">pub </span>WrapperAdapter&lt;T&gt; = Box&lt;Wrapper&lt;T&gt;&gt;: Wrapper&lt;T&gt; { link: RBTreeLink } <span class="kw">where </span>T: Ord);
 
-<span class="comment">// Use the inner type `T` (which must implement `Ord`) to define the key</span>
-<span class="comment">// for properly ordering the elements in the RBTree.</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>: <span class="ident">Ord</span> <span class="op">+</span> <span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">KeyAdapter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">WrapperAdapter</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Key</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">T</span>;
-    <span class="kw">fn</span> <span class="ident">get_key</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">value</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Wrapper</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) -&gt; <span class="ident"><span class="self">Self</span>::Key</span> {
-        <span class="kw-2">&amp;</span><span class="ident">value</span>.<span class="ident">inner</span>
+<span class="comment">// Use the inner type `T` (which must implement `Ord`) to define the key
+// for properly ordering the elements in the RBTree.
+</span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: Ord + <span class="lifetime">&#39;a</span>&gt; KeyAdapter&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>WrapperAdapter&lt;T&gt; {
+    <span class="kw">type </span>Key = <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>T;
+    <span class="kw">fn </span>get_key(<span class="kw-2">&amp;</span><span class="self">self</span>, value: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Wrapper&lt;T&gt;) -&gt; <span class="self">Self</span>::Key {
+        <span class="kw-2">&amp;</span>value.inner
     }
 }
-<span class="kw">impl</span> <span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Ord</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">Wrapper</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-	<span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
-	<span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">T</span> {
-		<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span>
+<span class="kw">impl </span>&lt;T: Ord&gt; Deref <span class="kw">for </span>Wrapper&lt;T&gt; {
+	<span class="kw">type </span>Target = T;
+	<span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>T {
+		<span class="kw-2">&amp;</span><span class="self">self</span>.inner
 	}
 }
-<span class="kw">impl</span> <span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Ord</span><span class="op">&gt;</span> <span class="ident">DerefMut</span> <span class="kw">for</span> <span class="ident">Wrapper</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-	<span class="kw">fn</span> <span class="ident">deref_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">T</span> {
-		<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">inner</span>
+<span class="kw">impl </span>&lt;T: Ord&gt; DerefMut <span class="kw">for </span>Wrapper&lt;T&gt; {
+	<span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>T {
+		<span class="kw-2">&amp;mut </span><span class="self">self</span>.inner
 	}
 }
-<span class="kw">impl</span> <span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Ord</span><span class="op">&gt;</span> <span class="ident">Wrapper</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Convenience method for creating a new link</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">new_link</span>(<span class="ident">value</span>: <span class="ident">T</span>) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="ident">Box::new</span>(<span class="ident">Wrapper</span> {
-            <span class="ident">link</span>: <span class="ident">RBTreeLink::new</span>(),
-            <span class="ident">inner</span>: <span class="ident">value</span>,
+<span class="kw">impl </span>&lt;T: Ord&gt; Wrapper&lt;T&gt; {
+    <span class="doccomment">/// Convenience method for creating a new link
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new_link(value: T) -&gt; Box&lt;<span class="self">Self</span>&gt; {
+        Box::new(Wrapper {
+            link: RBTreeLink::new(),
+            inner: value,
         })
     }
 }
 
 
-<span class="doccomment">/// A convenience wrapper that abstracts either an intrustive `RBTree&lt;T&gt;` or a primitive array `[T; N]`.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This allows the caller to create an array statically in a const context, </span>
-<span class="doccomment">/// and then abstract over both that and the inner `RBTree` when using it. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// TODO: use const generics to allow this to be of any arbitrary size beyond 32 elements.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Ord</span><span class="op">&gt;</span>(<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">Inner</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>);
+<span class="doccomment">/// A convenience wrapper that abstracts either an intrustive `RBTree&lt;T&gt;` or a primitive array `[T; N]`.
+/// 
+/// This allows the caller to create an array statically in a const context, 
+/// and then abstract over both that and the inner `RBTree` when using it. 
+/// 
+/// TODO: use const generics to allow this to be of any arbitrary size beyond 32 elements.
+</span><span class="kw">pub struct </span>StaticArrayRBTree&lt;T: Ord&gt;(<span class="kw">pub</span>(<span class="kw">crate</span>) Inner&lt;T&gt;);
 
-<span class="doccomment">/// The inner enum, hidden for visibility reasons because Rust lacks private enum variants.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum</span> <span class="ident">Inner</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Ord</span><span class="op">&gt;</span> {
-	<span class="ident">Array</span>([<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>; <span class="number">32</span>]),
-	<span class="ident">RBTree</span>(<span class="ident">RBTree</span><span class="op">&lt;</span><span class="ident">WrapperAdapter</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>),
+<span class="doccomment">/// The inner enum, hidden for visibility reasons because Rust lacks private enum variants.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum </span>Inner&lt;T: Ord&gt; {
+	Array([<span class="prelude-ty">Option</span>&lt;T&gt;; <span class="number">32</span>]),
+	RBTree(RBTree&lt;WrapperAdapter&lt;T&gt;&gt;),
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Ord</span><span class="op">&gt;</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-	<span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
-		<span class="ident"><span class="self">Self</span>::empty</span>()
+<span class="kw">impl</span>&lt;T: Ord&gt; Default <span class="kw">for </span>StaticArrayRBTree&lt;T&gt; {
+	<span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+		<span class="self">Self</span>::empty()
 	}
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Ord</span><span class="op">&gt;</span> <span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-	<span class="doccomment">/// Create a new empty collection (the default).</span>
-	<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="self">Self</span> {
-		<span class="comment">// Yes, this is stupid... Rust seems to have removed the [None; 32] array init syntax.</span>
-		<span class="ident">StaticArrayRBTree</span>(<span class="ident">Inner::Array</span>([
+<span class="kw">impl</span>&lt;T: Ord&gt; StaticArrayRBTree&lt;T&gt; {
+	<span class="doccomment">/// Create a new empty collection (the default).
+	</span><span class="kw">pub const fn </span>empty() -&gt; <span class="self">Self </span>{
+		<span class="comment">// Yes, this is stupid... Rust seems to have removed the [None; 32] array init syntax.
+		</span>StaticArrayRBTree(Inner::Array([
 			<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>,
 			<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>,
 			<span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>,
@@ -301,146 +295,145 @@
 		]))
 	}
 
-	<span class="doccomment">/// Create a new collection based on the given array of values.</span>
-	<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">arr</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>; <span class="number">32</span>]) -&gt; <span class="self">Self</span> {
-		<span class="ident">StaticArrayRBTree</span>(<span class="ident">Inner::Array</span>(<span class="ident">arr</span>))
+	<span class="doccomment">/// Create a new collection based on the given array of values.
+	</span><span class="kw">pub const fn </span>new(arr: [<span class="prelude-ty">Option</span>&lt;T&gt;; <span class="number">32</span>]) -&gt; <span class="self">Self </span>{
+		StaticArrayRBTree(Inner::Array(arr))
 	}
 }
 
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Ord</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Push the given `value` into this collection.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If the inner collection is an array, it is pushed onto the back of the array.</span>
-	<span class="doccomment">/// If there is no space left in the array, an `Err` containing the given `value` is returned.</span>
-	<span class="doccomment">///</span>
-	<span class="doccomment">/// If success</span>
-	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">insert</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">T</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ValueRefMut</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-		<span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="number">0</span> {
-			<span class="ident">Inner::Array</span>(<span class="ident">arr</span>) =&gt; {
-				<span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="ident">arr</span> {
-					<span class="kw">if</span> <span class="ident">elem</span>.<span class="ident">is_none</span>() {
-						<span class="kw-2">*</span><span class="ident">elem</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">value</span>);
-						<span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">ValueRefMut::Array</span>(<span class="ident">elem</span>));
+<span class="kw">impl</span>&lt;T: Ord + <span class="lifetime">&#39;static</span>&gt; StaticArrayRBTree&lt;T&gt; {
+    <span class="doccomment">/// Push the given `value` into this collection.
+    ///
+    /// If the inner collection is an array, it is pushed onto the back of the array.
+	/// If there is no space left in the array, an `Err` containing the given `value` is returned.
+	///
+	/// If success
+	</span><span class="kw">pub fn </span>insert(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: T) -&gt; <span class="prelude-ty">Result</span>&lt;ValueRefMut&lt;T&gt;, T&gt; {
+		<span class="kw">match </span><span class="kw-2">&amp;mut </span><span class="self">self</span>.<span class="number">0 </span>{
+			Inner::Array(arr) =&gt; {
+				<span class="kw">for </span>elem <span class="kw">in </span>arr {
+					<span class="kw">if </span>elem.is_none() {
+						<span class="kw-2">*</span>elem = <span class="prelude-val">Some</span>(value);
+						<span class="kw">return </span><span class="prelude-val">Ok</span>(ValueRefMut::Array(elem));
 					}
 				}
 				<span class="macro">error!</span>(<span class="string">&quot;Out of space in StaticArrayRBTree&#39;s inner array, failed to insert value.&quot;</span>);
-				<span class="prelude-val">Err</span>(<span class="ident">value</span>)
+				<span class="prelude-val">Err</span>(value)
 			}
-			<span class="ident">Inner::RBTree</span>(<span class="ident">tree</span>) =&gt; {
-                <span class="prelude-val">Ok</span>(<span class="ident">ValueRefMut::RBTree</span>(
-					<span class="ident">tree</span>.<span class="ident">insert</span>(<span class="ident">Wrapper::new_link</span>(<span class="ident">value</span>))
+			Inner::RBTree(tree) =&gt; {
+                <span class="prelude-val">Ok</span>(ValueRefMut::RBTree(
+					tree.insert(Wrapper::new_link(value))
 				))
 			}
 		}
 	}
 
-	<span class="doccomment">/// Converts the contained collection from a primitive array into a RBTree.</span>
-	<span class="doccomment">/// If the contained collection is already using heap allocation, this is a no-op.</span>
-	<span class="doccomment">/// </span>
-	<span class="doccomment">/// Call this function once heap allocation is available. </span>
-	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">convert_to_heap_allocated</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-		<span class="kw">let</span> <span class="ident">new_tree</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="number">0</span> {
-			<span class="ident">Inner::Array</span>(<span class="ident">arr</span>) =&gt; {
-				<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tree</span> <span class="op">=</span> <span class="ident">RBTree::new</span>(<span class="ident">WrapperAdapter::new</span>());
-				<span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="ident">arr</span> {
-					<span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">elem</span>.<span class="ident">take</span>() {
-						<span class="ident">tree</span>.<span class="ident">insert</span>(<span class="ident">Wrapper::new_link</span>(<span class="ident">e</span>));
+	<span class="doccomment">/// Converts the contained collection from a primitive array into a RBTree.
+	/// If the contained collection is already using heap allocation, this is a no-op.
+	/// 
+	/// Call this function once heap allocation is available. 
+	</span><span class="kw">pub fn </span>convert_to_heap_allocated(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+		<span class="kw">let </span>new_tree = <span class="kw">match </span><span class="kw-2">&amp;mut </span><span class="self">self</span>.<span class="number">0 </span>{
+			Inner::Array(arr) =&gt; {
+				<span class="kw">let </span><span class="kw-2">mut </span>tree = RBTree::new(WrapperAdapter::new());
+				<span class="kw">for </span>elem <span class="kw">in </span>arr {
+					<span class="kw">if let </span><span class="prelude-val">Some</span>(e) = elem.take() {
+						tree.insert(Wrapper::new_link(e));
 					}
 				}
-				<span class="ident">tree</span>
+				tree
 			}
-			<span class="ident">Inner::RBTree</span>(<span class="ident">_tree</span>) =&gt; <span class="kw">return</span>,
+			Inner::RBTree(_tree) =&gt; <span class="kw">return</span>,
 		};
-		<span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">StaticArrayRBTree</span>(<span class="ident">Inner::RBTree</span>(<span class="ident">new_tree</span>));
+		<span class="kw-2">*</span><span class="self">self </span>= StaticArrayRBTree(Inner::RBTree(new_tree));
 	}
 
-	<span class="doccomment">/// Returns a forward iterator over immutable references to items in this collection.</span>
-	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">iter</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl</span> <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">T</span><span class="op">&gt;</span> {
-		<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">iter_a</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-		<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">iter_b</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-		<span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span> {
-			<span class="ident">Inner::Array</span>(<span class="ident">arr</span>)     =&gt; <span class="ident">iter_a</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">arr</span>.<span class="ident">iter</span>().<span class="ident">flatten</span>()),
-			<span class="ident">Inner::RBTree</span>(<span class="ident">tree</span>) =&gt; <span class="ident">iter_b</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">tree</span>.<span class="ident">iter</span>()),
+	<span class="doccomment">/// Returns a forward iterator over immutable references to items in this collection.
+	</span><span class="kw">pub fn </span>iter(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = <span class="kw-2">&amp;</span>T&gt; {
+		<span class="kw">let </span><span class="kw-2">mut </span>iter_a = <span class="prelude-val">None</span>;
+		<span class="kw">let </span><span class="kw-2">mut </span>iter_b = <span class="prelude-val">None</span>;
+		<span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0 </span>{
+			Inner::Array(arr)     =&gt; iter_a = <span class="prelude-val">Some</span>(arr.iter().flatten()),
+			Inner::RBTree(tree) =&gt; iter_b = <span class="prelude-val">Some</span>(tree.iter()),
 		}
-        <span class="ident">iter_a</span>.<span class="ident">into_iter</span>()
-            .<span class="ident">flatten</span>()
-            .<span class="ident">chain</span>(
-                <span class="ident">iter_b</span>.<span class="ident">into_iter</span>()
-                    .<span class="ident">flatten</span>()
-                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">wrapper</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="ident">wrapper</span>.<span class="ident">inner</span>)
+        iter_a.into_iter()
+            .flatten()
+            .chain(
+                iter_b.into_iter()
+                    .flatten()
+                    .map(|wrapper| <span class="kw-2">&amp;</span>wrapper.inner)
 			)
 	}
 
-	<span class="comment">// /// Returns a forward iterator over mutable references to items in this collection.</span>
-	<span class="comment">// pub fn iter_mut(&amp;mut self) -&gt; impl Iterator&lt;Item = &amp;mut T&gt; {</span>
-	<span class="comment">// 	let mut iter_a = None;</span>
-	<span class="comment">// 	let mut iter_b = None;</span>
-	<span class="comment">// 	match self {</span>
-	<span class="comment">// 		StaticArrayRBTree::Array(arr)     =&gt; iter_a = Some(arr.iter_mut().flatten()),</span>
-	<span class="comment">// 		StaticArrayRBTree::RBTree(ll) =&gt; iter_b = Some(ll.iter_mut()),</span>
-	<span class="comment">// 	}</span>
-	<span class="comment">// 	iter_a.into_iter().flatten().chain(iter_b.into_iter().flatten())</span>
-	<span class="comment">// }</span>
-}
+	<span class="comment">// /// Returns a forward iterator over mutable references to items in this collection.
+	// pub fn iter_mut(&amp;mut self) -&gt; impl Iterator&lt;Item = &amp;mut T&gt; {
+	// 	let mut iter_a = None;
+	// 	let mut iter_b = None;
+	// 	match self {
+	// 		StaticArrayRBTree::Array(arr)     =&gt; iter_a = Some(arr.iter_mut().flatten()),
+	// 		StaticArrayRBTree::RBTree(ll) =&gt; iter_b = Some(ll.iter_mut()),
+	// 	}
+	// 	iter_a.into_iter().flatten().chain(iter_b.into_iter().flatten())
+	// }
+</span>}
 
 
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">RemovedValue</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Ord</span><span class="op">&gt;</span> {
-	<span class="ident">Array</span>(<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>),
-	<span class="ident">RBTree</span>(<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="ident">Wrapper</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>),
+<span class="kw">pub enum </span>RemovedValue&lt;T: Ord&gt; {
+	Array(<span class="prelude-ty">Option</span>&lt;T&gt;),
+	RBTree(<span class="prelude-ty">Option</span>&lt;Box&lt;Wrapper&lt;T&gt;&gt;&gt;),
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Ord</span><span class="op">&gt;</span> <span class="ident">RemovedValue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">T</span><span class="op">&gt;</span> {
-		<span class="kw">match</span> <span class="self">self</span> {
-			<span class="ident"><span class="self">Self</span>::Array</span>(<span class="ident">opt</span>) =&gt; <span class="ident">opt</span>.<span class="ident">as_ref</span>(),
-			<span class="ident"><span class="self">Self</span>::RBTree</span>(<span class="ident">opt</span>) =&gt; <span class="ident">opt</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">bw</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="ident">bw</span>.<span class="ident">inner</span>),
+<span class="kw">impl</span>&lt;T: Ord&gt; RemovedValue&lt;T&gt; {
+	<span class="kw">pub fn </span>as_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>T&gt; {
+		<span class="kw">match </span><span class="self">self </span>{
+			<span class="self">Self</span>::Array(opt) =&gt; opt.as_ref(),
+			<span class="self">Self</span>::RBTree(opt) =&gt; opt.as_ref().map(|bw| <span class="kw-2">&amp;</span>bw.inner),
 		}
 	}
 }
 
-<span class="doccomment">/// A mutable reference to a value in the `StaticArrayRBTree`. </span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ValueRefMut</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span>, <span class="ident">T</span>: <span class="ident">Ord</span><span class="op">&gt;</span> {
-	<span class="ident">Array</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;list</span> <span class="kw-2">mut</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>),
-	<span class="ident">RBTree</span>(<span class="ident">CursorMut</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span>, <span class="ident">WrapperAdapter</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>),
+<span class="doccomment">/// A mutable reference to a value in the `StaticArrayRBTree`. 
+</span><span class="kw">pub enum </span>ValueRefMut&lt;<span class="lifetime">&#39;list</span>, T: Ord&gt; {
+	Array(<span class="kw-2">&amp;</span><span class="lifetime">&#39;list </span><span class="kw-2">mut </span><span class="prelude-ty">Option</span>&lt;T&gt;),
+	RBTree(CursorMut&lt;<span class="lifetime">&#39;list</span>, WrapperAdapter&lt;T&gt;&gt;),
 }
-<span class="kw">impl</span> <span class="op">&lt;</span><span class="lifetime">&#39;list</span>, <span class="ident">T</span>: <span class="ident">Ord</span><span class="op">&gt;</span> <span class="ident">ValueRefMut</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-	<span class="doccomment">/// Removes this value from the collection and returns the removed value, if one existed. </span>
-	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">remove</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">RemovedValue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-		<span class="kw">match</span> <span class="self">self</span> {
-			<span class="ident"><span class="self">Self</span>::Array</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">arr_ref</span>) =&gt; {
-				<span class="ident">RemovedValue::Array</span>(<span class="ident">arr_ref</span>.<span class="ident">take</span>())
+<span class="kw">impl </span>&lt;<span class="lifetime">&#39;list</span>, T: Ord&gt; ValueRefMut&lt;<span class="lifetime">&#39;list</span>, T&gt; {
+	<span class="doccomment">/// Removes this value from the collection and returns the removed value, if one existed. 
+	</span><span class="kw">pub fn </span>remove(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; RemovedValue&lt;T&gt; {
+		<span class="kw">match </span><span class="self">self </span>{
+			<span class="self">Self</span>::Array(<span class="kw-2">ref mut </span>arr_ref) =&gt; {
+				RemovedValue::Array(arr_ref.take())
 			}
-			<span class="ident"><span class="self">Self</span>::RBTree</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">cursor_mut</span>) =&gt; {
-				<span class="ident">RemovedValue::RBTree</span>(<span class="ident">cursor_mut</span>.<span class="ident">remove</span>())
-			}
-		}
-	}
-
-
-	<span class="doccomment">/// Removes this value from the collection and replaces it with the given `new_value`. </span>
-	<span class="doccomment">///</span>
-	<span class="doccomment">/// Returns the removed value, if one existed. If not, the </span>
-	<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">replace_with</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">new_value</span>: <span class="ident">T</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-		<span class="kw">match</span> <span class="self">self</span> {
-			<span class="ident"><span class="self">Self</span>::Array</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">arr_ref</span>) =&gt; {
-				<span class="prelude-val">Ok</span>(<span class="ident">arr_ref</span>.<span class="ident">replace</span>(<span class="ident">new_value</span>))
-			}
-			<span class="ident"><span class="self">Self</span>::RBTree</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">cursor_mut</span>) =&gt; {
-				<span class="ident">cursor_mut</span>.<span class="ident">replace_with</span>(<span class="ident">Wrapper::new_link</span>(<span class="ident">new_value</span>))
-					.<span class="ident">map</span>(<span class="op">|</span><span class="ident">removed</span><span class="op">|</span> <span class="prelude-val">Some</span>(<span class="ident">removed</span>.<span class="ident">inner</span>))
-					.<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">e</span>.<span class="ident">inner</span>)
+			<span class="self">Self</span>::RBTree(<span class="kw-2">ref mut </span>cursor_mut) =&gt; {
+				RemovedValue::RBTree(cursor_mut.remove())
 			}
 		}
 	}
 
-	<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">T</span><span class="op">&gt;</span> {
-		<span class="kw">match</span> <span class="self">self</span> {
-			<span class="ident"><span class="self">Self</span>::Array</span>(<span class="kw-2">ref</span> <span class="ident">arr_ref</span>) =&gt; <span class="ident">arr_ref</span>.<span class="ident">as_ref</span>(),
-			<span class="ident"><span class="self">Self</span>::RBTree</span>(<span class="kw-2">ref</span> <span class="ident">cursor_mut</span>) =&gt; <span class="ident">cursor_mut</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">deref</span>()),
+
+	<span class="doccomment">/// Removes this value from the collection and replaces it with the given `new_value`. 
+	///
+	/// Returns the removed value, if one existed. If not, the 
+	</span><span class="attr">#[allow(dead_code)]
+	</span><span class="kw">pub fn </span>replace_with(<span class="kw-2">&amp;mut </span><span class="self">self</span>, new_value: T) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;T&gt;, T&gt; {
+		<span class="kw">match </span><span class="self">self </span>{
+			<span class="self">Self</span>::Array(<span class="kw-2">ref mut </span>arr_ref) =&gt; {
+				<span class="prelude-val">Ok</span>(arr_ref.replace(new_value))
+			}
+			<span class="self">Self</span>::RBTree(<span class="kw-2">ref mut </span>cursor_mut) =&gt; {
+				cursor_mut.replace_with(Wrapper::new_link(new_value))
+					.map(|removed| <span class="prelude-val">Some</span>(removed.inner))
+					.map_err(|e| e.inner)
+			}
+		}
+	}
+
+	<span class="attr">#[allow(dead_code)]
+	</span><span class="kw">pub fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>T&gt; {
+		<span class="kw">match </span><span class="self">self </span>{
+			<span class="self">Self</span>::Array(<span class="kw-2">ref </span>arr_ref) =&gt; arr_ref.as_ref(),
+			<span class="self">Self</span>::RBTree(<span class="kw-2">ref </span>cursor_mut) =&gt; cursor_mut.get().map(|w| w.deref()),
 		}
 	}
 }</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="page_allocator" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="page_allocator" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

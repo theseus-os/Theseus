@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/print/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../print/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../print/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../print/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/print/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../print/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -53,55 +47,54 @@
 <span id="47">47</span>
 <span id="48">48</span>
 <span id="49">49</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Allows crates in the kernel to log messages to the default terminal using the </span>
-<span class="doccomment">//! println! and print! macros</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! The current system simply enqueus the Print event into the print queue of the default terminal</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Allows crates in the kernel to log messages to the default terminal using the 
+//! println! and print! macros
+//! 
+//! The current system simply enqueus the Print event into the print queue of the default terminal
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">dfqueue</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">event_types</span>;
+#[macro_use] </span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>dfqueue;
+<span class="kw">extern crate </span>event_types;
 
-<span class="kw">use</span> <span class="ident">core::fmt</span>;
-<span class="kw">use</span> <span class="ident">spin::Once</span>;
-<span class="kw">use</span> <span class="ident">dfqueue::DFQueueProducer</span>;
-<span class="kw">use</span> <span class="ident">event_types::Event</span>;
+<span class="kw">use </span>core::fmt;
+<span class="kw">use </span>spin::Once;
+<span class="kw">use </span>dfqueue::DFQueueProducer;
+<span class="kw">use </span>event_types::Event;
 
 
-<span class="doccomment">/// The kernel&#39;s default destination for print/println invocations</span>
-<span class="kw">static</span> <span class="ident">DEFAULT_PRINT_OUTPUT</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">DFQueueProducer</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+<span class="doccomment">/// The kernel&#39;s default destination for print/println invocations
+</span><span class="kw">static </span>DEFAULT_PRINT_OUTPUT: Once&lt;DFQueueProducer&lt;Event&gt;&gt; = Once::new();
 
-<span class="doccomment">/// Gives the kernel an endpoint (queue producer) to which it can send messages to be printed</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_default_print_output</span>(<span class="ident">producer</span>: <span class="ident">DFQueueProducer</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>) {
-    <span class="ident">DEFAULT_PRINT_OUTPUT</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">producer</span>);
+<span class="doccomment">/// Gives the kernel an endpoint (queue producer) to which it can send messages to be printed
+</span><span class="kw">pub fn </span>set_default_print_output(producer: DFQueueProducer&lt;Event&gt;) {
+    DEFAULT_PRINT_OUTPUT.call_once(|| producer);
 }
 
-<span class="doccomment">/// Calls `print!()` with an extra newilne `\n` appended to the end. </span>
-<span class="attribute">#[<span class="ident">macro_export</span>]</span>
-<span class="macro">macro_rules!</span> <span class="ident">println</span> {
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>:<span class="ident">expr</span>) =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>, <span class="string">&quot;\n&quot;</span>)));
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>:<span class="ident">expr</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>)<span class="kw-2">*</span>));
+<span class="doccomment">/// Calls `print!()` with an extra newilne `\n` appended to the end. 
+</span><span class="attr">#[macro_export]
+</span><span class="macro">macro_rules! </span>println {
+    (<span class="macro-nonterminal">$fmt</span>:expr) =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>)));
+    (<span class="macro-nonterminal">$fmt</span>:expr, $(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
 }
 
-<span class="doccomment">/// The main printing macro, which simply pushes an output event to the event queue. </span>
-<span class="doccomment">/// This ensures that only one thread (e.g., a terminal acting as a consumer) ever accesses the GUI.</span>
-<span class="attribute">#[<span class="ident">macro_export</span>]</span>
-<span class="macro">macro_rules!</span> <span class="ident">print</span> {
-    ($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) =&gt; ({
-        <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::print_to_default_output</span>(<span class="macro">format_args!</span>($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>)<span class="kw-2">*</span>));
+<span class="doccomment">/// The main printing macro, which simply pushes an output event to the event queue. 
+/// This ensures that only one thread (e.g., a terminal acting as a consumer) ever accesses the GUI.
+</span><span class="attr">#[macro_export]
+</span><span class="macro">macro_rules! </span>print {
+    ($(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; ({
+        <span class="macro-nonterminal">$crate::print_to_default_output</span>(<span class="macro">format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
     });
 }
 
-<span class="doccomment">/// Enqueues the given `fmt_args` as a String onto the default printing output queue,</span>
-<span class="doccomment">/// which is typically the default terminal application&#39;s input queue</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">print_to_default_output</span>(<span class="ident">fmt_args</span>: <span class="ident">fmt::Arguments</span>) {
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">q</span>) <span class="op">=</span> <span class="ident">DEFAULT_PRINT_OUTPUT</span>.<span class="ident">get</span>() {
-        <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">q</span>.<span class="ident">enqueue</span>(<span class="ident">Event::new_output_event</span>(<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">fmt_args</span>)));
+<span class="doccomment">/// Enqueues the given `fmt_args` as a String onto the default printing output queue,
+/// which is typically the default terminal application&#39;s input queue
+</span><span class="kw">pub fn </span>print_to_default_output(fmt_args: fmt::Arguments) {
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(q) = DEFAULT_PRINT_OUTPUT.get() {
+        <span class="kw">let _ </span>= q.enqueue(Event::new_output_event(<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, fmt_args)));
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="print" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="print" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

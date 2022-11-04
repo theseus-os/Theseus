@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/flow_table.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>flow_table.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/flow_table.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>flow_table.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -247,249 +241,248 @@
 <span id="241">241</span>
 <span id="242">242</span>
 <span id="243">243</span>
-</pre><pre class="rust"><code><span class="doccomment">//! The flow table sets rules for forwarding packets to different queues.</span>
-<span class="doccomment">//! This module defines the layout of the context used to initialize a flow table.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! The flow table sets rules for forwarding packets to different queues.
+//! This module defines the layout of the context used to initialize a flow table.
 
-<span class="kw">use</span> <span class="ident">zerocopy</span>::{<span class="ident">U32</span>, <span class="ident">FromBytes</span>};
-<span class="kw">use</span> <span class="ident">volatile::Volatile</span>;
-<span class="kw">use</span> <span class="ident">byteorder::BigEndian</span>;
-<span class="kw">use</span> <span class="ident">core::fmt</span>;
-<span class="kw">use</span> <span class="ident">num_enum::TryFromPrimitive</span>;
+</span><span class="kw">use </span>zerocopy::{U32, FromBytes};
+<span class="kw">use </span>volatile::Volatile;
+<span class="kw">use </span>byteorder::BigEndian;
+<span class="kw">use </span>core::fmt;
+<span class="kw">use </span>num_enum::TryFromPrimitive;
 
-<span class="doccomment">/// Value written to the flow table context to set the flow table&#39;s role in packet processing.</span>
-<span class="doccomment">/// (PRM Section 23.17.1, Table 1737)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">TryFromPrimitive</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum</span> <span class="ident">FlowTableType</span> {
-    <span class="ident">NicRx</span> <span class="op">=</span> <span class="number">0x0</span>,
-    <span class="ident">NicTx</span> <span class="op">=</span> <span class="number">0x1</span>
+<span class="doccomment">/// Value written to the flow table context to set the flow table&#39;s role in packet processing.
+/// (PRM Section 23.17.1, Table 1737)
+</span><span class="attr">#[derive(Debug, TryFromPrimitive)]
+#[repr(u8)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum </span>FlowTableType {
+    NicRx = <span class="number">0x0</span>,
+    NicTx = <span class="number">0x1
+</span>}
+
+<span class="doccomment">/// The data structure containing flow table initialization parameters.
+/// It is passed to the HCA at the time of flow table creation.
+/// (Many fields are missing since they are not used)
+/// (PRM Section 23.17.1, Table 1740)
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C, packed)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>FlowTableContext {
+    <span class="doccomment">/// log base 2 of the table size (given in the number of flows), occupies bits [7:0]
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) log_size:                    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="doccomment">/// The data structure containing flow table initialization parameters.</span>
-<span class="doccomment">/// It is passed to the HCA at the time of flow table creation.</span>
-<span class="doccomment">/// (Many fields are missing since they are not used)</span>
-<span class="doccomment">/// (PRM Section 23.17.1, Table 1740)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">FlowTableContext</span> {
-    <span class="doccomment">/// log base 2 of the table size (given in the number of flows), occupies bits [7:0]</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">log_size</span>:                    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-}
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;FlowTableContext&gt;(), <span class="number">4</span>);
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">FlowTableContext</span><span class="op">&gt;</span>(), <span class="number">4</span>);
-
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">FlowTableContext</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;FlowTableContext&quot;</span>)
-            .<span class="ident">field</span>(<span class="string">&quot;log_size&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">log_size</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">finish</span>()
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>FlowTableContext {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        f.debug_struct(<span class="string">&quot;FlowTableContext&quot;</span>)
+            .field(<span class="string">&quot;log_size&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.log_size.read().get())
+            .finish()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">FlowTableContext</span> {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">num_entries</span>: <span class="ident">u32</span>) -&gt; <span class="ident">FlowTableContext</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctxt</span> <span class="op">=</span> <span class="ident">FlowTableContext::default</span>();
-        <span class="kw">let</span> <span class="ident">log_size</span> <span class="op">=</span> <span class="ident">libm::log2</span>(<span class="ident">num_entries</span> <span class="kw">as</span> <span class="ident">f64</span>) <span class="kw">as</span> <span class="ident">u32</span>;
-        <span class="ident">ctxt</span>.<span class="ident">log_size</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">log_size</span>));
-        <span class="ident">ctxt</span>
+<span class="kw">impl </span>FlowTableContext {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>init(num_entries: u32) -&gt; FlowTableContext {
+        <span class="kw">let </span><span class="kw-2">mut </span>ctxt = FlowTableContext::default();
+        <span class="kw">let </span>log_size = libm::log2(num_entries <span class="kw">as </span>f64) <span class="kw">as </span>u32;
+        ctxt.log_size.write(U32::new(log_size));
+        ctxt
     }
 
-    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">mailbox_offset</span>() -&gt; <span class="ident">usize</span> { <span class="number">0x8</span> }
+    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>mailbox_offset() -&gt; usize { <span class="number">0x8 </span>}
 }
 
-<span class="doccomment">/// Value written to the [`FlowGroupInput`] match_criteria_enable bitmask field.</span>
-<span class="doccomment">/// (PRM Section 23.17.6, Table 1759)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">TryFromPrimitive</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum</span> <span class="ident">MatchCriteriaEnable</span> {
-    <span class="doccomment">/// Use this option for the wildcard flow group</span>
-    <span class="prelude-val">None</span>                <span class="op">=</span> <span class="number">0</span>,
-    <span class="ident">OuterHeaders</span>        <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">0</span>,
-    <span class="ident">MiscParameters</span>      <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>,
-    <span class="ident">InnerHeader</span>         <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">2</span>
+<span class="doccomment">/// Value written to the [`FlowGroupInput`] match_criteria_enable bitmask field.
+/// (PRM Section 23.17.6, Table 1759)
+</span><span class="attr">#[derive(Debug, TryFromPrimitive)]
+#[repr(u8)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum </span>MatchCriteriaEnable {
+    <span class="doccomment">/// Use this option for the wildcard flow group
+    </span><span class="prelude-val">None                </span>= <span class="number">0</span>,
+    OuterHeaders        = <span class="number">1 </span>&lt;&lt; <span class="number">0</span>,
+    MiscParameters      = <span class="number">1 </span>&lt;&lt; <span class="number">1</span>,
+    InnerHeader         = <span class="number">1 </span>&lt;&lt; <span class="number">2
+</span>}
+
+<span class="doccomment">/// The data structure containing flow group initialization parameters.
+/// It is passed to the HCA at the time of flow group creation.
+/// (Many fields are missing since they are not used)
+/// (PRM Section 23.17.6, Table 1758)
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C, packed)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>FlowGroupInput {
+    <span class="doccomment">/// The table&#39;s role in packet processing, occupies bits [31:24]
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) table_type:                      Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// Table handler returned by the [`CommandOpcode::CreateFlowTable`] command
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) table_id:                        Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding1:                                  u32,
+    <span class="doccomment">/// The first flow included in the group
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) start_flow_index:                Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding2:                                  u32,
+    <span class="doccomment">/// The last flow included in the group
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) end_flow_index:                  Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding3:                                  [u8; <span class="number">20</span>],
+    <span class="doccomment">/// Bitmask representing which of the header and parameters in the
+    /// match_criteria field are used in defining the flow.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) match_criteria_enable:           Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="doccomment">/// The data structure containing flow group initialization parameters.</span>
-<span class="doccomment">/// It is passed to the HCA at the time of flow group creation.</span>
-<span class="doccomment">/// (Many fields are missing since they are not used)</span>
-<span class="doccomment">/// (PRM Section 23.17.6, Table 1758)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">FlowGroupInput</span> {
-    <span class="doccomment">/// The table&#39;s role in packet processing, occupies bits [31:24]</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">table_type</span>:                      <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Table handler returned by the [`CommandOpcode::CreateFlowTable`] command</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">table_id</span>:                        <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding1</span>:                                  <span class="ident">u32</span>,
-    <span class="doccomment">/// The first flow included in the group</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">start_flow_index</span>:                <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding2</span>:                                  <span class="ident">u32</span>,
-    <span class="doccomment">/// The last flow included in the group</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">end_flow_index</span>:                  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding3</span>:                                  [<span class="ident">u8</span>; <span class="number">20</span>],
-    <span class="doccomment">/// Bitmask representing which of the header and parameters in the</span>
-    <span class="doccomment">/// match_criteria field are used in defining the flow.</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">match_criteria_enable</span>:           <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-}
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;FlowGroupInput&gt;(), <span class="number">48</span>);
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">FlowGroupInput</span><span class="op">&gt;</span>(), <span class="number">48</span>);
-
-<span class="kw">impl</span> <span class="ident">FlowGroupInput</span> {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">init</span>(
-        <span class="ident">table_type</span>: <span class="ident">FlowTableType</span>, 
-        <span class="ident">table_id</span>: <span class="ident">u32</span>, 
-        <span class="ident">start_flow_index</span>: <span class="ident">u32</span>, 
-        <span class="ident">end_flow_index</span>: <span class="ident">u32</span>, 
-        <span class="ident">match_criteria_enable</span>: <span class="ident">MatchCriteriaEnable</span>
-    ) -&gt; <span class="ident">FlowGroupInput</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fgi</span> <span class="op">=</span> <span class="ident">FlowGroupInput::default</span>();
-        <span class="ident">fgi</span>.<span class="ident">table_type</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">table_type</span> <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">24</span>));
-        <span class="ident">fgi</span>.<span class="ident">table_id</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">table_id</span> <span class="op">&amp;</span> <span class="number">0xFF_FFFF</span>));
-        <span class="ident">fgi</span>.<span class="ident">start_flow_index</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">start_flow_index</span>));
-        <span class="ident">fgi</span>.<span class="ident">end_flow_index</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">end_flow_index</span>));
-        <span class="ident">fgi</span>.<span class="ident">match_criteria_enable</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">match_criteria_enable</span> <span class="kw">as</span> <span class="ident">u32</span>)); 
-        <span class="ident">fgi</span>
+<span class="kw">impl </span>FlowGroupInput {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>init(
+        table_type: FlowTableType, 
+        table_id: u32, 
+        start_flow_index: u32, 
+        end_flow_index: u32, 
+        match_criteria_enable: MatchCriteriaEnable
+    ) -&gt; FlowGroupInput {
+        <span class="kw">let </span><span class="kw-2">mut </span>fgi = FlowGroupInput::default();
+        fgi.table_type.write(U32::new((table_type <span class="kw">as </span>u32) &lt;&lt; <span class="number">24</span>));
+        fgi.table_id.write(U32::new(table_id &amp; <span class="number">0xFF_FFFF</span>));
+        fgi.start_flow_index.write(U32::new(start_flow_index));
+        fgi.end_flow_index.write(U32::new(end_flow_index));
+        fgi.match_criteria_enable.write(U32::new(match_criteria_enable <span class="kw">as </span>u32)); 
+        fgi
     }
 
-    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">mailbox_offset</span>() -&gt; <span class="ident">usize</span> { <span class="number">0</span> }
+    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>mailbox_offset() -&gt; usize { <span class="number">0 </span>}
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">FlowGroupInput</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;FlowTableContext&quot;</span>)
-            .<span class="ident">field</span>(<span class="string">&quot;table_type&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">table_type</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;table_id&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">table_id</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;start_flow_index&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">start_flow_index</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;end_flow_index&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">end_flow_index</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;match_criteria_enable&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">match_criteria_enable</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">finish</span>()
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>FlowGroupInput {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        f.debug_struct(<span class="string">&quot;FlowTableContext&quot;</span>)
+            .field(<span class="string">&quot;table_type&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.table_type.read().get())
+            .field(<span class="string">&quot;table_id&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.table_id.read().get())
+            .field(<span class="string">&quot;start_flow_index&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.start_flow_index.read().get())
+            .field(<span class="string">&quot;end_flow_index&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.end_flow_index.read().get())
+            .field(<span class="string">&quot;match_criteria_enable&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.match_criteria_enable.read().get())
+            .finish()
     }
 }
 
-<span class="doccomment">/// The data structure containing information to add an entry to a flow table.</span>
-<span class="doccomment">/// (PRM Section 23.17.9, Table 1788)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">FlowEntryInput</span> {
-    <span class="doccomment">/// The table&#39;s role in packet processing, occupies bits [31:24]</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">table_type</span>:                  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Table handler returned by the [`CommandOpcode::CreateFlowTable`] command</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">table_id</span>:                    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding1</span>:                              [<span class="ident">u8</span>; <span class="number">8</span>],
-    <span class="doccomment">/// flow index in the flow table</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">flow_index</span>:                  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding2</span>:                              [<span class="ident">u8</span>; <span class="number">28</span>]
+<span class="doccomment">/// The data structure containing information to add an entry to a flow table.
+/// (PRM Section 23.17.9, Table 1788)
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C, packed)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>FlowEntryInput {
+    <span class="doccomment">/// The table&#39;s role in packet processing, occupies bits [31:24]
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) table_type:                  Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// Table handler returned by the [`CommandOpcode::CreateFlowTable`] command
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) table_id:                    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding1:                              [u8; <span class="number">8</span>],
+    <span class="doccomment">/// flow index in the flow table
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) flow_index:                  Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding2:                              [u8; <span class="number">28</span>]
 }
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">FlowEntryInput</span><span class="op">&gt;</span>(), <span class="number">48</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;FlowEntryInput&gt;(), <span class="number">48</span>);
 
-<span class="kw">impl</span> <span class="ident">FlowEntryInput</span> {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">table_type</span>: <span class="ident">FlowTableType</span>, <span class="ident">table_id</span>: <span class="ident">u32</span>, <span class="ident">flow_index</span>: <span class="ident">u32</span>) -&gt; <span class="ident">FlowEntryInput</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fei</span> <span class="op">=</span> <span class="ident">FlowEntryInput::default</span>();
-        <span class="ident">fei</span>.<span class="ident">table_type</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">table_type</span> <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">24</span>));
-        <span class="ident">fei</span>.<span class="ident">table_id</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">table_id</span> <span class="op">&amp;</span> <span class="number">0xFF_FFFF</span>));
-        <span class="ident">fei</span>.<span class="ident">flow_index</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">flow_index</span>));
-        <span class="ident">fei</span>
+<span class="kw">impl </span>FlowEntryInput {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>init(table_type: FlowTableType, table_id: u32, flow_index: u32) -&gt; FlowEntryInput {
+        <span class="kw">let </span><span class="kw-2">mut </span>fei = FlowEntryInput::default();
+        fei.table_type.write(U32::new((table_type <span class="kw">as </span>u32) &lt;&lt; <span class="number">24</span>));
+        fei.table_id.write(U32::new(table_id &amp; <span class="number">0xFF_FFFF</span>));
+        fei.flow_index.write(U32::new(flow_index));
+        fei
     }
 
-    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">mailbox_offset</span>() -&gt; <span class="ident">usize</span> { <span class="number">0</span> }
+    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>mailbox_offset() -&gt; usize { <span class="number">0 </span>}
 }
 
-<span class="doccomment">/// Value written to the [`FlowContext`] action bitmask field.</span>
-<span class="doccomment">/// (PRM Section 23.17.9, Table 1791)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">TryFromPrimitive</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u32</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum</span> <span class="ident">FlowContextAction</span> {
-    <span class="prelude-val">None</span>            <span class="op">=</span> <span class="number">0</span>,
-    <span class="ident">Allow</span>           <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">0</span>,
-    <span class="ident">Drop</span>            <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>,
-    <span class="ident">FwdDest</span>         <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">2</span>,
-    <span class="ident">Count</span>           <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">3</span>,
-    <span class="ident">Reformat</span>        <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">4</span>,
-    <span class="ident">Decap</span>           <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">5</span>,
+<span class="doccomment">/// Value written to the [`FlowContext`] action bitmask field.
+/// (PRM Section 23.17.9, Table 1791)
+</span><span class="attr">#[derive(Debug, TryFromPrimitive)]
+#[repr(u32)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum </span>FlowContextAction {
+    <span class="prelude-val">None            </span>= <span class="number">0</span>,
+    Allow           = <span class="number">1 </span>&lt;&lt; <span class="number">0</span>,
+    Drop            = <span class="number">1 </span>&lt;&lt; <span class="number">1</span>,
+    FwdDest         = <span class="number">1 </span>&lt;&lt; <span class="number">2</span>,
+    Count           = <span class="number">1 </span>&lt;&lt; <span class="number">3</span>,
+    Reformat        = <span class="number">1 </span>&lt;&lt; <span class="number">4</span>,
+    Decap           = <span class="number">1 </span>&lt;&lt; <span class="number">5</span>,
 }
 
 
-<span class="doccomment">/// The data structure containing information about a flow.</span>
-<span class="doccomment">/// (PRM Section 23.17.9, Table 1790)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">FlowContext</span> {
-    <span class="ident">_padding1</span>:                              <span class="ident">u32</span>,
-    <span class="doccomment">/// Group handler returned by the [`CommandOpcode::CreateFlowGroup`] command</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">group_id</span>:                    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding2</span>:                              <span class="ident">u32</span>,
-    <span class="doccomment">/// bitmask indicating which actions to perform</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">action</span>:                      <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// size of destination list</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">dest_list_size</span>:              <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding3</span>:                              [<span class="ident">u8</span>; <span class="number">20</span>] 
+<span class="doccomment">/// The data structure containing information about a flow.
+/// (PRM Section 23.17.9, Table 1790)
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C, packed)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>FlowContext {
+    _padding1:                              u32,
+    <span class="doccomment">/// Group handler returned by the [`CommandOpcode::CreateFlowGroup`] command
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) group_id:                    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding2:                              u32,
+    <span class="doccomment">/// bitmask indicating which actions to perform
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) action:                      Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// size of destination list
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) dest_list_size:              Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding3:                              [u8; <span class="number">20</span>] 
 }
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">FlowContext</span><span class="op">&gt;</span>(), <span class="number">40</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;FlowContext&gt;(), <span class="number">40</span>);
 
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">FlowContext</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="ident">FlowContext</span> {
-        <span class="ident">FlowContext</span> { 
-            <span class="ident">_padding1</span>: <span class="number">0</span>, 
-            <span class="ident">group_id</span>: <span class="ident">Volatile::new</span>(<span class="ident">U32::new</span>(<span class="number">0</span>)), 
-            <span class="ident">_padding2</span>: <span class="number">0</span>, 
-            <span class="ident">action</span>: <span class="ident">Volatile::new</span>(<span class="ident">U32::new</span>(<span class="number">0</span>)),  
-            <span class="ident">dest_list_size</span>: <span class="ident">Volatile::new</span>(<span class="ident">U32::new</span>(<span class="number">0</span>)),  
-            <span class="ident">_padding3</span>: [<span class="number">0</span>; <span class="number">20</span>] 
+<span class="kw">impl </span>Default <span class="kw">for </span>FlowContext {
+    <span class="kw">fn </span>default() -&gt; FlowContext {
+        FlowContext { 
+            _padding1: <span class="number">0</span>, 
+            group_id: Volatile::new(U32::new(<span class="number">0</span>)), 
+            _padding2: <span class="number">0</span>, 
+            action: Volatile::new(U32::new(<span class="number">0</span>)),  
+            dest_list_size: Volatile::new(U32::new(<span class="number">0</span>)),  
+            _padding3: [<span class="number">0</span>; <span class="number">20</span>] 
         }
     }
 }
-<span class="kw">impl</span> <span class="ident">FlowContext</span> {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">group_id</span>: <span class="ident">u32</span>, <span class="ident">action</span>: <span class="ident">FlowContextAction</span>, <span class="ident">dest_list_size</span>: <span class="ident">u32</span>) -&gt; <span class="ident">FlowContext</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctxt</span> <span class="op">=</span> <span class="ident">FlowContext::default</span>();
-        <span class="ident">ctxt</span>.<span class="ident">group_id</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">group_id</span>));
-        <span class="ident">ctxt</span>.<span class="ident">action</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">action</span> <span class="kw">as</span> <span class="ident">u32</span>));
-        <span class="ident">ctxt</span>.<span class="ident">dest_list_size</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">dest_list_size</span>)); 
-        <span class="ident">ctxt</span>
+<span class="kw">impl </span>FlowContext {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>init(group_id: u32, action: FlowContextAction, dest_list_size: u32) -&gt; FlowContext {
+        <span class="kw">let </span><span class="kw-2">mut </span>ctxt = FlowContext::default();
+        ctxt.group_id.write(U32::new(group_id));
+        ctxt.action.write(U32::new(action <span class="kw">as </span>u32));
+        ctxt.dest_list_size.write(U32::new(dest_list_size)); 
+        ctxt
     }
 
-    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">mailbox_offset</span>() -&gt; <span class="ident">usize</span> { <span class="number">0x30</span> }
+    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>mailbox_offset() -&gt; usize { <span class="number">0x30 </span>}
 }
 
 
-<span class="doccomment">/// Value written to the [`DestinationEntry`] id_and_type field.</span>
-<span class="doccomment">/// (PRM Section 23.17.9, Table 1801)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">TryFromPrimitive</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum</span> <span class="ident">DestinationType</span> {
-    <span class="ident">VPort</span>           <span class="op">=</span> <span class="number">0x0</span>,
-    <span class="ident">FlowTable</span>       <span class="op">=</span> <span class="number">0x1</span>,
-    <span class="ident">TIR</span>             <span class="op">=</span> <span class="number">0x2</span>,
-    <span class="ident">QP</span>              <span class="op">=</span> <span class="number">0x3</span>,
-    <span class="ident">FlowSampler</span>     <span class="op">=</span> <span class="number">0x6</span>,
+<span class="doccomment">/// Value written to the [`DestinationEntry`] id_and_type field.
+/// (PRM Section 23.17.9, Table 1801)
+</span><span class="attr">#[derive(Debug, TryFromPrimitive)]
+#[repr(u8)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum </span>DestinationType {
+    VPort           = <span class="number">0x0</span>,
+    FlowTable       = <span class="number">0x1</span>,
+    TIR             = <span class="number">0x2</span>,
+    QP              = <span class="number">0x3</span>,
+    FlowSampler     = <span class="number">0x6</span>,
 }
 
 
-<span class="doccomment">/// The data structure containing information about the destination of a flow.</span>
-<span class="doccomment">/// (PRM Section 23.17.9, Table 1800)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">DestinationEntry</span> {
-    <span class="doccomment">/// currently we only set the type to [DestinationType::TIR] and the id is the TIR number for the RQ</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">id_and_type</span>:                <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">packet_reformat</span>:                 <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// The data structure containing information about the destination of a flow.
+/// (PRM Section 23.17.9, Table 1800)
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C, packed)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>DestinationEntry {
+    <span class="doccomment">/// currently we only set the type to [DestinationType::TIR] and the id is the TIR number for the RQ
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) id_and_type:                Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) packet_reformat:                 Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 
 }
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DestinationEntry</span><span class="op">&gt;</span>(), <span class="number">8</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;DestinationEntry&gt;(), <span class="number">8</span>);
 
-<span class="kw">impl</span> <span class="ident">DestinationEntry</span> {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">dest_type</span>: <span class="ident">DestinationType</span>, <span class="ident">dest_id</span>: <span class="ident">u32</span>) -&gt; <span class="ident">DestinationEntry</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entry</span> <span class="op">=</span> <span class="ident">DestinationEntry::default</span>();
-        <span class="ident">entry</span>.<span class="ident">id_and_type</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">dest_type</span> <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">24</span> <span class="op">|</span> (<span class="ident">dest_id</span> <span class="op">&amp;</span> <span class="number">0xFF_FFFF</span>)));
-        <span class="ident">entry</span>
+<span class="kw">impl </span>DestinationEntry {
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>init(dest_type: DestinationType, dest_id: u32) -&gt; DestinationEntry {
+        <span class="kw">let </span><span class="kw-2">mut </span>entry = DestinationEntry::default();
+        entry.id_and_type.write(U32::new((dest_type <span class="kw">as </span>u32) &lt;&lt; <span class="number">24 </span>| (dest_id &amp; <span class="number">0xFF_FFFF</span>)));
+        entry
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

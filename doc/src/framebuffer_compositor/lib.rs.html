@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/framebuffer_compositor/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../framebuffer_compositor/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../framebuffer_compositor/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../framebuffer_compositor/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/framebuffer_compositor/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../framebuffer_compositor/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -279,267 +273,265 @@
 <span id="273">273</span>
 <span id="274">274</span>
 <span id="275">275</span>
-<span id="276">276</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This crate defines a framebuffer compositor.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! A framebuffer compositor composites a list of framebuffers into a single destination framebuffer.</span>
-<span class="doccomment">//! The coordinate system within a framebuffer is expressed relative to its origin, i.e., the top-left point.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! # Cache</span>
-<span class="doccomment">//! The compositor caches groups of framebuffer rows for better performance. </span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! First, it divides each framebuffer into ranges of rows called &quot;blocks&quot; which are `CACHE_BLOCK_HEIGHT` rows in height,</span>
-<span class="doccomment">//! and deals with these row ranges one by one. </span>
-<span class="doccomment">//! The pixels in each block&#39;s row range are a contiguous array of length `CACHE_BLOCK_HEIGHT * framebuffer_width`,</span>
-<span class="doccomment">//! and the cache key is the hash value of that pixel array.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! In the next step, for every `CACHE_BLOCK_HEIGHT` rows, the compositor checks if the pixel array is are already cached.</span>
-<span class="doccomment">//! It ignores row ranges that do not overlap with the given bounding box to be updated.</span>
-<span class="doccomment">//! If a pixel array is not cached, the compositor will refresh the pixels within the bounding box and cache those `CACHE_BLOCK_HEIGHT` rows.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! In order to cache a range of rows from the source framebuffer, the compositor needs to cache its contents, its location in the destination framebuffer, and its size.</span>
-<span class="doccomment">//! The cache is basically a rectangular region in the destination framebuffer, and we define the structure `CacheBlock` to represent that cached region.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate defines a framebuffer compositor.
+//!
+//! A framebuffer compositor composites a list of framebuffers into a single destination framebuffer.
+//! The coordinate system within a framebuffer is expressed relative to its origin, i.e., the top-left point.
+//!
+//! # Cache
+//! The compositor caches groups of framebuffer rows for better performance. 
+//!
+//! First, it divides each framebuffer into ranges of rows called &quot;blocks&quot; which are `CACHE_BLOCK_HEIGHT` rows in height,
+//! and deals with these row ranges one by one. 
+//! The pixels in each block&#39;s row range are a contiguous array of length `CACHE_BLOCK_HEIGHT * framebuffer_width`,
+//! and the cache key is the hash value of that pixel array.
+//!
+//! In the next step, for every `CACHE_BLOCK_HEIGHT` rows, the compositor checks if the pixel array is are already cached.
+//! It ignores row ranges that do not overlap with the given bounding box to be updated.
+//! If a pixel array is not cached, the compositor will refresh the pixels within the bounding box and cache those `CACHE_BLOCK_HEIGHT` rows.
+//!
+//! In order to cache a range of rows from the source framebuffer, the compositor needs to cache its contents, its location in the destination framebuffer, and its size.
+//! The cache is basically a rectangular region in the destination framebuffer, and we define the structure `CacheBlock` to represent that cached region.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">const_btree_new</span>)]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">compositor</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">framebuffer</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">hashbrown</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">shapes</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>compositor;
+<span class="kw">extern crate </span>framebuffer;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>hashbrown;
+<span class="kw">extern crate </span>shapes;
 
-<span class="kw">use</span> <span class="ident">alloc::collections::BTreeMap</span>;
-<span class="kw">use</span> <span class="ident">alloc::vec</span>::{<span class="ident">Vec</span>};
-<span class="kw">use</span> <span class="ident">core::hash</span>::{<span class="ident">Hash</span>, <span class="ident">Hasher</span>, <span class="ident">BuildHasher</span>};
-<span class="kw">use</span> <span class="ident">hashbrown::hash_map</span>::{<span class="ident">DefaultHashBuilder</span>};
-<span class="kw">use</span> <span class="ident">compositor</span>::{<span class="ident">Compositor</span>, <span class="ident">FramebufferUpdates</span>, <span class="ident">CompositableRegion</span>};
-<span class="kw">use</span> <span class="ident">framebuffer</span>::{<span class="ident">Framebuffer</span>, <span class="ident">Pixel</span>};
-<span class="kw">use</span> <span class="ident">shapes</span>::{<span class="ident">Coord</span>, <span class="ident">Rectangle</span>};
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">core::ops::Range</span>;
+<span class="kw">use </span>alloc::collections::BTreeMap;
+<span class="kw">use </span>alloc::vec::{Vec};
+<span class="kw">use </span>core::hash::{Hash, Hasher, BuildHasher};
+<span class="kw">use </span>hashbrown::hash_map::{DefaultHashBuilder};
+<span class="kw">use </span>compositor::{Compositor, FramebufferUpdates, CompositableRegion};
+<span class="kw">use </span>framebuffer::{Framebuffer, Pixel};
+<span class="kw">use </span>shapes::{Coord, Rectangle};
+<span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>core::ops::Range;
 
-<span class="doccomment">/// The height of a cache block. In every iteration the compositor will deal with groups of 16 rows and cache them.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CACHE_BLOCK_HEIGHT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">16</span>;
+<span class="doccomment">/// The height of a cache block. In every iteration the compositor will deal with groups of 16 rows and cache them.
+</span><span class="kw">pub const </span>CACHE_BLOCK_HEIGHT: usize = <span class="number">16</span>;
 
-<span class="doccomment">/// The instance of the framebuffer compositor.</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">FRAME_COMPOSITOR</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">FrameCompositor</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(
-    <span class="ident">FrameCompositor</span>{
-        <span class="ident">caches</span>: <span class="ident">BTreeMap::new</span>()
+<span class="doccomment">/// The instance of the framebuffer compositor.
+</span><span class="kw">pub static </span>FRAME_COMPOSITOR: Mutex&lt;FrameCompositor&gt; = Mutex::new(
+    FrameCompositor{
+        caches: BTreeMap::new()
     }
 );
 
-<span class="doccomment">/// A `CacheBlock` represents the cached (previously-composited) content of a range of rows in the source framebuffer. </span>
-<span class="doccomment">/// It specifies the rectangular region in the destination framebuffer and the hash.</span>
-<span class="doccomment">/// Once cached, a `CacheBlock` block is independent of the source framebuffer it came from.</span>
-<span class="doccomment">/// `content_hash` is the hash value of the actual pixel contents in the cached block. A cache block is identical to some new framebuffer rows to be updated if they share the same `content_hash`, location and width.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CacheBlock</span> {
-    <span class="doccomment">/// The rectanglular region in the destination framebuffer occupied by the cached rows in the source framebuffer. </span>
-    <span class="doccomment">/// We need this information because if an old cache block overlaps with some new framebuffer rows to be updated, </span>
-    <span class="doccomment">/// the compositor should remove the old one since part of that region will change.</span>
-    <span class="ident">block</span>: <span class="ident">Rectangle</span>,
-    <span class="doccomment">/// The hash value of the actual pixel contents in the cached block.</span>
-    <span class="ident">content_hash</span>: <span class="ident">u64</span>,
+<span class="doccomment">/// A `CacheBlock` represents the cached (previously-composited) content of a range of rows in the source framebuffer. 
+/// It specifies the rectangular region in the destination framebuffer and the hash.
+/// Once cached, a `CacheBlock` block is independent of the source framebuffer it came from.
+/// `content_hash` is the hash value of the actual pixel contents in the cached block. A cache block is identical to some new framebuffer rows to be updated if they share the same `content_hash`, location and width.
+</span><span class="kw">pub struct </span>CacheBlock {
+    <span class="doccomment">/// The rectanglular region in the destination framebuffer occupied by the cached rows in the source framebuffer. 
+    /// We need this information because if an old cache block overlaps with some new framebuffer rows to be updated, 
+    /// the compositor should remove the old one since part of that region will change.
+    </span>block: Rectangle,
+    <span class="doccomment">/// The hash value of the actual pixel contents in the cached block.
+    </span>content_hash: u64,
 }
 
-<span class="kw">impl</span> <span class="ident">CacheBlock</span> {
-    <span class="doccomment">/// Checks if a cache block overlaps with another one</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">overlaps_with</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cache</span>: <span class="kw-2">&amp;</span><span class="ident">CacheBlock</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">contains_corner</span>(<span class="ident">cache</span>) <span class="op">|</span><span class="op">|</span> <span class="ident">cache</span>.<span class="ident">contains_corner</span>(<span class="self">self</span>)
+<span class="kw">impl </span>CacheBlock {
+    <span class="doccomment">/// Checks if a cache block overlaps with another one
+    </span><span class="kw">pub fn </span>overlaps_with(<span class="kw-2">&amp;</span><span class="self">self</span>, cache: <span class="kw-2">&amp;</span>CacheBlock) -&gt; bool {
+        <span class="self">self</span>.contains_corner(cache) || cache.contains_corner(<span class="self">self</span>)
     }
 
-    <span class="doccomment">/// checks if the coordinate is within the block</span>
-    <span class="kw">fn</span> <span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">coordinate</span>: <span class="ident">Coord</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">return</span> <span class="ident">coordinate</span>.<span class="ident">x</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">block</span>.<span class="ident">top_left</span>.<span class="ident">x</span>
-            <span class="op">&amp;&amp;</span> <span class="ident">coordinate</span>.<span class="ident">x</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">block</span>.<span class="ident">bottom_right</span>.<span class="ident">x</span>
-            <span class="op">&amp;&amp;</span> <span class="ident">coordinate</span>.<span class="ident">y</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">block</span>.<span class="ident">top_left</span>.<span class="ident">y</span>
-            <span class="op">&amp;&amp;</span> <span class="ident">coordinate</span>.<span class="ident">y</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">block</span>.<span class="ident">bottom_right</span>.<span class="ident">y</span>
+    <span class="doccomment">/// checks if the coordinate is within the block
+    </span><span class="kw">fn </span>contains(<span class="kw-2">&amp;</span><span class="self">self</span>, coordinate: Coord) -&gt; bool {
+        <span class="kw">return </span>coordinate.x &gt;= <span class="self">self</span>.block.top_left.x
+            &amp;&amp; coordinate.x &lt; <span class="self">self</span>.block.bottom_right.x
+            &amp;&amp; coordinate.y &gt;= <span class="self">self</span>.block.top_left.y
+            &amp;&amp; coordinate.y &lt; <span class="self">self</span>.block.bottom_right.y
     }
 
-    <span class="doccomment">/// checks if this block contains any of the four corners of another cache block.</span>
-    <span class="kw">fn</span> <span class="ident">contains_corner</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">cache</span>: <span class="kw-2">&amp;</span><span class="ident">CacheBlock</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">contains</span>(<span class="ident">cache</span>.<span class="ident">block</span>.<span class="ident">top_left</span>)
-            <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">contains</span>(<span class="ident">cache</span>.<span class="ident">block</span>.<span class="ident">top_left</span> <span class="op">+</span> (<span class="ident">cache</span>.<span class="ident">block</span>.<span class="ident">bottom_right</span>.<span class="ident">x</span> <span class="op">-</span> <span class="ident">cache</span>.<span class="ident">block</span>.<span class="ident">top_left</span>.<span class="ident">x</span> <span class="op">-</span> <span class="number">1</span>, <span class="number">0</span>))
-            <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">contains</span>(<span class="ident">cache</span>.<span class="ident">block</span>.<span class="ident">top_left</span> <span class="op">+</span> (<span class="number">0</span>, <span class="ident">cache</span>.<span class="ident">block</span>.<span class="ident">bottom_right</span>.<span class="ident">y</span> <span class="op">-</span> <span class="ident">cache</span>.<span class="ident">block</span>.<span class="ident">top_left</span>.<span class="ident">y</span> <span class="op">-</span> <span class="number">1</span>))
-            <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">contains</span>(<span class="ident">cache</span>.<span class="ident">block</span>.<span class="ident">bottom_right</span> <span class="op">-</span> (<span class="number">1</span>, <span class="number">1</span>))
+    <span class="doccomment">/// checks if this block contains any of the four corners of another cache block.
+    </span><span class="kw">fn </span>contains_corner(<span class="kw-2">&amp;</span><span class="self">self</span>, cache: <span class="kw-2">&amp;</span>CacheBlock) -&gt; bool {
+        <span class="self">self</span>.contains(cache.block.top_left)
+            || <span class="self">self</span>.contains(cache.block.top_left + (cache.block.bottom_right.x - cache.block.top_left.x - <span class="number">1</span>, <span class="number">0</span>))
+            || <span class="self">self</span>.contains(cache.block.top_left + (<span class="number">0</span>, cache.block.bottom_right.y - cache.block.top_left.y - <span class="number">1</span>))
+            || <span class="self">self</span>.contains(cache.block.bottom_right - (<span class="number">1</span>, <span class="number">1</span>))
     }
 }
 
-<span class="doccomment">/// The framebuffer compositor structure.</span>
-<span class="doccomment">/// It caches framebuffer rows since last update as soft states for better performance.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FrameCompositor</span> {
-    <span class="comment">// Cache of updated framebuffers before</span>
-    <span class="ident">caches</span>: <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">Coord</span>, <span class="ident">CacheBlock</span><span class="op">&gt;</span>,
+<span class="doccomment">/// The framebuffer compositor structure.
+/// It caches framebuffer rows since last update as soft states for better performance.
+</span><span class="kw">pub struct </span>FrameCompositor {
+    <span class="comment">// Cache of updated framebuffers before
+    </span>caches: BTreeMap&lt;Coord, CacheBlock&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">FrameCompositor</span> {
-    <span class="doccomment">/// Checks if some rows of a framebuffer are cached.</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `row_pixels`: the continuous pixels in the rows.</span>
-    <span class="doccomment">/// * `dest_coord`: the location of the first pixel in the destination framebuffer.</span>
-    <span class="doccomment">/// * `width`: the width of the rows</span>
-    <span class="doccomment">///</span>
-    <span class="kw">fn</span> <span class="ident">is_cached</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Pixel</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">row_pixels</span>: <span class="kw-2">&amp;</span>[<span class="ident">P</span>], <span class="ident">dest_coord</span>: <span class="kw-2">&amp;</span><span class="ident">Coord</span>, <span class="ident">width</span>: <span class="ident">usize</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">caches</span>.<span class="ident">get</span>(<span class="ident">dest_coord</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">cache</span>) =&gt; {
-                <span class="comment">// The same hash and width means the cache block is identical to the row pixels.</span>
-                <span class="comment">// We do not check the height because if the hashes are the same, the number of pixels, namely `width * height` must be the same.</span>
-                <span class="kw">return</span> <span class="ident">cache</span>.<span class="ident">content_hash</span> <span class="op">==</span> <span class="ident">hash</span>(<span class="ident">row_pixels</span>) <span class="op">&amp;&amp;</span> (<span class="ident">cache</span>.<span class="ident">block</span>.<span class="ident">bottom_right</span>.<span class="ident">x</span> <span class="op">-</span> <span class="ident">cache</span>.<span class="ident">block</span>.<span class="ident">top_left</span>.<span class="ident">x</span>) <span class="kw">as</span> <span class="ident">usize</span> <span class="op">==</span> <span class="ident">width</span>
+<span class="kw">impl </span>FrameCompositor {
+    <span class="doccomment">/// Checks if some rows of a framebuffer are cached.
+    /// # Arguments
+    /// * `row_pixels`: the continuous pixels in the rows.
+    /// * `dest_coord`: the location of the first pixel in the destination framebuffer.
+    /// * `width`: the width of the rows
+    ///
+    </span><span class="kw">fn </span>is_cached&lt;P: Pixel&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, row_pixels: <span class="kw-2">&amp;</span>[P], dest_coord: <span class="kw-2">&amp;</span>Coord, width: usize) -&gt; bool {
+        <span class="kw">match </span><span class="self">self</span>.caches.get(dest_coord) {
+            <span class="prelude-val">Some</span>(cache) =&gt; {
+                <span class="comment">// The same hash and width means the cache block is identical to the row pixels.
+                // We do not check the height because if the hashes are the same, the number of pixels, namely `width * height` must be the same.
+                </span><span class="kw">return </span>cache.content_hash == hash(row_pixels) &amp;&amp; (cache.block.bottom_right.x - cache.block.top_left.x) <span class="kw">as </span>usize == width
             }
-            <span class="prelude-val">None</span> =&gt; <span class="kw">return</span> <span class="bool-val">false</span>,
+            <span class="prelude-val">None </span>=&gt; <span class="kw">return </span><span class="bool-val">false</span>,
         }
     }
 
-    <span class="doccomment">/// This function will return true if several continuous rows in the framebuffer are cached.</span>
-    <span class="doccomment">/// If false, i.e. the given `row_range` is not in the cache, this function will remove </span>
-    <span class="doccomment">/// the old cached blocks that overlap with the rows in the given `src_fb_row_range` and cache those rows as a new cache block.</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `src_fb`: the updated source framebuffer.</span>
-    <span class="doccomment">/// * `dest_coord`: the position of the source framebuffer (its top-left corner) relative to the destination framebuffer&#39;s top-left corner.</span>
-    <span class="doccomment">/// * `src_fb_row_range`: the range of rows in the source framebuffer to check and cache.</span>
-    <span class="kw">fn</span> <span class="ident">check_and_cache</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Pixel</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>, 
-        <span class="ident">src_fb</span>: <span class="kw-2">&amp;</span><span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">P</span><span class="op">&gt;</span>, 
-        <span class="ident">dest_coord</span>: <span class="ident">Coord</span>, 
-        <span class="ident">src_fb_row_range</span>: <span class="kw-2">&amp;</span><span class="ident">Range</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> (<span class="ident">src_width</span>, <span class="ident">src_height</span>) <span class="op">=</span> <span class="ident">src_fb</span>.<span class="ident">get_size</span>();
-        <span class="kw">let</span> <span class="ident">src_buffer_len</span> <span class="op">=</span> <span class="ident">src_width</span> <span class="op">*</span> <span class="ident">src_height</span>;
+    <span class="doccomment">/// This function will return true if several continuous rows in the framebuffer are cached.
+    /// If false, i.e. the given `row_range` is not in the cache, this function will remove 
+    /// the old cached blocks that overlap with the rows in the given `src_fb_row_range` and cache those rows as a new cache block.
+    /// # Arguments
+    /// * `src_fb`: the updated source framebuffer.
+    /// * `dest_coord`: the position of the source framebuffer (its top-left corner) relative to the destination framebuffer&#39;s top-left corner.
+    /// * `src_fb_row_range`: the range of rows in the source framebuffer to check and cache.
+    </span><span class="kw">fn </span>check_and_cache&lt;P: Pixel&gt;(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>, 
+        src_fb: <span class="kw-2">&amp;</span>Framebuffer&lt;P&gt;, 
+        dest_coord: Coord, 
+        src_fb_row_range: <span class="kw-2">&amp;</span>Range&lt;usize&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;bool, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>(src_width, src_height) = src_fb.get_size();
+        <span class="kw">let </span>src_buffer_len = src_width * src_height;
 
-        <span class="comment">// The start pixel of the rows</span>
-        <span class="kw">let</span> <span class="ident">start_index</span> <span class="op">=</span> <span class="ident">src_width</span> <span class="op">*</span> <span class="ident">src_fb_row_range</span>.<span class="ident">start</span>;
-        <span class="kw">let</span> <span class="ident">coordinate_start</span> <span class="op">=</span> <span class="ident">dest_coord</span> <span class="op">+</span> (<span class="number">0</span>, <span class="ident">src_fb_row_range</span>.<span class="ident">start</span> <span class="kw">as</span> <span class="ident">isize</span>);
+        <span class="comment">// The start pixel of the rows
+        </span><span class="kw">let </span>start_index = src_width * src_fb_row_range.start;
+        <span class="kw">let </span>coordinate_start = dest_coord + (<span class="number">0</span>, src_fb_row_range.start <span class="kw">as </span>isize);
 
-        <span class="comment">// The end pixel of the rows</span>
-        <span class="kw">let</span> <span class="ident">end_index</span> <span class="op">=</span> <span class="ident">src_width</span> <span class="op">*</span> <span class="ident">src_fb_row_range</span>.<span class="ident">end</span>;
+        <span class="comment">// The end pixel of the rows
+        </span><span class="kw">let </span>end_index = src_width * src_fb_row_range.end;
         
-        <span class="kw">let</span> <span class="ident">pixel_slice</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">src_fb</span>.<span class="ident">buffer</span>()[<span class="ident">start_index</span>..<span class="ident">core::cmp::min</span>(<span class="ident">end_index</span>, <span class="ident">src_buffer_len</span>)];
+        <span class="kw">let </span>pixel_slice = <span class="kw-2">&amp;</span>src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
         
-        <span class="comment">// Skip if the rows are already cached</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_cached</span>(<span class="kw-2">&amp;</span><span class="ident">pixel_slice</span>, <span class="kw-2">&amp;</span><span class="ident">coordinate_start</span>, <span class="ident">src_width</span>) {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>);
+        <span class="comment">// Skip if the rows are already cached
+        </span><span class="kw">if </span><span class="self">self</span>.is_cached(<span class="kw-2">&amp;</span>pixel_slice, <span class="kw-2">&amp;</span>coordinate_start, src_width) {
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="bool-val">true</span>);
         }
 
-        <span class="comment">// remove overlapped caches</span>
-        <span class="kw">let</span> <span class="ident">new_cache</span> <span class="op">=</span> <span class="ident">CacheBlock</span> {
-            <span class="ident">block</span>: <span class="ident">Rectangle</span> {
-                <span class="ident">top_left</span>: <span class="ident">coordinate_start</span>,
-                <span class="ident">bottom_right</span>: <span class="ident">coordinate_start</span> <span class="op">+</span> (<span class="ident">src_width</span> <span class="kw">as</span> <span class="ident">isize</span>, (<span class="ident">pixel_slice</span>.<span class="ident">len</span>() <span class="op">/</span> <span class="ident">src_width</span>) <span class="kw">as</span> <span class="ident">isize</span>)
+        <span class="comment">// remove overlapped caches
+        </span><span class="kw">let </span>new_cache = CacheBlock {
+            block: Rectangle {
+                top_left: coordinate_start,
+                bottom_right: coordinate_start + (src_width <span class="kw">as </span>isize, (pixel_slice.len() / src_width) <span class="kw">as </span>isize)
             },
-            <span class="ident">content_hash</span>: <span class="ident">hash</span>(<span class="ident">pixel_slice</span>),
+            content_hash: hash(pixel_slice),
         };
-        <span class="kw">let</span> <span class="ident">keys</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">caches</span>.<span class="ident">keys</span>().<span class="ident">cloned</span>().<span class="ident">collect</span>();
-        <span class="kw">for</span> <span class="ident">key</span> <span class="kw">in</span> <span class="ident">keys</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">cache</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">caches</span>.<span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>) {
-                <span class="kw">if</span> <span class="ident">cache</span>.<span class="ident">overlaps_with</span>(<span class="kw-2">&amp;</span><span class="ident">new_cache</span>) {
-                    <span class="self">self</span>.<span class="ident">caches</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">key</span>);
+        <span class="kw">let </span>keys: Vec&lt;<span class="kw">_</span>&gt; = <span class="self">self</span>.caches.keys().cloned().collect();
+        <span class="kw">for </span>key <span class="kw">in </span>keys {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(cache) = <span class="self">self</span>.caches.get_mut(<span class="kw-2">&amp;</span>key) {
+                <span class="kw">if </span>cache.overlaps_with(<span class="kw-2">&amp;</span>new_cache) {
+                    <span class="self">self</span>.caches.remove(<span class="kw-2">&amp;</span>key);
                 }
             };
         }
 
-        <span class="self">self</span>.<span class="ident">caches</span>.<span class="ident">insert</span>(<span class="ident">coordinate_start</span>, <span class="ident">new_cache</span>);        
+        <span class="self">self</span>.caches.insert(coordinate_start, new_cache);        
         <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>)
     }
 
-    <span class="doccomment">/// Returns the range of rows in the source framebuffer that were (1) previously cached as cache blocks</span>
-    <span class="doccomment">/// and (2) overlap with the given `dest_bounding_box`. </span>
-    <span class="doccomment">/// This methods extends the row range of the given bounding box because the compositor deals with chunks of `CACHE_BLOCK_HEIGHT` rows.</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `dest_coord`: the position in the destination framebuffer (relative to its top-left corner)</span>
-    <span class="doccomment">///    to where the source framebuffer will be composited.</span>
-    <span class="doccomment">/// * `dest_bounding_box`: the region of the destination framebuffer that should be composited.</span>
-    <span class="doccomment">/// * `src_fb_height`: the height of the source framebuffer.</span>
-    <span class="kw">fn</span> <span class="ident">get_cache_row_range</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">CompositableRegion</span><span class="op">&gt;</span>(
+    <span class="doccomment">/// Returns the range of rows in the source framebuffer that were (1) previously cached as cache blocks
+    /// and (2) overlap with the given `dest_bounding_box`. 
+    /// This methods extends the row range of the given bounding box because the compositor deals with chunks of `CACHE_BLOCK_HEIGHT` rows.
+    /// # Arguments
+    /// * `dest_coord`: the position in the destination framebuffer (relative to its top-left corner)
+    ///    to where the source framebuffer will be composited.
+    /// * `dest_bounding_box`: the region of the destination framebuffer that should be composited.
+    /// * `src_fb_height`: the height of the source framebuffer.
+    </span><span class="kw">fn </span>get_cache_row_range&lt;B: CompositableRegion&gt;(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">dest_coord</span>: <span class="ident">Coord</span>,
-        <span class="ident">dest_bounding_box</span>: <span class="kw-2">&amp;</span><span class="ident">B</span>,
-        <span class="ident">src_fb_height</span>: <span class="ident">usize</span>,
-    ) -&gt; <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">abs_row_range</span> <span class="op">=</span> <span class="ident">dest_bounding_box</span>.<span class="ident">row_range</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">relative_row_start</span> <span class="op">=</span> <span class="ident">abs_row_range</span>.<span class="ident">start</span> <span class="op">-</span> <span class="ident">dest_coord</span>.<span class="ident">y</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">relative_row_end</span> <span class="op">=</span> <span class="ident">abs_row_range</span>.<span class="ident">end</span> <span class="op">-</span> <span class="ident">dest_coord</span>.<span class="ident">y</span>;
+        dest_coord: Coord,
+        dest_bounding_box: <span class="kw-2">&amp;</span>B,
+        src_fb_height: usize,
+    ) -&gt; Range&lt;usize&gt; {
+        <span class="kw">let </span>abs_row_range = dest_bounding_box.row_range();
+        <span class="kw">let </span><span class="kw-2">mut </span>relative_row_start = abs_row_range.start - dest_coord.y;
+        <span class="kw">let </span><span class="kw-2">mut </span>relative_row_end = abs_row_range.end - dest_coord.y;
 
-        <span class="ident">relative_row_start</span> <span class="op">=</span> <span class="ident">core::cmp::max</span>(<span class="ident">relative_row_start</span>, <span class="number">0</span>);
-        <span class="ident">relative_row_end</span> <span class="op">=</span> <span class="ident">core::cmp::min</span>(<span class="ident">relative_row_end</span>, <span class="ident">src_fb_height</span> <span class="kw">as</span> <span class="ident">isize</span>);
+        relative_row_start = core::cmp::max(relative_row_start, <span class="number">0</span>);
+        relative_row_end = core::cmp::min(relative_row_end, src_fb_height <span class="kw">as </span>isize);
 
-        <span class="kw">if</span> <span class="ident">relative_row_start</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">relative_row_end</span> {
-            <span class="kw">return</span> <span class="number">0</span>..<span class="number">0</span>;
+        <span class="kw">if </span>relative_row_start &gt;= relative_row_end {
+            <span class="kw">return </span><span class="number">0</span>..<span class="number">0</span>;
         }
         
-        <span class="kw">let</span> <span class="ident">cache_row_start</span> <span class="op">=</span> <span class="ident">relative_row_start</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">/</span> <span class="ident">CACHE_BLOCK_HEIGHT</span> <span class="op">*</span> <span class="ident">CACHE_BLOCK_HEIGHT</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cache_row_end</span> <span class="op">=</span> ((<span class="ident">relative_row_end</span> <span class="op">-</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">usize</span> <span class="op">/</span> <span class="ident">CACHE_BLOCK_HEIGHT</span> <span class="op">+</span> <span class="number">1</span>) <span class="op">*</span> <span class="ident">CACHE_BLOCK_HEIGHT</span>;
+        <span class="kw">let </span>cache_row_start = relative_row_start <span class="kw">as </span>usize / CACHE_BLOCK_HEIGHT * CACHE_BLOCK_HEIGHT;
+        <span class="kw">let </span><span class="kw-2">mut </span>cache_row_end = ((relative_row_end - <span class="number">1</span>) <span class="kw">as </span>usize / CACHE_BLOCK_HEIGHT + <span class="number">1</span>) * CACHE_BLOCK_HEIGHT;
 
-        <span class="ident">cache_row_end</span> <span class="op">=</span> <span class="ident">core::cmp::min</span>(<span class="ident">cache_row_end</span>, <span class="ident">src_fb_height</span>);
+        cache_row_end = core::cmp::min(cache_row_end, src_fb_height);
 
-        <span class="kw">return</span> <span class="ident">cache_row_start</span>..<span class="ident">cache_row_end</span>
+        <span class="kw">return </span>cache_row_start..cache_row_end
     }
 
 }
 
-<span class="kw">impl</span> <span class="ident">Compositor</span> <span class="kw">for</span> <span class="ident">FrameCompositor</span> {
-    <span class="kw">fn</span> <span class="ident">composite</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">B</span>: <span class="ident">CompositableRegion</span> <span class="op">+</span> <span class="ident">Clone</span>, <span class="ident">P</span>: <span class="lifetime">&#39;a</span> <span class="op">+</span> <span class="ident">Pixel</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">src_fbs</span>: <span class="kw">impl</span> <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">FramebufferUpdates</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">P</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">dest_fb</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">P</span><span class="op">&gt;</span>,
-        <span class="ident">dest_bounding_boxes</span>: <span class="kw">impl</span> <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">B</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">box_iter</span> <span class="op">=</span> <span class="ident">dest_bounding_boxes</span>.<span class="ident">clone</span>().<span class="ident">into_iter</span>();
-        <span class="kw">if</span> <span class="ident">box_iter</span>.<span class="ident">next</span>().<span class="ident">is_none</span>() {
-            <span class="kw">for</span> <span class="ident">framebuffer_updates</span> <span class="kw">in</span> <span class="ident">src_fbs</span>.<span class="ident">into_iter</span>() {
-                <span class="kw">let</span> <span class="ident">src_fb</span> <span class="op">=</span> <span class="ident">framebuffer_updates</span>.<span class="ident">src_framebuffer</span>;
-                <span class="kw">let</span> <span class="ident">coordinate</span> <span class="op">=</span> <span class="ident">framebuffer_updates</span>.<span class="ident">coordinate_in_dest_framebuffer</span>;
-                <span class="comment">// Update the whole screen if the caller does not specify the blocks</span>
-                <span class="kw">let</span> (<span class="ident">src_width</span>, <span class="ident">src_height</span>) <span class="op">=</span> <span class="ident">framebuffer_updates</span>.<span class="ident">src_framebuffer</span>.<span class="ident">get_size</span>();
-                <span class="comment">// let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;</span>
-                <span class="kw">let</span> <span class="ident">area</span> <span class="op">=</span> <span class="ident">Rectangle</span> {
-                    <span class="ident">top_left</span>: <span class="ident">coordinate</span>,
-                    <span class="ident">bottom_right</span>: <span class="ident">coordinate</span> <span class="op">+</span> (<span class="ident">src_width</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">src_height</span> <span class="kw">as</span> <span class="ident">isize</span>)
+<span class="kw">impl </span>Compositor <span class="kw">for </span>FrameCompositor {
+    <span class="kw">fn </span>composite&lt;<span class="lifetime">&#39;a</span>, B: CompositableRegion + Clone, P: <span class="lifetime">&#39;a </span>+ Pixel&gt;(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        src_fbs: <span class="kw">impl </span>IntoIterator&lt;Item = FramebufferUpdates&lt;<span class="lifetime">&#39;a</span>, P&gt;&gt;,
+        dest_fb: <span class="kw-2">&amp;mut </span>Framebuffer&lt;P&gt;,
+        dest_bounding_boxes: <span class="kw">impl </span>IntoIterator&lt;Item = B&gt; + Clone,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>box_iter = dest_bounding_boxes.clone().into_iter();
+        <span class="kw">if </span>box_iter.next().is_none() {
+            <span class="kw">for </span>framebuffer_updates <span class="kw">in </span>src_fbs.into_iter() {
+                <span class="kw">let </span>src_fb = framebuffer_updates.src_framebuffer;
+                <span class="kw">let </span>coordinate = framebuffer_updates.coordinate_in_dest_framebuffer;
+                <span class="comment">// Update the whole screen if the caller does not specify the blocks
+                </span><span class="kw">let </span>(src_width, src_height) = framebuffer_updates.src_framebuffer.get_size();
+                <span class="comment">// let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
+                </span><span class="kw">let </span>area = Rectangle {
+                    top_left: coordinate,
+                    bottom_right: coordinate + (src_width <span class="kw">as </span>isize, src_height <span class="kw">as </span>isize)
                 };
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">row_start</span> <span class="op">=</span> <span class="number">0</span>;
-                <span class="kw">loop</span> {
-                    <span class="kw">if</span> <span class="ident">row_start</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">src_height</span> {
+                <span class="kw">let </span><span class="kw-2">mut </span>row_start = <span class="number">0</span>;
+                <span class="kw">loop </span>{
+                    <span class="kw">if </span>row_start &gt;= src_height {
                         <span class="kw">break</span>;
                     }
-                    <span class="kw">let</span> <span class="ident">cache_range</span> <span class="op">=</span> <span class="ident">row_start</span>..(<span class="ident">row_start</span> <span class="op">+</span> <span class="ident">CACHE_BLOCK_HEIGHT</span>);
-                    <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">check_and_cache</span>(<span class="ident">src_fb</span>, <span class="ident">coordinate</span>, <span class="kw-2">&amp;</span><span class="ident">cache_range</span>)<span class="question-mark">?</span> {
-                        <span class="ident">area</span>.<span class="ident">blend_buffers</span>(
-                            <span class="ident">src_fb</span>,
-                            <span class="ident">dest_fb</span>,
-                            <span class="ident">coordinate</span>,
-                            <span class="ident">cache_range</span>,
+                    <span class="kw">let </span>cache_range = row_start..(row_start + CACHE_BLOCK_HEIGHT);
+                    <span class="kw">if </span>!<span class="self">self</span>.check_and_cache(src_fb, coordinate, <span class="kw-2">&amp;</span>cache_range)<span class="question-mark">? </span>{
+                        area.blend_buffers(
+                            src_fb,
+                            dest_fb,
+                            coordinate,
+                            cache_range,
                         )<span class="question-mark">?</span>;
                     }
-                    <span class="ident">row_start</span> <span class="op">+</span><span class="op">=</span> <span class="ident">CACHE_BLOCK_HEIGHT</span>;
+                    row_start += CACHE_BLOCK_HEIGHT;
                 }
             }
-        } <span class="kw">else</span> {
-            <span class="kw">for</span> <span class="ident">framebuffer_updates</span> <span class="kw">in</span> <span class="ident">src_fbs</span>.<span class="ident">into_iter</span>() {
-                <span class="comment">//let mut updated_blocks = Vec::new();</span>
-                <span class="kw">for</span> <span class="ident">bounding_box</span> <span class="kw">in</span> <span class="ident">dest_bounding_boxes</span>.<span class="ident">clone</span>() {
-                    <span class="kw">let</span> <span class="ident">src_fb</span> <span class="op">=</span> <span class="ident">framebuffer_updates</span>.<span class="ident">src_framebuffer</span>;
-                    <span class="kw">let</span> <span class="ident">coordinate</span> <span class="op">=</span> <span class="ident">framebuffer_updates</span>.<span class="ident">coordinate_in_dest_framebuffer</span>;
-                    <span class="kw">let</span> (<span class="kw">_</span>, <span class="ident">height</span>) <span class="op">=</span> <span class="ident">src_fb</span>.<span class="ident">get_size</span>();
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">row_range</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_cache_row_range</span>(<span class="ident">coordinate</span>, <span class="kw-2">&amp;</span><span class="ident">bounding_box</span>, <span class="ident">height</span>);
-                    <span class="comment">// let cache_block_size = CACHE_BLOCK_HEIGHT * width;</span>
+        } <span class="kw">else </span>{
+            <span class="kw">for </span>framebuffer_updates <span class="kw">in </span>src_fbs.into_iter() {
+                <span class="comment">//let mut updated_blocks = Vec::new();
+                </span><span class="kw">for </span>bounding_box <span class="kw">in </span>dest_bounding_boxes.clone() {
+                    <span class="kw">let </span>src_fb = framebuffer_updates.src_framebuffer;
+                    <span class="kw">let </span>coordinate = framebuffer_updates.coordinate_in_dest_framebuffer;
+                    <span class="kw">let </span>(<span class="kw">_</span>, height) = src_fb.get_size();
+                    <span class="kw">let </span><span class="kw-2">mut </span>row_range = <span class="self">self</span>.get_cache_row_range(coordinate, <span class="kw-2">&amp;</span>bounding_box, height);
+                    <span class="comment">// let cache_block_size = CACHE_BLOCK_HEIGHT * width;
 
-                    <span class="kw">loop</span> {
-                        <span class="kw">if</span> <span class="ident">row_range</span>.<span class="ident">start</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">row_range</span>.<span class="ident">end</span> {
+                    </span><span class="kw">loop </span>{
+                        <span class="kw">if </span>row_range.start &gt;= row_range.end {
                             <span class="kw">break</span>;
                         }
-                        <span class="kw">let</span> <span class="ident">cache_range</span> <span class="op">=</span> <span class="ident">row_range</span>.<span class="ident">start</span>..(<span class="ident">row_range</span>.<span class="ident">start</span> <span class="op">+</span> <span class="ident">CACHE_BLOCK_HEIGHT</span>);
-                        <span class="comment">// check cache if the bounding box is not a single pixel</span>
-                        <span class="kw">if</span> <span class="ident">bounding_box</span>.<span class="ident">size</span>() <span class="op">&gt;</span> <span class="number">1</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">check_and_cache</span>(<span class="ident">src_fb</span>, <span class="ident">coordinate</span>, <span class="kw-2">&amp;</span><span class="ident">cache_range</span>)<span class="question-mark">?</span> {
-                            <span class="ident">row_range</span>.<span class="ident">start</span> <span class="op">+</span><span class="op">=</span> <span class="ident">CACHE_BLOCK_HEIGHT</span>;
+                        <span class="kw">let </span>cache_range = row_range.start..(row_range.start + CACHE_BLOCK_HEIGHT);
+                        <span class="comment">// check cache if the bounding box is not a single pixel
+                        </span><span class="kw">if </span>bounding_box.size() &gt; <span class="number">1 </span>&amp;&amp; <span class="self">self</span>.check_and_cache(src_fb, coordinate, <span class="kw-2">&amp;</span>cache_range)<span class="question-mark">? </span>{
+                            row_range.start += CACHE_BLOCK_HEIGHT;
                             <span class="kw">continue</span>;
                         };
-                        <span class="ident">bounding_box</span>.<span class="ident">blend_buffers</span>(
-                            <span class="ident">src_fb</span>,
-                            <span class="ident">dest_fb</span>,
-                            <span class="ident">coordinate</span>,
-                            <span class="ident">cache_range</span>,
+                        bounding_box.blend_buffers(
+                            src_fb,
+                            dest_fb,
+                            coordinate,
+                            cache_range,
                         )<span class="question-mark">?</span>;
-                        <span class="ident">row_range</span>.<span class="ident">start</span> <span class="op">+</span><span class="op">=</span> <span class="ident">CACHE_BLOCK_HEIGHT</span>;
+                        row_range.start += CACHE_BLOCK_HEIGHT;
                     } 
                 }
             }
@@ -549,13 +541,12 @@
     }
 }
 
-<span class="doccomment">/// Gets the hash of an item</span>
-<span class="kw">fn</span> <span class="ident">hash</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Hash</span><span class="op">&gt;</span>(<span class="ident">item</span>: <span class="ident">T</span>) -&gt; <span class="ident">u64</span> {
-    <span class="kw">let</span> <span class="ident">builder</span> <span class="op">=</span> <span class="ident">DefaultHashBuilder::default</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">hasher</span> <span class="op">=</span> <span class="ident">builder</span>.<span class="ident">build_hasher</span>();
-    <span class="ident">item</span>.<span class="ident">hash</span>(<span class="kw-2">&amp;mut</span> <span class="ident">hasher</span>);
-    <span class="ident">hasher</span>.<span class="ident">finish</span>()
+<span class="doccomment">/// Gets the hash of an item
+</span><span class="kw">fn </span>hash&lt;T: Hash&gt;(item: T) -&gt; u64 {
+    <span class="kw">let </span>builder = DefaultHashBuilder::default();
+    <span class="kw">let </span><span class="kw-2">mut </span>hasher = builder.build_hasher();
+    item.hash(<span class="kw-2">&amp;mut </span>hasher);
+    hasher.finish()
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="framebuffer_compositor" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="framebuffer_compositor" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/work_queue.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>work_queue.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/work_queue.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>work_queue.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -413,415 +407,414 @@
 <span id="407">407</span>
 <span id="408">408</span>
 <span id="409">409</span>
-</pre><pre class="rust"><code><span class="doccomment">//! The Work Queue (WQ) contains a contiguous memory buffer used by SW to post I/O requests (WQEs) for HCA execution.</span>
-<span class="doccomment">//! A Work Request is posted to the HCA by writing to one or more Work Queue Elements (WQE) of the WQ and</span>
-<span class="doccomment">//! ringing the DoorBell, notifying the HCA that request has been posted.</span>
-<span class="doccomment">//! A WQ is created for every SQ and RQ and is comprised of WQE Basic Blocks (WQEBBs) which are 64 byte units.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! This module defines the context used to initialize a WQ, layout of WQ Doorbell Records, the layout of WQEBBs and related functions.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! (PRM Section 8.8: Work Queues)</span>
-<span class="doccomment">//! </span>
-<span class="kw">use</span> <span class="ident">zerocopy</span>::{<span class="ident">U32</span>, <span class="ident">FromBytes</span>};
-<span class="kw">use</span> <span class="ident">volatile</span>::{<span class="ident">ReadOnly</span>, <span class="ident">Volatile</span>};
-<span class="kw">use</span> <span class="ident">byteorder::BigEndian</span>;
-<span class="kw">use</span> <span class="ident">memory::PhysicalAddress</span>;
-<span class="kw">use</span> <span class="ident">num_enum::TryFromPrimitive</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::log_page_size</span>;
+</pre><pre class="rust"><code><span class="doccomment">//! The Work Queue (WQ) contains a contiguous memory buffer used by SW to post I/O requests (WQEs) for HCA execution.
+//! A Work Request is posted to the HCA by writing to one or more Work Queue Elements (WQE) of the WQ and
+//! ringing the DoorBell, notifying the HCA that request has been posted.
+//! A WQ is created for every SQ and RQ and is comprised of WQE Basic Blocks (WQEBBs) which are 64 byte units.
+//! 
+//! This module defines the context used to initialize a WQ, layout of WQ Doorbell Records, the layout of WQEBBs and related functions.
+//! 
+//! (PRM Section 8.8: Work Queues)
+//! 
+</span><span class="kw">use </span>zerocopy::{U32, FromBytes};
+<span class="kw">use </span>volatile::{ReadOnly, Volatile};
+<span class="kw">use </span>byteorder::BigEndian;
+<span class="kw">use </span>memory::PhysicalAddress;
+<span class="kw">use </span>num_enum::TryFromPrimitive;
+<span class="kw">use </span><span class="kw">crate</span>::log_page_size;
 
-<span class="doccomment">/// The layout of a doorbell record in memory.</span>
-<span class="doccomment">/// A doorbell should be created for each SQ/RQ pair, and its address passed to the HW at time of SQ/RQ creation.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// (PRM Section 8.8.2: Doorbell Record)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DoorbellRecord</span> {
-    <span class="doccomment">/// Receive Counter (aka wqe_counter).</span>
-    <span class="doccomment">/// This counter stores the number of receive WQEs posted since creation.</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">rcv_counter</span>:    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Send Counter (aka sq_wqebb_counter).</span>
-    <span class="doccomment">/// This counter stores the number of send WQEs posted since creation.</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">send_counter</span>:   <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// The layout of a doorbell record in memory.
+/// A doorbell should be created for each SQ/RQ pair, and its address passed to the HW at time of SQ/RQ creation.
+/// 
+/// (PRM Section 8.8.2: Doorbell Record)
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>DoorbellRecord {
+    <span class="doccomment">/// Receive Counter (aka wqe_counter).
+    /// This counter stores the number of receive WQEs posted since creation.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) rcv_counter:    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// Send Counter (aka sq_wqebb_counter).
+    /// This counter stores the number of send WQEs posted since creation.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) send_counter:   Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DoorbellRecord</span><span class="op">&gt;</span>(), <span class="number">8</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;DoorbellRecord&gt;(), <span class="number">8</span>);
 
-<span class="doccomment">/// The possible formats for a WQ buffer.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">TryFromPrimitive</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u32</span>)]</span>
-<span class="kw">enum</span> <span class="ident">WQType</span> {
-    <span class="ident">LinkedList</span> <span class="op">=</span> <span class="number">0</span>,
-    <span class="ident">Cyclic</span> <span class="op">=</span> <span class="number">1</span>,
-    <span class="ident">LinkedListStriding</span> <span class="op">=</span> <span class="number">2</span>,
-    <span class="ident">CyclicStriding</span> <span class="op">=</span> <span class="number">3</span>
+<span class="doccomment">/// The possible formats for a WQ buffer.
+</span><span class="attr">#[derive(Debug, TryFromPrimitive)]
+#[repr(u32)]
+</span><span class="kw">enum </span>WQType {
+    LinkedList = <span class="number">0</span>,
+    Cyclic = <span class="number">1</span>,
+    LinkedListStriding = <span class="number">2</span>,
+    CyclicStriding = <span class="number">3
+</span>}
+
+<span class="doccomment">/// A struct representing the layout of a WQ in memory.
+/// A WQ is part of the SQ and RQ context. 
+/// 
+/// (PRM Table 109: Work Queue Format)
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>WorkQueue {
+    <span class="doccomment">/// A multi-part field:
+    /// * `wq_type`: a value of [`WQType`], occupies bits [31:28]
+    /// * `wq_signature`: if set, WQE signature will be checked on this WQ, occupies bit 27
+    /// * `end_padding_mode`: if incoming packet should be padded, occupies bits [26:25]
+    /// * `cd_slave`: if set, WQ is a recipient of CD doorbells via the master SQ, occupies bit 24
+    </span>wq_type_signature:                  Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// A multi-part field:
+    /// * `page_offset`: page offset in quanta of (page_size / 64), occupies bits [20:16]
+    /// * `lwm`: limit water mark (disabled when 0), when WQE count drops below this limit, an event is fired, occupies bits [15:0]
+    </span>page_offset_lwm:                    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// protection domain, occupies bits [23:0]
+    </span>pd:                                 Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// UAR number allocated for ringing DoorBells for this WQ, occupies bits [23:0]
+    </span>uar_page:                           Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// upper 4 bytes of physical address of DB Record
+    </span>dbr_addr_h:                         Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// lower 4 bytes of physical address of DB Record
+    </span>dbr_addr_l:                         Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// current HW stride index, points to the next stride to be consumed by HW
+    </span>hw_counter:                         ReadOnly&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// current SW WQ WQE index, points to the next stride to be produced by SW
+    </span>sw_counter:                         ReadOnly&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// A multi-part field:
+    /// * `log_wq_stride`: the size of a WQ stride equals 2^log_wq_stride, occupies bits [19:16]
+    /// * `log_wq_pg_sz`: log (base 2) of page size in units of 4KiB, occupies bits [12:8]
+    /// * `log_wq_sz`: log (base 2) of the WQ size (in entries), occupies bits [4:0] TODO: check again
+    </span>log_wq_stride_pg_sz_sz:             Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    single_stride_log_num_of_bytes:     Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding1:                          [u64; <span class="number">19</span>],
 }
 
-<span class="doccomment">/// A struct representing the layout of a WQ in memory.</span>
-<span class="doccomment">/// A WQ is part of the SQ and RQ context. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// (PRM Table 109: Work Queue Format)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">WorkQueue</span> {
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `wq_type`: a value of [`WQType`], occupies bits [31:28]</span>
-    <span class="doccomment">/// * `wq_signature`: if set, WQE signature will be checked on this WQ, occupies bit 27</span>
-    <span class="doccomment">/// * `end_padding_mode`: if incoming packet should be padded, occupies bits [26:25]</span>
-    <span class="doccomment">/// * `cd_slave`: if set, WQ is a recipient of CD doorbells via the master SQ, occupies bit 24</span>
-    <span class="ident">wq_type_signature</span>:                  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `page_offset`: page offset in quanta of (page_size / 64), occupies bits [20:16]</span>
-    <span class="doccomment">/// * `lwm`: limit water mark (disabled when 0), when WQE count drops below this limit, an event is fired, occupies bits [15:0]</span>
-    <span class="ident">page_offset_lwm</span>:                    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// protection domain, occupies bits [23:0]</span>
-    <span class="ident">pd</span>:                                 <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// UAR number allocated for ringing DoorBells for this WQ, occupies bits [23:0]</span>
-    <span class="ident">uar_page</span>:                           <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// upper 4 bytes of physical address of DB Record</span>
-    <span class="ident">dbr_addr_h</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// lower 4 bytes of physical address of DB Record</span>
-    <span class="ident">dbr_addr_l</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// current HW stride index, points to the next stride to be consumed by HW</span>
-    <span class="ident">hw_counter</span>:                         <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// current SW WQ WQE index, points to the next stride to be produced by SW</span>
-    <span class="ident">sw_counter</span>:                         <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `log_wq_stride`: the size of a WQ stride equals 2^log_wq_stride, occupies bits [19:16]</span>
-    <span class="doccomment">/// * `log_wq_pg_sz`: log (base 2) of page size in units of 4KiB, occupies bits [12:8]</span>
-    <span class="doccomment">/// * `log_wq_sz`: log (base 2) of the WQ size (in entries), occupies bits [4:0] TODO: check again</span>
-    <span class="ident">log_wq_stride_pg_sz_sz</span>:             <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">single_stride_log_num_of_bytes</span>:     <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding1</span>:                          [<span class="ident">u64</span>; <span class="number">19</span>],
-}
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;WorkQueue&gt;(), <span class="number">192</span>);
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">WorkQueue</span><span class="op">&gt;</span>(), <span class="number">192</span>);
+<span class="kw">impl </span>WorkQueue {
+    <span class="doccomment">/// Create and initialize the fields of the WQ for a SQ or RQ context.
+    /// This is then passed to the HCA as part of the Context when creating the queue.
+    /// 
+    /// # Arguments
+    /// * `pd`: protection domain number
+    /// * `db_addr`: physical address of the doorbell record
+    /// * `wq_size`: number of WQ entries
+    /// * `wqe_size_in_bytes`: size of the WQE
+    </span><span class="kw">fn </span>init(pd: u32, db_addr: PhysicalAddress, wq_size: u32, wqe_size_in_bytes: u32) -&gt; WorkQueue {
+        <span class="kw">const </span>WQ_TYPE_SHIFT: u32 = <span class="number">28</span>;
+        <span class="kw">const </span>PD_MASK: u32 = <span class="number">0xFF_FFFF</span>;
+        <span class="kw">const </span>WQ_STRIDE_SHIFT: u32 = <span class="number">16</span>;
+        <span class="kw">const </span>WQ_PAGE_SIZE_SHIFT: u32 = <span class="number">8</span>;
 
-<span class="kw">impl</span> <span class="ident">WorkQueue</span> {
-    <span class="doccomment">/// Create and initialize the fields of the WQ for a SQ or RQ context.</span>
-    <span class="doccomment">/// This is then passed to the HCA as part of the Context when creating the queue.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `pd`: protection domain number</span>
-    <span class="doccomment">/// * `db_addr`: physical address of the doorbell record</span>
-    <span class="doccomment">/// * `wq_size`: number of WQ entries</span>
-    <span class="doccomment">/// * `wqe_size_in_bytes`: size of the WQE</span>
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">pd</span>: <span class="ident">u32</span>, <span class="ident">db_addr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">wq_size</span>: <span class="ident">u32</span>, <span class="ident">wqe_size_in_bytes</span>: <span class="ident">u32</span>) -&gt; <span class="ident">WorkQueue</span> {
-        <span class="kw">const</span> <span class="ident">WQ_TYPE_SHIFT</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">28</span>;
-        <span class="kw">const</span> <span class="ident">PD_MASK</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">0xFF_FFFF</span>;
-        <span class="kw">const</span> <span class="ident">WQ_STRIDE_SHIFT</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">16</span>;
-        <span class="kw">const</span> <span class="ident">WQ_PAGE_SIZE_SHIFT</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">8</span>;
-
-        <span class="comment">// set all fields to zero</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wq</span> <span class="op">=</span> <span class="ident">WorkQueue::default</span>();
+        <span class="comment">// set all fields to zero
+        </span><span class="kw">let </span><span class="kw-2">mut </span>wq = WorkQueue::default();
         
-        <span class="ident">wq</span>.<span class="ident">wq_type_signature</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">WQType::Cyclic</span> <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">WQ_TYPE_SHIFT</span>)); 
-        <span class="ident">wq</span>.<span class="ident">pd</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">pd</span> <span class="op">&amp;</span> <span class="ident">PD_MASK</span>));
-        <span class="ident">wq</span>.<span class="ident">dbr_addr_h</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">db_addr</span>.<span class="ident">value</span>() <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">32</span>) <span class="kw">as</span> <span class="ident">u32</span>));
-        <span class="ident">wq</span>.<span class="ident">dbr_addr_l</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">db_addr</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u32</span>));
+        wq.wq_type_signature.write(U32::new((WQType::Cyclic <span class="kw">as </span>u32) &lt;&lt; WQ_TYPE_SHIFT)); 
+        wq.pd.write(U32::new(pd &amp; PD_MASK));
+        wq.dbr_addr_h.write(U32::new((db_addr.value() &gt;&gt; <span class="number">32</span>) <span class="kw">as </span>u32));
+        wq.dbr_addr_l.write(U32::new(db_addr.value() <span class="kw">as </span>u32));
         
-        <span class="comment">// the stride of the WQE is equal to the size of the WQE</span>
-        <span class="kw">let</span> <span class="ident">log_wq_stride</span> <span class="op">=</span> <span class="ident">libm::log2</span>(<span class="ident">wqe_size_in_bytes</span> <span class="kw">as</span> <span class="ident">f64</span>) <span class="kw">as</span> <span class="ident">u32</span>; 
-        <span class="kw">let</span> <span class="ident">log_wq_size</span> <span class="op">=</span> <span class="ident">libm::log2</span>(<span class="ident">wq_size</span> <span class="kw">as</span> <span class="ident">f64</span>) <span class="kw">as</span> <span class="ident">u32</span>;
-        <span class="kw">let</span> <span class="ident">log_wq_page_size</span> <span class="op">=</span> <span class="ident">log_page_size</span>(<span class="ident">wq_size</span> <span class="op">*</span> <span class="ident">wqe_size_in_bytes</span>);
-        <span class="ident">wq</span>.<span class="ident">log_wq_stride_pg_sz_sz</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">log_wq_stride</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">WQ_STRIDE_SHIFT</span>) <span class="op">|</span> (<span class="ident">log_wq_page_size</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">WQ_PAGE_SIZE_SHIFT</span>) <span class="op">|</span> <span class="ident">log_wq_size</span>));
-        <span class="ident">wq</span>
+        <span class="comment">// the stride of the WQE is equal to the size of the WQE
+        </span><span class="kw">let </span>log_wq_stride = libm::log2(wqe_size_in_bytes <span class="kw">as </span>f64) <span class="kw">as </span>u32; 
+        <span class="kw">let </span>log_wq_size = libm::log2(wq_size <span class="kw">as </span>f64) <span class="kw">as </span>u32;
+        <span class="kw">let </span>log_wq_page_size = log_page_size(wq_size * wqe_size_in_bytes);
+        wq.log_wq_stride_pg_sz_sz.write(U32::new((log_wq_stride &lt;&lt; WQ_STRIDE_SHIFT) | (log_wq_page_size &lt;&lt; WQ_PAGE_SIZE_SHIFT) | log_wq_size));
+        wq
     }
 
-    <span class="doccomment">/// Create and initialize the fields of the WQ for a SQ context.</span>
-    <span class="doccomment">/// This is then passed to the HCA as part of the SQ Context when creating the SQ.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `pd`: protection domain number</span>
-    <span class="doccomment">/// * `uar_page`: UAR page number (only provided for a SQ)</span>
-    <span class="doccomment">/// * `db_addr`: physical address of the doorbell record</span>
-    <span class="doccomment">/// * `wq_size`: number of WQ entries</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_sq</span>(<span class="ident">pd</span>: <span class="ident">u32</span>, <span class="ident">uar_page</span>: <span class="ident">u32</span>, <span class="ident">db_addr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">wq_size</span>: <span class="ident">u32</span>) -&gt; <span class="ident">WorkQueue</span> {
-        <span class="kw">const</span> <span class="ident">UAR_PAGE_MASK</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">0xFF_FFFF</span>;
+    <span class="doccomment">/// Create and initialize the fields of the WQ for a SQ context.
+    /// This is then passed to the HCA as part of the SQ Context when creating the SQ.
+    /// 
+    /// # Arguments
+    /// * `pd`: protection domain number
+    /// * `uar_page`: UAR page number (only provided for a SQ)
+    /// * `db_addr`: physical address of the doorbell record
+    /// * `wq_size`: number of WQ entries
+    </span><span class="kw">pub fn </span>init_sq(pd: u32, uar_page: u32, db_addr: PhysicalAddress, wq_size: u32) -&gt; WorkQueue {
+        <span class="kw">const </span>UAR_PAGE_MASK: u32 = <span class="number">0xFF_FFFF</span>;
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wq</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::init</span>(<span class="ident">pd</span>, <span class="ident">db_addr</span>, <span class="ident">wq_size</span>, <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">WorkQueueEntrySend</span><span class="op">&gt;</span>() <span class="kw">as</span> <span class="ident">u32</span>);
-        <span class="ident">wq</span>.<span class="ident">uar_page</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">uar_page</span> <span class="op">&amp;</span> <span class="ident">UAR_PAGE_MASK</span>));
-        <span class="ident">wq</span>
+        <span class="kw">let </span><span class="kw-2">mut </span>wq = <span class="self">Self</span>::init(pd, db_addr, wq_size, core::mem::size_of::&lt;WorkQueueEntrySend&gt;() <span class="kw">as </span>u32);
+        wq.uar_page.write(U32::new(uar_page &amp; UAR_PAGE_MASK));
+        wq
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_rq</span>(<span class="ident">pd</span>: <span class="ident">u32</span>, <span class="ident">db_addr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">wq_size</span>: <span class="ident">u32</span>) -&gt; <span class="ident">WorkQueue</span> {
-        <span class="ident"><span class="self">Self</span>::init</span>(<span class="ident">pd</span>, <span class="ident">db_addr</span>, <span class="ident">wq_size</span>, <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">WorkQueueEntryReceive</span><span class="op">&gt;</span>() <span class="kw">as</span> <span class="ident">u32</span>)
+    <span class="kw">pub fn </span>init_rq(pd: u32, db_addr: PhysicalAddress, wq_size: u32) -&gt; WorkQueue {
+        <span class="self">Self</span>::init(pd, db_addr, wq_size, core::mem::size_of::&lt;WorkQueueEntryReceive&gt;() <span class="kw">as </span>u32)
     }
 
-    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">mailbox_offset</span>() -&gt; <span class="ident">usize</span> { <span class="number">0x10</span> <span class="op">+</span> <span class="number">0x30</span> }
+    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>mailbox_offset() -&gt; usize { <span class="number">0x10 </span>+ <span class="number">0x30 </span>}
 }
 
-<span class="doccomment">/// The possible values of the opcode field in the control segment of a WQE</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">TryFromPrimitive</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum</span> <span class="ident">WQEOpcode</span> {
-    <span class="doccomment">/// WQE with this opcode creates a completion, but does nothing else</span>
-    <span class="ident">Nop</span> <span class="op">=</span> <span class="number">0x0</span>,
-    <span class="ident">SndInv</span> <span class="op">=</span> <span class="number">0x1</span>,
-    <span class="ident">RDMAWrite</span> <span class="op">=</span> <span class="number">0x8</span>,
-    <span class="ident">RDMAWriteWithImmediate</span> <span class="op">=</span> <span class="number">0x9</span>,
-    <span class="ident">Send</span> <span class="op">=</span> <span class="number">0xA</span>,
-    <span class="ident">SendWithImmediate</span> <span class="op">=</span> <span class="number">0xB</span>,
-    <span class="ident">LargeSendOffload</span> <span class="op">=</span> <span class="number">0xE</span>,
-    <span class="ident">Wait</span> <span class="op">=</span> <span class="number">0xF</span>,
-    <span class="ident">RDMARead</span> <span class="op">=</span> <span class="number">0x10</span>,
-    <span class="ident">AtomicCompareAndSwap</span> <span class="op">=</span> <span class="number">0x11</span>,
-    <span class="ident">AtomicFetchAndAdd</span> <span class="op">=</span> <span class="number">0x12</span>,
-    <span class="ident">AtomicMaskedCompareAndSwap</span> <span class="op">=</span> <span class="number">0x14</span>,
-    <span class="ident">AtomicMaskedFetchAndAdd</span> <span class="op">=</span> <span class="number">0x15</span>,
-    <span class="ident">ReceiveEn</span> <span class="op">=</span> <span class="number">0x16</span>,
-    <span class="ident">SendEn</span> <span class="op">=</span> <span class="number">0x17</span>,
-    <span class="ident">SetPsv</span> <span class="op">=</span> <span class="number">0x20</span>,
-    <span class="ident">Dump</span> <span class="op">=</span> <span class="number">0x23</span>,
-    <span class="ident">Umr</span> <span class="op">=</span> <span class="number">0x25</span> 
+<span class="doccomment">/// The possible values of the opcode field in the control segment of a WQE
+</span><span class="attr">#[derive(Debug, TryFromPrimitive)]
+#[repr(u8)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum </span>WQEOpcode {
+    <span class="doccomment">/// WQE with this opcode creates a completion, but does nothing else
+    </span>Nop = <span class="number">0x0</span>,
+    SndInv = <span class="number">0x1</span>,
+    RDMAWrite = <span class="number">0x8</span>,
+    RDMAWriteWithImmediate = <span class="number">0x9</span>,
+    Send = <span class="number">0xA</span>,
+    SendWithImmediate = <span class="number">0xB</span>,
+    LargeSendOffload = <span class="number">0xE</span>,
+    Wait = <span class="number">0xF</span>,
+    RDMARead = <span class="number">0x10</span>,
+    AtomicCompareAndSwap = <span class="number">0x11</span>,
+    AtomicFetchAndAdd = <span class="number">0x12</span>,
+    AtomicMaskedCompareAndSwap = <span class="number">0x14</span>,
+    AtomicMaskedFetchAndAdd = <span class="number">0x15</span>,
+    ReceiveEn = <span class="number">0x16</span>,
+    SendEn = <span class="number">0x17</span>,
+    SetPsv = <span class="number">0x20</span>,
+    Dump = <span class="number">0x23</span>,
+    Umr = <span class="number">0x25 
+</span>}
+
+<span class="doccomment">/// WQEs are built from multiple segments.
+/// In the case of Send WQEs, there are three:
+/// * control segment
+/// * eth segment
+/// * memory pointer data segment
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>WorkQueueEntrySend {
+    <span class="doccomment">/// This segment contains control information of the WQE
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) control: ControlSegment,
+    <span class="doccomment">/// This segment contains inlined Ethernet packet headers
+    </span>eth: EthSegment,
+    <span class="doccomment">/// This segment contains the length and address of the packet buffer
+    </span>data: MemoryPointerDataSegment
 }
 
-<span class="doccomment">/// WQEs are built from multiple segments.</span>
-<span class="doccomment">/// In the case of Send WQEs, there are three:</span>
-<span class="doccomment">/// * control segment</span>
-<span class="doccomment">/// * eth segment</span>
-<span class="doccomment">/// * memory pointer data segment</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WorkQueueEntrySend</span> {
-    <span class="doccomment">/// This segment contains control information of the WQE</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">control</span>: <span class="ident">ControlSegment</span>,
-    <span class="doccomment">/// This segment contains inlined Ethernet packet headers</span>
-    <span class="ident">eth</span>: <span class="ident">EthSegment</span>,
-    <span class="doccomment">/// This segment contains the length and address of the packet buffer</span>
-    <span class="ident">data</span>: <span class="ident">MemoryPointerDataSegment</span>
-}
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;WorkQueueEntrySend&gt;(), <span class="number">64</span>);
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">WorkQueueEntrySend</span><span class="op">&gt;</span>(), <span class="number">64</span>);
-
-<span class="kw">impl</span> <span class="ident">WorkQueueEntrySend</span> {
-    <span class="doccomment">/// set a WQE to an initial state</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">WorkQueueEntrySend::default</span>();
+<span class="kw">impl </span>WorkQueueEntrySend {
+    <span class="doccomment">/// set a WQE to an initial state
+    </span><span class="kw">pub fn </span>init(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw-2">*</span><span class="self">self </span>= WorkQueueEntrySend::default();
     }
 
-    <span class="doccomment">/// Fill the control, ethernet and data segments of the WQE to send packets.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments    </span>
-    <span class="doccomment">/// * `wqe_index`: WQEBB number of the first block of this WQE // TODO? seems to be wqe_counter</span>
-    <span class="doccomment">/// * `sqn`: number of the SQ this WQE is posted to</span>
-    <span class="doccomment">/// * `lkey`: the lkey used by the SQ</span>
-    <span class="doccomment">/// * `local_address`: physical address of the packet buffer</span>
-    <span class="doccomment">/// * `packet`: packet buffer</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">wqe_index</span>: <span class="ident">u32</span>, <span class="ident">sqn</span>: <span class="ident">u32</span>, <span class="ident">lkey</span>: <span class="ident">u32</span>, <span class="ident">local_address</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">packet</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
-        <span class="self">self</span>.<span class="ident">control</span>.<span class="ident">send</span>(<span class="ident">wqe_index</span>, <span class="ident">sqn</span>);
-        <span class="self">self</span>.<span class="ident">eth</span>.<span class="ident">init</span>(<span class="ident">packet</span>);
-        <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">init</span>(<span class="ident">lkey</span>, <span class="ident">local_address</span>, <span class="ident">packet</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u32</span>);
+    <span class="doccomment">/// Fill the control, ethernet and data segments of the WQE to send packets.
+    /// 
+    /// # Arguments    
+    /// * `wqe_index`: WQEBB number of the first block of this WQE // TODO? seems to be wqe_counter
+    /// * `sqn`: number of the SQ this WQE is posted to
+    /// * `lkey`: the lkey used by the SQ
+    /// * `local_address`: physical address of the packet buffer
+    /// * `packet`: packet buffer
+    </span><span class="kw">pub fn </span>send(<span class="kw-2">&amp;mut </span><span class="self">self</span>, wqe_index: u32, sqn: u32, lkey: u32, local_address: PhysicalAddress, packet: <span class="kw-2">&amp;</span>[u8]) {
+        <span class="self">self</span>.control.send(wqe_index, sqn);
+        <span class="self">self</span>.eth.init(packet);
+        <span class="self">self</span>.data.init(lkey, local_address, packet.len() <span class="kw">as </span>u32);
     }
 
-    <span class="doccomment">/// Fill the control segment of the WQE to execute a NOP.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments    </span>
-    <span class="doccomment">/// * `wqe_index`: WQEBB number of the first block of this WQE</span>
-    <span class="doccomment">/// * `sqn`: number of the SQ this WQE is posted to</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">nop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">wqe_index</span>: <span class="ident">u32</span>, <span class="ident">sqn</span>: <span class="ident">u32</span>) {
-        <span class="self">self</span>.<span class="ident">control</span>.<span class="ident">nop</span>(<span class="ident">wqe_index</span>, <span class="ident">sqn</span>);
+    <span class="doccomment">/// Fill the control segment of the WQE to execute a NOP.
+    /// 
+    /// # Arguments    
+    /// * `wqe_index`: WQEBB number of the first block of this WQE
+    /// * `sqn`: number of the SQ this WQE is posted to
+    </span><span class="kw">pub fn </span>nop(<span class="kw-2">&amp;mut </span><span class="self">self</span>, wqe_index: u32, sqn: u32) {
+        <span class="self">self</span>.control.nop(wqe_index, sqn);
     }
 
-    <span class="doccomment">/// Prints out the fields of a WQE in the format used by other drivers (e.g. Linux, Snabb)</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dump</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">i</span>: <span class="ident">usize</span>) {
-        <span class="macro">debug!</span>(<span class="string">&quot;Tx WQE {}&quot;</span>, <span class="ident">i</span>);
-        <span class="kw">unsafe</span> {
-            <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">WorkQueueEntrySend</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">u32</span>;
-            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span><span class="ident">ptr</span>).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">1</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">2</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">3</span>)).<span class="ident">to_be</span>());
-            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">4</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">5</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">6</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">7</span>)).<span class="ident">to_be</span>());
-            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">8</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">9</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">10</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">11</span>)).<span class="ident">to_be</span>());
-            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x} \n&quot;</span>, (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">12</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">13</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">14</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">15</span>)).<span class="ident">to_be</span>());
+    <span class="doccomment">/// Prints out the fields of a WQE in the format used by other drivers (e.g. Linux, Snabb)
+    </span><span class="kw">pub fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>, i: usize) {
+        <span class="macro">debug!</span>(<span class="string">&quot;Tx WQE {}&quot;</span>, i);
+        <span class="kw">unsafe </span>{
+            <span class="kw">let </span>ptr = <span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span>WorkQueueEntrySend <span class="kw">as </span><span class="kw-2">*const </span>u32;
+            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span>ptr).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">1</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">2</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">3</span>)).to_be());
+            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span>ptr.offset(<span class="number">4</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">5</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">6</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">7</span>)).to_be());
+            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span>ptr.offset(<span class="number">8</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">9</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">10</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">11</span>)).to_be());
+            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x} \n&quot;</span>, (<span class="kw-2">*</span>ptr.offset(<span class="number">12</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">13</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">14</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">15</span>)).to_be());
         }
     }
 }
 
-<span class="doccomment">/// WQEs are built from multiple segments.</span>
-<span class="doccomment">/// In the case of Receive WQEs, there is only the memory pointer data segment</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WorkQueueEntryReceive</span> {
-    <span class="doccomment">/// This segment contains the length and address of the packet buffer</span>
-    <span class="ident">data</span>: <span class="ident">MemoryPointerDataSegment</span>
+<span class="doccomment">/// WQEs are built from multiple segments.
+/// In the case of Receive WQEs, there is only the memory pointer data segment
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>WorkQueueEntryReceive {
+    <span class="doccomment">/// This segment contains the length and address of the packet buffer
+    </span>data: MemoryPointerDataSegment
 }
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">WorkQueueEntryReceive</span><span class="op">&gt;</span>(), <span class="number">16</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;WorkQueueEntryReceive&gt;(), <span class="number">16</span>);
 
-<span class="kw">impl</span> <span class="ident">WorkQueueEntryReceive</span> {
-    <span class="doccomment">/// set a WQE to an initial state</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">WorkQueueEntryReceive::default</span>();
+<span class="kw">impl </span>WorkQueueEntryReceive {
+    <span class="doccomment">/// set a WQE to an initial state
+    </span><span class="kw">pub fn </span>init(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw-2">*</span><span class="self">self </span>= WorkQueueEntryReceive::default();
     }
 
-    <span class="doccomment">/// Fill the data segment of the WQE to receive packets.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments    </span>
-    <span class="doccomment">/// * `lkey`: the lkey used by the RQ</span>
-    <span class="doccomment">/// * `local_address`: physical address of the packet buffer</span>
-    <span class="doccomment">/// * `packet_len`: packet buffer length in bytes</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">update_buffer_info</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">lkey</span>: <span class="ident">u32</span>, <span class="ident">local_address</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">packet_len</span>: <span class="ident">u32</span>) {
-        <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">init</span>(<span class="ident">lkey</span>, <span class="ident">local_address</span>, <span class="ident">packet_len</span>);
+    <span class="doccomment">/// Fill the data segment of the WQE to receive packets.
+    /// 
+    /// # Arguments    
+    /// * `lkey`: the lkey used by the RQ
+    /// * `local_address`: physical address of the packet buffer
+    /// * `packet_len`: packet buffer length in bytes
+    </span><span class="kw">pub fn </span>update_buffer_info(<span class="kw-2">&amp;mut </span><span class="self">self</span>, lkey: u32, local_address: PhysicalAddress, packet_len: u32) {
+        <span class="self">self</span>.data.init(lkey, local_address, packet_len);
     }
 
-    <span class="doccomment">/// Prints out the fields of a WQE in the format used by other drivers (e.g. Linux, Snabb)</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dump</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">i</span>: <span class="ident">usize</span>) {
-        <span class="macro">debug!</span>(<span class="string">&quot;Rx WQE {}&quot;</span>, <span class="ident">i</span>);
-        <span class="kw">unsafe</span> {
-            <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">WorkQueueEntryReceive</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">u32</span>;
-            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span><span class="ident">ptr</span>).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">1</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">2</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">3</span>)).<span class="ident">to_be</span>());
+    <span class="doccomment">/// Prints out the fields of a WQE in the format used by other drivers (e.g. Linux, Snabb)
+    </span><span class="kw">pub fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>, i: usize) {
+        <span class="macro">debug!</span>(<span class="string">&quot;Rx WQE {}&quot;</span>, i);
+        <span class="kw">unsafe </span>{
+            <span class="kw">let </span>ptr = <span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span>WorkQueueEntryReceive <span class="kw">as </span><span class="kw-2">*const </span>u32;
+            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span>ptr).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">1</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">2</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">3</span>)).to_be());
         }
     }
 }
 
 
-<span class="doccomment">/// Possible values of the CE subfield in the [`ControlSegment`] </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">TryFromPrimitive</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
-<span class="kw">enum</span> <span class="ident">CompletionAndEventMode</span> {
-    <span class="doccomment">/// Generate CQE only on WQE completion with error</span>
-    <span class="ident">CQEOnWQEError</span> <span class="op">=</span> <span class="number">0</span>,
-    <span class="doccomment">/// Generate CQE only on first WQE completion with error</span>
-    <span class="ident">CQEOnFirstWQEError</span> <span class="op">=</span> <span class="number">1</span>,
-    <span class="doccomment">/// Generate CQE on WQE completion</span>
-    <span class="ident">CQEAlways</span> <span class="op">=</span> <span class="number">2</span>,
-    <span class="doccomment">/// Generate CQE and EQE</span>
-    <span class="ident">CQEAndEQE</span> <span class="op">=</span> <span class="number">3</span>
+<span class="doccomment">/// Possible values of the CE subfield in the [`ControlSegment`] 
+</span><span class="attr">#[derive(Debug, TryFromPrimitive)]
+#[repr(u8)]
+</span><span class="kw">enum </span>CompletionAndEventMode {
+    <span class="doccomment">/// Generate CQE only on WQE completion with error
+    </span>CQEOnWQEError = <span class="number">0</span>,
+    <span class="doccomment">/// Generate CQE only on first WQE completion with error
+    </span>CQEOnFirstWQEError = <span class="number">1</span>,
+    <span class="doccomment">/// Generate CQE on WQE completion
+    </span>CQEAlways = <span class="number">2</span>,
+    <span class="doccomment">/// Generate CQE and EQE
+    </span>CQEAndEQE = <span class="number">3
+</span>}
+
+<span class="doccomment">/// This segment contains control information of the WQE.
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>ControlSegment {
+    <span class="doccomment">/// A multi-part field:
+    /// * `opc_mod`: opcode modifier, occupies bits [31:24]
+    /// * `wqe_index`: WQEBB number of the first block of this WQE, occupies bits [23:8]
+    /// * `opcode`: a value of the type [`WQEOpcode`], occupies bits [7:0]
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) opcode:              Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// A multi-part field:
+    /// * `qp_or_sq`: QP/SQ number this WQE is posted to, occupies bits [31:8]
+    /// * `ds`: WQE size in octowords (16-byte units), occupies bits [5:0]
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) ds:                  Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// A multi-part field:
+    /// * `ce`: A value of the type [`CompletionAndEventMode`], occupies bits [3:2]
+    /// * `se`: true if a solicited event, occupies bit 1
+    </span>ce_se:                          Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// general identifier according to WQE opcode/opc_mod
+    </span>ctrl_general_id:                Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="doccomment">/// This segment contains control information of the WQE.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">ControlSegment</span> {
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `opc_mod`: opcode modifier, occupies bits [31:24]</span>
-    <span class="doccomment">/// * `wqe_index`: WQEBB number of the first block of this WQE, occupies bits [23:8]</span>
-    <span class="doccomment">/// * `opcode`: a value of the type [`WQEOpcode`], occupies bits [7:0]</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">opcode</span>:              <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `qp_or_sq`: QP/SQ number this WQE is posted to, occupies bits [31:8]</span>
-    <span class="doccomment">/// * `ds`: WQE size in octowords (16-byte units), occupies bits [5:0]</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">ds</span>:                  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `ce`: A value of the type [`CompletionAndEventMode`], occupies bits [3:2]</span>
-    <span class="doccomment">/// * `se`: true if a solicited event, occupies bit 1</span>
-    <span class="ident">ce_se</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// general identifier according to WQE opcode/opc_mod</span>
-    <span class="ident">ctrl_general_id</span>:                <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-}
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;ControlSegment&gt;(), <span class="number">16</span>);
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">ControlSegment</span><span class="op">&gt;</span>(), <span class="number">16</span>);
+<span class="kw">impl </span>ControlSegment {
+    <span class="doccomment">/// Initialize the fields of the control segment.
+    /// 
+    /// # Arguments
+    /// * `opcode`: the type of command this WQE will complete
+    /// * `wqe_index`: WQEBB number of the first block of this WQE
+    /// * `sqn`: number of the SQ this WQE is posted to
+    </span><span class="kw">fn </span>init(<span class="kw-2">&amp;mut </span><span class="self">self</span>, opcode: WQEOpcode, wqe_index: u32, sqn: u32) {
+        <span class="kw">const </span>WQE_INDEX_SHIFT: u32 = <span class="number">8</span>;
+        <span class="kw">const </span>SQN_SHIFT: u32 = <span class="number">8</span>;
+        <span class="comment">// WQE size in octowords (16-byte units)
+        </span><span class="kw">const </span>WQE_SIZE_IN_OCTWORDS: u32 =  core::mem::size_of::&lt;WorkQueueEntrySend&gt;() <span class="kw">as </span>u32 / <span class="number">16</span>;
+        <span class="kw">const </span>CE_SHIFT: u32 = <span class="number">2</span>;
 
-<span class="kw">impl</span> <span class="ident">ControlSegment</span> {
-    <span class="doccomment">/// Initialize the fields of the control segment.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `opcode`: the type of command this WQE will complete</span>
-    <span class="doccomment">/// * `wqe_index`: WQEBB number of the first block of this WQE</span>
-    <span class="doccomment">/// * `sqn`: number of the SQ this WQE is posted to</span>
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">opcode</span>: <span class="ident">WQEOpcode</span>, <span class="ident">wqe_index</span>: <span class="ident">u32</span>, <span class="ident">sqn</span>: <span class="ident">u32</span>) {
-        <span class="kw">const</span> <span class="ident">WQE_INDEX_SHIFT</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">8</span>;
-        <span class="kw">const</span> <span class="ident">SQN_SHIFT</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">8</span>;
-        <span class="comment">// WQE size in octowords (16-byte units)</span>
-        <span class="kw">const</span> <span class="ident">WQE_SIZE_IN_OCTWORDS</span>: <span class="ident">u32</span> <span class="op">=</span>  <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">WorkQueueEntrySend</span><span class="op">&gt;</span>() <span class="kw">as</span> <span class="ident">u32</span> <span class="op">/</span> <span class="number">16</span>;
-        <span class="kw">const</span> <span class="ident">CE_SHIFT</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">2</span>;
-
-        <span class="self">self</span>.<span class="ident">opcode</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">wqe_index</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">WQE_INDEX_SHIFT</span>)<span class="op">|</span> (<span class="ident">opcode</span> <span class="kw">as</span> <span class="ident">u32</span>)));
-        <span class="self">self</span>.<span class="ident">ds</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">sqn</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">SQN_SHIFT</span>) <span class="op">|</span> <span class="ident">WQE_SIZE_IN_OCTWORDS</span>));
-        <span class="self">self</span>.<span class="ident">ce_se</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">CompletionAndEventMode::CQEAlways</span> <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">CE_SHIFT</span>));
+        <span class="self">self</span>.opcode.write(U32::new((wqe_index &lt;&lt; WQE_INDEX_SHIFT)| (opcode <span class="kw">as </span>u32)));
+        <span class="self">self</span>.ds.write(U32::new((sqn &lt;&lt; SQN_SHIFT) | WQE_SIZE_IN_OCTWORDS));
+        <span class="self">self</span>.ce_se.write(U32::new((CompletionAndEventMode::CQEAlways <span class="kw">as </span>u32) &lt;&lt; CE_SHIFT));
     }
 
-    <span class="doccomment">/// Initialize the fields of the control segment to send a packet.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `wqe_index`: WQEBB number of the first block of this WQE</span>
-    <span class="doccomment">/// * `sqn`: number of the SQ this WQE is posted to</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">wqe_index</span>: <span class="ident">u32</span>, <span class="ident">sqn</span>: <span class="ident">u32</span>) {
-        <span class="self">self</span>.<span class="ident">init</span>(<span class="ident">WQEOpcode::Send</span>, <span class="ident">wqe_index</span>, <span class="ident">sqn</span>)
+    <span class="doccomment">/// Initialize the fields of the control segment to send a packet.
+    /// 
+    /// # Arguments
+    /// * `wqe_index`: WQEBB number of the first block of this WQE
+    /// * `sqn`: number of the SQ this WQE is posted to
+    </span><span class="kw">pub fn </span>send(<span class="kw-2">&amp;mut </span><span class="self">self</span>, wqe_index: u32, sqn: u32) {
+        <span class="self">self</span>.init(WQEOpcode::Send, wqe_index, sqn)
     }
 
-    <span class="doccomment">/// Initialize the fields of the control segment to create a NOP.</span>
-    <span class="doccomment">/// With a NOP, only a completion event will be generated. </span>
-    <span class="doccomment">/// It&#39;s a good way to make sure the CQ and WQ are properly initialized.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `wqe_index`: WQEBB number of the first block of this WQE</span>
-    <span class="doccomment">/// * `sqn`: number of the SQ this WQE is posted to</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">nop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">wqe_index</span>: <span class="ident">u32</span>, <span class="ident">sqn</span>: <span class="ident">u32</span>) {
-        <span class="self">self</span>.<span class="ident">init</span>(<span class="ident">WQEOpcode::Nop</span>, <span class="ident">wqe_index</span>, <span class="ident">sqn</span>)
-    }
-}
-
-<span class="doccomment">/// This segment contains stateless offloading control and inlined Ethernet packet headers</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">EthSegment</span> {
-    <span class="ident">_padding0</span>:              <span class="ident">u32</span>,
-    <span class="doccomment">/// Maximum Segment Size</span>
-    <span class="ident">mss</span>:                    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">flow_table_metadata</span>:    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `inline_header_size`: length of inlined packet headers in bytes, occupies bits [25:16]</span>
-    <span class="doccomment">/// * `inline_headers`: beginning of the inlined packet headers, occupies bits [15:0]</span>
-    <span class="ident">inline_headers_0</span>:       <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// bytes 2 to 5 of the packet header</span>
-    <span class="ident">inline_headers_1</span>:       <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// bytes 6 to 9 of the packet header</span>
-    <span class="ident">inline_headers_2</span>:       <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// bytes 10 to 13 of the packet header</span>
-    <span class="ident">inline_headers_3</span>:       <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// bytes 14 and 15 of the packet header</span>
-    <span class="ident">inline_headers_4</span>:       <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-}
-
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">EthSegment</span><span class="op">&gt;</span>(), <span class="number">32</span>);
-
-<span class="kw">impl</span> <span class="ident">EthSegment</span> {
-    <span class="doccomment">/// Initialize the fields of the eth segment to send a packet.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `packet`: packet buffer</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">packet</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
-        <span class="kw">const</span> <span class="ident">INLINE_HEADER_SIZE</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">16</span>;
-        <span class="kw">const</span> <span class="ident">INLINE_HEADER_SHIFT</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">16</span>;
-
-        <span class="self">self</span>.<span class="ident">inline_headers_0</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">INLINE_HEADER_SIZE</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">INLINE_HEADER_SHIFT</span>) <span class="op">|</span> (<span class="ident">packet</span>[<span class="number">0</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">8</span> <span class="op">|</span> (<span class="ident">packet</span>[<span class="number">1</span>] <span class="kw">as</span> <span class="ident">u32</span>)));
-        <span class="self">self</span>.<span class="ident">inline_headers_1</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">packet</span>[<span class="number">2</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">24</span> <span class="op">|</span> (<span class="ident">packet</span>[<span class="number">3</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span> <span class="op">|</span> (<span class="ident">packet</span>[<span class="number">4</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">8</span> <span class="op">|</span> <span class="ident">packet</span>[<span class="number">5</span>] <span class="kw">as</span> <span class="ident">u32</span>));
-        <span class="self">self</span>.<span class="ident">inline_headers_2</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">packet</span>[<span class="number">6</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">24</span> <span class="op">|</span> (<span class="ident">packet</span>[<span class="number">7</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span> <span class="op">|</span> (<span class="ident">packet</span>[<span class="number">8</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">8</span> <span class="op">|</span> <span class="ident">packet</span>[<span class="number">9</span>] <span class="kw">as</span> <span class="ident">u32</span>));
-        <span class="self">self</span>.<span class="ident">inline_headers_3</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">packet</span>[<span class="number">10</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">24</span> <span class="op">|</span> (<span class="ident">packet</span>[<span class="number">11</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span> <span class="op">|</span> (<span class="ident">packet</span>[<span class="number">12</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">8</span> <span class="op">|</span> <span class="ident">packet</span>[<span class="number">13</span>] <span class="kw">as</span> <span class="ident">u32</span>));
-        <span class="self">self</span>.<span class="ident">inline_headers_4</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">packet</span>[<span class="number">14</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">24</span> <span class="op">|</span> (<span class="ident">packet</span>[<span class="number">15</span>] <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>));
+    <span class="doccomment">/// Initialize the fields of the control segment to create a NOP.
+    /// With a NOP, only a completion event will be generated. 
+    /// It&#39;s a good way to make sure the CQ and WQ are properly initialized.
+    /// 
+    /// # Arguments
+    /// * `wqe_index`: WQEBB number of the first block of this WQE
+    /// * `sqn`: number of the SQ this WQE is posted to
+    </span><span class="kw">pub fn </span>nop(<span class="kw-2">&amp;mut </span><span class="self">self</span>, wqe_index: u32, sqn: u32) {
+        <span class="self">self</span>.init(WQEOpcode::Nop, wqe_index, sqn)
     }
 }
 
-<span class="doccomment">/// This segment contains the length and address of the packet buffer</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">MemoryPointerDataSegment</span> {
-    <span class="doccomment">/// length of the packet in bytes</span>
-    <span class="ident">byte_count</span>:         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// the lkey used by the WQ</span>
-    <span class="ident">l_key</span>:              <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// upper 4 bytes of the physical address of the packet buffer</span>
-    <span class="ident">local_address_h</span>:    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// lower 4 bytes of the physical address of the packet buffer</span>
-    <span class="ident">local_address_l</span>:    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// This segment contains stateless offloading control and inlined Ethernet packet headers
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>EthSegment {
+    _padding0:              u32,
+    <span class="doccomment">/// Maximum Segment Size
+    </span>mss:                    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    flow_table_metadata:    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// A multi-part field:
+    /// * `inline_header_size`: length of inlined packet headers in bytes, occupies bits [25:16]
+    /// * `inline_headers`: beginning of the inlined packet headers, occupies bits [15:0]
+    </span>inline_headers_0:       Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// bytes 2 to 5 of the packet header
+    </span>inline_headers_1:       Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// bytes 6 to 9 of the packet header
+    </span>inline_headers_2:       Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// bytes 10 to 13 of the packet header
+    </span>inline_headers_3:       Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// bytes 14 and 15 of the packet header
+    </span>inline_headers_4:       Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">MemoryPointerDataSegment</span><span class="op">&gt;</span>(), <span class="number">16</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;EthSegment&gt;(), <span class="number">32</span>);
 
-<span class="kw">impl</span> <span class="ident">MemoryPointerDataSegment</span> {
-    <span class="doccomment">/// Initialize the fields of the data segment to send or receive a packet.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments    </span>
-    <span class="doccomment">/// * `lkey`: the lkey used by the WQ</span>
-    <span class="doccomment">/// * `local_address`: physical address of the packet buffer</span>
-    <span class="doccomment">/// * `len`: length of the packet in bytes</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">lkey</span>: <span class="ident">u32</span>, <span class="ident">local_address</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">len</span>: <span class="ident">u32</span>) {
-        <span class="self">self</span>.<span class="ident">byte_count</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">len</span>));
-        <span class="self">self</span>.<span class="ident">l_key</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">lkey</span>));
-        <span class="self">self</span>.<span class="ident">local_address_h</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">local_address</span>.<span class="ident">value</span>() <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">32</span>) <span class="kw">as</span> <span class="ident">u32</span>));
-        <span class="self">self</span>.<span class="ident">local_address_l</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">local_address</span>.<span class="ident">value</span>() <span class="op">&amp;</span> <span class="number">0xFFFF_FFFF</span>) <span class="kw">as</span> <span class="ident">u32</span>));
+<span class="kw">impl </span>EthSegment {
+    <span class="doccomment">/// Initialize the fields of the eth segment to send a packet.
+    /// 
+    /// # Arguments
+    /// * `packet`: packet buffer
+    </span><span class="kw">pub fn </span>init(<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet: <span class="kw-2">&amp;</span>[u8]) {
+        <span class="kw">const </span>INLINE_HEADER_SIZE: u32 = <span class="number">16</span>;
+        <span class="kw">const </span>INLINE_HEADER_SHIFT: u32 = <span class="number">16</span>;
+
+        <span class="self">self</span>.inline_headers_0.write(U32::new((INLINE_HEADER_SIZE &lt;&lt; INLINE_HEADER_SHIFT) | (packet[<span class="number">0</span>] <span class="kw">as </span>u32) &lt;&lt; <span class="number">8 </span>| (packet[<span class="number">1</span>] <span class="kw">as </span>u32)));
+        <span class="self">self</span>.inline_headers_1.write(U32::new((packet[<span class="number">2</span>] <span class="kw">as </span>u32) &lt;&lt; <span class="number">24 </span>| (packet[<span class="number">3</span>] <span class="kw">as </span>u32) &lt;&lt; <span class="number">16 </span>| (packet[<span class="number">4</span>] <span class="kw">as </span>u32) &lt;&lt; <span class="number">8 </span>| packet[<span class="number">5</span>] <span class="kw">as </span>u32));
+        <span class="self">self</span>.inline_headers_2.write(U32::new((packet[<span class="number">6</span>] <span class="kw">as </span>u32) &lt;&lt; <span class="number">24 </span>| (packet[<span class="number">7</span>] <span class="kw">as </span>u32) &lt;&lt; <span class="number">16 </span>| (packet[<span class="number">8</span>] <span class="kw">as </span>u32) &lt;&lt; <span class="number">8 </span>| packet[<span class="number">9</span>] <span class="kw">as </span>u32));
+        <span class="self">self</span>.inline_headers_3.write(U32::new((packet[<span class="number">10</span>] <span class="kw">as </span>u32) &lt;&lt; <span class="number">24 </span>| (packet[<span class="number">11</span>] <span class="kw">as </span>u32) &lt;&lt; <span class="number">16 </span>| (packet[<span class="number">12</span>] <span class="kw">as </span>u32) &lt;&lt; <span class="number">8 </span>| packet[<span class="number">13</span>] <span class="kw">as </span>u32));
+        <span class="self">self</span>.inline_headers_4.write(U32::new((packet[<span class="number">14</span>] <span class="kw">as </span>u32) &lt;&lt; <span class="number">24 </span>| (packet[<span class="number">15</span>] <span class="kw">as </span>u32) &lt;&lt; <span class="number">16</span>));
+    }
+}
+
+<span class="doccomment">/// This segment contains the length and address of the packet buffer
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>MemoryPointerDataSegment {
+    <span class="doccomment">/// length of the packet in bytes
+    </span>byte_count:         Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// the lkey used by the WQ
+    </span>l_key:              Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// upper 4 bytes of the physical address of the packet buffer
+    </span>local_address_h:    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// lower 4 bytes of the physical address of the packet buffer
+    </span>local_address_l:    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+}
+
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;MemoryPointerDataSegment&gt;(), <span class="number">16</span>);
+
+<span class="kw">impl </span>MemoryPointerDataSegment {
+    <span class="doccomment">/// Initialize the fields of the data segment to send or receive a packet.
+    /// 
+    /// # Arguments    
+    /// * `lkey`: the lkey used by the WQ
+    /// * `local_address`: physical address of the packet buffer
+    /// * `len`: length of the packet in bytes
+    </span><span class="kw">pub fn </span>init(<span class="kw-2">&amp;mut </span><span class="self">self</span>, lkey: u32, local_address: PhysicalAddress, len: u32) {
+        <span class="self">self</span>.byte_count.write(U32::new(len));
+        <span class="self">self</span>.l_key.write(U32::new(lkey));
+        <span class="self">self</span>.local_address_h.write(U32::new((local_address.value() &gt;&gt; <span class="number">32</span>) <span class="kw">as </span>u32));
+        <span class="self">self</span>.local_address_l.write(U32::new((local_address.value() &amp; <span class="number">0xFFFF_FFFF</span>) <span class="kw">as </span>u32));
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

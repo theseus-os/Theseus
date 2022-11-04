@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/memory_x86_64/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../memory_x86_64/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../memory_x86_64/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../memory_x86_64/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/memory_x86_64/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../memory_x86_64/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -341,343 +335,342 @@
 <span id="335">335</span>
 <span id="336">336</span>
 <span id="337">337</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.</span>
-<span class="doccomment">//! `memory` uses this crate to get the memory layout and do other arch-specific operations on x86_64.  </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! This is the top-level arch-specific memory crate. </span>
-<span class="doccomment">//! All arch-specific definitions for memory system are exported from this crate.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
+//! `memory` uses this crate to get the memory layout and do other arch-specific operations on x86_64.  
+//! 
+//! This is the top-level arch-specific memory crate. 
+//! All arch-specific definitions for memory system are exported from this crate.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">ptr_internals</span>)]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">unboxed_closures</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(ptr_internals)]
+#![feature(unboxed_closures)]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">multiboot2</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory_structs</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">entryflags_x86_64</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">x86_64</span>;
+</span><span class="kw">extern crate </span>multiboot2;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>kernel_config;
+<span class="kw">extern crate </span>memory_structs;
+<span class="kw">extern crate </span>entryflags_x86_64;
+<span class="kw">extern crate </span>x86_64;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">multiboot2::BootInformation</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">entryflags_x86_64</span>::{<span class="ident">EntryFlags</span>, <span class="ident">PAGE_TABLE_ENTRY_FRAME_MASK</span>};
+<span class="kw">pub use </span>multiboot2::BootInformation;
+<span class="kw">pub use </span>entryflags_x86_64::{EntryFlags, PAGE_TABLE_ENTRY_FRAME_MASK};
 
-<span class="kw">use</span> <span class="ident">kernel_config::memory::KERNEL_OFFSET</span>;
-<span class="kw">use</span> <span class="ident">memory_structs</span>::{
-    <span class="ident">PhysicalAddress</span>, <span class="ident">VirtualAddress</span>, <span class="ident">SectionMemoryBounds</span>, <span class="ident">AggregatedSectionMemoryBounds</span>,
+<span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
+<span class="kw">use </span>memory_structs::{
+    PhysicalAddress, VirtualAddress, SectionMemoryBounds, AggregatedSectionMemoryBounds,
 };
-<span class="kw">use</span> <span class="ident">x86_64</span>::{<span class="ident">registers::control::Cr3</span>, <span class="ident">instructions::tlb</span>};
+<span class="kw">use </span>x86_64::{registers::control::Cr3, instructions::tlb};
 
 
-<span class="doccomment">/// Finds and returns the relevant addresses for the kernel image loaded into memory by the bootloader.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Returns the following tuple, if successful:</span>
-<span class="doccomment">///  * The kernel&#39;s starting physical address,</span>
-<span class="doccomment">///  * the kernel&#39;s ending physical address,</span>
-<span class="doccomment">///  * the kernel&#39;s ending virtual address.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_kernel_address</span>(
-    <span class="ident">boot_info</span>: <span class="kw-2">&amp;</span><span class="ident">BootInformation</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">PhysicalAddress</span>, <span class="ident">PhysicalAddress</span>, <span class="ident">VirtualAddress</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">elf_sections_tag</span> <span class="op">=</span> <span class="ident">boot_info</span>
-        .<span class="ident">elf_sections_tag</span>()
-        .<span class="ident">ok_or</span>(<span class="string">&quot;Elf sections tag not found&quot;</span>)<span class="question-mark">?</span>;
+<span class="doccomment">/// Finds and returns the relevant addresses for the kernel image loaded into memory by the bootloader.
+///
+/// Returns the following tuple, if successful:
+///  * The kernel&#39;s starting physical address,
+///  * the kernel&#39;s ending physical address,
+///  * the kernel&#39;s ending virtual address.
+</span><span class="kw">pub fn </span>get_kernel_address(
+    boot_info: <span class="kw-2">&amp;</span>BootInformation,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(PhysicalAddress, PhysicalAddress, VirtualAddress), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>elf_sections_tag = boot_info
+        .elf_sections_tag()
+        .ok_or(<span class="string">&quot;Elf sections tag not found&quot;</span>)<span class="question-mark">?</span>;
 
-    <span class="comment">// Our linker script specifies that the kernel will have the .init section starting at 1MB and ending at 1MB + .init size</span>
-    <span class="comment">// and all other kernel sections will start at (KERNEL_OFFSET + 1MB) and end at (KERNEL_OFFSET + 1MB + size).</span>
-    <span class="comment">// So, the start of the kernel is its physical address, but the end of it is its virtual address... confusing, I know</span>
-    <span class="comment">// Thus, kernel_phys_start is the same as kernel_virt_start initially, but we remap them later in paging::init.</span>
-    <span class="kw">let</span> <span class="ident">kernel_phys_start</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(
-        <span class="ident">elf_sections_tag</span>
-            .<span class="ident">sections</span>()
-            .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">is_allocated</span>())
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">start_address</span>())
-            .<span class="ident">min</span>()
-            .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find kernel start (phys) address&quot;</span>)<span class="question-mark">?</span> <span class="kw">as</span> <span class="ident">usize</span>,
-    ).<span class="ident">ok_or</span>(<span class="string">&quot;kernel start physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">kernel_virt_end</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(
-        <span class="ident">elf_sections_tag</span>
-            .<span class="ident">sections</span>()
-            .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">is_allocated</span>())
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">end_address</span>())
-            .<span class="ident">max</span>()
-            .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find kernel end (virt) address&quot;</span>)<span class="question-mark">?</span> <span class="kw">as</span> <span class="ident">usize</span>,
-    ).<span class="ident">ok_or</span>(<span class="string">&quot;kernel virtual end address was invalid&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">kernel_phys_end</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(<span class="ident">kernel_virt_end</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">KERNEL_OFFSET</span>)
-        .<span class="ident">ok_or</span>(<span class="string">&quot;kernel end physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
+    <span class="comment">// Our linker script specifies that the kernel will have the .init section starting at 1MB and ending at 1MB + .init size
+    // and all other kernel sections will start at (KERNEL_OFFSET + 1MB) and end at (KERNEL_OFFSET + 1MB + size).
+    // So, the start of the kernel is its physical address, but the end of it is its virtual address... confusing, I know
+    // Thus, kernel_phys_start is the same as kernel_virt_start initially, but we remap them later in paging::init.
+    </span><span class="kw">let </span>kernel_phys_start = PhysicalAddress::new(
+        elf_sections_tag
+            .sections()
+            .filter(|s| s.is_allocated())
+            .map(|s| s.start_address())
+            .min()
+            .ok_or(<span class="string">&quot;Couldn&#39;t find kernel start (phys) address&quot;</span>)<span class="question-mark">? </span><span class="kw">as </span>usize,
+    ).ok_or(<span class="string">&quot;kernel start physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>kernel_virt_end = VirtualAddress::new(
+        elf_sections_tag
+            .sections()
+            .filter(|s| s.is_allocated())
+            .map(|s| s.end_address())
+            .max()
+            .ok_or(<span class="string">&quot;Couldn&#39;t find kernel end (virt) address&quot;</span>)<span class="question-mark">? </span><span class="kw">as </span>usize,
+    ).ok_or(<span class="string">&quot;kernel virtual end address was invalid&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>kernel_phys_end = PhysicalAddress::new(kernel_virt_end.value() - KERNEL_OFFSET)
+        .ok_or(<span class="string">&quot;kernel end physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>((<span class="ident">kernel_phys_start</span>, <span class="ident">kernel_phys_end</span>, <span class="ident">kernel_virt_end</span>))
+    <span class="prelude-val">Ok</span>((kernel_phys_start, kernel_phys_end, kernel_virt_end))
 }
 
 
-<span class="doccomment">/// Gets the address bounds of physical memory occupied by all bootloader-loaded modules.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Returns (start_address, end_address).</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_modules_address</span>(<span class="ident">boot_info</span>: <span class="kw-2">&amp;</span><span class="ident">BootInformation</span>) -&gt; (<span class="ident">PhysicalAddress</span>, <span class="ident">PhysicalAddress</span>) {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">mod_min</span> <span class="op">=</span> <span class="ident">usize::max_value</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">mod_max</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="kw">use</span> <span class="ident">core::cmp</span>::{<span class="ident">max</span>, <span class="ident">min</span>};
+<span class="doccomment">/// Gets the address bounds of physical memory occupied by all bootloader-loaded modules.
+/// 
+/// Returns (start_address, end_address).
+</span><span class="kw">pub fn </span>get_modules_address(boot_info: <span class="kw-2">&amp;</span>BootInformation) -&gt; (PhysicalAddress, PhysicalAddress) {
+    <span class="kw">let </span><span class="kw-2">mut </span>mod_min = usize::max_value();
+    <span class="kw">let </span><span class="kw-2">mut </span>mod_max = <span class="number">0</span>;
+    <span class="kw">use </span>core::cmp::{max, min};
 
-    <span class="kw">for</span> <span class="ident">m</span> <span class="kw">in</span> <span class="ident">boot_info</span>.<span class="ident">module_tags</span>() {
-        <span class="ident">mod_min</span> <span class="op">=</span> <span class="ident">min</span>(<span class="ident">mod_min</span>, <span class="ident">m</span>.<span class="ident">start_address</span>() <span class="kw">as</span> <span class="ident">usize</span>);
-        <span class="ident">mod_max</span> <span class="op">=</span> <span class="ident">max</span>(<span class="ident">mod_max</span>, <span class="ident">m</span>.<span class="ident">end_address</span>() <span class="kw">as</span> <span class="ident">usize</span>);
+    <span class="kw">for </span>m <span class="kw">in </span>boot_info.module_tags() {
+        mod_min = min(mod_min, m.start_address() <span class="kw">as </span>usize);
+        mod_max = max(mod_max, m.end_address() <span class="kw">as </span>usize);
     }
-    (<span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">mod_min</span>), <span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">mod_max</span>))
+    (PhysicalAddress::new_canonical(mod_min), PhysicalAddress::new_canonical(mod_max))
 }
 
-<span class="doccomment">/// Gets the physical memory area occupied by the bootloader information.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_boot_info_mem_area</span>(
-    <span class="ident">boot_info</span>: <span class="kw-2">&amp;</span><span class="ident">BootInformation</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">PhysicalAddress</span>, <span class="ident">PhysicalAddress</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="doccomment">/// Gets the physical memory area occupied by the bootloader information.
+</span><span class="kw">pub fn </span>get_boot_info_mem_area(
+    boot_info: <span class="kw-2">&amp;</span>BootInformation,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(PhysicalAddress, PhysicalAddress), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="prelude-val">Ok</span>((
-        <span class="ident">PhysicalAddress::new</span>(<span class="ident">boot_info</span>.<span class="ident">start_address</span>() <span class="op">-</span> <span class="ident">KERNEL_OFFSET</span>)
-            .<span class="ident">ok_or</span>(<span class="string">&quot;boot info start physical address was invalid&quot;</span>)<span class="question-mark">?</span>,
-        <span class="ident">PhysicalAddress::new</span>(<span class="ident">boot_info</span>.<span class="ident">end_address</span>() <span class="op">-</span> <span class="ident">KERNEL_OFFSET</span>)
-            .<span class="ident">ok_or</span>(<span class="string">&quot;boot info end physical address was invalid&quot;</span>)<span class="question-mark">?</span>,
+        PhysicalAddress::new(boot_info.start_address() - KERNEL_OFFSET)
+            .ok_or(<span class="string">&quot;boot info start physical address was invalid&quot;</span>)<span class="question-mark">?</span>,
+        PhysicalAddress::new(boot_info.end_address() - KERNEL_OFFSET)
+            .ok_or(<span class="string">&quot;boot info end physical address was invalid&quot;</span>)<span class="question-mark">?</span>,
     ))
 }
 
 
-<span class="doccomment">/// Finds the addresses in memory of the main kernel sections, as specified by the given boot information. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Returns the following tuple, if successful:</span>
-<span class="doccomment">///  * The combined size and address bounds of key sections, e.g., .text, .rodata, .data.</span>
-<span class="doccomment">///    Each of the these section bounds is aggregated to cover the bounds and sizes of *all* sections </span>
-<span class="doccomment">///    that share the same page table mapping flags and can thus be logically combined.</span>
-<span class="doccomment">///  * The list of all individual sections found. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">find_section_memory_bounds</span>(<span class="ident">boot_info</span>: <span class="kw-2">&amp;</span><span class="ident">BootInformation</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AggregatedSectionMemoryBounds</span>, [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SectionMemoryBounds</span><span class="op">&gt;</span>; <span class="number">32</span>]), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">elf_sections_tag</span> <span class="op">=</span> <span class="ident">boot_info</span>.<span class="ident">elf_sections_tag</span>().<span class="ident">ok_or</span>(<span class="string">&quot;no Elf sections tag present!&quot;</span>)<span class="question-mark">?</span>;
+<span class="doccomment">/// Finds the addresses in memory of the main kernel sections, as specified by the given boot information. 
+/// 
+/// Returns the following tuple, if successful:
+///  * The combined size and address bounds of key sections, e.g., .text, .rodata, .data.
+///    Each of the these section bounds is aggregated to cover the bounds and sizes of *all* sections 
+///    that share the same page table mapping flags and can thus be logically combined.
+///  * The list of all individual sections found. 
+</span><span class="kw">pub fn </span>find_section_memory_bounds(boot_info: <span class="kw-2">&amp;</span>BootInformation) -&gt; <span class="prelude-ty">Result</span>&lt;(AggregatedSectionMemoryBounds, [<span class="prelude-ty">Option</span>&lt;SectionMemoryBounds&gt;; <span class="number">32</span>]), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>elf_sections_tag = boot_info.elf_sections_tag().ok_or(<span class="string">&quot;no Elf sections tag present!&quot;</span>)<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">index</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">text_start</span>:        <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">text_end</span>:          <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rodata_start</span>:      <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rodata_end</span>:        <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data_start</span>:        <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data_end</span>:          <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stack_start</span>:       <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stack_end</span>:         <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">page_table_start</span>:  <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">page_table_end</span>:    <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>index = <span class="number">0</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>text_start:        <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>text_end:          <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>rodata_start:      <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>rodata_end:        <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>data_start:        <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>data_end:          <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>stack_start:       <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>stack_end:         <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>page_table_start:  <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>page_table_end:    <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">text_flags</span>:        <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">EntryFlags</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rodata_flags</span>:      <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">EntryFlags</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data_flags</span>:        <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">EntryFlags</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>text_flags:        <span class="prelude-ty">Option</span>&lt;EntryFlags&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>rodata_flags:      <span class="prelude-ty">Option</span>&lt;EntryFlags&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>data_flags:        <span class="prelude-ty">Option</span>&lt;EntryFlags&gt; = <span class="prelude-val">None</span>;
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sections_memory_bounds</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SectionMemoryBounds</span><span class="op">&gt;</span>; <span class="number">32</span>] <span class="op">=</span> <span class="ident">Default::default</span>();
+    <span class="kw">let </span><span class="kw-2">mut </span>sections_memory_bounds: [<span class="prelude-ty">Option</span>&lt;SectionMemoryBounds&gt;; <span class="number">32</span>] = Default::default();
 
-    <span class="comment">// map the allocated kernel text sections</span>
-    <span class="kw">for</span> <span class="ident">section</span> <span class="kw">in</span> <span class="ident">elf_sections_tag</span>.<span class="ident">sections</span>() {
-        <span class="comment">// skip sections that don&#39;t need to be loaded into memory</span>
-        <span class="kw">if</span> <span class="ident">section</span>.<span class="ident">size</span>() <span class="op">==</span> <span class="number">0</span>
-            <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="ident">section</span>.<span class="ident">is_allocated</span>()
-            <span class="op">|</span><span class="op">|</span> <span class="ident">section</span>.<span class="ident">name</span>().<span class="ident">starts_with</span>(<span class="string">&quot;.debug&quot;</span>)
+    <span class="comment">// map the allocated kernel text sections
+    </span><span class="kw">for </span>section <span class="kw">in </span>elf_sections_tag.sections() {
+        <span class="comment">// skip sections that don&#39;t need to be loaded into memory
+        </span><span class="kw">if </span>section.size() == <span class="number">0
+            </span>|| !section.is_allocated()
+            || section.name().starts_with(<span class="string">&quot;.debug&quot;</span>)
         {
             <span class="kw">continue</span>;
         }
 
-        <span class="macro">debug!</span>(<span class="string">&quot;Looking at loaded section {} at {:#X}, size {:#X}&quot;</span>, <span class="ident">section</span>.<span class="ident">name</span>(), <span class="ident">section</span>.<span class="ident">start_address</span>(), <span class="ident">section</span>.<span class="ident">size</span>());
-        <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="ident">EntryFlags::from_multiboot2_section_flags</span>(<span class="kw-2">&amp;</span><span class="ident">section</span>) <span class="op">|</span> <span class="ident">EntryFlags::GLOBAL</span>;
+        <span class="macro">debug!</span>(<span class="string">&quot;Looking at loaded section {} at {:#X}, size {:#X}&quot;</span>, section.name(), section.start_address(), section.size());
+        <span class="kw">let </span>flags = EntryFlags::from_multiboot2_section_flags(<span class="kw-2">&amp;</span>section) | EntryFlags::GLOBAL;
 
-        <span class="comment">// even though the linker stipulates that the kernel sections have a higher-half virtual address,</span>
-        <span class="comment">// they are still loaded at a lower physical address, in which phys_addr = virt_addr - KERNEL_OFFSET.</span>
-        <span class="comment">// thus, we must map the zeroeth kernel section from its low address to a higher-half address,</span>
-        <span class="comment">// and we must map all the other sections from their higher given virtual address to the proper lower phys addr</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">start_phys_addr</span> <span class="op">=</span> <span class="ident">section</span>.<span class="ident">start_address</span>() <span class="kw">as</span> <span class="ident">usize</span>;
-        <span class="kw">if</span> <span class="ident">start_phys_addr</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">KERNEL_OFFSET</span> {
-            <span class="comment">// true for all sections but the first section (inittext)</span>
-            <span class="ident">start_phys_addr</span> <span class="op">-</span><span class="op">=</span> <span class="ident">KERNEL_OFFSET</span>;
+        <span class="comment">// even though the linker stipulates that the kernel sections have a higher-half virtual address,
+        // they are still loaded at a lower physical address, in which phys_addr = virt_addr - KERNEL_OFFSET.
+        // thus, we must map the zeroeth kernel section from its low address to a higher-half address,
+        // and we must map all the other sections from their higher given virtual address to the proper lower phys addr
+        </span><span class="kw">let </span><span class="kw-2">mut </span>start_phys_addr = section.start_address() <span class="kw">as </span>usize;
+        <span class="kw">if </span>start_phys_addr &gt;= KERNEL_OFFSET {
+            <span class="comment">// true for all sections but the first section (inittext)
+            </span>start_phys_addr -= KERNEL_OFFSET;
         }
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">start_virt_addr</span> <span class="op">=</span> <span class="ident">section</span>.<span class="ident">start_address</span>() <span class="kw">as</span> <span class="ident">usize</span>;
-        <span class="kw">if</span> <span class="ident">start_virt_addr</span> <span class="op">&lt;</span> <span class="ident">KERNEL_OFFSET</span> {
-            <span class="comment">// special case to handle the first section only</span>
-            <span class="ident">start_virt_addr</span> <span class="op">+</span><span class="op">=</span> <span class="ident">KERNEL_OFFSET</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>start_virt_addr = section.start_address() <span class="kw">as </span>usize;
+        <span class="kw">if </span>start_virt_addr &lt; KERNEL_OFFSET {
+            <span class="comment">// special case to handle the first section only
+            </span>start_virt_addr += KERNEL_OFFSET;
         }
 
-        <span class="kw">let</span> <span class="ident">start_phys_addr</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(<span class="ident">start_phys_addr</span>).<span class="ident">ok_or</span>(<span class="string">&quot;section had invalid starting physical address&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">start_virt_addr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">start_virt_addr</span>).<span class="ident">ok_or</span>(<span class="string">&quot;section had invalid ending physical address&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">end_virt_addr</span> <span class="op">=</span> <span class="ident">start_virt_addr</span> <span class="op">+</span> (<span class="ident">section</span>.<span class="ident">size</span>() <span class="kw">as</span> <span class="ident">usize</span>);
-        <span class="kw">let</span> <span class="ident">end_phys_addr</span> <span class="op">=</span> <span class="ident">start_phys_addr</span> <span class="op">+</span> (<span class="ident">section</span>.<span class="ident">size</span>() <span class="kw">as</span> <span class="ident">usize</span>);
+        <span class="kw">let </span>start_phys_addr = PhysicalAddress::new(start_phys_addr).ok_or(<span class="string">&quot;section had invalid starting physical address&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>start_virt_addr = VirtualAddress::new(start_virt_addr).ok_or(<span class="string">&quot;section had invalid ending physical address&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>end_virt_addr = start_virt_addr + (section.size() <span class="kw">as </span>usize);
+        <span class="kw">let </span>end_phys_addr = start_phys_addr + (section.size() <span class="kw">as </span>usize);
 
-        <span class="comment">// The linker script (linker_higher_half.ld) defines the following order of sections:</span>
-        <span class="comment">// |------|-------------------|-------------------------------|</span>
-        <span class="comment">// | Sec  |    Sec Name       |    Description / purpose      |</span>
-        <span class="comment">// | Num  |                   |                               |</span>
-        <span class="comment">// |------|---------------------------------------------------|</span>
-        <span class="comment">// | (1)  | .init             | start of executable pages     |</span>
-        <span class="comment">// | (2)  | .text             | end of executable pages       |</span>
-        <span class="comment">// | (3)  | .rodata           | start of read-only pages      |</span>
-        <span class="comment">// | (4)  | .eh_frame         | part of read-only pages       |</span>
-        <span class="comment">// | (5)  | .gcc_except_table | part/end of read-only pages   |</span>
-        <span class="comment">// | (6)  | .tdata            | part/end of read-only pages   |</span>
-        <span class="comment">// | (7)  | .tbss             | part/end of read-only pages   |</span>
-        <span class="comment">// | (8)  | .data             | start of read-write pages     | </span>
-        <span class="comment">// | (9)  | .bss              | end of read-write pages       |</span>
-        <span class="comment">// | (10) | .page_table       | separate .data-like section   |</span>
-        <span class="comment">// | (11) | .stack            | separate .data-like section   |</span>
-        <span class="comment">// |------|-------------------|-------------------------------|</span>
-        <span class="comment">//</span>
-        <span class="comment">// Note that we combine the TLS data sections (.tdata and .tbss) into the read-only pages,</span>
-        <span class="comment">// because they contain read-only initializer data &quot;images&quot; for each TLS area.</span>
-        <span class="comment">// In fact, .tbss can be completedly ignored because it represents a read-only data image of all zeroes,</span>
-        <span class="comment">// so there&#39;s no point in keeping it around.</span>
-        <span class="comment">//</span>
-        <span class="comment">// Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).</span>
-        <span class="kw">let</span> <span class="ident">static_str_name</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">section</span>.<span class="ident">name</span>() {
-            <span class="string">&quot;.init&quot;</span> =&gt; {
-                <span class="ident">text_start</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">start_virt_addr</span>, <span class="ident">start_phys_addr</span>));
-                <span class="string">&quot;nano_core .init&quot;</span>
-            } 
-            <span class="string">&quot;.text&quot;</span> =&gt; {
-                <span class="ident">text_end</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">end_virt_addr</span>, <span class="ident">end_phys_addr</span>));
-                <span class="ident">text_flags</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">flags</span>);
-                <span class="string">&quot;nano_core .text&quot;</span>
+        <span class="comment">// The linker script (linker_higher_half.ld) defines the following order of sections:
+        // |------|-------------------|-------------------------------|
+        // | Sec  |    Sec Name       |    Description / purpose      |
+        // | Num  |                   |                               |
+        // |------|---------------------------------------------------|
+        // | (1)  | .init             | start of executable pages     |
+        // | (2)  | .text             | end of executable pages       |
+        // | (3)  | .rodata           | start of read-only pages      |
+        // | (4)  | .eh_frame         | part of read-only pages       |
+        // | (5)  | .gcc_except_table | part/end of read-only pages   |
+        // | (6)  | .tdata            | part/end of read-only pages   |
+        // | (7)  | .tbss             | part/end of read-only pages   |
+        // | (8)  | .data             | start of read-write pages     | 
+        // | (9)  | .bss              | end of read-write pages       |
+        // | (10) | .page_table       | separate .data-like section   |
+        // | (11) | .stack            | separate .data-like section   |
+        // |------|-------------------|-------------------------------|
+        //
+        // Note that we combine the TLS data sections (.tdata and .tbss) into the read-only pages,
+        // because they contain read-only initializer data &quot;images&quot; for each TLS area.
+        // In fact, .tbss can be completedly ignored because it represents a read-only data image of all zeroes,
+        // so there&#39;s no point in keeping it around.
+        //
+        // Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).
+        </span><span class="kw">let </span>static_str_name = <span class="kw">match </span>section.name() {
+            <span class="string">&quot;.init&quot; </span>=&gt; {
+                text_start = <span class="prelude-val">Some</span>((start_virt_addr, start_phys_addr));
+                <span class="string">&quot;nano_core .init&quot;
+            </span>} 
+            <span class="string">&quot;.text&quot; </span>=&gt; {
+                text_end = <span class="prelude-val">Some</span>((end_virt_addr, end_phys_addr));
+                text_flags = <span class="prelude-val">Some</span>(flags);
+                <span class="string">&quot;nano_core .text&quot;
+            </span>}
+            <span class="string">&quot;.rodata&quot; </span>=&gt; {
+                rodata_start = <span class="prelude-val">Some</span>((start_virt_addr, start_phys_addr));
+                <span class="string">&quot;nano_core .rodata&quot;
+            </span>}
+            <span class="string">&quot;.eh_frame&quot; </span>=&gt; {
+                <span class="string">&quot;nano_core .eh_frame&quot;
+            </span>}
+            <span class="string">&quot;.gcc_except_table&quot; </span>=&gt; {
+                rodata_end   = <span class="prelude-val">Some</span>((end_virt_addr, end_phys_addr));
+                rodata_flags = <span class="prelude-val">Some</span>(flags);
+                <span class="string">&quot;nano_core .gcc_except_table&quot;
+            </span>}
+            <span class="comment">// The following four sections are optional: .tdata, .tbss, .data, .bss.
+            </span><span class="string">&quot;.tdata&quot; </span>=&gt; {
+                rodata_end = <span class="prelude-val">Some</span>((end_virt_addr, end_phys_addr));
+                <span class="string">&quot;nano_core .tdata&quot;
+            </span>}
+            <span class="string">&quot;.tbss&quot; </span>=&gt; {
+                <span class="comment">// Ignore .tbss (see above) because it is a read-only section of all zeroes.
+                </span><span class="kw">continue</span>;
             }
-            <span class="string">&quot;.rodata&quot;</span> =&gt; {
-                <span class="ident">rodata_start</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">start_virt_addr</span>, <span class="ident">start_phys_addr</span>));
-                <span class="string">&quot;nano_core .rodata&quot;</span>
-            }
-            <span class="string">&quot;.eh_frame&quot;</span> =&gt; {
-                <span class="string">&quot;nano_core .eh_frame&quot;</span>
-            }
-            <span class="string">&quot;.gcc_except_table&quot;</span> =&gt; {
-                <span class="ident">rodata_end</span>   <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">end_virt_addr</span>, <span class="ident">end_phys_addr</span>));
-                <span class="ident">rodata_flags</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">flags</span>);
-                <span class="string">&quot;nano_core .gcc_except_table&quot;</span>
-            }
-            <span class="comment">// The following four sections are optional: .tdata, .tbss, .data, .bss.</span>
-            <span class="string">&quot;.tdata&quot;</span> =&gt; {
-                <span class="ident">rodata_end</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">end_virt_addr</span>, <span class="ident">end_phys_addr</span>));
-                <span class="string">&quot;nano_core .tdata&quot;</span>
-            }
-            <span class="string">&quot;.tbss&quot;</span> =&gt; {
-                <span class="comment">// Ignore .tbss (see above) because it is a read-only section of all zeroes.</span>
-                <span class="kw">continue</span>;
-            }
-            <span class="string">&quot;.data&quot;</span> =&gt; {
-                <span class="ident">data_start</span>.<span class="ident">get_or_insert</span>((<span class="ident">start_virt_addr</span>, <span class="ident">start_phys_addr</span>));
-                <span class="ident">data_end</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">end_virt_addr</span>, <span class="ident">end_phys_addr</span>));
-                <span class="ident">data_flags</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">flags</span>);
-                <span class="string">&quot;nano_core .data&quot;</span>
-            }
-            <span class="string">&quot;.bss&quot;</span> =&gt; {
-                <span class="ident">data_start</span>.<span class="ident">get_or_insert</span>((<span class="ident">start_virt_addr</span>, <span class="ident">start_phys_addr</span>));
-                <span class="ident">data_end</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">end_virt_addr</span>, <span class="ident">end_phys_addr</span>));
-                <span class="ident">data_flags</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">flags</span>);
-                <span class="string">&quot;nano_core .bss&quot;</span>
-            }
-            <span class="string">&quot;.page_table&quot;</span> =&gt; {
-                <span class="ident">page_table_start</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">start_virt_addr</span>, <span class="ident">start_phys_addr</span>));
-                <span class="ident">page_table_end</span>   <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">end_virt_addr</span>, <span class="ident">end_phys_addr</span>));
-                <span class="string">&quot;initial page_table&quot;</span>
-            }
-            <span class="string">&quot;.stack&quot;</span> =&gt; {
-                <span class="ident">stack_start</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">start_virt_addr</span>, <span class="ident">start_phys_addr</span>));
-                <span class="ident">stack_end</span>   <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">end_virt_addr</span>, <span class="ident">end_phys_addr</span>));
-                <span class="string">&quot;initial stack&quot;</span>
-            }
-            <span class="kw">_</span> =&gt;  {
+            <span class="string">&quot;.data&quot; </span>=&gt; {
+                data_start.get_or_insert((start_virt_addr, start_phys_addr));
+                data_end = <span class="prelude-val">Some</span>((end_virt_addr, end_phys_addr));
+                data_flags = <span class="prelude-val">Some</span>(flags);
+                <span class="string">&quot;nano_core .data&quot;
+            </span>}
+            <span class="string">&quot;.bss&quot; </span>=&gt; {
+                data_start.get_or_insert((start_virt_addr, start_phys_addr));
+                data_end = <span class="prelude-val">Some</span>((end_virt_addr, end_phys_addr));
+                data_flags = <span class="prelude-val">Some</span>(flags);
+                <span class="string">&quot;nano_core .bss&quot;
+            </span>}
+            <span class="string">&quot;.page_table&quot; </span>=&gt; {
+                page_table_start = <span class="prelude-val">Some</span>((start_virt_addr, start_phys_addr));
+                page_table_end   = <span class="prelude-val">Some</span>((end_virt_addr, end_phys_addr));
+                <span class="string">&quot;initial page_table&quot;
+            </span>}
+            <span class="string">&quot;.stack&quot; </span>=&gt; {
+                stack_start = <span class="prelude-val">Some</span>((start_virt_addr, start_phys_addr));
+                stack_end   = <span class="prelude-val">Some</span>((end_virt_addr, end_phys_addr));
+                <span class="string">&quot;initial stack&quot;
+            </span>}
+            <span class="kw">_ </span>=&gt;  {
                 <span class="macro">error!</span>(<span class="string">&quot;Section {} at {:#X}, size {:#X} was not an expected section&quot;</span>, 
-                        <span class="ident">section</span>.<span class="ident">name</span>(), <span class="ident">section</span>.<span class="ident">start_address</span>(), <span class="ident">section</span>.<span class="ident">size</span>());
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Kernel ELF Section had an unexpected name&quot;</span>);
+                        section.name(), section.start_address(), section.size());
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Kernel ELF Section had an unexpected name&quot;</span>);
             }
         };
-        <span class="macro">debug!</span>(<span class="string">&quot;     will map kernel section {:?} as {:?} at vaddr: {:#X}, size {:#X} bytes&quot;</span>, <span class="ident">section</span>.<span class="ident">name</span>(), <span class="ident">static_str_name</span>, <span class="ident">start_virt_addr</span>, <span class="ident">section</span>.<span class="ident">size</span>());
+        <span class="macro">debug!</span>(<span class="string">&quot;     will map kernel section {:?} as {:?} at vaddr: {:#X}, size {:#X} bytes&quot;</span>, section.name(), static_str_name, start_virt_addr, section.size());
 
-        <span class="ident">sections_memory_bounds</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">SectionMemoryBounds</span> {
-            <span class="ident">start</span>: (<span class="ident">start_virt_addr</span>, <span class="ident">start_phys_addr</span>),
-            <span class="ident">end</span>: (<span class="ident">end_virt_addr</span>, <span class="ident">end_phys_addr</span>),
-            <span class="ident">flags</span>,
+        sections_memory_bounds[index] = <span class="prelude-val">Some</span>(SectionMemoryBounds {
+            start: (start_virt_addr, start_phys_addr),
+            end: (end_virt_addr, end_phys_addr),
+            flags,
         });
 
-        <span class="ident">index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        index += <span class="number">1</span>;
     }
 
-    <span class="kw">let</span> <span class="ident">text_start</span>         <span class="op">=</span> <span class="ident">text_start</span>       .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find start of .text section&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">text_end</span>           <span class="op">=</span> <span class="ident">text_end</span>         .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find end of .text section&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">rodata_start</span>       <span class="op">=</span> <span class="ident">rodata_start</span>     .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find start of .rodata section&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">rodata_end</span>         <span class="op">=</span> <span class="ident">rodata_end</span>       .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find end of .rodata section&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">data_start</span>         <span class="op">=</span> <span class="ident">data_start</span>       .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find start of .data section&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">data_end</span>           <span class="op">=</span> <span class="ident">data_end</span>         .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find start of .data section&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">page_table_start</span>   <span class="op">=</span> <span class="ident">page_table_start</span> .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find start of .page_table section&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">page_table_end</span>     <span class="op">=</span> <span class="ident">page_table_end</span>   .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find start of .page_table section&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">stack_start</span>        <span class="op">=</span> <span class="ident">stack_start</span>      .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find start of .stack section&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">stack_end</span>          <span class="op">=</span> <span class="ident">stack_end</span>        .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find start of .stack section&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>text_start         = text_start       .ok_or(<span class="string">&quot;Couldn&#39;t find start of .text section&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>text_end           = text_end         .ok_or(<span class="string">&quot;Couldn&#39;t find end of .text section&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>rodata_start       = rodata_start     .ok_or(<span class="string">&quot;Couldn&#39;t find start of .rodata section&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>rodata_end         = rodata_end       .ok_or(<span class="string">&quot;Couldn&#39;t find end of .rodata section&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>data_start         = data_start       .ok_or(<span class="string">&quot;Couldn&#39;t find start of .data section&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>data_end           = data_end         .ok_or(<span class="string">&quot;Couldn&#39;t find start of .data section&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>page_table_start   = page_table_start .ok_or(<span class="string">&quot;Couldn&#39;t find start of .page_table section&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>page_table_end     = page_table_end   .ok_or(<span class="string">&quot;Couldn&#39;t find start of .page_table section&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>stack_start        = stack_start      .ok_or(<span class="string">&quot;Couldn&#39;t find start of .stack section&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>stack_end          = stack_end        .ok_or(<span class="string">&quot;Couldn&#39;t find start of .stack section&quot;</span>)<span class="question-mark">?</span>;
      
-    <span class="kw">let</span> <span class="ident">text_flags</span>    <span class="op">=</span> <span class="ident">text_flags</span>  .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find .text section flags&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">rodata_flags</span>  <span class="op">=</span> <span class="ident">rodata_flags</span>.<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find .rodata section flags&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">data_flags</span>    <span class="op">=</span> <span class="ident">data_flags</span>  .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find .data section flags&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>text_flags    = text_flags  .ok_or(<span class="string">&quot;Couldn&#39;t find .text section flags&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>rodata_flags  = rodata_flags.ok_or(<span class="string">&quot;Couldn&#39;t find .rodata section flags&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>data_flags    = data_flags  .ok_or(<span class="string">&quot;Couldn&#39;t find .data section flags&quot;</span>)<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="ident">text</span> <span class="op">=</span> <span class="ident">SectionMemoryBounds</span> {
-        <span class="ident">start</span>: <span class="ident">text_start</span>,
-        <span class="ident">end</span>: <span class="ident">text_end</span>,
-        <span class="ident">flags</span>: <span class="ident">text_flags</span>,
+    <span class="kw">let </span>text = SectionMemoryBounds {
+        start: text_start,
+        end: text_end,
+        flags: text_flags,
     };
-    <span class="kw">let</span> <span class="ident">rodata</span> <span class="op">=</span> <span class="ident">SectionMemoryBounds</span> {
-        <span class="ident">start</span>: <span class="ident">rodata_start</span>,
-        <span class="ident">end</span>: <span class="ident">rodata_end</span>,
-        <span class="ident">flags</span>: <span class="ident">rodata_flags</span>,
+    <span class="kw">let </span>rodata = SectionMemoryBounds {
+        start: rodata_start,
+        end: rodata_end,
+        flags: rodata_flags,
     };
-    <span class="kw">let</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">SectionMemoryBounds</span> {
-        <span class="ident">start</span>: <span class="ident">data_start</span>,
-        <span class="ident">end</span>: <span class="ident">data_end</span>,
-        <span class="ident">flags</span>: <span class="ident">data_flags</span>,
+    <span class="kw">let </span>data = SectionMemoryBounds {
+        start: data_start,
+        end: data_end,
+        flags: data_flags,
     };
-    <span class="kw">let</span> <span class="ident">page_table</span> <span class="op">=</span> <span class="ident">SectionMemoryBounds</span> {
-        <span class="ident">start</span>: <span class="ident">page_table_start</span>,
-        <span class="ident">end</span>: <span class="ident">page_table_end</span>,
-        <span class="ident">flags</span>: <span class="ident">data_flags</span>, <span class="comment">// same flags as data sections</span>
-    };
-    <span class="kw">let</span> <span class="ident">stack</span> <span class="op">=</span> <span class="ident">SectionMemoryBounds</span> {
-        <span class="ident">start</span>: <span class="ident">stack_start</span>,
-        <span class="ident">end</span>: <span class="ident">stack_end</span>,
-        <span class="ident">flags</span>: <span class="ident">data_flags</span>, <span class="comment">// same flags as data sections</span>
-    };
+    <span class="kw">let </span>page_table = SectionMemoryBounds {
+        start: page_table_start,
+        end: page_table_end,
+        flags: data_flags, <span class="comment">// same flags as data sections
+    </span>};
+    <span class="kw">let </span>stack = SectionMemoryBounds {
+        start: stack_start,
+        end: stack_end,
+        flags: data_flags, <span class="comment">// same flags as data sections
+    </span>};
 
-    <span class="kw">let</span> <span class="ident">aggregated_sections_memory_bounds</span> <span class="op">=</span> <span class="ident">AggregatedSectionMemoryBounds</span> {
-        <span class="ident">text</span>,
-        <span class="ident">rodata</span>,
-        <span class="ident">data</span>,
-        <span class="ident">page_table</span>,
-        <span class="ident">stack</span>,
+    <span class="kw">let </span>aggregated_sections_memory_bounds = AggregatedSectionMemoryBounds {
+        text,
+        rodata,
+        data,
+        page_table,
+        stack,
     };
-    <span class="prelude-val">Ok</span>((<span class="ident">aggregated_sections_memory_bounds</span>, <span class="ident">sections_memory_bounds</span>))
+    <span class="prelude-val">Ok</span>((aggregated_sections_memory_bounds, sections_memory_bounds))
 }
 
 
-<span class="doccomment">/// Gets the physical memory occupied by vga.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Returns (start_physical_address, size, entryflags). </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_vga_mem_addr</span>(
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">PhysicalAddress</span>, <span class="ident">usize</span>, <span class="ident">EntryFlags</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">const</span> <span class="ident">VGA_DISPLAY_PHYS_START</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0xA_0000</span>;
-    <span class="kw">const</span> <span class="ident">VGA_DISPLAY_PHYS_END</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0xC_0000</span>;
-    <span class="kw">let</span> <span class="ident">vga_size_in_bytes</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">VGA_DISPLAY_PHYS_END</span> <span class="op">-</span> <span class="ident">VGA_DISPLAY_PHYS_START</span>;
-    <span class="kw">let</span> <span class="ident">vga_display_flags</span> <span class="op">=</span>
-        <span class="ident">EntryFlags::PRESENT</span> <span class="op">|</span> <span class="ident">EntryFlags::WRITABLE</span> <span class="op">|</span> <span class="ident">EntryFlags::GLOBAL</span> <span class="op">|</span> <span class="ident">EntryFlags::NO_CACHE</span>;
+<span class="doccomment">/// Gets the physical memory occupied by vga.
+/// 
+/// Returns (start_physical_address, size, entryflags). 
+</span><span class="kw">pub fn </span>get_vga_mem_addr(
+) -&gt; <span class="prelude-ty">Result</span>&lt;(PhysicalAddress, usize, EntryFlags), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">const </span>VGA_DISPLAY_PHYS_START: usize = <span class="number">0xA_0000</span>;
+    <span class="kw">const </span>VGA_DISPLAY_PHYS_END: usize = <span class="number">0xC_0000</span>;
+    <span class="kw">let </span>vga_size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
+    <span class="kw">let </span>vga_display_flags =
+        EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
 
     <span class="prelude-val">Ok</span>((
-        <span class="ident">PhysicalAddress::new</span>(<span class="ident">VGA_DISPLAY_PHYS_START</span>).<span class="ident">ok_or</span>(<span class="string">&quot;invalid VGA starting physical address&quot;</span>)<span class="question-mark">?</span>,
-        <span class="ident">vga_size_in_bytes</span>,
-        <span class="ident">vga_display_flags</span>,
+        PhysicalAddress::new(VGA_DISPLAY_PHYS_START).ok_or(<span class="string">&quot;invalid VGA starting physical address&quot;</span>)<span class="question-mark">?</span>,
+        vga_size_in_bytes,
+        vga_display_flags,
     ))
 }
 
-<span class="doccomment">/// Flushes the specific virtual address in TLB. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tlb_flush_virt_addr</span>(<span class="ident">vaddr</span>: <span class="ident">VirtualAddress</span>) {
-    <span class="ident">tlb::flush</span>(<span class="ident">x86_64::VirtAddr::new</span>(<span class="ident">vaddr</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>));
+<span class="doccomment">/// Flushes the specific virtual address in TLB. 
+</span><span class="kw">pub fn </span>tlb_flush_virt_addr(vaddr: VirtualAddress) {
+    tlb::flush(x86_64::VirtAddr::new(vaddr.value() <span class="kw">as </span>u64));
 }
 
-<span class="doccomment">/// Flushes the whole TLB. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tlb_flush_all</span>() {
-    <span class="ident">tlb::flush_all</span>();
+<span class="doccomment">/// Flushes the whole TLB. 
+</span><span class="kw">pub fn </span>tlb_flush_all() {
+    tlb::flush_all();
 }
 
-<span class="doccomment">/// Returns the current top-level page table address.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_p4</span>() -&gt; <span class="ident">PhysicalAddress</span> {
-    <span class="ident">PhysicalAddress::new_canonical</span>(
-        <span class="ident">Cr3::read_raw</span>().<span class="number">0</span>.<span class="ident">start_address</span>().<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>
+<span class="doccomment">/// Returns the current top-level page table address.
+</span><span class="kw">pub fn </span>get_p4() -&gt; PhysicalAddress {
+    PhysicalAddress::new_canonical(
+        Cr3::read_raw().<span class="number">0</span>.start_address().as_u64() <span class="kw">as </span>usize
     )
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="memory_x86_64" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="memory_x86_64" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

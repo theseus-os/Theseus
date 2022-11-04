@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/wait_condition/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../wait_condition/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../wait_condition/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../wait_condition/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/wait_condition/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../wait_condition/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -113,114 +107,113 @@
 <span id="107">107</span>
 <span id="108">108</span>
 <span id="109">109</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Simple condition variables that are convenience wrappers around wait queues.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Simple condition variables that are convenience wrappers around wait queues.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">trait_alias</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(trait_alias)]
 
-<span class="comment">// #[macro_use] extern crate log;</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">wait_queue</span>;
+</span><span class="comment">// #[macro_use] extern crate log;
+</span><span class="kw">extern crate </span>task;
+<span class="kw">extern crate </span>wait_queue;
 
-<span class="kw">use</span> <span class="ident">task::TaskRef</span>;
-<span class="kw">use</span> <span class="ident">wait_queue</span>::{<span class="ident">WaitQueue</span>, <span class="ident">WaitError</span>};
-
-
-<span class="doccomment">/// The closure type that can be used within a `WaitCondition`:</span>
-<span class="doccomment">/// a parameterless function that returns a bool indicating whether the condition is met.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">WaitConditionFn</span> <span class="op">=</span> <span class="ident">Fn</span>() -&gt; <span class="ident">bool</span>;
+<span class="kw">use </span>task::TaskRef;
+<span class="kw">use </span>wait_queue::{WaitQueue, WaitError};
 
 
-<span class="doccomment">/// A condition variable that allows multiple `Task`s to wait for a condition to be met,</span>
-<span class="doccomment">/// upon which other `Task`s can notify them.</span>
-<span class="doccomment">/// This is effectively a convenience wrapper around `WaitQueue::wait_until()`.  </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// The condition is specified as an closure that returns a boolean: </span>
-<span class="doccomment">/// `true` if the condition has been met, `false` if not. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// The condition closure must be a regular `Fn` that can be repeatedly executed,</span>
-<span class="doccomment">/// and should be cheap and quick to execute. </span>
-<span class="doccomment">/// Complicated logic should be kept outside of the condition function. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This can be shared across multiple `Task`s by wrapping it in an `Arc`. </span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WaitCondition</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">WaitConditionFn</span><span class="op">&gt;</span> {
-    <span class="ident">condition_fn</span>: <span class="ident">F</span>,
-    <span class="ident">wait_queue</span>: <span class="ident">WaitQueue</span>,
+<span class="doccomment">/// The closure type that can be used within a `WaitCondition`:
+/// a parameterless function that returns a bool indicating whether the condition is met.
+</span><span class="kw">pub trait </span>WaitConditionFn = Fn() -&gt; bool;
+
+
+<span class="doccomment">/// A condition variable that allows multiple `Task`s to wait for a condition to be met,
+/// upon which other `Task`s can notify them.
+/// This is effectively a convenience wrapper around `WaitQueue::wait_until()`.  
+/// 
+/// The condition is specified as an closure that returns a boolean: 
+/// `true` if the condition has been met, `false` if not. 
+/// 
+/// The condition closure must be a regular `Fn` that can be repeatedly executed,
+/// and should be cheap and quick to execute. 
+/// Complicated logic should be kept outside of the condition function. 
+/// 
+/// This can be shared across multiple `Task`s by wrapping it in an `Arc`. 
+</span><span class="kw">pub struct </span>WaitCondition&lt;F: WaitConditionFn&gt; {
+    condition_fn: F,
+    wait_queue: WaitQueue,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">Fn</span>() -&gt; <span class="ident">bool</span><span class="op">&gt;</span> <span class="ident">WaitCondition</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Create a new `WaitCondition` in which `Task`s can wait</span>
-    <span class="doccomment">/// for a condition to be met, as defined by the given `condition_fn`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">condition_fn</span>: <span class="ident">F</span>) -&gt; <span class="ident">WaitCondition</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span> {
-        <span class="ident">WaitCondition</span> {
-            <span class="ident">condition_fn</span>,
-            <span class="ident">wait_queue</span>: <span class="ident">WaitQueue::new</span>(),
+<span class="kw">impl</span>&lt;F: Fn() -&gt; bool&gt; WaitCondition&lt;F&gt; {
+    <span class="doccomment">/// Create a new `WaitCondition` in which `Task`s can wait
+    /// for a condition to be met, as defined by the given `condition_fn`.
+    </span><span class="kw">pub fn </span>new(condition_fn: F) -&gt; WaitCondition&lt;F&gt; {
+        WaitCondition {
+            condition_fn,
+            wait_queue: WaitQueue::new(),
         }
     }
 
-    <span class="doccomment">/// Waits for the condition to be true in a blocking fashion </span>
-    <span class="doccomment">/// that puts the current `Task` to sleep until it is notified that the condition has been met. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// The design of `WaitCondition` prevents spurious wakeups; </span>
-    <span class="doccomment">/// Tasks are only allowed to If the `Task` wakes up spuriously (it is still on the waitqueue),</span>
-    <span class="doccomment">/// it will be automatically put back to sleep until it is properly woken up. </span>
-    <span class="doccomment">/// Therefore, there is no need for the caller to check for spurious wakeups.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// This function blocks until the `Task` is woken up through the notify mechanism.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">wait</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">WaitError</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> (<span class="self">self</span>.<span class="ident">condition_fn</span>)() {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+    <span class="doccomment">/// Waits for the condition to be true in a blocking fashion 
+    /// that puts the current `Task` to sleep until it is notified that the condition has been met. 
+    /// 
+    /// The design of `WaitCondition` prevents spurious wakeups; 
+    /// Tasks are only allowed to If the `Task` wakes up spuriously (it is still on the waitqueue),
+    /// it will be automatically put back to sleep until it is properly woken up. 
+    /// Therefore, there is no need for the caller to check for spurious wakeups.
+    /// 
+    /// This function blocks until the `Task` is woken up through the notify mechanism.
+    </span><span class="kw">pub fn </span>wait(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), WaitError&gt; {
+        <span class="kw">if </span>(<span class="self">self</span>.condition_fn)() {
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(());
         }
-        <span class="self">self</span>.<span class="ident">wait_queue</span>.<span class="ident">wait_until</span>(<span class="kw-2">&amp;</span><span class="op">|</span><span class="op">|</span> {
-            <span class="kw">if</span> (<span class="self">self</span>.<span class="ident">condition_fn</span>)() {
+        <span class="self">self</span>.wait_queue.wait_until(<span class="kw-2">&amp;</span>|| {
+            <span class="kw">if </span>(<span class="self">self</span>.condition_fn)() {
                 <span class="prelude-val">Some</span>(())
-            } <span class="kw">else</span> {
-                <span class="prelude-val">None</span>
-            }
+            } <span class="kw">else </span>{
+                <span class="prelude-val">None
+            </span>}
         })
     }
 
-    <span class="doccomment">/// This function should be invoked after the wait condition has been met</span>
-    <span class="doccomment">/// and you are ready to notify other waiting tasks.</span>
-    <span class="doccomment">/// The condition function within this `WaitCondition` object will be run again to ensure it has been met. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// If the condition is met, it returns a `SatisfiedWaitCondition` object that can be used.</span>
-    <span class="doccomment">/// to notify (wake up) the other tasks waiting on this `WaitCondition`.</span>
-    <span class="doccomment">/// If the condition is not met, it returns `None`. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">condition_satisfied</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SatisfiedWaitCondition</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> (<span class="self">self</span>.<span class="ident">condition_fn</span>)() {
-            <span class="prelude-val">Some</span>(<span class="ident">SatisfiedWaitCondition</span> {
-                <span class="ident">inner</span>: <span class="self">self</span>,
+    <span class="doccomment">/// This function should be invoked after the wait condition has been met
+    /// and you are ready to notify other waiting tasks.
+    /// The condition function within this `WaitCondition` object will be run again to ensure it has been met. 
+    /// 
+    /// If the condition is met, it returns a `SatisfiedWaitCondition` object that can be used.
+    /// to notify (wake up) the other tasks waiting on this `WaitCondition`.
+    /// If the condition is not met, it returns `None`. 
+    </span><span class="kw">pub fn </span>condition_satisfied(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;SatisfiedWaitCondition&lt;F&gt;&gt; {
+        <span class="kw">if </span>(<span class="self">self</span>.condition_fn)() {
+            <span class="prelude-val">Some</span>(SatisfiedWaitCondition {
+                inner: <span class="self">self</span>,
             })
-        } <span class="kw">else</span> {
-            <span class="prelude-val">None</span>
-        }
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
     }
 }
 
 
-<span class="doccomment">/// A type wrapper that guarantees a given condition has been met</span>
-<span class="doccomment">/// before allowing one task to notify (wake up) other `Task`s waiting on a `WaitCondition`.</span>
-<span class="doccomment">/// See the [`condition_satisfied()`](#WaitCondition.condition_satisfied) method.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SatisfiedWaitCondition</span><span class="op">&lt;</span><span class="lifetime">&#39;wc</span>, <span class="ident">F</span>: <span class="ident">WaitConditionFn</span><span class="op">&gt;</span> {
-    <span class="ident">inner</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;wc</span> <span class="ident">WaitCondition</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A type wrapper that guarantees a given condition has been met
+/// before allowing one task to notify (wake up) other `Task`s waiting on a `WaitCondition`.
+/// See the [`condition_satisfied()`](#WaitCondition.condition_satisfied) method.
+</span><span class="kw">pub struct </span>SatisfiedWaitCondition&lt;<span class="lifetime">&#39;wc</span>, F: WaitConditionFn&gt; {
+    inner: <span class="kw-2">&amp;</span><span class="lifetime">&#39;wc </span>WaitCondition&lt;F&gt;,
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;wc</span>, <span class="ident">F</span>: <span class="ident">WaitConditionFn</span><span class="op">&gt;</span> <span class="ident">SatisfiedWaitCondition</span><span class="op">&lt;</span><span class="lifetime">&#39;wc</span>, <span class="ident">F</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Wake up a random `Task` that is waiting on this condition.</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// * returns `Ok(true)` if a `Task` was successfully woken up,</span>
-    <span class="doccomment">/// * returns `Ok(false)` if there were no `Task`s waiting.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">notify_one</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">wait_queue</span>.<span class="ident">notify_one</span>()
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;wc</span>, F: WaitConditionFn&gt; SatisfiedWaitCondition&lt;<span class="lifetime">&#39;wc</span>, F&gt; {
+    <span class="doccomment">/// Wake up a random `Task` that is waiting on this condition.
+    /// # Return
+    /// * returns `Ok(true)` if a `Task` was successfully woken up,
+    /// * returns `Ok(false)` if there were no `Task`s waiting.
+    </span><span class="kw">pub fn </span>notify_one(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.inner.wait_queue.notify_one()
     }
 
-    <span class="doccomment">/// Wake up a specific `Task` that is waiting on this condition.</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// * returns `true` if the given `Task` was waiting and was successfully woken up,</span>
-    <span class="doccomment">/// * returns `false` if there was no such `Task` waiting.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">notify_specific</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">task_to_wakeup</span>: <span class="kw-2">&amp;</span><span class="ident">TaskRef</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">wait_queue</span>.<span class="ident">notify_specific</span>(<span class="ident">task_to_wakeup</span>)
+    <span class="doccomment">/// Wake up a specific `Task` that is waiting on this condition.
+    /// # Return
+    /// * returns `true` if the given `Task` was waiting and was successfully woken up,
+    /// * returns `false` if there was no such `Task` waiting.
+    </span><span class="kw">pub fn </span>notify_specific(<span class="kw-2">&amp;</span><span class="self">self</span>, task_to_wakeup: <span class="kw-2">&amp;</span>TaskRef) -&gt; bool {
+        <span class="self">self</span>.inner.wait_queue.notify_specific(task_to_wakeup)
     }
 }</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="wait_condition" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="wait_condition" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

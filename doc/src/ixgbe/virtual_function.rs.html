@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ixgbe/src/virtual_function.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>virtual_function.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../ixgbe/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../ixgbe/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../ixgbe/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ixgbe/src/virtual_function.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>virtual_function.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../ixgbe/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -82,83 +76,82 @@
 <span id="76">76</span>
 <span id="77">77</span>
 <span id="78">78</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Interface for an application to request a `VirtualNIC` from the ixgbe device,</span>
-<span class="doccomment">//! and implementation of the `PhysicalNic` trait for the ixgbe device.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! The `PhysicalNic` trait is required for returning virtual NIC resources to the ixgbe device when dropped.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Interface for an application to request a `VirtualNIC` from the ixgbe device,
+//! and implementation of the `PhysicalNic` trait for the ixgbe device.
+//! 
+//! The `PhysicalNic` trait is required for returning virtual NIC resources to the ixgbe device when dropped.
 
-<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">IxgbeNic</span>, <span class="ident">get_ixgbe_nic</span>, <span class="ident">IxgbeRxQueueRegisters</span>, <span class="ident">IxgbeTxQueueRegisters</span>};
-<span class="kw">use</span> <span class="ident">physical_nic::PhysicalNic</span>;
-<span class="kw">use</span> <span class="ident">virtual_nic::VirtualNic</span>;
-<span class="kw">use</span> <span class="ident">intel_ethernet::descriptors</span>::{<span class="ident">AdvancedRxDescriptor</span>, <span class="ident">AdvancedTxDescriptor</span>};
-<span class="kw">use</span> <span class="ident">nic_queues</span>::{<span class="ident">RxQueue</span>, <span class="ident">TxQueue</span>};
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">network_interface_card::NetworkInterfaceCard</span>;
-<span class="kw">use</span> <span class="ident">pci::PciLocation</span>;
+</span><span class="kw">use super</span>::{IxgbeNic, get_ixgbe_nic, IxgbeRxQueueRegisters, IxgbeTxQueueRegisters};
+<span class="kw">use </span>physical_nic::PhysicalNic;
+<span class="kw">use </span>virtual_nic::VirtualNic;
+<span class="kw">use </span>intel_ethernet::descriptors::{AdvancedRxDescriptor, AdvancedTxDescriptor};
+<span class="kw">use </span>nic_queues::{RxQueue, TxQueue};
+<span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>network_interface_card::NetworkInterfaceCard;
+<span class="kw">use </span>pci::PciLocation;
 
-<span class="doccomment">/// Create a virtual NIC from the ixgbe device.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `nic_id`: the ixgbe NIC we will take receive and transmit queue from.</span>
-<span class="doccomment">/// * `ip_addresses`: set of ip addresses that will be assigned to the allocated receive queues.</span>
-<span class="doccomment">///    The number of ip addresses is equal to the number of queue pairs that will be assigned to the vNIC.</span>
-<span class="doccomment">///    Packets with the destination ip addresses specified here will be routed to the vNIC&#39;s queues. </span>
-<span class="doccomment">/// * `default_rx_queue`: the queue that will be polled for packets when no other queue is specified.</span>
-<span class="doccomment">/// * `default_tx_queue`: the queue that packets will be sent on when no other queue is specified.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_virtual_nic</span>(
-    <span class="ident">nic_id</span>: <span class="ident">PciLocation</span>,
-    <span class="ident">ip_addresses</span>: <span class="ident">Vec</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">4</span>]<span class="op">&gt;</span>, 
-    <span class="ident">default_rx_queue</span>: <span class="ident">usize</span>, 
-    <span class="ident">default_tx_queue</span>: <span class="ident">usize</span>
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>
-    <span class="ident">VirtualNic</span><span class="op">&lt;</span><span class="ident">IxgbeRxQueueRegisters</span>, <span class="ident">AdvancedRxDescriptor</span>, <span class="ident">IxgbeTxQueueRegisters</span>, <span class="ident">AdvancedTxDescriptor</span><span class="op">&gt;</span>, 
-<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="doccomment">/// Create a virtual NIC from the ixgbe device.
+/// 
+/// # Arguments
+/// * `nic_id`: the ixgbe NIC we will take receive and transmit queue from.
+/// * `ip_addresses`: set of ip addresses that will be assigned to the allocated receive queues.
+///    The number of ip addresses is equal to the number of queue pairs that will be assigned to the vNIC.
+///    Packets with the destination ip addresses specified here will be routed to the vNIC&#39;s queues. 
+/// * `default_rx_queue`: the queue that will be polled for packets when no other queue is specified.
+/// * `default_tx_queue`: the queue that packets will be sent on when no other queue is specified.
+</span><span class="kw">pub fn </span>create_virtual_nic(
+    nic_id: PciLocation,
+    ip_addresses: Vec&lt;[u8; <span class="number">4</span>]&gt;, 
+    default_rx_queue: usize, 
+    default_tx_queue: usize
+) -&gt; <span class="prelude-ty">Result</span>&lt;
+    VirtualNic&lt;IxgbeRxQueueRegisters, AdvancedRxDescriptor, IxgbeTxQueueRegisters, AdvancedTxDescriptor&gt;, 
+<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 
-    <span class="kw">let</span> <span class="ident">num_queues</span> <span class="op">=</span> <span class="ident">ip_addresses</span>.<span class="ident">len</span>();
-    <span class="kw">if</span> <span class="ident">num_queues</span> <span class="op">==</span> <span class="number">0</span> { <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;need to request &gt;0 number of queues&quot;</span>); }
-    <span class="kw">if</span> (<span class="ident">default_rx_queue</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">num_queues</span>) <span class="op">|</span><span class="op">|</span> (<span class="ident">default_tx_queue</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">num_queues</span>) {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;default queue value is out of bounds&quot;</span>);
+    <span class="kw">let </span>num_queues = ip_addresses.len();
+    <span class="kw">if </span>num_queues == <span class="number">0 </span>{ <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;need to request &gt;0 number of queues&quot;</span>); }
+    <span class="kw">if </span>(default_rx_queue &gt;= num_queues) || (default_tx_queue &gt;= num_queues) {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;default queue value is out of bounds&quot;</span>);
     }
     
-    <span class="kw">let</span> (<span class="ident">rx_queues</span>, <span class="ident">tx_queues</span>, <span class="ident">mac_address</span>) <span class="op">=</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">nic</span> <span class="op">=</span> <span class="ident">get_ixgbe_nic</span>(<span class="ident">nic_id</span>)<span class="question-mark">?</span>.<span class="ident">lock</span>();
-        <span class="comment">// Allocate queues from the physical NIC</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rx_queues</span> <span class="op">=</span> <span class="ident">nic</span>.<span class="ident">take_rx_queues_from_physical_nic</span>(<span class="ident">num_queues</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">tx_queues</span> <span class="op">=</span> <span class="ident">nic</span>.<span class="ident">take_tx_queues_from_physical_nic</span>(<span class="ident">num_queues</span>)<span class="question-mark">?</span>;
-        <span class="comment">// Set up the filters so that packets sent to `ip_addresses` are forwarded to these queues.</span>
-        <span class="kw">for</span> (<span class="ident">queue</span>, <span class="ident">ip_address</span>) <span class="kw">in</span> <span class="ident">rx_queues</span>.<span class="ident">iter_mut</span>().<span class="ident">zip</span>(<span class="ident">ip_addresses</span>.<span class="ident">iter</span>()) {
-            <span class="kw">let</span> <span class="ident">filter_num</span> <span class="op">=</span> <span class="ident">nic</span>.<span class="ident">set_5_tuple_filter</span>(<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">ip_address</span>), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="number">7</span> <span class="comment">/*highest priority*/</span>, <span class="ident">queue</span>.<span class="ident">id</span>)<span class="question-mark">?</span>;
-            <span class="ident">queue</span>.<span class="ident">filter_num</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">filter_num</span>);
+    <span class="kw">let </span>(rx_queues, tx_queues, mac_address) = {
+        <span class="kw">let </span><span class="kw-2">mut </span>nic = get_ixgbe_nic(nic_id)<span class="question-mark">?</span>.lock();
+        <span class="comment">// Allocate queues from the physical NIC
+        </span><span class="kw">let </span><span class="kw-2">mut </span>rx_queues = nic.take_rx_queues_from_physical_nic(num_queues)<span class="question-mark">?</span>;
+        <span class="kw">let </span>tx_queues = nic.take_tx_queues_from_physical_nic(num_queues)<span class="question-mark">?</span>;
+        <span class="comment">// Set up the filters so that packets sent to `ip_addresses` are forwarded to these queues.
+        </span><span class="kw">for </span>(queue, ip_address) <span class="kw">in </span>rx_queues.iter_mut().zip(ip_addresses.iter()) {
+            <span class="kw">let </span>filter_num = nic.set_5_tuple_filter(<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="kw-2">*</span>ip_address), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="number">7 </span><span class="comment">/*highest priority*/</span>, queue.id)<span class="question-mark">?</span>;
+            queue.filter_num = <span class="prelude-val">Some</span>(filter_num);
         }
-        (<span class="ident">rx_queues</span>, <span class="ident">tx_queues</span>, <span class="ident">nic</span>.<span class="ident">mac_address</span>())
+        (rx_queues, tx_queues, nic.mac_address())
     };
     
-    <span class="ident">VirtualNic::new</span>(
-        <span class="ident">rx_queues</span>,
-        <span class="ident">default_rx_queue</span>,
-        <span class="ident">tx_queues</span>,
-        <span class="ident">default_tx_queue</span>,
-        <span class="ident">mac_address</span>,
-        <span class="ident">get_ixgbe_nic</span>(<span class="ident">nic_id</span>)<span class="question-mark">?</span>
-    )
+    VirtualNic::new(
+        rx_queues,
+        default_rx_queue,
+        tx_queues,
+        default_tx_queue,
+        mac_address,
+        get_ixgbe_nic(nic_id)<span class="question-mark">?
+    </span>)
 }
 
 
-<span class="kw">impl</span> <span class="ident">PhysicalNic</span><span class="op">&lt;</span><span class="ident">IxgbeRxQueueRegisters</span>, <span class="ident">AdvancedRxDescriptor</span>, <span class="ident">IxgbeTxQueueRegisters</span>, <span class="ident">AdvancedTxDescriptor</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">IxgbeNic</span> 
+<span class="kw">impl </span>PhysicalNic&lt;IxgbeRxQueueRegisters, AdvancedRxDescriptor, IxgbeTxQueueRegisters, AdvancedTxDescriptor&gt; <span class="kw">for </span>IxgbeNic 
 {
-    <span class="kw">fn</span> <span class="ident">return_rx_queues</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">queues</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">RxQueue</span><span class="op">&lt;</span><span class="ident">IxgbeRxQueueRegisters</span>, <span class="ident">AdvancedRxDescriptor</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
-        <span class="comment">// disable filters for all queues</span>
-        <span class="kw">for</span> <span class="ident">queue</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">queues</span> {
-            <span class="self">self</span>.<span class="ident">disable_5_tuple_filter</span>(<span class="ident">queue</span>.<span class="ident">filter_num</span>.<span class="ident">unwrap</span>()); <span class="comment">// safe to unwrap here because creation of virtualNIC ensures a filter</span>
-        }
-        <span class="comment">// return queues to physical nic</span>
-        <span class="self">self</span>.<span class="ident">rx_queues</span>.<span class="ident">append</span>(<span class="kw-2">&amp;mut</span> <span class="ident">queues</span>);
+    <span class="kw">fn </span>return_rx_queues(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>queues: Vec&lt;RxQueue&lt;IxgbeRxQueueRegisters, AdvancedRxDescriptor&gt;&gt;) {
+        <span class="comment">// disable filters for all queues
+        </span><span class="kw">for </span>queue <span class="kw">in </span><span class="kw-2">&amp;</span>queues {
+            <span class="self">self</span>.disable_5_tuple_filter(queue.filter_num.unwrap()); <span class="comment">// safe to unwrap here because creation of virtualNIC ensures a filter
+        </span>}
+        <span class="comment">// return queues to physical nic
+        </span><span class="self">self</span>.rx_queues.append(<span class="kw-2">&amp;mut </span>queues);
     }
 
-    <span class="kw">fn</span> <span class="ident">return_tx_queues</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">queues</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">TxQueue</span><span class="op">&lt;</span><span class="ident">IxgbeTxQueueRegisters</span>, <span class="ident">AdvancedTxDescriptor</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
-        <span class="comment">// return queues to physical nic</span>
-        <span class="self">self</span>.<span class="ident">tx_queues</span>.<span class="ident">append</span>(<span class="kw-2">&amp;mut</span> <span class="ident">queues</span>);
+    <span class="kw">fn </span>return_tx_queues(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>queues: Vec&lt;TxQueue&lt;IxgbeTxQueueRegisters, AdvancedTxDescriptor&gt;&gt;) {
+        <span class="comment">// return queues to physical nic
+        </span><span class="self">self</span>.tx_queues.append(<span class="kw-2">&amp;mut </span>queues);
     }
 }</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ixgbe" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ixgbe" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

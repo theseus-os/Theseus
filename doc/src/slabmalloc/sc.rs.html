@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/slabmalloc/src/sc.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>sc.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../slabmalloc/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../slabmalloc/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../slabmalloc/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/slabmalloc/src/sc.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>sc.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../slabmalloc/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -348,350 +342,349 @@
 <span id="342">342</span>
 <span id="343">343</span>
 <span id="344">344</span>
-</pre><pre class="rust"><code><span class="doccomment">//! A SCAllocator that can allocate fixed size objects.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! A SCAllocator that can allocate fixed size objects.
 
-<span class="kw">use</span> <span class="kw">crate</span>::<span class="kw-2">*</span>;
+</span><span class="kw">use crate</span>::<span class="kw-2">*</span>;
 
-<span class="doccomment">/// A genius(?) const min()</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # What this does</span>
-<span class="doccomment">/// * create an array of the two elements you want to choose between</span>
-<span class="doccomment">/// * create an arbitrary boolean expression</span>
-<span class="doccomment">/// * cast said expresison to a usize</span>
-<span class="doccomment">/// * use that value to index into the array created above</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Source</span>
-<span class="doccomment">/// https://stackoverflow.com/questions/53619695/calculating-maximum-value-of-a-set-of-constant-expressions-at-compile-time</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>)]</span>
-<span class="kw">const</span> <span class="kw">fn</span> <span class="ident">cmin</span>(<span class="ident">a</span>: <span class="ident">usize</span>, <span class="ident">b</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-    [<span class="ident">a</span>, <span class="ident">b</span>][(<span class="ident">a</span> <span class="op">&gt;</span> <span class="ident">b</span>) <span class="kw">as</span> <span class="ident">usize</span>]
+<span class="doccomment">/// A genius(?) const min()
+///
+/// # What this does
+/// * create an array of the two elements you want to choose between
+/// * create an arbitrary boolean expression
+/// * cast said expresison to a usize
+/// * use that value to index into the array created above
+///
+/// # Source
+/// https://stackoverflow.com/questions/53619695/calculating-maximum-value-of-a-set-of-constant-expressions-at-compile-time
+</span><span class="attr">#[cfg(feature = <span class="string">&quot;unstable&quot;</span>)]
+</span><span class="kw">const fn </span>cmin(a: usize, b: usize) -&gt; usize {
+    [a, b][(a &gt; b) <span class="kw">as </span>usize]
 }
 
-<span class="doccomment">/// The boring variant of min (not const).</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>))]</span>
-<span class="kw">fn</span> <span class="ident">cmin</span>(<span class="ident">a</span>: <span class="ident">usize</span>, <span class="ident">b</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-    <span class="ident">core::cmp::min</span>(<span class="ident">a</span>, <span class="ident">b</span>)
+<span class="doccomment">/// The boring variant of min (not const).
+</span><span class="attr">#[cfg(not(feature = <span class="string">&quot;unstable&quot;</span>))]
+</span><span class="kw">fn </span>cmin(a: usize, b: usize) -&gt; usize {
+    core::cmp::min(a, b)
 }
 
-<span class="doccomment">/// A slab allocator allocates elements of a fixed size.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// It maintains three internal lists of objects that implement `AllocablePage`</span>
-<span class="doccomment">/// from which it can allocate memory.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">///  * `empty_slabs`: Is a list of pages that the SCAllocator maintains, but</span>
-<span class="doccomment">///    has 0 allocations in them, these can be given back to a requestor in case</span>
-<span class="doccomment">///    of reclamation.</span>
-<span class="doccomment">///  * `slabs`: A list of pages partially allocated and still have room for more.</span>
-<span class="doccomment">///  * `full_slabs`: A list of pages that are completely allocated.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// On allocation we allocate memory from `slabs`, however if the list is empty</span>
-<span class="doccomment">/// we try to reclaim a page from `empty_slabs` before we return with an out-of-memory</span>
-<span class="doccomment">/// error. If a page becomes full after the allocation we move it from `slabs` to</span>
-<span class="doccomment">/// `full_slabs`.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Similarly, on dealloaction we might move a page from `full_slabs` to `slabs`</span>
-<span class="doccomment">/// or from `slabs` to `empty_slabs` after we deallocate an object.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// If an allocation returns `OutOfMemory` a client using SCAllocator can refill</span>
-<span class="doccomment">/// it using the `refill` function.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SCAllocator</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">P</span>: <span class="ident">AllocablePage</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Maximum possible allocation size for this `SCAllocator`.</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">size</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// Keeps track of succeeded allocations.</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">allocation_count</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// max objects per page</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">obj_per_page</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// List of empty ObjectPages (nothing allocated in these).</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">empty_slabs</span>: <span class="ident">PageList</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">P</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// List of partially used ObjectPage (some objects allocated but pages are not full).</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">slabs</span>: <span class="ident">PageList</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">P</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// List of full ObjectPages (everything allocated in these don&#39;t need to search them).</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">full_slabs</span>: <span class="ident">PageList</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">P</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A slab allocator allocates elements of a fixed size.
+///
+/// It maintains three internal lists of objects that implement `AllocablePage`
+/// from which it can allocate memory.
+///
+///  * `empty_slabs`: Is a list of pages that the SCAllocator maintains, but
+///    has 0 allocations in them, these can be given back to a requestor in case
+///    of reclamation.
+///  * `slabs`: A list of pages partially allocated and still have room for more.
+///  * `full_slabs`: A list of pages that are completely allocated.
+///
+/// On allocation we allocate memory from `slabs`, however if the list is empty
+/// we try to reclaim a page from `empty_slabs` before we return with an out-of-memory
+/// error. If a page becomes full after the allocation we move it from `slabs` to
+/// `full_slabs`.
+///
+/// Similarly, on dealloaction we might move a page from `full_slabs` to `slabs`
+/// or from `slabs` to `empty_slabs` after we deallocate an object.
+///
+/// If an allocation returns `OutOfMemory` a client using SCAllocator can refill
+/// it using the `refill` function.
+</span><span class="kw">pub struct </span>SCAllocator&lt;<span class="lifetime">&#39;a</span>, P: AllocablePage&gt; {
+    <span class="doccomment">/// Maximum possible allocation size for this `SCAllocator`.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) size: usize,
+    <span class="doccomment">/// Keeps track of succeeded allocations.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) allocation_count: usize,
+    <span class="doccomment">/// max objects per page
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) obj_per_page: usize,
+    <span class="doccomment">/// List of empty ObjectPages (nothing allocated in these).
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) empty_slabs: PageList&lt;<span class="lifetime">&#39;a</span>, P&gt;,
+    <span class="doccomment">/// List of partially used ObjectPage (some objects allocated but pages are not full).
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) slabs: PageList&lt;<span class="lifetime">&#39;a</span>, P&gt;,
+    <span class="doccomment">/// List of full ObjectPages (everything allocated in these don&#39;t need to search them).
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) full_slabs: PageList&lt;<span class="lifetime">&#39;a</span>, P&gt;,
 }
 
-<span class="doccomment">/// Creates an instance of a scallocator, we do this in a macro because we</span>
-<span class="doccomment">/// re-use the code in const and non-const functions</span>
-<span class="macro">macro_rules!</span> <span class="ident">new_sc_allocator</span> {
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">size</span>:<span class="ident">expr</span>) =&gt; {
-        <span class="ident">SCAllocator</span> {
-            <span class="ident">size</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">size</span>,
-            <span class="ident">allocation_count</span>: <span class="number">0</span>,
-            <span class="ident">obj_per_page</span>: <span class="ident">cmin</span>((<span class="ident">P::SIZE</span> <span class="op">-</span> <span class="ident">P::METADATA_SIZE</span>) <span class="op">/</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">size</span>, <span class="number">8</span> <span class="op">*</span> <span class="number">64</span>),
-            <span class="ident">empty_slabs</span>: <span class="ident">PageList::new</span>(),
-            <span class="ident">slabs</span>: <span class="ident">PageList::new</span>(),
-            <span class="ident">full_slabs</span>: <span class="ident">PageList::new</span>(),
+<span class="doccomment">/// Creates an instance of a scallocator, we do this in a macro because we
+/// re-use the code in const and non-const functions
+</span><span class="macro">macro_rules! </span>new_sc_allocator {
+    (<span class="macro-nonterminal">$size</span>:expr) =&gt; {
+        SCAllocator {
+            size: <span class="macro-nonterminal">$size</span>,
+            allocation_count: <span class="number">0</span>,
+            obj_per_page: cmin((P::SIZE - P::METADATA_SIZE) / <span class="macro-nonterminal">$size</span>, <span class="number">8 </span>* <span class="number">64</span>),
+            empty_slabs: PageList::new(),
+            slabs: PageList::new(),
+            full_slabs: PageList::new(),
         }
     };
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">P</span>: <span class="ident">AllocablePage</span><span class="op">&gt;</span> <span class="ident">SCAllocator</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">P</span><span class="op">&gt;</span> {
-    <span class="kw">const</span> <span class="ident">_REBALANCE_COUNT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">10_000</span>;
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, P: AllocablePage&gt; SCAllocator&lt;<span class="lifetime">&#39;a</span>, P&gt; {
+    <span class="kw">const </span>_REBALANCE_COUNT: usize = <span class="number">10_000</span>;
 
-    <span class="doccomment">/// Create a new SCAllocator.</span>
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">SCAllocator</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">P</span><span class="op">&gt;</span> {
-        <span class="macro">new_sc_allocator!</span>(<span class="ident">size</span>)
+    <span class="doccomment">/// Create a new SCAllocator.
+    </span><span class="attr">#[cfg(feature = <span class="string">&quot;unstable&quot;</span>)]
+    </span><span class="kw">pub const fn </span>new(size: usize) -&gt; SCAllocator&lt;<span class="lifetime">&#39;a</span>, P&gt; {
+        <span class="macro">new_sc_allocator!</span>(size)
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>))]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">SCAllocator</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">P</span><span class="op">&gt;</span> {
-        <span class="macro">new_sc_allocator!</span>(<span class="ident">size</span>)
+    <span class="attr">#[cfg(not(feature = <span class="string">&quot;unstable&quot;</span>))]
+    </span><span class="kw">pub fn </span>new(size: usize) -&gt; SCAllocator&lt;<span class="lifetime">&#39;a</span>, P&gt; {
+        <span class="macro">new_sc_allocator!</span>(size)
     }
 
-    <span class="doccomment">/// Add page to partial list.</span>
-    <span class="kw">fn</span> <span class="ident">insert_partial_slab</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">new_head</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">P</span>) {
-        <span class="self">self</span>.<span class="ident">slabs</span>.<span class="ident">insert_front</span>(<span class="ident">new_head</span>);
+    <span class="doccomment">/// Add page to partial list.
+    </span><span class="kw">fn </span>insert_partial_slab(<span class="kw-2">&amp;mut </span><span class="self">self</span>, new_head: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>P) {
+        <span class="self">self</span>.slabs.insert_front(new_head);
     }
 
-    <span class="doccomment">/// Add page to empty list.</span>
-    <span class="kw">fn</span> <span class="ident">insert_empty</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">new_head</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">P</span>) {
-        <span class="self">self</span>.<span class="ident">empty_slabs</span>.<span class="ident">insert_front</span>(<span class="ident">new_head</span>);
+    <span class="doccomment">/// Add page to empty list.
+    </span><span class="kw">fn </span>insert_empty(<span class="kw-2">&amp;mut </span><span class="self">self</span>, new_head: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>P) {
+        <span class="self">self</span>.empty_slabs.insert_front(new_head);
     }
 
-    <span class="kw">fn</span> <span class="ident">remove_empty</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">P</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">empty_slabs</span>.<span class="ident">pop</span>()
+    <span class="kw">fn </span>remove_empty(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>P&gt; {
+        <span class="self">self</span>.empty_slabs.pop()
     }
 
     
-    <span class="comment">// /// Since `dealloc` can not reassign pages without requiring a lock</span>
-    <span class="comment">// /// we check slabs and full slabs periodically as part of `alloc`</span>
-    <span class="comment">// /// and move them to the empty or partially allocated slab lists.</span>
-    <span class="comment">// pub(crate) fn check_page_assignments(&amp;mut self) {</span>
-    <span class="comment">//     for slab_page in self.full_slabs.iter_mut() {</span>
-    <span class="comment">//         if !slab_page.is_full() {</span>
-    <span class="comment">//             // We need to move it from self.full_slabs -&gt; self.slabs</span>
-    <span class="comment">//             // trace!(&quot;move {:p} full -&gt; partial&quot;, slab_page);</span>
-    <span class="comment">//             self.move_full_to_partial(slab_page);</span>
-    <span class="comment">//         }</span>
-    <span class="comment">//     }</span>
+    <span class="comment">// /// Since `dealloc` can not reassign pages without requiring a lock
+    // /// we check slabs and full slabs periodically as part of `alloc`
+    // /// and move them to the empty or partially allocated slab lists.
+    // pub(crate) fn check_page_assignments(&amp;mut self) {
+    //     for slab_page in self.full_slabs.iter_mut() {
+    //         if !slab_page.is_full() {
+    //             // We need to move it from self.full_slabs -&gt; self.slabs
+    //             // trace!(&quot;move {:p} full -&gt; partial&quot;, slab_page);
+    //             self.move_full_to_partial(slab_page);
+    //         }
+    //     }
 
-    <span class="comment">//     for slab_page in self.slabs.iter_mut() {</span>
-    <span class="comment">//         if slab_page.is_empty(self.obj_per_page) {</span>
-    <span class="comment">//             // We need to move it from self.slabs -&gt; self.empty_slabs</span>
-    <span class="comment">//             // trace!(&quot;move {:p} partial -&gt; empty&quot;, slab_page);</span>
-    <span class="comment">//             self.move_to_empty(slab_page);</span>
-    <span class="comment">//         }</span>
-    <span class="comment">//     }</span>
-    <span class="comment">// }</span>
+    //     for slab_page in self.slabs.iter_mut() {
+    //         if slab_page.is_empty(self.obj_per_page) {
+    //             // We need to move it from self.slabs -&gt; self.empty_slabs
+    //             // trace!(&quot;move {:p} partial -&gt; empty&quot;, slab_page);
+    //             self.move_to_empty(slab_page);
+    //         }
+    //     }
+    // }
 
-    <span class="doccomment">/// Move a page from `slabs` to `empty_slabs`.</span>
-    <span class="kw">fn</span> <span class="ident">move_to_empty</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">page</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">P</span>) {
-        <span class="kw">let</span> <span class="ident">page_ptr</span> <span class="op">=</span> <span class="ident">page</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">P</span>;
+    </span><span class="doccomment">/// Move a page from `slabs` to `empty_slabs`.
+    </span><span class="kw">fn </span>move_to_empty(<span class="kw-2">&amp;mut </span><span class="self">self</span>, page: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>P) {
+        <span class="kw">let </span>page_ptr = page <span class="kw">as </span><span class="kw-2">*const </span>P;
 
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">slabs</span>.<span class="ident">contains</span>(<span class="ident">page_ptr</span>));
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.slabs.contains(page_ptr));
         <span class="macro">debug_assert!</span>(
-            <span class="op">!</span><span class="self">self</span>.<span class="ident">empty_slabs</span>.<span class="ident">contains</span>(<span class="ident">page_ptr</span>),
+            !<span class="self">self</span>.empty_slabs.contains(page_ptr),
             <span class="string">&quot;Page {:p} already in emtpy_slabs&quot;</span>,
-            <span class="ident">page_ptr</span>
+            page_ptr
         );
 
-        <span class="self">self</span>.<span class="ident">slabs</span>.<span class="ident">remove_from_list</span>(<span class="ident">page</span>);
-        <span class="self">self</span>.<span class="ident">empty_slabs</span>.<span class="ident">insert_front</span>(<span class="ident">page</span>);
+        <span class="self">self</span>.slabs.remove_from_list(page);
+        <span class="self">self</span>.empty_slabs.insert_front(page);
 
-        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">slabs</span>.<span class="ident">contains</span>(<span class="ident">page_ptr</span>));
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">empty_slabs</span>.<span class="ident">contains</span>(<span class="ident">page_ptr</span>));
+        <span class="macro">debug_assert!</span>(!<span class="self">self</span>.slabs.contains(page_ptr));
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.empty_slabs.contains(page_ptr));
     }
 
-    <span class="doccomment">/// Move a page from `slabs` to `full_slabs`.</span>
-    <span class="kw">fn</span> <span class="ident">move_partial_to_full</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">page</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">P</span>) {
-        <span class="kw">let</span> <span class="ident">page_ptr</span> <span class="op">=</span> <span class="ident">page</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">P</span>;
+    <span class="doccomment">/// Move a page from `slabs` to `full_slabs`.
+    </span><span class="kw">fn </span>move_partial_to_full(<span class="kw-2">&amp;mut </span><span class="self">self</span>, page: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>P) {
+        <span class="kw">let </span>page_ptr = page <span class="kw">as </span><span class="kw-2">*const </span>P;
 
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">slabs</span>.<span class="ident">contains</span>(<span class="ident">page_ptr</span>));
-        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">full_slabs</span>.<span class="ident">contains</span>(<span class="ident">page_ptr</span>));
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.slabs.contains(page_ptr));
+        <span class="macro">debug_assert!</span>(!<span class="self">self</span>.full_slabs.contains(page_ptr));
 
-        <span class="self">self</span>.<span class="ident">slabs</span>.<span class="ident">remove_from_list</span>(<span class="ident">page</span>);
-        <span class="self">self</span>.<span class="ident">full_slabs</span>.<span class="ident">insert_front</span>(<span class="ident">page</span>);
+        <span class="self">self</span>.slabs.remove_from_list(page);
+        <span class="self">self</span>.full_slabs.insert_front(page);
 
-        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">slabs</span>.<span class="ident">contains</span>(<span class="ident">page_ptr</span>));
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">full_slabs</span>.<span class="ident">contains</span>(<span class="ident">page_ptr</span>));
+        <span class="macro">debug_assert!</span>(!<span class="self">self</span>.slabs.contains(page_ptr));
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.full_slabs.contains(page_ptr));
     }
 
-    <span class="doccomment">/// Move a page from `full_slabs` to `slabs`.</span>
-    <span class="kw">fn</span> <span class="ident">move_full_to_partial</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">page</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">P</span>) {
-        <span class="kw">let</span> <span class="ident">page_ptr</span> <span class="op">=</span> <span class="ident">page</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">P</span>;
+    <span class="doccomment">/// Move a page from `full_slabs` to `slabs`.
+    </span><span class="kw">fn </span>move_full_to_partial(<span class="kw-2">&amp;mut </span><span class="self">self</span>, page: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>P) {
+        <span class="kw">let </span>page_ptr = page <span class="kw">as </span><span class="kw-2">*const </span>P;
 
-        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">slabs</span>.<span class="ident">contains</span>(<span class="ident">page_ptr</span>));
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">full_slabs</span>.<span class="ident">contains</span>(<span class="ident">page_ptr</span>));
+        <span class="macro">debug_assert!</span>(!<span class="self">self</span>.slabs.contains(page_ptr));
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.full_slabs.contains(page_ptr));
 
-        <span class="self">self</span>.<span class="ident">full_slabs</span>.<span class="ident">remove_from_list</span>(<span class="ident">page</span>);
-        <span class="self">self</span>.<span class="ident">slabs</span>.<span class="ident">insert_front</span>(<span class="ident">page</span>);
+        <span class="self">self</span>.full_slabs.remove_from_list(page);
+        <span class="self">self</span>.slabs.insert_front(page);
 
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">slabs</span>.<span class="ident">contains</span>(<span class="ident">page_ptr</span>));
-        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">full_slabs</span>.<span class="ident">contains</span>(<span class="ident">page_ptr</span>));
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.slabs.contains(page_ptr));
+        <span class="macro">debug_assert!</span>(!<span class="self">self</span>.full_slabs.contains(page_ptr));
     }
 
-    <span class="doccomment">/// Tries to allocate a block of memory with respect to the `layout`.</span>
-    <span class="doccomment">/// Searches within already allocated slab pages, if no suitable spot is found</span>
-    <span class="doccomment">/// will try to use a page from the empty page list.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">///  * `sc_layout`: This is not the original layout but adjusted for the</span>
-    <span class="doccomment">///     SCAllocator size (&gt;= original).</span>
-    <span class="kw">fn</span> <span class="ident">try_allocate_from_pagelist</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">sc_layout</span>: <span class="ident">Layout</span>) -&gt; <span class="kw-2">*mut</span> <span class="ident">u8</span> {
-        <span class="comment">// TODO: Do we really need to check multiple slab pages (due to alignment)</span>
-        <span class="comment">// If not we can get away with a singly-linked list and have 8 more bytes</span>
-        <span class="comment">// for the bitfield in an ObjectPage.</span>
+    <span class="doccomment">/// Tries to allocate a block of memory with respect to the `layout`.
+    /// Searches within already allocated slab pages, if no suitable spot is found
+    /// will try to use a page from the empty page list.
+    ///
+    /// # Arguments
+    ///  * `sc_layout`: This is not the original layout but adjusted for the
+    ///     SCAllocator size (&gt;= original).
+    </span><span class="kw">fn </span>try_allocate_from_pagelist(<span class="kw-2">&amp;mut </span><span class="self">self</span>, sc_layout: Layout) -&gt; <span class="kw-2">*mut </span>u8 {
+        <span class="comment">// TODO: Do we really need to check multiple slab pages (due to alignment)
+        // If not we can get away with a singly-linked list and have 8 more bytes
+        // for the bitfield in an ObjectPage.
 
-        <span class="kw">for</span> <span class="ident">slab_page</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">slabs</span>.<span class="ident">iter_mut</span>() {
-            <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="ident">slab_page</span>.<span class="ident">allocate</span>(<span class="ident">sc_layout</span>);
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">ptr</span>.<span class="ident">is_null</span>() {
-                <span class="kw">if</span> <span class="ident">slab_page</span>.<span class="ident">is_full</span>() {
-                    <span class="comment">// trace!(&quot;move {:p} partial -&gt; full&quot;, slab_page);</span>
-                    <span class="self">self</span>.<span class="ident">move_partial_to_full</span>(<span class="ident">slab_page</span>);
+        </span><span class="kw">for </span>slab_page <span class="kw">in </span><span class="self">self</span>.slabs.iter_mut() {
+            <span class="kw">let </span>ptr = slab_page.allocate(sc_layout);
+            <span class="kw">if </span>!ptr.is_null() {
+                <span class="kw">if </span>slab_page.is_full() {
+                    <span class="comment">// trace!(&quot;move {:p} partial -&gt; full&quot;, slab_page);
+                    </span><span class="self">self</span>.move_partial_to_full(slab_page);
                 }
-                <span class="self">self</span>.<span class="ident">allocation_count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-                <span class="kw">return</span> <span class="ident">ptr</span>;
-            } <span class="kw">else</span> {
+                <span class="self">self</span>.allocation_count += <span class="number">1</span>;
+                <span class="kw">return </span>ptr;
+            } <span class="kw">else </span>{
                 <span class="kw">continue</span>;
             }
         }
 
-        <span class="comment">// // Periodically rebalance page-lists (since dealloc can&#39;t do it for us)</span>
-        <span class="comment">// if self.allocation_count % SCAllocator::&lt;P&gt;::REBALANCE_COUNT == 0 {</span>
-        <span class="comment">//     self.check_page_assignments();</span>
-        <span class="comment">// }</span>
+        <span class="comment">// // Periodically rebalance page-lists (since dealloc can&#39;t do it for us)
+        // if self.allocation_count % SCAllocator::&lt;P&gt;::REBALANCE_COUNT == 0 {
+        //     self.check_page_assignments();
+        // }
 
-        <span class="ident">ptr::null_mut</span>()
+        </span>ptr::null_mut()
     }
 
 
-    <span class="doccomment">/// Creates an allocable page given a MappedPages8k object and returns a reference to the allocable page.</span>
-    <span class="doccomment">/// The MappedPages8k object is stored within the metadata of the allocable page.</span>
-    <span class="kw">fn</span> <span class="ident">create_allocable_page</span>(<span class="ident">mp</span>: <span class="ident">MappedPages8k</span>, <span class="ident">heap_id</span>: <span class="ident">usize</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">P</span>{
-        <span class="kw">let</span> <span class="ident">vaddr</span> <span class="op">=</span> <span class="ident">mp</span>.<span class="ident">start_address</span>().<span class="ident">value</span>();
+    <span class="doccomment">/// Creates an allocable page given a MappedPages8k object and returns a reference to the allocable page.
+    /// The MappedPages8k object is stored within the metadata of the allocable page.
+    </span><span class="kw">fn </span>create_allocable_page(mp: MappedPages8k, heap_id: usize) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>P{
+        <span class="kw">let </span>vaddr = mp.start_address().value();
 
-        <span class="comment">// create page and store the MappedPages object</span>
-        <span class="kw">let</span> <span class="ident">page</span> <span class="op">=</span> <span class="ident">P::new</span>(<span class="ident">mp</span>, <span class="ident">heap_id</span>);
-        <span class="kw">let</span> <span class="ident">page_ref</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">P</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">core::mem::transmute</span>(<span class="ident">vaddr</span>) } ; <span class="comment">// not unsafe because the allocable page was only create by a mapped page that fits the criteria</span>
-        <span class="kw">unsafe</span> { (<span class="ident">page_ref</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">P</span>).<span class="ident">write</span>(<span class="ident">page</span>); }
+        <span class="comment">// create page and store the MappedPages object
+        </span><span class="kw">let </span>page = P::new(mp, heap_id);
+        <span class="kw">let </span>page_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>P = <span class="kw">unsafe </span>{ core::mem::transmute(vaddr) } ; <span class="comment">// not unsafe because the allocable page was only create by a mapped page that fits the criteria
+        </span><span class="kw">unsafe </span>{ (page_ref <span class="kw">as </span><span class="kw-2">*mut </span>P).write(page); }
 
-        <span class="ident">page_ref</span> 
+        page_ref 
     }
 
-    <span class="doccomment">/// Refill the SCAllocator</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">refill</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">mp</span>: <span class="ident">MappedPages8k</span>, <span class="ident">heap_id</span>: <span class="ident">usize</span>) {
-        <span class="kw">let</span> <span class="ident">page</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::create_allocable_page</span>(<span class="ident">mp</span>, <span class="ident">heap_id</span>);
-        <span class="ident">page</span>.<span class="ident">bitfield_mut</span>().<span class="ident">initialize</span>(<span class="self">self</span>.<span class="ident">size</span>, <span class="ident">P::SIZE</span> <span class="op">-</span> <span class="ident">P::METADATA_SIZE</span>);
-        <span class="kw-2">*</span><span class="ident">page</span>.<span class="ident">prev</span>() <span class="op">=</span> <span class="ident">Rawlink::none</span>();
-        <span class="kw-2">*</span><span class="ident">page</span>.<span class="ident">next</span>() <span class="op">=</span> <span class="ident">Rawlink::none</span>();
-        <span class="comment">// trace!(&quot;adding page to SCAllocator {:p}&quot;, page);</span>
-        <span class="self">self</span>.<span class="ident">insert_empty</span>(<span class="ident">page</span>);
+    <span class="doccomment">/// Refill the SCAllocator
+    </span><span class="kw">pub fn </span>refill(<span class="kw-2">&amp;mut </span><span class="self">self</span>, mp: MappedPages8k, heap_id: usize) {
+        <span class="kw">let </span>page = <span class="self">Self</span>::create_allocable_page(mp, heap_id);
+        page.bitfield_mut().initialize(<span class="self">self</span>.size, P::SIZE - P::METADATA_SIZE);
+        <span class="kw-2">*</span>page.prev() = Rawlink::none();
+        <span class="kw-2">*</span>page.next() = Rawlink::none();
+        <span class="comment">// trace!(&quot;adding page to SCAllocator {:p}&quot;, page);
+        </span><span class="self">self</span>.insert_empty(page);
     }
 
-    <span class="doccomment">/// Returns an empty page from the allocator if available.</span>
-    <span class="doccomment">/// It removes the MappedPages object from the allocable page where it is stored.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">retrieve_empty_page</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MappedPages8k</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">remove_empty</span>(){
-            <span class="prelude-val">Some</span>(<span class="ident">page</span>) =&gt; {
-                <span class="ident">page</span>.<span class="ident">retrieve_mapped_pages</span>() <span class="comment">//safe because the page has been removed from the heap&#39;s linked lists</span>
-            }
-            <span class="prelude-val">None</span> =&gt; {
-                <span class="prelude-val">None</span>
-            }
+    <span class="doccomment">/// Returns an empty page from the allocator if available.
+    /// It removes the MappedPages object from the allocable page where it is stored.
+    </span><span class="kw">pub fn </span>retrieve_empty_page(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;MappedPages8k&gt; {
+        <span class="kw">match </span><span class="self">self</span>.remove_empty(){
+            <span class="prelude-val">Some</span>(page) =&gt; {
+                page.retrieve_mapped_pages() <span class="comment">//safe because the page has been removed from the heap&#39;s linked lists
+            </span>}
+            <span class="prelude-val">None </span>=&gt; {
+                <span class="prelude-val">None
+            </span>}
         }
     }
 
-    <span class="doccomment">/// Allocates a block of memory described by `layout`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Returns a pointer to a valid region of memory or an</span>
-    <span class="doccomment">/// Error.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The function may also move around pages between lists</span>
-    <span class="doccomment">/// (empty -&gt; partial or partial -&gt; full).</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">NonNull</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// trace!(</span>
-        <span class="comment">//     &quot;SCAllocator({}) is trying to allocate {:?}, {}&quot;,</span>
-        <span class="comment">//     self.size,</span>
-        <span class="comment">//     layout, </span>
-        <span class="comment">//     P::SIZE - CACHE_LINE_SIZE</span>
-        <span class="comment">// );</span>
-        <span class="macro">assert!</span>(<span class="ident">layout</span>.<span class="ident">size</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">size</span>);
-        <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">size</span> <span class="op">&lt;</span><span class="op">=</span> (<span class="ident">P::SIZE</span> <span class="op">-</span> <span class="ident">CACHE_LINE_SIZE</span>));
-        <span class="kw">let</span> <span class="ident">new_layout</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Layout::from_size_align_unchecked</span>(<span class="self">self</span>.<span class="ident">size</span>, <span class="ident">layout</span>.<span class="ident">align</span>()) };
-        <span class="macro">assert!</span>(<span class="ident">new_layout</span>.<span class="ident">size</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">layout</span>.<span class="ident">size</span>());
+    <span class="doccomment">/// Allocates a block of memory described by `layout`.
+    ///
+    /// Returns a pointer to a valid region of memory or an
+    /// Error.
+    ///
+    /// The function may also move around pages between lists
+    /// (empty -&gt; partial or partial -&gt; full).
+    </span><span class="kw">pub fn </span>allocate(<span class="kw-2">&amp;mut </span><span class="self">self</span>, layout: Layout) -&gt; <span class="prelude-ty">Result</span>&lt;NonNull&lt;u8&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// trace!(
+        //     &quot;SCAllocator({}) is trying to allocate {:?}, {}&quot;,
+        //     self.size,
+        //     layout, 
+        //     P::SIZE - CACHE_LINE_SIZE
+        // );
+        </span><span class="macro">assert!</span>(layout.size() &lt;= <span class="self">self</span>.size);
+        <span class="macro">assert!</span>(<span class="self">self</span>.size &lt;= (P::SIZE - CACHE_LINE_SIZE));
+        <span class="kw">let </span>new_layout = <span class="kw">unsafe </span>{ Layout::from_size_align_unchecked(<span class="self">self</span>.size, layout.align()) };
+        <span class="macro">assert!</span>(new_layout.size() &gt;= layout.size());
 
-        <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> {
-            <span class="comment">// Try to allocate from partial slabs,</span>
-            <span class="comment">// if we fail check if we have empty pages and allocate from there</span>
-            <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">try_allocate_from_pagelist</span>(<span class="ident">new_layout</span>);
-            <span class="kw">if</span> <span class="ident">ptr</span>.<span class="ident">is_null</span>() <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">empty_slabs</span>.<span class="ident">head</span>.<span class="ident">is_some</span>() {
-                <span class="comment">// Re-try allocation in empty page</span>
-                <span class="kw">let</span> <span class="ident">empty_page</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">empty_slabs</span>.<span class="ident">pop</span>().<span class="ident">expect</span>(<span class="string">&quot;We checked head.is_some()&quot;</span>);
-                <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">empty_slabs</span>.<span class="ident">contains</span>(<span class="ident">empty_page</span>));
+        <span class="kw">let </span>ptr = {
+            <span class="comment">// Try to allocate from partial slabs,
+            // if we fail check if we have empty pages and allocate from there
+            </span><span class="kw">let </span>ptr = <span class="self">self</span>.try_allocate_from_pagelist(new_layout);
+            <span class="kw">if </span>ptr.is_null() &amp;&amp; <span class="self">self</span>.empty_slabs.head.is_some() {
+                <span class="comment">// Re-try allocation in empty page
+                </span><span class="kw">let </span>empty_page = <span class="self">self</span>.empty_slabs.pop().expect(<span class="string">&quot;We checked head.is_some()&quot;</span>);
+                <span class="macro">debug_assert!</span>(!<span class="self">self</span>.empty_slabs.contains(empty_page));
 
-                <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="ident">empty_page</span>.<span class="ident">allocate</span>(<span class="ident">layout</span>);
-                <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">ptr</span>.<span class="ident">is_null</span>(), <span class="string">&quot;Allocation must have succeeded here.&quot;</span>);
+                <span class="kw">let </span>ptr = empty_page.allocate(layout);
+                <span class="macro">debug_assert!</span>(!ptr.is_null(), <span class="string">&quot;Allocation must have succeeded here.&quot;</span>);
 
-                <span class="comment">// trace!(</span>
-                <span class="comment">//     &quot;move {:p} empty -&gt; partial empty count {}&quot;,</span>
-                <span class="comment">//     empty_page,</span>
-                <span class="comment">//     self.empty_slabs.elements</span>
-                <span class="comment">// );</span>
-                <span class="comment">// Move empty page to partial pages</span>
-                <span class="self">self</span>.<span class="ident">insert_partial_slab</span>(<span class="ident">empty_page</span>);
-                <span class="ident">ptr</span>
-            } <span class="kw">else</span> {
-                <span class="ident">ptr</span>
+                <span class="comment">// trace!(
+                //     &quot;move {:p} empty -&gt; partial empty count {}&quot;,
+                //     empty_page,
+                //     self.empty_slabs.elements
+                // );
+                // Move empty page to partial pages
+                </span><span class="self">self</span>.insert_partial_slab(empty_page);
+                ptr
+            } <span class="kw">else </span>{
+                ptr
             }
         };
 
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">NonNull::new</span>(<span class="ident">ptr</span>).<span class="ident">ok_or</span>(<span class="string">&quot;AllocationError::OutOfMemory&quot;</span>);
+        <span class="kw">let </span>res = NonNull::new(ptr).ok_or(<span class="string">&quot;AllocationError::OutOfMemory&quot;</span>);
 
-        <span class="comment">// if !ptr.is_null() {</span>
-        <span class="comment">//     trace!(</span>
-        <span class="comment">//         &quot;SCAllocator({}) allocated ptr=0x{:x}&quot;,</span>
-        <span class="comment">//         self.size,</span>
-        <span class="comment">//         ptr as usize</span>
-        <span class="comment">//     );</span>
-        <span class="comment">// }</span>
+        <span class="comment">// if !ptr.is_null() {
+        //     trace!(
+        //         &quot;SCAllocator({}) allocated ptr=0x{:x}&quot;,
+        //         self.size,
+        //         ptr as usize
+        //     );
+        // }
 
-        <span class="ident">res</span>
+        </span>res
     }
 
-    <span class="doccomment">/// Deallocates a previously allocated `ptr` described by `layout`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// May return an error in case an invalid `layout` is provided.</span>
-    <span class="doccomment">/// The function may also move internal slab pages between lists partial -&gt; empty</span>
-    <span class="doccomment">/// or full -&gt; partial lists.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// The caller must ensure that `ptr` argument is returned from [`Self::allocate()`]</span>
-    <span class="doccomment">/// and `layout` argument is correct.</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">deallocate</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">ptr</span>: <span class="ident">NonNull</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="macro">assert!</span>(<span class="ident">layout</span>.<span class="ident">size</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">size</span>);
-        <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">size</span> <span class="op">&lt;</span><span class="op">=</span> (<span class="ident">P::SIZE</span> <span class="op">-</span> <span class="ident">CACHE_LINE_SIZE</span>));
-        <span class="comment">// trace!(</span>
-        <span class="comment">//     &quot;SCAllocator({}) is trying to deallocate ptr = {:p} layout={:?} P.size= {}&quot;,</span>
-        <span class="comment">//     self.size,</span>
-        <span class="comment">//     ptr,</span>
-        <span class="comment">//     layout,</span>
-        <span class="comment">//     P::SIZE</span>
-        <span class="comment">// );</span>
+    <span class="doccomment">/// Deallocates a previously allocated `ptr` described by `layout`.
+    ///
+    /// May return an error in case an invalid `layout` is provided.
+    /// The function may also move internal slab pages between lists partial -&gt; empty
+    /// or full -&gt; partial lists.
+    ///
+    /// # Safety
+    /// The caller must ensure that `ptr` argument is returned from [`Self::allocate()`]
+    /// and `layout` argument is correct.
+    </span><span class="kw">pub unsafe fn </span>deallocate(<span class="kw-2">&amp;mut </span><span class="self">self</span>, ptr: NonNull&lt;u8&gt;, layout: Layout) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="macro">assert!</span>(layout.size() &lt;= <span class="self">self</span>.size);
+        <span class="macro">assert!</span>(<span class="self">self</span>.size &lt;= (P::SIZE - CACHE_LINE_SIZE));
+        <span class="comment">// trace!(
+        //     &quot;SCAllocator({}) is trying to deallocate ptr = {:p} layout={:?} P.size= {}&quot;,
+        //     self.size,
+        //     ptr,
+        //     layout,
+        //     P::SIZE
+        // );
 
-        <span class="kw">let</span> <span class="ident">page</span> <span class="op">=</span> (<span class="ident">ptr</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">&amp;</span> <span class="op">!</span>(<span class="ident">P::SIZE</span> <span class="op">-</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">usize</span>;
+        </span><span class="kw">let </span>page = (ptr.as_ptr() <span class="kw">as </span>usize) &amp; !(P::SIZE - <span class="number">1</span>) <span class="kw">as </span>usize;
 
-        <span class="comment">// Figure out which page we are on and construct a reference to it</span>
-        <span class="comment">// TODO: The linked list will have another &amp;mut reference</span>
-        <span class="kw">let</span> <span class="ident">slab_page</span> <span class="op">=</span> <span class="ident">mem::transmute</span>::<span class="op">&lt;</span><span class="ident">VAddr</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">P</span><span class="op">&gt;</span>(<span class="ident">page</span>);
-        <span class="kw">let</span> <span class="ident">new_layout</span> <span class="op">=</span> <span class="ident">Layout::from_size_align_unchecked</span>(<span class="self">self</span>.<span class="ident">size</span>, <span class="ident">layout</span>.<span class="ident">align</span>());
+        <span class="comment">// Figure out which page we are on and construct a reference to it
+        // TODO: The linked list will have another &amp;mut reference
+        </span><span class="kw">let </span>slab_page = mem::transmute::&lt;VAddr, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>P&gt;(page);
+        <span class="kw">let </span>new_layout = Layout::from_size_align_unchecked(<span class="self">self</span>.size, layout.align());
 
-        <span class="kw">let</span> <span class="ident">slab_page_was_full</span> <span class="op">=</span> <span class="ident">slab_page</span>.<span class="ident">is_full</span>();
-        <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">slab_page</span>.<span class="ident">deallocate</span>(<span class="ident">ptr</span>, <span class="ident">new_layout</span>);
-        <span class="macro">debug_assert!</span>(<span class="ident">ret</span>.<span class="ident">is_ok</span>(), <span class="string">&quot;Slab page deallocate won&#39;t fail at the moment&quot;</span>);
+        <span class="kw">let </span>slab_page_was_full = slab_page.is_full();
+        <span class="kw">let </span>ret = slab_page.deallocate(ptr, new_layout);
+        <span class="macro">debug_assert!</span>(ret.is_ok(), <span class="string">&quot;Slab page deallocate won&#39;t fail at the moment&quot;</span>);
 
-        <span class="kw">if</span> <span class="ident">slab_page</span>.<span class="ident">is_empty</span>(<span class="self">self</span>.<span class="ident">obj_per_page</span>) {
-            <span class="comment">// We need to move it from self.slabs -&gt; self.empty_slabs</span>
-            <span class="comment">// trace!(&quot;move {:p} partial -&gt; empty&quot;, slab_page);</span>
-            <span class="self">self</span>.<span class="ident">move_to_empty</span>(<span class="ident">slab_page</span>);
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">slab_page_was_full</span> {
-            <span class="comment">// We need to move it from self.full_slabs -&gt; self.slabs</span>
-            <span class="comment">// trace!(&quot;move {:p} full -&gt; partial&quot;, slab_page);</span>
-            <span class="self">self</span>.<span class="ident">move_full_to_partial</span>(<span class="ident">slab_page</span>);
+        <span class="kw">if </span>slab_page.is_empty(<span class="self">self</span>.obj_per_page) {
+            <span class="comment">// We need to move it from self.slabs -&gt; self.empty_slabs
+            // trace!(&quot;move {:p} partial -&gt; empty&quot;, slab_page);
+            </span><span class="self">self</span>.move_to_empty(slab_page);
+        } <span class="kw">else if </span>slab_page_was_full {
+            <span class="comment">// We need to move it from self.full_slabs -&gt; self.slabs
+            // trace!(&quot;move {:p} full -&gt; partial&quot;, slab_page);
+            </span><span class="self">self</span>.move_full_to_partial(slab_page);
         }
 
-        <span class="ident">ret</span>
+        ret
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="slabmalloc" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="slabmalloc" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

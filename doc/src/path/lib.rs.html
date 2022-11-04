@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/path/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../path/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../path/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../path/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/path/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../path/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -280,281 +274,280 @@
 <span id="274">274</span>
 <span id="275">275</span>
 <span id="276">276</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="doccomment">/// This crate contains all the necessary functions for navigating the virtual filesystem / obtaining specific</span>
-<span class="doccomment">/// directories via the Path struct </span>
-<span class="comment">// #[macro_use] extern crate log;</span>
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fs_node</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">root</span>;
+</pre><pre class="rust"><code><span class="attr">#![no_std]
+</span><span class="doccomment">/// This crate contains all the necessary functions for navigating the virtual filesystem / obtaining specific
+/// directories via the Path struct 
+</span><span class="comment">// #[macro_use] extern crate log;
+</span><span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>fs_node;
+<span class="kw">extern crate </span>root;
 
-<span class="kw">use</span> <span class="ident">core::fmt</span>;
-<span class="kw">use</span> <span class="ident">core::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
-<span class="kw">use</span> <span class="ident">alloc</span>::{
-    <span class="ident">string</span>::{<span class="ident">String</span>, <span class="ident">ToString</span>},
-    <span class="ident">vec::Vec</span>,
-    <span class="ident">sync::Arc</span>,
+<span class="kw">use </span>core::fmt;
+<span class="kw">use </span>core::ops::{Deref, DerefMut};
+<span class="kw">use </span>alloc::{
+    string::{String, ToString},
+    vec::Vec,
+    sync::Arc,
 };
-<span class="kw">use</span> <span class="ident">fs_node</span>::{<span class="ident">FileOrDir</span>, <span class="ident">FileRef</span>, <span class="ident">DirRef</span>};
+<span class="kw">use </span>fs_node::{FileOrDir, FileRef, DirRef};
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PATH_DELIMITER</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;/&quot;</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EXTENSION_DELIMITER</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;.&quot;</span>;
+<span class="kw">pub const </span>PATH_DELIMITER: <span class="kw-2">&amp;</span>str = <span class="string">&quot;/&quot;</span>;
+<span class="kw">pub const </span>EXTENSION_DELIMITER: <span class="kw-2">&amp;</span>str = <span class="string">&quot;.&quot;</span>;
 
 
-<span class="doccomment">/// A structure that represents a relative or absolute path</span>
-<span class="doccomment">/// to a file or directory.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>, <span class="ident">Hash</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Path</span> {
-    <span class="ident">path</span>: <span class="ident">String</span>
+<span class="doccomment">/// A structure that represents a relative or absolute path
+/// to a file or directory.
+</span><span class="attr">#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+</span><span class="kw">pub struct </span>Path {
+    path: String
 }
 
-<span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">Path</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">String</span>;
+<span class="kw">impl </span>Deref <span class="kw">for </span>Path {
+    <span class="kw">type </span>Target = String;
 
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">String</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">path</span>
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>String {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.path
     }
 }
-<span class="kw">impl</span> <span class="ident">DerefMut</span> <span class="kw">for</span> <span class="ident">Path</span> {
-    <span class="kw">fn</span> <span class="ident">deref_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">String</span> {
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">path</span>
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">Path</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">fmt::Error</span><span class="op">&gt;</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{}&quot;</span>, <span class="self">self</span>.<span class="ident">path</span>)
+<span class="kw">impl </span>DerefMut <span class="kw">for </span>Path {
+    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>String {
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>.path
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Path</span> {
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">path</span>: <span class="ident">String</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">Path</span> { <span class="ident">path</span> }
+<span class="kw">impl </span>fmt::Display <span class="kw">for </span>Path {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; <span class="prelude-ty">Result</span>&lt;(), fmt::Error&gt; {
+        <span class="macro">write!</span>(f, <span class="string">&quot;{}&quot;</span>, <span class="self">self</span>.path)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Path</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">String</span> {
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">path</span>: <span class="ident">Path</span>) -&gt; <span class="ident">String</span> {
-        <span class="ident">path</span>.<span class="ident">path</span>
+<span class="kw">impl </span>From&lt;String&gt; <span class="kw">for </span>Path {
+    <span class="attr">#[inline]
+    </span><span class="kw">fn </span>from(path: String) -&gt; <span class="self">Self </span>{
+        Path { path }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Path</span> {
-    <span class="doccomment">/// Creates a new `Path` from the given String.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">path</span>: <span class="ident">String</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">Path</span> { <span class="ident">path</span> }
+<span class="kw">impl </span>From&lt;Path&gt; <span class="kw">for </span>String {
+    <span class="attr">#[inline]
+    </span><span class="kw">fn </span>from(path: Path) -&gt; String {
+        path.path
+    }
+}
+
+<span class="kw">impl </span>Path {
+    <span class="doccomment">/// Creates a new `Path` from the given String.
+    </span><span class="kw">pub fn </span>new(path: String) -&gt; <span class="self">Self </span>{
+        Path { path }
     }
     
-    <span class="doccomment">/// Returns an iterator over the components of this `Path`,</span>
-    <span class="doccomment">/// split by the path delimiter `&quot;/&quot;`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">components</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>) -&gt; <span class="kw">impl</span> <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">path</span>.<span class="ident">split</span>(<span class="ident">PATH_DELIMITER</span>)
-            .<span class="ident">filter</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="op">!</span><span class="ident">x</span>.<span class="ident">is_empty</span>())
+    <span class="doccomment">/// Returns an iterator over the components of this `Path`,
+    /// split by the path delimiter `&quot;/&quot;`.
+    </span><span class="kw">pub fn </span>components&lt;<span class="lifetime">&#39;a</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str&gt; {
+        <span class="self">self</span>.path.split(PATH_DELIMITER)
+            .filter(|<span class="kw-2">&amp;</span>x| !x.is_empty())
     }
 
-    <span class="doccomment">/// Returns a reverse iterator over the components of this `Path`,</span>
-    <span class="doccomment">/// split by the path delimiter `&quot;/&quot;`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">rcomponents</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>) -&gt; <span class="kw">impl</span> <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">path</span>.<span class="ident">rsplit</span>(<span class="ident">PATH_DELIMITER</span>)
-            .<span class="ident">filter</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="op">!</span><span class="ident">x</span>.<span class="ident">is_empty</span>())
+    <span class="doccomment">/// Returns a reverse iterator over the components of this `Path`,
+    /// split by the path delimiter `&quot;/&quot;`.
+    </span><span class="kw">pub fn </span>rcomponents&lt;<span class="lifetime">&#39;a</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str&gt; {
+        <span class="self">self</span>.path.rsplit(PATH_DELIMITER)
+            .filter(|<span class="kw-2">&amp;</span>x| !x.is_empty())
     }
 
-    <span class="doccomment">/// Returns just the file name, i.e., the trailling component of the path.</span>
-    <span class="doccomment">/// # Examples</span>
-    <span class="doccomment">/// `&quot;/path/to/my/file.a&quot;` -&gt; &quot;file.a&quot;</span>
-    <span class="doccomment">/// `&quot;my/file.a&quot;` -&gt; &quot;file.a&quot;</span>
-    <span class="doccomment">/// `&quot;file.a&quot;` -&gt; &quot;file.a&quot;</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">basename</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span> {
-        <span class="self">self</span>.<span class="ident">rcomponents</span>()
-            .<span class="ident">next</span>()
-            .<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">path</span>)
+    <span class="doccomment">/// Returns just the file name, i.e., the trailling component of the path.
+    /// # Examples
+    /// `&quot;/path/to/my/file.a&quot;` -&gt; &quot;file.a&quot;
+    /// `&quot;my/file.a&quot;` -&gt; &quot;file.a&quot;
+    /// `&quot;file.a&quot;` -&gt; &quot;file.a&quot;
+    </span><span class="kw">pub fn </span>basename&lt;<span class="lifetime">&#39;a</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str {
+        <span class="self">self</span>.rcomponents()
+            .next()
+            .unwrap_or(<span class="kw-2">&amp;</span><span class="self">self</span>.path)
     }
 
-    <span class="doccomment">/// Like [`basename()`](#method.basename), but excludes the file extension, if present.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">file_stem</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span> {
-        <span class="self">self</span>.<span class="ident">basename</span>()
-            .<span class="ident">split</span>(<span class="ident">EXTENSION_DELIMITER</span>)
-            .<span class="ident">find</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="op">!</span><span class="ident">x</span>.<span class="ident">is_empty</span>())
-            .<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">path</span>)
+    <span class="doccomment">/// Like [`basename()`](#method.basename), but excludes the file extension, if present.
+    </span><span class="kw">pub fn </span>file_stem&lt;<span class="lifetime">&#39;a</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str {
+        <span class="self">self</span>.basename()
+            .split(EXTENSION_DELIMITER)
+            .find(|<span class="kw-2">&amp;</span>x| !x.is_empty())
+            .unwrap_or(<span class="kw-2">&amp;</span><span class="self">self</span>.path)
     }
 
-    <span class="doccomment">/// Returns the file extension, if present. </span>
-    <span class="doccomment">/// If there are multiple extensions as defined by the extension delimiter, `&#39;.&#39;`,</span>
-    <span class="doccomment">/// then the last one will be treated as the extension. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">extension</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">basename</span>()
-            .<span class="ident">rsplit</span>(<span class="ident">EXTENSION_DELIMITER</span>)
-            .<span class="ident">find</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="op">!</span><span class="ident">x</span>.<span class="ident">is_empty</span>())
+    <span class="doccomment">/// Returns the file extension, if present. 
+    /// If there are multiple extensions as defined by the extension delimiter, `&#39;.&#39;`,
+    /// then the last one will be treated as the extension. 
+    </span><span class="kw">pub fn </span>extension&lt;<span class="lifetime">&#39;a</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str&gt; {
+        <span class="self">self</span>.basename()
+            .rsplit(EXTENSION_DELIMITER)
+            .find(|<span class="kw-2">&amp;</span>x| !x.is_empty())
     }
 
-    <span class="doccomment">/// Returns a canonical and absolute form of the current path (i.e. the path of the working directory)</span>
-    <span class="doccomment">/// TODO: FIXME:  this doesn&#39;t work if the `current_path` is absolute.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">canonicalize</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">current_path</span>: <span class="kw-2">&amp;</span><span class="ident">Path</span>) -&gt; <span class="ident">Path</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_components</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-        <span class="comment">// Push the components of the working directory to the components of the new path</span>
-        <span class="ident">new_components</span>.<span class="ident">extend</span>(<span class="ident">current_path</span>.<span class="ident">components</span>());
-        <span class="comment">// Push components of the path to the components of the new path</span>
-        <span class="kw">for</span> <span class="ident">component</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">components</span>() {
-            <span class="kw">if</span> <span class="ident">component</span> <span class="op">==</span> <span class="string">&quot;.&quot;</span> {
+    <span class="doccomment">/// Returns a canonical and absolute form of the current path (i.e. the path of the working directory)
+    /// TODO: FIXME:  this doesn&#39;t work if the `current_path` is absolute.
+    </span><span class="attr">#[allow(dead_code)]
+    </span><span class="kw">fn </span>canonicalize(<span class="kw-2">&amp;</span><span class="self">self</span>, current_path: <span class="kw-2">&amp;</span>Path) -&gt; Path {
+        <span class="kw">let </span><span class="kw-2">mut </span>new_components = Vec::new();
+        <span class="comment">// Push the components of the working directory to the components of the new path
+        </span>new_components.extend(current_path.components());
+        <span class="comment">// Push components of the path to the components of the new path
+        </span><span class="kw">for </span>component <span class="kw">in </span><span class="self">self</span>.components() {
+            <span class="kw">if </span>component == <span class="string">&quot;.&quot; </span>{
                 <span class="kw">continue</span>;
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">component</span> <span class="op">==</span> <span class="string">&quot;..&quot;</span> {
-                <span class="ident">new_components</span>.<span class="ident">pop</span>();
-            } <span class="kw">else</span> {
-                <span class="ident">new_components</span>.<span class="ident">push</span>(<span class="ident">component</span>);
+            } <span class="kw">else if </span>component == <span class="string">&quot;..&quot; </span>{
+                new_components.pop();
+            } <span class="kw">else </span>{
+                new_components.push(component);
             }
         }
-        <span class="comment">// Create the new path from its components </span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_path</span> <span class="op">=</span> <span class="ident">String::new</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">first_cmpnt</span> <span class="op">=</span> <span class="bool-val">true</span>; 
-        <span class="kw">for</span> <span class="ident">component</span> <span class="kw">in</span> <span class="ident">new_components</span> {
-            <span class="kw">if</span> <span class="ident">first_cmpnt</span> {
-                <span class="ident">new_path</span>.<span class="ident">push_str</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>,  <span class="ident">component</span>));
-                <span class="ident">first_cmpnt</span> <span class="op">=</span> <span class="bool-val">false</span>;
+        <span class="comment">// Create the new path from its components 
+        </span><span class="kw">let </span><span class="kw-2">mut </span>new_path = String::new();
+        <span class="kw">let </span><span class="kw-2">mut </span>first_cmpnt = <span class="bool-val">true</span>; 
+        <span class="kw">for </span>component <span class="kw">in </span>new_components {
+            <span class="kw">if </span>first_cmpnt {
+                new_path.push_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>,  component));
+                first_cmpnt = <span class="bool-val">false</span>;
             } 
-            <span class="kw">else</span> {
-                <span class="ident">new_path</span>.<span class="ident">push_str</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;/{}&quot;</span>,  <span class="ident">component</span>));
+            <span class="kw">else </span>{
+                new_path.push_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;/{}&quot;</span>,  component));
             }
         }
-        <span class="ident">Path::new</span>(<span class="ident">new_path</span>)
+        Path::new(new_path)
     }
     
-    <span class="doccomment">/// Returns a `Path` that expresses a relative path from this `Path` (`self`)</span>
-    <span class="doccomment">/// to the given `other` `Path`.</span>
-    <span class="comment">// An example algorithm: https://docs.rs/pathdiff/0.1.0/src/pathdiff/lib.rs.html#32-74</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">relative</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Path</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Path</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ita_iter</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">components</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">itb_iter</span> <span class="op">=</span> <span class="ident">other</span>.<span class="ident">components</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">comps</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-        <span class="kw">loop</span> {
-            <span class="kw">match</span> (<span class="ident">ita_iter</span>.<span class="ident">next</span>(), <span class="ident">itb_iter</span>.<span class="ident">next</span>()) {
+    <span class="doccomment">/// Returns a `Path` that expresses a relative path from this `Path` (`self`)
+    /// to the given `other` `Path`.
+    </span><span class="comment">// An example algorithm: https://docs.rs/pathdiff/0.1.0/src/pathdiff/lib.rs.html#32-74
+    </span><span class="kw">pub fn </span>relative(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Path) -&gt; <span class="prelude-ty">Option</span>&lt;Path&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>ita_iter = <span class="self">self</span>.components();
+        <span class="kw">let </span><span class="kw-2">mut </span>itb_iter = other.components();
+        <span class="kw">let </span><span class="kw-2">mut </span>comps: Vec&lt;String&gt; = Vec::new();
+        <span class="kw">loop </span>{
+            <span class="kw">match </span>(ita_iter.next(), itb_iter.next()) {
                 (<span class="prelude-val">None</span>, <span class="prelude-val">None</span>) =&gt; <span class="kw">break</span>,
-                (<span class="prelude-val">Some</span>(<span class="ident">a</span>), <span class="prelude-val">None</span>) =&gt; {
-                    <span class="ident">comps</span>.<span class="ident">push</span>(<span class="ident">a</span>.<span class="ident">to_string</span>());
-                    <span class="kw">for</span> <span class="ident">remaining_a</span> <span class="kw">in</span> <span class="ident">ita_iter</span> {
-                        <span class="ident">comps</span>.<span class="ident">push</span>(<span class="ident">remaining_a</span>.<span class="ident">to_string</span>());
+                (<span class="prelude-val">Some</span>(a), <span class="prelude-val">None</span>) =&gt; {
+                    comps.push(a.to_string());
+                    <span class="kw">for </span>remaining_a <span class="kw">in </span>ita_iter {
+                        comps.push(remaining_a.to_string());
                     }
                     <span class="kw">break</span>;
                 }
-                (<span class="prelude-val">None</span>, <span class="kw">_</span>) =&gt; <span class="ident">comps</span>.<span class="ident">push</span>(<span class="string">&quot;..&quot;</span>.<span class="ident">to_string</span>()),
-                (<span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">a</span>), <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">b</span>)) <span class="kw">if</span> <span class="ident">comps</span>.<span class="ident">is_empty</span>() <span class="op">&amp;&amp;</span> <span class="ident">a</span> <span class="op">==</span> <span class="ident">b</span> =&gt; <span class="kw">continue</span>,
-                (<span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">_a</span>), <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">b</span>)) <span class="kw">if</span> <span class="ident">b</span> <span class="op">==</span> <span class="kw-2">&amp;</span><span class="string">&quot;.&quot;</span>.<span class="ident">to_string</span>() =&gt; <span class="ident">comps</span>.<span class="ident">push</span>(<span class="string">&quot;..&quot;</span>.<span class="ident">to_string</span>()),
-                (<span class="prelude-val">Some</span>(<span class="kw">_</span>), <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">b</span>)) <span class="kw">if</span> <span class="ident">b</span> <span class="op">==</span> <span class="kw-2">&amp;</span><span class="string">&quot;..&quot;</span>.<span class="ident">to_string</span>() =&gt; <span class="kw">return</span> <span class="prelude-val">None</span>,
-                (<span class="prelude-val">Some</span>(<span class="ident">a</span>), <span class="prelude-val">Some</span>(<span class="kw">_</span>)) =&gt; {
-                    <span class="ident">comps</span>.<span class="ident">push</span>(<span class="string">&quot;..&quot;</span>.<span class="ident">to_string</span>());
-                    <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="ident">itb_iter</span> {
-                        <span class="ident">comps</span>.<span class="ident">push</span>(<span class="string">&quot;..&quot;</span>.<span class="ident">to_string</span>());
+                (<span class="prelude-val">None</span>, <span class="kw">_</span>) =&gt; comps.push(<span class="string">&quot;..&quot;</span>.to_string()),
+                (<span class="prelude-val">Some</span>(<span class="kw-2">ref </span>a), <span class="prelude-val">Some</span>(<span class="kw-2">ref </span>b)) <span class="kw">if </span>comps.is_empty() &amp;&amp; a == b =&gt; <span class="kw">continue</span>,
+                (<span class="prelude-val">Some</span>(<span class="kw-2">ref </span>_a), <span class="prelude-val">Some</span>(<span class="kw-2">ref </span>b)) <span class="kw">if </span>b == <span class="kw-2">&amp;</span><span class="string">&quot;.&quot;</span>.to_string() =&gt; comps.push(<span class="string">&quot;..&quot;</span>.to_string()),
+                (<span class="prelude-val">Some</span>(<span class="kw">_</span>), <span class="prelude-val">Some</span>(<span class="kw-2">ref </span>b)) <span class="kw">if </span>b == <span class="kw-2">&amp;</span><span class="string">&quot;..&quot;</span>.to_string() =&gt; <span class="kw">return </span><span class="prelude-val">None</span>,
+                (<span class="prelude-val">Some</span>(a), <span class="prelude-val">Some</span>(<span class="kw">_</span>)) =&gt; {
+                    comps.push(<span class="string">&quot;..&quot;</span>.to_string());
+                    <span class="kw">for _ in </span>itb_iter {
+                        comps.push(<span class="string">&quot;..&quot;</span>.to_string());
                     }
-                    <span class="ident">comps</span>.<span class="ident">push</span>(<span class="ident">a</span>.<span class="ident">to_string</span>());
-                    <span class="kw">for</span> <span class="ident">remaining_a</span> <span class="kw">in</span> <span class="ident">ita_iter</span> {
-                        <span class="ident">comps</span>.<span class="ident">push</span>(<span class="ident">remaining_a</span>.<span class="ident">to_string</span>());
+                    comps.push(a.to_string());
+                    <span class="kw">for </span>remaining_a <span class="kw">in </span>ita_iter {
+                        comps.push(remaining_a.to_string());
                     }
                     <span class="kw">break</span>;
                 }
             }
         }
-        <span class="comment">// Create the new path from its components </span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_path</span> <span class="op">=</span> <span class="ident">String::new</span>();
-        <span class="kw">for</span> <span class="ident">component</span> <span class="kw">in</span> <span class="ident">comps</span>.<span class="ident">iter</span>() {
-                <span class="ident">new_path</span>.<span class="ident">push_str</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/&quot;</span>,  <span class="ident">component</span>));
+        <span class="comment">// Create the new path from its components 
+        </span><span class="kw">let </span><span class="kw-2">mut </span>new_path = String::new();
+        <span class="kw">for </span>component <span class="kw">in </span>comps.iter() {
+                new_path.push_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/&quot;</span>,  component));
         }
-        <span class="comment">// Remove the trailing slash after the final path component</span>
-        <span class="ident">new_path</span>.<span class="ident">pop</span>();
-        <span class="prelude-val">Some</span>(<span class="ident">Path::new</span>(<span class="ident">new_path</span>))
+        <span class="comment">// Remove the trailing slash after the final path component
+        </span>new_path.pop();
+        <span class="prelude-val">Some</span>(Path::new(new_path))
     }
     
-    <span class="doccomment">/// Returns a boolean indicating whether this Path is absolute,</span>
-    <span class="doccomment">/// i.e., whether it starts with the root directory.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_absolute</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">path</span>.<span class="ident">starts_with</span>(<span class="ident">PATH_DELIMITER</span>)
+    <span class="doccomment">/// Returns a boolean indicating whether this Path is absolute,
+    /// i.e., whether it starts with the root directory.
+    </span><span class="kw">pub fn </span>is_absolute(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.path.starts_with(PATH_DELIMITER)
     }
 
-    <span class="doccomment">/// Returns the file or directory specified by the given path, </span>
-    <span class="doccomment">/// which can either be absolute or relative from the given starting directory.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">starting_dir</span>: <span class="kw-2">&amp;</span><span class="ident">DirRef</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span> {
-        <span class="comment">// let current_path = { Path::new(starting_dir.lock().get_absolute_path()) };</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">curr_dir</span> <span class="op">=</span> {
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_absolute</span>() {
-                <span class="ident">Arc::clone</span>(<span class="ident">root::get_root</span>())
+    <span class="doccomment">/// Returns the file or directory specified by the given path, 
+    /// which can either be absolute or relative from the given starting directory.
+    </span><span class="kw">pub fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, starting_dir: <span class="kw-2">&amp;</span>DirRef) -&gt; <span class="prelude-ty">Option</span>&lt;FileOrDir&gt; {
+        <span class="comment">// let current_path = { Path::new(starting_dir.lock().get_absolute_path()) };
+        </span><span class="kw">let </span><span class="kw-2">mut </span>curr_dir = {
+            <span class="kw">if </span><span class="self">self</span>.is_absolute() {
+                Arc::clone(root::get_root())
             }
-            <span class="kw">else</span> {
-                <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">starting_dir</span>)
+            <span class="kw">else </span>{
+                Arc::clone(<span class="kw-2">&amp;</span>starting_dir)
             }
         };
 
-        <span class="kw">for</span> <span class="ident">component</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">components</span>() {
-            <span class="kw">match</span> <span class="ident">component</span> {
-                <span class="string">&quot;.&quot;</span> =&gt; { 
-                    <span class="comment">// stay in the current directory, do nothing. </span>
+        <span class="kw">for </span>component <span class="kw">in </span><span class="self">self</span>.components() {
+            <span class="kw">match </span>component {
+                <span class="string">&quot;.&quot; </span>=&gt; { 
+                    <span class="comment">// stay in the current directory, do nothing. 
+                </span>}
+                <span class="string">&quot;..&quot; </span>=&gt; {
+                    <span class="comment">// navigate to parent directory
+                    </span><span class="kw">let </span>parent_dir = curr_dir.lock().get_parent_dir()<span class="question-mark">?</span>;
+                    curr_dir = parent_dir;
                 }
-                <span class="string">&quot;..&quot;</span> =&gt; {
-                    <span class="comment">// navigate to parent directory</span>
-                    <span class="kw">let</span> <span class="ident">parent_dir</span> <span class="op">=</span> <span class="ident">curr_dir</span>.<span class="ident">lock</span>().<span class="ident">get_parent_dir</span>()<span class="question-mark">?</span>;
-                    <span class="ident">curr_dir</span> <span class="op">=</span> <span class="ident">parent_dir</span>;
-                }
-                <span class="ident">cmpnt</span> =&gt; {
-                    <span class="comment">// navigate to child directory, or return the child file</span>
-                    <span class="kw">let</span> <span class="ident">child_dir</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">curr_dir</span>.<span class="ident">lock</span>().<span class="ident">get</span>(<span class="ident">cmpnt</span>) {
-                        <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::File</span>(<span class="ident">f</span>)) =&gt; <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::File</span>(<span class="ident">f</span>)),
-                        <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::Dir</span>(<span class="ident">d</span>)) =&gt; <span class="ident">d</span>,
-                        <span class="prelude-val">None</span> =&gt; <span class="kw">return</span> <span class="prelude-val">None</span>,
+                cmpnt =&gt; {
+                    <span class="comment">// navigate to child directory, or return the child file
+                    </span><span class="kw">let </span>child_dir = <span class="kw">match </span>curr_dir.lock().get(cmpnt) {
+                        <span class="prelude-val">Some</span>(FileOrDir::File(f)) =&gt; <span class="kw">return </span><span class="prelude-val">Some</span>(FileOrDir::File(f)),
+                        <span class="prelude-val">Some</span>(FileOrDir::Dir(d)) =&gt; d,
+                        <span class="prelude-val">None </span>=&gt; <span class="kw">return </span><span class="prelude-val">None</span>,
                     };
-                    <span class="ident">curr_dir</span> <span class="op">=</span> <span class="ident">child_dir</span>;
+                    curr_dir = child_dir;
                 }
             }
         }
-        <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::Dir</span>(<span class="ident">curr_dir</span>))
+        <span class="prelude-val">Some</span>(FileOrDir::Dir(curr_dir))
     }
 
-    <span class="doccomment">/// Returns the file specified by the given path, which can be either absolute,</span>
-    <span class="doccomment">/// or relative from the given starting directory. </span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If the path is invalid or points to a directory, then `None` is returned. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">starting_dir</span>: <span class="kw-2">&amp;</span><span class="ident">DirRef</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileRef</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">starting_dir</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::File</span>(<span class="ident">file</span>)) =&gt; <span class="prelude-val">Some</span>(<span class="ident">file</span>),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
+    <span class="doccomment">/// Returns the file specified by the given path, which can be either absolute,
+    /// or relative from the given starting directory. 
+    ///
+    /// If the path is invalid or points to a directory, then `None` is returned. 
+    </span><span class="kw">pub fn </span>get_file(<span class="kw-2">&amp;</span><span class="self">self</span>, starting_dir: <span class="kw-2">&amp;</span>DirRef) -&gt; <span class="prelude-ty">Option</span>&lt;FileRef&gt; {
+        <span class="kw">match </span><span class="self">self</span>.get(starting_dir) {
+            <span class="prelude-val">Some</span>(FileOrDir::File(file)) =&gt; <span class="prelude-val">Some</span>(file),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
         }
     }
 
-    <span class="doccomment">/// Returns the file specified by the given path, which can be either absolute,</span>
-    <span class="doccomment">/// or relative from the given starting directory. </span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If the path is invalid or points to a directory, then `None` is returned. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">starting_dir</span>: <span class="kw-2">&amp;</span><span class="ident">DirRef</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DirRef</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">starting_dir</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::Dir</span>(<span class="ident">dir</span>)) =&gt; <span class="prelude-val">Some</span>(<span class="ident">dir</span>),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
+    <span class="doccomment">/// Returns the file specified by the given path, which can be either absolute,
+    /// or relative from the given starting directory. 
+    ///
+    /// If the path is invalid or points to a directory, then `None` is returned. 
+    </span><span class="kw">pub fn </span>get_dir(<span class="kw-2">&amp;</span><span class="self">self</span>, starting_dir: <span class="kw-2">&amp;</span>DirRef) -&gt; <span class="prelude-ty">Option</span>&lt;DirRef&gt; {
+        <span class="kw">match </span><span class="self">self</span>.get(starting_dir) {
+            <span class="prelude-val">Some</span>(FileOrDir::Dir(dir)) =&gt; <span class="prelude-val">Some</span>(dir),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
         }
     }
 
-    <span class="doccomment">/// Returns the file or directory specified by the given absolute path</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_absolute</span>(<span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">Path</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">path</span>.<span class="ident">is_absolute</span>() {
-            <span class="ident">path</span>.<span class="ident">get</span>(<span class="ident">root::get_root</span>())
-        } <span class="kw">else</span> {
-            <span class="prelude-val">None</span>
-        }
+    <span class="doccomment">/// Returns the file or directory specified by the given absolute path
+    </span><span class="kw">pub fn </span>get_absolute(path: <span class="kw-2">&amp;</span>Path) -&gt; <span class="prelude-ty">Option</span>&lt;FileOrDir&gt; {
+        <span class="kw">if </span>path.is_absolute() {
+            path.get(root::get_root())
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
     }
 }
 
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">PathComponent</span> {
-    <span class="ident">RootDir</span>,
-    <span class="ident">ParentDir</span>,
-    <span class="ident">CurrentDir</span>, 
+<span class="kw">pub enum </span>PathComponent {
+    RootDir,
+    ParentDir,
+    CurrentDir, 
 }
 
-<span class="kw">impl</span> <span class="ident">PathComponent</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_string</span>(<span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">PathComponent::RootDir</span> =&gt; <span class="ident">String::from</span>(<span class="ident">root::ROOT_DIRECTORY_NAME</span>),
-            <span class="ident">PathComponent::CurrentDir</span> =&gt; <span class="ident">String::from</span>(<span class="string">&quot;.&quot;</span>),
-            <span class="ident">PathComponent::ParentDir</span> =&gt; <span class="ident">String::from</span>(<span class="string">&quot;..&quot;</span>),
+<span class="kw">impl </span>PathComponent {
+    <span class="kw">pub fn </span>as_string(<span class="self">self</span>) -&gt; String {
+        <span class="kw">match </span><span class="self">self </span>{
+            PathComponent::RootDir =&gt; String::from(root::ROOT_DIRECTORY_NAME),
+            PathComponent::CurrentDir =&gt; String::from(<span class="string">&quot;.&quot;</span>),
+            PathComponent::ParentDir =&gt; String::from(<span class="string">&quot;..&quot;</span>),
         }
     }
 }</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="path" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="path" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

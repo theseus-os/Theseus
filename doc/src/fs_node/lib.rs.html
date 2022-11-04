@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/fs_node/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../fs_node/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../fs_node/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../fs_node/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/fs_node/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../fs_node/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -197,199 +191,198 @@
 <span id="191">191</span>
 <span id="192">192</span>
 <span id="193">193</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="doccomment">//! Defines traits for Files and Directories within the virtual filesystem. These files and directories mimic </span>
-<span class="doccomment">//! that of a standard unix virtual filesystem, where directories follow a hierarchical system</span>
-<span class="doccomment">//! and all directories have a parent directory (except for the special root directory). </span>
-<span class="doccomment">//! All files must be contained within directories. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Note that both File and Directory extend from FsNode, which is a trait that defines</span>
-<span class="doccomment">//! common methods for both Files and Directories to enhance code reuse </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Some functions return an enum FileOrDir; this allows us to seamlessly call functions on the return types of</span>
-<span class="doccomment">//! other filesystem functions, and then we simply match on the FSnode to extract the concrete type</span>
-<span class="doccomment">//! to perform the desired function</span>
+</pre><pre class="rust"><code><span class="attr">#![no_std]
+</span><span class="doccomment">//! Defines traits for Files and Directories within the virtual filesystem. These files and directories mimic 
+//! that of a standard unix virtual filesystem, where directories follow a hierarchical system
+//! and all directories have a parent directory (except for the special root directory). 
+//! All files must be contained within directories. 
+//! 
+//! Note that both File and Directory extend from FsNode, which is a trait that defines
+//! common methods for both Files and Directories to enhance code reuse 
+//! 
+//! Some functions return an enum FileOrDir; this allows us to seamlessly call functions on the return types of
+//! other filesystem functions, and then we simply match on the FSnode to extract the concrete type
+//! to perform the desired function
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">io</span>;
+</span><span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>io;
 
-<span class="kw">use</span> <span class="ident">core::fmt</span>;
-<span class="kw">use</span> <span class="ident">alloc::string::String</span>;
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">alloc::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Weak</span>};
-<span class="kw">use</span> <span class="ident">memory::MappedPages</span>;
-<span class="kw">use</span> <span class="ident">io</span>::{<span class="ident">ByteReader</span>, <span class="ident">ByteWriter</span>, <span class="ident">KnownLength</span>};
-
-
-<span class="doccomment">/// A reference to any type that implements the [`File`] trait,</span>
-<span class="doccomment">/// which can only represent a File (not a Directory).</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">FileRef</span> <span class="op">=</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">File</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>;
-<span class="doccomment">/// A weak reference to any type that implements the [`File`] trait,</span>
-<span class="doccomment">/// which can only represent a File (not a Directory).</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">WeakFileRef</span> <span class="op">=</span> <span class="ident">Weak</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">File</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>;
-<span class="doccomment">/// A reference to any type that implements the [`Directory`] trait,</span>
-<span class="doccomment">/// which can only represent a Directory (not a File).</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">DirRef</span> <span class="op">=</span>  <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Directory</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>;
-<span class="doccomment">/// A weak reference to any type that implements the [`Directory`] trait,</span>
-<span class="doccomment">/// which can only represent a Directory (not a File).</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">WeakDirRef</span> <span class="op">=</span> <span class="ident">Weak</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Directory</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+<span class="kw">use </span>core::fmt;
+<span class="kw">use </span>alloc::string::String;
+<span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>alloc::sync::{Arc, Weak};
+<span class="kw">use </span>memory::MappedPages;
+<span class="kw">use </span>io::{ByteReader, ByteWriter, KnownLength};
 
 
-<span class="doccomment">/// A trait that covers any filesystem node, both files and directories.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">FsNode</span> {
-    <span class="doccomment">/// Recursively gets the absolute pathname as a String</span>
-    <span class="kw">fn</span> <span class="ident">get_absolute_path</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">path</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_name</span>();
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">cur_dir</span>) <span class="op">=</span>  <span class="self">self</span>.<span class="ident">get_parent_dir</span>()  {
-            <span class="kw">let</span> <span class="ident">parent_path</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">cur_dir</span>.<span class="ident">lock</span>().<span class="ident">get_absolute_path</span>();
-            <span class="comment">// Check if the parent path is root </span>
-            <span class="kw">if</span> <span class="ident">parent_path</span> <span class="op">==</span> <span class="string">&quot;/&quot;</span> {
-                <span class="ident">path</span>.<span class="ident">insert_str</span>(<span class="number">0</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">parent_path</span>));
-                <span class="kw">return</span> <span class="ident">path</span>;
+<span class="doccomment">/// A reference to any type that implements the [`File`] trait,
+/// which can only represent a File (not a Directory).
+</span><span class="kw">pub type </span>FileRef = Arc&lt;Mutex&lt;<span class="kw">dyn </span>File + Send&gt;&gt;;
+<span class="doccomment">/// A weak reference to any type that implements the [`File`] trait,
+/// which can only represent a File (not a Directory).
+</span><span class="kw">pub type </span>WeakFileRef = Weak&lt;Mutex&lt;<span class="kw">dyn </span>File + Send&gt;&gt;;
+<span class="doccomment">/// A reference to any type that implements the [`Directory`] trait,
+/// which can only represent a Directory (not a File).
+</span><span class="kw">pub type </span>DirRef =  Arc&lt;Mutex&lt;<span class="kw">dyn </span>Directory + Send&gt;&gt;;
+<span class="doccomment">/// A weak reference to any type that implements the [`Directory`] trait,
+/// which can only represent a Directory (not a File).
+</span><span class="kw">pub type </span>WeakDirRef = Weak&lt;Mutex&lt;<span class="kw">dyn </span>Directory + Send&gt;&gt;;
+
+
+<span class="doccomment">/// A trait that covers any filesystem node, both files and directories.
+</span><span class="kw">pub trait </span>FsNode {
+    <span class="doccomment">/// Recursively gets the absolute pathname as a String
+    </span><span class="kw">fn </span>get_absolute_path(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="kw">let </span><span class="kw-2">mut </span>path = <span class="self">self</span>.get_name();
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(cur_dir) =  <span class="self">self</span>.get_parent_dir()  {
+            <span class="kw">let </span>parent_path = <span class="kw-2">&amp;</span>cur_dir.lock().get_absolute_path();
+            <span class="comment">// Check if the parent path is root 
+            </span><span class="kw">if </span>parent_path == <span class="string">&quot;/&quot; </span>{
+                path.insert_str(<span class="number">0</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, parent_path));
+                <span class="kw">return </span>path;
             }
-            <span class="ident">path</span>.<span class="ident">insert_str</span>(<span class="number">0</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/&quot;</span>, <span class="ident">parent_path</span>));
-            <span class="kw">return</span> <span class="ident">path</span>;
+            path.insert_str(<span class="number">0</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/&quot;</span>, parent_path));
+            <span class="kw">return </span>path;
         }
-        <span class="kw">return</span> <span class="ident">path</span>;
+        <span class="kw">return </span>path;
     }
 
-    <span class="doccomment">/// Returns the string name of the node</span>
-    <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span>;
+    <span class="doccomment">/// Returns the string name of the node
+    </span><span class="kw">fn </span>get_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String;
 
-    <span class="doccomment">/// Returns the parent directory of the current node.</span>
-    <span class="kw">fn</span> <span class="ident">get_parent_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DirRef</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// Returns the parent directory of the current node.
+    </span><span class="kw">fn </span>get_parent_dir(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DirRef&gt;;
 
-    <span class="doccomment">/// Sets this node&#39;s parent directory.</span>
-    <span class="doccomment">/// This is useful for ensuring correctness when inserting or removing </span>
-    <span class="doccomment">/// files or directories from their parent directory.</span>
-    <span class="kw">fn</span> <span class="ident">set_parent_dir</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">new_parent</span>: <span class="ident">WeakDirRef</span>);
+    <span class="doccomment">/// Sets this node&#39;s parent directory.
+    /// This is useful for ensuring correctness when inserting or removing 
+    /// files or directories from their parent directory.
+    </span><span class="kw">fn </span>set_parent_dir(<span class="kw-2">&amp;mut </span><span class="self">self</span>, new_parent: WeakDirRef);
 }
 
-<span class="comment">// Trait for files, implementors of File must also implement FsNode</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">File</span> : <span class="ident">FsNode</span> <span class="op">+</span> <span class="ident">ByteReader</span> <span class="op">+</span> <span class="ident">ByteWriter</span> <span class="op">+</span> <span class="ident">KnownLength</span> {
-    <span class="doccomment">/// Returns a view of this file as an immutable memory-mapped region.</span>
-    <span class="kw">fn</span> <span class="ident">as_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">MappedPages</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>;
+<span class="comment">// Trait for files, implementors of File must also implement FsNode
+</span><span class="kw">pub trait </span>File : FsNode + ByteReader + ByteWriter + KnownLength {
+    <span class="doccomment">/// Returns a view of this file as an immutable memory-mapped region.
+    </span><span class="kw">fn </span>as_mapping(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
 }
 
-<span class="doccomment">/// Trait for directories, implementors of Directory must also implement FsNode</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Directory</span> : <span class="ident">FsNode</span> {
-    <span class="doccomment">/// Gets either the file or directory in this `Directory`  on its name.</span>
-    <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span>;
+<span class="doccomment">/// Trait for directories, implementors of Directory must also implement FsNode
+</span><span class="kw">pub trait </span>Directory : FsNode {
+    <span class="doccomment">/// Gets either the file or directory in this `Directory`  on its name.
+    </span><span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;FileOrDir&gt;;
 
-    <span class="doccomment">/// Like [`Directory::get()`], but only looks for **files** matching the given `name` in this `Directory`.</span>
-    <span class="kw">fn</span> <span class="ident">get_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileRef</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">name</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::File</span>(<span class="ident">f</span>)) =&gt; <span class="prelude-val">Some</span>(<span class="ident">f</span>),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
-        }
-    }
-
-    <span class="doccomment">/// Like [`Directory::get()`], but only looks for **directories** matching the given `name` in this `Directory`.</span>
-    <span class="kw">fn</span> <span class="ident">get_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DirRef</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">name</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::Dir</span>(<span class="ident">d</span>)) =&gt; <span class="prelude-val">Some</span>(<span class="ident">d</span>),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
+    <span class="doccomment">/// Like [`Directory::get()`], but only looks for **files** matching the given `name` in this `Directory`.
+    </span><span class="kw">fn </span>get_file(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;FileRef&gt; {
+        <span class="kw">match </span><span class="self">self</span>.get(name) {
+            <span class="prelude-val">Some</span>(FileOrDir::File(f)) =&gt; <span class="prelude-val">Some</span>(f),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
         }
     }
 
-    <span class="doccomment">/// Inserts the given new file or directory into this directory.</span>
-    <span class="doccomment">/// If an existing node has the same name, that node is replaced and returned.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Note that this function **does not** set the given `node`&#39;s parent directory;</span>
-    <span class="doccomment">/// that should be set when the `node` was originally created, before calling this function. </span>
-    <span class="doccomment">/// However, if a node is replaced, that old node&#39;s parent directory will be cleared</span>
-    <span class="doccomment">/// to reflect that it is no longer in this directory.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// The lock on `node` must not be held because it will be acquired within this function.</span>
-    <span class="kw">fn</span> <span class="ident">insert</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">node</span>: <span class="ident">FileOrDir</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// Like [`Directory::get()`], but only looks for **directories** matching the given `name` in this `Directory`.
+    </span><span class="kw">fn </span>get_dir(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;DirRef&gt; {
+        <span class="kw">match </span><span class="self">self</span>.get(name) {
+            <span class="prelude-val">Some</span>(FileOrDir::Dir(d)) =&gt; <span class="prelude-val">Some</span>(d),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
+        }
+    }
 
-    <span class="doccomment">/// Removes a file or directory from this directory and returns it if found.</span>
-    <span class="doccomment">/// Also, the returned node&#39;s parent directory reference is cleared.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// The lock on `node` must not be held because it will be acquired within this function.</span>
-    <span class="kw">fn</span> <span class="ident">remove</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">node</span>: <span class="kw-2">&amp;</span><span class="ident">FileOrDir</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// Inserts the given new file or directory into this directory.
+    /// If an existing node has the same name, that node is replaced and returned.
+    /// 
+    /// Note that this function **does not** set the given `node`&#39;s parent directory;
+    /// that should be set when the `node` was originally created, before calling this function. 
+    /// However, if a node is replaced, that old node&#39;s parent directory will be cleared
+    /// to reflect that it is no longer in this directory.
+    /// 
+    /// The lock on `node` must not be held because it will be acquired within this function.
+    </span><span class="kw">fn </span>insert(<span class="kw-2">&amp;mut </span><span class="self">self</span>, node: FileOrDir) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FileOrDir&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
 
-    <span class="doccomment">/// Lists the names of the nodes in this directory.</span>
-    <span class="kw">fn</span> <span class="ident">list</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// Removes a file or directory from this directory and returns it if found.
+    /// Also, the returned node&#39;s parent directory reference is cleared.
+    /// 
+    /// The lock on `node` must not be held because it will be acquired within this function.
+    </span><span class="kw">fn </span>remove(<span class="kw-2">&amp;mut </span><span class="self">self</span>, node: <span class="kw-2">&amp;</span>FileOrDir) -&gt; <span class="prelude-ty">Option</span>&lt;FileOrDir&gt;;
+
+    <span class="doccomment">/// Lists the names of the nodes in this directory.
+    </span><span class="kw">fn </span>list(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;String&gt;;
 }
 
-<span class="doccomment">/// Allows us to return a generic type that can be matched by the caller to extract the underlying type</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">FileOrDir</span> {
-    <span class="ident">File</span>(<span class="ident">FileRef</span>),
-    <span class="ident">Dir</span>(<span class="ident">DirRef</span>),
+<span class="doccomment">/// Allows us to return a generic type that can be matched by the caller to extract the underlying type
+</span><span class="attr">#[derive(Clone)]
+</span><span class="kw">pub enum </span>FileOrDir {
+    File(FileRef),
+    Dir(DirRef),
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">FileOrDir</span> {
-	<span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-		<span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{}&quot;</span>, <span class="self">self</span>.<span class="ident">get_absolute_path</span>())
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>FileOrDir {
+	<span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+		<span class="macro">write!</span>(f, <span class="string">&quot;{}&quot;</span>, <span class="self">self</span>.get_absolute_path())
 	}
 }
 
-<span class="comment">// Allows us to call methods directly on an enum so we don&#39;t have to match on the underlying type</span>
-<span class="kw">impl</span> <span class="ident">FsNode</span> <span class="kw">for</span> <span class="ident">FileOrDir</span> {
+<span class="comment">// Allows us to call methods directly on an enum so we don&#39;t have to match on the underlying type
+</span><span class="kw">impl </span>FsNode <span class="kw">for </span>FileOrDir {
     
-    <span class="kw">fn</span> <span class="ident">get_absolute_path</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">FileOrDir::File</span>(<span class="ident">file</span>) =&gt; <span class="ident">file</span>.<span class="ident">lock</span>().<span class="ident">get_absolute_path</span>(),
-            <span class="ident">FileOrDir::Dir</span>(<span class="ident">dir</span>) =&gt; <span class="ident">dir</span>.<span class="ident">lock</span>().<span class="ident">get_absolute_path</span>(),
+    <span class="kw">fn </span>get_absolute_path(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="kw">match </span><span class="self">self </span>{
+            FileOrDir::File(file) =&gt; file.lock().get_absolute_path(),
+            FileOrDir::Dir(dir) =&gt; dir.lock().get_absolute_path(),
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">FileOrDir::File</span>(<span class="ident">file</span>) =&gt; <span class="ident">file</span>.<span class="ident">lock</span>().<span class="ident">get_name</span>(),
-            <span class="ident">FileOrDir::Dir</span>(<span class="ident">dir</span>) =&gt; <span class="ident">dir</span>.<span class="ident">lock</span>().<span class="ident">get_name</span>(),
+    <span class="kw">fn </span>get_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="kw">match </span><span class="self">self </span>{
+            FileOrDir::File(file) =&gt; file.lock().get_name(),
+            FileOrDir::Dir(dir) =&gt; dir.lock().get_name(),
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">get_parent_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DirRef</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">FileOrDir::File</span>(<span class="ident">file</span>) =&gt; <span class="ident">file</span>.<span class="ident">lock</span>().<span class="ident">get_parent_dir</span>(),
-            <span class="ident">FileOrDir::Dir</span>(<span class="ident">dir</span>) =&gt; <span class="ident">dir</span>.<span class="ident">lock</span>().<span class="ident">get_parent_dir</span>(),
+    <span class="kw">fn </span>get_parent_dir(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DirRef&gt; {
+        <span class="kw">match </span><span class="self">self </span>{
+            FileOrDir::File(file) =&gt; file.lock().get_parent_dir(),
+            FileOrDir::Dir(dir) =&gt; dir.lock().get_parent_dir(),
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">set_parent_dir</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">new_parent</span>: <span class="ident">WeakDirRef</span>) {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">FileOrDir::File</span>(<span class="ident">file</span>) =&gt; <span class="ident">file</span>.<span class="ident">lock</span>().<span class="ident">set_parent_dir</span>(<span class="ident">new_parent</span>),
-            <span class="ident">FileOrDir::Dir</span>(<span class="ident">dir</span>) =&gt; <span class="ident">dir</span>.<span class="ident">lock</span>().<span class="ident">set_parent_dir</span>(<span class="ident">new_parent</span>),
-        }
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">KnownLength</span> <span class="kw">for</span> <span class="ident">FileOrDir</span> {
-    <span class="doccomment">/// Returns the length (size) in bytes of this `FileOrDir`.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Directories currently return `0`.</span>
-    <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span> {
-            <span class="ident">FileOrDir::File</span>(<span class="ident">f</span>) =&gt; <span class="ident">f</span>.<span class="ident">lock</span>().<span class="ident">len</span>(),
-            <span class="ident">FileOrDir::Dir</span>(<span class="kw">_</span>) =&gt; <span class="number">0</span>,
+    <span class="kw">fn </span>set_parent_dir(<span class="kw-2">&amp;mut </span><span class="self">self</span>, new_parent: WeakDirRef) {
+        <span class="kw">match </span><span class="self">self </span>{
+            FileOrDir::File(file) =&gt; file.lock().set_parent_dir(new_parent),
+            FileOrDir::Dir(dir) =&gt; dir.lock().set_parent_dir(new_parent),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">FileOrDir</span> {
-    <span class="doccomment">/// Returns `true` if this is a `File`, `false` if it is a `Directory`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span> {
-            <span class="ident">FileOrDir::File</span>(<span class="kw">_</span>) =&gt; <span class="bool-val">true</span>,
-            <span class="ident">FileOrDir::Dir</span>(<span class="kw">_</span>) =&gt; <span class="bool-val">false</span>,
+<span class="kw">impl </span>KnownLength <span class="kw">for </span>FileOrDir {
+    <span class="doccomment">/// Returns the length (size) in bytes of this `FileOrDir`.
+    /// 
+    /// Directories currently return `0`.
+    </span><span class="kw">fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self </span>{
+            FileOrDir::File(f) =&gt; f.lock().len(),
+            FileOrDir::Dir(<span class="kw">_</span>) =&gt; <span class="number">0</span>,
+        }
+    }
+}
+
+<span class="kw">impl </span>FileOrDir {
+    <span class="doccomment">/// Returns `true` if this is a `File`, `false` if it is a `Directory`.
+    </span><span class="kw">pub fn </span>is_file(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self </span>{
+            FileOrDir::File(<span class="kw">_</span>) =&gt; <span class="bool-val">true</span>,
+            FileOrDir::Dir(<span class="kw">_</span>) =&gt; <span class="bool-val">false</span>,
         }
     }
 
-    <span class="doccomment">/// Returns `true` if this is a `Directory`, `false` if it is a `File`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span> {
-            <span class="ident">FileOrDir::File</span>(<span class="kw">_</span>) =&gt; <span class="bool-val">false</span>,
-            <span class="ident">FileOrDir::Dir</span>(<span class="kw">_</span>) =&gt; <span class="bool-val">true</span>,
+    <span class="doccomment">/// Returns `true` if this is a `Directory`, `false` if it is a `File`.
+    </span><span class="kw">pub fn </span>is_dir(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self </span>{
+            FileOrDir::File(<span class="kw">_</span>) =&gt; <span class="bool-val">false</span>,
+            FileOrDir::Dir(<span class="kw">_</span>) =&gt; <span class="bool-val">true</span>,
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="fs_node" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="fs_node" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

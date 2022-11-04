@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/receive_queue.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>receive_queue.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/receive_queue.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>receive_queue.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -250,252 +244,251 @@
 <span id="244">244</span>
 <span id="245">245</span>
 <span id="246">246</span>
-</pre><pre class="rust"><code><span class="doccomment">//! The Receive Queue (RQ) object holds the descriptor ring used to hold incoming packets.</span>
-<span class="doccomment">//! The descriptor ring is referred to as a Work Queue Buffer.</span>
-<span class="doccomment">//! This module defines the layout of an RQ and the context used to initialize a RQ.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! (PRM Section 8.13: Receive Queue)</span>
+</pre><pre class="rust"><code><span class="doccomment">//! The Receive Queue (RQ) object holds the descriptor ring used to hold incoming packets.
+//! The descriptor ring is referred to as a Work Queue Buffer.
+//! This module defines the layout of an RQ and the context used to initialize a RQ.
+//! 
+//! (PRM Section 8.13: Receive Queue)
 
-<span class="kw">use</span> <span class="ident">zerocopy</span>::{<span class="ident">U32</span>, <span class="ident">FromBytes</span>};
-<span class="kw">use</span> <span class="ident">volatile::Volatile</span>;
-<span class="kw">use</span> <span class="ident">byteorder::BigEndian</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">MappedPages</span>, <span class="ident">create_contiguous_mapping</span>, <span class="ident">BorrowedSliceMappedPages</span>, <span class="ident">Mutable</span>};
-<span class="kw">use</span> <span class="ident">core::fmt</span>;
-<span class="kw">use</span> <span class="ident">num_enum::TryFromPrimitive</span>;
-<span class="kw">use</span> <span class="ident">core::convert::TryFrom</span>;
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">nic_buffers::ReceiveBuffer</span>;
-<span class="kw">use</span> <span class="ident">nic_initialization::NIC_MAPPING_FLAGS</span>;
+</span><span class="kw">use </span>zerocopy::{U32, FromBytes};
+<span class="kw">use </span>volatile::Volatile;
+<span class="kw">use </span>byteorder::BigEndian;
+<span class="kw">use </span>memory::{MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
+<span class="kw">use </span>core::fmt;
+<span class="kw">use </span>num_enum::TryFromPrimitive;
+<span class="kw">use </span>core::convert::TryFrom;
+<span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>nic_buffers::ReceiveBuffer;
+<span class="kw">use </span>nic_initialization::NIC_MAPPING_FLAGS;
 
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_imports</span>)]</span>
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">Rqn</span>, <span class="ident">Lkey</span>, <span class="ident">CQN_MASK</span>, <span class="ident">command_queue::CommandOpcode</span>, <span class="ident">work_queue::WorkQueueEntryReceive</span>, <span class="ident">completion_queue::CompletionQueue</span>};
+<span class="attr">#[allow(unused_imports)]
+</span><span class="kw">use crate</span>::{Rqn, Lkey, CQN_MASK, command_queue::CommandOpcode, work_queue::WorkQueueEntryReceive, completion_queue::CompletionQueue};
 
 
-<span class="doccomment">/// The Transport Interface Receive (TIR) object is responsible for performing </span>
-<span class="doccomment">/// all transport related operations on the receive side. TIR performs the</span>
-<span class="doccomment">/// packet processing and reassembly and is also responsible for demultiplexing</span>
-<span class="doccomment">/// packets into different RQs.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">TransportInterfaceReceiveContext</span> {
-    <span class="ident">_padding1</span>:              [<span class="ident">u8</span>; <span class="number">28</span>],
-    <span class="doccomment">/// RQ number that packets will directly be delivered to</span>
-    <span class="ident">inline_rqn</span>:             <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding2</span>:              <span class="ident">u32</span>,
-    <span class="doccomment">/// transport domain ID</span>
-    <span class="ident">transport_domain</span>:       <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding3</span>:              [<span class="ident">u8</span>; <span class="number">32</span>],
-    <span class="ident">_padding4</span>:              [<span class="ident">u8</span>; <span class="number">20</span>],
+<span class="doccomment">/// The Transport Interface Receive (TIR) object is responsible for performing 
+/// all transport related operations on the receive side. TIR performs the
+/// packet processing and reassembly and is also responsible for demultiplexing
+/// packets into different RQs.
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>TransportInterfaceReceiveContext {
+    _padding1:              [u8; <span class="number">28</span>],
+    <span class="doccomment">/// RQ number that packets will directly be delivered to
+    </span>inline_rqn:             Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding2:              u32,
+    <span class="doccomment">/// transport domain ID
+    </span>transport_domain:       Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding3:              [u8; <span class="number">32</span>],
+    _padding4:              [u8; <span class="number">20</span>],
 }
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">TransportInterfaceReceiveContext</span><span class="op">&gt;</span>(), <span class="number">92</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;TransportInterfaceReceiveContext&gt;(), <span class="number">92</span>);
 
-<span class="kw">impl</span> <span class="ident">TransportInterfaceReceiveContext</span> {
-    <span class="doccomment">/// Initialize the TIR object</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `rqn`: RQ number</span>
-    <span class="doccomment">/// * `td`: transport domain ID </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">rqn</span>: <span class="ident">u32</span>, <span class="ident">td</span>: <span class="ident">u32</span>) -&gt; <span class="ident">TransportInterfaceReceiveContext</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctxt</span> <span class="op">=</span> <span class="ident">TransportInterfaceReceiveContext::default</span>();
-        <span class="ident">ctxt</span>.<span class="ident">inline_rqn</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">rqn</span>));
-        <span class="ident">ctxt</span>.<span class="ident">transport_domain</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">td</span>));
-        <span class="ident">ctxt</span>
+<span class="kw">impl </span>TransportInterfaceReceiveContext {
+    <span class="doccomment">/// Initialize the TIR object
+    /// 
+    /// # Arguments
+    /// * `rqn`: RQ number
+    /// * `td`: transport domain ID 
+    </span><span class="kw">pub fn </span>init(rqn: u32, td: u32) -&gt; TransportInterfaceReceiveContext {
+        <span class="kw">let </span><span class="kw-2">mut </span>ctxt = TransportInterfaceReceiveContext::default();
+        ctxt.inline_rqn.write(U32::new(rqn));
+        ctxt.transport_domain.write(U32::new(td));
+        ctxt
     }
 
-    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">mailbox_offset</span>() -&gt; <span class="ident">usize</span> { <span class="number">0x10</span> }
+    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>mailbox_offset() -&gt; usize { <span class="number">0x10 </span>}
 }
 
-<span class="doccomment">/// The possible states the RQ can be in.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">TryFromPrimitive</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ReceiveQueueState</span> {
-    <span class="ident">Reset</span> <span class="op">=</span> <span class="number">0x0</span>,
-    <span class="ident">Ready</span> <span class="op">=</span> <span class="number">0x1</span>,
-    <span class="ident">Error</span> <span class="op">=</span> <span class="number">0x3</span>
+<span class="doccomment">/// The possible states the RQ can be in.
+</span><span class="attr">#[derive(Debug, TryFromPrimitive)]
+#[repr(u8)]
+</span><span class="kw">pub enum </span>ReceiveQueueState {
+    Reset = <span class="number">0x0</span>,
+    Ready = <span class="number">0x1</span>,
+    Error = <span class="number">0x3
+</span>}
+
+<span class="doccomment">/// The bitmask for the state in the [`ReceiveQueueContext`]
+</span><span class="kw">const </span>STATE_MASK:   u32 = <span class="number">0xF0_0000</span>;
+<span class="doccomment">/// The bit shift for the state in the [`ReceiveQueueContext`]
+</span><span class="kw">const </span>STATE_SHIFT:  u32 = <span class="number">20</span>;
+
+<span class="doccomment">/// The data structure containing RQ initialization parameters.
+/// It is passed to the HCA at the time of RQ creation.
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C, packed)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>ReceiveQueueContext {
+    <span class="doccomment">/// A multi-part field:
+    /// * `rlky`: when set the reserved LKey can be used on the RQ, occupies bit 31
+    /// * `vlan_strip_disable`: if set, VLAN is not stripped from incoming frames, occupies bit 28
+    /// * `state`: RQ state, occupies bits [23:20]
+    /// * `flush_in_error_en`: if set, and when RQ transitions into error state, the hardware will flush in error WQEs that were posted, occupies bit 18
+    </span>rlky_state:                         Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// an opaque identifier which software sets, which is reported to the Completion Queue
+    </span>user_index:                         Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// number of the CQ associated with this RQ
+    </span>cqn:                                Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// set of counters in which statistics on this RQ are collected
+    </span>counter_set_id:                     Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// remote memory pool number (only when enabled)
+    </span>rmpn:                               Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    hairpin_peer_sq:                    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    hairpin_peer_vhca:                  Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding1:                          [u8; <span class="number">20</span>],
 }
 
-<span class="doccomment">/// The bitmask for the state in the [`ReceiveQueueContext`]</span>
-<span class="kw">const</span> <span class="ident">STATE_MASK</span>:   <span class="ident">u32</span> <span class="op">=</span> <span class="number">0xF0_0000</span>;
-<span class="doccomment">/// The bit shift for the state in the [`ReceiveQueueContext`]</span>
-<span class="kw">const</span> <span class="ident">STATE_SHIFT</span>:  <span class="ident">u32</span> <span class="op">=</span> <span class="number">20</span>;
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;ReceiveQueueContext&gt;(), <span class="number">48</span>);
 
-<span class="doccomment">/// The data structure containing RQ initialization parameters.</span>
-<span class="doccomment">/// It is passed to the HCA at the time of RQ creation.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">ReceiveQueueContext</span> {
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `rlky`: when set the reserved LKey can be used on the RQ, occupies bit 31</span>
-    <span class="doccomment">/// * `vlan_strip_disable`: if set, VLAN is not stripped from incoming frames, occupies bit 28</span>
-    <span class="doccomment">/// * `state`: RQ state, occupies bits [23:20]</span>
-    <span class="doccomment">/// * `flush_in_error_en`: if set, and when RQ transitions into error state, the hardware will flush in error WQEs that were posted, occupies bit 18</span>
-    <span class="ident">rlky_state</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// an opaque identifier which software sets, which is reported to the Completion Queue</span>
-    <span class="ident">user_index</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// number of the CQ associated with this RQ</span>
-    <span class="ident">cqn</span>:                                <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// set of counters in which statistics on this RQ are collected</span>
-    <span class="ident">counter_set_id</span>:                     <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// remote memory pool number (only when enabled)</span>
-    <span class="ident">rmpn</span>:                               <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">hairpin_peer_sq</span>:                    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">hairpin_peer_vhca</span>:                  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding1</span>:                          [<span class="ident">u8</span>; <span class="number">20</span>],
-}
-
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">ReceiveQueueContext</span><span class="op">&gt;</span>(), <span class="number">48</span>);
-
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">ReceiveQueueContext</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;ReceiveQueueContext&quot;</span>)
-            .<span class="ident">field</span>(<span class="string">&quot;rlky_state&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">rlky_state</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;user_index&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">user_index</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;cqn&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">cqn</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;counter_set_id&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">counter_set_id</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;rmpn&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">rmpn</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;hairpin_peer_rq&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">hairpin_peer_sq</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;hairpin_peer_vhca&quot;</span>,<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">hairpin_peer_vhca</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">finish</span>()
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>ReceiveQueueContext {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        f.debug_struct(<span class="string">&quot;ReceiveQueueContext&quot;</span>)
+            .field(<span class="string">&quot;rlky_state&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.rlky_state.read().get())
+            .field(<span class="string">&quot;user_index&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.user_index.read().get())
+            .field(<span class="string">&quot;cqn&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.cqn.read().get())
+            .field(<span class="string">&quot;counter_set_id&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.counter_set_id.read().get())
+            .field(<span class="string">&quot;rmpn&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.rmpn.read().get())
+            .field(<span class="string">&quot;hairpin_peer_rq&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.hairpin_peer_sq.read().get())
+            .field(<span class="string">&quot;hairpin_peer_vhca&quot;</span>,<span class="kw-2">&amp;</span><span class="self">self</span>.hairpin_peer_vhca.read().get())
+            .finish()
     }
 }
 
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
-<span class="kw">impl</span> <span class="ident">ReceiveQueueContext</span> {
-    <span class="doccomment">/// Create and initialize the fields of the RQ context.</span>
-    <span class="doccomment">/// The RQ context is then passed to the HCA when creating the RQ.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `cqn`: number of CQ associated with this RQ </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">cqn</span>: <span class="ident">u32</span>) -&gt; <span class="ident">ReceiveQueueContext</span> {
-        <span class="kw">const</span> <span class="ident">ENABLE_RLKEY</span>:             <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">31</span>;
-        <span class="kw">const</span> <span class="ident">VLAN_STRIP_DISABLE</span>:       <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">28</span>;
+<span class="attr">#[allow(unused)]
+</span><span class="kw">impl </span>ReceiveQueueContext {
+    <span class="doccomment">/// Create and initialize the fields of the RQ context.
+    /// The RQ context is then passed to the HCA when creating the RQ.
+    /// 
+    /// # Arguments
+    /// * `cqn`: number of CQ associated with this RQ 
+    </span><span class="kw">pub fn </span>init(cqn: u32) -&gt; ReceiveQueueContext {
+        <span class="kw">const </span>ENABLE_RLKEY:             u32 = <span class="number">1 </span>&lt;&lt; <span class="number">31</span>;
+        <span class="kw">const </span>VLAN_STRIP_DISABLE:       u32 = <span class="number">1 </span>&lt;&lt; <span class="number">28</span>;
         
-        <span class="comment">// set all fields to zero</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctxt</span> <span class="op">=</span> <span class="ident">ReceiveQueueContext::default</span>();
-        <span class="ident">ctxt</span>.<span class="ident">rlky_state</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">ENABLE_RLKEY</span> <span class="op">|</span> <span class="ident">VLAN_STRIP_DISABLE</span>)); 
-        <span class="ident">ctxt</span>.<span class="ident">cqn</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">cqn</span> <span class="op">&amp;</span> <span class="ident">CQN_MASK</span>));
-        <span class="ident">ctxt</span>
+        <span class="comment">// set all fields to zero
+        </span><span class="kw">let </span><span class="kw-2">mut </span>ctxt = ReceiveQueueContext::default();
+        ctxt.rlky_state.write(U32::new(ENABLE_RLKEY | VLAN_STRIP_DISABLE)); 
+        ctxt.cqn.write(U32::new(cqn &amp; CQN_MASK));
+        ctxt
     }
 
-    <span class="doccomment">/// set state of the RQ in the RQ context to `next_state`</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_state</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">next_state</span>: <span class="ident">ReceiveQueueState</span>) {
-        <span class="kw">let</span> <span class="ident">state</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rlky_state</span>.<span class="ident">read</span>().<span class="ident">get</span>() <span class="op">&amp;</span> <span class="op">!</span><span class="ident">STATE_MASK</span>;
-        <span class="self">self</span>.<span class="ident">rlky_state</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">state</span> <span class="op">|</span> ((<span class="ident">next_state</span> <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">STATE_SHIFT</span>))); 
+    <span class="doccomment">/// set state of the RQ in the RQ context to `next_state`
+    </span><span class="kw">pub fn </span>set_state(<span class="kw-2">&amp;mut </span><span class="self">self</span>, next_state: ReceiveQueueState) {
+        <span class="kw">let </span>state = <span class="self">self</span>.rlky_state.read().get() &amp; !STATE_MASK;
+        <span class="self">self</span>.rlky_state.write(U32::new(state | ((next_state <span class="kw">as </span>u32) &lt;&lt; STATE_SHIFT))); 
     }
 
-    <span class="doccomment">/// Find the state of the RQ from the RQ context </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ReceiveQueueState</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">state</span> <span class="op">=</span> (<span class="self">self</span>.<span class="ident">rlky_state</span>.<span class="ident">read</span>().<span class="ident">get</span>() <span class="op">&amp;</span> <span class="ident">STATE_MASK</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">STATE_SHIFT</span>;
-        <span class="prelude-val">Ok</span>( <span class="ident">ReceiveQueueState::try_from</span>(<span class="ident">state</span> <span class="kw">as</span> <span class="ident">u8</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;Invalid value in the RQ state&quot;</span>)<span class="question-mark">?</span> )
+    <span class="doccomment">/// Find the state of the RQ from the RQ context 
+    </span><span class="kw">pub fn </span>get_state(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;ReceiveQueueState, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>state = (<span class="self">self</span>.rlky_state.read().get() &amp; STATE_MASK) &gt;&gt; STATE_SHIFT;
+        <span class="prelude-val">Ok</span>( ReceiveQueueState::try_from(state <span class="kw">as </span>u8).map_err(|_e| <span class="string">&quot;Invalid value in the RQ state&quot;</span>)<span class="question-mark">? </span>)
     }
 
-    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">mailbox_offset</span>() -&gt; <span class="ident">usize</span> { <span class="number">0x10</span> }
+    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>mailbox_offset() -&gt; usize { <span class="number">0x10 </span>}
 }
 
-<span class="doccomment">/// A data structure that contains the RQ ring of descriptors </span>
-<span class="doccomment">/// and is used to interact with the RQ once initialized.</span>
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ReceiveQueue</span> {
-    <span class="doccomment">/// physically-contiguous RQ descriptors</span>
-    <span class="ident">entries</span>: <span class="ident">BorrowedSliceMappedPages</span><span class="op">&lt;</span><span class="ident">WorkQueueEntryReceive</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>, 
-    <span class="doccomment">/// the packet buffers in use by the descriptors</span>
-    <span class="ident">packet_buffers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ReceiveBuffer</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The size of a receive buffers in bytes. </span>
-    <span class="doccomment">/// It should be set to the MTU.</span>
-    <span class="ident">buffer_size_bytes</span>: <span class="ident">u32</span>,
-    <span class="doccomment">/// Rx buffer pool </span>
-    <span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">mpmc::Queue</span><span class="op">&lt;</span><span class="ident">ReceiveBuffer</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The number of WQEs that have been completed.</span>
-    <span class="doccomment">/// From this we also calculate the next descriptor to use</span>
-    <span class="ident">wqe_counter</span>: <span class="ident">u16</span>,
-    <span class="doccomment">/// completion queue index of the next completed packet</span>
-    <span class="ident">cqe_counter</span>: <span class="ident">u16</span>,
-    <span class="doccomment">/// CQE ownership value that indicates SW owned</span>
-    <span class="ident">owner</span>: <span class="ident">u8</span>,
-    <span class="doccomment">/// RQ number that is returned by the [`CommandOpcode::CreateRq`] command</span>
-    <span class="ident">rqn</span>: <span class="ident">Rqn</span>,
-    <span class="doccomment">/// the lkey used by the SQ</span>
-    <span class="ident">lkey</span>: <span class="ident">Lkey</span>,
-    <span class="doccomment">/// completion queue associated with this receive queue</span>
-    <span class="ident">cq</span>: <span class="ident">CompletionQueue</span>
+<span class="doccomment">/// A data structure that contains the RQ ring of descriptors 
+/// and is used to interact with the RQ once initialized.
+</span><span class="attr">#[allow(dead_code)]
+</span><span class="kw">pub struct </span>ReceiveQueue {
+    <span class="doccomment">/// physically-contiguous RQ descriptors
+    </span>entries: BorrowedSliceMappedPages&lt;WorkQueueEntryReceive, Mutable&gt;, 
+    <span class="doccomment">/// the packet buffers in use by the descriptors
+    </span>packet_buffers: Vec&lt;ReceiveBuffer&gt;,
+    <span class="doccomment">/// The size of a receive buffers in bytes. 
+    /// It should be set to the MTU.
+    </span>buffer_size_bytes: u32,
+    <span class="doccomment">/// Rx buffer pool 
+    </span>pool: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>mpmc::Queue&lt;ReceiveBuffer&gt;,
+    <span class="doccomment">/// The number of WQEs that have been completed.
+    /// From this we also calculate the next descriptor to use
+    </span>wqe_counter: u16,
+    <span class="doccomment">/// completion queue index of the next completed packet
+    </span>cqe_counter: u16,
+    <span class="doccomment">/// CQE ownership value that indicates SW owned
+    </span>owner: u8,
+    <span class="doccomment">/// RQ number that is returned by the [`CommandOpcode::CreateRq`] command
+    </span>rqn: Rqn,
+    <span class="doccomment">/// the lkey used by the SQ
+    </span>lkey: Lkey,
+    <span class="doccomment">/// completion queue associated with this receive queue
+    </span>cq: CompletionQueue
 }
 
-<span class="kw">impl</span> <span class="ident">ReceiveQueue</span> {
-    <span class="doccomment">/// Creates a RQ by mapping the buffer as a slice of [`WorkQueueEntryReceive`]s.</span>
-    <span class="doccomment">/// Each WQE is set to an initial state.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `entries_mp`: memory that is to be transformed into a slice of WQEs. </span>
-    <span class="doccomment">/// The starting physical address should have been passed to the HCA when creating the SQ.</span>
-    <span class="doccomment">/// * `num_entries`: number of entries in the RQ</span>
-    <span class="doccomment">/// * `mtu`: size of the receive buffers in bytes</span>
-    <span class="doccomment">/// * `buffer_pool`: receive buffer pool </span>
-    <span class="doccomment">/// * `rqn`: SQ number returned by the HCA</span>
-    <span class="doccomment">/// * `lkey`: the lkey used by the RQ</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create</span>(
-        <span class="ident">entries_mp</span>: <span class="ident">MappedPages</span>, 
-        <span class="ident">num_entries</span>: <span class="ident">usize</span>,
-        <span class="ident">mtu</span>: <span class="ident">u32</span>,
-        <span class="ident">pool</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">mpmc::Queue</span><span class="op">&lt;</span><span class="ident">ReceiveBuffer</span><span class="op">&gt;</span>, 
-        <span class="ident">rqn</span>: <span class="ident">Rqn</span>, 
-        <span class="ident">lkey</span>: <span class="ident">Lkey</span>,
-        <span class="ident">cq</span>: <span class="ident">CompletionQueue</span>
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ReceiveQueue</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// map the descriptor ring and initialize</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entries</span> <span class="op">=</span> <span class="ident">entries_mp</span>.<span class="ident">into_borrowed_slice_mut</span>::<span class="op">&lt;</span><span class="ident">WorkQueueEntryReceive</span><span class="op">&gt;</span>(<span class="number">0</span>, <span class="ident">num_entries</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
-        <span class="kw">for</span> <span class="ident">entry</span> <span class="kw">in</span> <span class="ident">entries</span>.<span class="ident">iter_mut</span>() {
-            <span class="ident">entry</span>.<span class="ident">init</span>()
+<span class="kw">impl </span>ReceiveQueue {
+    <span class="doccomment">/// Creates a RQ by mapping the buffer as a slice of [`WorkQueueEntryReceive`]s.
+    /// Each WQE is set to an initial state.
+    /// 
+    /// # Arguments
+    /// * `entries_mp`: memory that is to be transformed into a slice of WQEs. 
+    /// The starting physical address should have been passed to the HCA when creating the SQ.
+    /// * `num_entries`: number of entries in the RQ
+    /// * `mtu`: size of the receive buffers in bytes
+    /// * `buffer_pool`: receive buffer pool 
+    /// * `rqn`: SQ number returned by the HCA
+    /// * `lkey`: the lkey used by the RQ
+    </span><span class="kw">pub fn </span>create(
+        entries_mp: MappedPages, 
+        num_entries: usize,
+        mtu: u32,
+        pool: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>mpmc::Queue&lt;ReceiveBuffer&gt;, 
+        rqn: Rqn, 
+        lkey: Lkey,
+        cq: CompletionQueue
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;ReceiveQueue, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// map the descriptor ring and initialize
+        </span><span class="kw">let </span><span class="kw-2">mut </span>entries = entries_mp.into_borrowed_slice_mut::&lt;WorkQueueEntryReceive&gt;(<span class="number">0</span>, num_entries)
+            .map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
+        <span class="kw">for </span>entry <span class="kw">in </span>entries.iter_mut() {
+            entry.init()
         }
-        <span class="prelude-val">Ok</span>(<span class="ident">ReceiveQueue</span> {
-            <span class="ident">entries</span>, 
-            <span class="ident">packet_buffers</span>: <span class="ident">Vec::new</span>(), 
-            <span class="ident">buffer_size_bytes</span>: <span class="ident">mtu</span>,
-            <span class="ident">pool</span>,
-            <span class="ident">wqe_counter</span>: <span class="number">0</span>,
-            <span class="ident">cqe_counter</span>: <span class="number">0</span>, 
-            <span class="ident">owner</span>: <span class="number">0</span>,
-            <span class="ident">rqn</span>, 
-            <span class="ident">lkey</span>,
-            <span class="ident">cq</span>
+        <span class="prelude-val">Ok</span>(ReceiveQueue {
+            entries, 
+            packet_buffers: Vec::new(), 
+            buffer_size_bytes: mtu,
+            pool,
+            wqe_counter: <span class="number">0</span>,
+            cqe_counter: <span class="number">0</span>, 
+            owner: <span class="number">0</span>,
+            rqn, 
+            lkey,
+            cq
         })
     }
 
-    <span class="doccomment">/// Refills the receive queue by updating WQEs with new packet buffers.</span>
-    <span class="doccomment">/// Right now we assume that this function is only called once at the point of initialization.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// TODO:</span>
-    <span class="doccomment">/// this function can be shifted to nic_initialization if we remove intel specific actions from those functions</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">refill</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">buffer_size</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">buffer_size_bytes</span>;
-        <span class="kw">let</span> <span class="ident">mem_pool</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pool</span>;
+    <span class="doccomment">/// Refills the receive queue by updating WQEs with new packet buffers.
+    /// Right now we assume that this function is only called once at the point of initialization.
+    /// 
+    /// TODO:
+    /// this function can be shifted to nic_initialization if we remove intel specific actions from those functions
+    </span><span class="kw">pub fn </span>refill(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>buffer_size = <span class="self">self</span>.buffer_size_bytes;
+        <span class="kw">let </span>mem_pool = <span class="self">self</span>.pool;
 
-        <span class="comment">// now that we&#39;ve created the rx descriptors, we can fill them in with initial values</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rx_bufs_in_use</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ReceiveBuffer</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="self">self</span>.<span class="ident">entries</span>.<span class="ident">len</span>());
-        <span class="kw">for</span> <span class="ident">wqe</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">entries</span>.<span class="ident">iter_mut</span>()
+        <span class="comment">// now that we&#39;ve created the rx descriptors, we can fill them in with initial values
+        </span><span class="kw">let </span><span class="kw-2">mut </span>rx_bufs_in_use: Vec&lt;ReceiveBuffer&gt; = Vec::with_capacity(<span class="self">self</span>.entries.len());
+        <span class="kw">for </span>wqe <span class="kw">in </span><span class="self">self</span>.entries.iter_mut()
         {
-            <span class="comment">// obtain or create a receive buffer for each rx_desc</span>
-            <span class="kw">let</span> <span class="ident">rx_buf</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pool</span>.<span class="ident">pop</span>()
-                .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t obtain a ReceiveBuffer from the pool&quot;</span>)
-                .<span class="ident">or_else</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> {
-                    <span class="ident">create_contiguous_mapping</span>(<span class="ident">buffer_size</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">NIC_MAPPING_FLAGS</span>)
-                        .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">buf_mapped</span>, <span class="ident">buf_paddr</span>)<span class="op">|</span> 
-                            <span class="ident">ReceiveBuffer::new</span>(<span class="ident">buf_mapped</span>, <span class="ident">buf_paddr</span>, <span class="ident">buffer_size</span> <span class="kw">as</span> <span class="ident">u16</span>, <span class="ident">mem_pool</span>)
+            <span class="comment">// obtain or create a receive buffer for each rx_desc
+            </span><span class="kw">let </span>rx_buf = <span class="self">self</span>.pool.pop()
+                .ok_or(<span class="string">&quot;Couldn&#39;t obtain a ReceiveBuffer from the pool&quot;</span>)
+                .or_else(|_e| {
+                    create_contiguous_mapping(buffer_size <span class="kw">as </span>usize, NIC_MAPPING_FLAGS)
+                        .map(|(buf_mapped, buf_paddr)| 
+                            ReceiveBuffer::new(buf_mapped, buf_paddr, buffer_size <span class="kw">as </span>u16, mem_pool)
                         )
                 })<span class="question-mark">?</span>;
-            <span class="kw">let</span> <span class="ident">paddr_buf</span> <span class="op">=</span> <span class="ident">rx_buf</span>.<span class="ident">phys_addr</span>;
-            <span class="ident">rx_bufs_in_use</span>.<span class="ident">push</span>(<span class="ident">rx_buf</span>); 
+            <span class="kw">let </span>paddr_buf = rx_buf.phys_addr;
+            rx_bufs_in_use.push(rx_buf); 
 
-            <span class="ident">wqe</span>.<span class="ident">update_buffer_info</span>(<span class="self">self</span>.<span class="ident">lkey</span>.<span class="number">0</span>, <span class="ident">paddr_buf</span>, <span class="self">self</span>.<span class="ident">buffer_size_bytes</span>); 
+            wqe.update_buffer_info(<span class="self">self</span>.lkey.<span class="number">0</span>, paddr_buf, <span class="self">self</span>.buffer_size_bytes); 
         }
-        <span class="self">self</span>.<span class="ident">packet_buffers</span> <span class="op">=</span> <span class="ident">rx_bufs_in_use</span>;
+        <span class="self">self</span>.packet_buffers = rx_bufs_in_use;
         <span class="prelude-val">Ok</span>(())
     }
 
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

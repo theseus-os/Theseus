@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/wasi_interpreter/src/wasmi_state_machine.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>wasmi_state_machine.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../wasi_interpreter/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../wasi_interpreter/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../wasi_interpreter/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/wasi_interpreter/src/wasmi_state_machine.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>wasmi_state_machine.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../wasi_interpreter/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -188,190 +182,189 @@
 <span id="182">182</span>
 <span id="183">183</span>
 <span id="184">184</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Module for resolving memory and function imports from WebAssembly module into state machine.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Subset of functionality borrowed from tomaka/redshirt:</span>
-<span class="doccomment">//! &lt;https://github.com/tomaka/redshirt/blob/4df506f68821353a7fd67bb94c4223df6b683e1b/kernel/core/src/scheduler/vm.rs&gt;</span>
-<span class="doccomment">//!</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Module for resolving memory and function imports from WebAssembly module into state machine.
+//!
+//! Subset of functionality borrowed from tomaka/redshirt:
+//! &lt;https://github.com/tomaka/redshirt/blob/4df506f68821353a7fd67bb94c4223df6b683e1b/kernel/core/src/scheduler/vm.rs&gt;
+//!
 
-<span class="kw">use</span> <span class="ident">alloc::string::String</span>;
-<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">cell::RefCell</span>, <span class="ident">convert::TryFrom</span> <span class="kw">as</span> <span class="kw">_</span>};
+</span><span class="kw">use </span>alloc::string::String;
+<span class="kw">use </span>core::{cell::RefCell, convert::TryFrom <span class="kw">as _</span>};
 
-<span class="kw">use</span> <span class="ident">wasmi</span>::{<span class="ident">Module</span>, <span class="ident">Signature</span>};
+<span class="kw">use </span>wasmi::{Module, Signature};
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">NewErr</span> {
-    <span class="doccomment">/// Error in the interpreter.</span>
-    <span class="ident">Interpreter</span>(<span class="ident">wasmi::Error</span>),
-    <span class="doccomment">/// If a &quot;memory&quot; symbol is provided, it must be a memory.</span>
-    <span class="ident">MemoryIsntMemory</span>,
-    <span class="doccomment">/// A memory object has both been imported and exported.</span>
-    <span class="ident">MultipleMemoriesNotSupported</span>,
-    <span class="doccomment">/// If a &quot;__indirect_function_table&quot; symbol is provided, it must be a table.</span>
-    <span class="ident">IndirectTableIsntTable</span>,
+<span class="attr">#[derive(Debug)]
+</span><span class="kw">pub enum </span>NewErr {
+    <span class="doccomment">/// Error in the interpreter.
+    </span>Interpreter(wasmi::Error),
+    <span class="doccomment">/// If a &quot;memory&quot; symbol is provided, it must be a memory.
+    </span>MemoryIsntMemory,
+    <span class="doccomment">/// A memory object has both been imported and exported.
+    </span>MultipleMemoriesNotSupported,
+    <span class="doccomment">/// If a &quot;__indirect_function_table&quot; symbol is provided, it must be a table.
+    </span>IndirectTableIsntTable,
 }
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ProcessStateMachine</span> {
-    <span class="doccomment">/// Original module, with resolved imports.</span>
-    <span class="kw">pub</span> <span class="ident">module</span>: <span class="ident">wasmi::ModuleRef</span>,
+<span class="kw">pub struct </span>ProcessStateMachine {
+    <span class="doccomment">/// Original module, with resolved imports.
+    </span><span class="kw">pub </span>module: wasmi::ModuleRef,
 
-    <span class="doccomment">/// Memory of the module instantiation.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Right now we only support one unique `Memory` object per process. This is it.</span>
-    <span class="doccomment">/// Contains `None` if the process doesn&#39;t export any memory object, which means it doesn&#39;t use</span>
-    <span class="doccomment">/// any memory.</span>
-    <span class="kw">pub</span> <span class="ident">memory</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">wasmi::MemoryRef</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Memory of the module instantiation.
+    ///
+    /// Right now we only support one unique `Memory` object per process. This is it.
+    /// Contains `None` if the process doesn&#39;t export any memory object, which means it doesn&#39;t use
+    /// any memory.
+    </span><span class="kw">pub </span>memory: <span class="prelude-ty">Option</span>&lt;wasmi::MemoryRef&gt;,
 
-    <span class="doccomment">/// Table of the indirect function calls.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// In WASM, function pointers are in reality indices in a table called</span>
-    <span class="doccomment">/// `__indirect_function_table`. This is this table, if it exists.</span>
-    <span class="kw">pub</span> <span class="ident">indirect_table</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">wasmi::TableRef</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Table of the indirect function calls.
+    ///
+    /// In WASM, function pointers are in reality indices in a table called
+    /// `__indirect_function_table`. This is this table, if it exists.
+    </span><span class="kw">pub </span>indirect_table: <span class="prelude-ty">Option</span>&lt;wasmi::TableRef&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">ProcessStateMachine</span> {
-    <span class="doccomment">/// Creates a new process state machine from the given module.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The closure is called for each import that the module has. It must assign a number to each</span>
-    <span class="doccomment">/// import, or return an error if the import can&#39;t be resolved. When the VM calls one of these</span>
-    <span class="doccomment">/// functions, this number will be returned back in order for the user to know how to handle</span>
-    <span class="doccomment">/// the call.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// A single main thread (whose user data is passed by parameter) is automatically created and</span>
-    <span class="doccomment">/// is paused at the start of the &quot;_start&quot; function of the module.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">module</span>: <span class="kw-2">&amp;</span><span class="ident">Module</span>,
-        <span class="kw-2">mut</span> <span class="ident">symbols</span>: <span class="kw">impl</span> <span class="ident">FnMut</span>(<span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="kw-2">&amp;</span><span class="ident">Signature</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, ()<span class="op">&gt;</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">NewErr</span><span class="op">&gt;</span> {
-        <span class="kw">struct</span> <span class="ident">ImportResolve</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-            <span class="ident">func</span>: <span class="ident">RefCell</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="kw">dyn</span> <span class="ident">FnMut</span>(<span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="kw-2">&amp;</span><span class="ident">Signature</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, ()<span class="op">&gt;</span><span class="op">&gt;</span>,
-            <span class="ident">memory</span>: <span class="ident">RefCell</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">wasmi::MemoryRef</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="kw">impl </span>ProcessStateMachine {
+    <span class="doccomment">/// Creates a new process state machine from the given module.
+    ///
+    /// The closure is called for each import that the module has. It must assign a number to each
+    /// import, or return an error if the import can&#39;t be resolved. When the VM calls one of these
+    /// functions, this number will be returned back in order for the user to know how to handle
+    /// the call.
+    ///
+    /// A single main thread (whose user data is passed by parameter) is automatically created and
+    /// is paused at the start of the &quot;_start&quot; function of the module.
+    </span><span class="kw">pub fn </span>new(
+        module: <span class="kw-2">&amp;</span>Module,
+        <span class="kw-2">mut </span>symbols: <span class="kw">impl </span>FnMut(<span class="kw-2">&amp;</span>str, <span class="kw-2">&amp;</span>str, <span class="kw-2">&amp;</span>Signature) -&gt; <span class="prelude-ty">Result</span>&lt;usize, ()&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, NewErr&gt; {
+        <span class="kw">struct </span>ImportResolve&lt;<span class="lifetime">&#39;a</span>&gt; {
+            func: RefCell&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="kw">dyn </span>FnMut(<span class="kw-2">&amp;</span>str, <span class="kw-2">&amp;</span>str, <span class="kw-2">&amp;</span>Signature) -&gt; <span class="prelude-ty">Result</span>&lt;usize, ()&gt;&gt;,
+            memory: RefCell&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="prelude-ty">Option</span>&lt;wasmi::MemoryRef&gt;&gt;,
         }
 
-        <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">wasmi::ImportResolver</span> <span class="kw">for</span> <span class="ident">ImportResolve</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-            <span class="kw">fn</span> <span class="ident">resolve_func</span>(
+        <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; wasmi::ImportResolver <span class="kw">for </span>ImportResolve&lt;<span class="lifetime">&#39;a</span>&gt; {
+            <span class="kw">fn </span>resolve_func(
                 <span class="kw-2">&amp;</span><span class="self">self</span>,
-                <span class="ident">module_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-                <span class="ident">field_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-                <span class="ident">signature</span>: <span class="kw-2">&amp;</span><span class="ident">wasmi::Signature</span>,
-            ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">wasmi::FuncRef</span>, <span class="ident">wasmi::Error</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">closure</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">func</span>.<span class="ident">borrow_mut</span>();
-                <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">closure</span>(<span class="ident">module_name</span>, <span class="ident">field_name</span>, <span class="ident">signature</span>) {
-                    <span class="prelude-val">Ok</span>(<span class="ident">i</span>) =&gt; <span class="ident">i</span>,
+                module_name: <span class="kw-2">&amp;</span>str,
+                field_name: <span class="kw-2">&amp;</span>str,
+                signature: <span class="kw-2">&amp;</span>wasmi::Signature,
+            ) -&gt; <span class="prelude-ty">Result</span>&lt;wasmi::FuncRef, wasmi::Error&gt; {
+                <span class="kw">let </span>closure = <span class="kw-2">&amp;mut **</span><span class="self">self</span>.func.borrow_mut();
+                <span class="kw">let </span>index = <span class="kw">match </span>closure(module_name, field_name, signature) {
+                    <span class="prelude-val">Ok</span>(i) =&gt; i,
                     <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">wasmi::Error::Instantiation</span>(<span class="macro">format!</span>(
+                        <span class="kw">return </span><span class="prelude-val">Err</span>(wasmi::Error::Instantiation(<span class="macro">format!</span>(
                             <span class="string">&quot;Couldn&#39;t resolve `{}`:`{}`&quot;</span>,
-                            <span class="ident">module_name</span>, <span class="ident">field_name</span>
+                            module_name, field_name
                         )))
                     }
                 };
 
-                <span class="prelude-val">Ok</span>(<span class="ident">wasmi::FuncInstance::alloc_host</span>(<span class="ident">signature</span>.<span class="ident">clone</span>(), <span class="ident">index</span>))
+                <span class="prelude-val">Ok</span>(wasmi::FuncInstance::alloc_host(signature.clone(), index))
             }
 
-            <span class="kw">fn</span> <span class="ident">resolve_global</span>(
+            <span class="kw">fn </span>resolve_global(
                 <span class="kw-2">&amp;</span><span class="self">self</span>,
-                <span class="ident">_module_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-                <span class="ident">_field_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-                <span class="ident">_global_type</span>: <span class="kw-2">&amp;</span><span class="ident">wasmi::GlobalDescriptor</span>,
-            ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">wasmi::GlobalRef</span>, <span class="ident">wasmi::Error</span><span class="op">&gt;</span> {
-                <span class="prelude-val">Err</span>(<span class="ident">wasmi::Error::Instantiation</span>(<span class="ident">String::from</span>(
+                _module_name: <span class="kw-2">&amp;</span>str,
+                _field_name: <span class="kw-2">&amp;</span>str,
+                _global_type: <span class="kw-2">&amp;</span>wasmi::GlobalDescriptor,
+            ) -&gt; <span class="prelude-ty">Result</span>&lt;wasmi::GlobalRef, wasmi::Error&gt; {
+                <span class="prelude-val">Err</span>(wasmi::Error::Instantiation(String::from(
                     <span class="string">&quot;Importing globals is not supported yet&quot;</span>,
                 )))
             }
 
-            <span class="kw">fn</span> <span class="ident">resolve_memory</span>(
+            <span class="kw">fn </span>resolve_memory(
                 <span class="kw-2">&amp;</span><span class="self">self</span>,
-                <span class="ident">_module_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-                <span class="ident">_field_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-                <span class="ident">memory_type</span>: <span class="kw-2">&amp;</span><span class="ident">wasmi::MemoryDescriptor</span>,
-            ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">wasmi::MemoryRef</span>, <span class="ident">wasmi::Error</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">mem</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">memory</span>.<span class="ident">borrow_mut</span>();
-                <span class="kw">if</span> <span class="ident">mem</span>.<span class="ident">is_some</span>() {
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">wasmi::Error::Instantiation</span>(<span class="ident">String::from</span>(
+                _module_name: <span class="kw-2">&amp;</span>str,
+                _field_name: <span class="kw-2">&amp;</span>str,
+                memory_type: <span class="kw-2">&amp;</span>wasmi::MemoryDescriptor,
+            ) -&gt; <span class="prelude-ty">Result</span>&lt;wasmi::MemoryRef, wasmi::Error&gt; {
+                <span class="kw">let </span><span class="kw-2">mut </span>mem = <span class="self">self</span>.memory.borrow_mut();
+                <span class="kw">if </span>mem.is_some() {
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(wasmi::Error::Instantiation(String::from(
                         <span class="string">&quot;Only one memory object is supported yet&quot;</span>,
                     )));
                 }
 
-                <span class="kw">let</span> <span class="ident">new_mem</span> <span class="op">=</span> <span class="ident">wasmi::MemoryInstance::alloc</span>(
-                    <span class="ident">wasmi::memory_units::Pages</span>(<span class="ident">usize::try_from</span>(<span class="ident">memory_type</span>.<span class="ident">initial</span>()).<span class="ident">unwrap</span>()),
-                    <span class="ident">memory_type</span>
-                        .<span class="ident">maximum</span>()
-                        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">p</span><span class="op">|</span> <span class="ident">wasmi::memory_units::Pages</span>(<span class="ident">usize::try_from</span>(<span class="ident">p</span>).<span class="ident">unwrap</span>())),
+                <span class="kw">let </span>new_mem = wasmi::MemoryInstance::alloc(
+                    wasmi::memory_units::Pages(usize::try_from(memory_type.initial()).unwrap()),
+                    memory_type
+                        .maximum()
+                        .map(|p| wasmi::memory_units::Pages(usize::try_from(p).unwrap())),
                 )
-                .<span class="ident">unwrap</span>();
-                <span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">mem</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">new_mem</span>.<span class="ident">clone</span>());
-                <span class="prelude-val">Ok</span>(<span class="ident">new_mem</span>)
+                .unwrap();
+                <span class="kw-2">**</span>mem = <span class="prelude-val">Some</span>(new_mem.clone());
+                <span class="prelude-val">Ok</span>(new_mem)
             }
 
-            <span class="kw">fn</span> <span class="ident">resolve_table</span>(
+            <span class="kw">fn </span>resolve_table(
                 <span class="kw-2">&amp;</span><span class="self">self</span>,
-                <span class="ident">_module_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-                <span class="ident">_field_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-                <span class="ident">_table_type</span>: <span class="kw-2">&amp;</span><span class="ident">wasmi::TableDescriptor</span>,
-            ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">wasmi::TableRef</span>, <span class="ident">wasmi::Error</span><span class="op">&gt;</span> {
-                <span class="prelude-val">Err</span>(<span class="ident">wasmi::Error::Instantiation</span>(<span class="ident">String::from</span>(
+                _module_name: <span class="kw-2">&amp;</span>str,
+                _field_name: <span class="kw-2">&amp;</span>str,
+                _table_type: <span class="kw-2">&amp;</span>wasmi::TableDescriptor,
+            ) -&gt; <span class="prelude-ty">Result</span>&lt;wasmi::TableRef, wasmi::Error&gt; {
+                <span class="prelude-val">Err</span>(wasmi::Error::Instantiation(String::from(
                     <span class="string">&quot;Importing tables is not supported yet&quot;</span>,
                 )))
             }
         }
 
-        <span class="kw">let</span> (<span class="ident">not_started</span>, <span class="ident">imported_memory</span>) <span class="op">=</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">imported_memory</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-            <span class="kw">let</span> <span class="ident">resolve</span> <span class="op">=</span> <span class="ident">ImportResolve</span> {
-                <span class="ident">func</span>: <span class="ident">RefCell::new</span>(<span class="kw-2">&amp;mut</span> <span class="ident">symbols</span>),
-                <span class="ident">memory</span>: <span class="ident">RefCell::new</span>(<span class="kw-2">&amp;mut</span> <span class="ident">imported_memory</span>),
+        <span class="kw">let </span>(not_started, imported_memory) = {
+            <span class="kw">let </span><span class="kw-2">mut </span>imported_memory = <span class="prelude-val">None</span>;
+            <span class="kw">let </span>resolve = ImportResolve {
+                func: RefCell::new(<span class="kw-2">&amp;mut </span>symbols),
+                memory: RefCell::new(<span class="kw-2">&amp;mut </span>imported_memory),
             };
-            <span class="kw">let</span> <span class="ident">not_started</span> <span class="op">=</span>
-                <span class="ident">wasmi::ModuleInstance::new</span>(<span class="kw-2">&amp;</span><span class="ident">module</span>, <span class="kw-2">&amp;</span><span class="ident">resolve</span>).<span class="ident">map_err</span>(<span class="ident">NewErr::Interpreter</span>)<span class="question-mark">?</span>;
-            (<span class="ident">not_started</span>, <span class="ident">imported_memory</span>)
+            <span class="kw">let </span>not_started =
+                wasmi::ModuleInstance::new(<span class="kw-2">&amp;</span>module, <span class="kw-2">&amp;</span>resolve).map_err(NewErr::Interpreter)<span class="question-mark">?</span>;
+            (not_started, imported_memory)
         };
 
-        <span class="comment">// TODO: WASM has a special &quot;start&quot; instruction that can be used to designate a function</span>
-        <span class="comment">// that must be executed before the module is considered initialized. It is unclear whether</span>
-        <span class="comment">// this is intended to be a function that for example initializes global variables, or if</span>
-        <span class="comment">// this is an equivalent of &quot;_start&quot;. In practice, Rust never seems to generate such as</span>
-        <span class="comment">// &quot;start&quot; instruction, so for now we ignore it. The code below panics if there is such</span>
-        <span class="comment">// a &quot;start&quot; item, so we will fortunately not blindly run into troubles.</span>
-        <span class="kw">let</span> <span class="ident">module</span> <span class="op">=</span> <span class="ident">not_started</span>.<span class="ident">assert_no_start</span>();
+        <span class="comment">// TODO: WASM has a special &quot;start&quot; instruction that can be used to designate a function
+        // that must be executed before the module is considered initialized. It is unclear whether
+        // this is intended to be a function that for example initializes global variables, or if
+        // this is an equivalent of &quot;_start&quot;. In practice, Rust never seems to generate such as
+        // &quot;start&quot; instruction, so for now we ignore it. The code below panics if there is such
+        // a &quot;start&quot; item, so we will fortunately not blindly run into troubles.
+        </span><span class="kw">let </span>module = not_started.assert_no_start();
 
-        <span class="kw">let</span> <span class="ident">memory</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">imported_mem</span>) <span class="op">=</span> <span class="ident">imported_memory</span> {
-            <span class="kw">if</span> <span class="ident">module</span>
-                .<span class="ident">export_by_name</span>(<span class="string">&quot;memory&quot;</span>)
-                .<span class="ident">map_or</span>(<span class="bool-val">false</span>, <span class="op">|</span><span class="ident">m</span><span class="op">|</span> <span class="ident">m</span>.<span class="ident">as_memory</span>().<span class="ident">is_some</span>())
+        <span class="kw">let </span>memory = <span class="kw">if let </span><span class="prelude-val">Some</span>(imported_mem) = imported_memory {
+            <span class="kw">if </span>module
+                .export_by_name(<span class="string">&quot;memory&quot;</span>)
+                .map_or(<span class="bool-val">false</span>, |m| m.as_memory().is_some())
             {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">NewErr::MultipleMemoriesNotSupported</span>);
+                <span class="kw">return </span><span class="prelude-val">Err</span>(NewErr::MultipleMemoriesNotSupported);
             }
-            <span class="prelude-val">Some</span>(<span class="ident">imported_mem</span>)
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">mem</span>) <span class="op">=</span> <span class="ident">module</span>.<span class="ident">export_by_name</span>(<span class="string">&quot;memory&quot;</span>) {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">mem</span>) <span class="op">=</span> <span class="ident">mem</span>.<span class="ident">as_memory</span>() {
-                <span class="prelude-val">Some</span>(<span class="ident">mem</span>.<span class="ident">clone</span>())
-            } <span class="kw">else</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">NewErr::MemoryIsntMemory</span>);
+            <span class="prelude-val">Some</span>(imported_mem)
+        } <span class="kw">else if let </span><span class="prelude-val">Some</span>(mem) = module.export_by_name(<span class="string">&quot;memory&quot;</span>) {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(mem) = mem.as_memory() {
+                <span class="prelude-val">Some</span>(mem.clone())
+            } <span class="kw">else </span>{
+                <span class="kw">return </span><span class="prelude-val">Err</span>(NewErr::MemoryIsntMemory);
             }
-        } <span class="kw">else</span> {
-            <span class="prelude-val">None</span>
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>};
+
+        <span class="kw">let </span>indirect_table = <span class="kw">if let </span><span class="prelude-val">Some</span>(tbl) = module.export_by_name(<span class="string">&quot;__indirect_function_table&quot;</span>) {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(tbl) = tbl.as_table() {
+                <span class="prelude-val">Some</span>(tbl.clone())
+            } <span class="kw">else </span>{
+                <span class="kw">return </span><span class="prelude-val">Err</span>(NewErr::IndirectTableIsntTable);
+            }
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>};
+
+        <span class="kw">let </span>state_machine = ProcessStateMachine {
+            module,
+            memory,
+            indirect_table,
         };
 
-        <span class="kw">let</span> <span class="ident">indirect_table</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">tbl</span>) <span class="op">=</span> <span class="ident">module</span>.<span class="ident">export_by_name</span>(<span class="string">&quot;__indirect_function_table&quot;</span>) {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">tbl</span>) <span class="op">=</span> <span class="ident">tbl</span>.<span class="ident">as_table</span>() {
-                <span class="prelude-val">Some</span>(<span class="ident">tbl</span>.<span class="ident">clone</span>())
-            } <span class="kw">else</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">NewErr::IndirectTableIsntTable</span>);
-            }
-        } <span class="kw">else</span> {
-            <span class="prelude-val">None</span>
-        };
-
-        <span class="kw">let</span> <span class="ident">state_machine</span> <span class="op">=</span> <span class="ident">ProcessStateMachine</span> {
-            <span class="ident">module</span>,
-            <span class="ident">memory</span>,
-            <span class="ident">indirect_table</span>,
-        };
-
-        <span class="prelude-val">Ok</span>(<span class="ident">state_machine</span>)
+        <span class="prelude-val">Ok</span>(state_machine)
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="wasi_interpreter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="wasi_interpreter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

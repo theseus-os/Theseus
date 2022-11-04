@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -103,105 +97,104 @@
 <span id="97">97</span>
 <span id="98">98</span>
 <span id="99">99</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This crate defines the layout of memory objects that make up the software interface between the Mellanox hardware and the driver,</span>
-<span class="doccomment">//! as well as functions to access different fields of these objects.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The Mellanox ethernet card is referred to as both the NIC (Network Interface Card) and the HCA (Host Channel Adapter).</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! All information is taken from the Mellanox Adapters Programmer’s Reference Manual (PRM) [Rev 0.54], unless otherwise specified.</span>
-<span class="doccomment">//! While this version of the manual was acquired by directly contacting Nvidia through their support site (&lt;https://support.mellanox.com/s/&gt;),</span>
-<span class="doccomment">//! an older version of the manual can be found at &lt;http://www.mellanox.com/related-docs/user_manuals/Ethernet_Adapters_Programming_Manual.pdf&gt;.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate defines the layout of memory objects that make up the software interface between the Mellanox hardware and the driver,
+//! as well as functions to access different fields of these objects.
+//!
+//! The Mellanox ethernet card is referred to as both the NIC (Network Interface Card) and the HCA (Host Channel Adapter).
+//!
+//! All information is taken from the Mellanox Adapters Programmer’s Reference Manual (PRM) [Rev 0.54], unless otherwise specified.
+//! While this version of the manual was acquired by directly contacting Nvidia through their support site (&lt;https://support.mellanox.com/s/&gt;),
+//! an older version of the manual can be found at &lt;http://www.mellanox.com/related-docs/user_manuals/Ethernet_Adapters_Programming_Manual.pdf&gt;.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">slice_pattern</span>)]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">core_intrinsics</span>)]</span>
-<span class="attribute">#![<span class="ident">allow</span>(<span class="ident">incomplete_features</span>)]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">adt_const_params</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(slice_pattern)]
+#![feature(core_intrinsics)]
+#![allow(incomplete_features)]
+#![feature(adt_const_params)]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span><span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">static_assertions</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">volatile</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bit_field</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">zerocopy</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">byteorder</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">nic_initialization</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">libm</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">num_enum</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">nic_buffers</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mpmc</span>;
+#[macro_use]</span><span class="kw">extern crate </span>log;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>volatile;
+<span class="kw">extern crate </span>bit_field;
+<span class="kw">extern crate </span>zerocopy;
+<span class="kw">extern crate </span>byteorder;
+<span class="kw">extern crate </span>nic_initialization;
+<span class="kw">extern crate </span>kernel_config;
+<span class="kw">extern crate </span>libm;
+<span class="kw">extern crate </span>num_enum;
+<span class="kw">extern crate </span>nic_buffers;
+<span class="kw">extern crate </span>mpmc;
 
-<span class="kw">use</span> <span class="ident">kernel_config::memory::PAGE_SIZE</span>;
+<span class="kw">use </span>kernel_config::memory::PAGE_SIZE;
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">initialization_segment</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">command_queue</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">event_queue</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">completion_queue</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">send_queue</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">receive_queue</span>;
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">work_queue</span>;
-<span class="kw">mod</span> <span class="ident">uar</span>;
-<span class="kw">mod</span> <span class="ident">flow_table</span>;
+<span class="kw">pub mod </span>initialization_segment;
+<span class="kw">pub mod </span>command_queue;
+<span class="kw">pub mod </span>event_queue;
+<span class="kw">pub mod </span>completion_queue;
+<span class="kw">pub mod </span>send_queue;
+<span class="kw">pub mod </span>receive_queue;
+<span class="kw">pub mod </span>work_queue;
+<span class="kw">mod </span>uar;
+<span class="kw">mod </span>flow_table;
 
-<span class="kw">const</span> <span class="ident">UAR_MASK</span>:                 <span class="ident">u32</span> <span class="op">=</span> <span class="number">0xFF_FFFF</span>;
-<span class="kw">const</span> <span class="ident">LOG_QUEUE_SIZE_MASK</span>:      <span class="ident">u32</span> <span class="op">=</span> <span class="number">0x1F</span>;
-<span class="kw">const</span> <span class="ident">CQN_MASK</span>:                 <span class="ident">u32</span> <span class="op">=</span> <span class="number">0xFF_FFFF</span>;
-<span class="kw">const</span> <span class="ident">LOG_QUEUE_SIZE_SHIFT</span>:     <span class="ident">u32</span> <span class="op">=</span> <span class="number">24</span>;
-<span class="kw">const</span> <span class="ident">LOG_PAGE_SIZE_SHIFT</span>:      <span class="ident">u32</span> <span class="op">=</span> <span class="number">24</span>;
-<span class="kw">const</span> <span class="ident">HW_OWNERSHIP</span>:             <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span>;
+<span class="kw">const </span>UAR_MASK:                 u32 = <span class="number">0xFF_FFFF</span>;
+<span class="kw">const </span>LOG_QUEUE_SIZE_MASK:      u32 = <span class="number">0x1F</span>;
+<span class="kw">const </span>CQN_MASK:                 u32 = <span class="number">0xFF_FFFF</span>;
+<span class="kw">const </span>LOG_QUEUE_SIZE_SHIFT:     u32 = <span class="number">24</span>;
+<span class="kw">const </span>LOG_PAGE_SIZE_SHIFT:      u32 = <span class="number">24</span>;
+<span class="kw">const </span>HW_OWNERSHIP:             u32 = <span class="number">1</span>;
 
-<span class="doccomment">/// Find the page size of the given `num_bytes` in units of 4KiB pages.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">log_page_size</span>(<span class="ident">num_bytes</span>: <span class="ident">u32</span>) -&gt; <span class="ident">u32</span> {
-    <span class="ident">libm::log2</span>(<span class="ident">libm::ceil</span>(<span class="ident">num_bytes</span> <span class="kw">as</span> <span class="ident">f64</span> <span class="op">/</span> <span class="ident">PAGE_SIZE</span> <span class="kw">as</span> <span class="ident">f64</span>)) <span class="kw">as</span> <span class="ident">u32</span>
+<span class="doccomment">/// Find the page size of the given `num_bytes` in units of 4KiB pages.
+</span><span class="kw">pub fn </span>log_page_size(num_bytes: u32) -&gt; u32 {
+    libm::log2(libm::ceil(num_bytes <span class="kw">as </span>f64 / PAGE_SIZE <span class="kw">as </span>f64)) <span class="kw">as </span>u32
 }
 
 
-<span class="comment">// Below are a set of types used to keep track of handlers which are returned by the device when creating objects.</span>
+<span class="comment">// Below are a set of types used to keep track of handlers which are returned by the device when creating objects.
 
-<span class="doccomment">/// receive queue number</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Rqn</span>(<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">u32</span>);
+</span><span class="doccomment">/// receive queue number
+</span><span class="attr">#[derive(Debug, Copy, Clone)]
+</span><span class="kw">pub struct </span>Rqn(<span class="kw">pub</span>(<span class="kw">crate</span>) u32);
 
-<span class="doccomment">/// send queue number</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Sqn</span>(<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">u32</span>);
+<span class="doccomment">/// send queue number
+</span><span class="attr">#[derive(Debug, Copy, Clone)]
+</span><span class="kw">pub struct </span>Sqn(<span class="kw">pub</span>(<span class="kw">crate</span>) u32);
 
-<span class="doccomment">/// completion queue number</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Cqn</span>(<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">u32</span>);
+<span class="doccomment">/// completion queue number
+</span><span class="attr">#[derive(Debug, Copy, Clone)]
+</span><span class="kw">pub struct </span>Cqn(<span class="kw">pub</span>(<span class="kw">crate</span>) u32);
 
-<span class="doccomment">/// protection domain</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Pd</span>(<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">u32</span>);
+<span class="doccomment">/// protection domain
+</span><span class="attr">#[derive(Debug, Copy, Clone)]
+</span><span class="kw">pub struct </span>Pd(<span class="kw">pub</span>(<span class="kw">crate</span>) u32);
 
-<span class="doccomment">/// transport domain</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Td</span>(<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">u32</span>);
+<span class="doccomment">/// transport domain
+</span><span class="attr">#[derive(Debug, Copy, Clone)]
+</span><span class="kw">pub struct </span>Td(<span class="kw">pub</span>(<span class="kw">crate</span>) u32);
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Lkey</span>(<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">u32</span>);
+<span class="attr">#[derive(Debug, Copy, Clone)]
+</span><span class="kw">pub struct </span>Lkey(<span class="kw">pub</span>(<span class="kw">crate</span>) u32);
 
-<span class="doccomment">/// event queue number</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Eqn</span>(<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">u8</span>);
+<span class="doccomment">/// event queue number
+</span><span class="attr">#[derive(Debug, Copy, Clone)]
+</span><span class="kw">pub struct </span>Eqn(<span class="kw">pub</span>(<span class="kw">crate</span>) u8);
 
-<span class="doccomment">/// transport interface receive number</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Tirn</span>(<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">u32</span>);
+<span class="doccomment">/// transport interface receive number
+</span><span class="attr">#[derive(Debug, Copy, Clone)]
+</span><span class="kw">pub struct </span>Tirn(<span class="kw">pub</span>(<span class="kw">crate</span>) u32);
 
-<span class="doccomment">/// transport interface send number</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Tisn</span>(<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">u32</span>);
+<span class="doccomment">/// transport interface send number
+</span><span class="attr">#[derive(Debug, Copy, Clone)]
+</span><span class="kw">pub struct </span>Tisn(<span class="kw">pub</span>(<span class="kw">crate</span>) u32);
 
-<span class="doccomment">/// flow table id</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FtId</span>(<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">u32</span>);
+<span class="doccomment">/// flow table id
+</span><span class="attr">#[derive(Debug, Copy, Clone)]
+</span><span class="kw">pub struct </span>FtId(<span class="kw">pub</span>(<span class="kw">crate</span>) u32);
 
-<span class="doccomment">/// flow group id</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FgId</span>(<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">u32</span>);
+<span class="doccomment">/// flow group id
+</span><span class="attr">#[derive(Debug, Copy, Clone)]
+</span><span class="kw">pub struct </span>FgId(<span class="kw">pub</span>(<span class="kw">crate</span>) u32);
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

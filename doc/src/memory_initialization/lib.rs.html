@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/memory_initialization/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../memory_initialization/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../memory_initialization/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../memory_initialization/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/memory_initialization/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../memory_initialization/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -137,139 +131,138 @@
 <span id="131">131</span>
 <span id="132">132</span>
 <span id="133">133</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
+</pre><pre class="rust"><code><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">heap</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">stack</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">no_drop</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">multiboot2</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bootloader_modules</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>heap;
+<span class="kw">extern crate </span>kernel_config;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>stack;
+<span class="kw">extern crate </span>no_drop;
+<span class="kw">extern crate </span>multiboot2;
+<span class="kw">extern crate </span>bootloader_modules;
 
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">MmiRef</span>, <span class="ident">MappedPages</span>, <span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>};
-<span class="kw">use</span> <span class="ident">kernel_config::memory</span>::{<span class="ident">KERNEL_HEAP_START</span>, <span class="ident">KERNEL_HEAP_INITIAL_SIZE</span>};
-<span class="kw">use</span> <span class="ident">multiboot2::BootInformation</span>;
-<span class="kw">use</span> <span class="ident">alloc</span>::{
-    <span class="ident">string::String</span>, 
-    <span class="ident">vec::Vec</span>,
+<span class="kw">use </span>memory::{MmiRef, MappedPages, VirtualAddress, PhysicalAddress};
+<span class="kw">use </span>kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
+<span class="kw">use </span>multiboot2::BootInformation;
+<span class="kw">use </span>alloc::{
+    string::String, 
+    vec::Vec,
 };
-<span class="kw">use</span> <span class="ident">heap::HEAP_FLAGS</span>;
-<span class="kw">use</span> <span class="ident">stack::Stack</span>;
-<span class="kw">use</span> <span class="ident">no_drop::NoDrop</span>;
-<span class="kw">use</span> <span class="ident">bootloader_modules::BootloaderModule</span>;
+<span class="kw">use </span>heap::HEAP_FLAGS;
+<span class="kw">use </span>stack::Stack;
+<span class="kw">use </span>no_drop::NoDrop;
+<span class="kw">use </span>bootloader_modules::BootloaderModule;
 
 
-<span class="doccomment">/// Initializes the virtual memory management system and returns a MemoryManagementInfo instance,</span>
-<span class="doccomment">/// which represents the initial (kernel) address space. </span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This consumes the given BootInformation, because after the memory system is initialized,</span>
-<span class="doccomment">/// the original BootInformation will be unmapped and inaccessible.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Returns the following tuple, if successful:</span>
-<span class="doccomment">///  1. The kernel&#39;s new MemoryManagementInfo,</span>
-<span class="doccomment">///  2. the MappedPages of the kernel&#39;s text section,</span>
-<span class="doccomment">///  3. the MappedPages of the kernel&#39;s rodata section,</span>
-<span class="doccomment">///  4. the MappedPages of the kernel&#39;s data section,</span>
-<span class="doccomment">///  5. the initial stack for this CPU (e.g., the BSP stack) that is currently in use,</span>
-<span class="doccomment">///  6. the list of bootloader modules obtained from the given `boot_info`,</span>
-<span class="doccomment">///  7. the kernel&#39;s list of identity-mapped [`MappedPages`],</span>
-<span class="doccomment">///     which must not be dropped until all AP (additional CPUs) are fully booted,</span>
-<span class="doccomment">///     but *should* be dropped before starting the first user application.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_memory_management</span>(
-    <span class="ident">boot_info</span>: <span class="ident">BootInformation</span>
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(
-        <span class="ident">MmiRef</span>,
-        <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>,
-        <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>,
-        <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>,
-        <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">Stack</span><span class="op">&gt;</span>,
-        <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">BootloaderModule</span><span class="op">&gt;</span>,
-        <span class="ident">NoDrop</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    ), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>
+<span class="doccomment">/// Initializes the virtual memory management system and returns a MemoryManagementInfo instance,
+/// which represents the initial (kernel) address space. 
+///
+/// This consumes the given BootInformation, because after the memory system is initialized,
+/// the original BootInformation will be unmapped and inaccessible.
+/// 
+/// Returns the following tuple, if successful:
+///  1. The kernel&#39;s new MemoryManagementInfo,
+///  2. the MappedPages of the kernel&#39;s text section,
+///  3. the MappedPages of the kernel&#39;s rodata section,
+///  4. the MappedPages of the kernel&#39;s data section,
+///  5. the initial stack for this CPU (e.g., the BSP stack) that is currently in use,
+///  6. the list of bootloader modules obtained from the given `boot_info`,
+///  7. the kernel&#39;s list of identity-mapped [`MappedPages`],
+///     which must not be dropped until all AP (additional CPUs) are fully booted,
+///     but *should* be dropped before starting the first user application.
+</span><span class="kw">pub fn </span>init_memory_management(
+    boot_info: BootInformation
+) -&gt; <span class="prelude-ty">Result</span>&lt;(
+        MmiRef,
+        NoDrop&lt;MappedPages&gt;,
+        NoDrop&lt;MappedPages&gt;,
+        NoDrop&lt;MappedPages&gt;,
+        NoDrop&lt;Stack&gt;,
+        Vec&lt;BootloaderModule&gt;,
+        NoDrop&lt;Vec&lt;MappedPages&gt;&gt;,
+    ), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
 {
-    <span class="comment">// Initialize memory management: paging (create a new page table), essential kernel mappings</span>
-    <span class="kw">let</span> (
-        <span class="kw-2">mut</span> <span class="ident">page_table</span>, 
-        <span class="ident">text_mapped_pages</span>, 
-        <span class="ident">rodata_mapped_pages</span>, 
-        <span class="ident">data_mapped_pages</span>, 
-        (<span class="ident">stack_guard_page</span>, <span class="ident">stack_pages</span>), 
-        <span class="ident">boot_info_mapped_pages</span>,
-        <span class="ident">higher_half_mapped_pages</span>, 
-        <span class="ident">identity_mapped_pages</span>
-    ) <span class="op">=</span> <span class="ident">memory::init</span>(<span class="kw-2">&amp;</span><span class="ident">boot_info</span>)<span class="question-mark">?</span>;
-    <span class="comment">// After this point, at which `memory::init()` has returned new objects that represent</span>
-    <span class="comment">// the currently-executing code/data/stack, we must ensure they aren&#39;t dropped if an error occurs,</span>
-    <span class="comment">// because that will cause them to be auto-unmapped.</span>
-    <span class="comment">// That will then cause all execution to stop and a processor fault/reset. </span>
-    <span class="comment">// We use the `NoDrop` type wrapper to accomplish this.</span>
-    <span class="kw">let</span> <span class="ident">stack</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">Stack::from_pages</span>(<span class="ident">stack_guard_page</span>, <span class="ident">stack_pages</span>.<span class="ident">into_inner</span>()) {
-        <span class="prelude-val">Ok</span>(<span class="ident">s</span>) =&gt; <span class="ident">NoDrop::new</span>(<span class="ident">s</span>),
-        <span class="prelude-val">Err</span>((<span class="ident">_stack_guard_page</span>, <span class="ident">stack_mp</span>)) =&gt; {
-            <span class="kw">let</span> <span class="ident">_stack_mp</span> <span class="op">=</span> <span class="ident">NoDrop::new</span>(<span class="ident">stack_mp</span>);
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;initial Stack was not contiguous in virtual memory&quot;</span>);
+    <span class="comment">// Initialize memory management: paging (create a new page table), essential kernel mappings
+    </span><span class="kw">let </span>(
+        <span class="kw-2">mut </span>page_table, 
+        text_mapped_pages, 
+        rodata_mapped_pages, 
+        data_mapped_pages, 
+        (stack_guard_page, stack_pages), 
+        boot_info_mapped_pages,
+        higher_half_mapped_pages, 
+        identity_mapped_pages
+    ) = memory::init(<span class="kw-2">&amp;</span>boot_info)<span class="question-mark">?</span>;
+    <span class="comment">// After this point, at which `memory::init()` has returned new objects that represent
+    // the currently-executing code/data/stack, we must ensure they aren&#39;t dropped if an error occurs,
+    // because that will cause them to be auto-unmapped.
+    // That will then cause all execution to stop and a processor fault/reset. 
+    // We use the `NoDrop` type wrapper to accomplish this.
+    </span><span class="kw">let </span>stack = <span class="kw">match </span>Stack::from_pages(stack_guard_page, stack_pages.into_inner()) {
+        <span class="prelude-val">Ok</span>(s) =&gt; NoDrop::new(s),
+        <span class="prelude-val">Err</span>((_stack_guard_page, stack_mp)) =&gt; {
+            <span class="kw">let </span>_stack_mp = NoDrop::new(stack_mp);
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;initial Stack was not contiguous in virtual memory&quot;</span>);
         }
     };
 
-    <span class="comment">// Initialize the kernel heap.</span>
-    <span class="kw">let</span> <span class="ident">heap_start</span> <span class="op">=</span> <span class="ident">KERNEL_HEAP_START</span>;
-    <span class="kw">let</span> <span class="ident">heap_initial_size</span> <span class="op">=</span> <span class="ident">KERNEL_HEAP_INITIAL_SIZE</span>;
+    <span class="comment">// Initialize the kernel heap.
+    </span><span class="kw">let </span>heap_start = KERNEL_HEAP_START;
+    <span class="kw">let </span>heap_initial_size = KERNEL_HEAP_INITIAL_SIZE;
     
-    <span class="kw">let</span> <span class="ident">heap_mapped_pages</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="ident">memory::allocate_pages_by_bytes_at</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">heap_start</span>), <span class="ident">heap_initial_size</span>)<span class="question-mark">?</span>;
-        <span class="macro">debug!</span>(<span class="string">&quot;Initial heap starts at: {:#X}, size: {:#X}, pages: {:?}&quot;</span>, <span class="ident">heap_start</span>, <span class="ident">heap_initial_size</span>, <span class="ident">pages</span>);
-        <span class="kw">let</span> <span class="ident">heap_mp</span> <span class="op">=</span> <span class="ident">page_table</span>.<span class="ident">map_allocated_pages</span>(<span class="ident">pages</span>, <span class="ident">HEAP_FLAGS</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+    <span class="kw">let </span>heap_mapped_pages = {
+        <span class="kw">let </span>pages = memory::allocate_pages_by_bytes_at(VirtualAddress::new_canonical(heap_start), heap_initial_size)<span class="question-mark">?</span>;
+        <span class="macro">debug!</span>(<span class="string">&quot;Initial heap starts at: {:#X}, size: {:#X}, pages: {:?}&quot;</span>, heap_start, heap_initial_size, pages);
+        <span class="kw">let </span>heap_mp = page_table.map_allocated_pages(pages, HEAP_FLAGS).map_err(|e| {
             <span class="macro">error!</span>(<span class="string">&quot;Failed to map kernel heap memory pages, {} bytes starting at virtual address {:#X}. Error: {:?}&quot;</span>,
-                <span class="ident">KERNEL_HEAP_INITIAL_SIZE</span>, <span class="ident">KERNEL_HEAP_START</span>, <span class="ident">e</span>
+                KERNEL_HEAP_INITIAL_SIZE, KERNEL_HEAP_START, e
             );
             <span class="string">&quot;Failed to map the kernel heap memory. Perhaps the KERNEL_HEAP_INITIAL_SIZE \
-                exceeds the size of the system&#39;s physical memory?&quot;</span>
-        })<span class="question-mark">?</span>;
-        <span class="ident">heap::init_single_heap</span>(<span class="ident">heap_start</span>, <span class="ident">heap_initial_size</span>);
-        <span class="ident">heap_mp</span>
+                exceeds the size of the system&#39;s physical memory?&quot;
+        </span>})<span class="question-mark">?</span>;
+        heap::init_single_heap(heap_start, heap_initial_size);
+        heap_mp
     };
 
     <span class="macro">debug!</span>(<span class="string">&quot;Mapped and initialized the initial heap&quot;</span>);
 
-    <span class="comment">// Initialize memory management post heap intialization: set up kernel stack allocator and kernel memory management info.</span>
-    <span class="kw">let</span> (<span class="ident">kernel_mmi_ref</span>, <span class="ident">identity_mapped_pages</span>) <span class="op">=</span> <span class="ident">memory::init_post_heap</span>(
-        <span class="ident">page_table</span>,
-        <span class="ident">higher_half_mapped_pages</span>,
-        <span class="ident">identity_mapped_pages</span>,
-        <span class="ident">heap_mapped_pages</span>,
+    <span class="comment">// Initialize memory management post heap intialization: set up kernel stack allocator and kernel memory management info.
+    </span><span class="kw">let </span>(kernel_mmi_ref, identity_mapped_pages) = memory::init_post_heap(
+        page_table,
+        higher_half_mapped_pages,
+        identity_mapped_pages,
+        heap_mapped_pages,
     );
 
-    <span class="comment">// Because bootloader modules may overlap with the actual boot information, </span>
-    <span class="comment">// we need to preserve those records here in a separate list,</span>
-    <span class="comment">// such that we can unmap the boot info pages &amp; frames here but still access that info in the future.</span>
-    <span class="kw">let</span> <span class="ident">bootloader_modules</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">BootloaderModule</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">boot_info</span>.<span class="ident">module_tags</span>()
-        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">m</span><span class="op">|</span> <span class="ident">m</span>.<span class="ident">cmdline</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">module_name</span><span class="op">|</span> 
-            <span class="ident">BootloaderModule::new</span>(
-                <span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">m</span>.<span class="ident">start_address</span>() <span class="kw">as</span> <span class="ident">usize</span>),
-                <span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">m</span>.<span class="ident">end_address</span>()   <span class="kw">as</span> <span class="ident">usize</span>),
-                <span class="ident">String::from</span>(<span class="ident">module_name</span>),
+    <span class="comment">// Because bootloader modules may overlap with the actual boot information, 
+    // we need to preserve those records here in a separate list,
+    // such that we can unmap the boot info pages &amp; frames here but still access that info in the future.
+    </span><span class="kw">let </span>bootloader_modules: Vec&lt;BootloaderModule&gt; = boot_info.module_tags()
+        .map(|m| m.cmdline().map(|module_name| 
+            BootloaderModule::new(
+                PhysicalAddress::new_canonical(m.start_address() <span class="kw">as </span>usize),
+                PhysicalAddress::new_canonical(m.end_address()   <span class="kw">as </span>usize),
+                String::from(module_name),
             )
         ))
-        .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>, <span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>() <span class="comment">// collect the `Vec&lt;Result&lt;...&gt;&gt;` into `Result&lt;Vec&lt;...&gt;&gt;`</span>
-        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;BUG: Bootloader module had invalid non-UTF8 name (cmdline) string&quot;</span>)<span class="question-mark">?</span>;
+        .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;() <span class="comment">// collect the `Vec&lt;Result&lt;...&gt;&gt;` into `Result&lt;Vec&lt;...&gt;&gt;`
+        </span>.map_err(|_e| <span class="string">&quot;BUG: Bootloader module had invalid non-UTF8 name (cmdline) string&quot;</span>)<span class="question-mark">?</span>;
 
-    <span class="comment">// Now that we&#39;ve recorded the rest of the necessary boot info, we can drop the boot_info_mapped_pages.</span>
-    <span class="comment">// This frees up those frames such that future code can exclusively map and access those pages/frames.</span>
-    <span class="ident">drop</span>(<span class="ident">boot_info_mapped_pages</span>);
+    <span class="comment">// Now that we&#39;ve recorded the rest of the necessary boot info, we can drop the boot_info_mapped_pages.
+    // This frees up those frames such that future code can exclusively map and access those pages/frames.
+    </span>drop(boot_info_mapped_pages);
 
     <span class="prelude-val">Ok</span>((
-        <span class="ident">kernel_mmi_ref</span>,
-        <span class="ident">text_mapped_pages</span>,
-        <span class="ident">rodata_mapped_pages</span>,
-        <span class="ident">data_mapped_pages</span>,
-        <span class="ident">stack</span>,
-        <span class="ident">bootloader_modules</span>,
-        <span class="ident">identity_mapped_pages</span>
+        kernel_mmi_ref,
+        text_mapped_pages,
+        rodata_mapped_pages,
+        data_mapped_pages,
+        stack,
+        bootloader_modules,
+        identity_mapped_pages
     ))
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="memory_initialization" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="memory_initialization" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

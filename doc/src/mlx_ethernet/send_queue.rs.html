@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/send_queue.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>send_queue.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/send_queue.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>send_queue.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -289,291 +283,290 @@
 <span id="283">283</span>
 <span id="284">284</span>
 <span id="285">285</span>
-</pre><pre class="rust"><code><span class="doccomment">//! The Send Queue (SQ) object holds the descriptor ring used to send outgoing messages and packets.</span>
-<span class="doccomment">//! The descriptor ring is referred to as a Work Queue Buffer.</span>
-<span class="doccomment">//! This module defines the layout of an SQ, the context used to initialize a SQ,</span>
-<span class="doccomment">//! the Transport Interface Send object attached to the queue and related functions.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! (PRM Section 8.15: Send Queue)</span>
+</pre><pre class="rust"><code><span class="doccomment">//! The Send Queue (SQ) object holds the descriptor ring used to send outgoing messages and packets.
+//! The descriptor ring is referred to as a Work Queue Buffer.
+//! This module defines the layout of an SQ, the context used to initialize a SQ,
+//! the Transport Interface Send object attached to the queue and related functions.
+//! 
+//! (PRM Section 8.15: Send Queue)
 
-<span class="kw">use</span> <span class="ident">zerocopy</span>::{<span class="ident">U32</span>, <span class="ident">FromBytes</span>};
-<span class="kw">use</span> <span class="ident">volatile::Volatile</span>;
-<span class="kw">use</span> <span class="ident">byteorder::BigEndian</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PhysicalAddress</span>, <span class="ident">MappedPages</span>, <span class="ident">BorrowedSliceMappedPages</span>, <span class="ident">Mutable</span>, <span class="ident">BorrowedMappedPages</span>};
-<span class="kw">use</span> <span class="ident">core::fmt</span>;
-<span class="kw">use</span> <span class="ident">num_enum::TryFromPrimitive</span>;
-<span class="kw">use</span> <span class="ident">core::convert::TryFrom</span>;
+</span><span class="kw">use </span>zerocopy::{U32, FromBytes};
+<span class="kw">use </span>volatile::Volatile;
+<span class="kw">use </span>byteorder::BigEndian;
+<span class="kw">use </span>memory::{PhysicalAddress, MappedPages, BorrowedSliceMappedPages, Mutable, BorrowedMappedPages};
+<span class="kw">use </span>core::fmt;
+<span class="kw">use </span>num_enum::TryFromPrimitive;
+<span class="kw">use </span>core::convert::TryFrom;
 
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_imports</span>)]</span>
-<span class="kw">use</span> <span class="kw">crate</span>::{ 
-    <span class="ident">Tisn</span>, <span class="ident">Sqn</span>, <span class="ident">Lkey</span>, <span class="ident">CQN_MASK</span>,
-    <span class="ident">command_queue::CommandOpcode</span>,
-    <span class="ident">work_queue</span>::{<span class="ident">WorkQueueEntrySend</span>, <span class="ident">DoorbellRecord</span>},
-    <span class="ident">uar::UserAccessRegion</span>
+<span class="attr">#[allow(unused_imports)]
+</span><span class="kw">use crate</span>::{ 
+    Tisn, Sqn, Lkey, CQN_MASK,
+    command_queue::CommandOpcode,
+    work_queue::{WorkQueueEntrySend, DoorbellRecord},
+    uar::UserAccessRegion
 };
 
-<span class="doccomment">/// The Transport Interface Send (TIS) object is responsible for performing all transport</span>
-<span class="doccomment">/// related operations of the transmit side. Each SQ is associated with a TIS.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">TransportInterfaceSendContext</span> {
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `tls_en`: if set, TLS offload is supported, occupies bit 30</span>
-    <span class="doccomment">/// * `prio_or_sl`: for Ethernet, Ethernet Priority in bits [19:17], occupies bits [19:16]</span>
-    <span class="ident">prio_or_sl</span>:         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding1</span>:          [<span class="ident">u8</span>; <span class="number">32</span>],
-    <span class="doccomment">/// transport domain ID</span>
-    <span class="ident">transport_domain</span>:   <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding2</span>:          <span class="ident">u32</span>,
-    <span class="doccomment">/// protection domain ID</span>
-    <span class="ident">pd</span>:                 <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding3</span>:          [<span class="ident">u32</span>; <span class="number">28</span>]
+<span class="doccomment">/// The Transport Interface Send (TIS) object is responsible for performing all transport
+/// related operations of the transmit side. Each SQ is associated with a TIS.
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>TransportInterfaceSendContext {
+    <span class="doccomment">/// A multi-part field:
+    /// * `tls_en`: if set, TLS offload is supported, occupies bit 30
+    /// * `prio_or_sl`: for Ethernet, Ethernet Priority in bits [19:17], occupies bits [19:16]
+    </span>prio_or_sl:         Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding1:          [u8; <span class="number">32</span>],
+    <span class="doccomment">/// transport domain ID
+    </span>transport_domain:   Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding2:          u32,
+    <span class="doccomment">/// protection domain ID
+    </span>pd:                 Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding3:          [u32; <span class="number">28</span>]
 }
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">TransportInterfaceSendContext</span><span class="op">&gt;</span>(), <span class="number">160</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;TransportInterfaceSendContext&gt;(), <span class="number">160</span>);
 
-<span class="kw">impl</span> <span class="ident">TransportInterfaceSendContext</span> {
-    <span class="doccomment">/// Create and initialize a TIS object</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `td`: transport domain ID </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">td</span>: <span class="ident">u32</span>) -&gt; <span class="ident">TransportInterfaceSendContext</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctxt</span> <span class="op">=</span> <span class="ident">TransportInterfaceSendContext::default</span>();
-        <span class="ident">ctxt</span>.<span class="ident">transport_domain</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">td</span>));
-        <span class="ident">ctxt</span>
+<span class="kw">impl </span>TransportInterfaceSendContext {
+    <span class="doccomment">/// Create and initialize a TIS object
+    /// 
+    /// # Arguments
+    /// * `td`: transport domain ID 
+    </span><span class="kw">pub fn </span>init(td: u32) -&gt; TransportInterfaceSendContext {
+        <span class="kw">let </span><span class="kw-2">mut </span>ctxt = TransportInterfaceSendContext::default();
+        ctxt.transport_domain.write(U32::new(td));
+        ctxt
     }
 
-    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">mailbox_offset</span>() -&gt; <span class="ident">usize</span> { <span class="number">0x10</span> }
+    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>mailbox_offset() -&gt; usize { <span class="number">0x10 </span>}
 }
 
-<span class="doccomment">/// The bitmask for the state in the [`SendQueueContext`]</span>
-<span class="kw">const</span> <span class="ident">STATE_MASK</span>:   <span class="ident">u32</span> <span class="op">=</span> <span class="number">0xF0_0000</span>;
-<span class="doccomment">/// The bit shift for the state in the [`SendQueueContext`]</span>
-<span class="kw">const</span> <span class="ident">STATE_SHIFT</span>:  <span class="ident">u32</span> <span class="op">=</span> <span class="number">20</span>;
+<span class="doccomment">/// The bitmask for the state in the [`SendQueueContext`]
+</span><span class="kw">const </span>STATE_MASK:   u32 = <span class="number">0xF0_0000</span>;
+<span class="doccomment">/// The bit shift for the state in the [`SendQueueContext`]
+</span><span class="kw">const </span>STATE_SHIFT:  u32 = <span class="number">20</span>;
 
-<span class="doccomment">/// The data structure containing SQ initialization parameters.</span>
-<span class="doccomment">/// It is passed to the HCA at the time of SQ creation.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">SendQueueContext</span> {
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `rlky`: when set the reserved LKey can be used on the SQ, occupies bit 31</span>
-    <span class="doccomment">/// * `fre`: when set the SQ supports Fast Register WQEs, occupies bit 29</span>
-    <span class="doccomment">/// * `flush_in_error_en`: if set, and when SQ transitions into error state, the hardware will flush in error WQEs that were posted, occupies bit 28</span>
-    <span class="doccomment">/// * `min_wqe_inline_mode`: sets the inline mode for the SQ, occupies bits [26:24] </span>
-    <span class="ident">rlky_state</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// an opaque identifier which software sets, which will be reported to the CQ</span>
-    <span class="ident">user_index</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// number of the CQ associated with this SQ</span>
-    <span class="ident">cqn</span>:                                <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">hairpin_peer_rq</span>:                    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">hairpin_peer_vhca</span>:                  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding1</span>:                          <span class="ident">u64</span>,
-    <span class="ident">packet_pacing_rate_limit_index</span>:     <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// the number of entries in the list of TISes</span>
-    <span class="ident">tis_lst_sz</span>:                         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding2</span>:                          <span class="ident">u64</span>,
-    <span class="doccomment">/// list of TIS numbers</span>
-    <span class="ident">tis_num_0</span>:                          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// The data structure containing SQ initialization parameters.
+/// It is passed to the HCA at the time of SQ creation.
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C, packed)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>SendQueueContext {
+    <span class="doccomment">/// A multi-part field:
+    /// * `rlky`: when set the reserved LKey can be used on the SQ, occupies bit 31
+    /// * `fre`: when set the SQ supports Fast Register WQEs, occupies bit 29
+    /// * `flush_in_error_en`: if set, and when SQ transitions into error state, the hardware will flush in error WQEs that were posted, occupies bit 28
+    /// * `min_wqe_inline_mode`: sets the inline mode for the SQ, occupies bits [26:24] 
+    </span>rlky_state:                         Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// an opaque identifier which software sets, which will be reported to the CQ
+    </span>user_index:                         Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// number of the CQ associated with this SQ
+    </span>cqn:                                Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    hairpin_peer_rq:                    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    hairpin_peer_vhca:                  Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding1:                          u64,
+    packet_pacing_rate_limit_index:     Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// the number of entries in the list of TISes
+    </span>tis_lst_sz:                         Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding2:                          u64,
+    <span class="doccomment">/// list of TIS numbers
+    </span>tis_num_0:                          Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">SendQueueContext</span><span class="op">&gt;</span>(), <span class="number">48</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;SendQueueContext&gt;(), <span class="number">48</span>);
 
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">SendQueueContext</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;SendQueueContext&quot;</span>)
-            .<span class="ident">field</span>(<span class="string">&quot;rlky_state&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">rlky_state</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;user_index&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">user_index</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;cqn&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">cqn</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;hairpin_peer_rq&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">hairpin_peer_rq</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;hairpin_peer_vhca&quot;</span>,<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">hairpin_peer_vhca</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;packet_pacing_rate_limit_index&quot;</span>,<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">packet_pacing_rate_limit_index</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;tis_list_sz&quot;</span>,<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">tis_lst_sz</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;tis_num_0&quot;</span>,<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">tis_num_0</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">finish</span>()
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>SendQueueContext {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        f.debug_struct(<span class="string">&quot;SendQueueContext&quot;</span>)
+            .field(<span class="string">&quot;rlky_state&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.rlky_state.read().get())
+            .field(<span class="string">&quot;user_index&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.user_index.read().get())
+            .field(<span class="string">&quot;cqn&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.cqn.read().get())
+            .field(<span class="string">&quot;hairpin_peer_rq&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.hairpin_peer_rq.read().get())
+            .field(<span class="string">&quot;hairpin_peer_vhca&quot;</span>,<span class="kw-2">&amp;</span><span class="self">self</span>.hairpin_peer_vhca.read().get())
+            .field(<span class="string">&quot;packet_pacing_rate_limit_index&quot;</span>,<span class="kw-2">&amp;</span><span class="self">self</span>.packet_pacing_rate_limit_index.read().get())
+            .field(<span class="string">&quot;tis_list_sz&quot;</span>,<span class="kw-2">&amp;</span><span class="self">self</span>.tis_lst_sz.read().get())
+            .field(<span class="string">&quot;tis_num_0&quot;</span>,<span class="kw-2">&amp;</span><span class="self">self</span>.tis_num_0.read().get())
+            .finish()
     }
 }
 
-<span class="doccomment">/// The possible states the SQ can be in.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">TryFromPrimitive</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">SendQueueState</span> {
-    <span class="ident">Reset</span> <span class="op">=</span> <span class="number">0x0</span>,
-    <span class="ident">Ready</span> <span class="op">=</span> <span class="number">0x1</span>,
-    <span class="ident">Error</span> <span class="op">=</span> <span class="number">0x3</span>
-}
+<span class="doccomment">/// The possible states the SQ can be in.
+</span><span class="attr">#[derive(Debug, TryFromPrimitive)]
+#[repr(u8)]
+</span><span class="kw">pub enum </span>SendQueueState {
+    Reset = <span class="number">0x0</span>,
+    Ready = <span class="number">0x1</span>,
+    Error = <span class="number">0x3
+</span>}
 
-<span class="kw">impl</span> <span class="ident">SendQueueContext</span> {
-    <span class="doccomment">/// Create and initialize the fields of the SQ context.</span>
-    <span class="doccomment">/// The SQ context is then passed to the HCA when creating the SQ.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `cqn`: number of CQ associated with this SQ </span>
-    <span class="doccomment">/// * `tisn`: number of the TIS context associated with this SQ</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">cqn</span>: <span class="ident">u32</span>, <span class="ident">tisn</span>: <span class="ident">u32</span>) -&gt; <span class="ident">SendQueueContext</span>{
-        <span class="comment">// We are always using 1 TIS per SQ</span>
-        <span class="kw">const</span> <span class="ident">TIS_LST_SZ</span>:               <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>;
-        <span class="kw">const</span> <span class="ident">TISN_MASK</span>:                <span class="ident">u32</span> <span class="op">=</span> <span class="number">0xFF_FFFF</span>;
-        <span class="kw">const</span> <span class="ident">ENABLE_RLKEY</span>:             <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">31</span>;
-        <span class="kw">const</span> <span class="ident">FAST_REGISTER_ENABLE</span>:     <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">29</span>;
-        <span class="kw">const</span> <span class="ident">FLUSH_IN_ERROR_ENABLE</span>:    <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">28</span>;
-        <span class="kw">const</span> <span class="ident">ONE_INLINE_HEADER</span>:        <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">24</span>;
+<span class="kw">impl </span>SendQueueContext {
+    <span class="doccomment">/// Create and initialize the fields of the SQ context.
+    /// The SQ context is then passed to the HCA when creating the SQ.
+    /// 
+    /// # Arguments
+    /// * `cqn`: number of CQ associated with this SQ 
+    /// * `tisn`: number of the TIS context associated with this SQ
+    </span><span class="kw">pub fn </span>init(cqn: u32, tisn: u32) -&gt; SendQueueContext{
+        <span class="comment">// We are always using 1 TIS per SQ
+        </span><span class="kw">const </span>TIS_LST_SZ:               u32 = <span class="number">1 </span>&lt;&lt; <span class="number">16</span>;
+        <span class="kw">const </span>TISN_MASK:                u32 = <span class="number">0xFF_FFFF</span>;
+        <span class="kw">const </span>ENABLE_RLKEY:             u32 = <span class="number">1 </span>&lt;&lt; <span class="number">31</span>;
+        <span class="kw">const </span>FAST_REGISTER_ENABLE:     u32 = <span class="number">1 </span>&lt;&lt; <span class="number">29</span>;
+        <span class="kw">const </span>FLUSH_IN_ERROR_ENABLE:    u32 = <span class="number">1 </span>&lt;&lt; <span class="number">28</span>;
+        <span class="kw">const </span>ONE_INLINE_HEADER:        u32 = <span class="number">1 </span>&lt;&lt; <span class="number">24</span>;
 
-        <span class="comment">// set all fields to zero</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctxt</span> <span class="op">=</span> <span class="ident">SendQueueContext::default</span>();
+        <span class="comment">// set all fields to zero
+        </span><span class="kw">let </span><span class="kw-2">mut </span>ctxt = SendQueueContext::default();
 
-        <span class="ident">ctxt</span>.<span class="ident">rlky_state</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">ENABLE_RLKEY</span> <span class="op">|</span> <span class="ident">FAST_REGISTER_ENABLE</span> <span class="op">|</span> <span class="ident">FLUSH_IN_ERROR_ENABLE</span> <span class="op">|</span> <span class="ident">ONE_INLINE_HEADER</span>));
-        <span class="ident">ctxt</span>.<span class="ident">cqn</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">cqn</span> <span class="op">&amp;</span> <span class="ident">CQN_MASK</span>));
-        <span class="ident">ctxt</span>.<span class="ident">tis_lst_sz</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">TIS_LST_SZ</span>));
-        <span class="ident">ctxt</span>.<span class="ident">tis_num_0</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">tisn</span> <span class="op">&amp;</span> <span class="ident">TISN_MASK</span>));
-        <span class="ident">ctxt</span>
+        ctxt.rlky_state.write(U32::new(ENABLE_RLKEY | FAST_REGISTER_ENABLE | FLUSH_IN_ERROR_ENABLE | ONE_INLINE_HEADER));
+        ctxt.cqn.write(U32::new(cqn &amp; CQN_MASK));
+        ctxt.tis_lst_sz.write(U32::new(TIS_LST_SZ));
+        ctxt.tis_num_0.write(U32::new(tisn &amp; TISN_MASK));
+        ctxt
     }
 
-    <span class="doccomment">/// set state of the SQ in the SQ context to `next_state`</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_state</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">next_state</span>: <span class="ident">SendQueueState</span>) {
-        <span class="kw">let</span> <span class="ident">state</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rlky_state</span>.<span class="ident">read</span>().<span class="ident">get</span>() <span class="op">&amp;</span> <span class="op">!</span><span class="ident">STATE_MASK</span>;
-        <span class="self">self</span>.<span class="ident">rlky_state</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">state</span> <span class="op">|</span> ((<span class="ident">next_state</span> <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">STATE_SHIFT</span>))); 
+    <span class="doccomment">/// set state of the SQ in the SQ context to `next_state`
+    </span><span class="kw">pub fn </span>set_state(<span class="kw-2">&amp;mut </span><span class="self">self</span>, next_state: SendQueueState) {
+        <span class="kw">let </span>state = <span class="self">self</span>.rlky_state.read().get() &amp; !STATE_MASK;
+        <span class="self">self</span>.rlky_state.write(U32::new(state | ((next_state <span class="kw">as </span>u32) &lt;&lt; STATE_SHIFT))); 
     }
 
-    <span class="doccomment">/// Find the state of the SQ from the SQ context </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">SendQueueState</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">state</span> <span class="op">=</span> (<span class="self">self</span>.<span class="ident">rlky_state</span>.<span class="ident">read</span>().<span class="ident">get</span>() <span class="op">&amp;</span> <span class="ident">STATE_MASK</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">STATE_SHIFT</span>;
-        <span class="prelude-val">Ok</span>( <span class="ident">SendQueueState::try_from</span>(<span class="ident">state</span> <span class="kw">as</span> <span class="ident">u8</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;Invalid value in the SQ state&quot;</span>)<span class="question-mark">?</span> )
+    <span class="doccomment">/// Find the state of the SQ from the SQ context 
+    </span><span class="kw">pub fn </span>get_state(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;SendQueueState, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>state = (<span class="self">self</span>.rlky_state.read().get() &amp; STATE_MASK) &gt;&gt; STATE_SHIFT;
+        <span class="prelude-val">Ok</span>( SendQueueState::try_from(state <span class="kw">as </span>u8).map_err(|_e| <span class="string">&quot;Invalid value in the SQ state&quot;</span>)<span class="question-mark">? </span>)
     }
 
-    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">mailbox_offset</span>() -&gt; <span class="ident">usize</span> { <span class="number">0x10</span> }
+    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>mailbox_offset() -&gt; usize { <span class="number">0x10 </span>}
 }
 
-<span class="doccomment">/// There are two doorbell registers we use to send packets.</span>
-<span class="doccomment">/// We alternate between them for each packet.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum</span> <span class="ident">CurrentUARDoorbell</span> {
-    <span class="ident">Even</span>,
-    <span class="ident">Odd</span>
+<span class="doccomment">/// There are two doorbell registers we use to send packets.
+/// We alternate between them for each packet.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum </span>CurrentUARDoorbell {
+    Even,
+    Odd
 }
 
-<span class="kw">impl</span> <span class="ident">CurrentUARDoorbell</span> {
-    <span class="kw">fn</span> <span class="ident">alternate</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">CurrentUARDoorbell</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident"><span class="self">Self</span>::Even</span> =&gt; <span class="ident"><span class="self">Self</span>::Odd</span>,
-            <span class="ident"><span class="self">Self</span>::Odd</span> =&gt; <span class="ident"><span class="self">Self</span>::Even</span>,
+<span class="kw">impl </span>CurrentUARDoorbell {
+    <span class="kw">fn </span>alternate(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; CurrentUARDoorbell {
+        <span class="kw">match </span><span class="self">self </span>{
+            <span class="self">Self</span>::Even =&gt; <span class="self">Self</span>::Odd,
+            <span class="self">Self</span>::Odd =&gt; <span class="self">Self</span>::Even,
         }
     }
 }
 
-<span class="doccomment">/// A data structure that contains the SQ ring of descriptors </span>
-<span class="doccomment">/// and is used to interact with the SQ once initialized.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SendQueue</span> {
-    <span class="doccomment">/// physically-contiguous SQ descriptors</span>
-    <span class="ident">entries</span>: <span class="ident">BorrowedSliceMappedPages</span><span class="op">&lt;</span><span class="ident">WorkQueueEntrySend</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>, 
-    <span class="doccomment">/// the doorbell for the SQ</span>
-    <span class="ident">doorbell</span>: <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">DoorbellRecord</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// the UAR page associated with the SQ</span>
-    <span class="ident">uar</span>: <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">UserAccessRegion</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The number of WQEs that have been completed.</span>
-    <span class="doccomment">/// From this we also calculate the next descriptor to use</span>
-    <span class="ident">wqe_counter</span>: <span class="ident">u16</span>,
-    <span class="doccomment">/// SQ number that is returned by the [`CommandOpcode::CreateSq`] command</span>
-    <span class="ident">sqn</span>: <span class="ident">Sqn</span>,
-    <span class="doccomment">/// number of the TIS context associated with this SQ</span>
-    <span class="ident">_tisn</span>: <span class="ident">Tisn</span>,
-    <span class="doccomment">/// the lkey used by the SQ</span>
-    <span class="ident">lkey</span>: <span class="ident">Lkey</span>,
-    <span class="doccomment">/// the uar doorbell to be used by the next packet</span>
-    <span class="ident">uar_db</span>: <span class="ident">CurrentUARDoorbell</span>
+<span class="doccomment">/// A data structure that contains the SQ ring of descriptors 
+/// and is used to interact with the SQ once initialized.
+</span><span class="kw">pub struct </span>SendQueue {
+    <span class="doccomment">/// physically-contiguous SQ descriptors
+    </span>entries: BorrowedSliceMappedPages&lt;WorkQueueEntrySend, Mutable&gt;, 
+    <span class="doccomment">/// the doorbell for the SQ
+    </span>doorbell: BorrowedMappedPages&lt;DoorbellRecord, Mutable&gt;,
+    <span class="doccomment">/// the UAR page associated with the SQ
+    </span>uar: BorrowedMappedPages&lt;UserAccessRegion, Mutable&gt;,
+    <span class="doccomment">/// The number of WQEs that have been completed.
+    /// From this we also calculate the next descriptor to use
+    </span>wqe_counter: u16,
+    <span class="doccomment">/// SQ number that is returned by the [`CommandOpcode::CreateSq`] command
+    </span>sqn: Sqn,
+    <span class="doccomment">/// number of the TIS context associated with this SQ
+    </span>_tisn: Tisn,
+    <span class="doccomment">/// the lkey used by the SQ
+    </span>lkey: Lkey,
+    <span class="doccomment">/// the uar doorbell to be used by the next packet
+    </span>uar_db: CurrentUARDoorbell
 }
 
-<span class="kw">impl</span> <span class="ident">SendQueue</span> {
-    <span class="doccomment">/// Creates a SQ by mapping the buffer as a slice of [`WorkQueueEntrySend`]s.</span>
-    <span class="doccomment">/// Each WQE is set to an initial state.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `entries_mp`: memory that is to be transformed into a slice of WQEs. </span>
-    <span class="doccomment">/// The starting physical address should have been passed to the HCA when creating the SQ.</span>
-    <span class="doccomment">/// * `num_entries`: number of entries in the SQ</span>
-    <span class="doccomment">/// * `doorbell_mp`: memory that is to be transformed into a doorbell record. </span>
-    <span class="doccomment">/// The starting physical address should have been passed to the HCA when creating the SQ.   </span>
-    <span class="doccomment">/// * `uar_mp`: The UAR page that is associate with this SQ. </span>
-    <span class="doccomment">/// * `sqn`: SQ number returned by the HCA</span>
-    <span class="doccomment">/// * `tisn`: number of the TIS context associated with this SQ</span>
-    <span class="doccomment">/// * `lkey`: the lkey used by the SQ</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create</span>(
-        <span class="ident">entries_mp</span>: <span class="ident">MappedPages</span>, 
-        <span class="ident">num_entries</span>: <span class="ident">usize</span>, 
-        <span class="ident">doorbell_mp</span>: <span class="ident">MappedPages</span>, 
-        <span class="ident">uar_mp</span>: <span class="ident">MappedPages</span>, 
-        <span class="ident">sqn</span>: <span class="ident">Sqn</span>,
-        <span class="ident">_tisn</span>: <span class="ident">Tisn</span>,
-        <span class="ident">lkey</span>: <span class="ident">Lkey</span>
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">SendQueue</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// map the descriptor ring and initialize</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entries</span> <span class="op">=</span> <span class="ident">entries_mp</span>.<span class="ident">into_borrowed_slice_mut</span>::<span class="op">&lt;</span><span class="ident">WorkQueueEntrySend</span><span class="op">&gt;</span>(<span class="number">0</span>, <span class="ident">num_entries</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
-        <span class="kw">for</span> <span class="ident">entry</span> <span class="kw">in</span> <span class="ident">entries</span>.<span class="ident">iter_mut</span>() {
-            <span class="ident">entry</span>.<span class="ident">init</span>()
+<span class="kw">impl </span>SendQueue {
+    <span class="doccomment">/// Creates a SQ by mapping the buffer as a slice of [`WorkQueueEntrySend`]s.
+    /// Each WQE is set to an initial state.
+    /// 
+    /// # Arguments
+    /// * `entries_mp`: memory that is to be transformed into a slice of WQEs. 
+    /// The starting physical address should have been passed to the HCA when creating the SQ.
+    /// * `num_entries`: number of entries in the SQ
+    /// * `doorbell_mp`: memory that is to be transformed into a doorbell record. 
+    /// The starting physical address should have been passed to the HCA when creating the SQ.   
+    /// * `uar_mp`: The UAR page that is associate with this SQ. 
+    /// * `sqn`: SQ number returned by the HCA
+    /// * `tisn`: number of the TIS context associated with this SQ
+    /// * `lkey`: the lkey used by the SQ
+    </span><span class="kw">pub fn </span>create(
+        entries_mp: MappedPages, 
+        num_entries: usize, 
+        doorbell_mp: MappedPages, 
+        uar_mp: MappedPages, 
+        sqn: Sqn,
+        _tisn: Tisn,
+        lkey: Lkey
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;SendQueue, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// map the descriptor ring and initialize
+        </span><span class="kw">let </span><span class="kw-2">mut </span>entries = entries_mp.into_borrowed_slice_mut::&lt;WorkQueueEntrySend&gt;(<span class="number">0</span>, num_entries)
+            .map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
+        <span class="kw">for </span>entry <span class="kw">in </span>entries.iter_mut() {
+            entry.init()
         }
-        <span class="comment">// map the doorbell and initialize</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">doorbell</span> <span class="op">=</span> <span class="ident">doorbell_mp</span>.<span class="ident">into_borrowed_mut</span>(<span class="number">0</span>).<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
-        <span class="kw-2">*</span><span class="ident">doorbell</span> <span class="op">=</span> <span class="ident">DoorbellRecord::default</span>();
-        <span class="comment">// map the uar and initialize</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">uar</span> <span class="op">=</span> <span class="ident">uar_mp</span>.<span class="ident">into_borrowed_mut</span>(<span class="number">0</span>).<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
-        <span class="kw-2">*</span><span class="ident">uar</span> <span class="op">=</span> <span class="ident">UserAccessRegion::default</span>();
+        <span class="comment">// map the doorbell and initialize
+        </span><span class="kw">let </span><span class="kw-2">mut </span>doorbell = doorbell_mp.into_borrowed_mut(<span class="number">0</span>).map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
+        <span class="kw-2">*</span>doorbell = DoorbellRecord::default();
+        <span class="comment">// map the uar and initialize
+        </span><span class="kw">let </span><span class="kw-2">mut </span>uar = uar_mp.into_borrowed_mut(<span class="number">0</span>).map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
+        <span class="kw-2">*</span>uar = UserAccessRegion::default();
 
-        <span class="prelude-val">Ok</span>( <span class="ident">SendQueue</span>{<span class="ident">entries</span>, <span class="ident">doorbell</span>, <span class="ident">uar</span>, <span class="ident">wqe_counter</span>: <span class="number">0</span>, <span class="ident">sqn</span>, <span class="ident">_tisn</span>, <span class="ident">lkey</span>, <span class="ident">uar_db</span>: <span class="ident">CurrentUARDoorbell::Even</span>} )
+        <span class="prelude-val">Ok</span>( SendQueue{entries, doorbell, uar, wqe_counter: <span class="number">0</span>, sqn, _tisn, lkey, uar_db: CurrentUARDoorbell::Even} )
     }
 
-    <span class="doccomment">/// Returns the index into the WQ given the total number of WQEs completed</span>
-    <span class="kw">fn</span> <span class="ident">desc_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">wqe_counter</span> <span class="kw">as</span> <span class="ident">usize</span>  <span class="op">%</span> <span class="self">self</span>.<span class="ident">entries</span>.<span class="ident">len</span>()
+    <span class="doccomment">/// Returns the index into the WQ given the total number of WQEs completed
+    </span><span class="kw">fn </span>desc_id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.wqe_counter <span class="kw">as </span>usize  % <span class="self">self</span>.entries.len()
     }
 
-    <span class="doccomment">/// The steps required to post a WQE after the WQE fields have been initialized.</span>
-    <span class="doccomment">/// The doorbell record is updated and the UAR register is written to.</span>
-    <span class="kw">fn</span> <span class="ident">finish_wqe_operation</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="ident">desc_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">desc_id</span>();
-        <span class="kw">let</span> <span class="ident">wqe</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">entries</span>[<span class="ident">desc_id</span>];
-        <span class="comment">// need to wrap around 0xFFFF, this should happen automatically with a u16</span>
-        <span class="self">self</span>.<span class="ident">wqe_counter</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>; 
-        <span class="comment">// we&#39;re writing the wqe counter, not the next wqe to be used (8.8.2 is confusing about what should actually be posted)</span>
-        <span class="self">self</span>.<span class="ident">doorbell</span>.<span class="ident">send_counter</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="self">self</span>.<span class="ident">wqe_counter</span> <span class="kw">as</span> <span class="ident">u32</span>)); 
+    <span class="doccomment">/// The steps required to post a WQE after the WQE fields have been initialized.
+    /// The doorbell record is updated and the UAR register is written to.
+    </span><span class="kw">fn </span>finish_wqe_operation(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">let </span>desc_id = <span class="self">self</span>.desc_id();
+        <span class="kw">let </span>wqe = <span class="kw-2">&amp;mut </span><span class="self">self</span>.entries[desc_id];
+        <span class="comment">// need to wrap around 0xFFFF, this should happen automatically with a u16
+        </span><span class="self">self</span>.wqe_counter += <span class="number">1</span>; 
+        <span class="comment">// we&#39;re writing the wqe counter, not the next wqe to be used (8.8.2 is confusing about what should actually be posted)
+        </span><span class="self">self</span>.doorbell.send_counter.write(U32::new(<span class="self">self</span>.wqe_counter <span class="kw">as </span>u32)); 
         
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">doorbell</span> <span class="op">=</span> [<span class="ident">U32::new</span>(<span class="number">0</span>);<span class="number">64</span>];
-        <span class="ident">doorbell</span>[<span class="number">0</span>] <span class="op">=</span> <span class="ident">wqe</span>.<span class="ident">control</span>.<span class="ident">opcode</span>.<span class="ident">read</span>(); 
-        <span class="ident">doorbell</span>[<span class="number">1</span>] <span class="op">=</span> <span class="ident">wqe</span>.<span class="ident">control</span>.<span class="ident">ds</span>.<span class="ident">read</span>();
-        <span class="self">self</span>.<span class="ident">uar</span>.<span class="ident">write_wqe_to_doorbell</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">uar_db</span>, <span class="ident">doorbell</span>);
-        <span class="self">self</span>.<span class="ident">uar_db</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">uar_db</span>.<span class="ident">alternate</span>();
+        <span class="kw">let </span><span class="kw-2">mut </span>doorbell = [U32::new(<span class="number">0</span>);<span class="number">64</span>];
+        doorbell[<span class="number">0</span>] = wqe.control.opcode.read(); 
+        doorbell[<span class="number">1</span>] = wqe.control.ds.read();
+        <span class="self">self</span>.uar.write_wqe_to_doorbell(<span class="kw-2">&amp;</span><span class="self">self</span>.uar_db, doorbell);
+        <span class="self">self</span>.uar_db = <span class="self">self</span>.uar_db.alternate();
 
-        <span class="comment">// wqe.dump(desc_id);</span>
+        <span class="comment">// wqe.dump(desc_id);
+    </span>}
+
+    <span class="doccomment">/// Perform all the steps to send a packet: initialize the WQE, update the doorbell record and the uar doorbell register.
+    /// Returns the current value of the WQE counter.
+    </span><span class="kw">pub fn </span>send(<span class="kw-2">&amp;mut </span><span class="self">self</span>, packet_address: PhysicalAddress, packet: <span class="kw-2">&amp;</span>[u8]) -&gt; u16 {
+        <span class="kw">let </span>desc_id = <span class="self">self</span>.desc_id();
+        <span class="kw">let </span>wqe = <span class="kw-2">&amp;mut </span><span class="self">self</span>.entries[desc_id];
+        wqe.send(<span class="self">self</span>.wqe_counter <span class="kw">as </span>u32, <span class="self">self</span>.sqn.<span class="number">0</span>, <span class="self">self</span>.lkey.<span class="number">0</span>, packet_address, packet);
+        <span class="self">self</span>.finish_wqe_operation();
+        <span class="self">self</span>.wqe_counter
     }
 
-    <span class="doccomment">/// Perform all the steps to send a packet: initialize the WQE, update the doorbell record and the uar doorbell register.</span>
-    <span class="doccomment">/// Returns the current value of the WQE counter.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">packet_address</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">packet</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) -&gt; <span class="ident">u16</span> {
-        <span class="kw">let</span> <span class="ident">desc_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">desc_id</span>();
-        <span class="kw">let</span> <span class="ident">wqe</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">entries</span>[<span class="ident">desc_id</span>];
-        <span class="ident">wqe</span>.<span class="ident">send</span>(<span class="self">self</span>.<span class="ident">wqe_counter</span> <span class="kw">as</span> <span class="ident">u32</span>, <span class="self">self</span>.<span class="ident">sqn</span>.<span class="number">0</span>, <span class="self">self</span>.<span class="ident">lkey</span>.<span class="number">0</span>, <span class="ident">packet_address</span>, <span class="ident">packet</span>);
-        <span class="self">self</span>.<span class="ident">finish_wqe_operation</span>();
-        <span class="self">self</span>.<span class="ident">wqe_counter</span>
+    <span class="doccomment">/// Perform all the steps to complete a NOP: initialize the WQE, update the doorbell record and the uar doorbell register.
+    /// Returns the current value of the WQE counter.
+    </span><span class="kw">pub fn </span>nop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; u16 {
+        <span class="kw">let </span>desc_id = <span class="self">self</span>.desc_id();
+        <span class="kw">let </span>wqe = <span class="kw-2">&amp;mut </span><span class="self">self</span>.entries[desc_id];
+        wqe.nop(<span class="self">self</span>.wqe_counter <span class="kw">as </span>u32, <span class="self">self</span>.sqn.<span class="number">0</span>);
+        <span class="self">self</span>.finish_wqe_operation();  
+        <span class="self">self</span>.wqe_counter
     }
 
-    <span class="doccomment">/// Perform all the steps to complete a NOP: initialize the WQE, update the doorbell record and the uar doorbell register.</span>
-    <span class="doccomment">/// Returns the current value of the WQE counter.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">nop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">u16</span> {
-        <span class="kw">let</span> <span class="ident">desc_id</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">desc_id</span>();
-        <span class="kw">let</span> <span class="ident">wqe</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">entries</span>[<span class="ident">desc_id</span>];
-        <span class="ident">wqe</span>.<span class="ident">nop</span>(<span class="self">self</span>.<span class="ident">wqe_counter</span> <span class="kw">as</span> <span class="ident">u32</span>, <span class="self">self</span>.<span class="ident">sqn</span>.<span class="number">0</span>);
-        <span class="self">self</span>.<span class="ident">finish_wqe_operation</span>();  
-        <span class="self">self</span>.<span class="ident">wqe_counter</span>
-    }
-
-    <span class="doccomment">/// Prints out all entries in the SQ</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dump</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">entry</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">entries</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
-            <span class="ident">entry</span>.<span class="ident">dump</span>(<span class="ident">i</span>)
+    <span class="doccomment">/// Prints out all entries in the SQ
+    </span><span class="kw">pub fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">for </span>(i, entry) <span class="kw">in </span><span class="self">self</span>.entries.iter().enumerate() {
+            entry.dump(i)
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

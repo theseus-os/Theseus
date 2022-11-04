@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/signal_handler/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../signal_handler/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../signal_handler/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../signal_handler/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/signal_handler/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../signal_handler/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -173,131 +167,131 @@
 <span id="167">167</span>
 <span id="168">168</span>
 <span id="169">169</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Signal handlers for CPU exceptions/errors, like POSIX-style signals, but safer and Rusty.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Instead of directly supporting POSIX signals like SIGSEGV, SIGILL, etc,</span>
-<span class="doccomment">//! this crate only supports a few categories of signals that represent a CPU/machine exception,</span>
-<span class="doccomment">//! e.g., divide errors, page faults, illegal instructions, etc.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Each task can [register] up to one signal handler per signal kind.</span>
-<span class="doccomment">//! If/when that exception occurs, the full [context] of that exception is provided as an argument</span>
-<span class="doccomment">//! to the registered signal handler.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Signal handlers can only be invoked once. If an exception occurs, it is up to the task logic</span>
-<span class="doccomment">//! to re-register that signal handler again. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! [register]: register_signal_handler</span>
-<span class="doccomment">//! [context]: SignalContext</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Signal handlers for CPU exceptions/errors, like POSIX-style signals, but safer and Rusty.
+//! 
+//! Instead of directly supporting POSIX signals like SIGSEGV, SIGILL, etc,
+//! this crate only supports a few categories of signals that represent a CPU/machine exception,
+//! e.g., divide errors, page faults, illegal instructions, etc.
+//! 
+//! Each task can [register] up to one signal handler per signal kind.
+//! If/when that exception occurs, the full [context] of that exception is provided as an argument
+//! to the registered signal handler.
+//! 
+//! Signal handlers can only be invoked once. If an exception occurs, it is up to the task logic
+//! to re-register that signal handler again. 
+//! 
+//! [register]: register_signal_handler
+//! [context]: SignalContext
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">trait_alias</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(trait_alias)]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
+</span><span class="kw">extern crate </span>alloc;
 
 
-<span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
-<span class="kw">use</span> <span class="ident">core::cell::RefCell</span>;
-<span class="kw">use</span> <span class="ident">memory::VirtualAddress</span>;
-<span class="kw">use</span> <span class="ident">x86_64::structures::idt::PageFaultErrorCode</span>;
-<span class="kw">use</span> <span class="ident">thread_local_macro::thread_local</span>;
+<span class="kw">use </span>alloc::boxed::Box;
+<span class="kw">use </span>core::cell::RefCell;
+<span class="kw">use </span>memory::VirtualAddress;
+<span class="kw">use </span>x86_64::structures::idt::PageFaultErrorCode;
+<span class="kw">use </span>thread_local_macro::thread_local;
 
 
 <span class="macro">thread_local!</span>{
-    <span class="doccomment">/// The signal handlers registered for the current task.</span>
-    <span class="kw">static</span> <span class="ident">SIGNAL_HANDLERS</span>: [<span class="ident">RefCell</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">SignalHandler</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>; <span class="ident">NUM_SIGNALS</span>] <span class="op">=</span> <span class="ident">Default::default</span>();
+    <span class="doccomment">/// The signal handlers registered for the current task.
+    </span><span class="kw">static </span>SIGNAL_HANDLERS: [RefCell&lt;<span class="prelude-ty">Option</span>&lt;Box&lt;<span class="kw">dyn </span>SignalHandler&gt;&gt;&gt;; NUM_SIGNALS] = Default::default();
 }
 
 
-<span class="doccomment">/// Register a [`SignalHandler`] callback function for the current task.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// If an exception/error occurs during the execution of the current task,</span>
-<span class="doccomment">/// the given `handler` will be invoked with details of that exception.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Return</span>
-<span class="doccomment">/// * `Ok` if the signal handler was registered successfully.</span>
-<span class="doccomment">/// * `Err` if the signal handler was registered successfully.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_signal_handler</span>(
-    <span class="ident">signal</span>: <span class="ident">Signal</span>,
-    <span class="ident">handler</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">SignalHandler</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), ()<span class="op">&gt;</span> {
-    <span class="ident">SIGNAL_HANDLERS</span>.<span class="ident">with</span>(<span class="op">|</span><span class="ident">sig_handlers</span><span class="op">|</span> {
-        <span class="kw">let</span> <span class="ident">handler_slot</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">sig_handlers</span>[<span class="ident">signal</span> <span class="kw">as</span> <span class="ident">usize</span>];
-        <span class="kw">if</span> <span class="ident">handler_slot</span>.<span class="ident">borrow</span>().<span class="ident">is_some</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(());
+<span class="doccomment">/// Register a [`SignalHandler`] callback function for the current task.
+/// 
+/// If an exception/error occurs during the execution of the current task,
+/// the given `handler` will be invoked with details of that exception.
+/// 
+/// # Return
+/// * `Ok` if the signal handler was registered successfully.
+/// * `Err` if the signal handler was registered successfully.
+</span><span class="kw">pub fn </span>register_signal_handler(
+    signal: Signal,
+    handler: Box&lt;<span class="kw">dyn </span>SignalHandler&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), ()&gt; {
+    SIGNAL_HANDLERS.with(|sig_handlers| {
+        <span class="kw">let </span>handler_slot = <span class="kw-2">&amp;</span>sig_handlers[signal <span class="kw">as </span>usize];
+        <span class="kw">if </span>handler_slot.borrow().is_some() {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(());
         }
-        <span class="kw-2">*</span><span class="ident">handler_slot</span>.<span class="ident">borrow_mut</span>() <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">handler</span>);
+        <span class="kw-2">*</span>handler_slot.borrow_mut() = <span class="prelude-val">Some</span>(handler);
         <span class="prelude-val">Ok</span>(())
     })
 }
 
 
-<span class="doccomment">/// Take the [`SignalHandler`] registered for the given `signal` for the current task.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This **removes** the signal handler registered for this `signal` for the current task.</span>
-<span class="doccomment">/// Thus, if another exception occurs that triggers this `signal`, </span>
-<span class="doccomment">/// the returned handler will no longer exist to be invoked.</span>
-<span class="doccomment">/// You&#39;d need to re-register another handler for it using [`register_signal_handler`].</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_signal_handler</span>(<span class="ident">signal</span>: <span class="ident">Signal</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">SignalHandler</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-    <span class="ident">SIGNAL_HANDLERS</span>.<span class="ident">with</span>(<span class="op">|</span><span class="ident">sig_handlers</span><span class="op">|</span> {
-        <span class="ident">sig_handlers</span>[<span class="ident">signal</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">borrow_mut</span>().<span class="ident">take</span>()
+<span class="doccomment">/// Take the [`SignalHandler`] registered for the given `signal` for the current task.
+/// 
+/// This **removes** the signal handler registered for this `signal` for the current task.
+/// Thus, if another exception occurs that triggers this `signal`, 
+/// the returned handler will no longer exist to be invoked.
+/// You&#39;d need to re-register another handler for it using [`register_signal_handler`].
+</span><span class="kw">pub fn </span>take_signal_handler(signal: Signal) -&gt; <span class="prelude-ty">Option</span>&lt;Box&lt;<span class="kw">dyn </span>SignalHandler&gt;&gt; {
+    SIGNAL_HANDLERS.with(|sig_handlers| {
+        sig_handlers[signal <span class="kw">as </span>usize].borrow_mut().take()
     })
 }
 
 
-<span class="doccomment">/// A signal handler is a callback function that will be invoked</span>
-<span class="doccomment">/// when a task&#39;s execution causes an illegal error or exception.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Returning `Ok` indicates the signal was handled and that the task may continue exection.</span>
-<span class="doccomment">/// Returning `Err` indicates it was not handled and that the system should proceed</span>
-<span class="doccomment">/// to its default procedure of cleaning up that task.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">SignalHandler</span> <span class="op">=</span> <span class="ident">FnOnce</span>(<span class="kw-2">&amp;</span><span class="ident">SignalContext</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), ()<span class="op">&gt;</span>;
+<span class="doccomment">/// A signal handler is a callback function that will be invoked
+/// when a task&#39;s execution causes an illegal error or exception.
+/// 
+/// Returning `Ok` indicates the signal was handled and that the task may continue exection.
+/// Returning `Err` indicates it was not handled and that the system should proceed
+/// to its default procedure of cleaning up that task.
+</span><span class="kw">pub trait </span>SignalHandler = FnOnce(<span class="kw-2">&amp;</span>SignalContext) -&gt; <span class="prelude-ty">Result</span>&lt;(), ()&gt;;
 
 
-<span class="doccomment">/// The possible signals that may occur due to CPU exceptions.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">PartialOrd</span>, <span class="ident">Ord</span>, <span class="ident">Hash</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Signal</span> {
-    <span class="doccomment">/// Bad virtual address, unexpected page fault.</span>
-    <span class="doccomment">/// Analogous to SIGSEGV.</span>
-    <span class="ident">InvalidAddress</span>                  <span class="op">=</span> <span class="number">0</span>,
-    <span class="doccomment">/// Invalid opcode, malformed instruction, etc.</span>
-    <span class="doccomment">/// Analogous to SIGILL.</span>
-    <span class="ident">IllegalInstruction</span>              <span class="op">=</span> <span class="number">1</span>,
-    <span class="doccomment">/// Bad memory alignment, non-existent physical address.</span>
-    <span class="doccomment">/// Analogous to SIGBUS.</span>
-    <span class="ident">BusError</span>                        <span class="op">=</span> <span class="number">2</span>,
-    <span class="doccomment">/// Bad arithmetic operation, e.g., divide by zero.</span>
-    <span class="doccomment">/// Analogous to SIGFPE.</span>
-    <span class="ident">ArithmeticError</span>                 <span class="op">=</span> <span class="number">3</span>,
-    <span class="comment">//</span>
-    <span class="comment">// Note: if other signals are added, update `NUM_SIGNALS` below.</span>
-    <span class="comment">//</span>
+<span class="doccomment">/// The possible signals that may occur due to CPU exceptions.
+</span><span class="attr">#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(u8)]
+</span><span class="kw">pub enum </span>Signal {
+    <span class="doccomment">/// Bad virtual address, unexpected page fault.
+    /// Analogous to SIGSEGV.
+    </span>InvalidAddress                  = <span class="number">0</span>,
+    <span class="doccomment">/// Invalid opcode, malformed instruction, etc.
+    /// Analogous to SIGILL.
+    </span>IllegalInstruction              = <span class="number">1</span>,
+    <span class="doccomment">/// Bad memory alignment, non-existent physical address.
+    /// Analogous to SIGBUS.
+    </span>BusError                        = <span class="number">2</span>,
+    <span class="doccomment">/// Bad arithmetic operation, e.g., divide by zero.
+    /// Analogous to SIGFPE.
+    </span>ArithmeticError                 = <span class="number">3</span>,
+    <span class="comment">//
+    // Note: if other signals are added, update `NUM_SIGNALS` below.
+    //
+</span>}
+<span class="kw">const </span>NUM_SIGNALS: usize = <span class="number">4</span>;
+
+
+<span class="doccomment">/// Information that is passed to a registered [`SignalHandler`]
+/// about an exception that occurred during execution.
+</span><span class="attr">#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+</span><span class="kw">pub struct </span>SignalContext {
+    <span class="kw">pub </span>instruction_pointer: VirtualAddress,
+    <span class="kw">pub </span>stack_pointer: VirtualAddress,
+    <span class="kw">pub </span>signal: Signal,
+    <span class="kw">pub </span>error_code: <span class="prelude-ty">Option</span>&lt;ErrorCode&gt;,
 }
-<span class="kw">const</span> <span class="ident">NUM_SIGNALS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">4</span>;
 
-
-<span class="doccomment">/// Information that is passed to a registered [`SignalHandler`]</span>
-<span class="doccomment">/// about an exception that occurred during execution.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SignalContext</span> {
-    <span class="kw">pub</span> <span class="ident">instruction_pointer</span>: <span class="ident">VirtualAddress</span>,
-    <span class="kw">pub</span> <span class="ident">stack_pointer</span>: <span class="ident">VirtualAddress</span>,
-    <span class="kw">pub</span> <span class="ident">signal</span>: <span class="ident">Signal</span>,
-    <span class="kw">pub</span> <span class="ident">error_code</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ErrorCode</span><span class="op">&gt;</span>,
-}
-
-<span class="doccomment">/// Possible error codes that may be provided by the CPU during an exception.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ErrorCode</span> {
-    <span class="ident">PageFaultError</span> {
-        <span class="ident">accessed_address</span>: <span class="ident">usize</span>,
-        <span class="ident">pf_error</span>: <span class="ident">PageFaultErrorCode</span>,
+<span class="doccomment">/// Possible error codes that may be provided by the CPU during an exception.
+</span><span class="attr">#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+</span><span class="kw">pub enum </span>ErrorCode {
+    PageFaultError {
+        accessed_address: usize,
+        pf_error: PageFaultErrorCode,
     },
-    <span class="ident">Other</span>(<span class="ident">u64</span>),
+    Other(u64),
 }
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ErrorCode</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">other_error</span>: <span class="ident">u64</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident"><span class="self">Self</span>::Other</span>(<span class="ident">other_error</span>)
+<span class="kw">impl </span>From&lt;u64&gt; <span class="kw">for </span>ErrorCode {
+    <span class="kw">fn </span>from(other_error: u64) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::Other(other_error)
     }
 }
 
@@ -341,7 +335,6 @@ bitflags::bitflags! {
         // reserved: 0x1F
     }
 }
-*/</span>
-</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="signal_handler" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+*/
+</span></code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="signal_handler" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

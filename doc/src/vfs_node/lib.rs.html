@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/vfs_node/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../vfs_node/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../vfs_node/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../vfs_node/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/vfs_node/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../vfs_node/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -95,97 +89,96 @@
 <span id="89">89</span>
 <span id="90">90</span>
 <span id="91">91</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
+</pre><pre class="rust"><code><span class="attr">#![no_std]
 
-<span class="doccomment">//! This crate contains a very basic, generic concrete implementation of the Directory</span>
-<span class="doccomment">//! and File traits. </span>
-<span class="doccomment">//! The VFSDirectory and VFSFile are intended to be used as regular nodes within the filesystem</span>
-<span class="doccomment">//! that require no special functionality as well as for inspiration for creating other concrete implementations</span>
-<span class="doccomment">//!s of the Directory and File traits. </span>
+</span><span class="doccomment">//! This crate contains a very basic, generic concrete implementation of the Directory
+//! and File traits. 
+//! The VFSDirectory and VFSFile are intended to be used as regular nodes within the filesystem
+//! that require no special functionality as well as for inspiration for creating other concrete implementations
+//!s of the Directory and File traits. 
 
-<span class="comment">// #[macro_use] extern crate log;</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fs_node</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
+</span><span class="comment">// #[macro_use] extern crate log;
+</span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>fs_node;
+<span class="kw">extern crate </span>memory;
 
-<span class="kw">use</span> <span class="ident">alloc::string::String</span>;
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">alloc::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Weak</span>};
-<span class="kw">use</span> <span class="ident">alloc::collections::BTreeMap</span>;
-<span class="kw">use</span> <span class="ident">fs_node</span>::{<span class="ident">DirRef</span>, <span class="ident">WeakDirRef</span>, <span class="ident">Directory</span>, <span class="ident">FileOrDir</span>, <span class="ident">FsNode</span>};
+<span class="kw">use </span>alloc::string::String;
+<span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>alloc::sync::{Arc, Weak};
+<span class="kw">use </span>alloc::collections::BTreeMap;
+<span class="kw">use </span>fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, FsNode};
 
 
-<span class="doccomment">/// A struct that represents a node in the VFS </span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">VFSDirectory</span> {
-    <span class="doccomment">/// The name of the directory</span>
-    <span class="kw">pub</span> <span class="ident">name</span>: <span class="ident">String</span>,
-    <span class="doccomment">/// A list of child filesystem nodes</span>
-    <span class="kw">pub</span> <span class="ident">children</span>: <span class="ident">BTreeMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">FileOrDir</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A weak reference to the parent directory</span>
-    <span class="kw">pub</span> <span class="ident">parent</span>: <span class="ident">WeakDirRef</span>,
+<span class="doccomment">/// A struct that represents a node in the VFS 
+</span><span class="kw">pub struct </span>VFSDirectory {
+    <span class="doccomment">/// The name of the directory
+    </span><span class="kw">pub </span>name: String,
+    <span class="doccomment">/// A list of child filesystem nodes
+    </span><span class="kw">pub </span>children: BTreeMap&lt;String, FileOrDir&gt;,
+    <span class="doccomment">/// A weak reference to the parent directory
+    </span><span class="kw">pub </span>parent: WeakDirRef,
 }
 
-<span class="kw">impl</span> <span class="ident">VFSDirectory</span> {
-    <span class="doccomment">/// Creates a new directory and passes a pointer to the new directory created as output</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">name</span>: <span class="ident">String</span>, <span class="ident">parent</span>: <span class="kw-2">&amp;</span><span class="ident">DirRef</span>)  -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DirRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// creates a copy of the parent pointer so that we can add the newly created folder to the parent&#39;s children later</span>
-        <span class="kw">let</span> <span class="ident">directory</span> <span class="op">=</span> <span class="ident">VFSDirectory</span> {
-            <span class="ident">name</span>,
-            <span class="ident">children</span>: <span class="ident">BTreeMap::new</span>(),
-            <span class="ident">parent</span>: <span class="ident">Arc::downgrade</span>(<span class="ident">parent</span>),
+<span class="kw">impl </span>VFSDirectory {
+    <span class="doccomment">/// Creates a new directory and passes a pointer to the new directory created as output
+    </span><span class="kw">pub fn </span>new(name: String, parent: <span class="kw-2">&amp;</span>DirRef)  -&gt; <span class="prelude-ty">Result</span>&lt;DirRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// creates a copy of the parent pointer so that we can add the newly created folder to the parent&#39;s children later
+        </span><span class="kw">let </span>directory = VFSDirectory {
+            name,
+            children: BTreeMap::new(),
+            parent: Arc::downgrade(parent),
         };
-        <span class="kw">let</span> <span class="ident">dir_ref</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">directory</span>)) <span class="kw">as</span> <span class="ident">DirRef</span>;
-        <span class="ident">parent</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="ident">FileOrDir::Dir</span>(<span class="ident">dir_ref</span>.<span class="ident">clone</span>()))<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">dir_ref</span>)
+        <span class="kw">let </span>dir_ref = Arc::new(Mutex::new(directory)) <span class="kw">as </span>DirRef;
+        parent.lock().insert(FileOrDir::Dir(dir_ref.clone()))<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(dir_ref)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Directory</span> <span class="kw">for</span> <span class="ident">VFSDirectory</span> {
-    <span class="kw">fn</span> <span class="ident">insert</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">node</span>: <span class="ident">FileOrDir</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="ident">node</span>.<span class="ident">get_name</span>();
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">mut</span> <span class="ident">old_node</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">children</span>.<span class="ident">insert</span>(<span class="ident">name</span>, <span class="ident">node</span>) {
-            <span class="ident">old_node</span>.<span class="ident">set_parent_dir</span>(<span class="ident">Weak</span>::<span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">VFSDirectory</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
-            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">old_node</span>))
-        } <span class="kw">else</span> {
+<span class="kw">impl </span>Directory <span class="kw">for </span>VFSDirectory {
+    <span class="kw">fn </span>insert(<span class="kw-2">&amp;mut </span><span class="self">self</span>, node: FileOrDir) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FileOrDir&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>name = node.get_name();
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>old_node) = <span class="self">self</span>.children.insert(name, node) {
+            old_node.set_parent_dir(Weak::&lt;Mutex&lt;VFSDirectory&gt;&gt;::new());
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(old_node))
+        } <span class="kw">else </span>{
             <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">children</span>.<span class="ident">get</span>(<span class="ident">name</span>).<span class="ident">cloned</span>()
+    <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;FileOrDir&gt; {
+        <span class="self">self</span>.children.get(name).cloned()
     }
 
-    <span class="doccomment">/// Returns a string listing all the children in the directory</span>
-    <span class="kw">fn</span> <span class="ident">list</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">children</span>.<span class="ident">keys</span>().<span class="ident">cloned</span>().<span class="ident">collect</span>()
+    <span class="doccomment">/// Returns a string listing all the children in the directory
+    </span><span class="kw">fn </span>list(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;String&gt; {
+        <span class="self">self</span>.children.keys().cloned().collect()
     }
 
-    <span class="kw">fn</span> <span class="ident">remove</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">node</span>: <span class="kw-2">&amp;</span><span class="ident">FileOrDir</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">mut</span> <span class="ident">old_node</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">children</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">node</span>.<span class="ident">get_name</span>()) {
-            <span class="ident">old_node</span>.<span class="ident">set_parent_dir</span>(<span class="ident">Weak</span>::<span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">VFSDirectory</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
-            <span class="prelude-val">Some</span>(<span class="ident">old_node</span>)
-        } <span class="kw">else</span> {
-            <span class="prelude-val">None</span>
-        }
+    <span class="kw">fn </span>remove(<span class="kw-2">&amp;mut </span><span class="self">self</span>, node: <span class="kw-2">&amp;</span>FileOrDir) -&gt; <span class="prelude-ty">Option</span>&lt;FileOrDir&gt; {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>old_node) = <span class="self">self</span>.children.remove(<span class="kw-2">&amp;</span>node.get_name()) {
+            old_node.set_parent_dir(Weak::&lt;Mutex&lt;VFSDirectory&gt;&gt;::new());
+            <span class="prelude-val">Some</span>(old_node)
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
     }
 }
 
-<span class="kw">impl</span> <span class="ident">FsNode</span> <span class="kw">for</span> <span class="ident">VFSDirectory</span> {
-    <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="self">self</span>.<span class="ident">name</span>.<span class="ident">clone</span>()
+<span class="kw">impl </span>FsNode <span class="kw">for </span>VFSDirectory {
+    <span class="kw">fn </span>get_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="self">self</span>.name.clone()
     }
 
-    <span class="doccomment">/// Returns a pointer to the parent if it exists</span>
-    <span class="kw">fn</span> <span class="ident">get_parent_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DirRef</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">parent</span>.<span class="ident">upgrade</span>()
+    <span class="doccomment">/// Returns a pointer to the parent if it exists
+    </span><span class="kw">fn </span>get_parent_dir(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DirRef&gt; {
+        <span class="self">self</span>.parent.upgrade()
     }
 
-    <span class="kw">fn</span> <span class="ident">set_parent_dir</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">new_parent</span>: <span class="ident">WeakDirRef</span>) {
-        <span class="self">self</span>.<span class="ident">parent</span> <span class="op">=</span> <span class="ident">new_parent</span>;
+    <span class="kw">fn </span>set_parent_dir(<span class="kw-2">&amp;mut </span><span class="self">self</span>, new_parent: WeakDirRef) {
+        <span class="self">self</span>.parent = new_parent;
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="vfs_node" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="vfs_node" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

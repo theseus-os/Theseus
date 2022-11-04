@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/text_terminal/src/ansi_style.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>ansi_style.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../text_terminal/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../text_terminal/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../text_terminal/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/text_terminal/src/ansi_style.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>ansi_style.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../text_terminal/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -589,591 +583,590 @@
 <span id="583">583</span>
 <span id="584">584</span>
 <span id="585">585</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Style and formatting of text displayed in a terminal,</span>
-<span class="doccomment">//! following the ANSI, VT100, and xterm standards.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Style and formatting of text displayed in a terminal,
+//! following the ANSI, VT100, and xterm standards.
 
-<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">convert::TryFrom</span>, <span class="ident">fmt</span>};
-<span class="kw">use</span> <span class="ident">alloc::borrow::Cow</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">BackgroundColor</span>, <span class="ident">ForegroundColor</span>, <span class="ident">ScreenPoint</span>, <span class="ident">ScrollbackBufferPoint</span>, <span class="ident">UnderlinedColor</span>};
+</span><span class="kw">use </span>core::{convert::TryFrom, fmt};
+<span class="kw">use </span>alloc::borrow::Cow;
+<span class="kw">use crate</span>::{BackgroundColor, ForegroundColor, ScreenPoint, ScrollbackBufferPoint, UnderlinedColor};
 
-<span class="doccomment">/// The style of text, including formatting and color choice, </span>
-<span class="doccomment">/// for the character(s) displayed in a `Unit`.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Default</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Style</span> {
-    <span class="doccomment">/// The color of the text itself.</span>
-    <span class="ident">color_foreground</span>: <span class="ident">ForegroundColor</span>,
-    <span class="doccomment">/// The color behind the text.</span>
-    <span class="ident">color_background</span>: <span class="ident">BackgroundColor</span>,
-    <span class="ident">format_flags</span>: <span class="ident">FormatFlags</span>,
+<span class="doccomment">/// The style of text, including formatting and color choice, 
+/// for the character(s) displayed in a `Unit`.
+</span><span class="attr">#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+</span><span class="kw">pub struct </span>Style {
+    <span class="doccomment">/// The color of the text itself.
+    </span>color_foreground: ForegroundColor,
+    <span class="doccomment">/// The color behind the text.
+    </span>color_background: BackgroundColor,
+    format_flags: FormatFlags,
 }
-<span class="kw">impl</span> <span class="ident">Style</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">diff</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;old</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;new</span> <span class="ident">Style</span>) -&gt; <span class="ident">StyleDiff</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span> {
-        <span class="ident">StyleDiff::new</span>(<span class="self">self</span>, <span class="ident">other</span>)
+<span class="kw">impl </span>Style {
+    <span class="kw">pub fn </span>diff&lt;<span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;old </span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="lifetime">&#39;new </span>Style) -&gt; StyleDiff&lt;<span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span>&gt; {
+        StyleDiff::new(<span class="self">self</span>, other)
     }
 }
 
 
-<span class="doccomment">/// A representation of the difference between two [`Style`]s.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This implements an [`Iterator`] that successively returns the set of </span>
-<span class="doccomment">/// [`AnsiStyleCodes`] needed to change a terminal emulator from displaying </span>
-<span class="doccomment">/// the `old` style to the `new` style. </span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// It first iterates over the complex differences in the two [`FormatFlags`],</span>
-<span class="doccomment">/// and then iterates over the remaining differences in color.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">StyleDiff</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span> {
-    <span class="ident">stage</span>: <span class="ident">u8</span>,
-    <span class="ident">format_flags_diff</span>: <span class="ident">FormatFlagsDiff</span>,
-    <span class="ident">old</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;old</span> <span class="ident">Style</span>,
-    <span class="ident">new</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;new</span> <span class="ident">Style</span>,
+<span class="doccomment">/// A representation of the difference between two [`Style`]s.
+/// 
+/// This implements an [`Iterator`] that successively returns the set of 
+/// [`AnsiStyleCodes`] needed to change a terminal emulator from displaying 
+/// the `old` style to the `new` style. 
+///
+/// It first iterates over the complex differences in the two [`FormatFlags`],
+/// and then iterates over the remaining differences in color.
+</span><span class="kw">pub struct </span>StyleDiff&lt;<span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span>&gt; {
+    stage: u8,
+    format_flags_diff: FormatFlagsDiff,
+    old: <span class="kw-2">&amp;</span><span class="lifetime">&#39;old </span>Style,
+    new: <span class="kw-2">&amp;</span><span class="lifetime">&#39;new </span>Style,
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span> <span class="ident">StyleDiff</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">old</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;old</span> <span class="ident">Style</span>, <span class="ident">new</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;new</span> <span class="ident">Style</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">format_flags_diff</span> <span class="op">=</span> <span class="ident">old</span>.<span class="ident">format_flags</span>.<span class="ident">diff</span>(<span class="ident">new</span>.<span class="ident">format_flags</span>);
-        <span class="kw">let</span> <span class="ident">fg_color_changed</span> <span class="op">=</span> <span class="ident">old</span>.<span class="ident">color_foreground</span> <span class="op">!</span><span class="op">=</span> <span class="ident">new</span>.<span class="ident">color_foreground</span>;
-        <span class="kw">let</span> <span class="ident">bg_color_changed</span> <span class="op">=</span> <span class="ident">old</span>.<span class="ident">color_background</span> <span class="op">!</span><span class="op">=</span> <span class="ident">new</span>.<span class="ident">color_background</span>;
-        <span class="comment">// Adjust the `FormatFlagsDiff` to account for the 2 possible color diffs.</span>
-        <span class="ident">format_flags_diff</span>.<span class="ident">max_differences</span> <span class="op">+</span><span class="op">=</span> <span class="number">2</span>;
-        <span class="ident">format_flags_diff</span>.<span class="ident">num_differences</span> <span class="op">+</span><span class="op">=</span> <span class="ident">fg_color_changed</span> <span class="kw">as</span> <span class="ident">u32</span> <span class="op">+</span> <span class="ident">bg_color_changed</span> <span class="kw">as</span> <span class="ident">u32</span>;
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span>&gt; StyleDiff&lt;<span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span>&gt; {
+    <span class="kw">fn </span>new(old: <span class="kw-2">&amp;</span><span class="lifetime">&#39;old </span>Style, new: <span class="kw-2">&amp;</span><span class="lifetime">&#39;new </span>Style) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>format_flags_diff = old.format_flags.diff(new.format_flags);
+        <span class="kw">let </span>fg_color_changed = old.color_foreground != new.color_foreground;
+        <span class="kw">let </span>bg_color_changed = old.color_background != new.color_background;
+        <span class="comment">// Adjust the `FormatFlagsDiff` to account for the 2 possible color diffs.
+        </span>format_flags_diff.max_differences += <span class="number">2</span>;
+        format_flags_diff.num_differences += fg_color_changed <span class="kw">as </span>u32 + bg_color_changed <span class="kw">as </span>u32;
         
-        <span class="ident">StyleDiff</span> {
-            <span class="ident">stage</span>: <span class="number">0</span>,
-            <span class="ident">format_flags_diff</span>,
-            <span class="ident">old</span>,
-            <span class="ident">new</span>,
+        StyleDiff {
+            stage: <span class="number">0</span>,
+            format_flags_diff,
+            old,
+            new,
         }
     }
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span> <span class="ident">Iterator</span> <span class="kw">for</span> <span class="ident">StyleDiff</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">AnsiStyleCodes</span>;
-    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span> {
-        <span class="comment">// Stage 0: return all the diffs for the format flags.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stage</span> <span class="op">==</span> <span class="number">0</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">diff</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">format_flags_diff</span>.<span class="ident">next</span>() {
-                <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">diff</span>);
-            } <span class="kw">else</span> {
-                <span class="self">self</span>.<span class="ident">stage</span> <span class="op">=</span> <span class="number">1</span>;
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span>&gt; Iterator <span class="kw">for </span>StyleDiff&lt;<span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span>&gt; {
+    <span class="kw">type </span>Item = AnsiStyleCodes;
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
+        <span class="comment">// Stage 0: return all the diffs for the format flags.
+        </span><span class="kw">if </span><span class="self">self</span>.stage == <span class="number">0 </span>{
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(diff) = <span class="self">self</span>.format_flags_diff.next() {
+                <span class="kw">return </span><span class="prelude-val">Some</span>(diff);
+            } <span class="kw">else </span>{
+                <span class="self">self</span>.stage = <span class="number">1</span>;
             }
         }
 
-        <span class="comment">// Stage 1: return foreground color diff.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stage</span> <span class="op">==</span> <span class="number">1</span> {
-            <span class="self">self</span>.<span class="ident">stage</span> <span class="op">=</span> <span class="number">2</span>;
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">format_flags_diff</span>.<span class="ident">reset_issued</span> {
-                <span class="comment">// Optimization: no need to issue a default color parameter after a reset.</span>
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">new</span>.<span class="ident">color_foreground</span> <span class="op">!</span><span class="op">=</span> <span class="ident">ForegroundColor::default</span>() {
-                    <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">AnsiStyleCodes::ForegroundColor</span>(<span class="self">self</span>.<span class="ident">new</span>.<span class="ident">color_foreground</span>));
+        <span class="comment">// Stage 1: return foreground color diff.
+        </span><span class="kw">if </span><span class="self">self</span>.stage == <span class="number">1 </span>{
+            <span class="self">self</span>.stage = <span class="number">2</span>;
+            <span class="kw">if </span><span class="self">self</span>.format_flags_diff.reset_issued {
+                <span class="comment">// Optimization: no need to issue a default color parameter after a reset.
+                </span><span class="kw">if </span><span class="self">self</span>.new.color_foreground != ForegroundColor::default() {
+                    <span class="kw">return </span><span class="prelude-val">Some</span>(AnsiStyleCodes::ForegroundColor(<span class="self">self</span>.new.color_foreground));
                 }
-            } <span class="kw">else</span> {
-                <span class="comment">// No reset issued, so manually set the new foreground color.</span>
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">old</span>.<span class="ident">color_foreground</span> <span class="op">!</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">new</span>.<span class="ident">color_foreground</span> {
-                    <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">AnsiStyleCodes::ForegroundColor</span>(<span class="self">self</span>.<span class="ident">new</span>.<span class="ident">color_foreground</span>));
-                }
-            }
-        }
-
-        <span class="comment">// Stage 2: return background color diff.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stage</span> <span class="op">==</span> <span class="number">2</span> {
-            <span class="self">self</span>.<span class="ident">stage</span> <span class="op">=</span> <span class="number">3</span>;
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">format_flags_diff</span>.<span class="ident">reset_issued</span> {
-                <span class="comment">// Optimization: no need to issue a default color parameter after a reset.</span>
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">new</span>.<span class="ident">color_background</span> <span class="op">!</span><span class="op">=</span> <span class="ident">BackgroundColor::default</span>() {
-                    <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">AnsiStyleCodes::BackgroundColor</span>(<span class="self">self</span>.<span class="ident">new</span>.<span class="ident">color_background</span>));
-                }
-            } <span class="kw">else</span> {
-                <span class="comment">// No reset issued, so manually set the new background color.</span>
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">old</span>.<span class="ident">color_background</span> <span class="op">!</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">new</span>.<span class="ident">color_background</span> {
-                    <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">AnsiStyleCodes::BackgroundColor</span>(<span class="self">self</span>.<span class="ident">new</span>.<span class="ident">color_background</span>));
+            } <span class="kw">else </span>{
+                <span class="comment">// No reset issued, so manually set the new foreground color.
+                </span><span class="kw">if </span><span class="self">self</span>.old.color_foreground != <span class="self">self</span>.new.color_foreground {
+                    <span class="kw">return </span><span class="prelude-val">Some</span>(AnsiStyleCodes::ForegroundColor(<span class="self">self</span>.new.color_foreground));
                 }
             }
         }
 
-        <span class="comment">// Add new stages here, for handling future additions to `Style`</span>
-
-        <span class="prelude-val">None</span>
-    }
-}
-
-<span class="doccomment">/// A representation of the difference between two [`FormatFlags`].</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This implements an [`Iterator`] that successively returns the set of </span>
-<span class="doccomment">/// [`AnsiStyleCodes`] needed to change a terminal emulator from displaying </span>
-<span class="doccomment">/// the `old` format to the `new` format. </span>
-<span class="kw">struct</span> <span class="ident">FormatFlagsDiff</span> {
-    <span class="ident">old</span>: <span class="ident">FormatFlags</span>,
-    <span class="ident">new</span>: <span class="ident">FormatFlags</span>,
-    <span class="doccomment">/// The bit that should be compared in the next iteration.</span>
-    <span class="ident">next_bit</span>: <span class="ident">u32</span>,
-    <span class="doccomment">/// A bitmask of the bits that differ between `old` and `new`.</span>
-    <span class="ident">bits_that_differ</span>: <span class="ident">FormatFlags</span>,
-    <span class="doccomment">/// The number of differences between `old` and `new`.</span>
-    <span class="ident">num_differences</span>: <span class="ident">u32</span>,
-    <span class="doccomment">/// The maximum number of differences that can possibly exist</span>
-    <span class="doccomment">/// between `old` and `new`.</span>
-    <span class="ident">max_differences</span>: <span class="ident">u32</span>,
-    <span class="doccomment">/// Whether a `Reset` command has already been issued.</span>
-    <span class="ident">reset_issued</span>: <span class="ident">bool</span>,
-}
-<span class="kw">impl</span> <span class="ident">FormatFlagsDiff</span> {
-    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">old</span>: <span class="ident">FormatFlags</span>, <span class="ident">new</span>: <span class="ident">FormatFlags</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">bits_that_differ</span> <span class="op">=</span> <span class="ident">old</span>.<span class="ident">bits_that_differ</span>(<span class="ident">new</span>);
-        <span class="kw">let</span> <span class="ident">num_different_bits</span> <span class="op">=</span> <span class="ident">bits_that_differ</span>.<span class="ident">bits</span>().<span class="ident">count_ones</span>();
-        <span class="ident">FormatFlagsDiff</span> {
-            <span class="ident">old</span>,
-            <span class="ident">new</span>,
-            <span class="ident">next_bit</span>: <span class="number">0</span>,
-            <span class="ident">bits_that_differ</span>,
-            <span class="ident">num_differences</span>: <span class="ident">num_different_bits</span>,
-            <span class="ident">max_differences</span>: <span class="ident">FormatFlags::MAX_BIT</span>,
-            <span class="ident">reset_issued</span>: <span class="bool-val">false</span>,
-        }
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">Iterator</span> <span class="kw">for</span> <span class="ident">FormatFlagsDiff</span> {
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">AnsiStyleCodes</span>;
-    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">next_bit</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">FormatFlags::MAX_BIT</span> { <span class="kw">return</span> <span class="prelude-val">None</span>; }
-
-        <span class="comment">// Optimization: the set of new flags is empty, so we only need to issue one `Reset`. </span>
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">reset_issued</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">new</span>.<span class="ident">is_empty</span>() <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">old</span>.<span class="ident">is_empty</span>() {
-            <span class="self">self</span>.<span class="ident">next_bit</span> <span class="op">=</span> <span class="ident">FormatFlags::MAX_BIT</span>;
-            <span class="self">self</span>.<span class="ident">reset_issued</span> <span class="op">=</span> <span class="bool-val">true</span>;
-            <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">AnsiStyleCodes::Reset</span>);
-        }
-
-        <span class="comment">// If there are more bits that differ than bits that are the same,</span>
-        <span class="comment">// then it&#39;s faster to emit a full `Reset` followed by the parameter for each bit set in `new`.</span>
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">reset_issued</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">num_differences</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">max_differences</span> <span class="op">/</span> <span class="number">2</span> {
-            <span class="self">self</span>.<span class="ident">reset_issued</span> <span class="op">=</span> <span class="bool-val">true</span>;
-            <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">AnsiStyleCodes::Reset</span>);
-        }
-
-        <span class="comment">// The regular case: iterate to the `next_bit` and return the style code for that bit. </span>
-        <span class="comment">// There are two main cases here:</span>
-        <span class="comment">//  1. `Reset` has been issued, so we go through all of the bits that are set in `new`</span>
-        <span class="comment">//      and emit an &quot;enabled&quot; style code for each one. </span>
-        <span class="comment">//  2. `Reset` has NOT been issued, so we go through all of the `bits_that_differ`</span>
-        <span class="comment">//      and emit a style code for each one. </span>
-        <span class="comment">//      The style code should be &quot;enabled&quot; if the bit is set in `new`, or &quot;disabled&quot; if not.</span>
-        <span class="kw">while</span> <span class="self">self</span>.<span class="ident">next_bit</span> <span class="op">&lt;</span> <span class="ident">FormatFlags::MAX_BIT</span> {
-            <span class="kw">let</span> <span class="ident">bit_mask</span> <span class="op">=</span> <span class="ident">FormatFlags::from_bits_truncate</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">next_bit</span>);
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">reset_issued</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">new</span>.<span class="ident">intersects</span>(<span class="ident">bit_mask</span>) {
-                <span class="comment">// Case 1: `Reset` was issued.</span>
-                <span class="self">self</span>.<span class="ident">next_bit</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-                <span class="kw">return</span> <span class="ident">bit_mask</span>.<span class="ident">to_style_code</span>(<span class="bool-val">true</span>);
+        <span class="comment">// Stage 2: return background color diff.
+        </span><span class="kw">if </span><span class="self">self</span>.stage == <span class="number">2 </span>{
+            <span class="self">self</span>.stage = <span class="number">3</span>;
+            <span class="kw">if </span><span class="self">self</span>.format_flags_diff.reset_issued {
+                <span class="comment">// Optimization: no need to issue a default color parameter after a reset.
+                </span><span class="kw">if </span><span class="self">self</span>.new.color_background != BackgroundColor::default() {
+                    <span class="kw">return </span><span class="prelude-val">Some</span>(AnsiStyleCodes::BackgroundColor(<span class="self">self</span>.new.color_background));
+                }
+            } <span class="kw">else </span>{
+                <span class="comment">// No reset issued, so manually set the new background color.
+                </span><span class="kw">if </span><span class="self">self</span>.old.color_background != <span class="self">self</span>.new.color_background {
+                    <span class="kw">return </span><span class="prelude-val">Some</span>(AnsiStyleCodes::BackgroundColor(<span class="self">self</span>.new.color_background));
+                }
             }
-            <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">reset_issued</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">bits_that_differ</span>.<span class="ident">intersects</span>(<span class="ident">bit_mask</span>) {
-                <span class="comment">// Case 2: `Reset` was NOT issued.</span>
-                <span class="self">self</span>.<span class="ident">next_bit</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-                <span class="kw">let</span> <span class="ident">bit_is_set_in_new</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">new</span>.<span class="ident">intersects</span>(<span class="ident">bit_mask</span>);
-                <span class="kw">return</span> <span class="ident">bit_mask</span>.<span class="ident">to_style_code</span>(<span class="ident">bit_is_set_in_new</span>);
-            }
-
-            <span class="self">self</span>.<span class="ident">next_bit</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         }
 
-        <span class="prelude-val">None</span>
+        <span class="comment">// Add new stages here, for handling future additions to `Style`
+
+        </span><span class="prelude-val">None
+    </span>}
+}
+
+<span class="doccomment">/// A representation of the difference between two [`FormatFlags`].
+/// 
+/// This implements an [`Iterator`] that successively returns the set of 
+/// [`AnsiStyleCodes`] needed to change a terminal emulator from displaying 
+/// the `old` format to the `new` format. 
+</span><span class="kw">struct </span>FormatFlagsDiff {
+    old: FormatFlags,
+    new: FormatFlags,
+    <span class="doccomment">/// The bit that should be compared in the next iteration.
+    </span>next_bit: u32,
+    <span class="doccomment">/// A bitmask of the bits that differ between `old` and `new`.
+    </span>bits_that_differ: FormatFlags,
+    <span class="doccomment">/// The number of differences between `old` and `new`.
+    </span>num_differences: u32,
+    <span class="doccomment">/// The maximum number of differences that can possibly exist
+    /// between `old` and `new`.
+    </span>max_differences: u32,
+    <span class="doccomment">/// Whether a `Reset` command has already been issued.
+    </span>reset_issued: bool,
+}
+<span class="kw">impl </span>FormatFlagsDiff {
+    <span class="kw">fn </span>new(old: FormatFlags, new: FormatFlags) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span>bits_that_differ = old.bits_that_differ(new);
+        <span class="kw">let </span>num_different_bits = bits_that_differ.bits().count_ones();
+        FormatFlagsDiff {
+            old,
+            new,
+            next_bit: <span class="number">0</span>,
+            bits_that_differ,
+            num_differences: num_different_bits,
+            max_differences: FormatFlags::MAX_BIT,
+            reset_issued: <span class="bool-val">false</span>,
+        }
     }
 }
 
-<span class="attribute">#[<span class="ident">test</span>]</span>
-<span class="kw">fn</span> <span class="ident">test_bit_diff1</span>() {
-    <span class="kw">let</span> <span class="ident">old</span> <span class="op">=</span> <span class="ident">FormatFlags::BRIGHT</span> <span class="op">|</span> <span class="ident">FormatFlags::UNDERLINE</span> <span class="op">|</span> <span class="ident">FormatFlags::INVERSE</span> <span class="op">|</span> <span class="ident">FormatFlags::HIDDEN</span>;
-    <span class="kw">let</span> <span class="ident">new</span> <span class="op">=</span> <span class="ident">FormatFlags::STRIKETHROUGH</span> <span class="op">|</span> <span class="ident">FormatFlags::INVERSE</span>; <span class="comment">// | FormatFlags::BRIGHT;</span>
-    <span class="macro">println!</span>(<span class="string">&quot;old: {:?}&quot;</span>, <span class="ident">old</span>);
-    <span class="macro">println!</span>(<span class="string">&quot;new: {:?}&quot;</span>, <span class="ident">new</span>);
-    <span class="macro">println!</span>(<span class="string">&quot;old - new: {:?}&quot;</span>, <span class="ident">old</span><span class="op">-</span><span class="ident">new</span>);
-    <span class="macro">println!</span>(<span class="string">&quot;new - old: {:?}&quot;</span>, <span class="ident">new</span><span class="op">-</span><span class="ident">old</span>);
-    <span class="macro">println!</span>(<span class="string">&quot;old XOR new: {:?}&quot;</span>, <span class="ident">old</span>.<span class="ident">bits_that_differ</span>(<span class="ident">new</span>));
-    <span class="kw">for</span> <span class="ident">code</span> <span class="kw">in</span> <span class="ident">old</span>.<span class="ident">diff</span>(<span class="ident">new</span>) {
-        <span class="macro">println!</span>(<span class="string">&quot;\t{:?}&quot;</span>, <span class="ident">code</span>);
+<span class="kw">impl </span>Iterator <span class="kw">for </span>FormatFlagsDiff {
+    <span class="kw">type </span>Item = AnsiStyleCodes;
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
+        <span class="kw">if </span><span class="self">self</span>.next_bit &gt;= FormatFlags::MAX_BIT { <span class="kw">return </span><span class="prelude-val">None</span>; }
+
+        <span class="comment">// Optimization: the set of new flags is empty, so we only need to issue one `Reset`. 
+        </span><span class="kw">if </span>!<span class="self">self</span>.reset_issued &amp;&amp; <span class="self">self</span>.new.is_empty() &amp;&amp; !<span class="self">self</span>.old.is_empty() {
+            <span class="self">self</span>.next_bit = FormatFlags::MAX_BIT;
+            <span class="self">self</span>.reset_issued = <span class="bool-val">true</span>;
+            <span class="kw">return </span><span class="prelude-val">Some</span>(AnsiStyleCodes::Reset);
+        }
+
+        <span class="comment">// If there are more bits that differ than bits that are the same,
+        // then it&#39;s faster to emit a full `Reset` followed by the parameter for each bit set in `new`.
+        </span><span class="kw">if </span>!<span class="self">self</span>.reset_issued &amp;&amp; <span class="self">self</span>.num_differences &gt;= <span class="self">self</span>.max_differences / <span class="number">2 </span>{
+            <span class="self">self</span>.reset_issued = <span class="bool-val">true</span>;
+            <span class="kw">return </span><span class="prelude-val">Some</span>(AnsiStyleCodes::Reset);
+        }
+
+        <span class="comment">// The regular case: iterate to the `next_bit` and return the style code for that bit. 
+        // There are two main cases here:
+        //  1. `Reset` has been issued, so we go through all of the bits that are set in `new`
+        //      and emit an &quot;enabled&quot; style code for each one. 
+        //  2. `Reset` has NOT been issued, so we go through all of the `bits_that_differ`
+        //      and emit a style code for each one. 
+        //      The style code should be &quot;enabled&quot; if the bit is set in `new`, or &quot;disabled&quot; if not.
+        </span><span class="kw">while </span><span class="self">self</span>.next_bit &lt; FormatFlags::MAX_BIT {
+            <span class="kw">let </span>bit_mask = FormatFlags::from_bits_truncate(<span class="number">1 </span>&lt;&lt; <span class="self">self</span>.next_bit);
+            <span class="kw">if </span><span class="self">self</span>.reset_issued &amp;&amp; <span class="self">self</span>.new.intersects(bit_mask) {
+                <span class="comment">// Case 1: `Reset` was issued.
+                </span><span class="self">self</span>.next_bit += <span class="number">1</span>;
+                <span class="kw">return </span>bit_mask.to_style_code(<span class="bool-val">true</span>);
+            }
+            <span class="kw">if </span>!<span class="self">self</span>.reset_issued &amp;&amp; <span class="self">self</span>.bits_that_differ.intersects(bit_mask) {
+                <span class="comment">// Case 2: `Reset` was NOT issued.
+                </span><span class="self">self</span>.next_bit += <span class="number">1</span>;
+                <span class="kw">let </span>bit_is_set_in_new = <span class="self">self</span>.new.intersects(bit_mask);
+                <span class="kw">return </span>bit_mask.to_style_code(bit_is_set_in_new);
+            }
+
+            <span class="self">self</span>.next_bit += <span class="number">1</span>;
+        }
+
+        <span class="prelude-val">None
+    </span>}
+}
+
+<span class="attr">#[test]
+</span><span class="kw">fn </span>test_bit_diff1() {
+    <span class="kw">let </span>old = FormatFlags::BRIGHT | FormatFlags::UNDERLINE | FormatFlags::INVERSE | FormatFlags::HIDDEN;
+    <span class="kw">let </span>new = FormatFlags::STRIKETHROUGH | FormatFlags::INVERSE; <span class="comment">// | FormatFlags::BRIGHT;
+    </span><span class="macro">println!</span>(<span class="string">&quot;old: {:?}&quot;</span>, old);
+    <span class="macro">println!</span>(<span class="string">&quot;new: {:?}&quot;</span>, new);
+    <span class="macro">println!</span>(<span class="string">&quot;old - new: {:?}&quot;</span>, old-new);
+    <span class="macro">println!</span>(<span class="string">&quot;new - old: {:?}&quot;</span>, new-old);
+    <span class="macro">println!</span>(<span class="string">&quot;old XOR new: {:?}&quot;</span>, old.bits_that_differ(new));
+    <span class="kw">for </span>code <span class="kw">in </span>old.diff(new) {
+        <span class="macro">println!</span>(<span class="string">&quot;\t{:?}&quot;</span>, code);
     }
 }
 
-<span class="attribute">#[<span class="ident">test</span>]</span>
-<span class="kw">fn</span> <span class="ident">test_style_diff1</span>() {
-    <span class="kw">let</span> <span class="ident">old_ff</span> <span class="op">=</span> <span class="ident">FormatFlags::BRIGHT</span> <span class="op">|</span> <span class="ident">FormatFlags::UNDERLINE</span> <span class="op">|</span> <span class="ident">FormatFlags::INVERSE</span> <span class="op">|</span> <span class="ident">FormatFlags::HIDDEN</span>;
-    <span class="kw">let</span> <span class="ident">old</span> <span class="op">=</span> <span class="ident">Style</span> { 
-        <span class="ident">format_flags</span>: <span class="ident">old_ff</span>,
-        <span class="ident">color_foreground</span>: <span class="ident">ForegroundColor</span>(<span class="ident"><span class="kw">crate</span>::Color::BrightCyan</span>),
-        <span class="ident">color_background</span>: <span class="ident">BackgroundColor</span>(<span class="ident"><span class="kw">crate</span>::Color::Cyan</span>),
+<span class="attr">#[test]
+</span><span class="kw">fn </span>test_style_diff1() {
+    <span class="kw">let </span>old_ff = FormatFlags::BRIGHT | FormatFlags::UNDERLINE | FormatFlags::INVERSE | FormatFlags::HIDDEN;
+    <span class="kw">let </span>old = Style { 
+        format_flags: old_ff,
+        color_foreground: ForegroundColor(<span class="kw">crate</span>::Color::BrightCyan),
+        color_background: BackgroundColor(<span class="kw">crate</span>::Color::Cyan),
     };
 
-    <span class="kw">let</span> <span class="ident">new_ff</span> <span class="op">=</span> <span class="ident">FormatFlags::empty</span>() <span class="op">|</span> <span class="ident">FormatFlags::STRIKETHROUGH</span>;
-    <span class="comment">// let new_ff = FormatFlags::BRIGHT | FormatFlags::STRIKETHROUGH | FormatFlags::INVERSE;</span>
-    <span class="kw">let</span> <span class="ident">new</span> <span class="op">=</span> <span class="ident">Style</span> { 
-        <span class="ident">format_flags</span>: <span class="ident">new_ff</span>,
-        <span class="ident">color_foreground</span>: <span class="ident">Default::default</span>(),
-        <span class="comment">// color_foreground: ForegroundColor(crate::Color::BrightMagenta),</span>
-        <span class="ident">color_background</span>: <span class="ident">BackgroundColor</span>(<span class="ident"><span class="kw">crate</span>::Color::Red</span>),
+    <span class="kw">let </span>new_ff = FormatFlags::empty() | FormatFlags::STRIKETHROUGH;
+    <span class="comment">// let new_ff = FormatFlags::BRIGHT | FormatFlags::STRIKETHROUGH | FormatFlags::INVERSE;
+    </span><span class="kw">let </span>new = Style { 
+        format_flags: new_ff,
+        color_foreground: Default::default(),
+        <span class="comment">// color_foreground: ForegroundColor(crate::Color::BrightMagenta),
+        </span>color_background: BackgroundColor(<span class="kw">crate</span>::Color::Red),
     };
 
-    <span class="macro">println!</span>(<span class="string">&quot;old: {:?}&quot;</span>, <span class="ident">old</span>);
-    <span class="macro">println!</span>(<span class="string">&quot;new: {:?}&quot;</span>, <span class="ident">new</span>);
+    <span class="macro">println!</span>(<span class="string">&quot;old: {:?}&quot;</span>, old);
+    <span class="macro">println!</span>(<span class="string">&quot;new: {:?}&quot;</span>, new);
     <span class="macro">println!</span>(<span class="string">&quot;&quot;</span>);
-    <span class="kw">for</span> <span class="ident">code</span> <span class="kw">in</span> <span class="ident">old</span>.<span class="ident">diff</span>(<span class="kw-2">&amp;</span><span class="ident">new</span>) {
-        <span class="macro">println!</span>(<span class="string">&quot;\t{:?}&quot;</span>, <span class="ident">code</span>);
+    <span class="kw">for </span>code <span class="kw">in </span>old.diff(<span class="kw-2">&amp;</span>new) {
+        <span class="macro">println!</span>(<span class="string">&quot;\t{:?}&quot;</span>, code);
     }
 }
 
-<span class="attribute">#[<span class="ident">test</span>]</span>
-<span class="kw">fn</span> <span class="ident">test_size</span>() {
-    <span class="macro">println!</span>(<span class="string">&quot;Unit: {}&quot;</span>, <span class="ident">std::mem::size_of</span>::<span class="op">&lt;</span><span class="ident"><span class="kw">crate</span>::Unit</span><span class="op">&gt;</span>());
-    <span class="macro">println!</span>(<span class="string">&quot;      Character: {}&quot;</span>, <span class="ident">std::mem::size_of</span>::<span class="op">&lt;</span><span class="ident"><span class="kw">crate</span>::Character</span><span class="op">&gt;</span>());
-    <span class="macro">println!</span>(<span class="string">&quot;      Style: {}&quot;</span>, <span class="ident">std::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">Style</span><span class="op">&gt;</span>());
-    <span class="macro">println!</span>(<span class="string">&quot;      FormatFlags: {}&quot;</span>, <span class="ident">std::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">FormatFlags</span><span class="op">&gt;</span>());
-    <span class="macro">println!</span>(<span class="string">&quot;      Color: {}&quot;</span>, <span class="ident">std::mem::size_of</span>::<span class="op">&lt;</span><span class="ident"><span class="kw">crate</span>::Color</span><span class="op">&gt;</span>());
+<span class="attr">#[test]
+</span><span class="kw">fn </span>test_size() {
+    <span class="macro">println!</span>(<span class="string">&quot;Unit: {}&quot;</span>, std::mem::size_of::&lt;<span class="kw">crate</span>::Unit&gt;());
+    <span class="macro">println!</span>(<span class="string">&quot;      Character: {}&quot;</span>, std::mem::size_of::&lt;<span class="kw">crate</span>::Character&gt;());
+    <span class="macro">println!</span>(<span class="string">&quot;      Style: {}&quot;</span>, std::mem::size_of::&lt;Style&gt;());
+    <span class="macro">println!</span>(<span class="string">&quot;      FormatFlags: {}&quot;</span>, std::mem::size_of::&lt;FormatFlags&gt;());
+    <span class="macro">println!</span>(<span class="string">&quot;      Color: {}&quot;</span>, std::mem::size_of::&lt;<span class="kw">crate</span>::Color&gt;());
 }
 
 
 
 
-<span class="doccomment">/// The set of all possible ANSI escape codes for setting text style.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This is also referred to as Select Graphic Rendition (SGR) parameters or Display Attributes.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Note that terminal emulators may not support all of these codes;</span>
-<span class="doccomment">/// in general, only the first 9 codes are supported (and their `Not*` variants that disable them).</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// See a list of all such parameters here:</span>
-<span class="doccomment">/// &lt;https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters&gt;</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">AnsiStyleCodes</span> {
-    <span class="doccomment">/// Resets or clears all styles.</span>
-    <span class="ident">Reset</span>,
-    <span class="doccomment">/// Bright or bold text.</span>
-    <span class="ident">Bright</span>,
-    <span class="doccomment">/// Dim or faint text.</span>
-    <span class="ident">Dim</span>,
-    <span class="doccomment">/// Italicized text.</span>
-    <span class="ident">Italic</span>,
-    <span class="doccomment">/// Underlined text. </span>
-    <span class="ident">Underlined</span>,
-    <span class="doccomment">/// The text will blink at slower rate, under 150 blinks per minute.</span>
-    <span class="ident">Blink</span>,
-    <span class="doccomment">/// The text will blink rapidly at a fast rate, over 150 blinks per minute.</span>
-    <span class="ident">BlinkRapid</span>,
-    <span class="doccomment">/// The foreground and background colors will be swapped. </span>
-    <span class="doccomment">/// The text will be displayed using the background color,</span>
-    <span class="doccomment">/// while the background will be displayed using the foreground color. </span>
-    <span class="ident">Inverse</span>,
-    <span class="doccomment">/// The text will be concealed/invisible and not displayed at all.</span>
-    <span class="doccomment">/// Only the solid background color will be displayed. </span>
-    <span class="ident">Hidden</span>,
-    <span class="doccomment">/// The text will be striked through, i.e., crossed out with a line through it.</span>
-    <span class="ident">Strikethrough</span>,
-    <span class="doccomment">/// Sets the font to the primary default font.</span>
-    <span class="ident">PrimaryFont</span>,
-    <span class="doccomment">/// Sets the font to an alternate font. </span>
-    <span class="doccomment">/// There are 10 available choices, from `0` to `9`,</span>
-    <span class="doccomment">/// in which `0` is the same as [`Self::PrimaryFont`].</span>
-    <span class="ident">AlternateFont</span>(<span class="ident">u8</span>),
-    <span class="doccomment">/// Sets the font to be a blackletter font, which is a calligraphic/angular font </span>
-    <span class="doccomment">/// in a gothic German style rather than the typical Roman/Latin style. </span>
-    <span class="doccomment">/// Example: &lt;https://git.enlightenment.org/apps/terminology.git/commit/?id=02856cbdec511e08cf579b08e906499d9583f018&gt;</span>
-    <span class="ident">Fraktur</span>,
-    <span class="doccomment">/// The text will be underlined twice, or, depending on the terminal,</span>
-    <span class="doccomment">/// this will disable `Bright`. </span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Note: it is better to use `NotBrightNorDim` to disable `Bright` </span>
-    <span class="doccomment">///       as that escape code is more widely supported than this one.</span>
-    <span class="ident">DoulbeUnderlinedOrNotBright</span>,
-    <span class="doccomment">/// Normal font intensity: Disables `Bright` or `Dim`.</span>
-    <span class="ident">NotBrightNorDim</span>, 
-    <span class="doccomment">/// Normal font sytle: Disables `Italic` or `Fraktur`.</span>
-    <span class="ident">NotItalicNorFraktur</span>,
-    <span class="doccomment">/// Disables `Underline` or `DoubleUnderline`.</span>
-    <span class="ident">NotUnderlined</span>,
-    <span class="doccomment">/// Disables `Blink` or `BlinkRapid`.</span>
-    <span class="ident">NotBlink</span>, 
-    <span class="doccomment">/// Proportional spacing, which sets the Teletex character set: &lt;https://en.wikipedia.org/wiki/ITU_T.61&gt;.</span>
-    <span class="doccomment">/// This is a different text encoding that is not used and has no effect on terminals. </span>
-    <span class="ident">_ProportionalSpacing</span>,
-    <span class="doccomment">/// Disables `Inverse`: foreground colors and background colors are used as normal.</span>
-    <span class="ident">NotInverse</span>,
-    <span class="doccomment">/// Disables Hidden``: text is displayed as normal. Sometimes called reveal.</span>
-    <span class="ident">NotHidden</span>, 
-    <span class="doccomment">/// Disables `Strikethrough`: text is not crossed out.</span>
-    <span class="ident">NotStrikethrough</span>,
-    <span class="doccomment">/// Set the foreground color: the color the text will be displayed in.</span>
-    <span class="doccomment">/// To set it back to the default, use `ForegroundColor(Color::Default)`.</span>
-    <span class="ident">ForegroundColor</span>(<span class="ident">ForegroundColor</span>),
-    <span class="doccomment">/// Set the background color: the color displayed behind the text.</span>
-    <span class="doccomment">/// To set it back to the default, use `BackgroundColor(Color::Default)`.</span>
-    <span class="ident">BackgroundColor</span>(<span class="ident">BackgroundColor</span>),
-    <span class="doccomment">/// Disables `_ProportionalSpacing`.</span>
-    <span class="ident">_NotProportionalSpacing</span>,
-    <span class="doccomment">/// The text will be displayed with a rectangular box surrounding it.</span>
-    <span class="ident">Framed</span>,
-    <span class="doccomment">/// The text will be displayed with a circle or oval surrounding it.</span>
-    <span class="ident">Circled</span>,
-    <span class="doccomment">/// The text will be overlined: displayed with a line on top (like underlined).</span>
-    <span class="ident">Overlined</span>,
-    <span class="doccomment">/// Disables `Framed` or `Circled`.</span>
-    <span class="ident">NotFramedOrCircled</span>,
-    <span class="doccomment">/// Disabled `Overlined`.</span>
-    <span class="ident">NotOverlined</span>,
-    <span class="doccomment">/// Sets the underline color. </span>
-    <span class="doccomment">/// Without this, the underline color will be the same as the text color.</span>
-    <span class="doccomment">/// To set it back to the default, use `UnderlinedColor(Color::Default)`.</span>
-    <span class="ident">UnderlinedColor</span>(<span class="ident">UnderlinedColor</span>),
-    <span class="ident">_IdeogramUnderlined</span>,
-    <span class="ident">_IdeogramDoubleUnderlined</span>,
-    <span class="ident">_IdeogramOverlined</span>,
-    <span class="ident">_IdeogramDoubleOverlined</span>,
-    <span class="ident">_IdeogramStressMarking</span>,
-    <span class="doccomment">/// Disables all Ideogram styles.</span>
-    <span class="ident">_NotIdeogram</span>,
-    <span class="ident">Superscript</span>,
-    <span class="ident">Subscript</span>,
-    <span class="doccomment">/// Disables `Superscript` or `Subscript`.</span>
-    <span class="ident">NotSuperOrSubscript</span>,
+<span class="doccomment">/// The set of all possible ANSI escape codes for setting text style.
+///
+/// This is also referred to as Select Graphic Rendition (SGR) parameters or Display Attributes.
+///
+/// Note that terminal emulators may not support all of these codes;
+/// in general, only the first 9 codes are supported (and their `Not*` variants that disable them).
+///
+/// See a list of all such parameters here:
+/// &lt;https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters&gt;
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub enum </span>AnsiStyleCodes {
+    <span class="doccomment">/// Resets or clears all styles.
+    </span>Reset,
+    <span class="doccomment">/// Bright or bold text.
+    </span>Bright,
+    <span class="doccomment">/// Dim or faint text.
+    </span>Dim,
+    <span class="doccomment">/// Italicized text.
+    </span>Italic,
+    <span class="doccomment">/// Underlined text. 
+    </span>Underlined,
+    <span class="doccomment">/// The text will blink at slower rate, under 150 blinks per minute.
+    </span>Blink,
+    <span class="doccomment">/// The text will blink rapidly at a fast rate, over 150 blinks per minute.
+    </span>BlinkRapid,
+    <span class="doccomment">/// The foreground and background colors will be swapped. 
+    /// The text will be displayed using the background color,
+    /// while the background will be displayed using the foreground color. 
+    </span>Inverse,
+    <span class="doccomment">/// The text will be concealed/invisible and not displayed at all.
+    /// Only the solid background color will be displayed. 
+    </span>Hidden,
+    <span class="doccomment">/// The text will be striked through, i.e., crossed out with a line through it.
+    </span>Strikethrough,
+    <span class="doccomment">/// Sets the font to the primary default font.
+    </span>PrimaryFont,
+    <span class="doccomment">/// Sets the font to an alternate font. 
+    /// There are 10 available choices, from `0` to `9`,
+    /// in which `0` is the same as [`Self::PrimaryFont`].
+    </span>AlternateFont(u8),
+    <span class="doccomment">/// Sets the font to be a blackletter font, which is a calligraphic/angular font 
+    /// in a gothic German style rather than the typical Roman/Latin style. 
+    /// Example: &lt;https://git.enlightenment.org/apps/terminology.git/commit/?id=02856cbdec511e08cf579b08e906499d9583f018&gt;
+    </span>Fraktur,
+    <span class="doccomment">/// The text will be underlined twice, or, depending on the terminal,
+    /// this will disable `Bright`. 
+    ///
+    /// Note: it is better to use `NotBrightNorDim` to disable `Bright` 
+    ///       as that escape code is more widely supported than this one.
+    </span>DoulbeUnderlinedOrNotBright,
+    <span class="doccomment">/// Normal font intensity: Disables `Bright` or `Dim`.
+    </span>NotBrightNorDim, 
+    <span class="doccomment">/// Normal font sytle: Disables `Italic` or `Fraktur`.
+    </span>NotItalicNorFraktur,
+    <span class="doccomment">/// Disables `Underline` or `DoubleUnderline`.
+    </span>NotUnderlined,
+    <span class="doccomment">/// Disables `Blink` or `BlinkRapid`.
+    </span>NotBlink, 
+    <span class="doccomment">/// Proportional spacing, which sets the Teletex character set: &lt;https://en.wikipedia.org/wiki/ITU_T.61&gt;.
+    /// This is a different text encoding that is not used and has no effect on terminals. 
+    </span>_ProportionalSpacing,
+    <span class="doccomment">/// Disables `Inverse`: foreground colors and background colors are used as normal.
+    </span>NotInverse,
+    <span class="doccomment">/// Disables Hidden``: text is displayed as normal. Sometimes called reveal.
+    </span>NotHidden, 
+    <span class="doccomment">/// Disables `Strikethrough`: text is not crossed out.
+    </span>NotStrikethrough,
+    <span class="doccomment">/// Set the foreground color: the color the text will be displayed in.
+    /// To set it back to the default, use `ForegroundColor(Color::Default)`.
+    </span>ForegroundColor(ForegroundColor),
+    <span class="doccomment">/// Set the background color: the color displayed behind the text.
+    /// To set it back to the default, use `BackgroundColor(Color::Default)`.
+    </span>BackgroundColor(BackgroundColor),
+    <span class="doccomment">/// Disables `_ProportionalSpacing`.
+    </span>_NotProportionalSpacing,
+    <span class="doccomment">/// The text will be displayed with a rectangular box surrounding it.
+    </span>Framed,
+    <span class="doccomment">/// The text will be displayed with a circle or oval surrounding it.
+    </span>Circled,
+    <span class="doccomment">/// The text will be overlined: displayed with a line on top (like underlined).
+    </span>Overlined,
+    <span class="doccomment">/// Disables `Framed` or `Circled`.
+    </span>NotFramedOrCircled,
+    <span class="doccomment">/// Disabled `Overlined`.
+    </span>NotOverlined,
+    <span class="doccomment">/// Sets the underline color. 
+    /// Without this, the underline color will be the same as the text color.
+    /// To set it back to the default, use `UnderlinedColor(Color::Default)`.
+    </span>UnderlinedColor(UnderlinedColor),
+    _IdeogramUnderlined,
+    _IdeogramDoubleUnderlined,
+    _IdeogramOverlined,
+    _IdeogramDoubleOverlined,
+    _IdeogramStressMarking,
+    <span class="doccomment">/// Disables all Ideogram styles.
+    </span>_NotIdeogram,
+    Superscript,
+    Subscript,
+    <span class="doccomment">/// Disables `Superscript` or `Subscript`.
+    </span>NotSuperOrSubscript,
 }
 
-<span class="kw">impl</span> <span class="ident">AnsiStyleCodes</span> {
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ESCAPE_PREFIX</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="string">b&quot;\x1B[&quot;</span>;
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ESCAPE_DELIM</span>:  <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="string">b&quot;;&quot;</span>;
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ESCAPE_SUFFIX</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="string">b&quot;m&quot;</span>;
+<span class="kw">impl </span>AnsiStyleCodes {
+    <span class="kw">pub const </span>ESCAPE_PREFIX: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8] = <span class="string">b&quot;\x1B[&quot;</span>;
+    <span class="kw">pub const </span>ESCAPE_DELIM:  <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8] = <span class="string">b&quot;;&quot;</span>;
+    <span class="kw">pub const </span>ESCAPE_SUFFIX: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8] = <span class="string">b&quot;m&quot;</span>;
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_escape_code</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Cow</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span>, <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident"><span class="self">Self</span>::Reset</span>                     =&gt; <span class="string">&quot;0&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::Bright</span>                    =&gt; <span class="string">&quot;1&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::Dim</span>                       =&gt; <span class="string">&quot;2&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::Italic</span>                    =&gt; <span class="string">&quot;3&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::Underlined</span>                =&gt; <span class="string">&quot;4&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::Blink</span>                     =&gt; <span class="string">&quot;5&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::BlinkRapid</span>                =&gt; <span class="string">&quot;6&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::Inverse</span>                   =&gt; <span class="string">&quot;7&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::Hidden</span>                    =&gt; <span class="string">&quot;8&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::Strikethrough</span>             =&gt; <span class="string">&quot;9&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::PrimaryFont</span>               =&gt; <span class="string">&quot;10&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">0</span>)          =&gt; <span class="string">&quot;10&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">1</span>)          =&gt; <span class="string">&quot;11&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">2</span>)          =&gt; <span class="string">&quot;12&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">3</span>)          =&gt; <span class="string">&quot;13&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">4</span>)          =&gt; <span class="string">&quot;14&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">5</span>)          =&gt; <span class="string">&quot;15&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">6</span>)          =&gt; <span class="string">&quot;16&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">7</span>)          =&gt; <span class="string">&quot;17&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">8</span>)          =&gt; <span class="string">&quot;18&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="ident">_9_and_up</span>)  =&gt; <span class="string">&quot;19&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::Fraktur</span>                   =&gt; <span class="string">&quot;20&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::DoulbeUnderlinedOrNotBright</span> =&gt; <span class="string">&quot;21&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::NotBrightNorDim</span>           =&gt; <span class="string">&quot;22&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::NotItalicNorFraktur</span>       =&gt; <span class="string">&quot;23&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::NotUnderlined</span>             =&gt; <span class="string">&quot;24&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::NotBlink</span>                  =&gt; <span class="string">&quot;25&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::_ProportionalSpacing</span>      =&gt; <span class="string">&quot;26&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::NotInverse</span>                =&gt; <span class="string">&quot;27&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::NotHidden</span>                 =&gt; <span class="string">&quot;28&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::NotStrikethrough</span>          =&gt; <span class="string">&quot;29&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::ForegroundColor</span>(<span class="ident">fgc</span>)      =&gt; <span class="ident">fgc</span>.<span class="ident">to_escape_code</span>(), <span class="comment">// Covers &quot;30&quot;-&quot;39&quot; and &quot;90&quot;-&quot;97&quot;</span>
-            <span class="ident"><span class="self">Self</span>::BackgroundColor</span>(<span class="ident">bgc</span>)      =&gt; <span class="ident">bgc</span>.<span class="ident">to_escape_code</span>(), <span class="comment">// Covers &quot;40&quot;-&quot;49&quot; and &quot;100&quot;-&quot;107&quot;</span>
-            <span class="ident"><span class="self">Self</span>::_NotProportionalSpacing</span>   =&gt; <span class="string">&quot;50&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::Framed</span>                    =&gt; <span class="string">&quot;51&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::Circled</span>                   =&gt; <span class="string">&quot;52&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::Overlined</span>                 =&gt; <span class="string">&quot;53&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::NotFramedOrCircled</span>        =&gt; <span class="string">&quot;54&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::NotOverlined</span>              =&gt; <span class="string">&quot;55&quot;</span>.<span class="ident">into</span>(),
-            <span class="comment">// 56 - 57 are unknown</span>
-            <span class="ident"><span class="self">Self</span>::UnderlinedColor</span>(<span class="ident">ulc</span>)      =&gt; <span class="ident">ulc</span>.<span class="ident">to_escape_code</span>(), <span class="comment">// Covers &quot;58&quot;-&quot;59&quot;</span>
-            <span class="ident"><span class="self">Self</span>::_IdeogramUnderlined</span>       =&gt; <span class="string">&quot;60&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::_IdeogramDoubleUnderlined</span> =&gt; <span class="string">&quot;61&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::_IdeogramOverlined</span>        =&gt; <span class="string">&quot;62&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::_IdeogramDoubleOverlined</span>  =&gt; <span class="string">&quot;63&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::_IdeogramStressMarking</span>    =&gt; <span class="string">&quot;64&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::_NotIdeogram</span>              =&gt; <span class="string">&quot;65&quot;</span>.<span class="ident">into</span>(),
-            <span class="comment">// 66 - 72 are unknown</span>
-            <span class="ident"><span class="self">Self</span>::Superscript</span>               =&gt; <span class="string">&quot;73&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::Subscript</span>                 =&gt; <span class="string">&quot;74&quot;</span>.<span class="ident">into</span>(),
-            <span class="ident"><span class="self">Self</span>::NotSuperOrSubscript</span>       =&gt; <span class="string">&quot;75&quot;</span>.<span class="ident">into</span>(),
-            <span class="comment">// 76 - 89 are unknown</span>
-            <span class="comment">// 90 - 97 are covered by `Self::ForegroundColor`</span>
-            <span class="comment">// 98 - 99 are unknown</span>
-            <span class="comment">// 100 - 107 are covered by `Self::BackgroundColor`</span>
-            <span class="comment">// 108 and up are unknown</span>
-        }
+    <span class="kw">pub fn </span>to_escape_code(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Cow&lt;<span class="lifetime">&#39;static</span>, str&gt; {
+        <span class="kw">match </span><span class="self">self </span>{
+            <span class="self">Self</span>::Reset                     =&gt; <span class="string">&quot;0&quot;</span>.into(),
+            <span class="self">Self</span>::Bright                    =&gt; <span class="string">&quot;1&quot;</span>.into(),
+            <span class="self">Self</span>::Dim                       =&gt; <span class="string">&quot;2&quot;</span>.into(),
+            <span class="self">Self</span>::Italic                    =&gt; <span class="string">&quot;3&quot;</span>.into(),
+            <span class="self">Self</span>::Underlined                =&gt; <span class="string">&quot;4&quot;</span>.into(),
+            <span class="self">Self</span>::Blink                     =&gt; <span class="string">&quot;5&quot;</span>.into(),
+            <span class="self">Self</span>::BlinkRapid                =&gt; <span class="string">&quot;6&quot;</span>.into(),
+            <span class="self">Self</span>::Inverse                   =&gt; <span class="string">&quot;7&quot;</span>.into(),
+            <span class="self">Self</span>::Hidden                    =&gt; <span class="string">&quot;8&quot;</span>.into(),
+            <span class="self">Self</span>::Strikethrough             =&gt; <span class="string">&quot;9&quot;</span>.into(),
+            <span class="self">Self</span>::PrimaryFont               =&gt; <span class="string">&quot;10&quot;</span>.into(),
+            <span class="self">Self</span>::AlternateFont(<span class="number">0</span>)          =&gt; <span class="string">&quot;10&quot;</span>.into(),
+            <span class="self">Self</span>::AlternateFont(<span class="number">1</span>)          =&gt; <span class="string">&quot;11&quot;</span>.into(),
+            <span class="self">Self</span>::AlternateFont(<span class="number">2</span>)          =&gt; <span class="string">&quot;12&quot;</span>.into(),
+            <span class="self">Self</span>::AlternateFont(<span class="number">3</span>)          =&gt; <span class="string">&quot;13&quot;</span>.into(),
+            <span class="self">Self</span>::AlternateFont(<span class="number">4</span>)          =&gt; <span class="string">&quot;14&quot;</span>.into(),
+            <span class="self">Self</span>::AlternateFont(<span class="number">5</span>)          =&gt; <span class="string">&quot;15&quot;</span>.into(),
+            <span class="self">Self</span>::AlternateFont(<span class="number">6</span>)          =&gt; <span class="string">&quot;16&quot;</span>.into(),
+            <span class="self">Self</span>::AlternateFont(<span class="number">7</span>)          =&gt; <span class="string">&quot;17&quot;</span>.into(),
+            <span class="self">Self</span>::AlternateFont(<span class="number">8</span>)          =&gt; <span class="string">&quot;18&quot;</span>.into(),
+            <span class="self">Self</span>::AlternateFont(_9_and_up)  =&gt; <span class="string">&quot;19&quot;</span>.into(),
+            <span class="self">Self</span>::Fraktur                   =&gt; <span class="string">&quot;20&quot;</span>.into(),
+            <span class="self">Self</span>::DoulbeUnderlinedOrNotBright =&gt; <span class="string">&quot;21&quot;</span>.into(),
+            <span class="self">Self</span>::NotBrightNorDim           =&gt; <span class="string">&quot;22&quot;</span>.into(),
+            <span class="self">Self</span>::NotItalicNorFraktur       =&gt; <span class="string">&quot;23&quot;</span>.into(),
+            <span class="self">Self</span>::NotUnderlined             =&gt; <span class="string">&quot;24&quot;</span>.into(),
+            <span class="self">Self</span>::NotBlink                  =&gt; <span class="string">&quot;25&quot;</span>.into(),
+            <span class="self">Self</span>::_ProportionalSpacing      =&gt; <span class="string">&quot;26&quot;</span>.into(),
+            <span class="self">Self</span>::NotInverse                =&gt; <span class="string">&quot;27&quot;</span>.into(),
+            <span class="self">Self</span>::NotHidden                 =&gt; <span class="string">&quot;28&quot;</span>.into(),
+            <span class="self">Self</span>::NotStrikethrough          =&gt; <span class="string">&quot;29&quot;</span>.into(),
+            <span class="self">Self</span>::ForegroundColor(fgc)      =&gt; fgc.to_escape_code(), <span class="comment">// Covers &quot;30&quot;-&quot;39&quot; and &quot;90&quot;-&quot;97&quot;
+            </span><span class="self">Self</span>::BackgroundColor(bgc)      =&gt; bgc.to_escape_code(), <span class="comment">// Covers &quot;40&quot;-&quot;49&quot; and &quot;100&quot;-&quot;107&quot;
+            </span><span class="self">Self</span>::_NotProportionalSpacing   =&gt; <span class="string">&quot;50&quot;</span>.into(),
+            <span class="self">Self</span>::Framed                    =&gt; <span class="string">&quot;51&quot;</span>.into(),
+            <span class="self">Self</span>::Circled                   =&gt; <span class="string">&quot;52&quot;</span>.into(),
+            <span class="self">Self</span>::Overlined                 =&gt; <span class="string">&quot;53&quot;</span>.into(),
+            <span class="self">Self</span>::NotFramedOrCircled        =&gt; <span class="string">&quot;54&quot;</span>.into(),
+            <span class="self">Self</span>::NotOverlined              =&gt; <span class="string">&quot;55&quot;</span>.into(),
+            <span class="comment">// 56 - 57 are unknown
+            </span><span class="self">Self</span>::UnderlinedColor(ulc)      =&gt; ulc.to_escape_code(), <span class="comment">// Covers &quot;58&quot;-&quot;59&quot;
+            </span><span class="self">Self</span>::_IdeogramUnderlined       =&gt; <span class="string">&quot;60&quot;</span>.into(),
+            <span class="self">Self</span>::_IdeogramDoubleUnderlined =&gt; <span class="string">&quot;61&quot;</span>.into(),
+            <span class="self">Self</span>::_IdeogramOverlined        =&gt; <span class="string">&quot;62&quot;</span>.into(),
+            <span class="self">Self</span>::_IdeogramDoubleOverlined  =&gt; <span class="string">&quot;63&quot;</span>.into(),
+            <span class="self">Self</span>::_IdeogramStressMarking    =&gt; <span class="string">&quot;64&quot;</span>.into(),
+            <span class="self">Self</span>::_NotIdeogram              =&gt; <span class="string">&quot;65&quot;</span>.into(),
+            <span class="comment">// 66 - 72 are unknown
+            </span><span class="self">Self</span>::Superscript               =&gt; <span class="string">&quot;73&quot;</span>.into(),
+            <span class="self">Self</span>::Subscript                 =&gt; <span class="string">&quot;74&quot;</span>.into(),
+            <span class="self">Self</span>::NotSuperOrSubscript       =&gt; <span class="string">&quot;75&quot;</span>.into(),
+            <span class="comment">// 76 - 89 are unknown
+            // 90 - 97 are covered by `Self::ForegroundColor`
+            // 98 - 99 are unknown
+            // 100 - 107 are covered by `Self::BackgroundColor`
+            // 108 and up are unknown
+        </span>}
     }
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">AnsiStyleCodes</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{}&quot;</span>, <span class="self">self</span>.<span class="ident">to_escape_code</span>())
+<span class="kw">impl </span>fmt::Display <span class="kw">for </span>AnsiStyleCodes {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;{}&quot;</span>, <span class="self">self</span>.to_escape_code())
     }
 }
 
 
-<span class="macro">bitflags!</span> {
-    <span class="doccomment">/// The flags that describe the formatting of a given text character.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This set of flags is completely self-contained within each `Unit`</span>
-    <span class="doccomment">/// and does not need to reference any previous `Unit`&#39;s flag as an anchor.</span>
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FormatFlags</span>: <span class="ident">u8</span> {
-        <span class="doccomment">/// If set, this character is displayed in a bright color, which is sometimes called &quot;bold&quot;.</span>
-        <span class="kw">const</span> <span class="ident">BRIGHT</span>                    <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">0</span>;
-        <span class="doccomment">/// If set, this character is displayed using a dim or faint color, the opposite of `BRIGHT`.</span>
-        <span class="kw">const</span> <span class="ident">DIM</span>                       <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>;
-        <span class="doccomment">/// If set, this character is displayed in italics.</span>
-        <span class="kw">const</span> <span class="ident">ITALIC</span>                    <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">2</span>;
-        <span class="doccomment">/// If set, this character is displayed with a single underline.</span>
-        <span class="kw">const</span> <span class="ident">UNDERLINE</span>                 <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">3</span>;
-        <span class="doccomment">/// If set, the unit box where this character is displayed will blink.</span>
-        <span class="kw">const</span> <span class="ident">BLINK</span>                     <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">4</span>;
-        <span class="doccomment">/// If set, this character is displayed with inversed/reversed colors:</span>
-        <span class="doccomment">/// the foreground character text is displayed using the background color,</span>
-        <span class="doccomment">/// while the background is displayed using the foreground color.</span>
-        <span class="kw">const</span> <span class="ident">INVERSE</span>                   <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">5</span>;
-        <span class="doccomment">/// If set, this character is not displayed at all,</span>
-        <span class="doccomment">/// only a blank box (in the specified background color) will be displayed.</span>
-        <span class="kw">const</span> <span class="ident">HIDDEN</span>                    <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">6</span>;
-        <span class="doccomment">/// If set, this character is displayed with a strike-through, i.e.,</span>
-        <span class="doccomment">/// with a line crossing it out.</span>
-        <span class="kw">const</span> <span class="ident">STRIKETHROUGH</span>             <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">7</span>;
+<span class="macro">bitflags! </span>{
+    <span class="doccomment">/// The flags that describe the formatting of a given text character.
+    ///
+    /// This set of flags is completely self-contained within each `Unit`
+    /// and does not need to reference any previous `Unit`&#39;s flag as an anchor.
+    </span><span class="attr">#[derive(Default)]
+    </span><span class="kw">pub struct </span>FormatFlags: u8 {
+        <span class="doccomment">/// If set, this character is displayed in a bright color, which is sometimes called &quot;bold&quot;.
+        </span><span class="kw">const </span>BRIGHT                    = <span class="number">1 </span>&lt;&lt; <span class="number">0</span>;
+        <span class="doccomment">/// If set, this character is displayed using a dim or faint color, the opposite of `BRIGHT`.
+        </span><span class="kw">const </span>DIM                       = <span class="number">1 </span>&lt;&lt; <span class="number">1</span>;
+        <span class="doccomment">/// If set, this character is displayed in italics.
+        </span><span class="kw">const </span>ITALIC                    = <span class="number">1 </span>&lt;&lt; <span class="number">2</span>;
+        <span class="doccomment">/// If set, this character is displayed with a single underline.
+        </span><span class="kw">const </span>UNDERLINE                 = <span class="number">1 </span>&lt;&lt; <span class="number">3</span>;
+        <span class="doccomment">/// If set, the unit box where this character is displayed will blink.
+        </span><span class="kw">const </span>BLINK                     = <span class="number">1 </span>&lt;&lt; <span class="number">4</span>;
+        <span class="doccomment">/// If set, this character is displayed with inversed/reversed colors:
+        /// the foreground character text is displayed using the background color,
+        /// while the background is displayed using the foreground color.
+        </span><span class="kw">const </span>INVERSE                   = <span class="number">1 </span>&lt;&lt; <span class="number">5</span>;
+        <span class="doccomment">/// If set, this character is not displayed at all,
+        /// only a blank box (in the specified background color) will be displayed.
+        </span><span class="kw">const </span>HIDDEN                    = <span class="number">1 </span>&lt;&lt; <span class="number">6</span>;
+        <span class="doccomment">/// If set, this character is displayed with a strike-through, i.e.,
+        /// with a line crossing it out.
+        </span><span class="kw">const </span>STRIKETHROUGH             = <span class="number">1 </span>&lt;&lt; <span class="number">7</span>;
     }
 }
 
-<span class="kw">impl</span> <span class="ident">FormatFlags</span> {
-    <span class="doccomment">/// The max bit index of the `FormatFlags` type.</span>
-    <span class="kw">const</span> <span class="ident">MAX_BIT</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">8</span>;
+<span class="kw">impl </span>FormatFlags {
+    <span class="doccomment">/// The max bit index of the `FormatFlags` type.
+    </span><span class="kw">const </span>MAX_BIT: u32 = <span class="number">8</span>;
     
-    <span class="doccomment">/// Returns a bit mask of the bits that differ between `self` and `other`,</span>
-    <span class="doccomment">/// in which the bit is set if that bit was different across `self` vs `other`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This is merely a bit-wise logical XOR of `self` and `other`. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bits_that_differ</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="ident">FormatFlags</span>) -&gt; <span class="ident">FormatFlags</span> {
-        <span class="self">self</span> <span class="op">^</span> <span class="ident">other</span>
+    <span class="doccomment">/// Returns a bit mask of the bits that differ between `self` and `other`,
+    /// in which the bit is set if that bit was different across `self` vs `other`.
+    ///
+    /// This is merely a bit-wise logical XOR of `self` and `other`. 
+    </span><span class="kw">pub fn </span>bits_that_differ(<span class="self">self</span>, other: FormatFlags) -&gt; FormatFlags {
+        <span class="self">self </span>^ other
     }
 
-    <span class="kw">fn</span> <span class="ident">diff</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="ident">FormatFlags</span>) -&gt; <span class="ident">FormatFlagsDiff</span> {
-        <span class="ident">FormatFlagsDiff::new</span>(<span class="self">self</span>, <span class="ident">other</span>)
+    <span class="kw">fn </span>diff(<span class="self">self</span>, other: FormatFlags) -&gt; FormatFlagsDiff {
+        FormatFlagsDiff::new(<span class="self">self</span>, other)
     }
 
-    <span class="doccomment">/// Returns the style code required to enable or disable the style</span>
-    <span class="doccomment">/// given by the single bit that is set in this `Format`Flags` (`self`). </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Returns `None` if more than one bit is set in this `FormatFlags` (`self`).</span>
-    <span class="kw">fn</span> <span class="ident">to_style_code</span>(<span class="self">self</span>, <span class="ident">enable</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AnsiStyleCodes</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">code</span> <span class="op">=</span> <span class="kw">match</span> (<span class="self">self</span>, <span class="ident">enable</span>) {
-            (<span class="ident">FormatFlags::BRIGHT</span>, <span class="bool-val">true</span>)            =&gt; <span class="ident">AnsiStyleCodes::Bright</span>,
-            (<span class="ident">FormatFlags::BRIGHT</span>, <span class="bool-val">false</span>)           =&gt; <span class="ident">AnsiStyleCodes::NotBrightNorDim</span>,
-            (<span class="ident">FormatFlags::DIM</span>, <span class="bool-val">true</span>)               =&gt; <span class="ident">AnsiStyleCodes::Dim</span>,
-            (<span class="ident">FormatFlags::DIM</span>, <span class="bool-val">false</span>)              =&gt; <span class="ident">AnsiStyleCodes::NotBrightNorDim</span>,
-            (<span class="ident">FormatFlags::ITALIC</span>, <span class="bool-val">true</span>)            =&gt; <span class="ident">AnsiStyleCodes::Italic</span>,
-            (<span class="ident">FormatFlags::ITALIC</span>, <span class="bool-val">false</span>)           =&gt; <span class="ident">AnsiStyleCodes::NotItalicNorFraktur</span>,
-            (<span class="ident">FormatFlags::UNDERLINE</span>, <span class="bool-val">true</span>)         =&gt; <span class="ident">AnsiStyleCodes::Underlined</span>,
-            (<span class="ident">FormatFlags::UNDERLINE</span>, <span class="bool-val">false</span>)        =&gt; <span class="ident">AnsiStyleCodes::NotUnderlined</span>,
-            (<span class="ident">FormatFlags::BLINK</span>, <span class="bool-val">true</span>)             =&gt; <span class="ident">AnsiStyleCodes::Blink</span>,
-            (<span class="ident">FormatFlags::BLINK</span>, <span class="bool-val">false</span>)            =&gt; <span class="ident">AnsiStyleCodes::NotBlink</span>,
-            (<span class="ident">FormatFlags::INVERSE</span>, <span class="bool-val">true</span>)           =&gt; <span class="ident">AnsiStyleCodes::Inverse</span>,
-            (<span class="ident">FormatFlags::INVERSE</span>, <span class="bool-val">false</span>)          =&gt; <span class="ident">AnsiStyleCodes::NotInverse</span>,
-            (<span class="ident">FormatFlags::HIDDEN</span>, <span class="bool-val">true</span>)            =&gt; <span class="ident">AnsiStyleCodes::Hidden</span>,
-            (<span class="ident">FormatFlags::HIDDEN</span>, <span class="bool-val">false</span>)           =&gt; <span class="ident">AnsiStyleCodes::NotHidden</span>,
-            (<span class="ident">FormatFlags::STRIKETHROUGH</span>, <span class="bool-val">true</span>)     =&gt; <span class="ident">AnsiStyleCodes::Strikethrough</span>,
-            (<span class="ident">FormatFlags::STRIKETHROUGH</span>, <span class="bool-val">false</span>)    =&gt; <span class="ident">AnsiStyleCodes::NotStrikethrough</span>,
-            <span class="comment">// When more bit flags exist, add those cases here.</span>
-            <span class="kw">_</span> =&gt; <span class="kw">return</span> <span class="prelude-val">None</span>,
+    <span class="doccomment">/// Returns the style code required to enable or disable the style
+    /// given by the single bit that is set in this `Format`Flags` (`self`). 
+    /// 
+    /// Returns `None` if more than one bit is set in this `FormatFlags` (`self`).
+    </span><span class="kw">fn </span>to_style_code(<span class="self">self</span>, enable: bool) -&gt; <span class="prelude-ty">Option</span>&lt;AnsiStyleCodes&gt; {
+        <span class="kw">let </span>code = <span class="kw">match </span>(<span class="self">self</span>, enable) {
+            (FormatFlags::BRIGHT, <span class="bool-val">true</span>)            =&gt; AnsiStyleCodes::Bright,
+            (FormatFlags::BRIGHT, <span class="bool-val">false</span>)           =&gt; AnsiStyleCodes::NotBrightNorDim,
+            (FormatFlags::DIM, <span class="bool-val">true</span>)               =&gt; AnsiStyleCodes::Dim,
+            (FormatFlags::DIM, <span class="bool-val">false</span>)              =&gt; AnsiStyleCodes::NotBrightNorDim,
+            (FormatFlags::ITALIC, <span class="bool-val">true</span>)            =&gt; AnsiStyleCodes::Italic,
+            (FormatFlags::ITALIC, <span class="bool-val">false</span>)           =&gt; AnsiStyleCodes::NotItalicNorFraktur,
+            (FormatFlags::UNDERLINE, <span class="bool-val">true</span>)         =&gt; AnsiStyleCodes::Underlined,
+            (FormatFlags::UNDERLINE, <span class="bool-val">false</span>)        =&gt; AnsiStyleCodes::NotUnderlined,
+            (FormatFlags::BLINK, <span class="bool-val">true</span>)             =&gt; AnsiStyleCodes::Blink,
+            (FormatFlags::BLINK, <span class="bool-val">false</span>)            =&gt; AnsiStyleCodes::NotBlink,
+            (FormatFlags::INVERSE, <span class="bool-val">true</span>)           =&gt; AnsiStyleCodes::Inverse,
+            (FormatFlags::INVERSE, <span class="bool-val">false</span>)          =&gt; AnsiStyleCodes::NotInverse,
+            (FormatFlags::HIDDEN, <span class="bool-val">true</span>)            =&gt; AnsiStyleCodes::Hidden,
+            (FormatFlags::HIDDEN, <span class="bool-val">false</span>)           =&gt; AnsiStyleCodes::NotHidden,
+            (FormatFlags::STRIKETHROUGH, <span class="bool-val">true</span>)     =&gt; AnsiStyleCodes::Strikethrough,
+            (FormatFlags::STRIKETHROUGH, <span class="bool-val">false</span>)    =&gt; AnsiStyleCodes::NotStrikethrough,
+            <span class="comment">// When more bit flags exist, add those cases here.
+            </span><span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">None</span>,
         };
-        <span class="prelude-val">Some</span>(<span class="ident">code</span>)
+        <span class="prelude-val">Some</span>(code)
     }
 }
 
 
-<span class="doccomment">/// The set of ASCII values that are non-printable characters </span>
-<span class="doccomment">/// and require special handling by a terminal emulator. </span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AsciiControlCodes</span>;
+<span class="doccomment">/// The set of ASCII values that are non-printable characters 
+/// and require special handling by a terminal emulator. 
+</span><span class="kw">pub struct </span>AsciiControlCodes;
 
-<span class="comment">// Use associated consts instead of an enum for easy matching.</span>
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">non_upper_case_globals</span>)]</span>
-<span class="kw">impl</span> <span class="ident">AsciiControlCodes</span> {
-    <span class="doccomment">/// (BEL) Plays a terminal bell or beep.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// `Ctrl + G`, or `&#39;\a&#39;`.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Bell</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x07</span>;
-    <span class="doccomment">/// (BS) Moves the cursor backwards by one unit/character, but does not remove it.</span>
-    <span class="doccomment">/// Note that this is different than the typical behavior of the &quot;Backspace&quot; key on a keyboard.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// `Ctrl + H`, or `&#39;\b&#39;`.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Backspace</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x08</span>;
-    <span class="doccomment">/// (HT) Inserts a horizontal tab.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// `Ctrl + I`, or `&#39;\t&#39;`.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tab</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x09</span>;
-    <span class="doccomment">/// (LF) Moves the cursor to the next line, i.e., Line feed, or new line / newline.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// `Ctrl + J`, or `&#39;\n&#39;`.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LineFeed</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x0A</span>;
-    <span class="doccomment">/// (VT) Inserts a vertical tab.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// `Ctrl + K`, or `&#39;\v&#39;`.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">VerticalTab</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x0B</span>;
-    <span class="doccomment">/// (FF) Inserts a page break (form feed) to move the cursor/prompt to the beginning of a new page (screen).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// `Ctrl + L`, or `&#39;\f&#39;`.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PageBreak</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x0C</span>;
-    <span class="doccomment">/// (CR) Moves the cursor to the beginning of the line, i.e., carriage return.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// `Ctrl + M`, or `&#39;\r&#39;`.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CarriageReturn</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x0D</span>;
-    <span class="doccomment">/// (ESC) The escape character.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// `ESC`, or `&#39;\e&#39;`.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Escape</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x1B</span>;
-    <span class="doccomment">/// (DEL) Backwards-deletes the character before (to the left of) the cursor.</span>
-    <span class="doccomment">/// This is equivalent to what the Backspace key on a keyboard typically does.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// `DEL`.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BackwardsDelete</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x7F</span>;
+<span class="comment">// Use associated consts instead of an enum for easy matching.
+</span><span class="attr">#[allow(non_upper_case_globals)]
+</span><span class="kw">impl </span>AsciiControlCodes {
+    <span class="doccomment">/// (BEL) Plays a terminal bell or beep.
+    ///
+    /// `Ctrl + G`, or `&#39;\a&#39;`.
+    </span><span class="kw">pub const </span>Bell: u8 = <span class="number">0x07</span>;
+    <span class="doccomment">/// (BS) Moves the cursor backwards by one unit/character, but does not remove it.
+    /// Note that this is different than the typical behavior of the &quot;Backspace&quot; key on a keyboard.
+    ///
+    /// `Ctrl + H`, or `&#39;\b&#39;`.
+    </span><span class="kw">pub const </span>Backspace: u8 = <span class="number">0x08</span>;
+    <span class="doccomment">/// (HT) Inserts a horizontal tab.
+    ///
+    /// `Ctrl + I`, or `&#39;\t&#39;`.
+    </span><span class="kw">pub const </span>Tab: u8 = <span class="number">0x09</span>;
+    <span class="doccomment">/// (LF) Moves the cursor to the next line, i.e., Line feed, or new line / newline.
+    ///
+    /// `Ctrl + J`, or `&#39;\n&#39;`.
+    </span><span class="kw">pub const </span>LineFeed: u8 = <span class="number">0x0A</span>;
+    <span class="doccomment">/// (VT) Inserts a vertical tab.
+    ///
+    /// `Ctrl + K`, or `&#39;\v&#39;`.
+    </span><span class="kw">pub const </span>VerticalTab: u8 = <span class="number">0x0B</span>;
+    <span class="doccomment">/// (FF) Inserts a page break (form feed) to move the cursor/prompt to the beginning of a new page (screen).
+    ///
+    /// `Ctrl + L`, or `&#39;\f&#39;`.
+    </span><span class="kw">pub const </span>PageBreak: u8 = <span class="number">0x0C</span>;
+    <span class="doccomment">/// (CR) Moves the cursor to the beginning of the line, i.e., carriage return.
+    ///
+    /// `Ctrl + M`, or `&#39;\r&#39;`.
+    </span><span class="kw">pub const </span>CarriageReturn: u8 = <span class="number">0x0D</span>;
+    <span class="doccomment">/// (ESC) The escape character.
+    ///
+    /// `ESC`, or `&#39;\e&#39;`.
+    </span><span class="kw">pub const </span>Escape: u8 = <span class="number">0x1B</span>;
+    <span class="doccomment">/// (DEL) Backwards-deletes the character before (to the left of) the cursor.
+    /// This is equivalent to what the Backspace key on a keyboard typically does.
+    ///
+    /// `DEL`.
+    </span><span class="kw">pub const </span>BackwardsDelete: u8 = <span class="number">0x7F</span>;
 }
 
 
-<span class="doccomment">/// The set of &quot;frequently-supported&quot; commands to switch terminal modes.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// These are sometimes referred to as &quot;ECMA-48&quot; modes or commands.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ModeSwitch</span>;
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">non_upper_case_globals</span>)]</span>
-<span class="kw">impl</span> <span class="ident">ModeSwitch</span> {
-    <span class="doccomment">/// (DECCRM) Display control characters.</span>
-    <span class="doccomment">/// This is off by default.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DisplayControlChars</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="string">b&#39;3&#39;</span>;
+<span class="doccomment">/// The set of &quot;frequently-supported&quot; commands to switch terminal modes.
+///
+/// These are sometimes referred to as &quot;ECMA-48&quot; modes or commands.
+</span><span class="kw">pub struct </span>ModeSwitch;
+<span class="attr">#[allow(non_upper_case_globals)]
+</span><span class="kw">impl </span>ModeSwitch {
+    <span class="doccomment">/// (DECCRM) Display control characters.
+    /// This is off by default.
+    </span><span class="kw">pub const </span>DisplayControlChars: u8 = <span class="string">b&#39;3&#39;</span>;
 
-    <span class="doccomment">/// (DECIM) Set insert mode.</span>
-    <span class="doccomment">/// This is off by default, meaning the terminal is in replace mode.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">InsertMode</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="string">b&#39;4&#39;</span>;
+    <span class="doccomment">/// (DECIM) Set insert mode.
+    /// This is off by default, meaning the terminal is in replace mode.
+    </span><span class="kw">pub const </span>InsertMode: u8 = <span class="string">b&#39;4&#39;</span>;
 
-    <span class="doccomment">/// (LF/NL) Automatically follow a Line Feed (LF), Vertical Tab (VT),</span>
-    <span class="doccomment">/// and Form Feed (FF) with a Carriage Return (CR).</span>
-    <span class="doccomment">/// This is off by default.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">AutomaticCarriageReturn</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>; <span class="number">2</span>] <span class="op">=</span> <span class="string">b&quot;20&quot;</span>;
+    <span class="doccomment">/// (LF/NL) Automatically follow a Line Feed (LF), Vertical Tab (VT),
+    /// and Form Feed (FF) with a Carriage Return (CR).
+    /// This is off by default.
+    </span><span class="kw">pub const </span>AutomaticCarriageReturn: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8; <span class="number">2</span>] = <span class="string">b&quot;20&quot;</span>;
 
-    <span class="doccomment">/// If this value comes after one of the above command values,</span>
-    <span class="doccomment">/// it means that the mode should be set, replacing the default value.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SET_SUFFIX</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="string">b&#39;h&#39;</span>;
+    <span class="doccomment">/// If this value comes after one of the above command values,
+    /// it means that the mode should be set, replacing the default value.
+    </span><span class="kw">pub const </span>SET_SUFFIX: u8 = <span class="string">b&#39;h&#39;</span>;
 
-    <span class="doccomment">/// If this value comes after one of the above command values,</span>
-    <span class="doccomment">/// it means that the mode should be &quot;unset&quot; or &quot;reset&quot; to the default.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RESET_SUFFIX</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="string">b&#39;l&#39;</span>;
+    <span class="doccomment">/// If this value comes after one of the above command values,
+    /// it means that the mode should be &quot;unset&quot; or &quot;reset&quot; to the default.
+    </span><span class="kw">pub const </span>RESET_SUFFIX: u8 = <span class="string">b&#39;l&#39;</span>;
 }
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">StatusReportCommands</span>;
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">non_upper_case_globals</span>)]</span>
-<span class="kw">impl</span> <span class="ident">StatusReportCommands</span> {
-    <span class="doccomment">/// (DSR) Queries the terminal device for its status.</span>
-    <span class="doccomment">/// A reply of `&quot;ESC [ 0 n&quot;` indicates the terminal is okay.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DeviceStatusRequest</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="string">b&#39;5&#39;</span>;
+<span class="kw">pub struct </span>StatusReportCommands;
+<span class="attr">#[allow(non_upper_case_globals)]
+</span><span class="kw">impl </span>StatusReportCommands {
+    <span class="doccomment">/// (DSR) Queries the terminal device for its status.
+    /// A reply of `&quot;ESC [ 0 n&quot;` indicates the terminal is okay.
+    </span><span class="kw">pub const </span>DeviceStatusRequest: u8 = <span class="string">b&#39;5&#39;</span>;
 
-    <span class="doccomment">/// The response to a [`DeviceStatusRequest`] indicating the terminal device is Ok.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DeviceStatusOk</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="string">b&#39;0&#39;</span>;
+    <span class="doccomment">/// The response to a [`DeviceStatusRequest`] indicating the terminal device is Ok.
+    </span><span class="kw">pub const </span>DeviceStatusOk: u8 = <span class="string">b&#39;0&#39;</span>;
 
-    <span class="doccomment">/// (CSR) Queries the terminal device for a cursor position report.</span>
-    <span class="doccomment">/// A reply will be `&quot;ESC [ y ; x R&quot;`, in which `(x,y)` is the cursor position.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CursosPositionReport</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="string">b&#39;6&#39;</span>;
+    <span class="doccomment">/// (CSR) Queries the terminal device for a cursor position report.
+    /// A reply will be `&quot;ESC [ y ; x R&quot;`, in which `(x,y)` is the cursor position.
+    </span><span class="kw">pub const </span>CursosPositionReport: u8 = <span class="string">b&#39;6&#39;</span>;
 
-    <span class="doccomment">/// The value that comes after one of the above command values.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SUFFIX</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="string">b&#39;n&#39;</span>;
+    <span class="doccomment">/// The value that comes after one of the above command values.
+    </span><span class="kw">pub const </span>SUFFIX: u8 = <span class="string">b&#39;n&#39;</span>;
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="text_terminal" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="text_terminal" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/initialization_segment.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>initialization_segment.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/initialization_segment.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>initialization_segment.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -125,127 +119,126 @@
 <span id="119">119</span>
 <span id="120">120</span>
 <span id="121">121</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This module defines the layout of the initialization segment as well as access functions.</span>
-<span class="doccomment">//! (PRM Section 5.4: Initialization Segment)</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This module defines the layout of the initialization segment as well as access functions.
+//! (PRM Section 5.4: Initialization Segment)
 
-<span class="kw">use</span> <span class="ident">command_queue</span>::{<span class="ident">Command</span>, <span class="ident">CmdState</span>};
-<span class="kw">use</span> <span class="ident">memory::PhysicalAddress</span>;
-<span class="kw">use</span> <span class="ident">volatile</span>::{<span class="ident">Volatile</span>, <span class="ident">ReadOnly</span>};
-<span class="kw">use</span> <span class="ident">bit_field::BitField</span>;
-<span class="kw">use</span> <span class="ident">zerocopy</span>::{<span class="ident">U16</span>, <span class="ident">U32</span>, <span class="ident">U64</span>, <span class="ident">FromBytes</span>};
-<span class="kw">use</span> <span class="ident">byteorder::BigEndian</span>;
-<span class="kw">use</span> <span class="ident">core::fmt</span>;
+</span><span class="kw">use </span>command_queue::{Command, CmdState};
+<span class="kw">use </span>memory::PhysicalAddress;
+<span class="kw">use </span>volatile::{Volatile, ReadOnly};
+<span class="kw">use </span>bit_field::BitField;
+<span class="kw">use </span>zerocopy::{U16, U32, U64, FromBytes};
+<span class="kw">use </span>byteorder::BigEndian;
+<span class="kw">use </span>core::fmt;
 
 
-<span class="doccomment">/// The initialization segment is located at offset 0 of PCI BAR0.</span>
-<span class="doccomment">/// It is used in the initialization procedure of the device,</span>
-<span class="doccomment">/// and it contains the 32-bit command doorbell vector used to inform the HW when a command is ready to be processed.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">packed</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">InitializationSegment</span> {
-    <span class="doccomment">/// Firmware Revision - Minor</span>
-    <span class="ident">fw_rev_minor</span>:               <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">U16</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Firmware Revision - Major</span>
-    <span class="ident">fw_rev_major</span>:               <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">U16</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Command Interface Interpreter Revision ID</span>
-    <span class="ident">cmd_interface_rev</span>:          <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">U16</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Firmware Sub-minor version (Patch level)</span>
-    <span class="ident">fw_rev_subminor</span>:            <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">U16</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding1</span>:                  [<span class="ident">u8</span>; <span class="number">8</span>],
-    <span class="doccomment">/// MSBs of the physical address of the command queue record.</span>
-    <span class="ident">cmdq_phy_addr_high</span>:         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// LSBs of the physical address of the command queue record.</span>
-    <span class="ident">cmdq_phy_addr_low</span>:          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Bit per command in the cmdq.</span>
-    <span class="doccomment">/// When the bit is set, that command entry in the queue is moved to HW ownership.</span>
-    <span class="ident">command_doorbell_vector</span>:    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding2</span>:                  [<span class="ident">u8</span>; <span class="number">480</span>],
-    <span class="doccomment">/// If bit 31 is set, the device is still initializing and driver should not post commands</span>
-    <span class="ident">initializing_state</span>:         <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Advanced debug information.</span>
-    <span class="ident">_health_buffer</span>:              <span class="ident">Volatile</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">64</span>]<span class="op">&gt;</span>,
-    <span class="doccomment">/// The offset in bytes, inside the initialization segment, where the NODNIC registers can be found.</span>
-    <span class="ident">_no_dram_nic_offset</span>:         <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding3</span>:                  [<span class="ident">u8</span>; <span class="number">3516</span>],
-    <span class="doccomment">/// MSBs of the current internal timer value</span>
-    <span class="ident">_internal_timer_h</span>:           <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// LSBs of the current internal timer value</span>
-    <span class="ident">_internal_timer_l</span>:           <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding4</span>:                  [<span class="ident">u8</span>; <span class="number">8</span>],
-    <span class="doccomment">/// Advanced debug information</span>
-    <span class="ident">_health_counter</span>:             <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding5</span>:                  [<span class="ident">u8</span>; <span class="number">44</span>],
-    <span class="ident">_real_time</span>:                  <span class="ident">ReadOnly</span><span class="op">&lt;</span><span class="ident">U64</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding6</span>:                  [<span class="ident">u8</span>; <span class="number">12228</span>],
+<span class="doccomment">/// The initialization segment is located at offset 0 of PCI BAR0.
+/// It is used in the initialization procedure of the device,
+/// and it contains the 32-bit command doorbell vector used to inform the HW when a command is ready to be processed.
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(packed)]
+</span><span class="kw">pub struct </span>InitializationSegment {
+    <span class="doccomment">/// Firmware Revision - Minor
+    </span>fw_rev_minor:               ReadOnly&lt;U16&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// Firmware Revision - Major
+    </span>fw_rev_major:               ReadOnly&lt;U16&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// Command Interface Interpreter Revision ID
+    </span>cmd_interface_rev:          ReadOnly&lt;U16&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// Firmware Sub-minor version (Patch level)
+    </span>fw_rev_subminor:            ReadOnly&lt;U16&lt;BigEndian&gt;&gt;,
+    _padding1:                  [u8; <span class="number">8</span>],
+    <span class="doccomment">/// MSBs of the physical address of the command queue record.
+    </span>cmdq_phy_addr_high:         Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// LSBs of the physical address of the command queue record.
+    </span>cmdq_phy_addr_low:          Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// Bit per command in the cmdq.
+    /// When the bit is set, that command entry in the queue is moved to HW ownership.
+    </span>command_doorbell_vector:    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding2:                  [u8; <span class="number">480</span>],
+    <span class="doccomment">/// If bit 31 is set, the device is still initializing and driver should not post commands
+    </span>initializing_state:         ReadOnly&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// Advanced debug information.
+    </span>_health_buffer:              Volatile&lt;[u8; <span class="number">64</span>]&gt;,
+    <span class="doccomment">/// The offset in bytes, inside the initialization segment, where the NODNIC registers can be found.
+    </span>_no_dram_nic_offset:         ReadOnly&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding3:                  [u8; <span class="number">3516</span>],
+    <span class="doccomment">/// MSBs of the current internal timer value
+    </span>_internal_timer_h:           ReadOnly&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// LSBs of the current internal timer value
+    </span>_internal_timer_l:           ReadOnly&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding4:                  [u8; <span class="number">8</span>],
+    <span class="doccomment">/// Advanced debug information
+    </span>_health_counter:             ReadOnly&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding5:                  [u8; <span class="number">44</span>],
+    _real_time:                  ReadOnly&lt;U64&lt;BigEndian&gt;&gt;,
+    _padding6:                  [u8; <span class="number">12228</span>],
 }
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">InitializationSegment</span><span class="op">&gt;</span>(), <span class="number">16396</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;InitializationSegment&gt;(), <span class="number">16396</span>);
 
-<span class="kw">impl</span> <span class="ident">InitializationSegment</span> {
-    <span class="doccomment">/// Returns the maximum number of entries that can be in the command queue</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_cmdq_entries</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> {
-        <span class="kw">let</span> <span class="ident">log</span> <span class="op">=</span> (<span class="self">self</span>.<span class="ident">cmdq_phy_addr_low</span>.<span class="ident">read</span>().<span class="ident">get</span>() <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">4</span>) <span class="op">&amp;</span> <span class="number">0x0F</span>;
-        <span class="number">2_u8</span>.<span class="ident">pow</span>(<span class="ident">log</span>)
+<span class="kw">impl </span>InitializationSegment {
+    <span class="doccomment">/// Returns the maximum number of entries that can be in the command queue
+    </span><span class="kw">pub fn </span>num_cmdq_entries(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 {
+        <span class="kw">let </span>log = (<span class="self">self</span>.cmdq_phy_addr_low.read().get() &gt;&gt; <span class="number">4</span>) &amp; <span class="number">0x0F</span>;
+        <span class="number">2_u8</span>.pow(log)
     }
 
-    <span class="doccomment">/// Returns the required stride of command queue entries (bytes between the start of consecutive entries)</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cmdq_entry_stride</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> {
-        <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cmdq_phy_addr_low</span>.<span class="ident">read</span>().<span class="ident">get</span>() <span class="op">&amp;</span> <span class="number">0x0F</span>;
-        <span class="number">2_u8</span>.<span class="ident">pow</span>(<span class="ident">val</span>)
+    <span class="doccomment">/// Returns the required stride of command queue entries (bytes between the start of consecutive entries)
+    </span><span class="kw">pub fn </span>cmdq_entry_stride(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 {
+        <span class="kw">let </span>val = <span class="self">self</span>.cmdq_phy_addr_low.read().get() &amp; <span class="number">0x0F</span>;
+        <span class="number">2_u8</span>.pow(val)
     }
     
-    <span class="doccomment">/// Sets the physical address of the command queue within the initialization segment.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `cmdq_physical_addr`: the starting physical address of the command queue, the lower 12 bits of which must be zero. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_physical_address_of_cmdq</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">cmdq_physical_addr</span>: <span class="ident">PhysicalAddress</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">cmdq_physical_addr</span>.<span class="ident">value</span>() <span class="op">&amp;</span> <span class="number">0xFFF</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;cmdq physical address lower 12 bits must be zero.&quot;</span>);
+    <span class="doccomment">/// Sets the physical address of the command queue within the initialization segment.
+    ///
+    /// # Arguments
+    /// * `cmdq_physical_addr`: the starting physical address of the command queue, the lower 12 bits of which must be zero. 
+    </span><span class="kw">pub fn </span>set_physical_address_of_cmdq(<span class="kw-2">&amp;mut </span><span class="self">self</span>, cmdq_physical_addr: PhysicalAddress) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">if </span>cmdq_physical_addr.value() &amp; <span class="number">0xFFF </span>!= <span class="number">0 </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;cmdq physical address lower 12 bits must be zero.&quot;</span>);
         }
 
-        <span class="self">self</span>.<span class="ident">cmdq_phy_addr_high</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">cmdq_physical_addr</span>.<span class="ident">value</span>() <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">32</span>) <span class="kw">as</span> <span class="ident">u32</span>));
-        <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cmdq_phy_addr_low</span>.<span class="ident">read</span>().<span class="ident">get</span>() <span class="op">&amp;</span> <span class="number">0xFFF</span>;
-        <span class="self">self</span>.<span class="ident">cmdq_phy_addr_low</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">cmdq_physical_addr</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u32</span> <span class="op">|</span> <span class="ident">val</span>));
+        <span class="self">self</span>.cmdq_phy_addr_high.write(U32::new((cmdq_physical_addr.value() &gt;&gt; <span class="number">32</span>) <span class="kw">as </span>u32));
+        <span class="kw">let </span>val = <span class="self">self</span>.cmdq_phy_addr_low.read().get() &amp; <span class="number">0xFFF</span>;
+        <span class="self">self</span>.cmdq_phy_addr_low.write(U32::new(cmdq_physical_addr.value() <span class="kw">as </span>u32 | val));
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Returns true if the device is still initializing, and driver should not pass any commands to the device.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">device_is_initializing</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">initializing_state</span>.<span class="ident">read</span>().<span class="ident">get</span>().<span class="ident">get_bit</span>(<span class="number">31</span>)
+    <span class="doccomment">/// Returns true if the device is still initializing, and driver should not pass any commands to the device.
+    </span><span class="kw">pub fn </span>device_is_initializing(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.initializing_state.read().get().get_bit(<span class="number">31</span>)
     }
 
-    <span class="doccomment">/// Sets a bit in the [`InitializationSegment::command_doorbell_vector`] to inform HW that the command needs to be executed.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `command bit`: the command entry that needs to be executed. (e.g. bit 0 corresponds to entry at index 0).</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">post_command</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">command</span>: <span class="kw-2">&amp;</span><span class="ident">Command</span><span class="op">&lt;</span>{<span class="ident">CmdState::Initialized</span>}<span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">command_doorbell_vector</span>.<span class="ident">read</span>().<span class="ident">get</span>();
-        <span class="self">self</span>.<span class="ident">command_doorbell_vector</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">val</span> <span class="op">|</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">command</span>.<span class="ident">entry_num</span>)));
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">InitializationSegment</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;InitializationSegment&quot;</span>)
-            .<span class="ident">field</span>(<span class="string">&quot;Firmware Rev Major&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">fw_rev_major</span>.<span class="ident">read</span>().<span class="ident">get</span>()) 
-            .<span class="ident">field</span>(<span class="string">&quot;Firmware Rev Minor&quot;</span>,<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">fw_rev_minor</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;Firmware Rev Subminor&quot;</span>,<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">fw_rev_subminor</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;Command Interface Rev&quot;</span>,<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">cmd_interface_rev</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;Command queue address high&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">cmdq_phy_addr_high</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;Command queue address low&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">cmdq_phy_addr_low</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;Command doorbell vector&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">command_doorbell_vector</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;Initializing state&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">initializing_state</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">finish</span>()
+    <span class="doccomment">/// Sets a bit in the [`InitializationSegment::command_doorbell_vector`] to inform HW that the command needs to be executed.
+    ///
+    /// # Arguments
+    /// * `command bit`: the command entry that needs to be executed. (e.g. bit 0 corresponds to entry at index 0).
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>post_command(<span class="kw-2">&amp;mut </span><span class="self">self</span>, command: <span class="kw-2">&amp;</span>Command&lt;{CmdState::Initialized}&gt;) {
+        <span class="kw">let </span>val = <span class="self">self</span>.command_doorbell_vector.read().get();
+        <span class="self">self</span>.command_doorbell_vector.write(U32::new(val | (<span class="number">1 </span>&lt;&lt; command.entry_num)));
     }
 }
 
-<span class="doccomment">/// The possible values of the initialization state of the device as taken from the intialization segment.</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">InitializingState</span> {
-    <span class="ident">NotAllowed</span> <span class="op">=</span> <span class="number">0</span>,
-    <span class="ident">WaitingPermetion</span> <span class="op">=</span> <span class="number">1</span>,
-    <span class="ident">WaitingResources</span> <span class="op">=</span> <span class="number">2</span>,
-    <span class="ident">Abort</span> <span class="op">=</span> <span class="number">3</span>
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>InitializationSegment {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        f.debug_struct(<span class="string">&quot;InitializationSegment&quot;</span>)
+            .field(<span class="string">&quot;Firmware Rev Major&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.fw_rev_major.read().get()) 
+            .field(<span class="string">&quot;Firmware Rev Minor&quot;</span>,<span class="kw-2">&amp;</span><span class="self">self</span>.fw_rev_minor.read().get())
+            .field(<span class="string">&quot;Firmware Rev Subminor&quot;</span>,<span class="kw-2">&amp;</span><span class="self">self</span>.fw_rev_subminor.read().get())
+            .field(<span class="string">&quot;Command Interface Rev&quot;</span>,<span class="kw-2">&amp;</span><span class="self">self</span>.cmd_interface_rev.read().get())
+            .field(<span class="string">&quot;Command queue address high&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.cmdq_phy_addr_high.read().get())
+            .field(<span class="string">&quot;Command queue address low&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.cmdq_phy_addr_low.read().get())
+            .field(<span class="string">&quot;Command doorbell vector&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.command_doorbell_vector.read().get())
+            .field(<span class="string">&quot;Initializing state&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.initializing_state.read().get())
+            .finish()
+    }
 }
+
+<span class="doccomment">/// The possible values of the initialization state of the device as taken from the intialization segment.
+</span><span class="kw">pub enum </span>InitializingState {
+    NotAllowed = <span class="number">0</span>,
+    WaitingPermetion = <span class="number">1</span>,
+    WaitingResources = <span class="number">2</span>,
+    Abort = <span class="number">3
+</span>}
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

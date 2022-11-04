@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/multicore_bringup/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../multicore_bringup/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../multicore_bringup/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../multicore_bringup/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/multicore_bringup/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../multicore_bringup/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -369,371 +363,370 @@
 <span id="363">363</span>
 <span id="364">364</span>
 <span id="365">365</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Functions for initializing and bringing up other CPU cores. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! These functions are intended to be invoked from the main core</span>
-<span class="doccomment">//! (the BSP -- bootstrap core) in order to jumpstart other cores.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Functions for initializing and bringing up other CPU cores. 
+//! 
+//! These functions are intended to be invoked from the main core
+//! (the BSP -- bootstrap core) in order to jumpstart other cores.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">volatile</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">zerocopy</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pit_clock_basic</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">stack</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">apic</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">acpi</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">madt</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mod_mgmt</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">ap_start</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pause</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>volatile;
+<span class="kw">extern crate </span>zerocopy;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>pit_clock_basic;
+<span class="kw">extern crate </span>stack;
+<span class="kw">extern crate </span>kernel_config;
+<span class="kw">extern crate </span>apic;
+<span class="kw">extern crate </span>acpi;
+<span class="kw">extern crate </span>madt;
+<span class="kw">extern crate </span>mod_mgmt;
+<span class="kw">extern crate </span>ap_start;
+<span class="kw">extern crate </span>pause;
 
-<span class="kw">use</span> <span class="ident">core</span>::{
-    <span class="ident">ops::DerefMut</span>,
-    <span class="ident">sync::atomic::Ordering</span>,
+<span class="kw">use </span>core::{
+    ops::DerefMut,
+    sync::atomic::Ordering,
 };
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">volatile::Volatile</span>;
-<span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>, <span class="ident">MappedPages</span>, <span class="ident">EntryFlags</span>, <span class="ident">MmiRef</span>};
-<span class="kw">use</span> <span class="ident">kernel_config::memory</span>::{<span class="ident">PAGE_SIZE</span>, <span class="ident">PAGE_SHIFT</span>, <span class="ident">KERNEL_STACK_SIZE_IN_PAGES</span>};
-<span class="kw">use</span> <span class="ident">apic</span>::{<span class="ident">LocalApic</span>, <span class="ident">get_lapics</span>, <span class="ident">get_my_apic_id</span>, <span class="ident">has_x2apic</span>, <span class="ident">get_bsp_id</span>, <span class="ident">cpu_count</span>};
-<span class="kw">use</span> <span class="ident">ap_start</span>::{<span class="ident">kstart_ap</span>, <span class="ident">AP_READY_FLAG</span>};
-<span class="kw">use</span> <span class="ident">madt</span>::{<span class="ident">Madt</span>, <span class="ident">MadtEntry</span>, <span class="ident">MadtLocalApic</span>, <span class="ident">find_nmi_entry_for_processor</span>};
-<span class="kw">use</span> <span class="ident">pause::spin_loop_hint</span>;
+<span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>volatile::Volatile;
+<span class="kw">use </span>zerocopy::FromBytes;
+<span class="kw">use </span>memory::{VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, MmiRef};
+<span class="kw">use </span>kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
+<span class="kw">use </span>apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id, cpu_count};
+<span class="kw">use </span>ap_start::{kstart_ap, AP_READY_FLAG};
+<span class="kw">use </span>madt::{Madt, MadtEntry, MadtLocalApic, find_nmi_entry_for_processor};
+<span class="kw">use </span>pause::spin_loop_hint;
 
 
-<span class="doccomment">/// The physical address that an AP jumps to when it first is booted by the BSP.</span>
-<span class="doccomment">/// For x2apic systems, this must be at 0x10000 or higher! </span>
-<span class="kw">const</span> <span class="ident">AP_STARTUP</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0x10000</span>; 
+<span class="doccomment">/// The physical address that an AP jumps to when it first is booted by the BSP.
+/// For x2apic systems, this must be at 0x10000 or higher! 
+</span><span class="kw">const </span>AP_STARTUP: usize = <span class="number">0x10000</span>; 
 
-<span class="doccomment">/// The physical address of the memory area for AP startup data passed from the BSP in long mode (Rust) code.</span>
-<span class="doccomment">/// Located one page below the AP_STARTUP code entry point, at 0xF000.</span>
-<span class="kw">const</span> <span class="ident">TRAMPOLINE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">AP_STARTUP</span> <span class="op">-</span> <span class="ident">PAGE_SIZE</span>;
+<span class="doccomment">/// The physical address of the memory area for AP startup data passed from the BSP in long mode (Rust) code.
+/// Located one page below the AP_STARTUP code entry point, at 0xF000.
+</span><span class="kw">const </span>TRAMPOLINE: usize = AP_STARTUP - PAGE_SIZE;
 
-<span class="doccomment">/// The offset from the `TRAMPOLINE` address to where the AP startup code will write `GraphicInfo`.</span>
-<span class="kw">const</span> <span class="ident">GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0x100</span>;
+<span class="doccomment">/// The offset from the `TRAMPOLINE` address to where the AP startup code will write `GraphicInfo`.
+</span><span class="kw">const </span>GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE: usize = <span class="number">0x100</span>;
 
-<span class="doccomment">/// Graphic mode information that will be updated after `handle_ap_cores()` is invoked. </span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">GRAPHIC_INFO</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">GraphicInfo</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">GraphicInfo</span> {
-    <span class="ident">width</span>: <span class="number">0</span>,
-    <span class="ident">height</span>: <span class="number">0</span>,
-    <span class="ident">physical_address</span>: <span class="number">0</span>,
+<span class="doccomment">/// Graphic mode information that will be updated after `handle_ap_cores()` is invoked. 
+</span><span class="kw">pub static </span>GRAPHIC_INFO: Mutex&lt;GraphicInfo&gt; = Mutex::new(GraphicInfo {
+    width: <span class="number">0</span>,
+    height: <span class="number">0</span>,
+    physical_address: <span class="number">0</span>,
 });
 
-<span class="doccomment">/// A structure to access information about the graphical framebuffer mode</span>
-<span class="doccomment">/// that was discovered and chosen in the AP&#39;s real-mode initialization sequence.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Struct format</span>
-<span class="doccomment">/// The layout of fields in this struct must be kept in sync with the code in </span>
-<span class="doccomment">/// `ap_realmode.asm` that writes to this structure.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GraphicInfo</span> {
-    <span class="kw">pub</span> <span class="ident">width</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">height</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">physical_address</span>: <span class="ident">u64</span>,
+<span class="doccomment">/// A structure to access information about the graphical framebuffer mode
+/// that was discovered and chosen in the AP&#39;s real-mode initialization sequence.
+/// 
+/// # Struct format
+/// The layout of fields in this struct must be kept in sync with the code in 
+/// `ap_realmode.asm` that writes to this structure.
+</span><span class="attr">#[derive(FromBytes, Clone, Debug)]
+</span><span class="kw">pub struct </span>GraphicInfo {
+    <span class="kw">pub </span>width: u64,
+    <span class="kw">pub </span>height: u64,
+    <span class="kw">pub </span>physical_address: u64,
 }
 
-<span class="doccomment">/// Starts up and sets up AP cores based on system information from ACPI</span>
-<span class="doccomment">/// (specifically the MADT (APIC) table).</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Arguments: </span>
-<span class="doccomment">/// * `kernel_mmi_ref`: A reference to the MMI structure with the kernel&#39;s page table.</span>
-<span class="doccomment">/// * `ap_start_realmode_begin`: the starting virtual address of where the ap_start realmode code is.</span>
-<span class="doccomment">/// * `ap_start_realmode_end`: the ending virtual address of where the ap_start realmode code is.</span>
-<span class="doccomment">/// * `max_framebuffer_resolution`: the maximum resolution `(width, height)` of the graphical framebuffer</span>
-<span class="doccomment">///    that an AP should request from the BIOS when it boots up in 16-bit real mode.</span>
-<span class="doccomment">///    If `None`, there will be no maximum.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_ap_cores</span>(
-    <span class="ident">kernel_mmi_ref</span>: <span class="kw-2">&amp;</span><span class="ident">MmiRef</span>,
-    <span class="ident">ap_start_realmode_begin</span>: <span class="ident">VirtualAddress</span>,
-    <span class="ident">ap_start_realmode_end</span>: <span class="ident">VirtualAddress</span>,
-    <span class="ident">max_framebuffer_resolution</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">u16</span>, <span class="ident">u16</span>)<span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">ap_startup_size_in_bytes</span> <span class="op">=</span> <span class="ident">ap_start_realmode_end</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">ap_start_realmode_begin</span>.<span class="ident">value</span>();
+<span class="doccomment">/// Starts up and sets up AP cores based on system information from ACPI
+/// (specifically the MADT (APIC) table).
+/// 
+/// # Arguments: 
+/// * `kernel_mmi_ref`: A reference to the MMI structure with the kernel&#39;s page table.
+/// * `ap_start_realmode_begin`: the starting virtual address of where the ap_start realmode code is.
+/// * `ap_start_realmode_end`: the ending virtual address of where the ap_start realmode code is.
+/// * `max_framebuffer_resolution`: the maximum resolution `(width, height)` of the graphical framebuffer
+///    that an AP should request from the BIOS when it boots up in 16-bit real mode.
+///    If `None`, there will be no maximum.
+</span><span class="kw">pub fn </span>handle_ap_cores(
+    kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef,
+    ap_start_realmode_begin: VirtualAddress,
+    ap_start_realmode_end: VirtualAddress,
+    max_framebuffer_resolution: <span class="prelude-ty">Option</span>&lt;(u16, u16)&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;u8, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>ap_startup_size_in_bytes = ap_start_realmode_end.value() - ap_start_realmode_begin.value();
 
-    <span class="kw">let</span> <span class="ident">page_table_phys_addr</span>: <span class="ident">PhysicalAddress</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">trampoline_mapped_pages</span>: <span class="ident">MappedPages</span>; <span class="comment">// must be held throughout APs being booted up</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ap_startup_mapped_pages</span>: <span class="ident">MappedPages</span>; <span class="comment">// must be held throughout APs being booted up</span>
-    {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">kernel_mmi</span> <span class="op">=</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="ident">page_table</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="ident">kernel_mmi</span>.<span class="ident">page_table</span>;
-        <span class="comment">// first, double check that the ap_start_realmode address is mapped and valid</span>
-        <span class="ident">page_table</span>.<span class="ident">translate</span>(<span class="ident">ap_start_realmode_begin</span>).<span class="ident">ok_or</span>(<span class="string">&quot;handle_ap_cores(): couldn&#39;t translate ap_start_realmode address&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>page_table_phys_addr: PhysicalAddress;
+    <span class="kw">let </span><span class="kw-2">mut </span>trampoline_mapped_pages: MappedPages; <span class="comment">// must be held throughout APs being booted up
+    </span><span class="kw">let </span><span class="kw-2">mut </span>ap_startup_mapped_pages: MappedPages; <span class="comment">// must be held throughout APs being booted up
+    </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>kernel_mmi = kernel_mmi_ref.lock();
+        <span class="kw">let </span>page_table = <span class="kw-2">&amp;mut </span>kernel_mmi.page_table;
+        <span class="comment">// first, double check that the ap_start_realmode address is mapped and valid
+        </span>page_table.translate(ap_start_realmode_begin).ok_or(<span class="string">&quot;handle_ap_cores(): couldn&#39;t translate ap_start_realmode address&quot;</span>)<span class="question-mark">?</span>;
 
-        <span class="comment">// Map trampoline frame and the ap_startup code to the AP_STARTUP frame.</span>
-        <span class="comment">// These frames MUST be identity mapped because they&#39;re accessed in AP boot up code,</span>
-        <span class="comment">// which has no page tables because it operates in 16-bit real mode.</span>
-        <span class="kw">let</span> <span class="ident">trampoline_frame</span>  <span class="op">=</span> <span class="ident">memory::allocate_frames_at</span>(<span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">TRAMPOLINE</span>), <span class="number">1</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;handle_ap_cores(): failed to allocate trampoline frame&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">trampoline_page</span>   <span class="op">=</span> <span class="ident">memory::allocate_pages_at</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">TRAMPOLINE</span>), <span class="ident">trampoline_frame</span>.<span class="ident">size_in_frames</span>())
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;handle_ap_cores(): failed to allocate trampoline page&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">ap_startup_frames</span> <span class="op">=</span> <span class="ident">memory::allocate_frames_by_bytes_at</span>(<span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">AP_STARTUP</span>), <span class="ident">ap_startup_size_in_bytes</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;handle_ap_cores(): failed to allocate AP startup frames&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">ap_startup_pages</span>  <span class="op">=</span> <span class="ident">memory::allocate_pages_at</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">AP_STARTUP</span>), <span class="ident">ap_startup_frames</span>.<span class="ident">size_in_frames</span>())
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;handle_ap_cores(): failed to allocate AP startup pages&quot;</span>)<span class="question-mark">?</span>;
+        <span class="comment">// Map trampoline frame and the ap_startup code to the AP_STARTUP frame.
+        // These frames MUST be identity mapped because they&#39;re accessed in AP boot up code,
+        // which has no page tables because it operates in 16-bit real mode.
+        </span><span class="kw">let </span>trampoline_frame  = memory::allocate_frames_at(PhysicalAddress::new_canonical(TRAMPOLINE), <span class="number">1</span>)
+            .map_err(|_e| <span class="string">&quot;handle_ap_cores(): failed to allocate trampoline frame&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>trampoline_page   = memory::allocate_pages_at(VirtualAddress::new_canonical(TRAMPOLINE), trampoline_frame.size_in_frames())
+            .map_err(|_e| <span class="string">&quot;handle_ap_cores(): failed to allocate trampoline page&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>ap_startup_frames = memory::allocate_frames_by_bytes_at(PhysicalAddress::new_canonical(AP_STARTUP), ap_startup_size_in_bytes)
+            .map_err(|_e| <span class="string">&quot;handle_ap_cores(): failed to allocate AP startup frames&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>ap_startup_pages  = memory::allocate_pages_at(VirtualAddress::new_canonical(AP_STARTUP), ap_startup_frames.size_in_frames())
+            .map_err(|_e| <span class="string">&quot;handle_ap_cores(): failed to allocate AP startup pages&quot;</span>)<span class="question-mark">?</span>;
         
-        <span class="ident">trampoline_mapped_pages</span> <span class="op">=</span> <span class="ident">page_table</span>.<span class="ident">map_allocated_pages_to</span>(
-            <span class="ident">trampoline_page</span>, 
-            <span class="ident">trampoline_frame</span>, 
-            <span class="ident">EntryFlags::PRESENT</span> <span class="op">|</span> <span class="ident">EntryFlags::WRITABLE</span>, 
+        trampoline_mapped_pages = page_table.map_allocated_pages_to(
+            trampoline_page, 
+            trampoline_frame, 
+            EntryFlags::PRESENT | EntryFlags::WRITABLE, 
         )<span class="question-mark">?</span>;
-        <span class="ident">ap_startup_mapped_pages</span> <span class="op">=</span> <span class="ident">page_table</span>.<span class="ident">map_allocated_pages_to</span>(
-            <span class="ident">ap_startup_pages</span>,
-            <span class="ident">ap_startup_frames</span>,
-            <span class="ident">EntryFlags::PRESENT</span> <span class="op">|</span> <span class="ident">EntryFlags::WRITABLE</span>,
+        ap_startup_mapped_pages = page_table.map_allocated_pages_to(
+            ap_startup_pages,
+            ap_startup_frames,
+            EntryFlags::PRESENT | EntryFlags::WRITABLE,
         )<span class="question-mark">?</span>;
-        <span class="ident">page_table_phys_addr</span> <span class="op">=</span> <span class="ident">page_table</span>.<span class="ident">physical_address</span>();
+        page_table_phys_addr = page_table.physical_address();
     }
 
-    <span class="kw">let</span> <span class="ident">all_lapics</span> <span class="op">=</span> <span class="ident">get_lapics</span>();
-    <span class="kw">let</span> <span class="ident">me</span> <span class="op">=</span> <span class="ident">get_my_apic_id</span>();
+    <span class="kw">let </span>all_lapics = get_lapics();
+    <span class="kw">let </span>me = get_my_apic_id();
 
-    <span class="comment">// Copy the AP startup code (from the kernel&#39;s text section pages) into the AP_STARTUP physical address entry point.</span>
-    {
-        <span class="comment">// First, get the kernel&#39;s text pages, which is the MappedPages object that contains the vaddr `ap_start_realmode_begin`.</span>
-        <span class="kw">let</span> <span class="ident">kernel_text_pages_ref</span> <span class="op">=</span> <span class="ident">mod_mgmt::get_initial_kernel_namespace</span>()
-            .<span class="ident">ok_or</span>(<span class="string">&quot;BUG: couldn&#39;t get the initial kernel CrateNamespace&quot;</span>)
-            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">namespace</span><span class="op">|</span> <span class="ident">namespace</span>.<span class="ident">get_crate</span>(<span class="string">&quot;nano_core&quot;</span>).<span class="ident">ok_or</span>(<span class="string">&quot;BUG: couldn&#39;t get the &#39;nano_core&#39; crate&quot;</span>))
-            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">nano_core_crate</span><span class="op">|</span> <span class="ident">nano_core_crate</span>.<span class="ident">lock_as_ref</span>().<span class="ident">text_pages</span>.<span class="ident">clone</span>().<span class="ident">ok_or</span>(<span class="string">&quot;BUG: nano_core crate had no text pages&quot;</span>))<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">kernel_text_pages</span> <span class="op">=</span> <span class="ident">kernel_text_pages_ref</span>.<span class="number">0</span>.<span class="ident">lock</span>();
-        <span class="comment">// Second, perform the actual copy.</span>
-        <span class="kw">let</span> <span class="ident">source_slice</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">kernel_text_pages</span>.<span class="ident">offset_of_address</span>(<span class="ident">ap_start_realmode_begin</span>)
-            .<span class="ident">ok_or</span>(<span class="string">&quot;BUG: the &#39;ap_start_realmode_begin&#39; virtual address was not covered by the kernel&#39;s text pages&quot;</span>)
-            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">offset</span><span class="op">|</span> <span class="ident">kernel_text_pages</span>.<span class="ident">as_slice</span>(<span class="ident">offset</span>, <span class="ident">ap_startup_size_in_bytes</span>))<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">dest_slice</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">ap_startup_mapped_pages</span>.<span class="ident">as_slice_mut</span>(<span class="number">0</span>, <span class="ident">ap_startup_size_in_bytes</span>)<span class="question-mark">?</span>;
-        <span class="ident">dest_slice</span>.<span class="ident">copy_from_slice</span>(<span class="ident">source_slice</span>);
+    <span class="comment">// Copy the AP startup code (from the kernel&#39;s text section pages) into the AP_STARTUP physical address entry point.
+    </span>{
+        <span class="comment">// First, get the kernel&#39;s text pages, which is the MappedPages object that contains the vaddr `ap_start_realmode_begin`.
+        </span><span class="kw">let </span>kernel_text_pages_ref = mod_mgmt::get_initial_kernel_namespace()
+            .ok_or(<span class="string">&quot;BUG: couldn&#39;t get the initial kernel CrateNamespace&quot;</span>)
+            .and_then(|namespace| namespace.get_crate(<span class="string">&quot;nano_core&quot;</span>).ok_or(<span class="string">&quot;BUG: couldn&#39;t get the &#39;nano_core&#39; crate&quot;</span>))
+            .and_then(|nano_core_crate| nano_core_crate.lock_as_ref().text_pages.clone().ok_or(<span class="string">&quot;BUG: nano_core crate had no text pages&quot;</span>))<span class="question-mark">?</span>;
+        <span class="kw">let </span>kernel_text_pages = kernel_text_pages_ref.<span class="number">0</span>.lock();
+        <span class="comment">// Second, perform the actual copy.
+        </span><span class="kw">let </span>source_slice: <span class="kw-2">&amp;</span>[u8] = kernel_text_pages.offset_of_address(ap_start_realmode_begin)
+            .ok_or(<span class="string">&quot;BUG: the &#39;ap_start_realmode_begin&#39; virtual address was not covered by the kernel&#39;s text pages&quot;</span>)
+            .and_then(|offset| kernel_text_pages.as_slice(offset, ap_startup_size_in_bytes))<span class="question-mark">?</span>;
+        <span class="kw">let </span>dest_slice: <span class="kw-2">&amp;mut </span>[u8] = ap_startup_mapped_pages.as_slice_mut(<span class="number">0</span>, ap_startup_size_in_bytes)<span class="question-mark">?</span>;
+        dest_slice.copy_from_slice(source_slice);
     }
-    <span class="comment">// Now, the AP startup code is at the PhysicalAddress `AP_STARTUP`.</span>
+    <span class="comment">// Now, the AP startup code is at the PhysicalAddress `AP_STARTUP`.
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ap_count</span> <span class="op">=</span> <span class="number">0</span>; <span class="comment">// the number of AP cores we have successfully booted.</span>
-    <span class="kw">let</span> <span class="ident">ap_trampoline_data</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ApTrampolineData</span> <span class="op">=</span> <span class="ident">trampoline_mapped_pages</span>.<span class="ident">as_type_mut</span>(<span class="number">0</span>)<span class="question-mark">?</span>;
-    <span class="comment">// Here, we set up the data items that will be accessible to the APs when they boot up.</span>
-    <span class="comment">// We only set the values of fields that are the same for ALL APs here;</span>
-    <span class="comment">// values that change for each AP are set individually in `bring_up_ap()` below.</span>
-    <span class="kw">let</span> (<span class="ident">max_width</span>, <span class="ident">max_height</span>) <span class="op">=</span> <span class="ident">max_framebuffer_resolution</span>.<span class="ident">unwrap_or</span>((<span class="ident">u16::MAX</span>, <span class="ident">u16::MAX</span>));
-    <span class="ident">ap_trampoline_data</span>.<span class="ident">ap_max_fb_width</span>.<span class="ident">write</span>(<span class="ident">max_width</span>);
-    <span class="ident">ap_trampoline_data</span>.<span class="ident">ap_max_fb_height</span>.<span class="ident">write</span>(<span class="ident">max_height</span>);
+    </span><span class="kw">let </span><span class="kw-2">mut </span>ap_count = <span class="number">0</span>; <span class="comment">// the number of AP cores we have successfully booted.
+    </span><span class="kw">let </span>ap_trampoline_data: <span class="kw-2">&amp;mut </span>ApTrampolineData = trampoline_mapped_pages.as_type_mut(<span class="number">0</span>)<span class="question-mark">?</span>;
+    <span class="comment">// Here, we set up the data items that will be accessible to the APs when they boot up.
+    // We only set the values of fields that are the same for ALL APs here;
+    // values that change for each AP are set individually in `bring_up_ap()` below.
+    </span><span class="kw">let </span>(max_width, max_height) = max_framebuffer_resolution.unwrap_or((u16::MAX, u16::MAX));
+    ap_trampoline_data.ap_max_fb_width.write(max_width);
+    ap_trampoline_data.ap_max_fb_height.write(max_height);
 
-    <span class="kw">let</span> <span class="ident">acpi_tables</span> <span class="op">=</span> <span class="ident">acpi::get_acpi_tables</span>().<span class="ident">lock</span>();
-    <span class="kw">let</span> <span class="ident">madt</span> <span class="op">=</span> <span class="ident">Madt::get</span>(<span class="kw-2">&amp;</span><span class="ident">acpi_tables</span>)
-        .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find the MADT APIC table. Has the ACPI subsystem been initialized yet?&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">madt_iter</span> <span class="op">=</span> <span class="ident">madt</span>.<span class="ident">iter</span>();
+    <span class="kw">let </span>acpi_tables = acpi::get_acpi_tables().lock();
+    <span class="kw">let </span>madt = Madt::get(<span class="kw-2">&amp;</span>acpi_tables)
+        .ok_or(<span class="string">&quot;Couldn&#39;t find the MADT APIC table. Has the ACPI subsystem been initialized yet?&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>madt_iter = madt.iter();
 
-    <span class="kw">for</span> <span class="ident">madt_entry</span> <span class="kw">in</span> <span class="ident">madt_iter</span>.<span class="ident">clone</span>() {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">MadtEntry::LocalApic</span>(<span class="ident">lapic_entry</span>) <span class="op">=</span> <span class="ident">madt_entry</span> { 
-            <span class="kw">if</span> <span class="ident">lapic_entry</span>.<span class="ident">apic_id</span> <span class="op">==</span> <span class="ident">me</span> {
-                <span class="comment">// debug!(&quot;skipping BSP&#39;s local apic&quot;);</span>
-            }
-            <span class="kw">else</span> {
-                <span class="kw">if</span> <span class="ident">lapic_entry</span>.<span class="ident">flags</span> <span class="op">&amp;</span> <span class="number">0x1</span> <span class="op">!</span><span class="op">=</span> <span class="number">0x1</span> {
+    <span class="kw">for </span>madt_entry <span class="kw">in </span>madt_iter.clone() {
+        <span class="kw">if let </span>MadtEntry::LocalApic(lapic_entry) = madt_entry { 
+            <span class="kw">if </span>lapic_entry.apic_id == me {
+                <span class="comment">// debug!(&quot;skipping BSP&#39;s local apic&quot;);
+            </span>}
+            <span class="kw">else </span>{
+                <span class="kw">if </span>lapic_entry.flags &amp; <span class="number">0x1 </span>!= <span class="number">0x1 </span>{
                     <span class="macro">warn!</span>(<span class="string">&quot;Processor {} apic_id {} is disabled by the hardware, cannot initialize or use it.&quot;</span>, 
-                            <span class="ident">lapic_entry</span>.<span class="ident">processor</span>, <span class="ident">lapic_entry</span>.<span class="ident">apic_id</span>);
+                            lapic_entry.processor, lapic_entry.apic_id);
                     <span class="kw">continue</span>;
                 }
 
-                <span class="comment">// start up this AP, and have it create a new LocalApic for itself. </span>
-                <span class="comment">// This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.</span>
-                <span class="kw">let</span> <span class="ident">bsp_lapic_ref</span> <span class="op">=</span> <span class="ident">get_bsp_id</span>()
-                    .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">bsp_id</span><span class="op">|</span> <span class="ident">all_lapics</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">bsp_id</span>))
-                    .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t get BSP&#39;s LocalApic!&quot;</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bsp_lapic</span> <span class="op">=</span> <span class="ident">bsp_lapic_ref</span>.<span class="ident">write</span>();
-                <span class="kw">let</span> <span class="ident">ap_stack</span> <span class="op">=</span> <span class="ident">stack::alloc_stack</span>(
-                    <span class="ident">KERNEL_STACK_SIZE_IN_PAGES</span>,
-                    <span class="kw-2">&amp;mut</span> <span class="ident">kernel_mmi_ref</span>.<span class="ident">lock</span>().<span class="ident">page_table</span>,
-                ).<span class="ident">ok_or</span>(<span class="string">&quot;could not allocate AP stack!&quot;</span>)<span class="question-mark">?</span>;
+                <span class="comment">// start up this AP, and have it create a new LocalApic for itself. 
+                // This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.
+                </span><span class="kw">let </span>bsp_lapic_ref = get_bsp_id()
+                    .and_then(|bsp_id| all_lapics.get(<span class="kw-2">&amp;</span>bsp_id))
+                    .ok_or(<span class="string">&quot;Couldn&#39;t get BSP&#39;s LocalApic!&quot;</span>)<span class="question-mark">?</span>;
+                <span class="kw">let </span><span class="kw-2">mut </span>bsp_lapic = bsp_lapic_ref.write();
+                <span class="kw">let </span>ap_stack = stack::alloc_stack(
+                    KERNEL_STACK_SIZE_IN_PAGES,
+                    <span class="kw-2">&amp;mut </span>kernel_mmi_ref.lock().page_table,
+                ).ok_or(<span class="string">&quot;could not allocate AP stack!&quot;</span>)<span class="question-mark">?</span>;
 
-                <span class="kw">let</span> (<span class="ident">nmi_lint</span>, <span class="ident">nmi_flags</span>) <span class="op">=</span> <span class="ident">find_nmi_entry_for_processor</span>(<span class="ident">lapic_entry</span>.<span class="ident">processor</span>, <span class="ident">madt_iter</span>.<span class="ident">clone</span>());
+                <span class="kw">let </span>(nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
 
-                <span class="ident">bring_up_ap</span>(
-                    <span class="ident">bsp_lapic</span>.<span class="ident">deref_mut</span>(), 
-                    <span class="ident">lapic_entry</span>,
-                    <span class="ident">ap_trampoline_data</span>,
-                    <span class="ident">page_table_phys_addr</span>, 
-                    <span class="ident">ap_stack</span>, 
-                    <span class="ident">nmi_lint</span>,
-                    <span class="ident">nmi_flags</span> 
+                bring_up_ap(
+                    bsp_lapic.deref_mut(), 
+                    lapic_entry,
+                    ap_trampoline_data,
+                    page_table_phys_addr, 
+                    ap_stack, 
+                    nmi_lint,
+                    nmi_flags 
                 );
-                <span class="ident">ap_count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                ap_count += <span class="number">1</span>;
             }
         }
     }
 
-    <span class="comment">// Retrieve the graphic mode information written during the AP bootup sequence in `ap_realmode.asm`.</span>
-    {
-        <span class="kw">let</span> <span class="ident">graphic_info</span> <span class="op">=</span> <span class="ident">trampoline_mapped_pages</span>.<span class="ident">as_type</span>::<span class="op">&lt;</span><span class="ident">GraphicInfo</span><span class="op">&gt;</span>(<span class="ident">GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE</span>)<span class="question-mark">?</span>;
-        <span class="macro">info!</span>(<span class="string">&quot;Obtained graphic info from real mode: {:?}&quot;</span>, <span class="ident">graphic_info</span>);
-        <span class="kw-2">*</span><span class="ident">GRAPHIC_INFO</span>.<span class="ident">lock</span>() <span class="op">=</span> <span class="ident">graphic_info</span>.<span class="ident">clone</span>();
+    <span class="comment">// Retrieve the graphic mode information written during the AP bootup sequence in `ap_realmode.asm`.
+    </span>{
+        <span class="kw">let </span>graphic_info = trampoline_mapped_pages.as_type::&lt;GraphicInfo&gt;(GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE)<span class="question-mark">?</span>;
+        <span class="macro">info!</span>(<span class="string">&quot;Obtained graphic info from real mode: {:?}&quot;</span>, graphic_info);
+        <span class="kw-2">*</span>GRAPHIC_INFO.lock() = graphic_info.clone();
     }
     
-    <span class="comment">// Wait for all CPUs to finish booting and init</span>
-    <span class="macro">info!</span>(<span class="string">&quot;handle_ap_cores(): BSP is waiting for APs to boot...&quot;</span>);
-    <span class="kw">let</span> <span class="ident">expected_cpus</span> <span class="op">=</span> <span class="ident">ap_count</span> <span class="op">+</span> <span class="number">1</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">num_known_cpus</span> <span class="op">=</span> <span class="ident">cpu_count</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">iter</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="kw">while</span> <span class="ident">num_known_cpus</span> <span class="op">&lt;</span> <span class="ident">expected_cpus</span> {
-        <span class="ident">spin_loop_hint</span>();
-        <span class="ident">num_known_cpus</span> <span class="op">=</span> <span class="ident">cpu_count</span>();
-        <span class="kw">if</span> <span class="ident">iter</span> <span class="op">==</span> <span class="number">100000</span> {
-            <span class="macro">trace!</span>(<span class="string">&quot;BSP is waiting for APs to boot ({} of {})&quot;</span>, <span class="ident">num_known_cpus</span>, <span class="ident">expected_cpus</span>);
-            <span class="ident">iter</span> <span class="op">=</span> <span class="number">0</span>;
+    <span class="comment">// Wait for all CPUs to finish booting and init
+    </span><span class="macro">info!</span>(<span class="string">&quot;handle_ap_cores(): BSP is waiting for APs to boot...&quot;</span>);
+    <span class="kw">let </span>expected_cpus = ap_count + <span class="number">1</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>num_known_cpus = cpu_count();
+    <span class="kw">let </span><span class="kw-2">mut </span>iter = <span class="number">0</span>;
+    <span class="kw">while </span>num_known_cpus &lt; expected_cpus {
+        spin_loop_hint();
+        num_known_cpus = cpu_count();
+        <span class="kw">if </span>iter == <span class="number">100000 </span>{
+            <span class="macro">trace!</span>(<span class="string">&quot;BSP is waiting for APs to boot ({} of {})&quot;</span>, num_known_cpus, expected_cpus);
+            iter = <span class="number">0</span>;
         }
-        <span class="ident">iter</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        iter += <span class="number">1</span>;
     }
     
-    <span class="prelude-val">Ok</span>(<span class="ident">ap_count</span>)  
+    <span class="prelude-val">Ok</span>(ap_count)  
 }
 
 
-<span class="doccomment">/// The data items used when an AP core is booting up in real mode.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Important Layout Note</span>
-<span class="doccomment">/// The order of the members in this struct must exactly match how they are used</span>
-<span class="doccomment">/// and specified in the AP bootup code (at the top of `defines.asm`).</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">struct</span> <span class="ident">ApTrampolineData</span> {
-    <span class="doccomment">/// A flag that indicates whether the new AP is ready. </span>
-    <span class="doccomment">/// The Rust setup code sets it to 0, and the AP boot code sets it to 1.</span>
-    <span class="ident">ap_ready</span>:          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The processor ID of the new AP that is being brought up.</span>
-    <span class="ident">ap_processor_id</span>:   <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="ident">_padding0</span>:         [<span class="ident">u8</span>; <span class="number">7</span>],
-    <span class="doccomment">/// The APIC ID of the new AP that is being brought up.</span>
-    <span class="ident">ap_apic_id</span>:        <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="ident">_padding1</span>:         [<span class="ident">u8</span>; <span class="number">7</span>],
-    <span class="doccomment">/// The physical address of the top-level P4 page table root (value of CR3).</span>
-    <span class="ident">ap_page_table</span>:     <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">PhysicalAddress</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The starting virtual address (bottom) of the stack that was allocated for the new AP.</span>
-    <span class="ident">ap_stack_start</span>:    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The ending virtual address (top) of the stack that was allocated for the new AP.</span>
-    <span class="ident">ap_stack_end</span>:      <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The virtual address of the Rust entry point that the new AP should jump to after booting up.</span>
-    <span class="ident">ap_code</span>:           <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The NMI LINT (Non-Maskable Interrupt Local Interrupt) value for the new AP.</span>
-    <span class="ident">ap_nmi_lint</span>:       <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="ident">_padding2</span>:         [<span class="ident">u8</span>; <span class="number">7</span>],
-    <span class="doccomment">/// The NMI (Non-Maskable Interrupt) flags value for the new AP.</span>
-    <span class="ident">ap_nmi_flags</span>:      <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
-    <span class="ident">_padding3</span>:         [<span class="ident">u8</span>; <span class="number">6</span>],
-    <span class="doccomment">/// The maximum width in pixels of the graphical framebuffer that an AP should request</span>
-    <span class="doccomment">/// when changing graphical framebuffer modes in its 16-bit real-mode code. </span>
-    <span class="ident">ap_max_fb_width</span>:   <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
-    <span class="ident">_padding4</span>:         [<span class="ident">u8</span>; <span class="number">6</span>],
-    <span class="doccomment">/// The maximum height in pixels of the graphical framebuffer that an AP should request</span>
-    <span class="doccomment">/// when changing graphical framebuffer modes in its 16-bit real-mode code. </span>
-    <span class="ident">ap_max_fb_height</span>:  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
-    <span class="ident">_padding5</span>:         [<span class="ident">u8</span>; <span class="number">6</span>],
+<span class="doccomment">/// The data items used when an AP core is booting up in real mode.
+///
+/// # Important Layout Note
+/// The order of the members in this struct must exactly match how they are used
+/// and specified in the AP bootup code (at the top of `defines.asm`).
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C)]
+</span><span class="kw">struct </span>ApTrampolineData {
+    <span class="doccomment">/// A flag that indicates whether the new AP is ready. 
+    /// The Rust setup code sets it to 0, and the AP boot code sets it to 1.
+    </span>ap_ready:          Volatile&lt;u64&gt;,
+    <span class="doccomment">/// The processor ID of the new AP that is being brought up.
+    </span>ap_processor_id:   Volatile&lt;u8&gt;,
+    _padding0:         [u8; <span class="number">7</span>],
+    <span class="doccomment">/// The APIC ID of the new AP that is being brought up.
+    </span>ap_apic_id:        Volatile&lt;u8&gt;,
+    _padding1:         [u8; <span class="number">7</span>],
+    <span class="doccomment">/// The physical address of the top-level P4 page table root (value of CR3).
+    </span>ap_page_table:     Volatile&lt;PhysicalAddress&gt;,
+    <span class="doccomment">/// The starting virtual address (bottom) of the stack that was allocated for the new AP.
+    </span>ap_stack_start:    Volatile&lt;VirtualAddress&gt;,
+    <span class="doccomment">/// The ending virtual address (top) of the stack that was allocated for the new AP.
+    </span>ap_stack_end:      Volatile&lt;VirtualAddress&gt;,
+    <span class="doccomment">/// The virtual address of the Rust entry point that the new AP should jump to after booting up.
+    </span>ap_code:           Volatile&lt;VirtualAddress&gt;,
+    <span class="doccomment">/// The NMI LINT (Non-Maskable Interrupt Local Interrupt) value for the new AP.
+    </span>ap_nmi_lint:       Volatile&lt;u8&gt;,
+    _padding2:         [u8; <span class="number">7</span>],
+    <span class="doccomment">/// The NMI (Non-Maskable Interrupt) flags value for the new AP.
+    </span>ap_nmi_flags:      Volatile&lt;u16&gt;,
+    _padding3:         [u8; <span class="number">6</span>],
+    <span class="doccomment">/// The maximum width in pixels of the graphical framebuffer that an AP should request
+    /// when changing graphical framebuffer modes in its 16-bit real-mode code. 
+    </span>ap_max_fb_width:   Volatile&lt;u16&gt;,
+    _padding4:         [u8; <span class="number">6</span>],
+    <span class="doccomment">/// The maximum height in pixels of the graphical framebuffer that an AP should request
+    /// when changing graphical framebuffer modes in its 16-bit real-mode code. 
+    </span>ap_max_fb_height:  Volatile&lt;u16&gt;,
+    _padding5:         [u8; <span class="number">6</span>],
 }
 
 
-<span class="doccomment">/// Called by the BSP to initialize the given `new_lapic` using IPIs.</span>
-<span class="kw">fn</span> <span class="ident">bring_up_ap</span>(
-    <span class="ident">bsp_lapic</span>: <span class="kw-2">&amp;mut</span> <span class="ident">LocalApic</span>,
-    <span class="ident">new_lapic</span>: <span class="kw-2">&amp;</span><span class="ident">MadtLocalApic</span>, 
-    <span class="ident">ap_trampoline_data</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ApTrampolineData</span>,
-    <span class="ident">page_table_paddr</span>: <span class="ident">PhysicalAddress</span>, 
-    <span class="ident">ap_stack</span>: <span class="ident">stack::Stack</span>,
-    <span class="ident">nmi_lint</span>: <span class="ident">u8</span>, 
-    <span class="ident">nmi_flags</span>: <span class="ident">u16</span>
+<span class="doccomment">/// Called by the BSP to initialize the given `new_lapic` using IPIs.
+</span><span class="kw">fn </span>bring_up_ap(
+    bsp_lapic: <span class="kw-2">&amp;mut </span>LocalApic,
+    new_lapic: <span class="kw-2">&amp;</span>MadtLocalApic, 
+    ap_trampoline_data: <span class="kw-2">&amp;mut </span>ApTrampolineData,
+    page_table_paddr: PhysicalAddress, 
+    ap_stack: stack::Stack,
+    nmi_lint: u8, 
+    nmi_flags: u16
 ) {
-    <span class="ident">ap_trampoline_data</span>.<span class="ident">ap_ready</span>.<span class="ident">write</span>(<span class="number">0</span>);
-    <span class="ident">ap_trampoline_data</span>.<span class="ident">ap_processor_id</span>.<span class="ident">write</span>(<span class="ident">new_lapic</span>.<span class="ident">processor</span>);
-    <span class="ident">ap_trampoline_data</span>.<span class="ident">ap_apic_id</span>.<span class="ident">write</span>(<span class="ident">new_lapic</span>.<span class="ident">apic_id</span>);
-    <span class="ident">ap_trampoline_data</span>.<span class="ident">ap_page_table</span>.<span class="ident">write</span>(<span class="ident">page_table_paddr</span>);
-    <span class="ident">ap_trampoline_data</span>.<span class="ident">ap_stack_start</span>.<span class="ident">write</span>(<span class="ident">ap_stack</span>.<span class="ident">bottom</span>());
-    <span class="ident">ap_trampoline_data</span>.<span class="ident">ap_stack_end</span>.<span class="ident">write</span>(<span class="ident">ap_stack</span>.<span class="ident">top_unusable</span>());
-    <span class="ident">ap_trampoline_data</span>.<span class="ident">ap_code</span>.<span class="ident">write</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">kstart_ap</span> <span class="kw">as</span> <span class="ident">usize</span>));
-    <span class="ident">ap_trampoline_data</span>.<span class="ident">ap_nmi_lint</span>.<span class="ident">write</span>(<span class="ident">nmi_lint</span>);
-    <span class="ident">ap_trampoline_data</span>.<span class="ident">ap_nmi_flags</span>.<span class="ident">write</span>(<span class="ident">nmi_flags</span>);
-    <span class="ident">AP_READY_FLAG</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
+    ap_trampoline_data.ap_ready.write(<span class="number">0</span>);
+    ap_trampoline_data.ap_processor_id.write(new_lapic.processor);
+    ap_trampoline_data.ap_apic_id.write(new_lapic.apic_id);
+    ap_trampoline_data.ap_page_table.write(page_table_paddr);
+    ap_trampoline_data.ap_stack_start.write(ap_stack.bottom());
+    ap_trampoline_data.ap_stack_end.write(ap_stack.top_unusable());
+    ap_trampoline_data.ap_code.write(VirtualAddress::new_canonical(kstart_ap <span class="kw">as </span>usize));
+    ap_trampoline_data.ap_nmi_lint.write(nmi_lint);
+    ap_trampoline_data.ap_nmi_flags.write(nmi_flags);
+    AP_READY_FLAG.store(<span class="bool-val">false</span>, Ordering::SeqCst);
 
-    <span class="comment">// Give ownership of the stack we created for this AP to the `ap_start` crate, </span>
-    <span class="comment">// in which the AP will take ownership of it once it boots up.</span>
-    <span class="ident">ap_start::insert_ap_stack</span>(<span class="ident">new_lapic</span>.<span class="ident">apic_id</span>, <span class="ident">ap_stack</span>); 
+    <span class="comment">// Give ownership of the stack we created for this AP to the `ap_start` crate, 
+    // in which the AP will take ownership of it once it boots up.
+    </span>ap_start::insert_ap_stack(new_lapic.apic_id, ap_stack); 
 
-    <span class="macro">info!</span>(<span class="string">&quot;Bringing up AP, proc: {} apic_id: {}&quot;</span>, <span class="ident">new_lapic</span>.<span class="ident">processor</span>, <span class="ident">new_lapic</span>.<span class="ident">apic_id</span>);
-    <span class="kw">let</span> <span class="ident">new_apic_id</span> <span class="op">=</span> <span class="ident">new_lapic</span>.<span class="ident">apic_id</span>; 
+    <span class="macro">info!</span>(<span class="string">&quot;Bringing up AP, proc: {} apic_id: {}&quot;</span>, new_lapic.processor, new_lapic.apic_id);
+    <span class="kw">let </span>new_apic_id = new_lapic.apic_id; 
     
-    <span class="ident">bsp_lapic</span>.<span class="ident">clear_error</span>();
-    <span class="kw">let</span> <span class="ident">esr</span> <span class="op">=</span> <span class="ident">bsp_lapic</span>.<span class="ident">error</span>();
-    <span class="macro">debug!</span>(<span class="string">&quot; initial esr = {:#X}&quot;</span>, <span class="ident">esr</span>);
+    bsp_lapic.clear_error();
+    <span class="kw">let </span>esr = bsp_lapic.error();
+    <span class="macro">debug!</span>(<span class="string">&quot; initial esr = {:#X}&quot;</span>, esr);
 
-    <span class="comment">// Send INIT IPI</span>
-    {
-        <span class="comment">// 0x500 means INIT Delivery Mode, 0x4000 means Assert (not de-assert), 0x8000 means level triggers</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">icr</span> <span class="op">=</span> <span class="comment">/*0x8000 |*/</span> <span class="number">0x4000</span> <span class="op">|</span> <span class="number">0x500</span>; 
-        <span class="kw">if</span> <span class="ident">has_x2apic</span>() {
-            <span class="ident">icr</span> <span class="op">|</span><span class="op">=</span> (<span class="ident">new_apic_id</span> <span class="kw">as</span> <span class="ident">u64</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">32</span>;
-        } <span class="kw">else</span> {
-            <span class="ident">icr</span> <span class="op">|</span><span class="op">=</span> ( <span class="ident">new_apic_id</span> <span class="kw">as</span> <span class="ident">u64</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">56</span>; <span class="comment">// destination apic id </span>
-        }
-        <span class="comment">// icr |= 1 &lt;&lt; 11; // (1 &lt;&lt; 11) is logical address mode, 0 is physical. Doesn&#39;t work with physical addressing mode!</span>
-        <span class="macro">debug!</span>(<span class="string">&quot; INIT IPI... icr: {:#X}&quot;</span>, <span class="ident">icr</span>);
-        <span class="ident">bsp_lapic</span>.<span class="ident">set_icr</span>(<span class="ident">icr</span>);
+    <span class="comment">// Send INIT IPI
+    </span>{
+        <span class="comment">// 0x500 means INIT Delivery Mode, 0x4000 means Assert (not de-assert), 0x8000 means level triggers
+        </span><span class="kw">let </span><span class="kw-2">mut </span>icr = <span class="comment">/*0x8000 |*/ </span><span class="number">0x4000 </span>| <span class="number">0x500</span>; 
+        <span class="kw">if </span>has_x2apic() {
+            icr |= (new_apic_id <span class="kw">as </span>u64) &lt;&lt; <span class="number">32</span>;
+        } <span class="kw">else </span>{
+            icr |= ( new_apic_id <span class="kw">as </span>u64) &lt;&lt; <span class="number">56</span>; <span class="comment">// destination apic id 
+        </span>}
+        <span class="comment">// icr |= 1 &lt;&lt; 11; // (1 &lt;&lt; 11) is logical address mode, 0 is physical. Doesn&#39;t work with physical addressing mode!
+        </span><span class="macro">debug!</span>(<span class="string">&quot; INIT IPI... icr: {:#X}&quot;</span>, icr);
+        bsp_lapic.set_icr(icr);
     }
 
     <span class="macro">debug!</span>(<span class="string">&quot;waiting 10 ms...&quot;</span>);
-    <span class="ident">pit_clock_basic::pit_wait</span>(<span class="number">10000</span>).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> { <span class="macro">error!</span>(<span class="string">&quot;bring_up_ap(): failed to pit_wait 10 ms. Error: {:?}&quot;</span>, <span class="ident">_e</span>); });
+    pit_clock_basic::pit_wait(<span class="number">10000</span>).unwrap_or_else(|_e| { <span class="macro">error!</span>(<span class="string">&quot;bring_up_ap(): failed to pit_wait 10 ms. Error: {:?}&quot;</span>, _e); });
     <span class="macro">debug!</span>(<span class="string">&quot;done waiting.&quot;</span>);
 
-    <span class="comment">// // Send DEASSERT INIT IPI</span>
-    <span class="comment">// {</span>
-    <span class="comment">//     // 0x500 means INIT Delivery Mode, 0x8000 means level triggers</span>
-    <span class="comment">//     let mut icr = 0x8000 | 0x500; </span>
-    <span class="comment">//     if has_x2apic() {</span>
-    <span class="comment">//         icr |= (new_apic_id as u64) &lt;&lt; 32;</span>
-    <span class="comment">//     } else {</span>
-    <span class="comment">//         icr |= ( new_apic_id as u64) &lt;&lt; 56; // destination apic id </span>
-    <span class="comment">//     }</span>
-    <span class="comment">//     // icr |= 1 &lt;&lt; 11; // (1 &lt;&lt; 11) is logical address mode, 0 is physical. Doesn&#39;t work with physical addressing mode!</span>
-    <span class="comment">//     debug!(&quot; DEASSERT IPI... icr: {:#X}&quot;, icr);</span>
-    <span class="comment">//     bsp_lapic.set_icr(icr);</span>
-    <span class="comment">// }</span>
+    <span class="comment">// // Send DEASSERT INIT IPI
+    // {
+    //     // 0x500 means INIT Delivery Mode, 0x8000 means level triggers
+    //     let mut icr = 0x8000 | 0x500; 
+    //     if has_x2apic() {
+    //         icr |= (new_apic_id as u64) &lt;&lt; 32;
+    //     } else {
+    //         icr |= ( new_apic_id as u64) &lt;&lt; 56; // destination apic id 
+    //     }
+    //     // icr |= 1 &lt;&lt; 11; // (1 &lt;&lt; 11) is logical address mode, 0 is physical. Doesn&#39;t work with physical addressing mode!
+    //     debug!(&quot; DEASSERT IPI... icr: {:#X}&quot;, icr);
+    //     bsp_lapic.set_icr(icr);
+    // }
 
-    <span class="ident">bsp_lapic</span>.<span class="ident">clear_error</span>();
-    <span class="kw">let</span> <span class="ident">esr</span> <span class="op">=</span> <span class="ident">bsp_lapic</span>.<span class="ident">error</span>();
-    <span class="macro">debug!</span>(<span class="string">&quot; pre-SIPI esr = {:#X}&quot;</span>, <span class="ident">esr</span>);
+    </span>bsp_lapic.clear_error();
+    <span class="kw">let </span>esr = bsp_lapic.error();
+    <span class="macro">debug!</span>(<span class="string">&quot; pre-SIPI esr = {:#X}&quot;</span>, esr);
 
-    <span class="comment">// Send START IPI</span>
-    {
-        <span class="comment">//Start at 0x1000:0000 =&gt; 0x10000. We copied the ap_start_realmode code into AP_STARTUP earlier, in handle_apic_entry()</span>
-        <span class="kw">let</span> <span class="ident">ap_segment</span> <span class="op">=</span> (<span class="ident">AP_STARTUP</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">PAGE_SHIFT</span>) <span class="op">&amp;</span> <span class="number">0xFF</span>; <span class="comment">// the frame number where we want the AP to start executing from boot</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">icr</span> <span class="op">=</span> <span class="comment">/*0x8000 |*/</span> <span class="number">0x4000</span> <span class="op">|</span> <span class="number">0x600</span> <span class="op">|</span> <span class="ident">ap_segment</span> <span class="kw">as</span> <span class="ident">u64</span>; <span class="comment">//0x600 means Startup IPI</span>
+    <span class="comment">// Send START IPI
+    </span>{
+        <span class="comment">//Start at 0x1000:0000 =&gt; 0x10000. We copied the ap_start_realmode code into AP_STARTUP earlier, in handle_apic_entry()
+        </span><span class="kw">let </span>ap_segment = (AP_STARTUP &gt;&gt; PAGE_SHIFT) &amp; <span class="number">0xFF</span>; <span class="comment">// the frame number where we want the AP to start executing from boot
+        </span><span class="kw">let </span><span class="kw-2">mut </span>icr = <span class="comment">/*0x8000 |*/ </span><span class="number">0x4000 </span>| <span class="number">0x600 </span>| ap_segment <span class="kw">as </span>u64; <span class="comment">//0x600 means Startup IPI
 
-        <span class="kw">if</span> <span class="ident">has_x2apic</span>() {
-            <span class="ident">icr</span> <span class="op">|</span><span class="op">=</span> (<span class="ident">new_apic_id</span> <span class="kw">as</span> <span class="ident">u64</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">32</span>;
-        } <span class="kw">else</span> {
-            <span class="ident">icr</span> <span class="op">|</span><span class="op">=</span> (<span class="ident">new_apic_id</span> <span class="kw">as</span> <span class="ident">u64</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">56</span>;
+        </span><span class="kw">if </span>has_x2apic() {
+            icr |= (new_apic_id <span class="kw">as </span>u64) &lt;&lt; <span class="number">32</span>;
+        } <span class="kw">else </span>{
+            icr |= (new_apic_id <span class="kw">as </span>u64) &lt;&lt; <span class="number">56</span>;
         }
-        <span class="comment">// icr |= 1 &lt;&lt; 11; // (1 &lt;&lt; 11) is logical address mode, 0 is physical. Doesn&#39;t work with physical addressing mode!</span>
-        <span class="macro">debug!</span>(<span class="string">&quot; SIPI... icr: {:#X}&quot;</span>, <span class="ident">icr</span>);
-        <span class="ident">bsp_lapic</span>.<span class="ident">set_icr</span>(<span class="ident">icr</span>);
+        <span class="comment">// icr |= 1 &lt;&lt; 11; // (1 &lt;&lt; 11) is logical address mode, 0 is physical. Doesn&#39;t work with physical addressing mode!
+        </span><span class="macro">debug!</span>(<span class="string">&quot; SIPI... icr: {:#X}&quot;</span>, icr);
+        bsp_lapic.set_icr(icr);
     }
 
-    <span class="ident">pit_clock_basic::pit_wait</span>(<span class="number">300</span>).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> { <span class="macro">error!</span>(<span class="string">&quot;bring_up_ap(): failed to pit_wait 300 us. Error {:?}&quot;</span>, <span class="ident">_e</span>); });
-    <span class="ident">pit_clock_basic::pit_wait</span>(<span class="number">200</span>).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> { <span class="macro">error!</span>(<span class="string">&quot;bring_up_ap(): failed to pit_wait 200 us. Error {:?}&quot;</span>, <span class="ident">_e</span>); });
+    pit_clock_basic::pit_wait(<span class="number">300</span>).unwrap_or_else(|_e| { <span class="macro">error!</span>(<span class="string">&quot;bring_up_ap(): failed to pit_wait 300 us. Error {:?}&quot;</span>, _e); });
+    pit_clock_basic::pit_wait(<span class="number">200</span>).unwrap_or_else(|_e| { <span class="macro">error!</span>(<span class="string">&quot;bring_up_ap(): failed to pit_wait 200 us. Error {:?}&quot;</span>, _e); });
 
-    <span class="ident">bsp_lapic</span>.<span class="ident">clear_error</span>();
-    <span class="kw">let</span> <span class="ident">esr</span> <span class="op">=</span> <span class="ident">bsp_lapic</span>.<span class="ident">error</span>();
-    <span class="macro">debug!</span>(<span class="string">&quot; post-SIPI esr = {:#X}&quot;</span>, <span class="ident">esr</span>);
-    <span class="comment">// TODO: we may need to send a second START IPI on real hardware???</span>
+    bsp_lapic.clear_error();
+    <span class="kw">let </span>esr = bsp_lapic.error();
+    <span class="macro">debug!</span>(<span class="string">&quot; post-SIPI esr = {:#X}&quot;</span>, esr);
+    <span class="comment">// TODO: we may need to send a second START IPI on real hardware???
 
-    <span class="comment">// Wait for trampoline ready</span>
-    <span class="macro">debug!</span>(<span class="string">&quot; Wait...&quot;</span>);
-    <span class="kw">while</span> <span class="ident">ap_trampoline_data</span>.<span class="ident">ap_ready</span>.<span class="ident">read</span>() <span class="op">==</span> <span class="number">0</span> {
-        <span class="ident">spin_loop_hint</span>();
+    // Wait for trampoline ready
+    </span><span class="macro">debug!</span>(<span class="string">&quot; Wait...&quot;</span>);
+    <span class="kw">while </span>ap_trampoline_data.ap_ready.read() == <span class="number">0 </span>{
+        spin_loop_hint();
     }
     <span class="macro">debug!</span>(<span class="string">&quot; Trampoline...&quot;</span>);
-    <span class="kw">while</span> <span class="op">!</span> <span class="ident">AP_READY_FLAG</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) {
-        <span class="ident">spin_loop_hint</span>();
+    <span class="kw">while </span>! AP_READY_FLAG.load(Ordering::SeqCst) {
+        spin_loop_hint();
     }
-    <span class="macro">info!</span>(<span class="string">&quot; AP {} is in Rust code. Ready!&quot;</span>, <span class="ident">new_apic_id</span>);
+    <span class="macro">info!</span>(<span class="string">&quot; AP {} is in Rust code. Ready!&quot;</span>, new_apic_id);
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="multicore_bringup" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="multicore_bringup" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

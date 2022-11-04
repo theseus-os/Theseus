@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/fault_crate_swap/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../fault_crate_swap/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../fault_crate_swap/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../fault_crate_swap/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/fault_crate_swap/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../fault_crate_swap/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -554,556 +548,555 @@
 <span id="548">548</span>
 <span id="549">549</span>
 <span id="550">550</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Defines support functions needed for swapping of corrupted crates to a different address for fault tolerance</span>
-<span class="doccomment">//! </span>
+</pre><pre class="rust"><code><span class="doccomment">//! Defines support functions needed for swapping of corrupted crates to a different address for fault tolerance
+//! 
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>; 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mod_mgmt</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fs_node</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">path</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">crate_swap</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fault_log</span>;
+#[macro_use] </span><span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log; 
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>mod_mgmt;
+<span class="kw">extern crate </span>fs_node;
+<span class="kw">extern crate </span>path;
+<span class="kw">extern crate </span>crate_swap;
+<span class="kw">extern crate </span>task;
+<span class="kw">extern crate </span>fault_log;
 
-<span class="kw">use</span> <span class="ident">core::ptr</span>;
-<span class="kw">use</span> <span class="ident">core::ops::Range</span>;
+<span class="kw">use </span>core::ptr;
+<span class="kw">use </span>core::ops::Range;
 
-<span class="kw">use</span> <span class="ident">alloc</span>::{
-    <span class="ident">string</span>::{<span class="ident">String</span>, <span class="ident">ToString</span>},
-    <span class="ident">sync::Arc</span>,
-    <span class="ident">vec::Vec</span>,
+<span class="kw">use </span>alloc::{
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
 };
 
-<span class="kw">use</span> <span class="ident">memory::VirtualAddress</span>;
-<span class="kw">use</span> <span class="ident">fs_node</span>::{<span class="ident">FileOrDir</span>, <span class="ident">DirRef</span>};
-<span class="kw">use</span> <span class="ident">mod_mgmt</span>::{
-    <span class="ident">CrateNamespace</span>,
-    <span class="ident">NamespaceDir</span>,
-    <span class="ident">IntoCrateObjectFile</span>,
+<span class="kw">use </span>memory::VirtualAddress;
+<span class="kw">use </span>fs_node::{FileOrDir, DirRef};
+<span class="kw">use </span>mod_mgmt::{
+    CrateNamespace,
+    NamespaceDir,
+    IntoCrateObjectFile,
 };
-<span class="kw">use</span> <span class="ident">path::Path</span>;
-<span class="kw">use</span> <span class="ident">crate_swap</span>::{<span class="ident">SwapRequest</span>, <span class="ident">swap_crates</span>};
-<span class="kw">use</span> <span class="ident">fault_log</span>::{<span class="ident">RecoveryAction</span>, <span class="ident">FaultEntry</span>, <span class="ident">remove_unhandled_exceptions</span>, <span class="ident">log_handled_fault</span>};
+<span class="kw">use </span>path::Path;
+<span class="kw">use </span>crate_swap::{SwapRequest, swap_crates};
+<span class="kw">use </span>fault_log::{RecoveryAction, FaultEntry, remove_unhandled_exceptions, log_handled_fault};
 
-<span class="doccomment">/// A data structure to hold the ranges of memory used by the old crate and the new crate.</span>
-<span class="doccomment">/// The crate only maintains the values as virtual addresses and holds no references to any</span>
-<span class="doccomment">/// crate</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Default</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SwapRanges</span>{
-    <span class="kw">pub</span> <span class="ident">old_text</span> : <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Range</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">old_rodata</span> : <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Range</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">old_data</span> : <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Range</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A data structure to hold the ranges of memory used by the old crate and the new crate.
+/// The crate only maintains the values as virtual addresses and holds no references to any
+/// crate
+</span><span class="attr">#[derive(Clone, Default)]
+</span><span class="kw">pub struct </span>SwapRanges{
+    <span class="kw">pub </span>old_text : <span class="prelude-ty">Option</span>&lt;Range&lt;VirtualAddress&gt;&gt;,
+    <span class="kw">pub </span>old_rodata : <span class="prelude-ty">Option</span>&lt;Range&lt;VirtualAddress&gt;&gt;,
+    <span class="kw">pub </span>old_data : <span class="prelude-ty">Option</span>&lt;Range&lt;VirtualAddress&gt;&gt;,
 
-    <span class="kw">pub</span> <span class="ident">new_text</span> : <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Range</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">new_rodata</span> : <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Range</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">new_data</span> : <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Range</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="kw">pub </span>new_text : <span class="prelude-ty">Option</span>&lt;Range&lt;VirtualAddress&gt;&gt;,
+    <span class="kw">pub </span>new_rodata : <span class="prelude-ty">Option</span>&lt;Range&lt;VirtualAddress&gt;&gt;,
+    <span class="kw">pub </span>new_data : <span class="prelude-ty">Option</span>&lt;Range&lt;VirtualAddress&gt;&gt;,
 }
 
-<span class="doccomment">/// For swapping of a crate from the identical object file in the disk. </span>
-<span class="doccomment">/// Wraps arpund the crate_swap function by creating an appropriate  Swap request. </span>
-<span class="doccomment">/// Arguments identical to the ones of crate_swap except</span>
-<span class="doccomment">/// namespace : Arc to the current namespace</span>
-<span class="doccomment">/// Returns a `SwapRanges` struct indicating the old and new `VirtualAddress` range</span>
-<span class="doccomment">/// of the swapped crate</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">do_self_swap</span>(
-    <span class="ident">crate_name</span> : <span class="kw-2">&amp;</span><span class="ident">str</span>, 
-    <span class="ident">curr_dir</span>: <span class="kw-2">&amp;</span><span class="ident">DirRef</span>, 
-    <span class="ident">override_namespace_crate_dir</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">NamespaceDir</span><span class="op">&gt;</span>, 
-    <span class="ident">state_transfer_functions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="ident">namespace</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>,
-    <span class="ident">verbose_log</span>: <span class="ident">bool</span>
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">SwapRanges</span>, <span class="ident">String</span><span class="op">&gt;</span> {
+<span class="doccomment">/// For swapping of a crate from the identical object file in the disk. 
+/// Wraps arpund the crate_swap function by creating an appropriate  Swap request. 
+/// Arguments identical to the ones of crate_swap except
+/// namespace : Arc to the current namespace
+/// Returns a `SwapRanges` struct indicating the old and new `VirtualAddress` range
+/// of the swapped crate
+</span><span class="kw">pub fn </span>do_self_swap(
+    crate_name : <span class="kw-2">&amp;</span>str, 
+    curr_dir: <span class="kw-2">&amp;</span>DirRef, 
+    override_namespace_crate_dir: <span class="prelude-ty">Option</span>&lt;NamespaceDir&gt;, 
+    state_transfer_functions: Vec&lt;String&gt;,
+    namespace: <span class="kw-2">&amp;</span>Arc&lt;CrateNamespace&gt;,
+    verbose_log: bool
+) -&gt; <span class="prelude-ty">Result</span>&lt;SwapRanges, String&gt; {
 
-    <span class="kw">let</span> <span class="ident">kernel_mmi_ref</span> <span class="op">=</span> <span class="ident">memory::get_kernel_mmi_ref</span>().<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;couldn&#39;t get kernel_mmi_ref&quot;</span>.<span class="ident">to_string</span>())<span class="question-mark">?</span>;
+    <span class="kw">let </span>kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| <span class="string">&quot;couldn&#39;t get kernel_mmi_ref&quot;</span>.to_string())<span class="question-mark">?</span>;
 
-    <span class="comment">// Create swap request</span>
-    <span class="kw">let</span> <span class="ident">swap_requests</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">requests</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SwapRequest</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="number">1</span>);
-        <span class="comment">// Check that the new crate file exists. It could be a regular path, or a prefix for a file in the namespace&#39;s dir.</span>
-        <span class="comment">// If it&#39;s a full path, then we just check that the path points to a valid crate object file. </span>
-        <span class="comment">// Otherwise, we treat it as a prefix for a crate object file name that may be found </span>
-        <span class="kw">let</span> (<span class="ident">into_new_crate_file</span>, <span class="ident">new_namespace</span>) <span class="op">=</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">f</span>) <span class="op">=</span> <span class="ident">override_namespace_crate_dir</span>.<span class="ident">as_ref</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">ns_dir</span><span class="op">|</span> <span class="ident">ns_dir</span>.<span class="ident">get_file_starting_with</span>(<span class="ident">crate_name</span>)) {
-                (<span class="ident">IntoCrateObjectFile::File</span>(<span class="ident">f</span>), <span class="prelude-val">None</span>)
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::File</span>(<span class="ident">f</span>)) <span class="op">=</span> <span class="ident">Path::new</span>(<span class="ident">String::from</span>(<span class="ident">crate_name</span>)).<span class="ident">get</span>(<span class="ident">curr_dir</span>) {
-                (<span class="ident">IntoCrateObjectFile::File</span>(<span class="ident">f</span>), <span class="prelude-val">None</span>)
-            } <span class="kw">else</span> {
-                (<span class="ident">IntoCrateObjectFile::Prefix</span>(<span class="ident">String::from</span>(<span class="ident">crate_name</span>)), <span class="prelude-val">None</span>)
+    <span class="comment">// Create swap request
+    </span><span class="kw">let </span>swap_requests = {
+        <span class="kw">let </span><span class="kw-2">mut </span>requests: Vec&lt;SwapRequest&gt; = Vec::with_capacity(<span class="number">1</span>);
+        <span class="comment">// Check that the new crate file exists. It could be a regular path, or a prefix for a file in the namespace&#39;s dir.
+        // If it&#39;s a full path, then we just check that the path points to a valid crate object file. 
+        // Otherwise, we treat it as a prefix for a crate object file name that may be found 
+        </span><span class="kw">let </span>(into_new_crate_file, new_namespace) = {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(f) = override_namespace_crate_dir.as_ref().and_then(|ns_dir| ns_dir.get_file_starting_with(crate_name)) {
+                (IntoCrateObjectFile::File(f), <span class="prelude-val">None</span>)
+            } <span class="kw">else if let </span><span class="prelude-val">Some</span>(FileOrDir::File(f)) = Path::new(String::from(crate_name)).get(curr_dir) {
+                (IntoCrateObjectFile::File(f), <span class="prelude-val">None</span>)
+            } <span class="kw">else </span>{
+                (IntoCrateObjectFile::Prefix(String::from(crate_name)), <span class="prelude-val">None</span>)
             }
         };
 
 
-        <span class="kw">let</span> <span class="ident">swap_req</span> <span class="op">=</span> <span class="ident">SwapRequest::new</span>(
-            <span class="prelude-val">Some</span>(<span class="ident">crate_name</span>),
-            <span class="ident">Arc::clone</span>(<span class="ident">namespace</span>),
-            <span class="ident">into_new_crate_file</span>,
-            <span class="ident">new_namespace</span>,
-            <span class="bool-val">false</span>, <span class="comment">//reexport</span>
-        ).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">invalid_req</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;{:#?}&quot;</span>, <span class="ident">invalid_req</span>))<span class="question-mark">?</span>;
+        <span class="kw">let </span>swap_req = SwapRequest::new(
+            <span class="prelude-val">Some</span>(crate_name),
+            Arc::clone(namespace),
+            into_new_crate_file,
+            new_namespace,
+            <span class="bool-val">false</span>, <span class="comment">//reexport
+        </span>).map_err(|invalid_req| <span class="macro">format!</span>(<span class="string">&quot;{:#?}&quot;</span>, invalid_req))<span class="question-mark">?</span>;
 
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-        <span class="macro">debug!</span>(<span class="string">&quot;swap call {:?}&quot;</span>, <span class="ident">swap_req</span>);
+        <span class="attr">#[cfg(not(downtime_eval))]
+        </span><span class="macro">debug!</span>(<span class="string">&quot;swap call {:?}&quot;</span>, swap_req);
 
-        <span class="ident">requests</span>.<span class="ident">push</span>(<span class="ident">swap_req</span>);
+        requests.push(swap_req);
 
-        <span class="ident">requests</span>
+        requests
     };
 
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">matching_crates</span> <span class="op">=</span> <span class="ident">CrateNamespace::get_crates_starting_with</span>(<span class="ident">namespace</span>, <span class="ident">crate_name</span>);
+    <span class="kw">let </span><span class="kw-2">mut </span>matching_crates = CrateNamespace::get_crates_starting_with(namespace, crate_name);
 
-    <span class="comment">// There can be only one matching crate for a given crate name</span>
-    <span class="kw">if</span> <span class="ident">matching_crates</span>.<span class="ident">len</span>() <span class="op">==</span> <span class="number">0</span> {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;No crates currently loaded matches &quot;</span>.<span class="ident">to_string</span>() <span class="op">+</span> <span class="ident">crate_name</span>);
+    <span class="comment">// There can be only one matching crate for a given crate name
+    </span><span class="kw">if </span>matching_crates.len() == <span class="number">0 </span>{
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;No crates currently loaded matches &quot;</span>.to_string() + crate_name);
     }
 
-    <span class="kw">if</span> <span class="ident">matching_crates</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="number">1</span> {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;More than one crate matches &quot;</span>.<span class="ident">to_string</span>() <span class="op">+</span> <span class="ident">crate_name</span>);
+    <span class="kw">if </span>matching_crates.len() &gt; <span class="number">1 </span>{
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;More than one crate matches &quot;</span>.to_string() + crate_name);
     }
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">return_struct</span> <span class="op">=</span> <span class="ident">SwapRanges::default</span>();
+    <span class="kw">let </span><span class="kw-2">mut </span>return_struct = SwapRanges::default();
 
-    <span class="kw">let</span> (<span class="ident">_old_crate_name</span>, <span class="ident">old_crate_ref</span>, <span class="ident">_old_namespace</span>) <span class="op">=</span> <span class="ident">matching_crates</span>.<span class="ident">remove</span>(<span class="number">0</span>);
+    <span class="kw">let </span>(_old_crate_name, old_crate_ref, _old_namespace) = matching_crates.remove(<span class="number">0</span>);
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-    <span class="macro">debug!</span>(<span class="string">&quot;{:?}&quot;</span>,<span class="ident">old_crate_ref</span>);
+    <span class="attr">#[cfg(not(downtime_eval))]
+    </span><span class="macro">debug!</span>(<span class="string">&quot;{:?}&quot;</span>,old_crate_ref);
 
     {
-        <span class="kw">let</span> <span class="ident">old_crate</span> <span class="op">=</span> <span class="ident">old_crate_ref</span>.<span class="ident">lock_as_ref</span>();
-        <span class="comment">// Find the text, data and rodata ranges of old crate</span>
-        <span class="ident">return_struct</span>.<span class="ident">old_text</span> <span class="op">=</span> <span class="ident">old_crate</span>.<span class="ident">text_pages</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">addr_range</span>)<span class="op">|</span> <span class="ident">addr_range</span>.<span class="ident">clone</span>());
-        <span class="ident">return_struct</span>.<span class="ident">old_rodata</span> <span class="op">=</span> <span class="ident">old_crate</span>.<span class="ident">rodata_pages</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">addr_range</span>)<span class="op">|</span> <span class="ident">addr_range</span>.<span class="ident">clone</span>());
-        <span class="ident">return_struct</span>.<span class="ident">old_data</span> <span class="op">=</span> <span class="ident">old_crate</span>.<span class="ident">data_pages</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">addr_range</span>)<span class="op">|</span> <span class="ident">addr_range</span>.<span class="ident">clone</span>());
+        <span class="kw">let </span>old_crate = old_crate_ref.lock_as_ref();
+        <span class="comment">// Find the text, data and rodata ranges of old crate
+        </span>return_struct.old_text = old_crate.text_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+        return_struct.old_rodata = old_crate.rodata_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+        return_struct.old_data = old_crate.data_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
     }
 
 
-    <span class="comment">// Swap crates</span>
-    <span class="kw">let</span> <span class="ident">swap_result</span> <span class="op">=</span> <span class="ident">swap_crates</span>(
-        <span class="ident">namespace</span>,
-        <span class="ident">swap_requests</span>, 
-        <span class="ident">override_namespace_crate_dir</span>,
-        <span class="ident">state_transfer_functions</span>,
-        <span class="ident">kernel_mmi_ref</span>,
-        <span class="ident">verbose_log</span>,
-        <span class="bool-val">false</span> <span class="comment">// enable crate_cahce</span>
-    );
+    <span class="comment">// Swap crates
+    </span><span class="kw">let </span>swap_result = swap_crates(
+        namespace,
+        swap_requests, 
+        override_namespace_crate_dir,
+        state_transfer_functions,
+        kernel_mmi_ref,
+        verbose_log,
+        <span class="bool-val">false </span><span class="comment">// enable crate_cahce
+    </span>);
 
-    <span class="kw">let</span> <span class="ident">ocn</span> <span class="op">=</span> <span class="ident">crate_name</span>;
+    <span class="kw">let </span>ocn = crate_name;
 
-    <span class="comment">// Find the new crate loaded. It should have the exact same name as the old crate</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">matching_crates</span> <span class="op">=</span> <span class="ident">CrateNamespace::get_crates_starting_with</span>(<span class="ident">namespace</span>, <span class="ident">ocn</span>);
+    <span class="comment">// Find the new crate loaded. It should have the exact same name as the old crate
+    </span><span class="kw">let </span><span class="kw-2">mut </span>matching_crates = CrateNamespace::get_crates_starting_with(namespace, ocn);
 
-    <span class="comment">// There can be only one matching crate for a given crate name</span>
-    <span class="kw">if</span> <span class="ident">matching_crates</span>.<span class="ident">len</span>() <span class="op">==</span> <span class="number">0</span> {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;No crates currently loaded matches &quot;</span>.<span class="ident">to_string</span>() <span class="op">+</span> <span class="ident">crate_name</span>);
+    <span class="comment">// There can be only one matching crate for a given crate name
+    </span><span class="kw">if </span>matching_crates.len() == <span class="number">0 </span>{
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;No crates currently loaded matches &quot;</span>.to_string() + crate_name);
     }
 
-    <span class="kw">if</span> <span class="ident">matching_crates</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="number">1</span> {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;More than one crate matches &quot;</span>.<span class="ident">to_string</span>() <span class="op">+</span> <span class="ident">crate_name</span>);
+    <span class="kw">if </span>matching_crates.len() &gt; <span class="number">1 </span>{
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;More than one crate matches &quot;</span>.to_string() + crate_name);
     }
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-    <span class="macro">debug!</span>(<span class="string">&quot;We got a match&quot;</span>);
+    <span class="attr">#[cfg(not(downtime_eval))]
+    </span><span class="macro">debug!</span>(<span class="string">&quot;We got a match&quot;</span>);
 
-    <span class="kw">let</span> (<span class="ident">new_crate_full_name</span>, <span class="ident">_ocr</span>, <span class="ident">real_new_namespace</span>) <span class="op">=</span> <span class="ident">matching_crates</span>.<span class="ident">remove</span>(<span class="number">0</span>);
-    <span class="kw">let</span> <span class="ident">new_crate_ref</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">CrateNamespace::get_crate_and_namespace</span>(<span class="kw-2">&amp;</span><span class="ident">real_new_namespace</span>, <span class="kw-2">&amp;</span><span class="ident">new_crate_full_name</span>) {
-        <span class="prelude-val">Some</span>((<span class="ident">ocr</span>, <span class="ident">_ns</span>)) =&gt; {
-            <span class="ident">ocr</span>
+    <span class="kw">let </span>(new_crate_full_name, _ocr, real_new_namespace) = matching_crates.remove(<span class="number">0</span>);
+    <span class="kw">let </span>new_crate_ref = <span class="kw">match </span>CrateNamespace::get_crate_and_namespace(<span class="kw-2">&amp;</span>real_new_namespace, <span class="kw-2">&amp;</span>new_crate_full_name) {
+        <span class="prelude-val">Some</span>((ocr, _ns)) =&gt; {
+            ocr
         }
-        <span class="kw">_</span> =&gt; {
+        <span class="kw">_ </span>=&gt; {
             <span class="macro">debug!</span>(<span class="string">&quot;Match occurs but cannot get the crate&quot;</span>);
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Cannot get reference&quot;</span>.<span class="ident">to_string</span>());
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Cannot get reference&quot;</span>.to_string());
         }
     };
     
-    <span class="comment">// Find the address range of the newly loaded crate</span>
-    {
-        <span class="kw">let</span> <span class="ident">new_crate</span> <span class="op">=</span> <span class="ident">new_crate_ref</span>.<span class="ident">lock_as_ref</span>();
-        <span class="ident">return_struct</span>.<span class="ident">new_text</span>   <span class="op">=</span> <span class="ident">new_crate</span>.<span class="ident">text_pages</span>  .<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">addr_range</span>)<span class="op">|</span> <span class="ident">addr_range</span>.<span class="ident">clone</span>());
-        <span class="ident">return_struct</span>.<span class="ident">new_rodata</span> <span class="op">=</span> <span class="ident">new_crate</span>.<span class="ident">rodata_pages</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">addr_range</span>)<span class="op">|</span> <span class="ident">addr_range</span>.<span class="ident">clone</span>());
-        <span class="ident">return_struct</span>.<span class="ident">new_data</span>   <span class="op">=</span> <span class="ident">new_crate</span>.<span class="ident">data_pages</span>  .<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">addr_range</span>)<span class="op">|</span> <span class="ident">addr_range</span>.<span class="ident">clone</span>());
+    <span class="comment">// Find the address range of the newly loaded crate
+    </span>{
+        <span class="kw">let </span>new_crate = new_crate_ref.lock_as_ref();
+        return_struct.new_text   = new_crate.text_pages  .as_ref().map(|(_mp, addr_range)| addr_range.clone());
+        return_struct.new_rodata = new_crate.rodata_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+        return_struct.new_data   = new_crate.data_pages  .as_ref().map(|(_mp, addr_range)| addr_range.clone());
 
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-        {
-            <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Some</span>(<span class="ident">old_text</span>) , <span class="prelude-val">Some</span>(<span class="ident">new_text</span>)) <span class="op">=</span> (<span class="ident">return_struct</span>.<span class="ident">old_text</span>.<span class="ident">clone</span>(), <span class="ident">return_struct</span>.<span class="ident">new_text</span>.<span class="ident">clone</span>()) {
-                    <span class="macro">debug!</span>(<span class="string">&quot;Text Range was {:X} - {:X}&quot;</span>, <span class="ident">old_text</span>.<span class="ident">start</span>, <span class="ident">old_text</span>.<span class="ident">end</span>);
-                    <span class="macro">debug!</span>(<span class="string">&quot;Text Range is {:X} - {:X}&quot;</span>, <span class="ident">new_text</span>.<span class="ident">start</span>, <span class="ident">new_text</span>.<span class="ident">end</span>);
+        <span class="attr">#[cfg(not(downtime_eval))]
+        </span>{
+            <span class="kw">if let </span>(<span class="prelude-val">Some</span>(old_text) , <span class="prelude-val">Some</span>(new_text)) = (return_struct.old_text.clone(), return_struct.new_text.clone()) {
+                    <span class="macro">debug!</span>(<span class="string">&quot;Text Range was {:X} - {:X}&quot;</span>, old_text.start, old_text.end);
+                    <span class="macro">debug!</span>(<span class="string">&quot;Text Range is {:X} - {:X}&quot;</span>, new_text.start, new_text.end);
             }
 
-            <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Some</span>(<span class="ident">old_data</span>) , <span class="prelude-val">Some</span>(<span class="ident">new_data</span>)) <span class="op">=</span> (<span class="ident">return_struct</span>.<span class="ident">old_data</span>.<span class="ident">clone</span>(), <span class="ident">return_struct</span>.<span class="ident">new_data</span>.<span class="ident">clone</span>()) {
-                    <span class="macro">debug!</span>(<span class="string">&quot;Data Range was {:X} - {:X}&quot;</span>, <span class="ident">old_data</span>.<span class="ident">start</span>, <span class="ident">old_data</span>.<span class="ident">end</span>);
-                    <span class="macro">debug!</span>(<span class="string">&quot;Data Range is {:X} - {:X}&quot;</span>, <span class="ident">new_data</span>.<span class="ident">start</span>, <span class="ident">new_data</span>.<span class="ident">end</span>);
+            <span class="kw">if let </span>(<span class="prelude-val">Some</span>(old_data) , <span class="prelude-val">Some</span>(new_data)) = (return_struct.old_data.clone(), return_struct.new_data.clone()) {
+                    <span class="macro">debug!</span>(<span class="string">&quot;Data Range was {:X} - {:X}&quot;</span>, old_data.start, old_data.end);
+                    <span class="macro">debug!</span>(<span class="string">&quot;Data Range is {:X} - {:X}&quot;</span>, new_data.start, new_data.end);
             }
 
-            <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Some</span>(<span class="ident">old_rodata</span>) , <span class="prelude-val">Some</span>(<span class="ident">new_rodata</span>)) <span class="op">=</span> (<span class="ident">return_struct</span>.<span class="ident">old_rodata</span>.<span class="ident">clone</span>(), <span class="ident">return_struct</span>.<span class="ident">new_rodata</span>.<span class="ident">clone</span>()) {
-                    <span class="macro">debug!</span>(<span class="string">&quot;Rodata Range was {:X} - {:X}&quot;</span>, <span class="ident">old_rodata</span>.<span class="ident">start</span>, <span class="ident">old_rodata</span>.<span class="ident">end</span>);
-                    <span class="macro">debug!</span>(<span class="string">&quot;Rodata Range is {:X} - {:X}&quot;</span>, <span class="ident">new_rodata</span>.<span class="ident">start</span>, <span class="ident">new_rodata</span>.<span class="ident">end</span>);
+            <span class="kw">if let </span>(<span class="prelude-val">Some</span>(old_rodata) , <span class="prelude-val">Some</span>(new_rodata)) = (return_struct.old_rodata.clone(), return_struct.new_rodata.clone()) {
+                    <span class="macro">debug!</span>(<span class="string">&quot;Rodata Range was {:X} - {:X}&quot;</span>, old_rodata.start, old_rodata.end);
+                    <span class="macro">debug!</span>(<span class="string">&quot;Rodata Range is {:X} - {:X}&quot;</span>, new_rodata.start, new_rodata.end);
             }
         }
     }
 
 
-    <span class="kw">match</span> <span class="ident">swap_result</span> {
+    <span class="kw">match </span>swap_result {
         <span class="prelude-val">Ok</span>(()) =&gt; {
 
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-            <span class="macro">debug!</span>(<span class="string">&quot;Swap operation complete&quot;</span>);
+            <span class="attr">#[cfg(not(downtime_eval))]
+            </span><span class="macro">debug!</span>(<span class="string">&quot;Swap operation complete&quot;</span>);
 
-            <span class="prelude-val">Ok</span>(<span class="ident">return_struct</span>)
+            <span class="prelude-val">Ok</span>(return_struct)
         }
-        <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
+        <span class="prelude-val">Err</span>(e) =&gt; {
             <span class="macro">debug!</span>(<span class="string">&quot;Swap FAILED&quot;</span>);
-            <span class="prelude-val">Err</span>(<span class="ident">e</span>.<span class="ident">to_string</span>())
+            <span class="prelude-val">Err</span>(e.to_string())
         }
     }
 
 
 }
 
-<span class="doccomment">/// A support function for self swap of crate</span>
-<span class="doccomment">/// Iterates through a given set of address from top to bottom and</span>
-<span class="doccomment">/// checks whether they fall within the range of an old crate and </span>
-<span class="doccomment">/// shifts them by a constant offset to map them to correct region</span>
-<span class="doccomment">/// in the new crate.</span>
-<span class="doccomment">/// Fix is as follows if virtual address matches.</span>
-<span class="doccomment">/// `new_address` = `old_address` - `start_address_of_old_text_region` + `start_address_of_new_text_region`.</span>
-<span class="doccomment">/// Address ranges are provided via `SwapRanges` struct.</span>
-<span class="doccomment">/// Uses unsafe logic for pointer manipulation</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">constant_offset_fix</span>(
-    <span class="ident">swap_ranges</span> : <span class="kw-2">&amp;</span><span class="ident">SwapRanges</span>, 
-    <span class="ident">bottom</span> : <span class="ident">usize</span>,
-    <span class="ident">top</span> : <span class="ident">usize</span>
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">String</span><span class="op">&gt;</span> {
+<span class="doccomment">/// A support function for self swap of crate
+/// Iterates through a given set of address from top to bottom and
+/// checks whether they fall within the range of an old crate and 
+/// shifts them by a constant offset to map them to correct region
+/// in the new crate.
+/// Fix is as follows if virtual address matches.
+/// `new_address` = `old_address` - `start_address_of_old_text_region` + `start_address_of_new_text_region`.
+/// Address ranges are provided via `SwapRanges` struct.
+/// Uses unsafe logic for pointer manipulation
+</span><span class="kw">pub fn </span>constant_offset_fix(
+    swap_ranges : <span class="kw-2">&amp;</span>SwapRanges, 
+    bottom : usize,
+    top : usize
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), String&gt; {
 
-    <span class="kw">if</span> <span class="ident">top</span> <span class="op">&lt;</span> <span class="ident">bottom</span> {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;In constant_offset_fix bottom must be less than or equal to top&quot;</span>.<span class="ident">to_string</span>())
+    <span class="kw">if </span>top &lt; bottom {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;In constant_offset_fix bottom must be less than or equal to top&quot;</span>.to_string())
     }
 
-    <span class="kw">if</span> <span class="ident">swap_ranges</span>.<span class="ident">new_text</span>.<span class="ident">is_none</span>(){
-        <span class="comment">// crate swap haven&#39;t happened. No constant_offset_fix to be done</span>
-        <span class="kw">return</span> <span class="prelude-val">Ok</span>(())
+    <span class="kw">if </span>swap_ranges.new_text.is_none(){
+        <span class="comment">// crate swap haven&#39;t happened. No constant_offset_fix to be done
+        </span><span class="kw">return </span><span class="prelude-val">Ok</span>(())
     } 
-    <span class="comment">// start from the bottom value</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">bottom</span>;
-    <span class="kw">loop</span> {
-        <span class="comment">// read the value at that location</span>
-        <span class="kw">let</span> <span class="ident">p</span> <span class="op">=</span> (<span class="ident">x</span>) <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">u64</span>;
-        <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span>  <span class="kw">unsafe</span> { <span class="ident">ptr::read</span>(<span class="ident">p</span>) };
-        <span class="comment">//debug!(&quot;{:#X} = {:#X}&quot;, x ,n);</span>
-        <span class="kw">let</span> <span class="ident">ra</span> <span class="op">=</span> <span class="ident">memory::VirtualAddress::new_canonical</span>(<span class="ident">n</span> <span class="kw">as</span> <span class="ident">usize</span>);
+    <span class="comment">// start from the bottom value
+    </span><span class="kw">let </span><span class="kw-2">mut </span>x = bottom;
+    <span class="kw">loop </span>{
+        <span class="comment">// read the value at that location
+        </span><span class="kw">let </span>p = (x) <span class="kw">as </span><span class="kw-2">*const </span>u64;
+        <span class="kw">let </span>n =  <span class="kw">unsafe </span>{ ptr::read(p) };
+        <span class="comment">//debug!(&quot;{:#X} = {:#X}&quot;, x ,n);
+        </span><span class="kw">let </span>ra = memory::VirtualAddress::new_canonical(n <span class="kw">as </span>usize);
 
-        <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Some</span>(<span class="ident">old_text</span>) , <span class="prelude-val">Some</span>(<span class="ident">new_text</span>)) <span class="op">=</span> (<span class="ident">swap_ranges</span>.<span class="ident">old_text</span>.<span class="ident">clone</span>(), <span class="ident">swap_ranges</span>.<span class="ident">new_text</span>.<span class="ident">clone</span>()) {
-            <span class="kw">if</span> <span class="ident">old_text</span>.<span class="ident">start</span> <span class="op">&lt;</span> <span class="ident">ra</span> <span class="op">&amp;&amp;</span> <span class="ident">old_text</span>.<span class="ident">end</span> <span class="op">&gt;</span> <span class="ident">ra</span> {
+        <span class="kw">if let </span>(<span class="prelude-val">Some</span>(old_text) , <span class="prelude-val">Some</span>(new_text)) = (swap_ranges.old_text.clone(), swap_ranges.new_text.clone()) {
+            <span class="kw">if </span>old_text.start &lt; ra &amp;&amp; old_text.end &gt; ra {
 
-                <span class="comment">// debug!(&quot;Match text at address {:#X}, value  = {:#X}&quot;, x , n);</span>
+                <span class="comment">// debug!(&quot;Match text at address {:#X}, value  = {:#X}&quot;, x , n);
 
-                <span class="comment">// Note : Does not use saturation add since underflow is not possible and overflow could not be caused in proper execution</span>
-                <span class="kw">let</span> <span class="ident">n_ra</span> <span class="op">=</span> <span class="ident">ra</span> <span class="op">-</span> <span class="ident">old_text</span>.<span class="ident">start</span> <span class="op">+</span> <span class="ident">new_text</span>.<span class="ident">start</span>;
-                <span class="kw">let</span> <span class="ident">p1</span> <span class="op">=</span> (<span class="ident">x</span>) <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">usize</span>;
-                <span class="kw">unsafe</span> { <span class="ident">ptr::write</span>(<span class="ident">p1</span>,<span class="ident">n_ra</span>.<span class="ident">value</span>()) };
-                <span class="comment">// For debug purposes we re-read teh value</span>
-                <span class="comment">// #[cfg(not(downtime_eval))]</span>
-                <span class="comment">// {</span>
-                <span class="comment">//     let n =  unsafe { ptr::read(p) };</span>
-                <span class="comment">//     debug!(&quot;New value at address {:#X}, value  = {:#X}&quot;, x , n);</span>
-                <span class="comment">// }</span>
-            }
+                // Note : Does not use saturation add since underflow is not possible and overflow could not be caused in proper execution
+                </span><span class="kw">let </span>n_ra = ra - old_text.start + new_text.start;
+                <span class="kw">let </span>p1 = (x) <span class="kw">as </span><span class="kw-2">*mut </span>usize;
+                <span class="kw">unsafe </span>{ ptr::write(p1,n_ra.value()) };
+                <span class="comment">// For debug purposes we re-read teh value
+                // #[cfg(not(downtime_eval))]
+                // {
+                //     let n =  unsafe { ptr::read(p) };
+                //     debug!(&quot;New value at address {:#X}, value  = {:#X}&quot;, x , n);
+                // }
+            </span>}
         }
 
-        <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Some</span>(<span class="ident">old_rodata</span>) , <span class="prelude-val">Some</span>(<span class="ident">new_rodata</span>)) <span class="op">=</span> (<span class="ident">swap_ranges</span>.<span class="ident">old_rodata</span>.<span class="ident">clone</span>(), <span class="ident">swap_ranges</span>.<span class="ident">new_rodata</span>.<span class="ident">clone</span>()) {
-            <span class="kw">if</span> <span class="ident">old_rodata</span>.<span class="ident">start</span> <span class="op">&lt;</span> <span class="ident">ra</span> <span class="op">&amp;&amp;</span> <span class="ident">old_rodata</span>.<span class="ident">end</span> <span class="op">&gt;</span> <span class="ident">ra</span> {
+        <span class="kw">if let </span>(<span class="prelude-val">Some</span>(old_rodata) , <span class="prelude-val">Some</span>(new_rodata)) = (swap_ranges.old_rodata.clone(), swap_ranges.new_rodata.clone()) {
+            <span class="kw">if </span>old_rodata.start &lt; ra &amp;&amp; old_rodata.end &gt; ra {
 
-                <span class="comment">// debug!(&quot;Match rodata at address {:#X}, value  = {:#X}&quot;, x , n);</span>
-                <span class="kw">let</span> <span class="ident">n_ra</span> <span class="op">=</span> <span class="ident">ra</span> <span class="op">-</span> <span class="ident">old_rodata</span>.<span class="ident">start</span> <span class="op">+</span> <span class="ident">new_rodata</span>.<span class="ident">start</span>;
-                <span class="kw">let</span> <span class="ident">p1</span> <span class="op">=</span> (<span class="ident">x</span>) <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">usize</span>;
-                <span class="kw">unsafe</span> { <span class="ident">ptr::write</span>(<span class="ident">p1</span>,<span class="ident">n_ra</span>.<span class="ident">value</span>()) };
+                <span class="comment">// debug!(&quot;Match rodata at address {:#X}, value  = {:#X}&quot;, x , n);
+                </span><span class="kw">let </span>n_ra = ra - old_rodata.start + new_rodata.start;
+                <span class="kw">let </span>p1 = (x) <span class="kw">as </span><span class="kw-2">*mut </span>usize;
+                <span class="kw">unsafe </span>{ ptr::write(p1,n_ra.value()) };
 
-                <span class="comment">// #[cfg(not(downtime_eval))]</span>
-                <span class="comment">// {</span>
-                <span class="comment">//     let n =  unsafe { ptr::read(p) };</span>
-                <span class="comment">//     debug!(&quot;New value at address {:#X}, value  = {:#X}&quot;, x , n);</span>
-                <span class="comment">// }</span>
-            }
+                <span class="comment">// #[cfg(not(downtime_eval))]
+                // {
+                //     let n =  unsafe { ptr::read(p) };
+                //     debug!(&quot;New value at address {:#X}, value  = {:#X}&quot;, x , n);
+                // }
+            </span>}
         }
 
-        <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Some</span>(<span class="ident">old_data</span>) , <span class="prelude-val">Some</span>(<span class="ident">new_data</span>)) <span class="op">=</span> (<span class="ident">swap_ranges</span>.<span class="ident">old_data</span>.<span class="ident">clone</span>(), <span class="ident">swap_ranges</span>.<span class="ident">new_data</span>.<span class="ident">clone</span>()) {
-            <span class="kw">if</span> <span class="ident">old_data</span>.<span class="ident">start</span> <span class="op">&lt;</span> <span class="ident">ra</span> <span class="op">&amp;&amp;</span> <span class="ident">old_data</span>.<span class="ident">end</span> <span class="op">&gt;</span> <span class="ident">ra</span> {
+        <span class="kw">if let </span>(<span class="prelude-val">Some</span>(old_data) , <span class="prelude-val">Some</span>(new_data)) = (swap_ranges.old_data.clone(), swap_ranges.new_data.clone()) {
+            <span class="kw">if </span>old_data.start &lt; ra &amp;&amp; old_data.end &gt; ra {
 
-                <span class="comment">// debug!(&quot;Match data at address {:#X}, value  = {:#X}&quot;, x , n);</span>
-                <span class="kw">let</span> <span class="ident">n_ra</span> <span class="op">=</span> <span class="ident">ra</span> <span class="op">-</span> <span class="ident">old_data</span>.<span class="ident">start</span> <span class="op">+</span> <span class="ident">new_data</span>.<span class="ident">start</span>;
-                <span class="kw">let</span> <span class="ident">p1</span> <span class="op">=</span> (<span class="ident">x</span>) <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">usize</span>;
-                <span class="kw">unsafe</span> { <span class="ident">ptr::write</span>(<span class="ident">p1</span>,<span class="ident">n_ra</span>.<span class="ident">value</span>()) };
-                <span class="comment">// #[cfg(not(downtime_eval))]</span>
-                <span class="comment">// {</span>
-                <span class="comment">//     let n =  unsafe { ptr::read(p) };</span>
-                <span class="comment">//     debug!(&quot;New value at address {:#X}, value  = {:#X}&quot;, x , n);</span>
-                <span class="comment">// }</span>
-            }
+                <span class="comment">// debug!(&quot;Match data at address {:#X}, value  = {:#X}&quot;, x , n);
+                </span><span class="kw">let </span>n_ra = ra - old_data.start + new_data.start;
+                <span class="kw">let </span>p1 = (x) <span class="kw">as </span><span class="kw-2">*mut </span>usize;
+                <span class="kw">unsafe </span>{ ptr::write(p1,n_ra.value()) };
+                <span class="comment">// #[cfg(not(downtime_eval))]
+                // {
+                //     let n =  unsafe { ptr::read(p) };
+                //     debug!(&quot;New value at address {:#X}, value  = {:#X}&quot;, x , n);
+                // }
+            </span>}
         }
 
-        <span class="ident">x</span> <span class="op">+</span><span class="op">=</span> <span class="number">8</span>;
-        <span class="kw">if</span> <span class="ident">x</span> <span class="op">&gt;</span> <span class="ident">top</span> {
+        x += <span class="number">8</span>;
+        <span class="kw">if </span>x &gt; top {
             <span class="kw">break</span>;
         }
     }
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="doccomment">/// This function calls the crate swapping routine for a corrupted crate (referred to as self swap)</span>
-<span class="doccomment">/// Swapping a crate with a new copy of object file includes following steps in high level</span>
-<span class="doccomment">/// 1) Call generic crate swapping routine with self_swap = true</span>
-<span class="doccomment">/// 2) Change the calues in the stack to the reloaded crate</span>
-<span class="doccomment">/// 3) Change any other references in the heap to the reloaded crate</span>
-<span class="doccomment">/// This function handles 1 and 2 operations and 3 is handled in the call site depending on necessity</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">self_swap_handler</span>(<span class="ident">crate_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">SwapRanges</span>, <span class="ident">String</span><span class="op">&gt;</span> {
+<span class="doccomment">/// This function calls the crate swapping routine for a corrupted crate (referred to as self swap)
+/// Swapping a crate with a new copy of object file includes following steps in high level
+/// 1) Call generic crate swapping routine with self_swap = true
+/// 2) Change the calues in the stack to the reloaded crate
+/// 3) Change any other references in the heap to the reloaded crate
+/// This function handles 1 and 2 operations and 3 is handled in the call site depending on necessity
+</span><span class="kw">pub fn </span>self_swap_handler(crate_name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;SwapRanges, String&gt; {
 
-    <span class="kw">let</span> <span class="ident">taskref</span> <span class="op">=</span> <span class="ident">task::get_my_current_task</span>()
-        .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;failed to get current task&quot;</span>))<span class="question-mark">?</span>;
+    <span class="kw">let </span>taskref = task::get_my_current_task()
+        .ok_or_else(|| <span class="macro">format!</span>(<span class="string">&quot;failed to get current task&quot;</span>))<span class="question-mark">?</span>;
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-    <span class="macro">debug!</span>(<span class="string">&quot;The taskref is {:?}&quot;</span>,<span class="ident">taskref</span>);
+    <span class="attr">#[cfg(not(downtime_eval))]
+    </span><span class="macro">debug!</span>(<span class="string">&quot;The taskref is {:?}&quot;</span>,taskref);
 
-    <span class="kw">let</span> <span class="ident">curr_dir</span> <span class="op">=</span> <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">taskref</span>.<span class="ident">get_env</span>().<span class="ident">lock</span>().<span class="ident">working_dir</span>);
+    <span class="kw">let </span>curr_dir = Arc::clone(<span class="kw-2">&amp;</span>taskref.get_env().lock().working_dir);
 
-    <span class="kw">let</span> <span class="ident">override_namespace_crate_dir</span> <span class="op">=</span> <span class="prelude-ty">Option</span>::<span class="op">&lt;</span><span class="ident">NamespaceDir</span><span class="op">&gt;</span><span class="ident">::None</span>;
+    <span class="kw">let </span>override_namespace_crate_dir = <span class="prelude-ty">Option</span>::&lt;NamespaceDir&gt;::None;
 
-    <span class="kw">let</span> <span class="ident">verbose</span> <span class="op">=</span> <span class="bool-val">false</span>;
-    <span class="kw">let</span> <span class="ident">state_transfer_functions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
+    <span class="kw">let </span>verbose = <span class="bool-val">false</span>;
+    <span class="kw">let </span>state_transfer_functions: Vec&lt;String&gt; = Vec::new();
 
-    <span class="kw">let</span> <span class="ident">tuples</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">bool</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[(<span class="ident">crate_name</span>, <span class="ident">crate_name</span> , <span class="bool-val">false</span>)];
+    <span class="kw">let </span>tuples: Vec&lt;(<span class="kw-2">&amp;</span>str, <span class="kw-2">&amp;</span>str, bool)&gt; = <span class="macro">vec!</span>[(crate_name, crate_name , <span class="bool-val">false</span>)];
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-    <span class="macro">debug!</span>(<span class="string">&quot;tuples: {:?}&quot;</span>, <span class="ident">tuples</span>);
+    <span class="attr">#[cfg(not(downtime_eval))]
+    </span><span class="macro">debug!</span>(<span class="string">&quot;tuples: {:?}&quot;</span>, tuples);
 
-    <span class="comment">// 1) Call generic crate swapping routine</span>
-    <span class="kw">let</span> <span class="ident">swap_result</span> <span class="op">=</span> <span class="ident">do_self_swap</span>(
-        <span class="ident">crate_name</span>, 
-        <span class="kw-2">&amp;</span><span class="ident">curr_dir</span>, 
-        <span class="ident">override_namespace_crate_dir</span>,
-        <span class="ident">state_transfer_functions</span>,
-        <span class="kw-2">&amp;</span><span class="ident">taskref</span>.<span class="ident">namespace</span>,
-        <span class="ident">verbose</span>
+    <span class="comment">// 1) Call generic crate swapping routine
+    </span><span class="kw">let </span>swap_result = do_self_swap(
+        crate_name, 
+        <span class="kw-2">&amp;</span>curr_dir, 
+        override_namespace_crate_dir,
+        state_transfer_functions,
+        <span class="kw-2">&amp;</span>taskref.namespace,
+        verbose
     );
 
-    <span class="kw">let</span> <span class="ident">swap_ranges</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">swap_result</span> {
-        <span class="prelude-val">Ok</span>(<span class="ident">x</span>) =&gt; {
+    <span class="kw">let </span>swap_ranges = <span class="kw">match </span>swap_result {
+        <span class="prelude-val">Ok</span>(x) =&gt; {
 
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-            <span class="macro">debug!</span>(<span class="string">&quot;Swap operation complete&quot;</span>);
-            <span class="ident">x</span>
+            <span class="attr">#[cfg(not(downtime_eval))]
+            </span><span class="macro">debug!</span>(<span class="string">&quot;Swap operation complete&quot;</span>);
+            x
         }
-        <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
+        <span class="prelude-val">Err</span>(e) =&gt; {
             <span class="macro">debug!</span>(<span class="string">&quot;SWAP FAILED at do_self_swap&quot;</span>);
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>)
+            <span class="kw">return </span><span class="prelude-val">Err</span>(e)
         }
     };
 
-    <span class="kw">for</span> (<span class="ident">_id</span>, <span class="ident">taskref</span>) <span class="kw">in</span> <span class="ident">task::TASKLIST</span>.<span class="ident">lock</span>().<span class="ident">iter</span>() {
-        <span class="kw">let</span> (<span class="ident">bottom</span>, <span class="ident">top</span>) <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">with_kstack</span>(<span class="op">|</span><span class="ident">kstack</span><span class="op">|</span> 
-            (<span class="ident">kstack</span>.<span class="ident">bottom</span>().<span class="ident">value</span>(), <span class="ident">kstack</span>.<span class="ident">top_usable</span>().<span class="ident">value</span>())
+    <span class="kw">for </span>(_id, taskref) <span class="kw">in </span>task::TASKLIST.lock().iter() {
+        <span class="kw">let </span>(bottom, top) = taskref.with_kstack(|kstack| 
+            (kstack.bottom().value(), kstack.top_usable().value())
         ); 
-        <span class="comment">// debug!(&quot;Bottom and top of stack of task {} are {:X} {:X}&quot;, taskref.name, bottom, top);</span>
+        <span class="comment">// debug!(&quot;Bottom and top of stack of task {} are {:X} {:X}&quot;, taskref.name, bottom, top);
 
-        <span class="kw">match</span> <span class="ident">constant_offset_fix</span>(<span class="kw-2">&amp;</span><span class="ident">swap_ranges</span>, <span class="ident">bottom</span>, <span class="ident">top</span>) {
-            <span class="prelude-val">Err</span> (<span class="ident">e</span>) =&gt; {
-                <span class="macro">debug!</span> {<span class="string">&quot;Failed to perform constant offset fix for the stack for task {} due to {}&quot;</span>, <span class="ident">taskref</span>.<span class="ident">name</span>, <span class="ident">e</span>.<span class="ident">to_string</span>()};
+        </span><span class="kw">match </span>constant_offset_fix(<span class="kw-2">&amp;</span>swap_ranges, bottom, top) {
+            <span class="prelude-val">Err </span>(e) =&gt; {
+                <span class="macro">debug! </span>{<span class="string">&quot;Failed to perform constant offset fix for the stack for task {} due to {}&quot;</span>, taskref.name, e.to_string()};
             },
-            <span class="kw">_</span> =&gt; {},
+            <span class="kw">_ </span>=&gt; {},
         }
     }
 
-    <span class="prelude-val">Ok</span>(<span class="ident">swap_ranges</span>)
+    <span class="prelude-val">Ok</span>(swap_ranges)
 }
 
-<span class="doccomment">/// null crate swap policy.</span>
-<span class="doccomment">/// When this policy is enabled no crate swapping is performed</span>
-<span class="kw">fn</span> <span class="ident">null_swap_policy</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
+<span class="doccomment">/// null crate swap policy.
+/// When this policy is enabled no crate swapping is performed
+</span><span class="kw">fn </span>null_swap_policy() -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-    <span class="macro">debug!</span>(<span class="string">&quot;Running null swap policy&quot;</span>);
+    <span class="attr">#[cfg(not(downtime_eval))]
+    </span><span class="macro">debug!</span>(<span class="string">&quot;Running null swap policy&quot;</span>);
 
-    <span class="comment">// We get all unhanlded faults</span>
-    <span class="kw">let</span> <span class="ident">unhandled_list</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FaultEntry</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">remove_unhandled_exceptions</span>();
+    <span class="comment">// We get all unhanlded faults
+    </span><span class="kw">let </span>unhandled_list: Vec&lt;FaultEntry&gt; = remove_unhandled_exceptions();
 
-    <span class="comment">// No unhandled faults. Nothing to do. This happens when restartable tasks get killed or </span>
-    <span class="comment">// exits without encountering a panic or an exception</span>
-    <span class="kw">if</span> <span class="ident">unhandled_list</span>.<span class="ident">is_empty</span>(){
+    <span class="comment">// No unhandled faults. Nothing to do. This happens when restartable tasks get killed or 
+    // exits without encountering a panic or an exception
+    </span><span class="kw">if </span>unhandled_list.is_empty(){
         <span class="macro">debug!</span>(<span class="string">&quot;No unhandled errors in the fault log&quot;</span>);
-        <span class="kw">return</span> <span class="prelude-val">None</span>
-    }
-    <span class="comment">// For the first fault we mark as task restarted.</span>
-    <span class="comment">// For any subsequent fault we mark them as multiple fault recovery</span>
-    <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">fe</span>) <span class="kw">in</span> <span class="ident">unhandled_list</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fe</span> <span class="op">=</span> <span class="ident">fe</span>.<span class="ident">clone</span>();
-        <span class="kw">if</span> <span class="ident">i</span> <span class="op">==</span> <span class="number">0</span> {
-            <span class="ident">fe</span>.<span class="ident">action_taken</span> <span class="op">=</span> <span class="ident">RecoveryAction::TaskRestarted</span>;
-        } <span class="kw">else</span> {
-            <span class="ident">fe</span>.<span class="ident">action_taken</span> <span class="op">=</span> <span class="ident">RecoveryAction::MultipleFaultRecovery</span>;
+        <span class="kw">return </span><span class="prelude-val">None
+    </span>}
+    <span class="comment">// For the first fault we mark as task restarted.
+    // For any subsequent fault we mark them as multiple fault recovery
+    </span><span class="kw">for </span>(i, fe) <span class="kw">in </span>unhandled_list.iter().enumerate() {
+        <span class="kw">let </span><span class="kw-2">mut </span>fe = fe.clone();
+        <span class="kw">if </span>i == <span class="number">0 </span>{
+            fe.action_taken = RecoveryAction::TaskRestarted;
+        } <span class="kw">else </span>{
+            fe.action_taken = RecoveryAction::MultipleFaultRecovery;
         }
-        <span class="ident">log_handled_fault</span>(<span class="ident">fe</span>);
+        log_handled_fault(fe);
     }
-    <span class="kw">return</span> <span class="prelude-val">None</span>
-}
+    <span class="kw">return </span><span class="prelude-val">None
+</span>}
 
-<span class="doccomment">/// simple swap policy. </span>
-<span class="doccomment">/// When this swap policy is enabled always the crate which the last fault occurs </span>
-<span class="doccomment">/// is swapped.</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">use_crate_replacement</span>)]</span>
-<span class="kw">fn</span> <span class="ident">simple_swap_policy</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
+<span class="doccomment">/// simple swap policy. 
+/// When this swap policy is enabled always the crate which the last fault occurs 
+/// is swapped.
+</span><span class="attr">#[cfg(use_crate_replacement)]
+</span><span class="kw">fn </span>simple_swap_policy() -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-    <span class="macro">debug!</span>(<span class="string">&quot;Running simple swap policy&quot;</span>);
+    <span class="attr">#[cfg(not(downtime_eval))]
+    </span><span class="macro">debug!</span>(<span class="string">&quot;Running simple swap policy&quot;</span>);
 
-    <span class="comment">// We get all unhanlded faults</span>
-    <span class="kw">let</span> <span class="ident">unhandled_list</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FaultEntry</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">remove_unhandled_exceptions</span>();
-    <span class="kw">if</span> <span class="ident">unhandled_list</span>.<span class="ident">is_empty</span>(){
+    <span class="comment">// We get all unhanlded faults
+    </span><span class="kw">let </span>unhandled_list: Vec&lt;FaultEntry&gt; = remove_unhandled_exceptions();
+    <span class="kw">if </span>unhandled_list.is_empty(){
         <span class="macro">debug!</span>(<span class="string">&quot;No unhandled errors in the fault log&quot;</span>);
-        <span class="kw">return</span> <span class="prelude-val">None</span>
-    }
+        <span class="kw">return </span><span class="prelude-val">None
+    </span>}
 
-    <span class="comment">// For the first fault we take action.</span>
-    <span class="comment">// For any subsequent fault we mark them as multiple fault recovery</span>
-    <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">fe</span>) <span class="kw">in</span> <span class="ident">unhandled_list</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fe</span> <span class="op">=</span> <span class="ident">fe</span>.<span class="ident">clone</span>();
-        <span class="kw">if</span> <span class="ident">i</span> <span class="op">==</span> <span class="number">0</span> {
-            <span class="kw">let</span> <span class="ident">crate_to_swap</span> <span class="op">=</span> <span class="ident">unhandled_list</span>[<span class="number">0</span>].<span class="ident">crate_error_occured</span>.<span class="ident">clone</span>();
+    <span class="comment">// For the first fault we take action.
+    // For any subsequent fault we mark them as multiple fault recovery
+    </span><span class="kw">for </span>(i, fe) <span class="kw">in </span>unhandled_list.iter().enumerate() {
+        <span class="kw">let </span><span class="kw-2">mut </span>fe = fe.clone();
+        <span class="kw">if </span>i == <span class="number">0 </span>{
+            <span class="kw">let </span>crate_to_swap = unhandled_list[<span class="number">0</span>].crate_error_occured.clone();
 
-            <span class="comment">// If the crate fault occured is not logged we can only restart</span>
-            <span class="kw">if</span> <span class="ident">crate_to_swap</span>.<span class="ident">is_none</span>() {
+            <span class="comment">// If the crate fault occured is not logged we can only restart
+            </span><span class="kw">if </span>crate_to_swap.is_none() {
                 <span class="macro">debug!</span>(<span class="string">&quot;No information on where the first failure occured&quot;</span>);
-                <span class="ident">fe</span>.<span class="ident">action_taken</span> <span class="op">=</span> <span class="ident">RecoveryAction::TaskRestarted</span>;
-            } <span class="kw">else</span> {
-                <span class="comment">// If the crate is logged we mark that as replaced crate</span>
-                <span class="ident">fe</span>.<span class="ident">action_taken</span> <span class="op">=</span> <span class="ident">RecoveryAction::FaultCrateReplaced</span>;
-                <span class="ident">fe</span>.<span class="ident">replaced_crates</span>.<span class="ident">push</span>(<span class="ident">crate_to_swap</span>.<span class="ident">unwrap</span>().<span class="ident">clone</span>());
+                fe.action_taken = RecoveryAction::TaskRestarted;
+            } <span class="kw">else </span>{
+                <span class="comment">// If the crate is logged we mark that as replaced crate
+                </span>fe.action_taken = RecoveryAction::FaultCrateReplaced;
+                fe.replaced_crates.push(crate_to_swap.unwrap().clone());
             }
 
-        } <span class="kw">else</span> {
-            <span class="ident">fe</span>.<span class="ident">action_taken</span> <span class="op">=</span> <span class="ident">RecoveryAction::MultipleFaultRecovery</span>;
+        } <span class="kw">else </span>{
+            fe.action_taken = RecoveryAction::MultipleFaultRecovery;
         }
-        <span class="ident">log_handled_fault</span>(<span class="ident">fe</span>);
+        log_handled_fault(fe);
     }
 
-    <span class="kw">let</span> <span class="ident">crate_to_swap</span> <span class="op">=</span> <span class="ident">unhandled_list</span>[<span class="number">0</span>].<span class="ident">crate_error_occured</span>.<span class="ident">clone</span>();
+    <span class="kw">let </span>crate_to_swap = unhandled_list[<span class="number">0</span>].crate_error_occured.clone();
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-    <span class="macro">debug!</span>(<span class="string">&quot;Repalce : {:?}&quot;</span>,<span class="ident">crate_to_swap</span>);
+    <span class="attr">#[cfg(not(downtime_eval))]
+    </span><span class="macro">debug!</span>(<span class="string">&quot;Repalce : {:?}&quot;</span>,crate_to_swap);
 
-    <span class="ident">crate_to_swap</span>
+    crate_to_swap
 }
 
-<span class="doccomment">/// slightly advanced swap policy. </span>
-<span class="doccomment">/// When this policy is enabled the following actions are taken in order to the number of time same fault is detected. </span>
-<span class="doccomment">/// 1) Restart the task</span>
-<span class="doccomment">/// 2) Replace the crate fault is detected</span>
-<span class="doccomment">/// 3) Replace the application crate</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">use_crate_replacement</span>)]</span>
-<span class="kw">fn</span> <span class="ident">iterative_swap_policy</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
+<span class="doccomment">/// slightly advanced swap policy. 
+/// When this policy is enabled the following actions are taken in order to the number of time same fault is detected. 
+/// 1) Restart the task
+/// 2) Replace the crate fault is detected
+/// 3) Replace the application crate
+</span><span class="attr">#[cfg(use_crate_replacement)]
+</span><span class="kw">fn </span>iterative_swap_policy() -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-    <span class="macro">debug!</span>(<span class="string">&quot;Running iterative swap policy&quot;</span>);
+    <span class="attr">#[cfg(not(downtime_eval))]
+    </span><span class="macro">debug!</span>(<span class="string">&quot;Running iterative swap policy&quot;</span>);
 
-    <span class="comment">// We get all unhanlded faults</span>
-    <span class="kw">let</span> <span class="ident">unhandled_list</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FaultEntry</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">remove_unhandled_exceptions</span>();
-    <span class="kw">if</span> <span class="ident">unhandled_list</span>.<span class="ident">is_empty</span>(){
+    <span class="comment">// We get all unhanlded faults
+    </span><span class="kw">let </span>unhandled_list: Vec&lt;FaultEntry&gt; = remove_unhandled_exceptions();
+    <span class="kw">if </span>unhandled_list.is_empty(){
         <span class="macro">debug!</span>(<span class="string">&quot;No unhandled errors in the fault log&quot;</span>);
-        <span class="kw">return</span> <span class="prelude-val">None</span>
-    }
+        <span class="kw">return </span><span class="prelude-val">None
+    </span>}
     
     
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">crate_to_swap</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>crate_to_swap = <span class="prelude-val">None</span>;
 
-    <span class="comment">// For the first fault we take action.</span>
-    <span class="comment">// For any subsequent fault we mark them as multiple fault recovery</span>
-    <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">fe</span>) <span class="kw">in</span> <span class="ident">unhandled_list</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fe</span> <span class="op">=</span> <span class="ident">fe</span>.<span class="ident">clone</span>();
-        <span class="kw">if</span> <span class="ident">i</span> <span class="op">==</span> <span class="number">0</span> {
+    <span class="comment">// For the first fault we take action.
+    // For any subsequent fault we mark them as multiple fault recovery
+    </span><span class="kw">for </span>(i, fe) <span class="kw">in </span>unhandled_list.iter().enumerate() {
+        <span class="kw">let </span><span class="kw-2">mut </span>fe = fe.clone();
+        <span class="kw">if </span>i == <span class="number">0 </span>{
 
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">error_crate</span>) <span class="op">=</span> <span class="ident">unhandled_list</span>[<span class="number">0</span>].<span class="ident">crate_error_occured</span>.<span class="ident">clone</span>() {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(error_crate) = unhandled_list[<span class="number">0</span>].crate_error_occured.clone() {
 
-                <span class="kw">let</span> <span class="ident">error_crate_name</span> <span class="op">=</span> <span class="ident">error_crate</span>.<span class="ident">clone</span>();
-                <span class="kw">let</span> <span class="ident">error_crate_name_simple</span> <span class="op">=</span> <span class="ident">error_crate_name</span>.<span class="ident">split</span>(<span class="string">&quot;-&quot;</span>).<span class="ident">next</span>().<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="ident">error_crate_name</span>);
+                <span class="kw">let </span>error_crate_name = error_crate.clone();
+                <span class="kw">let </span>error_crate_name_simple = error_crate_name.split(<span class="string">&quot;-&quot;</span>).next().unwrap_or(<span class="kw-2">&amp;</span>error_crate_name);
 
-                <span class="comment">// We check whether the fault is logged previously</span>
-                <span class="kw">let</span> <span class="ident">fe_last_fault</span> <span class="op">=</span> <span class="ident">fault_log::get_the_most_recent_match</span>(<span class="ident">error_crate_name_simple</span>);
-                <span class="kw">match</span> <span class="ident">fe_last_fault</span> {
+                <span class="comment">// We check whether the fault is logged previously
+                </span><span class="kw">let </span>fe_last_fault = fault_log::get_the_most_recent_match(error_crate_name_simple);
+                <span class="kw">match </span>fe_last_fault {
 
-                    <span class="comment">// If the fault is logged we check the action taken and then take the next drastic action.</span>
-                    <span class="prelude-val">Some</span>(<span class="ident">fault_entry</span>) =&gt; {
-                        <span class="kw">if</span> <span class="ident">fault_entry</span>.<span class="ident">action_taken</span> <span class="op">==</span> <span class="ident">RecoveryAction::FaultCrateReplaced</span> {
-                            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">app_crate</span>) <span class="op">=</span> <span class="ident">fault_entry</span>.<span class="ident">running_app_crate</span> {
-                                <span class="comment">// last action : 2  -&gt; Next action : 3</span>
-                                <span class="ident">crate_to_swap</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">app_crate</span>.<span class="ident">clone</span>());
-                                <span class="ident">fe</span>.<span class="ident">action_taken</span> <span class="op">=</span> <span class="ident">RecoveryAction::IterativelyCrateReplaced</span>;
-                                <span class="ident">fe</span>.<span class="ident">replaced_crates</span>.<span class="ident">push</span>(<span class="ident">app_crate</span>.<span class="ident">clone</span>());
-                            } <span class="kw">else</span> {
-                                <span class="comment">// last action : 2 -&gt; Next action : 2 due to insufficient details</span>
-                                <span class="ident">crate_to_swap</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">error_crate</span>.<span class="ident">clone</span>());
-                                <span class="ident">fe</span>.<span class="ident">action_taken</span> <span class="op">=</span> <span class="ident">RecoveryAction::FaultCrateReplaced</span>;
-                                <span class="ident">fe</span>.<span class="ident">replaced_crates</span>.<span class="ident">push</span>(<span class="ident">error_crate</span>.<span class="ident">clone</span>());
+                    <span class="comment">// If the fault is logged we check the action taken and then take the next drastic action.
+                    </span><span class="prelude-val">Some</span>(fault_entry) =&gt; {
+                        <span class="kw">if </span>fault_entry.action_taken == RecoveryAction::FaultCrateReplaced {
+                            <span class="kw">if let </span><span class="prelude-val">Some</span>(app_crate) = fault_entry.running_app_crate {
+                                <span class="comment">// last action : 2  -&gt; Next action : 3
+                                </span>crate_to_swap = <span class="prelude-val">Some</span>(app_crate.clone());
+                                fe.action_taken = RecoveryAction::IterativelyCrateReplaced;
+                                fe.replaced_crates.push(app_crate.clone());
+                            } <span class="kw">else </span>{
+                                <span class="comment">// last action : 2 -&gt; Next action : 2 due to insufficient details
+                                </span>crate_to_swap = <span class="prelude-val">Some</span>(error_crate.clone());
+                                fe.action_taken = RecoveryAction::FaultCrateReplaced;
+                                fe.replaced_crates.push(error_crate.clone());
                             }
-                        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">fault_entry</span>.<span class="ident">action_taken</span> <span class="op">==</span> <span class="ident">RecoveryAction::TaskRestarted</span> <span class="op">|</span><span class="op">|</span> <span class="ident">fault_entry</span>.<span class="ident">action_taken</span> <span class="op">==</span> <span class="ident">RecoveryAction::MultipleFaultRecovery</span> {
-                            <span class="comment">// last action : 1  -&gt; Next action : 2</span>
-                            <span class="ident">crate_to_swap</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">error_crate</span>.<span class="ident">clone</span>());
-                            <span class="ident">fe</span>.<span class="ident">action_taken</span> <span class="op">=</span> <span class="ident">RecoveryAction::FaultCrateReplaced</span>;
-                            <span class="ident">fe</span>.<span class="ident">replaced_crates</span>.<span class="ident">push</span>(<span class="ident">error_crate</span>.<span class="ident">clone</span>());
-                        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">fault_entry</span>.<span class="ident">action_taken</span> <span class="op">==</span> <span class="ident">RecoveryAction::None</span> {
-                            <span class="comment">// last action : None  -&gt; Next action : 1</span>
-                            <span class="ident">crate_to_swap</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-                            <span class="ident">fe</span>.<span class="ident">action_taken</span> <span class="op">=</span> <span class="ident">RecoveryAction::TaskRestarted</span>;
-                        } <span class="kw">else</span> {
-                            <span class="comment">// We have exhausted all our fault tolerance stages. So we just reuse stage 2 </span>
-                            <span class="ident">crate_to_swap</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">error_crate</span>.<span class="ident">clone</span>());
-                            <span class="ident">fe</span>.<span class="ident">action_taken</span> <span class="op">=</span> <span class="ident">RecoveryAction::FaultCrateReplaced</span>;
-                            <span class="ident">fe</span>.<span class="ident">replaced_crates</span>.<span class="ident">push</span>(<span class="ident">error_crate</span>.<span class="ident">clone</span>());
+                        } <span class="kw">else if </span>fault_entry.action_taken == RecoveryAction::TaskRestarted || fault_entry.action_taken == RecoveryAction::MultipleFaultRecovery {
+                            <span class="comment">// last action : 1  -&gt; Next action : 2
+                            </span>crate_to_swap = <span class="prelude-val">Some</span>(error_crate.clone());
+                            fe.action_taken = RecoveryAction::FaultCrateReplaced;
+                            fe.replaced_crates.push(error_crate.clone());
+                        } <span class="kw">else if </span>fault_entry.action_taken == RecoveryAction::None {
+                            <span class="comment">// last action : None  -&gt; Next action : 1
+                            </span>crate_to_swap = <span class="prelude-val">None</span>;
+                            fe.action_taken = RecoveryAction::TaskRestarted;
+                        } <span class="kw">else </span>{
+                            <span class="comment">// We have exhausted all our fault tolerance stages. So we just reuse stage 2 
+                            </span>crate_to_swap = <span class="prelude-val">Some</span>(error_crate.clone());
+                            fe.action_taken = RecoveryAction::FaultCrateReplaced;
+                            fe.replaced_crates.push(error_crate.clone());
                         }
                     }
 
-                    <span class="comment">// If the fault is not logged we start from step 1</span>
-                    <span class="prelude-val">None</span> =&gt; {
-                        <span class="ident">crate_to_swap</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-                        <span class="ident">fe</span>.<span class="ident">action_taken</span> <span class="op">=</span> <span class="ident">RecoveryAction::TaskRestarted</span>;
+                    <span class="comment">// If the fault is not logged we start from step 1
+                    </span><span class="prelude-val">None </span>=&gt; {
+                        crate_to_swap = <span class="prelude-val">None</span>;
+                        fe.action_taken = RecoveryAction::TaskRestarted;
                     }
                 }
-            } <span class="kw">else</span> {
-                <span class="comment">// If the crate fault occured is not logged we can only restart</span>
-                <span class="macro">debug!</span>(<span class="string">&quot;No information on where the first failure occured&quot;</span>);
-                <span class="ident">fe</span>.<span class="ident">action_taken</span> <span class="op">=</span> <span class="ident">RecoveryAction::TaskRestarted</span>;
+            } <span class="kw">else </span>{
+                <span class="comment">// If the crate fault occured is not logged we can only restart
+                </span><span class="macro">debug!</span>(<span class="string">&quot;No information on where the first failure occured&quot;</span>);
+                fe.action_taken = RecoveryAction::TaskRestarted;
             }
-        } <span class="kw">else</span> {
-            <span class="ident">fe</span>.<span class="ident">action_taken</span> <span class="op">=</span> <span class="ident">RecoveryAction::MultipleFaultRecovery</span>;
+        } <span class="kw">else </span>{
+            fe.action_taken = RecoveryAction::MultipleFaultRecovery;
         }
-        <span class="ident">log_handled_fault</span>(<span class="ident">fe</span>);
+        log_handled_fault(fe);
     }
 
-    <span class="macro">debug!</span>(<span class="string">&quot;Repalce : {:?}&quot;</span>,<span class="ident">crate_to_swap</span>);
+    <span class="macro">debug!</span>(<span class="string">&quot;Repalce : {:?}&quot;</span>,crate_to_swap);
 
-    <span class="ident">crate_to_swap</span>
+    crate_to_swap
 }
 
-<span class="doccomment">/// This function returns the name of the crate to replace if required. </span>
-<span class="doccomment">/// Returns none if no crate is needed to be replaced. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_crate_to_swap</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
+<span class="doccomment">/// This function returns the name of the crate to replace if required. 
+/// Returns none if no crate is needed to be replaced. 
+</span><span class="kw">pub fn </span>get_crate_to_swap() -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">use_crate_replacement</span>))]</span>
-    {
-        <span class="kw">return</span> <span class="ident">null_swap_policy</span>();
+    <span class="attr">#[cfg(not(use_crate_replacement))]
+    </span>{
+        <span class="kw">return </span>null_swap_policy();
     }
 
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">use_crate_replacement</span>)]</span>
-    {
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">use_iterative_replacement</span>))]</span>
-        <span class="kw">return</span> <span class="ident">simple_swap_policy</span>();
+    <span class="attr">#[cfg(use_crate_replacement)]
+    </span>{
+        <span class="attr">#[cfg(not(use_iterative_replacement))]
+        </span><span class="kw">return </span>simple_swap_policy();
 
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">use_iterative_replacement</span>)]</span>
-        <span class="kw">return</span> <span class="ident">iterative_swap_policy</span>() ;
+        <span class="attr">#[cfg(use_iterative_replacement)]
+        </span><span class="kw">return </span>iterative_swap_policy() ;
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="fault_crate_swap" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="fault_crate_swap" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

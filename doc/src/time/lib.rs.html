@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/time/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../time/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../time/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../time/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/time/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../time/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -324,326 +318,325 @@
 <span id="318">318</span>
 <span id="319">319</span>
 <span id="320">320</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This crate contains abstractions to interact with hardware clocks.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate contains abstractions to interact with hardware clocks.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">mod</span> <span class="ident">dummy</span>;
+</span><span class="kw">mod </span>dummy;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">core::time::Duration</span>;
+<span class="kw">pub use </span>core::time::Duration;
 
-<span class="kw">use</span> <span class="ident">core::sync::atomic</span>::{<span class="ident">AtomicU64</span>, <span class="ident">Ordering</span>};
-<span class="kw">use</span> <span class="ident">crossbeam_utils::atomic::AtomicCell</span>;
+<span class="kw">use </span>core::sync::atomic::{AtomicU64, Ordering};
+<span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
 
-<span class="kw">static</span> <span class="ident">EARLY_SLEEP_FUNCTION</span>: <span class="ident">AtomicCell</span><span class="op">&lt;</span><span class="kw">fn</span>(<span class="ident">Duration</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicCell::new</span>(<span class="ident">dummy::early_sleep</span>);
-<span class="kw">static</span> <span class="ident">EARLY_SLEEPER_FREQUENCY</span>: <span class="ident">AtomicU64</span> <span class="op">=</span> <span class="ident">AtomicU64::new</span>(<span class="number">0</span>);
+<span class="kw">static </span>EARLY_SLEEP_FUNCTION: AtomicCell&lt;<span class="kw">fn</span>(Duration)&gt; = AtomicCell::new(dummy::early_sleep);
+<span class="kw">static </span>EARLY_SLEEPER_FREQUENCY: AtomicU64 = AtomicU64::new(<span class="number">0</span>);
 
-<span class="kw">static</span> <span class="ident">MONOTONIC_NOW_FUNCTION</span>: <span class="ident">AtomicCell</span><span class="op">&lt;</span><span class="kw">fn</span>() -&gt; <span class="ident">Instant</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicCell::new</span>(<span class="ident">dummy::monotonic_now</span>);
-<span class="kw">static</span> <span class="ident">INSTANT_TO_DURATION_FUNCTION</span>: <span class="ident">AtomicCell</span><span class="op">&lt;</span><span class="kw">fn</span>(<span class="ident">Instant</span>) -&gt; <span class="ident">Duration</span><span class="op">&gt;</span> <span class="op">=</span>
-    <span class="ident">AtomicCell::new</span>(<span class="ident">dummy::instant_to_duration</span>);
-<span class="kw">static</span> <span class="ident">DURATION_TO_INSTANT_FUNCTION</span>: <span class="ident">AtomicCell</span><span class="op">&lt;</span><span class="kw">fn</span>(<span class="ident">Duration</span>) -&gt; <span class="ident">Instant</span><span class="op">&gt;</span> <span class="op">=</span>
-    <span class="ident">AtomicCell::new</span>(<span class="ident">dummy::duration_to_instant</span>);
-<span class="kw">static</span> <span class="ident">MONOTONIC_FREQUENCY</span>: <span class="ident">AtomicU64</span> <span class="op">=</span> <span class="ident">AtomicU64::new</span>(<span class="number">0</span>);
+<span class="kw">static </span>MONOTONIC_NOW_FUNCTION: AtomicCell&lt;<span class="kw">fn</span>() -&gt; Instant&gt; = AtomicCell::new(dummy::monotonic_now);
+<span class="kw">static </span>INSTANT_TO_DURATION_FUNCTION: AtomicCell&lt;<span class="kw">fn</span>(Instant) -&gt; Duration&gt; =
+    AtomicCell::new(dummy::instant_to_duration);
+<span class="kw">static </span>DURATION_TO_INSTANT_FUNCTION: AtomicCell&lt;<span class="kw">fn</span>(Duration) -&gt; Instant&gt; =
+    AtomicCell::new(dummy::duration_to_instant);
+<span class="kw">static </span>MONOTONIC_FREQUENCY: AtomicU64 = AtomicU64::new(<span class="number">0</span>);
 
-<span class="kw">static</span> <span class="ident">WALL_TIME_NOW_FUNCTION</span>: <span class="ident">AtomicCell</span><span class="op">&lt;</span><span class="kw">fn</span>() -&gt; <span class="ident">Duration</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicCell::new</span>(<span class="ident">dummy::wall_time_now</span>);
-<span class="kw">static</span> <span class="ident">WALL_TIME_FREQUENCY</span>: <span class="ident">AtomicU64</span> <span class="op">=</span> <span class="ident">AtomicU64::new</span>(<span class="number">0</span>);
+<span class="kw">static </span>WALL_TIME_NOW_FUNCTION: AtomicCell&lt;<span class="kw">fn</span>() -&gt; Duration&gt; = AtomicCell::new(dummy::wall_time_now);
+<span class="kw">static </span>WALL_TIME_FREQUENCY: AtomicU64 = AtomicU64::new(<span class="number">0</span>);
 
-<span class="kw">fn</span> <span class="ident">duration_to_instant</span>(<span class="ident">duration</span>: <span class="ident">Duration</span>) -&gt; <span class="ident">Instant</span> {
-    <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">DURATION_TO_INSTANT_FUNCTION</span>.<span class="ident">load</span>();
-    <span class="ident">f</span>(<span class="ident">duration</span>)
+<span class="kw">fn </span>duration_to_instant(duration: Duration) -&gt; Instant {
+    <span class="kw">let </span>f = DURATION_TO_INSTANT_FUNCTION.load();
+    f(duration)
 }
 
-<span class="kw">fn</span> <span class="ident">instant_to_duration</span>(<span class="ident">instant</span>: <span class="ident">Instant</span>) -&gt; <span class="ident">Duration</span> {
-    <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">INSTANT_TO_DURATION_FUNCTION</span>.<span class="ident">load</span>();
-    <span class="ident">f</span>(<span class="ident">instant</span>)
+<span class="kw">fn </span>instant_to_duration(instant: Instant) -&gt; Duration {
+    <span class="kw">let </span>f = INSTANT_TO_DURATION_FUNCTION.load();
+    f(instant)
 }
 
-<span class="doccomment">/// A measurement of a monotonically nondecreasing clock.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The inner value usually represents the internal counter value but the type</span>
-<span class="doccomment">/// is intentionally opaque and only useful with [`Duration`].</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>, <span class="ident">Ord</span>, <span class="ident">PartialEq</span>, <span class="ident">PartialOrd</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Instant</span> {
-    <span class="ident">counter</span>: <span class="ident">u64</span>,
+<span class="doccomment">/// A measurement of a monotonically nondecreasing clock.
+///
+/// The inner value usually represents the internal counter value but the type
+/// is intentionally opaque and only useful with [`Duration`].
+</span><span class="attr">#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+</span><span class="kw">pub struct </span>Instant {
+    counter: u64,
 }
 
-<span class="kw">impl</span> <span class="ident">Instant</span> {
-    <span class="kw">const</span> <span class="ident">ZERO</span>: <span class="self">Self</span> <span class="op">=</span> <span class="self">Self</span> { <span class="ident">counter</span>: <span class="number">0</span> };
+<span class="kw">impl </span>Instant {
+    <span class="kw">const </span>ZERO: <span class="self">Self </span>= <span class="self">Self </span>{ counter: <span class="number">0 </span>};
 
-    <span class="doccomment">/// Returns the amout of time elapsed from another instant to this one, or</span>
-    <span class="doccomment">/// zero duration if that instant is later than this one.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">duration_since</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">earlier</span>: <span class="self">Self</span>) -&gt; <span class="ident">Duration</span> {
-        <span class="kw">let</span> <span class="ident">instant</span> <span class="op">=</span> <span class="ident">Instant</span> {
-            <span class="ident">counter</span>: <span class="kw">match</span> <span class="self">self</span>.<span class="ident">counter</span>.<span class="ident">checked_sub</span>(<span class="ident">earlier</span>.<span class="ident">counter</span>) {
-                <span class="prelude-val">Some</span>(<span class="ident">value</span>) =&gt; <span class="ident">value</span>,
-                <span class="prelude-val">None</span> =&gt; <span class="kw">return</span> <span class="ident">Duration::ZERO</span>,
+    <span class="doccomment">/// Returns the amout of time elapsed from another instant to this one, or
+    /// zero duration if that instant is later than this one.
+    </span><span class="kw">pub fn </span>duration_since(<span class="kw-2">&amp;</span><span class="self">self</span>, earlier: <span class="self">Self</span>) -&gt; Duration {
+        <span class="kw">let </span>instant = Instant {
+            counter: <span class="kw">match </span><span class="self">self</span>.counter.checked_sub(earlier.counter) {
+                <span class="prelude-val">Some</span>(value) =&gt; value,
+                <span class="prelude-val">None </span>=&gt; <span class="kw">return </span>Duration::ZERO,
             },
         };
-        <span class="ident">instant_to_duration</span>(<span class="ident">instant</span>)
+        instant_to_duration(instant)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">checked_duraction_since</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">earlier</span>: <span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Duration</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">instant</span> <span class="op">=</span> <span class="ident">Instant</span> {
-            <span class="ident">counter</span>: <span class="self">self</span>.<span class="ident">counter</span>.<span class="ident">checked_sub</span>(<span class="ident">earlier</span>.<span class="ident">counter</span>)<span class="question-mark">?</span>,
+    <span class="kw">pub fn </span>checked_duraction_since(<span class="kw-2">&amp;</span><span class="self">self</span>, earlier: <span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Duration&gt; {
+        <span class="kw">let </span>instant = Instant {
+            counter: <span class="self">self</span>.counter.checked_sub(earlier.counter)<span class="question-mark">?</span>,
         };
-        <span class="prelude-val">Some</span>(<span class="ident">instant_to_duration</span>(<span class="ident">instant</span>))
+        <span class="prelude-val">Some</span>(instant_to_duration(instant))
     }
 }
 
-<span class="kw">impl</span> <span class="ident">core::ops::Add</span><span class="op">&lt;</span><span class="ident">Duration</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Instant</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="self">Self</span>;
+<span class="kw">impl </span>core::ops::Add&lt;Duration&gt; <span class="kw">for </span>Instant {
+    <span class="kw">type </span>Output = <span class="self">Self</span>;
 
-    <span class="kw">fn</span> <span class="ident">add</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="ident">Duration</span>) -&gt; <span class="ident"><span class="self">Self</span>::Output</span> {
-        <span class="kw">let</span> <span class="ident">instant</span> <span class="op">=</span> <span class="ident">duration_to_instant</span>(<span class="ident">rhs</span>);
-        <span class="self">Self</span> {
-            <span class="ident">counter</span>: <span class="self">self</span>
-                .<span class="ident">counter</span>
-                .<span class="ident">checked_add</span>(<span class="ident">instant</span>.<span class="ident">counter</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;overflow when adding duration to instant&quot;</span>),
+    <span class="kw">fn </span>add(<span class="self">self</span>, rhs: Duration) -&gt; <span class="self">Self</span>::Output {
+        <span class="kw">let </span>instant = duration_to_instant(rhs);
+        <span class="self">Self </span>{
+            counter: <span class="self">self
+                </span>.counter
+                .checked_add(instant.counter)
+                .expect(<span class="string">&quot;overflow when adding duration to instant&quot;</span>),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">core::ops::Sub</span><span class="op">&lt;</span><span class="ident">Duration</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Instant</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="self">Self</span>;
+<span class="kw">impl </span>core::ops::Sub&lt;Duration&gt; <span class="kw">for </span>Instant {
+    <span class="kw">type </span>Output = <span class="self">Self</span>;
 
-    <span class="kw">fn</span> <span class="ident">sub</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="ident">Duration</span>) -&gt; <span class="ident"><span class="self">Self</span>::Output</span> {
-        <span class="kw">let</span> <span class="ident">instant</span> <span class="op">=</span> <span class="ident">duration_to_instant</span>(<span class="ident">rhs</span>);
-        <span class="self">Self</span> {
-            <span class="ident">counter</span>: <span class="self">self</span>
-                .<span class="ident">counter</span>
-                .<span class="ident">checked_sub</span>(<span class="ident">instant</span>.<span class="ident">counter</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;overflow when subtracting duration from instant&quot;</span>),
+    <span class="kw">fn </span>sub(<span class="self">self</span>, rhs: Duration) -&gt; <span class="self">Self</span>::Output {
+        <span class="kw">let </span>instant = duration_to_instant(rhs);
+        <span class="self">Self </span>{
+            counter: <span class="self">self
+                </span>.counter
+                .checked_sub(instant.counter)
+                .expect(<span class="string">&quot;overflow when subtracting duration from instant&quot;</span>),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">core::ops::Sub</span><span class="op">&lt;</span><span class="ident">Instant</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Instant</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">Duration</span>;
+<span class="kw">impl </span>core::ops::Sub&lt;Instant&gt; <span class="kw">for </span>Instant {
+    <span class="kw">type </span>Output = Duration;
 
-    <span class="kw">fn</span> <span class="ident">sub</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="ident">Instant</span>) -&gt; <span class="ident"><span class="self">Self</span>::Output</span> {
-        <span class="self">self</span>.<span class="ident">duration_since</span>(<span class="ident">rhs</span>)
+    <span class="kw">fn </span>sub(<span class="self">self</span>, rhs: Instant) -&gt; <span class="self">Self</span>::Output {
+        <span class="self">self</span>.duration_since(rhs)
     }
 }
 
-<span class="doccomment">/// A clock frequency.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">Ord</span>, <span class="ident">PartialEq</span>, <span class="ident">PartialOrd</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Frequency</span>(<span class="ident">u64</span>);
+<span class="doccomment">/// A clock frequency.
+</span><span class="attr">#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+</span><span class="kw">pub struct </span>Frequency(u64);
 
-<span class="kw">impl</span> <span class="ident">Frequency</span> {
-    <span class="doccomment">/// Creates a new frequency with the specified hertz.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">frequency</span>: <span class="ident">u64</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">frequency</span>)
+<span class="kw">impl </span>Frequency {
+    <span class="doccomment">/// Creates a new frequency with the specified hertz.
+    </span><span class="kw">pub fn </span>new(frequency: u64) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(frequency)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Frequency</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">u64</span> {
-    <span class="doccomment">/// Returns the frequency in hertz.</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">f</span>: <span class="ident">Frequency</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">f</span>.<span class="number">0</span>
+<span class="kw">impl </span>From&lt;Frequency&gt; <span class="kw">for </span>u64 {
+    <span class="doccomment">/// Returns the frequency in hertz.
+    </span><span class="kw">fn </span>from(f: Frequency) -&gt; <span class="self">Self </span>{
+        f.<span class="number">0
+    </span>}
+}
+
+<span class="kw">impl </span>From&lt;u64&gt; <span class="kw">for </span>Frequency {
+    <span class="doccomment">/// Creates a new frequency with the specified hertz.
+    </span><span class="kw">fn </span>from(f: u64) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(f)
     }
 }
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Frequency</span> {
-    <span class="doccomment">/// Creates a new frequency with the specified hertz.</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">f</span>: <span class="ident">u64</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">f</span>)
-    }
-}
-
-<span class="doccomment">/// Register the clock source that can be used to sleep when interrupts are</span>
-<span class="doccomment">/// disabled.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The current early sleeper will only be overwritten by `T` if `frequency` is</span>
-<span class="doccomment">/// larger than the frequency of the current early sleeper.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Returns whether the early sleeper was overwritten.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_early_sleeper</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">frequency</span>: <span class="ident">Frequency</span>) -&gt; <span class="ident">bool</span>
-<span class="kw">where</span>
-    <span class="ident">T</span>: <span class="ident">EarlySleeper</span>,
+<span class="doccomment">/// Register the clock source that can be used to sleep when interrupts are
+/// disabled.
+///
+/// The current early sleeper will only be overwritten by `T` if `frequency` is
+/// larger than the frequency of the current early sleeper.
+///
+/// Returns whether the early sleeper was overwritten.
+</span><span class="kw">pub fn </span>register_early_sleeper&lt;T&gt;(frequency: Frequency) -&gt; bool
+<span class="kw">where
+    </span>T: EarlySleeper,
 {
-    <span class="kw">let</span> <span class="ident">old_frequency</span> <span class="op">=</span> <span class="ident">EARLY_SLEEPER_FREQUENCY</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
-    <span class="kw">if</span> <span class="ident">frequency</span> <span class="op">&gt;</span> <span class="ident">Frequency::new</span>(<span class="ident">old_frequency</span>) {
-        <span class="ident">EARLY_SLEEP_FUNCTION</span>.<span class="ident">store</span>(<span class="ident">T::sleep</span>);
-        <span class="ident">EARLY_SLEEPER_FREQUENCY</span>.<span class="ident">store</span>(<span class="ident">frequency</span>.<span class="ident">into</span>(), <span class="ident">Ordering::SeqCst</span>);
-        <span class="bool-val">true</span>
-    } <span class="kw">else</span> {
-        <span class="bool-val">false</span>
-    }
+    <span class="kw">let </span>old_frequency = EARLY_SLEEPER_FREQUENCY.load(Ordering::SeqCst);
+    <span class="kw">if </span>frequency &gt; Frequency::new(old_frequency) {
+        EARLY_SLEEP_FUNCTION.store(T::sleep);
+        EARLY_SLEEPER_FREQUENCY.store(frequency.into(), Ordering::SeqCst);
+        <span class="bool-val">true
+    </span>} <span class="kw">else </span>{
+        <span class="bool-val">false
+    </span>}
 }
 
-<span class="doccomment">/// Wait for the given `duration`.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This function spins the current task rather than sleeping it and so, when</span>
-<span class="doccomment">/// possible, the `sleep` crate should be used. However, unlike the `sleep`</span>
-<span class="doccomment">/// crate, this function doesn&#39;t rely on interrupts.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This function must not be called prior to registering an early sleeper using</span>
-<span class="doccomment">/// [`register_early_sleeper`].</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">early_sleep</span>(<span class="ident">duration</span>: <span class="ident">Duration</span>) {
-    <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">EARLY_SLEEP_FUNCTION</span>.<span class="ident">load</span>();
-    <span class="ident">f</span>(<span class="ident">duration</span>)
+<span class="doccomment">/// Wait for the given `duration`.
+///
+/// This function spins the current task rather than sleeping it and so, when
+/// possible, the `sleep` crate should be used. However, unlike the `sleep`
+/// crate, this function doesn&#39;t rely on interrupts.
+///
+/// This function must not be called prior to registering an early sleeper using
+/// [`register_early_sleeper`].
+</span><span class="kw">pub fn </span>early_sleep(duration: Duration) {
+    <span class="kw">let </span>f = EARLY_SLEEP_FUNCTION.load();
+    f(duration)
 }
 
-<span class="doccomment">/// Register a clock source.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The provided source will overwrite the previous source only if `frequency`</span>
-<span class="doccomment">/// is larger than that of the previous source.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Returns whether the previous source was overwritten.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_clock_source</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">frequency</span>: <span class="ident">Frequency</span>) -&gt; <span class="ident">bool</span>
-<span class="kw">where</span>
-    <span class="ident">T</span>: <span class="ident">ClockSource</span>,
+<span class="doccomment">/// Register a clock source.
+///
+/// The provided source will overwrite the previous source only if `frequency`
+/// is larger than that of the previous source.
+///
+/// Returns whether the previous source was overwritten.
+</span><span class="kw">pub fn </span>register_clock_source&lt;T&gt;(frequency: Frequency) -&gt; bool
+<span class="kw">where
+    </span>T: ClockSource,
 {
-    <span class="kw">let</span> <span class="ident">old_frequency</span> <span class="op">=</span> <span class="ident">Frequency::new</span>(<span class="ident">T::ClockType::frequency_atomic</span>().<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>));
-    <span class="kw">if</span> <span class="ident">frequency</span> <span class="op">&gt;</span> <span class="ident">old_frequency</span> {
-        <span class="kw">let</span> <span class="ident">now_fn</span> <span class="op">=</span> <span class="ident">T::ClockType::now_fn</span>();
-        <span class="ident">now_fn</span>.<span class="ident">store</span>(<span class="ident">T::now</span>);
+    <span class="kw">let </span>old_frequency = Frequency::new(T::ClockType::frequency_atomic().load(Ordering::SeqCst));
+    <span class="kw">if </span>frequency &gt; old_frequency {
+        <span class="kw">let </span>now_fn = T::ClockType::now_fn();
+        now_fn.store(T::now);
 
-        <span class="ident">T::ClockType::store_unit_to_duration_func</span>(<span class="ident">T::unit_to_duration</span>);
-        <span class="ident">T::ClockType::store_duration_to_unit_func</span>(<span class="ident">T::duration_to_unit</span>);
+        T::ClockType::store_unit_to_duration_func(T::unit_to_duration);
+        T::ClockType::store_duration_to_unit_func(T::duration_to_unit);
 
-        <span class="ident">T::ClockType::frequency_atomic</span>().<span class="ident">store</span>(<span class="ident">frequency</span>.<span class="ident">into</span>(), <span class="ident">Ordering::SeqCst</span>);
+        T::ClockType::frequency_atomic().store(frequency.into(), Ordering::SeqCst);
 
-        <span class="bool-val">true</span>
-    } <span class="kw">else</span> {
-        <span class="bool-val">false</span>
-    }
+        <span class="bool-val">true
+    </span>} <span class="kw">else </span>{
+        <span class="bool-val">false
+    </span>}
 }
 
-<span class="doccomment">/// Returns the current time.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Monotonic clocks return an [`Instant`] whereas wall time clocks return a</span>
-<span class="doccomment">/// [`Duration`] signifying the time since 12:00am January 1st 1970 (i.e. Unix</span>
-<span class="doccomment">/// time).</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This function must not be called prior to registering a clock source of the</span>
-<span class="doccomment">/// specified type using [`register_clock_source`].</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">now</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>() -&gt; <span class="ident">T::Unit</span>
-<span class="kw">where</span>
-    <span class="ident">T</span>: <span class="ident">ClockType</span>,
+<span class="doccomment">/// Returns the current time.
+///
+/// Monotonic clocks return an [`Instant`] whereas wall time clocks return a
+/// [`Duration`] signifying the time since 12:00am January 1st 1970 (i.e. Unix
+/// time).
+///
+/// This function must not be called prior to registering a clock source of the
+/// specified type using [`register_clock_source`].
+</span><span class="kw">pub fn </span>now&lt;T&gt;() -&gt; T::Unit
+<span class="kw">where
+    </span>T: ClockType,
 {
-    <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">T::now_fn</span>().<span class="ident">load</span>();
-    <span class="ident">f</span>()
+    <span class="kw">let </span>f = T::now_fn().load();
+    f()
 }
 
-<span class="doccomment">/// A clock source.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ClockSource</span> {
-    <span class="doccomment">/// The type of clock (either [`Monotonic`] or [`WallTime`]).</span>
-    <span class="kw">type</span> <span class="ident">ClockType</span>: <span class="ident">ClockType</span>;
+<span class="doccomment">/// A clock source.
+</span><span class="kw">pub trait </span>ClockSource {
+    <span class="doccomment">/// The type of clock (either [`Monotonic`] or [`WallTime`]).
+    </span><span class="kw">type </span>ClockType: ClockType;
 
-    <span class="doccomment">/// The current time according to the clock.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Monotonic clocks return an [`Instant`] whereas wall time clocks return a</span>
-    <span class="doccomment">/// [`Duration`] signifying the time since 12:00am January 1st 1970 (i.e.</span>
-    <span class="doccomment">/// Unix time).</span>
-    <span class="kw">fn</span> <span class="ident">now</span>() -&gt; <span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::ClockType</span> <span class="kw">as</span> <span class="ident">ClockType</span><span class="op">&gt;</span><span class="ident">::Unit</span>;
+    <span class="doccomment">/// The current time according to the clock.
+    ///
+    /// Monotonic clocks return an [`Instant`] whereas wall time clocks return a
+    /// [`Duration`] signifying the time since 12:00am January 1st 1970 (i.e.
+    /// Unix time).
+    </span><span class="kw">fn </span>now() -&gt; &lt;<span class="self">Self</span>::ClockType <span class="kw">as </span>ClockType&gt;::Unit;
 
-    <span class="doccomment">/// Converts a [`ClockType::Unit`] into a [`Duration`].</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Monotonic clocks should just return the [`ClockType::Unit`].</span>
-    <span class="kw">fn</span> <span class="ident">unit_to_duration</span>(<span class="ident">unit</span>: <span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::ClockType</span> <span class="kw">as</span> <span class="ident">ClockType</span><span class="op">&gt;</span><span class="ident">::Unit</span>) -&gt; <span class="ident">Duration</span>;
+    <span class="doccomment">/// Converts a [`ClockType::Unit`] into a [`Duration`].
+    ///
+    /// Monotonic clocks should just return the [`ClockType::Unit`].
+    </span><span class="kw">fn </span>unit_to_duration(unit: &lt;<span class="self">Self</span>::ClockType <span class="kw">as </span>ClockType&gt;::Unit) -&gt; Duration;
 
-    <span class="doccomment">/// Converts a [`Duration`] into a [`ClockType::Unit`].</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Monotonic clocks should just return the [`Duration`].</span>
-    <span class="kw">fn</span> <span class="ident">duration_to_unit</span>(<span class="ident">duration</span>: <span class="ident">Duration</span>) -&gt; <span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::ClockType</span> <span class="kw">as</span> <span class="ident">ClockType</span><span class="op">&gt;</span><span class="ident">::Unit</span>;
+    <span class="doccomment">/// Converts a [`Duration`] into a [`ClockType::Unit`].
+    ///
+    /// Monotonic clocks should just return the [`Duration`].
+    </span><span class="kw">fn </span>duration_to_unit(duration: Duration) -&gt; &lt;<span class="self">Self</span>::ClockType <span class="kw">as </span>ClockType&gt;::Unit;
 }
 
-<span class="doccomment">/// A hardware clock that can sleep without relying on interrupts.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">EarlySleeper</span>: <span class="ident">ClockSource</span><span class="op">&lt;</span><span class="ident">ClockType</span> <span class="op">=</span> <span class="ident">Monotonic</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Wait for the given `duration`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This function spins the current task rather than sleeping it and so,</span>
-    <span class="doccomment">/// when possible, the `sleep` crate should be used.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// However, unlike the `sleep` crate, this function doesn&#39;t rely on</span>
-    <span class="doccomment">/// interrupts, and can be used prior to the scheduler being initiated.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Note to Implementors</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The default implementation of this function uses [`ClockSource::now`] -</span>
-    <span class="doccomment">/// it can only be used if [`ClockSource::now`] doesn&#39;t rely on</span>
-    <span class="doccomment">/// interrupts.</span>
-    <span class="kw">fn</span> <span class="ident">sleep</span>(<span class="ident">duration</span>: <span class="ident">Duration</span>) {
-        <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::now</span>();
-        <span class="kw">while</span> <span class="ident"><span class="self">Self</span>::now</span>() <span class="op">&lt;</span> <span class="ident">start</span> <span class="op">+</span> <span class="ident">duration</span> {}
-    }
-}
-
-<span class="doccomment">/// Either a [`Monotonic`] or [`WallTime`] clock.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This trait is sealed and so cannot be implemented outside of this crate.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ClockType</span>: <span class="ident">private::Sealed</span> {
-    <span class="doccomment">/// The type returned by the [`now`] function.</span>
-    <span class="kw">type</span> <span class="ident">Unit</span>: <span class="lifetime">&#39;static</span>;
-
-    <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">now_fn</span>() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">AtomicCell</span><span class="op">&lt;</span><span class="kw">fn</span>() -&gt; <span class="ident"><span class="self">Self</span>::Unit</span><span class="op">&gt;</span>;
-    <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">frequency_atomic</span>() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">AtomicU64</span>;
-
-    <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">store_unit_to_duration_func</span>(<span class="ident">f</span>: <span class="kw">fn</span>(<span class="ident"><span class="self">Self</span>::Unit</span>) -&gt; <span class="ident">Duration</span>);
-    <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">store_duration_to_unit_func</span>(<span class="ident">f</span>: <span class="kw">fn</span>(<span class="ident">Duration</span>) -&gt; <span class="ident"><span class="self">Self</span>::Unit</span>);
-}
-
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Monotonic</span>;
-
-<span class="kw">impl</span> <span class="ident">private::Sealed</span> <span class="kw">for</span> <span class="ident">Monotonic</span> {}
-
-<span class="kw">impl</span> <span class="ident">ClockType</span> <span class="kw">for</span> <span class="ident">Monotonic</span> {
-    <span class="kw">type</span> <span class="ident">Unit</span> <span class="op">=</span> <span class="ident">Instant</span>;
-
-    <span class="kw">fn</span> <span class="ident">now_fn</span>() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">AtomicCell</span><span class="op">&lt;</span><span class="kw">fn</span>() -&gt; <span class="ident"><span class="self">Self</span>::Unit</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="ident">MONOTONIC_NOW_FUNCTION</span>
-    }
-
-    <span class="kw">fn</span> <span class="ident">frequency_atomic</span>() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">AtomicU64</span> {
-        <span class="kw-2">&amp;</span><span class="ident">MONOTONIC_FREQUENCY</span>
-    }
-
-    <span class="kw">fn</span> <span class="ident">store_unit_to_duration_func</span>(<span class="ident">f</span>: <span class="kw">fn</span>(<span class="ident"><span class="self">Self</span>::Unit</span>) -&gt; <span class="ident">Duration</span>) {
-        <span class="ident">INSTANT_TO_DURATION_FUNCTION</span>.<span class="ident">store</span>(<span class="ident">f</span>);
-    }
-
-    <span class="kw">fn</span> <span class="ident">store_duration_to_unit_func</span>(<span class="ident">f</span>: <span class="kw">fn</span>(<span class="ident">Duration</span>) -&gt; <span class="ident"><span class="self">Self</span>::Unit</span>) {
-        <span class="ident">DURATION_TO_INSTANT_FUNCTION</span>.<span class="ident">store</span>(<span class="ident">f</span>);
+<span class="doccomment">/// A hardware clock that can sleep without relying on interrupts.
+</span><span class="kw">pub trait </span>EarlySleeper: ClockSource&lt;ClockType = Monotonic&gt; {
+    <span class="doccomment">/// Wait for the given `duration`.
+    ///
+    /// This function spins the current task rather than sleeping it and so,
+    /// when possible, the `sleep` crate should be used.
+    ///
+    /// However, unlike the `sleep` crate, this function doesn&#39;t rely on
+    /// interrupts, and can be used prior to the scheduler being initiated.
+    ///
+    /// # Note to Implementors
+    ///
+    /// The default implementation of this function uses [`ClockSource::now`] -
+    /// it can only be used if [`ClockSource::now`] doesn&#39;t rely on
+    /// interrupts.
+    </span><span class="kw">fn </span>sleep(duration: Duration) {
+        <span class="kw">let </span>start = <span class="self">Self</span>::now();
+        <span class="kw">while </span><span class="self">Self</span>::now() &lt; start + duration {}
     }
 }
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WallTime</span>;
+<span class="doccomment">/// Either a [`Monotonic`] or [`WallTime`] clock.
+///
+/// This trait is sealed and so cannot be implemented outside of this crate.
+</span><span class="kw">pub trait </span>ClockType: private::Sealed {
+    <span class="doccomment">/// The type returned by the [`now`] function.
+    </span><span class="kw">type </span>Unit: <span class="lifetime">&#39;static</span>;
 
-<span class="kw">impl</span> <span class="ident">private::Sealed</span> <span class="kw">for</span> <span class="ident">WallTime</span> {}
+    <span class="attr">#[doc(hidden)]
+    </span><span class="kw">fn </span>now_fn() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicCell&lt;<span class="kw">fn</span>() -&gt; <span class="self">Self</span>::Unit&gt;;
+    <span class="attr">#[doc(hidden)]
+    </span><span class="kw">fn </span>frequency_atomic() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicU64;
 
-<span class="kw">impl</span> <span class="ident">ClockType</span> <span class="kw">for</span> <span class="ident">WallTime</span> {
-    <span class="kw">type</span> <span class="ident">Unit</span> <span class="op">=</span> <span class="ident">Duration</span>;
+    <span class="attr">#[doc(hidden)]
+    </span><span class="kw">fn </span>store_unit_to_duration_func(f: <span class="kw">fn</span>(<span class="self">Self</span>::Unit) -&gt; Duration);
+    <span class="attr">#[doc(hidden)]
+    </span><span class="kw">fn </span>store_duration_to_unit_func(f: <span class="kw">fn</span>(Duration) -&gt; <span class="self">Self</span>::Unit);
+}
 
-    <span class="kw">fn</span> <span class="ident">now_fn</span>() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">AtomicCell</span><span class="op">&lt;</span><span class="kw">fn</span>() -&gt; <span class="ident"><span class="self">Self</span>::Unit</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="ident">WALL_TIME_NOW_FUNCTION</span>
+<span class="kw">pub struct </span>Monotonic;
+
+<span class="kw">impl </span>private::Sealed <span class="kw">for </span>Monotonic {}
+
+<span class="kw">impl </span>ClockType <span class="kw">for </span>Monotonic {
+    <span class="kw">type </span>Unit = Instant;
+
+    <span class="kw">fn </span>now_fn() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicCell&lt;<span class="kw">fn</span>() -&gt; <span class="self">Self</span>::Unit&gt; {
+        <span class="kw-2">&amp;</span>MONOTONIC_NOW_FUNCTION
     }
 
-    <span class="kw">fn</span> <span class="ident">frequency_atomic</span>() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">AtomicU64</span> {
-        <span class="kw-2">&amp;</span><span class="ident">WALL_TIME_FREQUENCY</span>
+    <span class="kw">fn </span>frequency_atomic() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicU64 {
+        <span class="kw-2">&amp;</span>MONOTONIC_FREQUENCY
     }
 
-    <span class="kw">fn</span> <span class="ident">store_unit_to_duration_func</span>(<span class="kw">_</span>: <span class="kw">fn</span>(<span class="ident"><span class="self">Self</span>::Unit</span>) -&gt; <span class="ident">Duration</span>) {
-        <span class="comment">// We intentionally don&#39;t store the function for wall time clocks.</span>
+    <span class="kw">fn </span>store_unit_to_duration_func(f: <span class="kw">fn</span>(<span class="self">Self</span>::Unit) -&gt; Duration) {
+        INSTANT_TO_DURATION_FUNCTION.store(f);
     }
 
-    <span class="kw">fn</span> <span class="ident">store_duration_to_unit_func</span>(<span class="kw">_</span>: <span class="kw">fn</span>(<span class="ident">Duration</span>) -&gt; <span class="ident"><span class="self">Self</span>::Unit</span>) {
-        <span class="comment">// We intentionally don&#39;t store the function for wall time clocks.</span>
+    <span class="kw">fn </span>store_duration_to_unit_func(f: <span class="kw">fn</span>(Duration) -&gt; <span class="self">Self</span>::Unit) {
+        DURATION_TO_INSTANT_FUNCTION.store(f);
     }
 }
 
-<span class="kw">mod</span> <span class="ident">private</span> {
-    <span class="doccomment">/// This trait is a supertrait of [`Clocktype`](super::ClockType).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Since it&#39;s in a private module, it can&#39;t be implemented by types outside</span>
-    <span class="doccomment">/// this crate and thus neither can [`Clocktype`](super::ClockType).</span>
-    <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Sealed</span> {}
+<span class="kw">pub struct </span>WallTime;
+
+<span class="kw">impl </span>private::Sealed <span class="kw">for </span>WallTime {}
+
+<span class="kw">impl </span>ClockType <span class="kw">for </span>WallTime {
+    <span class="kw">type </span>Unit = Duration;
+
+    <span class="kw">fn </span>now_fn() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicCell&lt;<span class="kw">fn</span>() -&gt; <span class="self">Self</span>::Unit&gt; {
+        <span class="kw-2">&amp;</span>WALL_TIME_NOW_FUNCTION
+    }
+
+    <span class="kw">fn </span>frequency_atomic() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicU64 {
+        <span class="kw-2">&amp;</span>WALL_TIME_FREQUENCY
+    }
+
+    <span class="kw">fn </span>store_unit_to_duration_func(<span class="kw">_</span>: <span class="kw">fn</span>(<span class="self">Self</span>::Unit) -&gt; Duration) {
+        <span class="comment">// We intentionally don&#39;t store the function for wall time clocks.
+    </span>}
+
+    <span class="kw">fn </span>store_duration_to_unit_func(<span class="kw">_</span>: <span class="kw">fn</span>(Duration) -&gt; <span class="self">Self</span>::Unit) {
+        <span class="comment">// We intentionally don&#39;t store the function for wall time clocks.
+    </span>}
+}
+
+<span class="kw">mod </span>private {
+    <span class="doccomment">/// This trait is a supertrait of [`Clocktype`](super::ClockType).
+    ///
+    /// Since it&#39;s in a private module, it can&#39;t be implemented by types outside
+    /// this crate and thus neither can [`Clocktype`](super::ClockType).
+    </span><span class="kw">pub trait </span>Sealed {}
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="time" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="time" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

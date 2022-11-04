@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/wasi_interpreter/src/wasi_definitions.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>wasi_definitions.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../wasi_interpreter/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../wasi_interpreter/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../wasi_interpreter/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/wasi_interpreter/src/wasi_definitions.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>wasi_definitions.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../wasi_interpreter/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -237,239 +231,238 @@
 <span id="231">231</span>
 <span id="232">232</span>
 <span id="233">233</span>
-</pre><pre class="rust"><code><span class="doccomment">//! WASI system call, signature, and permission definitions as well as mappings.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This module contains the following:</span>
-<span class="doccomment">//! * Macros for easily defining wasmi function signatures.</span>
-<span class="doccomment">//! * SystemCall enum type consisting of supported system calls.</span>
-<span class="doccomment">//! * Mapping from system call string to SystemCall type.</span>
-<span class="doccomment">//! * Mapping between system call number and SystemCall type.</span>
-<span class="doccomment">//! * Mapping from SystemCall type to wasmi signature.</span>
-<span class="doccomment">//! * Definitions of WASI rights for full file and directory permissions.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Signature macro from tomaka/redshirt:</span>
-<span class="doccomment">//! &lt;https://github.com/tomaka/redshirt/blob/4df506f68821353a7fd67bb94c4223df6b683e1b/kernel/core/src/primitives.rs&gt;</span>
-<span class="doccomment">//!</span>
+</pre><pre class="rust"><code><span class="doccomment">//! WASI system call, signature, and permission definitions as well as mappings.
+//!
+//! This module contains the following:
+//! * Macros for easily defining wasmi function signatures.
+//! * SystemCall enum type consisting of supported system calls.
+//! * Mapping from system call string to SystemCall type.
+//! * Mapping between system call number and SystemCall type.
+//! * Mapping from SystemCall type to wasmi signature.
+//! * Definitions of WASI rights for full file and directory permissions.
+//!
+//! Signature macro from tomaka/redshirt:
+//! &lt;https://github.com/tomaka/redshirt/blob/4df506f68821353a7fd67bb94c4223df6b683e1b/kernel/core/src/primitives.rs&gt;
+//!
 
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">core::convert::TryFrom</span>;
-<span class="kw">use</span> <span class="ident">core::str::FromStr</span>;
-<span class="kw">use</span> <span class="ident">wasmi</span>::{<span class="ident">Signature</span>, <span class="ident">ValueType</span>};
+</span><span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>core::convert::TryFrom;
+<span class="kw">use </span>core::str::FromStr;
+<span class="kw">use </span>wasmi::{Signature, ValueType};
 
-<span class="doccomment">/// Generates wasmi function signature.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `params`: function signature argument types.</span>
-<span class="doccomment">/// * `ret_ty`: function signature return type.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Return</span>
-<span class="doccomment">/// Returns requested wasmi signature.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_signature</span>(
-    <span class="ident">params</span>: <span class="kw">impl</span> <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">ValueType</span><span class="op">&gt;</span>,
-    <span class="ident">ret_ty</span>: <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ValueType</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-) -&gt; <span class="ident">Signature</span> {
-    <span class="ident">wasmi::Signature::new</span>(
-        <span class="ident">params</span>.<span class="ident">map</span>(<span class="ident">wasmi::ValueType::from</span>).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>(),
-        <span class="ident">ret_ty</span>.<span class="ident">into</span>().<span class="ident">map</span>(<span class="ident">wasmi::ValueType::from</span>),
+<span class="doccomment">/// Generates wasmi function signature.
+///
+/// # Arguments
+/// * `params`: function signature argument types.
+/// * `ret_ty`: function signature return type.
+///
+/// # Return
+/// Returns requested wasmi signature.
+</span><span class="kw">pub fn </span>get_signature(
+    params: <span class="kw">impl </span>Iterator&lt;Item = ValueType&gt;,
+    ret_ty: <span class="kw">impl </span>Into&lt;<span class="prelude-ty">Option</span>&lt;ValueType&gt;&gt;,
+) -&gt; Signature {
+    wasmi::Signature::new(
+        params.map(wasmi::ValueType::from).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;(),
+        ret_ty.into().map(wasmi::ValueType::from),
     )
 }
 
-<span class="doccomment">/// Macro to efficiently generate wasmi function signature.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Usage examples:</span>
-<span class="doccomment">///     sig!((I32))</span>
-<span class="doccomment">///     sig!((I32, I32)-&gt;I32)</span>
-<span class="doccomment">///</span>
-<span class="attribute">#[<span class="ident">macro_export</span>]</span>
-<span class="macro">macro_rules!</span> <span class="ident">sig</span> {
-    (($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">p</span>:<span class="ident">ident</span>),<span class="kw-2">*</span>)) =&gt; {{
-        <span class="kw">let</span> <span class="ident">params</span> <span class="op">=</span> <span class="ident">core::iter::empty</span>();
-        $(<span class="kw">let</span> <span class="ident">params</span> <span class="op">=</span> <span class="ident">params</span>.<span class="ident">chain</span>(<span class="ident">core::iter::once</span>(<span class="ident">ValueType</span>::<span class="macro-nonterminal">$</span><span class="macro-nonterminal">p</span>));)<span class="op">*</span>
-        <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::wasi_definitions::get_signature</span>(<span class="ident">params</span>, <span class="prelude-val">None</span>)
+<span class="doccomment">/// Macro to efficiently generate wasmi function signature.
+///
+/// Usage examples:
+///     sig!((I32))
+///     sig!((I32, I32)-&gt;I32)
+///
+</span><span class="attr">#[macro_export]
+</span><span class="macro">macro_rules! </span>sig {
+    (($(<span class="macro-nonterminal">$p</span>:ident),<span class="kw-2">*</span>)) =&gt; {{
+        <span class="kw">let </span>params = core::iter::empty();
+        $(<span class="kw">let </span>params = params.chain(core::iter::once(ValueType::<span class="macro-nonterminal">$p</span>));)*
+        <span class="macro-nonterminal">$crate::wasi_definitions::get_signature</span>(params, <span class="prelude-val">None</span>)
     }};
-    (($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">p</span>:<span class="ident">ident</span>),<span class="kw-2">*</span>) -&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ret</span>:<span class="ident">ident</span>) =&gt; {{
-        <span class="kw">let</span> <span class="ident">params</span> <span class="op">=</span> <span class="ident">core::iter::empty</span>();
-        $(<span class="kw">let</span> <span class="ident">params</span> <span class="op">=</span> <span class="ident">params</span>.<span class="ident">chain</span>(<span class="ident">core::iter::once</span>(<span class="ident">ValueType</span>::<span class="macro-nonterminal">$</span><span class="macro-nonterminal">p</span>));)<span class="op">*</span>
-        <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::wasi_definitions::get_signature</span>(<span class="ident">params</span>, <span class="prelude-val">Some</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::ValueType</span>::<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ret</span>))
+    (($(<span class="macro-nonterminal">$p</span>:ident),<span class="kw-2">*</span>) -&gt; <span class="macro-nonterminal">$ret</span>:ident) =&gt; {{
+        <span class="kw">let </span>params = core::iter::empty();
+        $(<span class="kw">let </span>params = params.chain(core::iter::once(ValueType::<span class="macro-nonterminal">$p</span>));)*
+        <span class="macro-nonterminal">$crate::wasi_definitions::get_signature</span>(params, <span class="prelude-val">Some</span>(<span class="macro-nonterminal">$crate::ValueType</span>::<span class="macro-nonterminal">$ret</span>))
     }};
 }
 
-<span class="doccomment">/// WASI system calls that are currently supported.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">SystemCall</span> {
-    <span class="ident">ProcExit</span>,
-    <span class="ident">FdClose</span>,
-    <span class="ident">FdWrite</span>,
-    <span class="ident">FdSeek</span>,
-    <span class="ident">FdRead</span>,
-    <span class="ident">FdFdstatGet</span>,
-    <span class="ident">EnvironSizesGet</span>,
-    <span class="ident">EnvironGet</span>,
-    <span class="ident">FdPrestatGet</span>,
-    <span class="ident">FdPrestatDirName</span>,
-    <span class="ident">PathOpen</span>,
-    <span class="ident">FdFdstatSetFlags</span>,
-    <span class="ident">ArgsSizesGet</span>,
-    <span class="ident">ArgsGet</span>,
-    <span class="ident">ClockTimeGet</span>,
+<span class="doccomment">/// WASI system calls that are currently supported.
+</span><span class="attr">#[derive(Copy, Clone, Debug)]
+</span><span class="kw">pub enum </span>SystemCall {
+    ProcExit,
+    FdClose,
+    FdWrite,
+    FdSeek,
+    FdRead,
+    FdFdstatGet,
+    EnvironSizesGet,
+    EnvironGet,
+    FdPrestatGet,
+    FdPrestatDirName,
+    PathOpen,
+    FdFdstatSetFlags,
+    ArgsSizesGet,
+    ArgsGet,
+    ClockTimeGet,
 }
 
-<span class="kw">impl</span> <span class="ident">FromStr</span> <span class="kw">for</span> <span class="ident">SystemCall</span> {
-    <span class="kw">type</span> <span class="prelude-val">Err</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>;
+<span class="kw">impl </span>FromStr <span class="kw">for </span>SystemCall {
+    <span class="kw">type </span><span class="prelude-val">Err </span>= <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str;
 
-    <span class="doccomment">/// Get SystemCall type from imported function name string.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments:</span>
-    <span class="doccomment">/// * `fn_name`: system call string representation.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// Returns SystemCall enum corresponding to given system call string.</span>
-    <span class="kw">fn</span> <span class="ident">from_str</span>(<span class="ident">fn_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Err</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="ident">fn_name</span> {
-            <span class="string">&quot;proc_exit&quot;</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::ProcExit</span>),
-            <span class="string">&quot;fd_close&quot;</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::FdClose</span>),
-            <span class="string">&quot;fd_write&quot;</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::FdWrite</span>),
-            <span class="string">&quot;fd_seek&quot;</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::FdSeek</span>),
-            <span class="string">&quot;fd_read&quot;</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::FdRead</span>),
-            <span class="string">&quot;fd_fdstat_get&quot;</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::FdFdstatGet</span>),
-            <span class="string">&quot;environ_sizes_get&quot;</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::EnvironSizesGet</span>),
-            <span class="string">&quot;environ_get&quot;</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::EnvironGet</span>),
-            <span class="string">&quot;fd_prestat_get&quot;</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::FdPrestatGet</span>),
-            <span class="string">&quot;fd_prestat_dir_name&quot;</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::FdPrestatDirName</span>),
-            <span class="string">&quot;path_open&quot;</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::PathOpen</span>),
-            <span class="string">&quot;fd_fdstat_set_flags&quot;</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::FdFdstatSetFlags</span>),
-            <span class="string">&quot;args_sizes_get&quot;</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::ArgsSizesGet</span>),
-            <span class="string">&quot;args_get&quot;</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::ArgsGet</span>),
-            <span class="string">&quot;clock_time_get&quot;</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::ClockTimeGet</span>),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;Unknown WASI system call.&quot;</span>),
+    <span class="doccomment">/// Get SystemCall type from imported function name string.
+    ///
+    /// # Arguments:
+    /// * `fn_name`: system call string representation.
+    ///
+    /// # Return
+    /// Returns SystemCall enum corresponding to given system call string.
+    </span><span class="kw">fn </span>from_str(fn_name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Err&gt; {
+        <span class="kw">match </span>fn_name {
+            <span class="string">&quot;proc_exit&quot; </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::ProcExit),
+            <span class="string">&quot;fd_close&quot; </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::FdClose),
+            <span class="string">&quot;fd_write&quot; </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::FdWrite),
+            <span class="string">&quot;fd_seek&quot; </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::FdSeek),
+            <span class="string">&quot;fd_read&quot; </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::FdRead),
+            <span class="string">&quot;fd_fdstat_get&quot; </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::FdFdstatGet),
+            <span class="string">&quot;environ_sizes_get&quot; </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::EnvironSizesGet),
+            <span class="string">&quot;environ_get&quot; </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::EnvironGet),
+            <span class="string">&quot;fd_prestat_get&quot; </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::FdPrestatGet),
+            <span class="string">&quot;fd_prestat_dir_name&quot; </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::FdPrestatDirName),
+            <span class="string">&quot;path_open&quot; </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::PathOpen),
+            <span class="string">&quot;fd_fdstat_set_flags&quot; </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::FdFdstatSetFlags),
+            <span class="string">&quot;args_sizes_get&quot; </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::ArgsSizesGet),
+            <span class="string">&quot;args_get&quot; </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::ArgsGet),
+            <span class="string">&quot;clock_time_get&quot; </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::ClockTimeGet),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;Unknown WASI system call.&quot;</span>),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">SystemCall</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>;
+<span class="kw">impl </span>TryFrom&lt;usize&gt; <span class="kw">for </span>SystemCall {
+    <span class="kw">type </span>Error = <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str;
 
-    <span class="doccomment">/// Get SystemCall type from system call number.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments:</span>
-    <span class="doccomment">/// * `syscall_index`: system call number.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// Returns SystemCall enum corresponding to given system call number.</span>
-    <span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">syscall_index</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="ident">syscall_index</span> {
-            <span class="number">0</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::ProcExit</span>),
-            <span class="number">1</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::FdClose</span>),
-            <span class="number">2</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::FdWrite</span>),
-            <span class="number">3</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::FdSeek</span>),
-            <span class="number">4</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::FdRead</span>),
-            <span class="number">5</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::FdFdstatGet</span>),
-            <span class="number">6</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::EnvironSizesGet</span>),
-            <span class="number">7</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::EnvironGet</span>),
-            <span class="number">8</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::FdPrestatGet</span>),
-            <span class="number">9</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::FdPrestatDirName</span>),
-            <span class="number">10</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::PathOpen</span>),
-            <span class="number">11</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::FdFdstatSetFlags</span>),
-            <span class="number">12</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::ArgsSizesGet</span>),
-            <span class="number">13</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::ArgsGet</span>),
-            <span class="number">14</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">SystemCall::ClockTimeGet</span>),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;Unknown WASI system call.&quot;</span>),
+    <span class="doccomment">/// Get SystemCall type from system call number.
+    ///
+    /// # Arguments:
+    /// * `syscall_index`: system call number.
+    ///
+    /// # Return
+    /// Returns SystemCall enum corresponding to given system call number.
+    </span><span class="kw">fn </span>try_from(syscall_index: usize) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        <span class="kw">match </span>syscall_index {
+            <span class="number">0 </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::ProcExit),
+            <span class="number">1 </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::FdClose),
+            <span class="number">2 </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::FdWrite),
+            <span class="number">3 </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::FdSeek),
+            <span class="number">4 </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::FdRead),
+            <span class="number">5 </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::FdFdstatGet),
+            <span class="number">6 </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::EnvironSizesGet),
+            <span class="number">7 </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::EnvironGet),
+            <span class="number">8 </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::FdPrestatGet),
+            <span class="number">9 </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::FdPrestatDirName),
+            <span class="number">10 </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::PathOpen),
+            <span class="number">11 </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::FdFdstatSetFlags),
+            <span class="number">12 </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::ArgsSizesGet),
+            <span class="number">13 </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::ArgsGet),
+            <span class="number">14 </span>=&gt; <span class="prelude-val">Ok</span>(SystemCall::ClockTimeGet),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;Unknown WASI system call.&quot;</span>),
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">SystemCall</span> {
-    <span class="doccomment">/// Get system call number from this SystemCall enum.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// Returns system call number of this SystemCall enum.</span>
-    <span class="kw">fn</span> <span class="ident">into</span>(<span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">SystemCall::ProcExit</span> =&gt; <span class="number">0</span>,
-            <span class="ident">SystemCall::FdClose</span> =&gt; <span class="number">1</span>,
-            <span class="ident">SystemCall::FdWrite</span> =&gt; <span class="number">2</span>,
-            <span class="ident">SystemCall::FdSeek</span> =&gt; <span class="number">3</span>,
-            <span class="ident">SystemCall::FdRead</span> =&gt; <span class="number">4</span>,
-            <span class="ident">SystemCall::FdFdstatGet</span> =&gt; <span class="number">5</span>,
-            <span class="ident">SystemCall::EnvironSizesGet</span> =&gt; <span class="number">6</span>,
-            <span class="ident">SystemCall::EnvironGet</span> =&gt; <span class="number">7</span>,
-            <span class="ident">SystemCall::FdPrestatGet</span> =&gt; <span class="number">8</span>,
-            <span class="ident">SystemCall::FdPrestatDirName</span> =&gt; <span class="number">9</span>,
-            <span class="ident">SystemCall::PathOpen</span> =&gt; <span class="number">10</span>,
-            <span class="ident">SystemCall::FdFdstatSetFlags</span> =&gt; <span class="number">11</span>,
-            <span class="ident">SystemCall::ArgsSizesGet</span> =&gt; <span class="number">12</span>,
-            <span class="ident">SystemCall::ArgsGet</span> =&gt; <span class="number">13</span>,
-            <span class="ident">SystemCall::ClockTimeGet</span> =&gt; <span class="number">14</span>,
+<span class="kw">impl </span>Into&lt;usize&gt; <span class="kw">for </span>SystemCall {
+    <span class="doccomment">/// Get system call number from this SystemCall enum.
+    ///
+    /// # Return
+    /// Returns system call number of this SystemCall enum.
+    </span><span class="kw">fn </span>into(<span class="self">self</span>) -&gt; usize {
+        <span class="kw">match </span><span class="self">self </span>{
+            SystemCall::ProcExit =&gt; <span class="number">0</span>,
+            SystemCall::FdClose =&gt; <span class="number">1</span>,
+            SystemCall::FdWrite =&gt; <span class="number">2</span>,
+            SystemCall::FdSeek =&gt; <span class="number">3</span>,
+            SystemCall::FdRead =&gt; <span class="number">4</span>,
+            SystemCall::FdFdstatGet =&gt; <span class="number">5</span>,
+            SystemCall::EnvironSizesGet =&gt; <span class="number">6</span>,
+            SystemCall::EnvironGet =&gt; <span class="number">7</span>,
+            SystemCall::FdPrestatGet =&gt; <span class="number">8</span>,
+            SystemCall::FdPrestatDirName =&gt; <span class="number">9</span>,
+            SystemCall::PathOpen =&gt; <span class="number">10</span>,
+            SystemCall::FdFdstatSetFlags =&gt; <span class="number">11</span>,
+            SystemCall::ArgsSizesGet =&gt; <span class="number">12</span>,
+            SystemCall::ArgsGet =&gt; <span class="number">13</span>,
+            SystemCall::ClockTimeGet =&gt; <span class="number">14</span>,
         }
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">Signature</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">SystemCall</span> {
-    <span class="doccomment">/// Get wasmi function signature of SystemCall enum.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// Returns wasmi function signature of this SystemCall enum.</span>
-    <span class="kw">fn</span> <span class="ident">into</span>(<span class="self">self</span>) -&gt; <span class="ident">Signature</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">SystemCall::ProcExit</span> =&gt; <span class="macro">sig!</span>((<span class="ident">I32</span>)),
-            <span class="ident">SystemCall::FdClose</span> =&gt; <span class="macro">sig!</span>((<span class="ident">I32</span>)-&gt;<span class="ident">I32</span>),
-            <span class="ident">SystemCall::FdWrite</span> =&gt; <span class="macro">sig!</span>((<span class="ident">I32</span>,<span class="ident">I32</span>,<span class="ident">I32</span>,<span class="ident">I32</span>)-&gt;<span class="ident">I32</span>),
-            <span class="ident">SystemCall::FdSeek</span> =&gt; <span class="macro">sig!</span>((<span class="ident">I32</span>,<span class="ident">I64</span>,<span class="ident">I32</span>,<span class="ident">I32</span>)-&gt;<span class="ident">I32</span>),
-            <span class="ident">SystemCall::FdRead</span> =&gt; <span class="macro">sig!</span>((<span class="ident">I32</span>,<span class="ident">I32</span>,<span class="ident">I32</span>,<span class="ident">I32</span>)-&gt;<span class="ident">I32</span>),
-            <span class="ident">SystemCall::FdFdstatGet</span> =&gt; <span class="macro">sig!</span>((<span class="ident">I32</span>,<span class="ident">I32</span>)-&gt;<span class="ident">I32</span>),
-            <span class="ident">SystemCall::EnvironSizesGet</span> =&gt; <span class="macro">sig!</span>((<span class="ident">I32</span>,<span class="ident">I32</span>)-&gt;<span class="ident">I32</span>),
-            <span class="ident">SystemCall::EnvironGet</span> =&gt; <span class="macro">sig!</span>((<span class="ident">I32</span>,<span class="ident">I32</span>)-&gt;<span class="ident">I32</span>),
-            <span class="ident">SystemCall::FdPrestatGet</span> =&gt; <span class="macro">sig!</span>((<span class="ident">I32</span>,<span class="ident">I32</span>)-&gt;<span class="ident">I32</span>),
-            <span class="ident">SystemCall::FdPrestatDirName</span> =&gt; <span class="macro">sig!</span>((<span class="ident">I32</span>,<span class="ident">I32</span>,<span class="ident">I32</span>)-&gt;<span class="ident">I32</span>),
-            <span class="ident">SystemCall::PathOpen</span> =&gt; <span class="macro">sig!</span>((<span class="ident">I32</span>,<span class="ident">I32</span>,<span class="ident">I32</span>,<span class="ident">I32</span>,<span class="ident">I32</span>,<span class="ident">I64</span>,<span class="ident">I64</span>,<span class="ident">I32</span>,<span class="ident">I32</span>)-&gt;<span class="ident">I32</span>),
-            <span class="ident">SystemCall::FdFdstatSetFlags</span> =&gt; <span class="macro">sig!</span>((<span class="ident">I32</span>,<span class="ident">I32</span>)-&gt;<span class="ident">I32</span>),
-            <span class="ident">SystemCall::ArgsSizesGet</span> =&gt; <span class="macro">sig!</span>((<span class="ident">I32</span>,<span class="ident">I32</span>)-&gt;<span class="ident">I32</span>),
-            <span class="ident">SystemCall::ArgsGet</span> =&gt; <span class="macro">sig!</span>((<span class="ident">I32</span>,<span class="ident">I32</span>)-&gt;<span class="ident">I32</span>),
-            <span class="ident">SystemCall::ClockTimeGet</span> =&gt; <span class="macro">sig!</span>((<span class="ident">I32</span>,<span class="ident">I64</span>,<span class="ident">I32</span>)-&gt;<span class="ident">I32</span>),
+<span class="kw">impl </span>Into&lt;Signature&gt; <span class="kw">for </span>SystemCall {
+    <span class="doccomment">/// Get wasmi function signature of SystemCall enum.
+    ///
+    /// # Return
+    /// Returns wasmi function signature of this SystemCall enum.
+    </span><span class="kw">fn </span>into(<span class="self">self</span>) -&gt; Signature {
+        <span class="kw">match </span><span class="self">self </span>{
+            SystemCall::ProcExit =&gt; <span class="macro">sig!</span>((I32)),
+            SystemCall::FdClose =&gt; <span class="macro">sig!</span>((I32)-&gt;I32),
+            SystemCall::FdWrite =&gt; <span class="macro">sig!</span>((I32,I32,I32,I32)-&gt;I32),
+            SystemCall::FdSeek =&gt; <span class="macro">sig!</span>((I32,I64,I32,I32)-&gt;I32),
+            SystemCall::FdRead =&gt; <span class="macro">sig!</span>((I32,I32,I32,I32)-&gt;I32),
+            SystemCall::FdFdstatGet =&gt; <span class="macro">sig!</span>((I32,I32)-&gt;I32),
+            SystemCall::EnvironSizesGet =&gt; <span class="macro">sig!</span>((I32,I32)-&gt;I32),
+            SystemCall::EnvironGet =&gt; <span class="macro">sig!</span>((I32,I32)-&gt;I32),
+            SystemCall::FdPrestatGet =&gt; <span class="macro">sig!</span>((I32,I32)-&gt;I32),
+            SystemCall::FdPrestatDirName =&gt; <span class="macro">sig!</span>((I32,I32,I32)-&gt;I32),
+            SystemCall::PathOpen =&gt; <span class="macro">sig!</span>((I32,I32,I32,I32,I32,I64,I64,I32,I32)-&gt;I32),
+            SystemCall::FdFdstatSetFlags =&gt; <span class="macro">sig!</span>((I32,I32)-&gt;I32),
+            SystemCall::ArgsSizesGet =&gt; <span class="macro">sig!</span>((I32,I32)-&gt;I32),
+            SystemCall::ArgsGet =&gt; <span class="macro">sig!</span>((I32,I32)-&gt;I32),
+            SystemCall::ClockTimeGet =&gt; <span class="macro">sig!</span>((I32,I64,I32)-&gt;I32),
         }
     }
 }
 
-<span class="doccomment">/// WASI rights of a directory with full permissions.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FULL_DIR_RIGHTS</span>: <span class="ident">wasi::Rights</span> <span class="op">=</span> <span class="ident">wasi::RIGHTS_FD_FDSTAT_SET_FLAGS</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_SYNC</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_ADVISE</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_PATH_CREATE_DIRECTORY</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_PATH_CREATE_FILE</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_PATH_LINK_SOURCE</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_PATH_LINK_TARGET</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_PATH_OPEN</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_READDIR</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_PATH_READLINK</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_PATH_RENAME_SOURCE</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_PATH_RENAME_TARGET</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_PATH_FILESTAT_GET</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_PATH_FILESTAT_SET_SIZE</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_PATH_FILESTAT_SET_TIMES</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_FILESTAT_GET</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_FILESTAT_SET_SIZE</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_FILESTAT_SET_TIMES</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_PATH_SYMLINK</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_PATH_REMOVE_DIRECTORY</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_PATH_UNLINK_FILE</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_POLL_FD_READWRITE</span>;
+<span class="doccomment">/// WASI rights of a directory with full permissions.
+</span><span class="kw">pub const </span>FULL_DIR_RIGHTS: wasi::Rights = wasi::RIGHTS_FD_FDSTAT_SET_FLAGS
+    | wasi::RIGHTS_FD_SYNC
+    | wasi::RIGHTS_FD_ADVISE
+    | wasi::RIGHTS_PATH_CREATE_DIRECTORY
+    | wasi::RIGHTS_PATH_CREATE_FILE
+    | wasi::RIGHTS_PATH_LINK_SOURCE
+    | wasi::RIGHTS_PATH_LINK_TARGET
+    | wasi::RIGHTS_PATH_OPEN
+    | wasi::RIGHTS_FD_READDIR
+    | wasi::RIGHTS_PATH_READLINK
+    | wasi::RIGHTS_PATH_RENAME_SOURCE
+    | wasi::RIGHTS_PATH_RENAME_TARGET
+    | wasi::RIGHTS_PATH_FILESTAT_GET
+    | wasi::RIGHTS_PATH_FILESTAT_SET_SIZE
+    | wasi::RIGHTS_PATH_FILESTAT_SET_TIMES
+    | wasi::RIGHTS_FD_FILESTAT_GET
+    | wasi::RIGHTS_FD_FILESTAT_SET_SIZE
+    | wasi::RIGHTS_FD_FILESTAT_SET_TIMES
+    | wasi::RIGHTS_PATH_SYMLINK
+    | wasi::RIGHTS_PATH_REMOVE_DIRECTORY
+    | wasi::RIGHTS_PATH_UNLINK_FILE
+    | wasi::RIGHTS_POLL_FD_READWRITE;
 
-<span class="doccomment">/// WASI rights of a file with full permissions.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FULL_FILE_RIGHTS</span>: <span class="ident">wasi::Rights</span> <span class="op">=</span> <span class="ident">wasi::RIGHTS_FD_DATASYNC</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_READ</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_SEEK</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_FDSTAT_SET_FLAGS</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_SYNC</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_TELL</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_WRITE</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_ADVISE</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_ALLOCATE</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_FILESTAT_GET</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_FILESTAT_SET_SIZE</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_FILESTAT_SET_TIMES</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_POLL_FD_READWRITE</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_FD_FILESTAT_SET_TIMES</span>
-    <span class="op">|</span> <span class="ident">wasi::RIGHTS_POLL_FD_READWRITE</span>;
+<span class="doccomment">/// WASI rights of a file with full permissions.
+</span><span class="kw">pub const </span>FULL_FILE_RIGHTS: wasi::Rights = wasi::RIGHTS_FD_DATASYNC
+    | wasi::RIGHTS_FD_READ
+    | wasi::RIGHTS_FD_SEEK
+    | wasi::RIGHTS_FD_FDSTAT_SET_FLAGS
+    | wasi::RIGHTS_FD_SYNC
+    | wasi::RIGHTS_FD_TELL
+    | wasi::RIGHTS_FD_WRITE
+    | wasi::RIGHTS_FD_ADVISE
+    | wasi::RIGHTS_FD_ALLOCATE
+    | wasi::RIGHTS_FD_FILESTAT_GET
+    | wasi::RIGHTS_FD_FILESTAT_SET_SIZE
+    | wasi::RIGHTS_FD_FILESTAT_SET_TIMES
+    | wasi::RIGHTS_POLL_FD_READWRITE
+    | wasi::RIGHTS_FD_FILESTAT_SET_TIMES
+    | wasi::RIGHTS_POLL_FD_READWRITE;
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="wasi_interpreter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="wasi_interpreter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

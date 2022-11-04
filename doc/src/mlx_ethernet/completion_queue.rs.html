@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/completion_queue.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>completion_queue.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/completion_queue.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>completion_queue.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -309,311 +303,310 @@
 <span id="303">303</span>
 <span id="304">304</span>
 <span id="305">305</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Completion Queues (CQ) are circular buffers used by the HCA to post completion reports upon completion of a work request.</span>
-<span class="doccomment">//! This module defines the layout of an CQ, the context used to initialize an CQ and related functions.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! (PRM Section 8.18: Completion Queues)</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Completion Queues (CQ) are circular buffers used by the HCA to post completion reports upon completion of a work request.
+//! This module defines the layout of an CQ, the context used to initialize an CQ and related functions.
+//! 
+//! (PRM Section 8.18: Completion Queues)
 
-<span class="kw">use</span> <span class="ident">core</span>::{
-    <span class="ident">convert::TryFrom</span>,
-    <span class="ident">fmt</span>
+</span><span class="kw">use </span>core::{
+    convert::TryFrom,
+    fmt
 };
-<span class="kw">use</span> <span class="ident">bit_field::BitField</span>;
-<span class="kw">use</span> <span class="ident">zerocopy</span>::{<span class="ident">U32</span>, <span class="ident">FromBytes</span>};
-<span class="kw">use</span> <span class="ident">volatile::Volatile</span>;
-<span class="kw">use</span> <span class="ident">byteorder::BigEndian</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PhysicalAddress</span>, <span class="ident">MappedPages</span>, <span class="ident">BorrowedSliceMappedPages</span>, <span class="ident">Mutable</span>, <span class="ident">BorrowedMappedPages</span>};
-<span class="kw">use</span> <span class="ident">num_enum::TryFromPrimitive</span>;
+<span class="kw">use </span>bit_field::BitField;
+<span class="kw">use </span>zerocopy::{U32, FromBytes};
+<span class="kw">use </span>volatile::Volatile;
+<span class="kw">use </span>byteorder::BigEndian;
+<span class="kw">use </span>memory::{PhysicalAddress, MappedPages, BorrowedSliceMappedPages, Mutable, BorrowedMappedPages};
+<span class="kw">use </span>num_enum::TryFromPrimitive;
 
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_imports</span>)]</span>
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">log_page_size</span>, <span class="ident">Cqn</span>, <span class="ident">UAR_MASK</span>, <span class="ident">LOG_QUEUE_SIZE_MASK</span>, <span class="ident">LOG_QUEUE_SIZE_SHIFT</span>, <span class="ident">LOG_PAGE_SIZE_SHIFT</span>, <span class="ident">HW_OWNERSHIP</span>,
-    <span class="ident">command_queue::CommandOpcode</span>,
-    <span class="ident">work_queue::WQEOpcode</span>
+<span class="attr">#[allow(unused_imports)]
+</span><span class="kw">use crate</span>::{
+    log_page_size, Cqn, UAR_MASK, LOG_QUEUE_SIZE_MASK, LOG_QUEUE_SIZE_SHIFT, LOG_PAGE_SIZE_SHIFT, HW_OWNERSHIP,
+    command_queue::CommandOpcode,
+    work_queue::WQEOpcode
 };
 
-<span class="kw">const</span> <span class="ident">CQE_OPCODE_SHIFT</span>:         <span class="ident">u32</span> <span class="op">=</span> <span class="number">4</span>;
+<span class="kw">const </span>CQE_OPCODE_SHIFT:         u32 = <span class="number">4</span>;
 
-<span class="doccomment">/// The data structure containing CQ initialization parameters.</span>
-<span class="doccomment">/// It is passed to the HCA at the time of CQ creation.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// (PRM Section 8.18.10: Completion Queue Context)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">CompletionQueueContext</span> {
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `status`: occupies bits [31:28]</span>
-    <span class="doccomment">/// * `cc`: if set all the CQE&#39;s are collapsed to the first, occupies bit 20</span>
-    <span class="doccomment">/// * `oi`: overrun ignore, allows CQE to be overwritten rather than generating an error, occupies bit 17</span>
-    <span class="doccomment">/// * `st`: event delivery state machine, occupies bits [11:8] </span>
-    <span class="ident">status</span>:                 <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding1</span>:              <span class="ident">u32</span>,
-    <span class="doccomment">/// This field must be set to zero</span>
-    <span class="ident">page_offset</span>:            <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `log_cq_size`: Log (base 2) of the CQ size (in entries), occupies bits [28:24]</span>
-    <span class="doccomment">/// * `uar_page`: UAR page this CQ can be accessed through, occupies bits [23:0]</span>
-    <span class="ident">uar_log_cq_size</span>:        <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">cq_max_count_period</span>:    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// EQ this CQ reports completion events to.</span>
-    <span class="ident">c_eqn</span>:                  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Log (base 2) of page size in units of 4KiB</span>
-    <span class="ident">log_page_size</span>:          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding2</span>:              <span class="ident">u32</span>,
-    <span class="ident">last_notified_index</span>:    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">last_solicit_index</span>:     <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Consumer counter. The counter is incremented for each CQE polled from the CQ.</span>
-    <span class="ident">consumer_counter</span>:       <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Producer Counter. The counter is incremented for each CQE that is written by the HW to the CQ.</span>
-    <span class="ident">producer_counter</span>:       <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding3</span>:              <span class="ident">u64</span>,
-    <span class="doccomment">/// Upper 4 bytes of the physical address of the [`CompletionQueueDoorbellRecord`]</span>
-    <span class="ident">dbr_addr_h</span>:             <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Lower 4 bytes of the physical address of the [`CompletionQueueDoorbellRecord`]</span>
-    <span class="ident">dbr_addr_l</span>:             <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// The data structure containing CQ initialization parameters.
+/// It is passed to the HCA at the time of CQ creation.
+/// 
+/// (PRM Section 8.18.10: Completion Queue Context)
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>CompletionQueueContext {
+    <span class="doccomment">/// A multi-part field:
+    /// * `status`: occupies bits [31:28]
+    /// * `cc`: if set all the CQE&#39;s are collapsed to the first, occupies bit 20
+    /// * `oi`: overrun ignore, allows CQE to be overwritten rather than generating an error, occupies bit 17
+    /// * `st`: event delivery state machine, occupies bits [11:8] 
+    </span>status:                 Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding1:              u32,
+    <span class="doccomment">/// This field must be set to zero
+    </span>page_offset:            Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// A multi-part field:
+    /// * `log_cq_size`: Log (base 2) of the CQ size (in entries), occupies bits [28:24]
+    /// * `uar_page`: UAR page this CQ can be accessed through, occupies bits [23:0]
+    </span>uar_log_cq_size:        Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    cq_max_count_period:    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// EQ this CQ reports completion events to.
+    </span>c_eqn:                  Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// Log (base 2) of page size in units of 4KiB
+    </span>log_page_size:          Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding2:              u32,
+    last_notified_index:    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    last_solicit_index:     Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// Consumer counter. The counter is incremented for each CQE polled from the CQ.
+    </span>consumer_counter:       Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// Producer Counter. The counter is incremented for each CQE that is written by the HW to the CQ.
+    </span>producer_counter:       Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding3:              u64,
+    <span class="doccomment">/// Upper 4 bytes of the physical address of the [`CompletionQueueDoorbellRecord`]
+    </span>dbr_addr_h:             Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// Lower 4 bytes of the physical address of the [`CompletionQueueDoorbellRecord`]
+    </span>dbr_addr_l:             Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">CompletionQueueContext</span><span class="op">&gt;</span>(), <span class="number">64</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;CompletionQueueContext&gt;(), <span class="number">64</span>);
 
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">CompletionQueueContext</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;CompletionQueueContext&quot;</span>)
-            .<span class="ident">field</span>(<span class="string">&quot;status&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">status</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;page_offset&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">page_offset</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">field</span>(<span class="string">&quot;uar_log_cq_size&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">uar_log_cq_size</span>.<span class="ident">read</span>().<span class="ident">get</span>())
-            .<span class="ident">finish</span>()
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>CompletionQueueContext {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        f.debug_struct(<span class="string">&quot;CompletionQueueContext&quot;</span>)
+            .field(<span class="string">&quot;status&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.status.read().get())
+            .field(<span class="string">&quot;page_offset&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.page_offset.read().get())
+            .field(<span class="string">&quot;uar_log_cq_size&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.uar_log_cq_size.read().get())
+            .finish()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">CompletionQueueContext</span> {
-    <span class="doccomment">/// Create and initialize the fields of the CQ context.</span>
-    <span class="doccomment">/// The CQ context is then passed to the HCA when creating the CQ.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `uar_page`: UAR page the CQ can be accessed through. </span>
-    <span class="doccomment">/// * `cq_size`: number of entries in the CQ.</span>
-    <span class="doccomment">/// * `c_eqn`: number of the EQ this CQ reports completion events to.</span>
-    <span class="doccomment">/// * `db_addr`: physical address of the [`CompletionQueueDoorbellRecord`].</span>
-    <span class="doccomment">/// * `collapsed`: set to true if all CQE&#39;s are collapsed to the first.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">uar_page</span>: <span class="ident">u32</span>, <span class="ident">cq_size</span>: <span class="ident">u32</span>, <span class="ident">c_eqn</span>: <span class="ident">u8</span>, <span class="ident">db_addr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">collapsed</span>: <span class="ident">bool</span>) -&gt; <span class="ident">CompletionQueueContext</span> {
-        <span class="kw">const</span> <span class="ident">COLLAPSE_CQE</span>:     <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">20</span>;
-        <span class="kw">const</span> <span class="ident">OVERRUN_IGNORE</span>:   <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">17</span>;
+<span class="kw">impl </span>CompletionQueueContext {
+    <span class="doccomment">/// Create and initialize the fields of the CQ context.
+    /// The CQ context is then passed to the HCA when creating the CQ.
+    /// 
+    /// # Arguments
+    /// * `uar_page`: UAR page the CQ can be accessed through. 
+    /// * `cq_size`: number of entries in the CQ.
+    /// * `c_eqn`: number of the EQ this CQ reports completion events to.
+    /// * `db_addr`: physical address of the [`CompletionQueueDoorbellRecord`].
+    /// * `collapsed`: set to true if all CQE&#39;s are collapsed to the first.
+    </span><span class="kw">pub fn </span>init(uar_page: u32, cq_size: u32, c_eqn: u8, db_addr: PhysicalAddress, collapsed: bool) -&gt; CompletionQueueContext {
+        <span class="kw">const </span>COLLAPSE_CQE:     u32 = <span class="number">1 </span>&lt;&lt; <span class="number">20</span>;
+        <span class="kw">const </span>OVERRUN_IGNORE:   u32 = <span class="number">1 </span>&lt;&lt; <span class="number">17</span>;
 
-        <span class="comment">// set all fields to zero</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctxt</span> <span class="op">=</span> <span class="ident">CompletionQueueContext::default</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">OVERRUN_IGNORE</span>; 
-        <span class="kw">if</span> <span class="ident">collapsed</span> {
-            <span class="ident">status</span> <span class="op">|</span><span class="op">=</span> <span class="ident">COLLAPSE_CQE</span>; 
+        <span class="comment">// set all fields to zero
+        </span><span class="kw">let </span><span class="kw-2">mut </span>ctxt = CompletionQueueContext::default();
+        <span class="kw">let </span><span class="kw-2">mut </span>status = OVERRUN_IGNORE; 
+        <span class="kw">if </span>collapsed {
+            status |= COLLAPSE_CQE; 
         }
-        <span class="ident">ctxt</span>.<span class="ident">status</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">status</span>)); 
+        ctxt.status.write(U32::new(status)); 
 
-        <span class="kw">let</span> <span class="ident">uar</span> <span class="op">=</span> <span class="ident">uar_page</span> <span class="op">&amp;</span> <span class="ident">UAR_MASK</span>;
-        <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> (<span class="ident">libm::log2</span>(<span class="ident">cq_size</span> <span class="kw">as</span> <span class="ident">f64</span>) <span class="kw">as</span> <span class="ident">u32</span> <span class="op">&amp;</span> <span class="ident">LOG_QUEUE_SIZE_MASK</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_QUEUE_SIZE_SHIFT</span>;
-        <span class="ident">ctxt</span>.<span class="ident">uar_log_cq_size</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">uar</span> <span class="op">|</span> <span class="ident">size</span>));
+        <span class="kw">let </span>uar = uar_page &amp; UAR_MASK;
+        <span class="kw">let </span>size = (libm::log2(cq_size <span class="kw">as </span>f64) <span class="kw">as </span>u32 &amp; LOG_QUEUE_SIZE_MASK) &lt;&lt; LOG_QUEUE_SIZE_SHIFT;
+        ctxt.uar_log_cq_size.write(U32::new(uar | size));
 
-        <span class="ident">ctxt</span>.<span class="ident">c_eqn</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">c_eqn</span> <span class="kw">as</span> <span class="ident">u32</span>));
+        ctxt.c_eqn.write(U32::new(c_eqn <span class="kw">as </span>u32));
 
-        <span class="kw">let</span> <span class="ident">log_page_size</span> <span class="op">=</span> <span class="ident">log_page_size</span>(<span class="ident">cq_size</span> <span class="op">*</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">CompletionQueueEntry</span><span class="op">&gt;</span>() <span class="kw">as</span> <span class="ident">u32</span>); 
-        <span class="ident">ctxt</span>.<span class="ident">log_page_size</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">log_page_size</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_PAGE_SIZE_SHIFT</span>));
+        <span class="kw">let </span>log_page_size = log_page_size(cq_size * core::mem::size_of::&lt;CompletionQueueEntry&gt;() <span class="kw">as </span>u32); 
+        ctxt.log_page_size.write(U32::new(log_page_size &lt;&lt; LOG_PAGE_SIZE_SHIFT));
         
-        <span class="ident">ctxt</span>.<span class="ident">dbr_addr_h</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>((<span class="ident">db_addr</span>.<span class="ident">value</span>() <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">32</span>) <span class="kw">as</span> <span class="ident">u32</span>));
-        <span class="ident">ctxt</span>.<span class="ident">dbr_addr_l</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">db_addr</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u32</span>));
-        <span class="ident">ctxt</span>
+        ctxt.dbr_addr_h.write(U32::new((db_addr.value() &gt;&gt; <span class="number">32</span>) <span class="kw">as </span>u32));
+        ctxt.dbr_addr_l.write(U32::new(db_addr.value() <span class="kw">as </span>u32));
+        ctxt
     }
 
-    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">mailbox_offset</span>() -&gt; <span class="ident">usize</span> { <span class="number">0</span> }
+    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>mailbox_offset() -&gt; usize { <span class="number">0 </span>}
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">TryFromPrimitive</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum</span> <span class="ident">CQEOpcode</span> {
-    <span class="ident">Requester</span> <span class="op">=</span> <span class="number">0x0</span>,
-    <span class="ident">ResponderRDMAWriteWithImmediate</span> <span class="op">=</span> <span class="number">0x1</span>,
-    <span class="ident">ResponderSend</span> <span class="op">=</span> <span class="number">0x2</span>,
-    <span class="ident">ResponderSendWithImmediate</span> <span class="op">=</span> <span class="number">0x3</span>,
-    <span class="ident">ResponderSendWithInvalidate</span> <span class="op">=</span> <span class="number">0x4</span>,
-    <span class="ident">ResizeCq</span> <span class="op">=</span> <span class="number">0x5</span>,
-    <span class="ident">SignatureError</span> <span class="op">=</span> <span class="number">0xC</span>, <span class="comment">// PRM ERROR: says its 0x12 but thats not possible with 4 bits</span>
-    <span class="ident">RequesterError</span> <span class="op">=</span> <span class="number">0xD</span>,
-    <span class="ident">ResponderError</span> <span class="op">=</span> <span class="number">0xE</span>,
-    <span class="ident">InvalidCQE</span> <span class="op">=</span> <span class="number">0xF</span>,
-    <span class="ident">Unknown</span>
+<span class="attr">#[derive(Debug, TryFromPrimitive, PartialEq)]
+#[repr(u8)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum </span>CQEOpcode {
+    Requester = <span class="number">0x0</span>,
+    ResponderRDMAWriteWithImmediate = <span class="number">0x1</span>,
+    ResponderSend = <span class="number">0x2</span>,
+    ResponderSendWithImmediate = <span class="number">0x3</span>,
+    ResponderSendWithInvalidate = <span class="number">0x4</span>,
+    ResizeCq = <span class="number">0x5</span>,
+    SignatureError = <span class="number">0xC</span>, <span class="comment">// PRM ERROR: says its 0x12 but thats not possible with 4 bits
+    </span>RequesterError = <span class="number">0xD</span>,
+    ResponderError = <span class="number">0xE</span>,
+    InvalidCQE = <span class="number">0xF</span>,
+    Unknown
 }
 
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
-<span class="kw">enum</span> <span class="ident">CQEFormat</span> {
-    <span class="ident">NoInlineData</span> <span class="op">=</span> <span class="number">0x0</span>,
-    <span class="ident">InlineData32</span> <span class="op">=</span> <span class="number">0x1</span>,
-    <span class="ident">InlineData64</span> <span class="op">=</span> <span class="number">0x2</span>,
-    <span class="ident">CompressedCQE</span> <span class="op">=</span> <span class="number">0x3</span>,
+<span class="attr">#[allow(dead_code)]
+#[repr(u8)]
+</span><span class="kw">enum </span>CQEFormat {
+    NoInlineData = <span class="number">0x0</span>,
+    InlineData32 = <span class="number">0x1</span>,
+    InlineData64 = <span class="number">0x2</span>,
+    CompressedCQE = <span class="number">0x3</span>,
 }
 
-<span class="doccomment">/// The layout of an entry in the CQ buffer.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// (PRM Section 8.18.1.1: CQE Format)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Debug</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CompletionQueueEntry</span> {
-    <span class="ident">eth_wqe_id</span>:             <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">lro_tcp_win</span>:            <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">lro_ack_seq_num</span>:        <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">rx_hash_result</span>:         <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">ml_path</span>:                <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">slid_smac</span>:              <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">rqpn</span>:                   <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">vid</span>:                    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">srqn_user_index</span>:        <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">flow_table_metadata</span>:    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding1</span>:              <span class="ident">u32</span>,
-    <span class="doccomment">/// Byte count of data transferred. Can be used to find length of received packets.</span>
-    <span class="ident">byte_count</span>:             <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">timestamp_h</span>:            <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">timestamp_l</span>:            <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `send_wqe_opcode/rx_drop_counter`: the send WQE opcode or the number of dropped packets</span>
-    <span class="doccomment">/// because of no RCV WQE since the last CQE, occupies bits \[31:24\]</span>
-    <span class="ident">flow_tag</span>:               <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `wqe_counter`: wqe_counter of the WQE completed, occupies bits \[31:16\]</span>
-    <span class="doccomment">/// * `signature`: byte-wise XOR of CQE, occupies bits \[15:8\]</span>
-    <span class="doccomment">/// * `opcode`: a [`CQEOpcode`] value, occupies bits \[7:4\]</span>
-    <span class="doccomment">/// * `cqe_format`: a [`CQEFormat`] value, occupies bits \[3:2\]</span>
-    <span class="doccomment">/// * `se`: solicited event. This CQE cause EQE generation for solicited event, occupies bit 1</span>
-    <span class="doccomment">/// * `owner`: owner of the entry, occupies bit 0.</span>
-    <span class="doccomment">/// The value indicating SW ownership is flipped every time CQ wraps around, starting with 0.</span>
-    <span class="ident">owner</span>:                  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// The layout of an entry in the CQ buffer.
+/// 
+/// (PRM Section 8.18.1.1: CQE Format)
+</span><span class="attr">#[derive(FromBytes, Debug, Default)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>CompletionQueueEntry {
+    eth_wqe_id:             Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    lro_tcp_win:            Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    lro_ack_seq_num:        Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    rx_hash_result:         Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    ml_path:                Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    slid_smac:              Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    rqpn:                   Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    vid:                    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    srqn_user_index:        Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    flow_table_metadata:    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding1:              u32,
+    <span class="doccomment">/// Byte count of data transferred. Can be used to find length of received packets.
+    </span>byte_count:             Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    timestamp_h:            Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    timestamp_l:            Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// A multi-part field:
+    /// * `send_wqe_opcode/rx_drop_counter`: the send WQE opcode or the number of dropped packets
+    /// because of no RCV WQE since the last CQE, occupies bits \[31:24\]
+    </span>flow_tag:               Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// A multi-part field:
+    /// * `wqe_counter`: wqe_counter of the WQE completed, occupies bits \[31:16\]
+    /// * `signature`: byte-wise XOR of CQE, occupies bits \[15:8\]
+    /// * `opcode`: a [`CQEOpcode`] value, occupies bits \[7:4\]
+    /// * `cqe_format`: a [`CQEFormat`] value, occupies bits \[3:2\]
+    /// * `se`: solicited event. This CQE cause EQE generation for solicited event, occupies bit 1
+    /// * `owner`: owner of the entry, occupies bit 0.
+    /// The value indicating SW ownership is flipped every time CQ wraps around, starting with 0.
+    </span>owner:                  Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">CompletionQueueEntry</span><span class="op">&gt;</span>(), <span class="number">64</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;CompletionQueueEntry&gt;(), <span class="number">64</span>);
 
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
-<span class="kw">impl</span> <span class="ident">CompletionQueueEntry</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="comment">// Snabb initializes the CQE but setting all the bits. I do not think that is correct.</span>
-        <span class="comment">// In section 23.9.1: CREATE_CQ it stated that only the opcode and owner bit need to be set</span>
+<span class="attr">#[allow(unused)]
+</span><span class="kw">impl </span>CompletionQueueEntry {
+    <span class="kw">pub fn </span>init(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="comment">// Snabb initializes the CQE but setting all the bits. I do not think that is correct.
+        // In section 23.9.1: CREATE_CQ it stated that only the opcode and owner bit need to be set
         
-        <span class="comment">// set all fields to zero</span>
-        <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">CompletionQueueEntry::default</span>();
-        <span class="kw">let</span> <span class="ident">invalid_cqe</span> <span class="op">=</span> (<span class="ident">CQEOpcode::InvalidCQE</span> <span class="kw">as</span> <span class="ident">u32</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">CQE_OPCODE_SHIFT</span>;
-        <span class="self">self</span>.<span class="ident">owner</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">invalid_cqe</span> <span class="op">|</span> <span class="ident">HW_OWNERSHIP</span>));
+        // set all fields to zero
+        </span><span class="kw-2">*</span><span class="self">self </span>= CompletionQueueEntry::default();
+        <span class="kw">let </span>invalid_cqe = (CQEOpcode::InvalidCQE <span class="kw">as </span>u32) &lt;&lt; CQE_OPCODE_SHIFT;
+        <span class="self">self</span>.owner.write(U32::new(invalid_cqe | HW_OWNERSHIP));
     }
 
-    <span class="doccomment">/// Return the WQE opcode value of the WQE completed</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">get_send_wqe_opcode</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">WQEOpcode</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">const</span> <span class="ident">WQE_OPCODE_SHIFT</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">24</span>;
-        <span class="ident">WQEOpcode::try_from</span>((<span class="self">self</span>.<span class="ident">flow_tag</span>.<span class="ident">read</span>().<span class="ident">get</span>() <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">WQE_OPCODE_SHIFT</span>) <span class="kw">as</span> <span class="ident">u8</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;Invalid WQE opcode in the CQE&quot;</span>)
+    <span class="doccomment">/// Return the WQE opcode value of the WQE completed
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_send_wqe_opcode(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;WQEOpcode, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">const </span>WQE_OPCODE_SHIFT: u32 = <span class="number">24</span>;
+        WQEOpcode::try_from((<span class="self">self</span>.flow_tag.read().get() &gt;&gt; WQE_OPCODE_SHIFT) <span class="kw">as </span>u8)
+            .map_err(|_e| <span class="string">&quot;Invalid WQE opcode in the CQE&quot;</span>)
     }
 
-    <span class="doccomment">/// Return the WQE counter value for the WQE completed</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">get_wqe_counter</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u16</span> {
-        <span class="kw">const</span> <span class="ident">WQE_COUNTER_SHIFT</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">16</span>;
-        (<span class="self">self</span>.<span class="ident">owner</span>.<span class="ident">read</span>().<span class="ident">get</span>() <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">WQE_COUNTER_SHIFT</span>) <span class="kw">as</span> <span class="ident">u16</span>
+    <span class="doccomment">/// Return the WQE counter value for the WQE completed
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_wqe_counter(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u16 {
+        <span class="kw">const </span>WQE_COUNTER_SHIFT: u32 = <span class="number">16</span>;
+        (<span class="self">self</span>.owner.read().get() &gt;&gt; WQE_COUNTER_SHIFT) <span class="kw">as </span>u16
     }
 
-    <span class="doccomment">/// Returns true if the ownership bit is set</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">get_owner</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">owner</span>.<span class="ident">read</span>().<span class="ident">get</span>().<span class="ident">get_bit</span>(<span class="number">0</span>)
+    <span class="doccomment">/// Returns true if the ownership bit is set
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_owner(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.owner.read().get().get_bit(<span class="number">0</span>)
     }
 
-    <span class="doccomment">/// Returns the WQE entry opcode</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">get_opcode</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">CQEOpcode</span> {
-        <span class="ident">CQEOpcode::try_from</span>((<span class="self">self</span>.<span class="ident">owner</span>.<span class="ident">read</span>().<span class="ident">get</span>() <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">4</span> <span class="op">&amp;</span> <span class="number">0xF</span>) <span class="kw">as</span> <span class="ident">u8</span>)
-            .<span class="ident">unwrap_or</span>(<span class="ident">CQEOpcode::Unknown</span>)
+    <span class="doccomment">/// Returns the WQE entry opcode
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_opcode(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; CQEOpcode {
+        CQEOpcode::try_from((<span class="self">self</span>.owner.read().get() &gt;&gt; <span class="number">4 </span>&amp; <span class="number">0xF</span>) <span class="kw">as </span>u8)
+            .unwrap_or(CQEOpcode::Unknown)
     }
 
-    <span class="doccomment">/// Returns the length of the received packet</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">get_pkt_len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u32</span> {
-        <span class="self">self</span>.<span class="ident">byte_count</span>.<span class="ident">read</span>().<span class="ident">get</span>()
+    <span class="doccomment">/// Returns the length of the received packet
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_pkt_len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
+        <span class="self">self</span>.byte_count.read().get()
     }
 
-    <span class="doccomment">/// Prints out the fields of a CQE in the format used by other drivers (e.g. Linux, Snabb)</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dump</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">i</span>: <span class="ident">usize</span>) {
-        <span class="macro">debug!</span>(<span class="string">&quot;CQE {}&quot;</span>, <span class="ident">i</span>);
-        <span class="kw">unsafe</span> {
-            <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">CompletionQueueEntry</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">u32</span>;
-            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span><span class="ident">ptr</span>).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">1</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">2</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">3</span>)).<span class="ident">to_be</span>());
-            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">4</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">5</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">6</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">7</span>)).<span class="ident">to_be</span>());
-            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">8</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">9</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">10</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">11</span>)).<span class="ident">to_be</span>());
-            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x} \n&quot;</span>, (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">12</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">13</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">14</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">15</span>)).<span class="ident">to_be</span>());
+    <span class="doccomment">/// Prints out the fields of a CQE in the format used by other drivers (e.g. Linux, Snabb)
+    </span><span class="kw">pub fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>, i: usize) {
+        <span class="macro">debug!</span>(<span class="string">&quot;CQE {}&quot;</span>, i);
+        <span class="kw">unsafe </span>{
+            <span class="kw">let </span>ptr = <span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span>CompletionQueueEntry <span class="kw">as </span><span class="kw-2">*const </span>u32;
+            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span>ptr).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">1</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">2</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">3</span>)).to_be());
+            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span>ptr.offset(<span class="number">4</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">5</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">6</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">7</span>)).to_be());
+            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span>ptr.offset(<span class="number">8</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">9</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">10</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">11</span>)).to_be());
+            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x} \n&quot;</span>, (<span class="kw-2">*</span>ptr.offset(<span class="number">12</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">13</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">14</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">15</span>)).to_be());
         }
     }
 }
 
-<span class="doccomment">/// A structure containing information of recently-posted CQ commands</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CompletionQueueDoorbellRecord</span> {
-    <span class="doccomment">/// Consumer counter of the last polled CQE.</span>
-    <span class="doccomment">/// It points to the next CQE to be polled.</span>
-    <span class="ident">update_ci</span>:          <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Consumer Counter for arming CQ</span>
-    <span class="ident">arm_ci</span>:             <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A structure containing information of recently-posted CQ commands
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>CompletionQueueDoorbellRecord {
+    <span class="doccomment">/// Consumer counter of the last polled CQE.
+    /// It points to the next CQE to be polled.
+    </span>update_ci:          Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// Consumer Counter for arming CQ
+    </span>arm_ci:             Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">CompletionQueueDoorbellRecord</span><span class="op">&gt;</span>(), <span class="number">8</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;CompletionQueueDoorbellRecord&gt;(), <span class="number">8</span>);
 
-<span class="doccomment">/// A data structure that contains the CQ buffer </span>
-<span class="doccomment">/// and is used to interact with the CQ once initialized.</span>
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CompletionQueue</span> {
-    <span class="doccomment">/// Physically-contiguous completion queue entries</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">entries</span>: <span class="ident">BorrowedSliceMappedPages</span><span class="op">&lt;</span><span class="ident">CompletionQueueEntry</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Doorbell record for this CQ</span>
-    <span class="ident">doorbell</span>: <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">CompletionQueueDoorbellRecord</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// CQ number that is returned by the [`CommandOpcode::CreateCq`] command</span>
-    <span class="ident">cqn</span>: <span class="ident">Cqn</span>,
+<span class="doccomment">/// A data structure that contains the CQ buffer 
+/// and is used to interact with the CQ once initialized.
+</span><span class="attr">#[allow(dead_code)]
+</span><span class="kw">pub struct </span>CompletionQueue {
+    <span class="doccomment">/// Physically-contiguous completion queue entries
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) entries: BorrowedSliceMappedPages&lt;CompletionQueueEntry, Mutable&gt;,
+    <span class="doccomment">/// Doorbell record for this CQ
+    </span>doorbell: BorrowedMappedPages&lt;CompletionQueueDoorbellRecord, Mutable&gt;,
+    <span class="doccomment">/// CQ number that is returned by the [`CommandOpcode::CreateCq`] command
+    </span>cqn: Cqn,
 }
 
-<span class="kw">impl</span> <span class="ident">CompletionQueue</span> {
-    <span class="doccomment">/// Creates a completion queue by mapping the buffer as a slice of [`CompletionQueueEntry`]s.</span>
-    <span class="doccomment">/// Each CQE is set to an initial state.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `entries_mp`: memory that is to be transformed into a slice of CQEs. </span>
-    <span class="doccomment">///    The starting physical address should have been passed to the HCA when creating the CQ.</span>
-    <span class="doccomment">/// * `num_entries`: number of entries in the CQ</span>
-    <span class="doccomment">/// * `doorbell_mp`: memory that is to be transformed into a [`CompletionQueueDoorbellRecord`]. </span>
-    <span class="doccomment">///    The starting physical address should have been passed to the HCA when creating the CQ.</span>
-    <span class="doccomment">/// * `cqn`: CQ number returned by the HCA</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(
-        <span class="ident">entries_mp</span>: <span class="ident">MappedPages</span>, 
-        <span class="ident">num_entries</span>: <span class="ident">usize</span>, 
-        <span class="ident">doorbell_mp</span>: <span class="ident">MappedPages</span>,
-        <span class="ident">cqn</span>: <span class="ident">Cqn</span>
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">CompletionQueue</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entries</span> <span class="op">=</span> <span class="ident">entries_mp</span>.<span class="ident">into_borrowed_slice_mut</span>::<span class="op">&lt;</span><span class="ident">CompletionQueueEntry</span><span class="op">&gt;</span>(<span class="number">0</span>, <span class="ident">num_entries</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">doorbell</span> <span class="op">=</span> <span class="ident">doorbell_mp</span>.<span class="ident">into_borrowed_mut</span>(<span class="number">0</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
+<span class="kw">impl </span>CompletionQueue {
+    <span class="doccomment">/// Creates a completion queue by mapping the buffer as a slice of [`CompletionQueueEntry`]s.
+    /// Each CQE is set to an initial state.
+    /// 
+    /// # Arguments
+    /// * `entries_mp`: memory that is to be transformed into a slice of CQEs. 
+    ///    The starting physical address should have been passed to the HCA when creating the CQ.
+    /// * `num_entries`: number of entries in the CQ
+    /// * `doorbell_mp`: memory that is to be transformed into a [`CompletionQueueDoorbellRecord`]. 
+    ///    The starting physical address should have been passed to the HCA when creating the CQ.
+    /// * `cqn`: CQ number returned by the HCA
+    </span><span class="kw">pub fn </span>init(
+        entries_mp: MappedPages, 
+        num_entries: usize, 
+        doorbell_mp: MappedPages,
+        cqn: Cqn
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;CompletionQueue, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>entries = entries_mp.into_borrowed_slice_mut::&lt;CompletionQueueEntry&gt;(<span class="number">0</span>, num_entries)
+            .map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>doorbell = doorbell_mp.into_borrowed_mut(<span class="number">0</span>)
+            .map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
         
-        <span class="kw">for</span> <span class="ident">entry</span> <span class="kw">in</span> <span class="ident">entries</span>.<span class="ident">iter_mut</span>() {
-            <span class="ident">entry</span>.<span class="ident">init</span>()
+        <span class="kw">for </span>entry <span class="kw">in </span>entries.iter_mut() {
+            entry.init()
         }
-        <span class="kw-2">*</span><span class="ident">doorbell</span> <span class="op">=</span> <span class="ident">CompletionQueueDoorbellRecord::default</span>();
+        <span class="kw-2">*</span>doorbell = CompletionQueueDoorbellRecord::default();
 
-        <span class="prelude-val">Ok</span>( <span class="ident">CompletionQueue</span> { <span class="ident">entries</span>, <span class="ident">doorbell</span>, <span class="ident">cqn</span> } )
+        <span class="prelude-val">Ok</span>( CompletionQueue { entries, doorbell, cqn } )
     }
 
-    <span class="doccomment">/// Checks if a packet is transmitted by comparing the `wqe_counter` with the value in the CQE.</span>
-    <span class="doccomment">/// If it is, then prints out the WQE opcode and counter.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_packet_transmission</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">entry_num</span>: <span class="ident">usize</span>, <span class="ident">wqe_counter</span>: <span class="ident">u16</span>) {
-        <span class="kw">let</span> <span class="ident">entry</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">entries</span>[<span class="ident">entry_num</span>];
-        <span class="kw">let</span> <span class="ident">counter</span> <span class="op">=</span> <span class="ident">entry</span>.<span class="ident">get_wqe_counter</span>();
-        <span class="kw">if</span> <span class="ident">wqe_counter</span> <span class="op">==</span> <span class="ident">counter</span> {
-            <span class="macro">trace!</span>(<span class="string">&quot;opcode: {:?}, wqe_counter: {}&quot;</span>, <span class="ident">entry</span>.<span class="ident">get_send_wqe_opcode</span>(), <span class="ident">counter</span>);
+    <span class="doccomment">/// Checks if a packet is transmitted by comparing the `wqe_counter` with the value in the CQE.
+    /// If it is, then prints out the WQE opcode and counter.
+    </span><span class="kw">pub fn </span>check_packet_transmission(<span class="kw-2">&amp;mut </span><span class="self">self</span>, entry_num: usize, wqe_counter: u16) {
+        <span class="kw">let </span>entry = <span class="kw-2">&amp;</span><span class="self">self</span>.entries[entry_num];
+        <span class="kw">let </span>counter = entry.get_wqe_counter();
+        <span class="kw">if </span>wqe_counter == counter {
+            <span class="macro">trace!</span>(<span class="string">&quot;opcode: {:?}, wqe_counter: {}&quot;</span>, entry.get_send_wqe_opcode(), counter);
         }
     }
 
-    <span class="doccomment">/// Prints out all entries in the CQ</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dump</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">entry</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">entries</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
-            <span class="ident">entry</span>.<span class="ident">dump</span>(<span class="ident">i</span>)
+    <span class="doccomment">/// Prints out all entries in the CQ
+    </span><span class="kw">pub fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">for </span>(i, entry) <span class="kw">in </span><span class="self">self</span>.entries.iter().enumerate() {
+            entry.dump(i)
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

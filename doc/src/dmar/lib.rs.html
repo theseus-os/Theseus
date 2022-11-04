@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/acpi/dmar/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../dmar/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../dmar/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../dmar/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/acpi/dmar/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../dmar/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -311,313 +305,312 @@
 <span id="305">305</span>
 <span id="306">306</span>
 <span id="307">307</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Definitions for the DMAR, the Direct Memory Access (DMA) Remapping ACPI table.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The structures defined herein are based on Section 8 of Intel&#39;s VT Directed I/O Spec:</span>
-<span class="doccomment">//! &lt;https://software.intel.com/content/www/us/en/develop/download/intel-virtualization-technology-for-directed-io-architecture-specification.html&gt;</span>
-<span class="doccomment">//!</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Definitions for the DMAR, the Direct Memory Access (DMA) Remapping ACPI table.
+//!
+//! The structures defined herein are based on Section 8 of Intel&#39;s VT Directed I/O Spec:
+//! &lt;https://software.intel.com/content/www/us/en/develop/download/intel-virtualization-technology-for-directed-io-architecture-specification.html&gt;
+//!
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">sdt</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">acpi_table</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">zerocopy</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">static_assertions</span>;
+</span><span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>sdt;
+<span class="kw">extern crate </span>acpi_table;
+<span class="kw">extern crate </span>zerocopy;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
 
-<span class="kw">use</span> <span class="ident">core::mem::size_of</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PhysicalAddress</span>, <span class="ident">MappedPages</span>};
-<span class="kw">use</span> <span class="ident">sdt::Sdt</span>;
-<span class="kw">use</span> <span class="ident">acpi_table</span>::{<span class="ident">AcpiSignature</span>, <span class="ident">AcpiTables</span>};
-<span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
+<span class="kw">use </span>core::mem::size_of;
+<span class="kw">use </span>memory::{PhysicalAddress, MappedPages};
+<span class="kw">use </span>sdt::Sdt;
+<span class="kw">use </span>acpi_table::{AcpiSignature, AcpiTables};
+<span class="kw">use </span>zerocopy::FromBytes;
 
-<span class="kw">mod</span> <span class="ident">drhd</span>;
-<span class="kw">mod</span> <span class="ident">device_scope</span>;
+<span class="kw">mod </span>drhd;
+<span class="kw">mod </span>device_scope;
 
-<span class="comment">// TODO: once these sub-tables are complete, uncomment them.</span>
-<span class="comment">// mod rmrr;</span>
-<span class="comment">// mod atsr;</span>
-<span class="comment">// mod rhsa;</span>
-<span class="comment">// mod andd;</span>
-<span class="comment">// mod satc;</span>
+<span class="comment">// TODO: once these sub-tables are complete, uncomment them.
+// mod rmrr;
+// mod atsr;
+// mod rhsa;
+// mod andd;
+// mod satc;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">drhd</span>::<span class="kw-2">*</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">device_scope</span>::<span class="kw-2">*</span>;
-<span class="comment">// pub use rmrr::*;</span>
-<span class="comment">// pub use atsr::*;</span>
-<span class="comment">// pub use rhsa::*;</span>
-<span class="comment">// pub use andd::*;</span>
-<span class="comment">// pub use satc::*;</span>
-
-
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DMAR_SIGNATURE</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>; <span class="number">4</span>] <span class="op">=</span> <span class="string">b&quot;DMAR&quot;</span>;
+</span><span class="kw">pub use </span>drhd::<span class="kw-2">*</span>;
+<span class="kw">pub use </span>device_scope::<span class="kw-2">*</span>;
+<span class="comment">// pub use rmrr::*;
+// pub use atsr::*;
+// pub use rhsa::*;
+// pub use andd::*;
+// pub use satc::*;
 
 
-<span class="doccomment">/// The handler for parsing the DMAR table and adding it to the ACPI tables list.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle</span>(
-    <span class="ident">acpi_tables</span>: <span class="kw-2">&amp;mut</span> <span class="ident">AcpiTables</span>,
-    <span class="ident">signature</span>: <span class="ident">AcpiSignature</span>,
-    <span class="ident">_length</span>: <span class="ident">usize</span>,
-    <span class="ident">phys_addr</span>: <span class="ident">PhysicalAddress</span>
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="comment">// The DMAR has a variable number of entries, and each entry is of variable size. </span>
-    <span class="comment">// So we can&#39;t determine the slice_length (just use 0 instead), but we can determine where it starts.</span>
-    <span class="kw">let</span> <span class="ident">slice_start_paddr</span> <span class="op">=</span> <span class="ident">phys_addr</span> <span class="op">+</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">DmarReporting</span><span class="op">&gt;</span>();
-    <span class="ident">acpi_tables</span>.<span class="ident">add_table_location</span>(<span class="ident">signature</span>, <span class="ident">phys_addr</span>, <span class="prelude-val">Some</span>((<span class="ident">slice_start_paddr</span>, <span class="number">0</span>)))
+</span><span class="kw">pub const </span>DMAR_SIGNATURE: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8; <span class="number">4</span>] = <span class="string">b&quot;DMAR&quot;</span>;
+
+
+<span class="doccomment">/// The handler for parsing the DMAR table and adding it to the ACPI tables list.
+</span><span class="kw">pub fn </span>handle(
+    acpi_tables: <span class="kw-2">&amp;mut </span>AcpiTables,
+    signature: AcpiSignature,
+    _length: usize,
+    phys_addr: PhysicalAddress
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="comment">// The DMAR has a variable number of entries, and each entry is of variable size. 
+    // So we can&#39;t determine the slice_length (just use 0 instead), but we can determine where it starts.
+    </span><span class="kw">let </span>slice_start_paddr = phys_addr + size_of::&lt;DmarReporting&gt;();
+    acpi_tables.add_table_location(signature, phys_addr, <span class="prelude-val">Some</span>((slice_start_paddr, <span class="number">0</span>)))
 }
 
 
-<span class="doccomment">/// The top-level DMAR table, a DMA Remapping Reporting Structure</span>
-<span class="doccomment">/// (also called a DMA Remapping Description table).</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This table is described in Section 8.1 of the VT Directed I/O Spec.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="kw">struct</span> <span class="ident">DmarReporting</span> {
-    <span class="ident">header</span>: <span class="ident">Sdt</span>,
-    <span class="ident">host_address_width</span>: <span class="ident">u8</span>,
-    <span class="ident">flags</span>: <span class="ident">u8</span>,
-    <span class="ident">_reserved</span>: [<span class="ident">u8</span>; <span class="number">10</span>],
-    <span class="comment">// Following this is a variable number of variable-sized DMAR table entries,</span>
-    <span class="comment">// so we cannot include them here in the static struct definition.</span>
+<span class="doccomment">/// The top-level DMAR table, a DMA Remapping Reporting Structure
+/// (also called a DMA Remapping Description table).
+///
+/// This table is described in Section 8.1 of the VT Directed I/O Spec.
+</span><span class="attr">#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(C, packed)]
+</span><span class="kw">struct </span>DmarReporting {
+    header: Sdt,
+    host_address_width: u8,
+    flags: u8,
+    _reserved: [u8; <span class="number">10</span>],
+    <span class="comment">// Following this is a variable number of variable-sized DMAR table entries,
+    // so we cannot include them here in the static struct definition.
+</span>}
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;DmarReporting&gt;(), <span class="number">48</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;DmarReporting&gt;(), <span class="number">1</span>);
+
+
+<span class="doccomment">/// A wrapper around the DMAR ACPI table ([`DmarReporting`]),
+/// which contains details about IOMMU configuration.
+/// 
+/// You most likely care about the [`Dmar::iter()`]
+/// and [`Dmar::host_address_width()`] methods.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>Dmar&lt;<span class="lifetime">&#39;t</span>&gt; {
+    <span class="doccomment">/// The fixed-size part of the actual DMAR ACPI table.
+    </span>table: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>DmarReporting,
+    <span class="doccomment">/// The underlying MappedPages that cover this table
+    </span>mapped_pages: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>MappedPages,
+    <span class="doccomment">/// The offset into the above `mapped_pages` at which the dynamic part
+    /// of the DMAR table begins.
+    </span>dynamic_entries_starting_offset: usize,
+    <span class="doccomment">/// The total size in bytes of all dynamic entries.
+    /// This is *not* the number of entries.
+    </span>dynamic_entries_total_size: usize,
 }
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DmarReporting</span><span class="op">&gt;</span>(), <span class="number">48</span>);
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DmarReporting</span><span class="op">&gt;</span>(), <span class="number">1</span>);
 
-
-<span class="doccomment">/// A wrapper around the DMAR ACPI table ([`DmarReporting`]),</span>
-<span class="doccomment">/// which contains details about IOMMU configuration.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// You most likely care about the [`Dmar::iter()`]</span>
-<span class="doccomment">/// and [`Dmar::host_address_width()`] methods.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Dmar</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// The fixed-size part of the actual DMAR ACPI table.</span>
-    <span class="ident">table</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">DmarReporting</span>,
-    <span class="doccomment">/// The underlying MappedPages that cover this table</span>
-    <span class="ident">mapped_pages</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">MappedPages</span>,
-    <span class="doccomment">/// The offset into the above `mapped_pages` at which the dynamic part</span>
-    <span class="doccomment">/// of the DMAR table begins.</span>
-    <span class="ident">dynamic_entries_starting_offset</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// The total size in bytes of all dynamic entries.</span>
-    <span class="doccomment">/// This is *not* the number of entries.</span>
-    <span class="ident">dynamic_entries_total_size</span>: <span class="ident">usize</span>,
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> <span class="ident">Dmar</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Finds the DMAR in the given `AcpiTables` and returns a reference to it.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="ident">acpi_tables</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">AcpiTables</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Dmar</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">table</span>: <span class="kw-2">&amp;</span><span class="ident">DmarReporting</span> <span class="op">=</span> <span class="ident">acpi_tables</span>.<span class="ident">table</span>(<span class="kw-2">&amp;</span><span class="ident">DMAR_SIGNATURE</span>).<span class="ident">ok</span>()<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">total_length</span> <span class="op">=</span> <span class="ident">table</span>.<span class="ident">header</span>.<span class="ident">length</span> <span class="kw">as</span> <span class="ident">usize</span>;
-        <span class="kw">let</span> <span class="ident">dynamic_part_length</span> <span class="op">=</span> <span class="ident">total_length</span> <span class="op">-</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">DmarReporting</span><span class="op">&gt;</span>();
-        <span class="kw">let</span> <span class="ident">loc</span> <span class="op">=</span> <span class="ident">acpi_tables</span>.<span class="ident">table_location</span>(<span class="kw-2">&amp;</span><span class="ident">DMAR_SIGNATURE</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Some</span>(<span class="ident">Dmar</span> {
-            <span class="ident">table</span>,
-            <span class="ident">mapped_pages</span>: <span class="ident">acpi_tables</span>.<span class="ident">mapping</span>(),
-            <span class="ident">dynamic_entries_starting_offset</span>: <span class="ident">loc</span>.<span class="ident">slice_offset_and_length</span><span class="question-mark">?</span>.<span class="number">0</span>,
-            <span class="ident">dynamic_entries_total_size</span>: <span class="ident">dynamic_part_length</span>,
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;t</span>&gt; Dmar&lt;<span class="lifetime">&#39;t</span>&gt; {
+    <span class="doccomment">/// Finds the DMAR in the given `AcpiTables` and returns a reference to it.
+    </span><span class="kw">pub fn </span>get(acpi_tables: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>AcpiTables) -&gt; <span class="prelude-ty">Option</span>&lt;Dmar&lt;<span class="lifetime">&#39;t</span>&gt;&gt; {
+        <span class="kw">let </span>table: <span class="kw-2">&amp;</span>DmarReporting = acpi_tables.table(<span class="kw-2">&amp;</span>DMAR_SIGNATURE).ok()<span class="question-mark">?</span>;
+        <span class="kw">let </span>total_length = table.header.length <span class="kw">as </span>usize;
+        <span class="kw">let </span>dynamic_part_length = total_length - size_of::&lt;DmarReporting&gt;();
+        <span class="kw">let </span>loc = acpi_tables.table_location(<span class="kw-2">&amp;</span>DMAR_SIGNATURE)<span class="question-mark">?</span>;
+        <span class="prelude-val">Some</span>(Dmar {
+            table,
+            mapped_pages: acpi_tables.mapping(),
+            dynamic_entries_starting_offset: loc.slice_offset_and_length<span class="question-mark">?</span>.<span class="number">0</span>,
+            dynamic_entries_total_size: dynamic_part_length,
         })
     }
 
-    <span class="doccomment">/// Returns an [`Iterator`] over the DMAR&#39;s remapping structures ([`DmarEntry`]s),</span>
-    <span class="doccomment">/// which are variable in both number and size.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">iter</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">DmarIter</span> {
-        <span class="ident">DmarIter</span> {
-            <span class="ident">mapped_pages</span>: <span class="self">self</span>.<span class="ident">mapped_pages</span>,
-            <span class="ident">offset</span>: <span class="self">self</span>.<span class="ident">dynamic_entries_starting_offset</span>,
-            <span class="ident">end_of_entries</span>: <span class="self">self</span>.<span class="ident">dynamic_entries_starting_offset</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">dynamic_entries_total_size</span>,
+    <span class="doccomment">/// Returns an [`Iterator`] over the DMAR&#39;s remapping structures ([`DmarEntry`]s),
+    /// which are variable in both number and size.
+    </span><span class="kw">pub fn </span>iter(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DmarIter {
+        DmarIter {
+            mapped_pages: <span class="self">self</span>.mapped_pages,
+            offset: <span class="self">self</span>.dynamic_entries_starting_offset,
+            end_of_entries: <span class="self">self</span>.dynamic_entries_starting_offset + <span class="self">self</span>.dynamic_entries_total_size,
         }
     }
 
-    <span class="doccomment">/// Returns a reference to the `Sdt` header in this DMAR table.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sdt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Sdt</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">table</span>.<span class="ident">header</span>
+    <span class="doccomment">/// Returns a reference to the `Sdt` header in this DMAR table.
+    </span><span class="kw">pub fn </span>sdt(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Sdt {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.table.header
     }
 
-    <span class="doccomment">/// Returns the `flags` value in this DMAR table.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flags</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> {
-        <span class="self">self</span>.<span class="ident">table</span>.<span class="ident">flags</span>
+    <span class="doccomment">/// Returns the `flags` value in this DMAR table.
+    </span><span class="kw">pub fn </span>flags(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 {
+        <span class="self">self</span>.table.flags
     }
 
-    <span class="doccomment">/// Returns the maximum DMA physical addressability (in number of bits) </span>
-    <span class="doccomment">/// supported by this machine.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">host_address_width</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u8</span> {
-        <span class="comment">// The Host Address Width (HAW) of this machine is computed as (N+1),</span>
-        <span class="comment">// where N is the value reported in the `host_address_width` field.</span>
-        <span class="self">self</span>.<span class="ident">table</span>.<span class="ident">host_address_width</span> <span class="op">+</span> <span class="number">1</span>
-    }
+    <span class="doccomment">/// Returns the maximum DMA physical addressability (in number of bits) 
+    /// supported by this machine.
+    </span><span class="kw">pub fn </span>host_address_width(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 {
+        <span class="comment">// The Host Address Width (HAW) of this machine is computed as (N+1),
+        // where N is the value reported in the `host_address_width` field.
+        </span><span class="self">self</span>.table.host_address_width + <span class="number">1
+    </span>}
 }
 
 
-<span class="doccomment">/// An [`Iterator`] over the dynamic entries of the [`Dmar`].</span>
-<span class="doccomment">/// Its lifetime is dependent upon the lifetime of its [`Dmar`] instance,</span>
-<span class="doccomment">/// which itself is bound to the lifetime of the underlying [`AcpiTables`]. </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DmarIter</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// The underlying MappedPages that contain all ACPI tables.</span>
-    <span class="ident">mapped_pages</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">MappedPages</span>,
-    <span class="doccomment">/// The offset of the next entry, which should point to a [`DmarEntryRecord`]</span>
-    <span class="doccomment">/// at the start of each iteration.</span>
-    <span class="ident">offset</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// The end bound of all DMAR entries. </span>
-    <span class="doccomment">/// This is fixed and should not ever change throughout iteration.</span>
-    <span class="ident">end_of_entries</span>: <span class="ident">usize</span>,
+<span class="doccomment">/// An [`Iterator`] over the dynamic entries of the [`Dmar`].
+/// Its lifetime is dependent upon the lifetime of its [`Dmar`] instance,
+/// which itself is bound to the lifetime of the underlying [`AcpiTables`]. 
+</span><span class="attr">#[derive(Clone)]
+</span><span class="kw">pub struct </span>DmarIter&lt;<span class="lifetime">&#39;t</span>&gt; {
+    <span class="doccomment">/// The underlying MappedPages that contain all ACPI tables.
+    </span>mapped_pages: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>MappedPages,
+    <span class="doccomment">/// The offset of the next entry, which should point to a [`DmarEntryRecord`]
+    /// at the start of each iteration.
+    </span>offset: usize,
+    <span class="doccomment">/// The end bound of all DMAR entries. 
+    /// This is fixed and should not ever change throughout iteration.
+    </span>end_of_entries: usize,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> <span class="ident">Iterator</span> <span class="kw">for</span> <span class="ident">DmarIter</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">DmarEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span>;
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;t</span>&gt; Iterator <span class="kw">for </span>DmarIter&lt;<span class="lifetime">&#39;t</span>&gt; {
+    <span class="kw">type </span>Item = DmarEntry&lt;<span class="lifetime">&#39;t</span>&gt;;
 
-    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> (<span class="self">self</span>.<span class="ident">offset</span> <span class="op">+</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">DmarEntryRecord</span><span class="op">&gt;</span>()) <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">end_of_entries</span> {
-            <span class="comment">// First, we get the next entry record to get the type and size of the actual entry.</span>
-            <span class="kw">let</span> <span class="ident">entry</span>: <span class="kw-2">&amp;</span><span class="ident">DmarEntryRecord</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">mapped_pages</span>.<span class="ident">as_type</span>(<span class="self">self</span>.<span class="ident">offset</span>).<span class="ident">ok</span>()<span class="question-mark">?</span>;
-            <span class="comment">// Second, use that entry record to return the specific DMAR entry struct.</span>
-            <span class="kw">if</span> (<span class="self">self</span>.<span class="ident">offset</span> <span class="op">+</span> <span class="ident">entry</span>.<span class="ident">length</span> <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">end_of_entries</span> {
-                <span class="kw">let</span> <span class="ident">table</span> <span class="op">=</span> <span class="ident">DmarEntry::from_entry</span>(<span class="self">self</span>.<span class="ident">mapped_pages</span>, <span class="self">self</span>.<span class="ident">offset</span>, <span class="ident">entry</span>);
-                <span class="comment">// move the offset to the end of this entry, i.e., the beginning of the next entry record</span>
-                <span class="self">self</span>.<span class="ident">offset</span> <span class="op">+</span><span class="op">=</span> <span class="ident">entry</span>.<span class="ident">length</span> <span class="kw">as</span> <span class="ident">usize</span>;
-                <span class="kw">return</span> <span class="ident">table</span>.<span class="ident">ok</span>();
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
+        <span class="kw">if </span>(<span class="self">self</span>.offset + size_of::&lt;DmarEntryRecord&gt;()) &lt; <span class="self">self</span>.end_of_entries {
+            <span class="comment">// First, we get the next entry record to get the type and size of the actual entry.
+            </span><span class="kw">let </span>entry: <span class="kw-2">&amp;</span>DmarEntryRecord = <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok()<span class="question-mark">?</span>;
+            <span class="comment">// Second, use that entry record to return the specific DMAR entry struct.
+            </span><span class="kw">if </span>(<span class="self">self</span>.offset + entry.length <span class="kw">as </span>usize) &lt;= <span class="self">self</span>.end_of_entries {
+                <span class="kw">let </span>table = DmarEntry::from_entry(<span class="self">self</span>.mapped_pages, <span class="self">self</span>.offset, entry);
+                <span class="comment">// move the offset to the end of this entry, i.e., the beginning of the next entry record
+                </span><span class="self">self</span>.offset += entry.length <span class="kw">as </span>usize;
+                <span class="kw">return </span>table.ok();
             }
         }
-        <span class="prelude-val">None</span>
-    }
+        <span class="prelude-val">None
+    </span>}
 }
 
 
-<span class="doccomment">/// Represents the &quot;header&quot; of each dynamic table entry </span>
-<span class="doccomment">/// in the [`DmarReporting`] table.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DmarEntryRecord</span> {
-    <span class="doccomment">/// The type of a DMAR entry.</span>
-    <span class="ident">typ</span>: <span class="ident">u16</span>,
-    <span class="doccomment">/// The length in bytes of a DMAR entry table.</span>
-    <span class="ident">length</span>: <span class="ident">u16</span>,
+<span class="doccomment">/// Represents the &quot;header&quot; of each dynamic table entry 
+/// in the [`DmarReporting`] table.
+</span><span class="attr">#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(C, packed)]
+</span><span class="kw">pub struct </span>DmarEntryRecord {
+    <span class="doccomment">/// The type of a DMAR entry.
+    </span>typ: u16,
+    <span class="doccomment">/// The length in bytes of a DMAR entry table.
+    </span>length: u16,
 }
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DmarEntryRecord</span><span class="op">&gt;</span>(), <span class="number">4</span>);
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DmarEntryRecord</span><span class="op">&gt;</span>(), <span class="number">1</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;DmarEntryRecord&gt;(), <span class="number">4</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;DmarEntryRecord&gt;(), <span class="number">1</span>);
 
 
-<span class="doccomment">/// The set of possible sub-tables that can exist in the top-level DMAR table.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The types of sub-tables are described in Section 8.2 of the VT Directed I/O Spec.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">DmarEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> {
-    <span class="ident">Drhd</span>(<span class="ident">DmarDrhd</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span>),
-    <span class="ident">Rmrr</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">DmarRmrr</span>),
-    <span class="ident">Atsr</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">DmarAtsr</span>),
-    <span class="ident">Rhsa</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">DmarRhsa</span>),
-    <span class="ident">Andd</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">DmarAndd</span>),
-    <span class="ident">Satc</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">DmarSatc</span>),
-    <span class="doccomment">/// The DMAR table had an entry of an unknown type or mismatched length,</span>
-    <span class="doccomment">/// so the table entry was malformed and unusable.</span>
-    <span class="doccomment">/// The entry type ID is included.</span>
-    <span class="ident">UnknownOrCorrupt</span>(<span class="ident">DmarEntryRecord</span>)
+<span class="doccomment">/// The set of possible sub-tables that can exist in the top-level DMAR table.
+///
+/// The types of sub-tables are described in Section 8.2 of the VT Directed I/O Spec.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub enum </span>DmarEntry&lt;<span class="lifetime">&#39;t</span>&gt; {
+    Drhd(DmarDrhd&lt;<span class="lifetime">&#39;t</span>&gt;),
+    Rmrr(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>DmarRmrr),
+    Atsr(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>DmarAtsr),
+    Rhsa(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>DmarRhsa),
+    Andd(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>DmarAndd),
+    Satc(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>DmarSatc),
+    <span class="doccomment">/// The DMAR table had an entry of an unknown type or mismatched length,
+    /// so the table entry was malformed and unusable.
+    /// The entry type ID is included.
+    </span>UnknownOrCorrupt(DmarEntryRecord)
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> <span class="ident">DmarEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">from_entry</span>(
-        <span class="ident">mp</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">MappedPages</span>,
-        <span class="ident">mp_offset</span>: <span class="ident">usize</span>,
-        <span class="ident">entry</span>: <span class="kw-2">&amp;</span><span class="ident">DmarEntryRecord</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DmarEntry</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">entry</span>.<span class="ident">typ</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;t</span>&gt; DmarEntry&lt;<span class="lifetime">&#39;t</span>&gt; {
+    <span class="kw">fn </span>from_entry(
+        mp: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>MappedPages,
+        mp_offset: usize,
+        entry: <span class="kw-2">&amp;</span>DmarEntryRecord,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;DmarEntry&lt;<span class="lifetime">&#39;t</span>&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">if </span>entry.typ != <span class="number">0 </span>{
             <span class="macro">log::warn!</span>(<span class="string">&quot;Note: non-DRHD remapping structure types (1, 2, 3, 4, or 5) are unimplemented!&quot;</span>);
         }
-        <span class="kw">match</span> <span class="ident">entry</span>.<span class="ident">typ</span> {
-            <span class="number">0</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident"><span class="self">Self</span>::Drhd</span>(<span class="ident">DmarDrhd::from_entry</span>(<span class="ident">mp</span>, <span class="ident">mp_offset</span>, <span class="ident">entry</span>)<span class="question-mark">?</span>)),
-            <span class="number">1</span> =&gt; <span class="ident">mp</span>.<span class="ident">as_type</span>(<span class="ident">mp_offset</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">ent</span><span class="op">|</span> <span class="ident"><span class="self">Self</span>::Rmrr</span>(<span class="ident">ent</span>)),
-            <span class="number">2</span> =&gt; <span class="ident">mp</span>.<span class="ident">as_type</span>(<span class="ident">mp_offset</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">ent</span><span class="op">|</span> <span class="ident"><span class="self">Self</span>::Atsr</span>(<span class="ident">ent</span>)),
-            <span class="number">3</span> =&gt; <span class="ident">mp</span>.<span class="ident">as_type</span>(<span class="ident">mp_offset</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">ent</span><span class="op">|</span> <span class="ident"><span class="self">Self</span>::Rhsa</span>(<span class="ident">ent</span>)),
-            <span class="number">4</span> =&gt; <span class="ident">mp</span>.<span class="ident">as_type</span>(<span class="ident">mp_offset</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">ent</span><span class="op">|</span> <span class="ident"><span class="self">Self</span>::Andd</span>(<span class="ident">ent</span>)),
-            <span class="number">5</span> =&gt; <span class="ident">mp</span>.<span class="ident">as_type</span>(<span class="ident">mp_offset</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">ent</span><span class="op">|</span> <span class="ident"><span class="self">Self</span>::Satc</span>(<span class="ident">ent</span>)),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident"><span class="self">Self</span>::UnknownOrCorrupt</span>(<span class="kw-2">*</span><span class="ident">entry</span>)),
+        <span class="kw">match </span>entry.typ {
+            <span class="number">0 </span>=&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>::Drhd(DmarDrhd::from_entry(mp, mp_offset, entry)<span class="question-mark">?</span>)),
+            <span class="number">1 </span>=&gt; mp.as_type(mp_offset).map(|ent| <span class="self">Self</span>::Rmrr(ent)),
+            <span class="number">2 </span>=&gt; mp.as_type(mp_offset).map(|ent| <span class="self">Self</span>::Atsr(ent)),
+            <span class="number">3 </span>=&gt; mp.as_type(mp_offset).map(|ent| <span class="self">Self</span>::Rhsa(ent)),
+            <span class="number">4 </span>=&gt; mp.as_type(mp_offset).map(|ent| <span class="self">Self</span>::Andd(ent)),
+            <span class="number">5 </span>=&gt; mp.as_type(mp_offset).map(|ent| <span class="self">Self</span>::Satc(ent)),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>::UnknownOrCorrupt(<span class="kw-2">*</span>entry)),
         }
     }
 }
 
 
-<span class="doccomment">/// RMRR: DMAR Reserved Memory Region Reporting Structure. </span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// An instance of this struct describes a memory region</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DmarRmrr</span> {
-    <span class="ident">header</span>: <span class="ident">DmarEntryRecord</span>,
-    <span class="ident">_reserved</span>: <span class="ident">u16</span>,
-    <span class="ident">segment_number</span>: <span class="ident">u16</span>,
-    <span class="doccomment">/// The base address of a 4KB-aligned reserved memory region. </span>
-    <span class="ident">base_address</span>: <span class="ident">u64</span>,
-    <span class="doccomment">/// The upper limit (last address) of the reserved memory region. </span>
-    <span class="ident">limit_address</span>: <span class="ident">u64</span>,
-    <span class="comment">// Following this is a variable number of variable-sized DMAR device scope table entries,</span>
-    <span class="comment">// so we cannot include them here in the static struct definition.</span>
+<span class="doccomment">/// RMRR: DMAR Reserved Memory Region Reporting Structure. 
+///
+/// An instance of this struct describes a memory region
+</span><span class="attr">#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(C, packed)]
+#[allow(dead_code)]
+</span><span class="kw">pub struct </span>DmarRmrr {
+    header: DmarEntryRecord,
+    _reserved: u16,
+    segment_number: u16,
+    <span class="doccomment">/// The base address of a 4KB-aligned reserved memory region. 
+    </span>base_address: u64,
+    <span class="doccomment">/// The upper limit (last address) of the reserved memory region. 
+    </span>limit_address: u64,
+    <span class="comment">// Following this is a variable number of variable-sized DMAR device scope table entries,
+    // so we cannot include them here in the static struct definition.
+</span>}
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;DmarRmrr&gt;(), <span class="number">24</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;DmarRmrr&gt;(), <span class="number">1</span>);
+
+
+<span class="doccomment">/// ATSR: DMAR Root Port ATS (Address Translation Services) Capability Reporting Structure. 
+</span><span class="attr">#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(C, packed)]
+#[allow(dead_code)]
+</span><span class="kw">pub struct </span>DmarAtsr {
+    header: DmarEntryRecord,
+    flags: u8,
+    _reserved: u8,
+    segment_number: u16,
+    <span class="comment">// Following this is a variable number of variable-sized DMAR device scope table entries,
+    // so we cannot include them here in the static struct definition.
+</span>}
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;DmarAtsr&gt;(), <span class="number">8</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;DmarAtsr&gt;(), <span class="number">1</span>);
+
+
+<span class="doccomment">/// RHSA: DMAR Remapping Hardware Static Affinity Structure. 
+</span><span class="attr">#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(C, packed)]
+#[allow(dead_code)]
+</span><span class="kw">pub struct </span>DmarRhsa {
+    header: DmarEntryRecord,
+    _reserved: u32,
+    register_base_address: u64,
+    proximity_domain: u32,
 }
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DmarRmrr</span><span class="op">&gt;</span>(), <span class="number">24</span>);
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DmarRmrr</span><span class="op">&gt;</span>(), <span class="number">1</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;DmarRhsa&gt;(), <span class="number">20</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;DmarRhsa&gt;(), <span class="number">1</span>);
 
 
-<span class="doccomment">/// ATSR: DMAR Root Port ATS (Address Translation Services) Capability Reporting Structure. </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DmarAtsr</span> {
-    <span class="ident">header</span>: <span class="ident">DmarEntryRecord</span>,
-    <span class="ident">flags</span>: <span class="ident">u8</span>,
-    <span class="ident">_reserved</span>: <span class="ident">u8</span>,
-    <span class="ident">segment_number</span>: <span class="ident">u16</span>,
-    <span class="comment">// Following this is a variable number of variable-sized DMAR device scope table entries,</span>
-    <span class="comment">// so we cannot include them here in the static struct definition.</span>
-}
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DmarAtsr</span><span class="op">&gt;</span>(), <span class="number">8</span>);
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DmarAtsr</span><span class="op">&gt;</span>(), <span class="number">1</span>);
+<span class="doccomment">/// ANDD: DMAR ACPI Name-space Device Declaration Structure. 
+</span><span class="attr">#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(C, packed)]
+#[allow(dead_code)]
+</span><span class="kw">pub struct </span>DmarAndd {
+    header: DmarEntryRecord,
+    _reserved: [u8; <span class="number">3</span>],
+    acpi_device_number: u8,
+    <span class="comment">// Following this is a variable-sized `ACPI Object Name` field,
+    // so we cannot include it here in the static struct definition.
+    // It&#39;s a C-style null-terminated string, which would look something like:
+    // acpi_object_name: [u8],
+</span>}
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;DmarAndd&gt;(), <span class="number">8</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;DmarAndd&gt;(), <span class="number">1</span>);
 
 
-<span class="doccomment">/// RHSA: DMAR Remapping Hardware Static Affinity Structure. </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DmarRhsa</span> {
-    <span class="ident">header</span>: <span class="ident">DmarEntryRecord</span>,
-    <span class="ident">_reserved</span>: <span class="ident">u32</span>,
-    <span class="ident">register_base_address</span>: <span class="ident">u64</span>,
-    <span class="ident">proximity_domain</span>: <span class="ident">u32</span>,
-}
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DmarRhsa</span><span class="op">&gt;</span>(), <span class="number">20</span>);
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DmarRhsa</span><span class="op">&gt;</span>(), <span class="number">1</span>);
-
-
-<span class="doccomment">/// ANDD: DMAR ACPI Name-space Device Declaration Structure. </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DmarAndd</span> {
-    <span class="ident">header</span>: <span class="ident">DmarEntryRecord</span>,
-    <span class="ident">_reserved</span>: [<span class="ident">u8</span>; <span class="number">3</span>],
-    <span class="ident">acpi_device_number</span>: <span class="ident">u8</span>,
-    <span class="comment">// Following this is a variable-sized `ACPI Object Name` field,</span>
-    <span class="comment">// so we cannot include it here in the static struct definition.</span>
-    <span class="comment">// It&#39;s a C-style null-terminated string, which would look something like:</span>
-    <span class="comment">// acpi_object_name: [u8],</span>
-}
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DmarAndd</span><span class="op">&gt;</span>(), <span class="number">8</span>);
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DmarAndd</span><span class="op">&gt;</span>(), <span class="number">1</span>);
-
-
-<span class="doccomment">/// SATC: DMAR SoC Integrated Address Translation Cache Reorting Structure. </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DmarSatc</span> {
-    <span class="ident">header</span>: <span class="ident">DmarEntryRecord</span>,
-    <span class="ident">flags</span>: <span class="ident">u8</span>,
-    <span class="ident">_reserved</span>: <span class="ident">u8</span>,
-    <span class="ident">segment_number</span>: <span class="ident">u16</span>,
-    <span class="comment">// Following this is a variable number of variable-sized DMAR device scope table entries,</span>
-    <span class="comment">// so we cannot include them here in the static struct definition.</span>
-}
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DmarSatc</span><span class="op">&gt;</span>(), <span class="number">8</span>);
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DmarSatc</span><span class="op">&gt;</span>(), <span class="number">1</span>);
+<span class="doccomment">/// SATC: DMAR SoC Integrated Address Translation Cache Reorting Structure. 
+</span><span class="attr">#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(C, packed)]
+#[allow(dead_code)]
+</span><span class="kw">pub struct </span>DmarSatc {
+    header: DmarEntryRecord,
+    flags: u8,
+    _reserved: u8,
+    segment_number: u16,
+    <span class="comment">// Following this is a variable number of variable-sized DMAR device scope table entries,
+    // so we cannot include them here in the static struct definition.
+</span>}
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;DmarSatc&gt;(), <span class="number">8</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;DmarSatc&gt;(), <span class="number">1</span>);
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="dmar" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="dmar" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

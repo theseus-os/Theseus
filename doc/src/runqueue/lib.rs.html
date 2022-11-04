@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/runqueue/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../runqueue/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../runqueue/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../runqueue/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/runqueue/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../runqueue/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -64,66 +58,65 @@
 <span id="58">58</span>
 <span id="59">59</span>
 <span id="60">60</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This crate contains the API of the `RunQueue` structure, Runqueue Structure should contain</span>
-<span class="doccomment">//! list of tasks with additional scheduling information depending on the scheduler.</span>
-<span class="doccomment">//! All crates except the scheduler should refer to this crate to access functions on `RunQueue`.</span>
-<span class="doccomment">//! </span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate contains the API of the `RunQueue` structure, Runqueue Structure should contain
+//! list of tasks with additional scheduling information depending on the scheduler.
+//! All crates except the scheduler should refer to this crate to access functions on `RunQueue`.
+//! 
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mutex_preemption</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">atomic_linked_list</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">cfg_if</span>;
-<span class="macro">cfg_if!</span> {
-    <span class="kw">if</span> <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">priority_scheduler</span>)]</span> {
-        <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">runqueue_priority</span> <span class="kw">as</span> <span class="ident">runqueue</span>;
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">realtime_scheduler</span>)]</span> {
-        <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">runqueue_realtime</span> <span class="kw">as</span> <span class="ident">runqueue</span>;
-    } <span class="kw">else</span> {
-        <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">runqueue_round_robin</span> <span class="kw">as</span> <span class="ident">runqueue</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>mutex_preemption;
+<span class="kw">extern crate </span>atomic_linked_list;
+<span class="kw">extern crate </span>task;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>cfg_if;
+<span class="macro">cfg_if! </span>{
+    <span class="kw">if </span><span class="attr">#[cfg(priority_scheduler)] </span>{
+        <span class="kw">extern crate </span>runqueue_priority <span class="kw">as </span>runqueue;
+    } <span class="kw">else if </span><span class="attr">#[cfg(realtime_scheduler)] </span>{
+        <span class="kw">extern crate </span>runqueue_realtime <span class="kw">as </span>runqueue;
+    } <span class="kw">else </span>{
+        <span class="kw">extern crate </span>runqueue_round_robin <span class="kw">as </span>runqueue;
     }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">single_simd_task_optimization</span>)]</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">single_simd_task_optimization</span>;
+<span class="attr">#[cfg(single_simd_task_optimization)]
+</span><span class="kw">extern crate </span>single_simd_task_optimization;
 
-<span class="kw">use</span> <span class="ident">mutex_preemption::RwLockPreempt</span>;
-<span class="kw">use</span> <span class="ident">task::TaskRef</span>;
-<span class="kw">use</span> <span class="ident">runqueue::RunQueue</span>;
+<span class="kw">use </span>mutex_preemption::RwLockPreempt;
+<span class="kw">use </span>task::TaskRef;
+<span class="kw">use </span>runqueue::RunQueue;
 
 
-<span class="doccomment">/// Creates a new `RunQueue` for the given core, which is an `apic_id`.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">which_core</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="ident">RunQueue::init</span>(<span class="ident">which_core</span>)
+<span class="doccomment">/// Creates a new `RunQueue` for the given core, which is an `apic_id`.
+</span><span class="kw">pub fn </span>init(which_core: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    RunQueue::init(which_core)
 }
 
-<span class="doccomment">/// Returns the `RunQueue` of the given core, which is an `apic_id`.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_runqueue</span>(<span class="ident">which_core</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">RwLockPreempt</span><span class="op">&lt;</span><span class="ident">RunQueue</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-    <span class="ident">RunQueue::get_runqueue</span>(<span class="ident">which_core</span>)
+<span class="doccomment">/// Returns the `RunQueue` of the given core, which is an `apic_id`.
+</span><span class="kw">pub fn </span>get_runqueue(which_core: u8) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>RwLockPreempt&lt;RunQueue&gt;&gt; {
+    RunQueue::get_runqueue(which_core)
 }
 
-<span class="doccomment">/// Returns the &quot;least busy&quot; core</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_least_busy_core</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
-    <span class="ident">RunQueue::get_least_busy_core</span>()
+<span class="doccomment">/// Returns the &quot;least busy&quot; core
+</span><span class="kw">pub fn </span>get_least_busy_core() -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
+    RunQueue::get_least_busy_core()
 }
 
-<span class="doccomment">/// Chooses the &quot;least busy&quot; core&#39;s runqueue</span>
-<span class="doccomment">/// and adds the given `Task` reference to that core&#39;s runqueue.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_task_to_any_runqueue</span>(<span class="ident">task</span>: <span class="ident">TaskRef</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="ident">RunQueue::add_task_to_any_runqueue</span>(<span class="ident">task</span>)
+<span class="doccomment">/// Chooses the &quot;least busy&quot; core&#39;s runqueue
+/// and adds the given `Task` reference to that core&#39;s runqueue.
+</span><span class="kw">pub fn </span>add_task_to_any_runqueue(task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    RunQueue::add_task_to_any_runqueue(task)
 }
 
-<span class="doccomment">/// Adds the given `Task` reference to given core&#39;s runqueue.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_task_to_specific_runqueue</span>(<span class="ident">which_core</span>: <span class="ident">u8</span>, <span class="ident">task</span>: <span class="ident">TaskRef</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="ident">RunQueue::add_task_to_specific_runqueue</span>(<span class="ident">which_core</span>, <span class="ident">task</span>)
+<span class="doccomment">/// Adds the given `Task` reference to given core&#39;s runqueue.
+</span><span class="kw">pub fn </span>add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    RunQueue::add_task_to_specific_runqueue(which_core, task)
 }
 
-<span class="doccomment">/// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">remove_task_from_all</span>(<span class="ident">task</span>: <span class="kw-2">&amp;</span><span class="ident">TaskRef</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="ident">RunQueue::remove_task_from_all</span>(<span class="ident">task</span>)
+<span class="doccomment">/// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
+</span><span class="kw">pub fn </span>remove_task_from_all(task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    RunQueue::remove_task_from_all(task)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="runqueue" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="runqueue" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

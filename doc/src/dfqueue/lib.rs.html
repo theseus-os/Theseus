@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../dfqueue/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../dfqueue/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../dfqueue/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../dfqueue/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -677,158 +671,158 @@
 <span id="671">671</span>
 <span id="672">672</span>
 <span id="673">673</span>
-</pre><pre class="rust"><code><span class="doccomment">//! DFQ is a decoupled, fault-tolerant, multi-producer single-consumer queue.</span>
-<span class="doccomment">//! DFQ is compatible with `no_std` and is interrupt-safe by being entirely lock-free and mostly wait-free.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! DFQ accepts immutable data items only and does not allow the consumer</span>
-<span class="doccomment">//! to immediately remove (pop) or modify the items in the queue.</span>
-<span class="doccomment">//! In a transactional fashion, the consumer must call [`mark_completed`]: #method.mark_completed </span>
-<span class="doccomment">//! on a queued item to indicate that that item can be safely removed from the queue. </span>
-<span class="doccomment">//! Because the original producer that enqueued that item retains a reference to that item,</span>
-<span class="doccomment">//! it is then safe for any entity (any producer or the consumer) to remove it from the queue. </span>
-<span class="doccomment">//! Currently, the consumer simply removes completed items from the queue on the next occasion </span>
-<span class="doccomment">//! of a conumser method like `peek()`.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Each producer retains ownership of the data items it queues, and only those items. </span>
-<span class="doccomment">//! Thus, a producer is able to query the status of that item&#39;s handling by the consumer, </span>
-<span class="doccomment">//! to see if it is still on the queue or if something has gone wrong and it has failed. </span>
-<span class="doccomment">//! If a failure has occurred, that producer can enqueue that item again, </span>
-<span class="doccomment">//! but of course its original position in the queue will be lost. </span>
+</pre><pre class="rust"><code><span class="doccomment">//! DFQ is a decoupled, fault-tolerant, multi-producer single-consumer queue.
+//! DFQ is compatible with `no_std` and is interrupt-safe by being entirely lock-free and mostly wait-free.
+//!
+//! DFQ accepts immutable data items only and does not allow the consumer
+//! to immediately remove (pop) or modify the items in the queue.
+//! In a transactional fashion, the consumer must call [`mark_completed`]: #method.mark_completed 
+//! on a queued item to indicate that that item can be safely removed from the queue. 
+//! Because the original producer that enqueued that item retains a reference to that item,
+//! it is then safe for any entity (any producer or the consumer) to remove it from the queue. 
+//! Currently, the consumer simply removes completed items from the queue on the next occasion 
+//! of a conumser method like `peek()`.
+//!
+//! Each producer retains ownership of the data items it queues, and only those items. 
+//! Thus, a producer is able to query the status of that item&#39;s handling by the consumer, 
+//! to see if it is still on the queue or if something has gone wrong and it has failed. 
+//! If a failure has occurred, that producer can enqueue that item again, 
+//! but of course its original position in the queue will be lost. 
 
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="attribute">#![<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">box_syntax</span>)]</span>
-
-
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">std</span>;
+#![allow(dead_code)]
+#![feature(box_syntax)]
 
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-
-<span class="kw">use</span> <span class="ident">core::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
-<span class="kw">use</span> <span class="ident">core::ptr</span>;
-<span class="kw">use</span> <span class="ident">core::ops::Deref</span>;
-<span class="kw">use</span> <span class="ident">alloc::sync::Arc</span>;
+#[cfg(test)]
+#[macro_use] </span><span class="kw">extern crate </span>std;
 
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">mpsc_queue</span>;
+<span class="kw">extern crate </span>alloc;
+
+<span class="kw">use </span>core::sync::atomic::{AtomicBool, Ordering};
+<span class="kw">use </span>core::ptr;
+<span class="kw">use </span>core::ops::Deref;
+<span class="kw">use </span>alloc::sync::Arc;
+
+
+<span class="kw">pub mod </span>mpsc_queue;
 
 
 
-<span class="doccomment">/// The actual queue, an opaque type that cannot be used directly. </span>
-<span class="doccomment">/// The user must use `DFQueueConsumer` and `DFQueueProducer`. </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DFQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// the actual inner queue</span>
-    <span class="ident">queue</span>: <span class="ident">InnerQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// whether this queue has a consumer (it can only have one!!)</span>
-    <span class="ident">has_consumer</span>: <span class="ident">AtomicBool</span>,
+<span class="doccomment">/// The actual queue, an opaque type that cannot be used directly. 
+/// The user must use `DFQueueConsumer` and `DFQueueProducer`. 
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>DFQueue&lt;T&gt; {
+    <span class="doccomment">/// the actual inner queue
+    </span>queue: InnerQueue&lt;T&gt;,
+    <span class="doccomment">/// whether this queue has a consumer (it can only have one!!)
+    </span>has_consumer: AtomicBool,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">DFQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+<span class="kw">impl</span>&lt;T&gt; DFQueue&lt;T&gt; {
 
-    <span class="doccomment">/// Creates a new DFQueue. </span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This object cannot be used directly, you must obtain a producer or consumer to the queue</span>
-    <span class="doccomment">/// using the functions `into_consumer()` or `obtain_producer()`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">DFQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">DFQueue</span> {
-            <span class="ident">queue</span>: <span class="ident">InnerQueue::new</span>(),
-            <span class="ident">has_consumer</span>: <span class="ident">AtomicBool::default</span>(),
+    <span class="doccomment">/// Creates a new DFQueue. 
+    ///
+    /// This object cannot be used directly, you must obtain a producer or consumer to the queue
+    /// using the functions `into_consumer()` or `obtain_producer()`.
+    </span><span class="kw">pub fn </span>new() -&gt; DFQueue&lt;T&gt; {
+        DFQueue {
+            queue: InnerQueue::new(),
+            has_consumer: AtomicBool::default(),
         }
     }
 
 
-    <span class="doccomment">/// Consumes the DFQueue and returns the one and only consumer for this DFQueue. </span>
-    <span class="doccomment">/// It consumes the DFQueue instance because there is only one consumer allowed per DFQueue.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_consumer</span>(<span class="self">self</span>) -&gt; <span class="ident">DFQueueConsumer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">has_consumer</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="op">==</span> <span class="bool-val">false</span>, 
+    <span class="doccomment">/// Consumes the DFQueue and returns the one and only consumer for this DFQueue. 
+    /// It consumes the DFQueue instance because there is only one consumer allowed per DFQueue.
+    </span><span class="kw">pub fn </span>into_consumer(<span class="self">self</span>) -&gt; DFQueueConsumer&lt;T&gt; {
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.has_consumer.load(Ordering::SeqCst) == <span class="bool-val">false</span>, 
                       <span class="string">&quot;DFQueue::into_consumer(): FATAL ERROR: already had a consumer!&quot;</span>);
-        <span class="self">self</span>.<span class="ident">has_consumer</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
+        <span class="self">self</span>.has_consumer.store(<span class="bool-val">true</span>, Ordering::SeqCst);
 
-        <span class="ident">DFQueueConsumer</span> {
-            <span class="ident">qref</span>: <span class="ident">Arc::new</span>(<span class="self">self</span>),
+        DFQueueConsumer {
+            qref: Arc::new(<span class="self">self</span>),
         }
     }
 
-    <span class="doccomment">/// Consumes the DFQueue and returns a producer. </span>
-    <span class="doccomment">/// To obtain another DFQueueProducer for this DFQueue, call `obtain_producer()` on the returned DFQueueProducer. </span>
-    <span class="doccomment">/// DFQueueProducer does not implement the standard Clone trait, to avoid accidentally cloning it implicity. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_producer</span>(<span class="self">self</span>) -&gt; <span class="ident">DFQueueProducer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">DFQueueProducer</span> {
-            <span class="ident">qref</span>: <span class="ident">Arc::new</span>(<span class="self">self</span>),
-        }
-    }
-}
-
-
-
-<span class="doccomment">/// A consumer that can process (peek into) elements in a DFQueue, but not actually remove them.</span>
-<span class="doccomment">/// Do not wrap this in an Arc or Mutex, the queue it is already protected by those on the interior. </span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This does not provide a `pop()` method like most queues, </span>
-<span class="doccomment">/// because we do not permit the consumer to directly remove items from the queue.</span>
-<span class="doccomment">/// Instead, we require that an element can only be removed from the queue once it has been marked complete,</span>
-<span class="doccomment">/// providing a sort of transactional behavior. </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DFQueueConsumer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="ident">qref</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">DFQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">DFQueueConsumer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-
-    <span class="doccomment">/// Returns a new DFQueueProducer cloned from this consumer instance, since there can be multiple producers.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">obtain_producer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">DFQueueProducer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">DFQueueProducer</span> {
-            <span class="ident">qref</span>: <span class="self">self</span>.<span class="ident">qref</span>.<span class="ident">clone</span>(),
-        }
-    }
-
-    <span class="doccomment">/// Returns the next non-completed element in the queue without actually removing it from the queue,</span>
-    <span class="doccomment">/// or `None` if the queue is empty or in a temporarily-inconsistent state. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">peek</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">PeekedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">peek_result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">qref</span>.<span class="ident">queue</span>.<span class="ident">peek</span>();
-        <span class="kw">match</span> <span class="ident">peek_result</span> {
-            <span class="ident">PeekResult::Data</span>(<span class="ident">data</span>) =&gt; <span class="prelude-val">Some</span>(<span class="ident">data</span>),
-            <span class="ident">PeekResult::Empty</span> <span class="op">|</span> <span class="ident">PeekResult::Inconsistent</span> =&gt; <span class="prelude-val">None</span>,
+    <span class="doccomment">/// Consumes the DFQueue and returns a producer. 
+    /// To obtain another DFQueueProducer for this DFQueue, call `obtain_producer()` on the returned DFQueueProducer. 
+    /// DFQueueProducer does not implement the standard Clone trait, to avoid accidentally cloning it implicity. 
+    </span><span class="kw">pub fn </span>into_producer(<span class="self">self</span>) -&gt; DFQueueProducer&lt;T&gt; {
+        DFQueueProducer {
+            qref: Arc::new(<span class="self">self</span>),
         }
     }
 }
 
 
-<span class="doccomment">/// A producer that can enqueue elements into a DFQueue.</span>
-<span class="doccomment">/// Do not wrap this in an Arc or Mutex, the queue it is already protected by those on the interior. </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DFQueueProducer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="ident">qref</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">DFQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+
+<span class="doccomment">/// A consumer that can process (peek into) elements in a DFQueue, but not actually remove them.
+/// Do not wrap this in an Arc or Mutex, the queue it is already protected by those on the interior. 
+///
+/// This does not provide a `pop()` method like most queues, 
+/// because we do not permit the consumer to directly remove items from the queue.
+/// Instead, we require that an element can only be removed from the queue once it has been marked complete,
+/// providing a sort of transactional behavior. 
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>DFQueueConsumer&lt;T&gt; {
+    qref: Arc&lt;DFQueue&lt;T&gt;&gt;,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">DFQueueProducer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+<span class="kw">impl</span>&lt;T&gt; DFQueueConsumer&lt;T&gt; {
 
-    <span class="doccomment">/// Call this to obtain another DFQueueProducer. </span>
-    <span class="doccomment">/// DFQueueProducer does not implement the standard Clone trait, to avoid accidentally cloning it implicity. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">obtain_producer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">DFQueueProducer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">DFQueueProducer</span> {
-            <span class="ident">qref</span>: <span class="self">self</span>.<span class="ident">qref</span>.<span class="ident">clone</span>(),
+    <span class="doccomment">/// Returns a new DFQueueProducer cloned from this consumer instance, since there can be multiple producers.
+    </span><span class="kw">pub fn </span>obtain_producer(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DFQueueProducer&lt;T&gt; {
+        DFQueueProducer {
+            qref: <span class="self">self</span>.qref.clone(),
+        }
+    }
+
+    <span class="doccomment">/// Returns the next non-completed element in the queue without actually removing it from the queue,
+    /// or `None` if the queue is empty or in a temporarily-inconsistent state. 
+    </span><span class="kw">pub fn </span>peek(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;PeekedData&lt;T&gt;&gt; {
+        <span class="kw">let </span>peek_result = <span class="self">self</span>.qref.queue.peek();
+        <span class="kw">match </span>peek_result {
+            PeekResult::Data(data) =&gt; <span class="prelude-val">Some</span>(data),
+            PeekResult::Empty | PeekResult::Inconsistent =&gt; <span class="prelude-val">None</span>,
+        }
+    }
+}
+
+
+<span class="doccomment">/// A producer that can enqueue elements into a DFQueue.
+/// Do not wrap this in an Arc or Mutex, the queue it is already protected by those on the interior. 
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>DFQueueProducer&lt;T&gt; {
+    qref: Arc&lt;DFQueue&lt;T&gt;&gt;,
+}
+
+<span class="kw">impl</span>&lt;T&gt; DFQueueProducer&lt;T&gt; {
+
+    <span class="doccomment">/// Call this to obtain another DFQueueProducer. 
+    /// DFQueueProducer does not implement the standard Clone trait, to avoid accidentally cloning it implicity. 
+    </span><span class="kw">pub fn </span>obtain_producer(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DFQueueProducer&lt;T&gt; {
+        DFQueueProducer {
+            qref: <span class="self">self</span>.qref.clone(),
         }
     }
 
 
-    <span class="doccomment">/// Returns a DFQueueConsumer for this queue, if it hasn&#39;t yet been obtained </span>
-    <span class="doccomment">/// (either via this function or via `DFQueue::into_consumer()`).</span>
-    <span class="doccomment">/// To ensure there is only a single DFQueueConsumer, it will return `None` if there is already a `DFQueueConsumer`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_consumer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DFQueueConsumer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">has_consumer</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">qref</span>.<span class="ident">has_consumer</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
-        <span class="kw">match</span> <span class="ident">has_consumer</span> {
-            <span class="bool-val">true</span> =&gt; <span class="prelude-val">None</span>,
-            <span class="bool-val">false</span> =&gt; {
-                <span class="self">self</span>.<span class="ident">qref</span>.<span class="ident">has_consumer</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
+    <span class="doccomment">/// Returns a DFQueueConsumer for this queue, if it hasn&#39;t yet been obtained 
+    /// (either via this function or via `DFQueue::into_consumer()`).
+    /// To ensure there is only a single DFQueueConsumer, it will return `None` if there is already a `DFQueueConsumer`.
+    </span><span class="kw">pub fn </span>get_consumer(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DFQueueConsumer&lt;T&gt;&gt; {
+        <span class="kw">let </span>has_consumer: bool = <span class="self">self</span>.qref.has_consumer.load(Ordering::SeqCst);
+        <span class="kw">match </span>has_consumer {
+            <span class="bool-val">true </span>=&gt; <span class="prelude-val">None</span>,
+            <span class="bool-val">false </span>=&gt; {
+                <span class="self">self</span>.qref.has_consumer.store(<span class="bool-val">true</span>, Ordering::SeqCst);
                 <span class="prelude-val">Some</span>(
-                    <span class="ident">DFQueueConsumer</span> {
-                        <span class="ident">qref</span>: <span class="self">self</span>.<span class="ident">qref</span>.<span class="ident">clone</span>(),
+                    DFQueueConsumer {
+                        qref: <span class="self">self</span>.qref.clone(),
                     }
                 )
             }
@@ -836,275 +830,275 @@
     }
 
 
-    <span class="doccomment">/// Pushes the given `data` onto the queue.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Returns </span>
-    <span class="doccomment">/// Returns a QueuedData instance, an Arc-like reference to the given `data` on the queue.</span>
-    <span class="doccomment">/// This ensures that the producer can still retain the given `data` if the queue experiences a failure. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enqueue</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">data</span>: <span class="ident">T</span>) -&gt; <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>{
-        <span class="self">self</span>.<span class="ident">qref</span>.<span class="ident">queue</span>.<span class="ident">push</span>(<span class="ident">data</span>)
+    <span class="doccomment">/// Pushes the given `data` onto the queue.
+    ///
+    /// # Returns 
+    /// Returns a QueuedData instance, an Arc-like reference to the given `data` on the queue.
+    /// This ensures that the producer can still retain the given `data` if the queue experiences a failure. 
+    </span><span class="kw">pub fn </span>enqueue(<span class="kw-2">&amp;</span><span class="self">self</span>, data: T) -&gt; QueuedData&lt;T&gt;{
+        <span class="self">self</span>.qref.queue.push(data)
     }
 }
 
 
 
 
-<span class="comment">// ---------------------------------------------------------</span>
-<span class="comment">//    Below is the modified MPSC queue from Rust&#39;s libstd</span>
-<span class="comment">// ---------------------------------------------------------</span>
+<span class="comment">// ---------------------------------------------------------
+//    Below is the modified MPSC queue from Rust&#39;s libstd
+// ---------------------------------------------------------
 
-<span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
-<span class="kw">use</span> <span class="ident">core::cell::UnsafeCell</span>;
-<span class="kw">use</span> <span class="ident">core::sync::atomic::AtomicPtr</span>;
-
-
-<span class="comment">// /// A result of the `pop` function.</span>
-<span class="comment">// pub enum PopResult&lt;T&gt; {</span>
-<span class="comment">//     /// Some data has been popped</span>
-<span class="comment">//     Data(QueuedData&lt;T&gt;),</span>
-<span class="comment">//     /// The queue is empty</span>
-<span class="comment">//     Empty,</span>
-<span class="comment">//     /// The queue is in an inconsistent state. Popping data should succeed, but</span>
-<span class="comment">//     /// some pushers have yet to make enough progress in order allow a pop to</span>
-<span class="comment">//     /// succeed. It is recommended that a pop() occur &quot;in the near future&quot; in</span>
-<span class="comment">//     /// order to see if the sender has made progress or not</span>
-<span class="comment">//     Inconsistent,</span>
-<span class="comment">// }</span>
+</span><span class="kw">use </span>alloc::boxed::Box;
+<span class="kw">use </span>core::cell::UnsafeCell;
+<span class="kw">use </span>core::sync::atomic::AtomicPtr;
 
 
-<span class="doccomment">/// A result of the `peek` function.</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">PeekResult</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Some data has been successfully peeked</span>
-    <span class="ident">Data</span>(<span class="ident">PeekedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>),
-    <span class="doccomment">/// The queue is empty</span>
-    <span class="ident">Empty</span>,
-    <span class="doccomment">/// The queue is in an inconsistent state. Peeking data should succeed, but</span>
-    <span class="doccomment">/// some pushers have yet to make enough progress in order allow a peek to</span>
-    <span class="doccomment">/// succeed. It is recommended that a peek() occur &quot;in the near future&quot; in</span>
-    <span class="doccomment">/// order to see if the sender has made progress or not.</span>
-    <span class="ident">Inconsistent</span>,
+<span class="comment">// /// A result of the `pop` function.
+// pub enum PopResult&lt;T&gt; {
+//     /// Some data has been popped
+//     Data(QueuedData&lt;T&gt;),
+//     /// The queue is empty
+//     Empty,
+//     /// The queue is in an inconsistent state. Popping data should succeed, but
+//     /// some pushers have yet to make enough progress in order allow a pop to
+//     /// succeed. It is recommended that a pop() occur &quot;in the near future&quot; in
+//     /// order to see if the sender has made progress or not
+//     Inconsistent,
+// }
+
+
+</span><span class="doccomment">/// A result of the `peek` function.
+</span><span class="kw">pub enum </span>PeekResult&lt;T&gt; {
+    <span class="doccomment">/// Some data has been successfully peeked
+    </span>Data(PeekedData&lt;T&gt;),
+    <span class="doccomment">/// The queue is empty
+    </span>Empty,
+    <span class="doccomment">/// The queue is in an inconsistent state. Peeking data should succeed, but
+    /// some pushers have yet to make enough progress in order allow a peek to
+    /// succeed. It is recommended that a peek() occur &quot;in the near future&quot; in
+    /// order to see if the sender has made progress or not.
+    </span>Inconsistent,
 }
 
-<span class="kw">struct</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// next points to the node before it, the next one to be popped</span>
-    <span class="ident">next</span>: <span class="ident">AtomicPtr</span><span class="op">&lt;</span><span class="ident">Node</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// marking the value as None is how we denote an item is removed from the queue</span>
-    <span class="ident">value</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="comment">// /// prev points to the node ahead of it, the one that was just pushed in front of it</span>
-    <span class="comment">// prev: AtomicPtr&lt;Node&lt;T&gt;&gt;, // we don&#39;t need prev</span>
-}
+<span class="kw">struct </span>Node&lt;T&gt; {
+    <span class="doccomment">/// next points to the node before it, the next one to be popped
+    </span>next: AtomicPtr&lt;Node&lt;T&gt;&gt;,
+    <span class="doccomment">/// marking the value as None is how we denote an item is removed from the queue
+    </span>value: <span class="prelude-ty">Option</span>&lt;QueuedData&lt;T&gt;&gt;,
+    <span class="comment">// /// prev points to the node ahead of it, the one that was just pushed in front of it
+    // prev: AtomicPtr&lt;Node&lt;T&gt;&gt;, // we don&#39;t need prev
+</span>}
 
 
-<span class="doccomment">/// A special reference type that wraps a data item that has been queued. </span>
-<span class="doccomment">/// This is returned to a producer thread (the user of a DFQueueProducer)</span>
-<span class="doccomment">/// when enqueuing an item onto the queue so that the producer </span>
-<span class="doccomment">/// can retain a reference to it in the case of failure.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">InnerQueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>);
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+<span class="doccomment">/// A special reference type that wraps a data item that has been queued. 
+/// This is returned to a producer thread (the user of a DFQueueProducer)
+/// when enqueuing an item onto the queue so that the producer 
+/// can retain a reference to it in the case of failure.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>QueuedData&lt;T&gt;(Arc&lt;InnerQueuedData&lt;T&gt;&gt;);
+<span class="kw">impl</span>&lt;T&gt; QueuedData&lt;T&gt; {
 
-    <span class="doccomment">/// Not public, a DFQueueProducer must call an enqueue function to receive one of these back.</span>
-    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">data</span>: <span class="ident">T</span>) -&gt; <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">QueuedData</span>(<span class="ident">Arc::new</span>(<span class="ident">InnerQueuedData</span>{
-            <span class="ident">data</span>: <span class="ident">data</span>,
-            <span class="ident">completed</span>: <span class="ident">AtomicBool::default</span>(),
+    <span class="doccomment">/// Not public, a DFQueueProducer must call an enqueue function to receive one of these back.
+    </span><span class="kw">fn </span>new(data: T) -&gt; QueuedData&lt;T&gt; {
+        QueuedData(Arc::new(InnerQueuedData{
+            data: data,
+            completed: AtomicBool::default(),
         }))
     }
 
 
-    <span class="doccomment">/// Whether this item has been completed (handled) by the DFQueueConsumer.</span>
-    <span class="doccomment">/// If an item is completed, it&#39;s okay to remove it from the queue (and it will be removed).</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_completed</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">completed</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
+    <span class="doccomment">/// Whether this item has been completed (handled) by the DFQueueConsumer.
+    /// If an item is completed, it&#39;s okay to remove it from the queue (and it will be removed).
+    </span><span class="kw">pub fn </span>is_completed(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.<span class="number">0</span>.completed.load(Ordering::SeqCst)
     }
 
 
-    <span class="doccomment">/// Returns true if this data is still on the queue</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// The logic here is as follows: the thread invoking this function holds one reference. </span>
-    <span class="doccomment">/// Thus, if there is more than one reference, then it means it is on the queue, </span>
-    <span class="doccomment">/// because the queue also holds a reference to it. </span>
-    <span class="doccomment">/// That&#39;s why we cannot call it internally -- it won&#39;t be correct because the original producer thread</span>
-    <span class="doccomment">/// may also be holding a reference to it, in order for that producer to retain a reference to it.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Private note: do not call this internally! This is a public API meant for the producer thread to use.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_enqueued</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="ident">Arc::strong_count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>) <span class="op">&gt;</span> <span class="number">1</span>
+    <span class="doccomment">/// Returns true if this data is still on the queue
+    /// 
+    /// The logic here is as follows: the thread invoking this function holds one reference. 
+    /// Thus, if there is more than one reference, then it means it is on the queue, 
+    /// because the queue also holds a reference to it. 
+    /// That&#39;s why we cannot call it internally -- it won&#39;t be correct because the original producer thread
+    /// may also be holding a reference to it, in order for that producer to retain a reference to it.
+    ///
+    /// Private note: do not call this internally! This is a public API meant for the producer thread to use.
+    </span><span class="kw">pub fn </span>is_enqueued(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        Arc::strong_count(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>) &gt; <span class="number">1
+    </span>}
+
+
+    <span class="doccomment">/// The logic here is as follows: if the item on the queue has only one reference, and has not been completed,
+    /// that means it is no longer on the queue (the consumer thread crashed or failed). 
+    /// Again, the producer thread invoking this function holds one reference, and if the data is indeed enqueued, 
+    /// that constitutes another reference. 
+    /// If the reference held in the queue isn&#39;t there (only one total), and the thread hasn&#39;t completed 
+    /// (it may have just been completed in another enqueue call), then something went wrong because it&#39;s not complete
+    /// and not on the queue anymore. 
+    /// 
+    /// Private note: do not call this internally! This is a public API meant for the producer thread to use.
+    </span><span class="kw">pub fn </span>has_failed(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="comment">// an item that has been completed could not have possibly failed!
+        </span>(!<span class="self">self</span>.is_completed()) &amp;&amp; 
+        (Arc::strong_count(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>) == <span class="number">1</span>)
     }
 
 
-    <span class="doccomment">/// The logic here is as follows: if the item on the queue has only one reference, and has not been completed,</span>
-    <span class="doccomment">/// that means it is no longer on the queue (the consumer thread crashed or failed). </span>
-    <span class="doccomment">/// Again, the producer thread invoking this function holds one reference, and if the data is indeed enqueued, </span>
-    <span class="doccomment">/// that constitutes another reference. </span>
-    <span class="doccomment">/// If the reference held in the queue isn&#39;t there (only one total), and the thread hasn&#39;t completed </span>
-    <span class="doccomment">/// (it may have just been completed in another enqueue call), then something went wrong because it&#39;s not complete</span>
-    <span class="doccomment">/// and not on the queue anymore. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Private note: do not call this internally! This is a public API meant for the producer thread to use.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">has_failed</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="comment">// an item that has been completed could not have possibly failed!</span>
-        (<span class="op">!</span><span class="self">self</span>.<span class="ident">is_completed</span>()) <span class="op">&amp;&amp;</span> 
-        (<span class="ident">Arc::strong_count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>) <span class="op">==</span> <span class="number">1</span>)
-    }
-
-
-    <span class="doccomment">/// not public, because we want to control when this is cloned </span>
-    <span class="doccomment">/// so we can keep track of the number of Arc references to the InnerQueuedData.</span>
-    <span class="kw">fn</span> <span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">QueuedData</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">clone</span>())
+    <span class="doccomment">/// not public, because we want to control when this is cloned 
+    /// so we can keep track of the number of Arc references to the InnerQueuedData.
+    </span><span class="kw">fn </span>clone(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; QueuedData&lt;T&gt; {
+        QueuedData(<span class="self">self</span>.<span class="number">0</span>.clone())
     }
 
     
-    <span class="doccomment">/// creates a clone of this, marshalled as a PeekedData </span>
-    <span class="doccomment">/// so that a consumer can access the InnerQueuedData without being able to access </span>
-    <span class="doccomment">/// all of the QueuedData methods here.</span>
-    <span class="kw">fn</span> <span class="ident">as_peeked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">PeekedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">PeekedData</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">clone</span>())
+    <span class="doccomment">/// creates a clone of this, marshalled as a PeekedData 
+    /// so that a consumer can access the InnerQueuedData without being able to access 
+    /// all of the QueuedData methods here.
+    </span><span class="kw">fn </span>as_peeked(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PeekedData&lt;T&gt; {
+        PeekedData(<span class="self">self</span>.<span class="number">0</span>.clone())
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">T</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">data</span>
-    }
-}
-
-
-<span class="doccomment">/// A wrapper around data in the queue that allows a DFQueueConsumer </span>
-<span class="doccomment">/// to access the data and mark the queued item as completed. </span>
-<span class="doccomment">/// Automatically Derefs to the inner type `&amp;T`, just like Arc does. </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PeekedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">InnerQueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>);
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">PeekedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mark_completed</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">completed</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::Release</span>);
-    }
-}
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">PeekedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">T</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">data</span>
+<span class="kw">impl</span>&lt;T&gt; Deref <span class="kw">for </span>QueuedData&lt;T&gt; {
+    <span class="kw">type </span>Target = T;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>T {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.data
     }
 }
 
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">struct</span> <span class="ident">InnerQueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// the actual value contained in the Node</span>
-    <span class="ident">data</span>: <span class="ident">T</span>,
-    <span class="doccomment">/// whether this queued item has been completed</span>
-    <span class="ident">completed</span>: <span class="ident">AtomicBool</span>,
+<span class="doccomment">/// A wrapper around data in the queue that allows a DFQueueConsumer 
+/// to access the data and mark the queued item as completed. 
+/// Automatically Derefs to the inner type `&amp;T`, just like Arc does. 
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>PeekedData&lt;T&gt;(Arc&lt;InnerQueuedData&lt;T&gt;&gt;);
+<span class="kw">impl</span>&lt;T&gt; PeekedData&lt;T&gt; {
+    <span class="kw">pub fn </span>mark_completed(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.<span class="number">0</span>.completed.store(<span class="bool-val">true</span>, Ordering::Release);
+    }
+}
+<span class="kw">impl</span>&lt;T&gt; Deref <span class="kw">for </span>PeekedData&lt;T&gt; {
+    <span class="kw">type </span>Target = T;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>T {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.data
+    }
 }
 
 
-<span class="doccomment">/// Adapted from Rust&#39;s `std::sync::mpsc::Queue`, </span>
-<span class="doccomment">/// but modified slightly to forbid pop() in favor of peek().</span>
-<span class="doccomment">/// Therefore, we assume it&#39;s safe. We also preserve safety by </span>
-<span class="doccomment">/// always checking for null pointers before dereferencing.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">struct</span> <span class="ident">InnerQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// The head is the node that was most recently pushed</span>
-    <span class="ident">head</span>: <span class="ident">AtomicPtr</span><span class="op">&lt;</span><span class="ident">Node</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// the tail is a placeholder that exists right after the one that was pushed first.</span>
-    <span class="doccomment">/// The tail&#39;s next pointer points to the next Node to be popped off.</span>
-    <span class="ident">tail</span>: <span class="ident">UnsafeCell</span><span class="op">&lt;</span><span class="kw-2">*mut</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="attr">#[derive(Debug)]
+</span><span class="kw">struct </span>InnerQueuedData&lt;T&gt; {
+    <span class="doccomment">/// the actual value contained in the Node
+    </span>data: T,
+    <span class="doccomment">/// whether this queued item has been completed
+    </span>completed: AtomicBool,
 }
 
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Send</span> <span class="kw">for</span> <span class="ident">InnerQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> { }
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">InnerQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> { }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">v</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="kw-2">*mut</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">Box::into_raw</span>(<span class="kw">box</span> <span class="ident">Node</span> {
-            <span class="ident">next</span>: <span class="ident">AtomicPtr::new</span>(<span class="ident">ptr::null_mut</span>()),
-            <span class="comment">// prev: AtomicPtr::new(ptr::null_mut()), // we don&#39;t need prev</span>
-            <span class="ident">value</span>: <span class="ident">v</span>,
+<span class="doccomment">/// Adapted from Rust&#39;s `std::sync::mpsc::Queue`, 
+/// but modified slightly to forbid pop() in favor of peek().
+/// Therefore, we assume it&#39;s safe. We also preserve safety by 
+/// always checking for null pointers before dereferencing.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">struct </span>InnerQueue&lt;T&gt; {
+    <span class="doccomment">/// The head is the node that was most recently pushed
+    </span>head: AtomicPtr&lt;Node&lt;T&gt;&gt;,
+    <span class="doccomment">/// the tail is a placeholder that exists right after the one that was pushed first.
+    /// The tail&#39;s next pointer points to the next Node to be popped off.
+    </span>tail: UnsafeCell&lt;<span class="kw-2">*mut </span>Node&lt;T&gt;&gt;,
+}
+
+<span class="kw">unsafe impl</span>&lt;T: Send&gt; Send <span class="kw">for </span>InnerQueue&lt;T&gt; { }
+<span class="kw">unsafe impl</span>&lt;T: Send&gt; Sync <span class="kw">for </span>InnerQueue&lt;T&gt; { }
+
+<span class="kw">impl</span>&lt;T&gt; Node&lt;T&gt; {
+    <span class="kw">unsafe fn </span>new(v: <span class="prelude-ty">Option</span>&lt;QueuedData&lt;T&gt;&gt;) -&gt; <span class="kw-2">*mut </span>Node&lt;T&gt; {
+        Box::into_raw(<span class="kw">box </span>Node {
+            next: AtomicPtr::new(ptr::null_mut()),
+            <span class="comment">// prev: AtomicPtr::new(ptr::null_mut()), // we don&#39;t need prev
+            </span>value: v,
         })
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">InnerQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Creates a new queue that is safe to share among multiple producers and one consumer. </span>
-    <span class="doccomment">/// Its storage semantics are push onto the front, pop off the back. </span>
-    <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">InnerQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">stub</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Node::new</span>(<span class="prelude-val">None</span>) };
-        <span class="ident">InnerQueue</span> {
-            <span class="ident">head</span>: <span class="ident">AtomicPtr::new</span>(<span class="ident">stub</span>),
-            <span class="ident">tail</span>: <span class="ident">UnsafeCell::new</span>(<span class="ident">stub</span>),
+<span class="kw">impl</span>&lt;T&gt; InnerQueue&lt;T&gt; {
+    <span class="doccomment">/// Creates a new queue that is safe to share among multiple producers and one consumer. 
+    /// Its storage semantics are push onto the front, pop off the back. 
+    </span><span class="kw">fn </span>new() -&gt; InnerQueue&lt;T&gt; {
+        <span class="kw">let </span>stub = <span class="kw">unsafe </span>{ Node::new(<span class="prelude-val">None</span>) };
+        InnerQueue {
+            head: AtomicPtr::new(stub),
+            tail: UnsafeCell::new(stub),
         }
     }
 
-    <span class="doccomment">/// Pushes a new value onto the front of this queue.</span>
-    <span class="kw">fn</span> <span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">t</span>: <span class="ident">T</span>) -&gt; <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">queued_data</span> <span class="op">=</span> <span class="ident">QueuedData::new</span>(<span class="ident">t</span>);
+    <span class="doccomment">/// Pushes a new value onto the front of this queue.
+    </span><span class="kw">fn </span>push(<span class="kw-2">&amp;</span><span class="self">self</span>, t: T) -&gt; QueuedData&lt;T&gt; {
+        <span class="kw">let </span>queued_data = QueuedData::new(t);
 
-        <span class="kw">unsafe</span> {
-            <span class="kw">let</span> <span class="ident">n</span> <span class="op">=</span> <span class="ident">Node::new</span>(<span class="prelude-val">Some</span>(<span class="ident">queued_data</span>.<span class="ident">clone</span>())); <span class="comment">// Kevin: &#39;n&#39; will be the new head</span>
-            <span class="kw">let</span> <span class="ident">prev</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">head</span>.<span class="ident">swap</span>(<span class="ident">n</span>, <span class="ident">Ordering::AcqRel</span>); <span class="comment">// here, prev becomes the original head</span>
-            <span class="comment">// here, prev = old head, and head = n</span>
-            <span class="comment">// (*n).prev.store(prev, Ordering::Release); // KevinBoos: current head (n)&#39;s prev = old head (prev) // we don&#39;t need prev</span>
-            (<span class="kw-2">*</span><span class="ident">prev</span>).<span class="ident">next</span>.<span class="ident">store</span>(<span class="ident">n</span>, <span class="ident">Ordering::Release</span>);  <span class="comment">// prev(old head).next = n</span>
-        }
+        <span class="kw">unsafe </span>{
+            <span class="kw">let </span>n = Node::new(<span class="prelude-val">Some</span>(queued_data.clone())); <span class="comment">// Kevin: &#39;n&#39; will be the new head
+            </span><span class="kw">let </span>prev = <span class="self">self</span>.head.swap(n, Ordering::AcqRel); <span class="comment">// here, prev becomes the original head
+            // here, prev = old head, and head = n
+            // (*n).prev.store(prev, Ordering::Release); // KevinBoos: current head (n)&#39;s prev = old head (prev) // we don&#39;t need prev
+            </span>(<span class="kw-2">*</span>prev).next.store(n, Ordering::Release);  <span class="comment">// prev(old head).next = n
+        </span>}
 
-        <span class="ident">queued_data</span>
+        queued_data
     }
 
 
-    <span class="doccomment">/// Peeks at this queue and returns a reference to the next non-completed item.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// It is possible for this queue to be in an inconsistent state </span>
-    <span class="doccomment">/// where many pushes have succeeded and completely finished, </span>
-    <span class="doccomment">/// but a peek cannot return some queued data. This inconsistent state happens </span>
-    <span class="comment">//// when a pusher is pre-empted at an inopportune moment before completing its push.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// An Inconsistent state means that this queue does indeed have data, but</span>
-    <span class="doccomment">/// it does not currently have access to it at this time.</span>
-    <span class="doccomment">/// If Inconsistent is returned, try to peek again after a short wait.</span>
-    <span class="kw">fn</span> <span class="ident">peek</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">PeekResult</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="kw">unsafe</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tail</span> <span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">tail</span>.<span class="ident">get</span>();
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">next</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="ident">tail</span>).<span class="ident">next</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>);
+    <span class="doccomment">/// Peeks at this queue and returns a reference to the next non-completed item.
+    ///
+    /// It is possible for this queue to be in an inconsistent state 
+    /// where many pushes have succeeded and completely finished, 
+    /// but a peek cannot return some queued data. This inconsistent state happens 
+    </span><span class="comment">//// when a pusher is pre-empted at an inopportune moment before completing its push.
+    </span><span class="doccomment">///
+    /// An Inconsistent state means that this queue does indeed have data, but
+    /// it does not currently have access to it at this time.
+    /// If Inconsistent is returned, try to peek again after a short wait.
+    </span><span class="kw">fn </span>peek(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PeekResult&lt;T&gt; {
+        <span class="kw">unsafe </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>tail = <span class="kw-2">*</span><span class="self">self</span>.tail.get();
+            <span class="kw">let </span><span class="kw-2">mut </span>next = (<span class="kw-2">*</span>tail).next.load(Ordering::Acquire);
 
-            <span class="kw">while</span> <span class="op">!</span><span class="ident">next</span>.<span class="ident">is_null</span>() {
-                <span class="macro">assert!</span>((<span class="kw-2">*</span><span class="ident">next</span>).<span class="ident">value</span>.<span class="ident">is_some</span>()); <span class="comment">// all nodes still in the queue should have Some values (not None)</span>
+            <span class="kw">while </span>!next.is_null() {
+                <span class="macro">assert!</span>((<span class="kw-2">*</span>next).value.is_some()); <span class="comment">// all nodes still in the queue should have Some values (not None)
 
-                <span class="comment">// if the node has been completed, we no longer want to return it when peeking</span>
-                <span class="kw">if</span> (<span class="kw-2">*</span><span class="ident">next</span>).<span class="ident">value</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">is_completed</span>() {
+                // if the node has been completed, we no longer want to return it when peeking
+                </span><span class="kw">if </span>(<span class="kw-2">*</span>next).value.as_ref().unwrap().is_completed() {
 
-                    <span class="comment">// just go ahead and remove the completed node</span>
-                    <span class="comment">// to remove a node, we point &quot;self.tail&quot; to it and then remove its value</span>
-                    <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">tail</span>.<span class="ident">get</span>() <span class="op">=</span> <span class="ident">next</span>;
-                    <span class="macro">assert!</span>((<span class="kw-2">*</span><span class="ident">tail</span>).<span class="ident">value</span>.<span class="ident">is_none</span>());
-                    <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="ident">next</span>).<span class="ident">value</span>.<span class="ident">take</span>().<span class="ident">unwrap</span>(); <span class="comment">// remove the value and discard it</span>
-                    <span class="kw">let</span> <span class="kw">_</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">Node</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Box::from_raw</span>(<span class="ident">tail</span>); <span class="comment">// grant ownership of the original tail node and let it fall out of scope</span>
+                    <span class="comment">// just go ahead and remove the completed node
+                    // to remove a node, we point &quot;self.tail&quot; to it and then remove its value
+                    </span><span class="kw-2">*</span><span class="self">self</span>.tail.get() = next;
+                    <span class="macro">assert!</span>((<span class="kw-2">*</span>tail).value.is_none());
+                    <span class="kw">let _ </span>= (<span class="kw-2">*</span>next).value.take().unwrap(); <span class="comment">// remove the value and discard it
+                    </span><span class="kw">let _</span>: Box&lt;Node&lt;T&gt;&gt; = Box::from_raw(tail); <span class="comment">// grant ownership of the original tail node and let it fall out of scope
                     
-                    <span class="comment">// move to the next node</span>
-                    <span class="ident">tail</span> <span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">tail</span>.<span class="ident">get</span>();
-                    <span class="ident">next</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="ident">tail</span>).<span class="ident">next</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>);
+                    // move to the next node
+                    </span>tail = <span class="kw-2">*</span><span class="self">self</span>.tail.get();
+                    next = (<span class="kw-2">*</span>tail).next.load(Ordering::Acquire);
                     <span class="kw">continue</span>;
                 }
 
-                <span class="macro">assert!</span>((<span class="kw-2">*</span><span class="ident">tail</span>).<span class="ident">value</span>.<span class="ident">is_none</span>());
-                <span class="macro">assert!</span>((<span class="kw-2">*</span><span class="ident">next</span>).<span class="ident">value</span>.<span class="ident">is_some</span>());
-                <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="ident">next</span>).<span class="ident">value</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">as_peeked</span>();
-                <span class="kw">return</span> <span class="ident">PeekResult::Data</span>(<span class="ident">ret</span>);
+                <span class="macro">assert!</span>((<span class="kw-2">*</span>tail).value.is_none());
+                <span class="macro">assert!</span>((<span class="kw-2">*</span>next).value.is_some());
+                <span class="kw">let </span>ret = (<span class="kw-2">*</span>next).value.as_ref().unwrap().as_peeked();
+                <span class="kw">return </span>PeekResult::Data(ret);
             }
 
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">head</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>) <span class="op">==</span> <span class="ident">tail</span> {<span class="ident">PeekResult::Empty</span>} <span class="kw">else</span> {<span class="ident">PeekResult::Inconsistent</span>}
+            <span class="kw">if </span><span class="self">self</span>.head.load(Ordering::Acquire) == tail {PeekResult::Empty} <span class="kw">else </span>{PeekResult::Inconsistent}
         }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">InnerQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">unsafe</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cur</span> <span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">tail</span>.<span class="ident">get</span>();
-            <span class="kw">while</span> <span class="op">!</span><span class="ident">cur</span>.<span class="ident">is_null</span>() {
-                <span class="kw">let</span> <span class="ident">next</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="ident">cur</span>).<span class="ident">next</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>);
-                <span class="kw">let</span> <span class="kw">_</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">Node</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Box::from_raw</span>(<span class="ident">cur</span>);
-                <span class="ident">cur</span> <span class="op">=</span> <span class="ident">next</span>;
+<span class="kw">impl</span>&lt;T&gt; Drop <span class="kw">for </span>InnerQueue&lt;T&gt; {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">unsafe </span>{
+            <span class="kw">let </span><span class="kw-2">mut </span>cur = <span class="kw-2">*</span><span class="self">self</span>.tail.get();
+            <span class="kw">while </span>!cur.is_null() {
+                <span class="kw">let </span>next = (<span class="kw-2">*</span>cur).next.load(Ordering::Relaxed);
+                <span class="kw">let _</span>: Box&lt;Node&lt;T&gt;&gt; = Box::from_raw(cur);
+                cur = next;
             }
         }
     }
@@ -1114,157 +1108,157 @@
 
 
 
-<span class="comment">// Conditionally compile the module `test` only when the test-suite is run.</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span> {
+<span class="comment">// Conditionally compile the module `test` only when the test-suite is run.
+</span><span class="attr">#[cfg(test)]
+</span><span class="kw">mod </span>test {
     
     
-    <span class="kw">use</span> <span class="ident">std::sync::mpsc::channel</span>;
-    <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
-    <span class="kw">use</span> <span class="ident">std::thread</span>; 
-    <span class="kw">use</span> <span class="ident">std::vec::Vec</span>;
-    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use </span>std::sync::mpsc::channel;
+    <span class="kw">use </span>std::sync::Arc;
+    <span class="kw">use </span>std::thread; 
+    <span class="kw">use </span>std::vec::Vec;
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
 
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="comment">// #[should_panic]</span>
-    <span class="kw">fn</span> <span class="ident">simple_test</span>() {
+    <span class="attr">#[test]
+    </span><span class="comment">// #[should_panic]
+    </span><span class="kw">fn </span>simple_test() {
 
-        <span class="kw">let</span> <span class="ident">queue</span>: <span class="ident">DFQueue</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">DFQueue::new</span>();
+        <span class="kw">let </span>queue: DFQueue&lt;usize&gt; = DFQueue::new();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">queue_prod</span> <span class="op">=</span> <span class="ident">queue</span>.<span class="ident">into_producer</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">queue_cons</span> <span class="op">=</span> <span class="ident">queue_prod</span>.<span class="ident">get_consumer</span>();
-        <span class="macro">assert!</span>(<span class="ident">queue_cons</span>.<span class="ident">is_some</span>(), <span class="string">&quot;First DFQueueConsumer was None!!!&quot;</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>queue_prod = queue.into_producer();
+        <span class="kw">let </span><span class="kw-2">mut </span>queue_cons = queue_prod.get_consumer();
+        <span class="macro">assert!</span>(queue_cons.is_some(), <span class="string">&quot;First DFQueueConsumer was None!!!&quot;</span>);
 
-        <span class="comment">// a second call to get_consumer must return None</span>
-        <span class="macro">assert!</span>(<span class="ident">queue_prod</span>.<span class="ident">get_consumer</span>().<span class="ident">is_none</span>(), <span class="string">&quot;Second DFQueueConsumer wasn&#39;t None!!&quot;</span>); 
+        <span class="comment">// a second call to get_consumer must return None
+        </span><span class="macro">assert!</span>(queue_prod.get_consumer().is_none(), <span class="string">&quot;Second DFQueueConsumer wasn&#39;t None!!&quot;</span>); 
 
-        <span class="kw">let</span> <span class="ident">queue_cons</span> <span class="op">=</span> <span class="ident">queue_cons</span>.<span class="ident">unwrap</span>();
+        <span class="kw">let </span>queue_cons = queue_cons.unwrap();
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">queue_prod2</span> <span class="op">=</span> <span class="ident">queue_prod</span>.<span class="ident">obtain_producer</span>();
+        <span class="kw">let </span><span class="kw-2">mut </span>queue_prod2 = queue_prod.obtain_producer();
 
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">thr_p</span> <span class="op">=</span> <span class="ident">thread::spawn</span>( <span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
-            <span class="kw">let</span> <span class="ident">original_data</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>];
+        <span class="kw">let </span><span class="kw-2">mut </span>thr_p = thread::spawn( <span class="kw">move </span>|| {
+            <span class="kw">let </span>original_data: Vec&lt;usize&gt; = <span class="macro">vec!</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>];
 
-            <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">1</span>..<span class="number">20</span> {
-                <span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="ident">original_data</span>.<span class="ident">iter</span>() {
-                    <span class="ident">queue_prod</span>.<span class="ident">enqueue</span>(<span class="kw-2">*</span><span class="ident">elem</span>);
+            <span class="kw">for </span>i <span class="kw">in </span><span class="number">1</span>..<span class="number">20 </span>{
+                <span class="kw">for </span>elem <span class="kw">in </span>original_data.iter() {
+                    queue_prod.enqueue(<span class="kw-2">*</span>elem);
                 }
             }
             
-            <span class="kw">let</span> <span class="ident">queued_data</span> <span class="op">=</span> <span class="ident">queue_prod</span>.<span class="ident">enqueue</span>(<span class="number">256</span>);
-            <span class="macro">println!</span>(<span class="string">&quot;prod1: queued_data = {:?}&quot;</span>, <span class="ident">queued_data</span>);
+            <span class="kw">let </span>queued_data = queue_prod.enqueue(<span class="number">256</span>);
+            <span class="macro">println!</span>(<span class="string">&quot;prod1: queued_data = {:?}&quot;</span>, queued_data);
 
         } );
 
-         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">thr_p2</span> <span class="op">=</span> <span class="ident">thread::spawn</span>( <span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
-            <span class="kw">let</span> <span class="ident">original_data</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">10</span>, <span class="number">11</span>, <span class="number">12</span>, <span class="number">13</span>, <span class="number">14</span>];
+         <span class="kw">let </span><span class="kw-2">mut </span>thr_p2 = thread::spawn( <span class="kw">move </span>|| {
+            <span class="kw">let </span>original_data: Vec&lt;usize&gt; = <span class="macro">vec!</span>[<span class="number">10</span>, <span class="number">11</span>, <span class="number">12</span>, <span class="number">13</span>, <span class="number">14</span>];
 
-            <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">1</span>..<span class="number">20</span> {
-                <span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="ident">original_data</span>.<span class="ident">iter</span>() {
-                    <span class="ident">queue_prod2</span>.<span class="ident">enqueue</span>(<span class="kw-2">*</span><span class="ident">elem</span>);
+            <span class="kw">for </span>i <span class="kw">in </span><span class="number">1</span>..<span class="number">20 </span>{
+                <span class="kw">for </span>elem <span class="kw">in </span>original_data.iter() {
+                    queue_prod2.enqueue(<span class="kw-2">*</span>elem);
                 }
             }
 
-            <span class="kw">let</span> <span class="ident">queued_data</span> <span class="op">=</span> <span class="ident">queue_prod2</span>.<span class="ident">enqueue</span>(<span class="number">512</span>);
-            <span class="macro">println!</span>(<span class="string">&quot;prod2: queued_data = {:?}&quot;</span>, <span class="ident">queued_data</span>);
+            <span class="kw">let </span>queued_data = queue_prod2.enqueue(<span class="number">512</span>);
+            <span class="macro">println!</span>(<span class="string">&quot;prod2: queued_data = {:?}&quot;</span>, queued_data);
         } );
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">thr_c</span> <span class="op">=</span> <span class="ident">thread::spawn</span>( <span class="kw">move</span> <span class="op">|</span><span class="op">|</span> {
-            <span class="kw">loop</span> {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">queue_cons</span>.<span class="ident">peek</span>();
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">v</span>) <span class="op">=</span> <span class="ident">val</span> {
-                    <span class="macro">println!</span>(<span class="string">&quot;peeked: {:?}, value={}&quot;</span>, <span class="ident">v</span>, <span class="kw-2">*</span><span class="ident">v</span>);
-                    <span class="ident">v</span>.<span class="ident">mark_completed</span>();
+        <span class="kw">let </span><span class="kw-2">mut </span>thr_c = thread::spawn( <span class="kw">move </span>|| {
+            <span class="kw">loop </span>{
+                <span class="kw">let </span><span class="kw-2">mut </span>val = queue_cons.peek();
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(v) = val {
+                    <span class="macro">println!</span>(<span class="string">&quot;peeked: {:?}, value={}&quot;</span>, v, <span class="kw-2">*</span>v);
+                    v.mark_completed();
                 }
-                <span class="kw">else</span> {
-                    <span class="comment">// println!(&quot;\nDumping queue: \n  {:?}&quot;, queue_cons.qref.queue);</span>
-                }
+                <span class="kw">else </span>{
+                    <span class="comment">// println!(&quot;\nDumping queue: \n  {:?}&quot;, queue_cons.qref.queue);
+                </span>}
             }
         } );
 
-        <span class="ident">thr_p</span>.<span class="ident">join</span>();
+        thr_p.join();
         <span class="macro">println!</span>(<span class="string">&quot;producer 1 done&quot;</span>);
-        <span class="ident">thr_p2</span>.<span class="ident">join</span>();
+        thr_p2.join();
         <span class="macro">println!</span>(<span class="string">&quot;producer 2 done&quot;</span>);
-        <span class="ident">thr_c</span>.<span class="ident">join</span>();
+        thr_c.join();
     }
 
 
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">inner_queue_test</span>() {
-        <span class="kw">let</span> <span class="ident">nthreads</span> <span class="op">=</span> <span class="number">16</span>;
-        <span class="kw">let</span> <span class="ident">top_range</span> <span class="op">=</span> <span class="number">10</span>;
-        <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">InnerQueue::new</span>();
-        <span class="kw">match</span> <span class="ident">q</span>.<span class="ident">peek</span>() {
-            <span class="ident">PeekResult::Empty</span> =&gt; {}
-            <span class="ident">PeekResult::Inconsistent</span> <span class="op">|</span> <span class="ident">PeekResult::Data</span>(..) =&gt; <span class="macro">panic!</span>()
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>inner_queue_test() {
+        <span class="kw">let </span>nthreads = <span class="number">16</span>;
+        <span class="kw">let </span>top_range = <span class="number">10</span>;
+        <span class="kw">let </span>q = InnerQueue::new();
+        <span class="kw">match </span>q.peek() {
+            PeekResult::Empty =&gt; {}
+            PeekResult::Inconsistent | PeekResult::Data(..) =&gt; <span class="macro">panic!</span>()
         }
         
-        <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">q</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">threads</span> <span class="op">=</span> <span class="macro">vec!</span>[];
+        <span class="kw">let </span>q = Arc::new(q);
+        <span class="kw">let </span><span class="kw-2">mut </span>threads = <span class="macro">vec!</span>[];
 
-        <span class="kw">for</span> <span class="ident">id</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">nthreads</span> {
-            <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">q</span>.<span class="ident">clone</span>();
-            <span class="ident">threads</span>.<span class="ident">push</span>(<span class="ident">thread::spawn</span>(<span class="kw">move</span><span class="op">|</span><span class="op">|</span> {
-                <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">top_range</span> {
-                    <span class="kw">let</span> <span class="ident">push_val</span> <span class="op">=</span> <span class="ident">i</span> <span class="op">+</span> (<span class="ident">id</span> <span class="op">*</span> <span class="ident">top_range</span>);
-                    <span class="macro">println!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">push_val</span>);
-                    <span class="ident">q</span>.<span class="ident">push</span>(<span class="ident">push_val</span>);
-                    <span class="kw">for</span> <span class="ident">y</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">1</span> {
-                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">y</span> <span class="op">+</span> <span class="number">10</span>;
-                        <span class="ident">a</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        <span class="kw">for </span>id <span class="kw">in </span><span class="number">0</span>..nthreads {
+            <span class="kw">let </span>q = q.clone();
+            threads.push(thread::spawn(<span class="kw">move</span>|| {
+                <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..top_range {
+                    <span class="kw">let </span>push_val = i + (id * top_range);
+                    <span class="macro">println!</span>(<span class="string">&quot;{}&quot;</span>, push_val);
+                    q.push(push_val);
+                    <span class="kw">for </span>y <span class="kw">in </span><span class="number">0</span>..<span class="number">1 </span>{
+                        <span class="kw">let </span><span class="kw-2">mut </span>a = y + <span class="number">10</span>;
+                        a += <span class="number">1</span>;
                     }
                 }
             }));
         }
 
-        <span class="kw">for</span> <span class="ident">t</span> <span class="kw">in</span> <span class="ident">threads</span> {
-            <span class="ident">t</span>.<span class="ident">join</span>().<span class="ident">unwrap</span>();
+        <span class="kw">for </span>t <span class="kw">in </span>threads {
+            t.join().unwrap();
         }
 
-        <span class="comment">// unsafe {</span>
-        <span class="comment">//     let mut curr = q.tail.load(Ordering::SeqCst);</span>
-        <span class="comment">//     let curr_node = &amp;*curr;</span>
-        <span class="comment">//     println!(&quot;ail Node: val={:?}, &quot;, curr_node.value);</span>
-        <span class="comment">//     // if next_node_ptr.is_null() { </span>
-        <span class="comment">//     //     print!(&quot;next=NULL, &quot;);</span>
-        <span class="comment">//     // } else { </span>
-        <span class="comment">//     //     print!(&quot;next={:?}, &quot;, (*next_node_ptr).value);</span>
-        <span class="comment">//     // }</span>
+        <span class="comment">// unsafe {
+        //     let mut curr = q.tail.load(Ordering::SeqCst);
+        //     let curr_node = &amp;*curr;
+        //     println!(&quot;ail Node: val={:?}, &quot;, curr_node.value);
+        //     // if next_node_ptr.is_null() { 
+        //     //     print!(&quot;next=NULL, &quot;);
+        //     // } else { 
+        //     //     print!(&quot;next={:?}, &quot;, (*next_node_ptr).value);
+        //     // }
 
 
-        <span class="comment">//     while !(*curr).next.load(Ordering::SeqCst).is_null()</span>
-        <span class="comment">//     {</span>
-        <span class="comment">//         let curr_node = &amp;*curr;</span>
-        <span class="comment">//         let next_node_ptr = (*curr).next.load(Ordering::SeqCst);</span>
+        //     while !(*curr).next.load(Ordering::SeqCst).is_null()
+        //     {
+        //         let curr_node = &amp;*curr;
+        //         let next_node_ptr = (*curr).next.load(Ordering::SeqCst);
 
-        <span class="comment">//         print!(&quot;Node: val={:?}, &quot;, curr_node.value);</span>
-        <span class="comment">//         if next_node_ptr.is_null() { </span>
-        <span class="comment">//             print!(&quot;next=NULL, &quot;);</span>
-        <span class="comment">//         } else { </span>
-        <span class="comment">//             print!(&quot;next={:?}, &quot;, (*next_node_ptr).value);</span>
-        <span class="comment">//         }</span>
+        //         print!(&quot;Node: val={:?}, &quot;, curr_node.value);
+        //         if next_node_ptr.is_null() { 
+        //             print!(&quot;next=NULL, &quot;);
+        //         } else { 
+        //             print!(&quot;next={:?}, &quot;, (*next_node_ptr).value);
+        //         }
 
-        <span class="comment">//         curr = (*curr).prev.load(Ordering::SeqCst);</span>
-        <span class="comment">//     }</span>
-        <span class="comment">// }</span>
+        //         curr = (*curr).prev.load(Ordering::SeqCst);
+        //     }
+        // }
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">i</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="comment">// while i &lt; nthreads * top_range {</span>
-        <span class="kw">loop</span> {
-            <span class="kw">let</span> <span class="ident">peeked</span> <span class="op">=</span> <span class="ident">q</span>.<span class="ident">peek</span>();
-            <span class="kw">match</span> <span class="ident">peeked</span> {
-                <span class="ident">PeekResult::Empty</span> <span class="op">|</span> <span class="ident">PeekResult::Inconsistent</span> =&gt; {
-                    <span class="comment">// println!(&quot;peeked data None&quot;);</span>
-                },
-                <span class="ident">PeekResult::Data</span>(<span class="ident">x</span>) =&gt; { 
-                    <span class="comment">// i += 1;</span>
-                    <span class="macro">println!</span>(<span class="string">&quot;peeked data {}&quot;</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">x</span>);
-                    <span class="ident">x</span>.<span class="ident">mark_completed</span>();
+        </span><span class="kw">let </span><span class="kw-2">mut </span>i = <span class="number">0</span>;
+        <span class="comment">// while i &lt; nthreads * top_range {
+        </span><span class="kw">loop </span>{
+            <span class="kw">let </span>peeked = q.peek();
+            <span class="kw">match </span>peeked {
+                PeekResult::Empty | PeekResult::Inconsistent =&gt; {
+                    <span class="comment">// println!(&quot;peeked data None&quot;);
+                </span>},
+                PeekResult::Data(x) =&gt; { 
+                    <span class="comment">// i += 1;
+                    </span><span class="macro">println!</span>(<span class="string">&quot;peeked data {}&quot;</span>, <span class="kw-2">&amp;*</span>x);
+                    x.mark_completed();
                 }
             }
         }
@@ -1274,75 +1268,75 @@
 
 
 
-    <span class="attribute">#[<span class="ident">test</span>]</span>
-    <span class="kw">fn</span> <span class="ident">mpsc_queue_test</span>() {
-        <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mpsc_queue</span>::{<span class="ident">MpscQueue</span>, <span class="ident">PopResult</span>};
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>mpsc_queue_test() {
+        <span class="kw">use </span><span class="kw">super</span>::mpsc_queue::{MpscQueue, PopResult};
 
-        <span class="kw">let</span> <span class="ident">nthreads</span> <span class="op">=</span> <span class="number">16</span>;
-        <span class="kw">let</span> <span class="ident">top_range</span> <span class="op">=</span> <span class="number">100</span>;
-        <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">MpscQueue::new</span>();
-        <span class="macro">assert!</span>(<span class="ident">q</span>.<span class="ident">pop</span>().<span class="ident">is_none</span>());
+        <span class="kw">let </span>nthreads = <span class="number">16</span>;
+        <span class="kw">let </span>top_range = <span class="number">100</span>;
+        <span class="kw">let </span>q = MpscQueue::new();
+        <span class="macro">assert!</span>(q.pop().is_none());
         
-        <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">q</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">threads</span> <span class="op">=</span> <span class="macro">vec!</span>[];
+        <span class="kw">let </span>q = Arc::new(q);
+        <span class="kw">let </span><span class="kw-2">mut </span>threads = <span class="macro">vec!</span>[];
 
-        <span class="kw">for</span> <span class="ident">id</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">nthreads</span> {
-            <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">q</span>.<span class="ident">clone</span>();
-            <span class="ident">threads</span>.<span class="ident">push</span>(<span class="ident">thread::spawn</span>(<span class="kw">move</span><span class="op">|</span><span class="op">|</span> {
-                <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">top_range</span> {
-                    <span class="kw">let</span> <span class="ident">push_val</span> <span class="op">=</span> <span class="ident">i</span> <span class="op">+</span> (<span class="ident">id</span> <span class="op">*</span> <span class="ident">top_range</span>);
-                    <span class="macro">println!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">push_val</span>);
-                    <span class="ident">q</span>.<span class="ident">push</span>(<span class="ident">push_val</span>);
-                    <span class="kw">for</span> <span class="ident">y</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">1</span> {
-                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">y</span> <span class="op">+</span> <span class="number">10</span>;
-                        <span class="ident">a</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        <span class="kw">for </span>id <span class="kw">in </span><span class="number">0</span>..nthreads {
+            <span class="kw">let </span>q = q.clone();
+            threads.push(thread::spawn(<span class="kw">move</span>|| {
+                <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..top_range {
+                    <span class="kw">let </span>push_val = i + (id * top_range);
+                    <span class="macro">println!</span>(<span class="string">&quot;{}&quot;</span>, push_val);
+                    q.push(push_val);
+                    <span class="kw">for </span>y <span class="kw">in </span><span class="number">0</span>..<span class="number">1 </span>{
+                        <span class="kw">let </span><span class="kw-2">mut </span>a = y + <span class="number">10</span>;
+                        a += <span class="number">1</span>;
                     }
                 }
             }));
         }
 
-        <span class="kw">for</span> <span class="ident">t</span> <span class="kw">in</span> <span class="ident">threads</span> {
-            <span class="ident">t</span>.<span class="ident">join</span>().<span class="ident">unwrap</span>();
+        <span class="kw">for </span>t <span class="kw">in </span>threads {
+            t.join().unwrap();
         }
 
-        <span class="comment">// unsafe {</span>
-        <span class="comment">//     let mut curr = q.tail.load(Ordering::SeqCst);</span>
-        <span class="comment">//     let curr_node = &amp;*curr;</span>
-        <span class="comment">//     println!(&quot;ail Node: val={:?}, &quot;, curr_node.value);</span>
-        <span class="comment">//     // if next_node_ptr.is_null() { </span>
-        <span class="comment">//     //     print!(&quot;next=NULL, &quot;);</span>
-        <span class="comment">//     // } else { </span>
-        <span class="comment">//     //     print!(&quot;next={:?}, &quot;, (*next_node_ptr).value);</span>
-        <span class="comment">//     // }</span>
+        <span class="comment">// unsafe {
+        //     let mut curr = q.tail.load(Ordering::SeqCst);
+        //     let curr_node = &amp;*curr;
+        //     println!(&quot;ail Node: val={:?}, &quot;, curr_node.value);
+        //     // if next_node_ptr.is_null() { 
+        //     //     print!(&quot;next=NULL, &quot;);
+        //     // } else { 
+        //     //     print!(&quot;next={:?}, &quot;, (*next_node_ptr).value);
+        //     // }
 
 
-        <span class="comment">//     while !(*curr).next.load(Ordering::SeqCst).is_null()</span>
-        <span class="comment">//     {</span>
-        <span class="comment">//         let curr_node = &amp;*curr;</span>
-        <span class="comment">//         let next_node_ptr = (*curr).next.load(Ordering::SeqCst);</span>
+        //     while !(*curr).next.load(Ordering::SeqCst).is_null()
+        //     {
+        //         let curr_node = &amp;*curr;
+        //         let next_node_ptr = (*curr).next.load(Ordering::SeqCst);
 
-        <span class="comment">//         print!(&quot;Node: val={:?}, &quot;, curr_node.value);</span>
-        <span class="comment">//         if next_node_ptr.is_null() { </span>
-        <span class="comment">//             print!(&quot;next=NULL, &quot;);</span>
-        <span class="comment">//         } else { </span>
-        <span class="comment">//             print!(&quot;next={:?}, &quot;, (*next_node_ptr).value);</span>
-        <span class="comment">//         }</span>
+        //         print!(&quot;Node: val={:?}, &quot;, curr_node.value);
+        //         if next_node_ptr.is_null() { 
+        //             print!(&quot;next=NULL, &quot;);
+        //         } else { 
+        //             print!(&quot;next={:?}, &quot;, (*next_node_ptr).value);
+        //         }
 
-        <span class="comment">//         curr = (*curr).prev.load(Ordering::SeqCst);</span>
-        <span class="comment">//     }</span>
-        <span class="comment">// }</span>
+        //         curr = (*curr).prev.load(Ordering::SeqCst);
+        //     }
+        // }
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">i</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="comment">// while i &lt; nthreads * top_range {</span>
-        <span class="kw">loop</span> {
-            <span class="kw">let</span> <span class="ident">popped</span> <span class="op">=</span> <span class="ident">q</span>.<span class="ident">pop</span>();
-            <span class="kw">match</span> <span class="ident">popped</span> {
-                <span class="prelude-val">None</span> =&gt; {
-                    <span class="comment">// println!(&quot;popped data None&quot;);</span>
-                },
-                <span class="prelude-val">Some</span>(<span class="ident">x</span>) =&gt; { 
-                    <span class="comment">// i += 1;</span>
-                    <span class="macro">println!</span>(<span class="string">&quot;popped data {}&quot;</span>, <span class="ident">x</span>);
+        </span><span class="kw">let </span><span class="kw-2">mut </span>i = <span class="number">0</span>;
+        <span class="comment">// while i &lt; nthreads * top_range {
+        </span><span class="kw">loop </span>{
+            <span class="kw">let </span>popped = q.pop();
+            <span class="kw">match </span>popped {
+                <span class="prelude-val">None </span>=&gt; {
+                    <span class="comment">// println!(&quot;popped data None&quot;);
+                </span>},
+                <span class="prelude-val">Some</span>(x) =&gt; { 
+                    <span class="comment">// i += 1;
+                    </span><span class="macro">println!</span>(<span class="string">&quot;popped data {}&quot;</span>, x);
                 }
             }
         }
@@ -1351,5 +1345,4 @@
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="dfqueue" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="dfqueue" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

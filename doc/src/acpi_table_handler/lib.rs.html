@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/acpi/acpi_table_handler/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../acpi_table_handler/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../acpi_table_handler/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../acpi_table_handler/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/acpi/acpi_table_handler/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../acpi_table_handler/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -60,61 +54,60 @@
 <span id="54">54</span>
 <span id="55">55</span>
 <span id="56">56</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Handles ACPI tables based on signatures.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Essentially a giant multiplexer that invokes the proper</span>
-<span class="doccomment">//! table-specific handler function based on an ACPI table signature.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Handles ACPI tables based on signatures.
+//! 
+//! Essentially a giant multiplexer that invokes the proper
+//! table-specific handler function based on an ACPI table signature.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">acpi_table</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>acpi_table;
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">rsdt</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fadt</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">hpet</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">madt</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">dmar</span>;
-
-
-<span class="kw">use</span> <span class="ident">memory::PhysicalAddress</span>;
-<span class="kw">use</span> <span class="ident">acpi_table</span>::{<span class="ident">AcpiSignature</span>, <span class="ident">AcpiTables</span>};
+<span class="kw">extern crate </span>rsdt;
+<span class="kw">extern crate </span>fadt;
+<span class="kw">extern crate </span>hpet;
+<span class="kw">extern crate </span>madt;
+<span class="kw">extern crate </span>dmar;
 
 
-<span class="doccomment">/// The single arbiter of ACPI Table types, </span>
-<span class="doccomment">/// which contains a large table of ACPI signatures to specific table handler functions. </span>
-<span class="doccomment">/// Each handler invoked by this function will add the specific table</span>
-<span class="doccomment">/// to the given list of `AcpiTables`.</span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `acpi_tables`: a mutable reference to the `AcpiTables` that will contain the new table. </span>
-<span class="doccomment">/// * `signature`: the signature of the ACPI table that is being added. </span>
-<span class="doccomment">///    This determines which handler is invoked.</span>
-<span class="doccomment">/// * `length`: the total length of the table, which was obtained from its `Sdt` header when originally mapped.</span>
-<span class="doccomment">/// * `phys_addr`: the `PhysicalAddress` of the table, which is used for determining where it exists within the mapped region.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">acpi_table_handler</span>(
-    <span class="ident">acpi_tables</span>: <span class="kw-2">&amp;mut</span> <span class="ident">AcpiTables</span>,
-    <span class="ident">signature</span>: <span class="ident">AcpiSignature</span>,
-    <span class="ident">length</span>: <span class="ident">usize</span>,
-    <span class="ident">phys_addr</span>: <span class="ident">PhysicalAddress</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">use </span>memory::PhysicalAddress;
+<span class="kw">use </span>acpi_table::{AcpiSignature, AcpiTables};
 
-    <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">signature</span> {
-        <span class="comment">// TODO: use a trait to handle this, with an associated const of the table signature </span>
-        <span class="comment">//       and an associated type of the root ACPI table for that signature.</span>
-        <span class="ident">rsdt::RSDT_SIGNATURE</span> <span class="op">|</span>
-        <span class="ident">rsdt::XSDT_SIGNATURE</span> =&gt; <span class="ident">rsdt::handle</span>(<span class="ident">acpi_tables</span>, <span class="ident">signature</span>, <span class="ident">length</span>, <span class="ident">phys_addr</span>),
-        <span class="ident">fadt::FADT_SIGNATURE</span> =&gt; <span class="ident">fadt::handle</span>(<span class="ident">acpi_tables</span>, <span class="ident">signature</span>, <span class="ident">length</span>, <span class="ident">phys_addr</span>),
-        <span class="ident">hpet::HPET_SIGNATURE</span> =&gt; <span class="ident">hpet::handle</span>(<span class="ident">acpi_tables</span>, <span class="ident">signature</span>, <span class="ident">length</span>, <span class="ident">phys_addr</span>),
-        <span class="ident">madt::MADT_SIGNATURE</span> =&gt; <span class="ident">madt::handle</span>(<span class="ident">acpi_tables</span>, <span class="ident">signature</span>, <span class="ident">length</span>, <span class="ident">phys_addr</span>),
-        <span class="ident">dmar::DMAR_SIGNATURE</span> =&gt; <span class="ident">dmar::handle</span>(<span class="ident">acpi_tables</span>, <span class="ident">signature</span>, <span class="ident">length</span>, <span class="ident">phys_addr</span>),
-        <span class="kw">_</span> =&gt; {
-            <span class="macro">warn!</span>(<span class="string">&quot;Skipping unsupported ACPI table {:?}&quot;</span>, <span class="ident">core::str::from_utf8</span>(<span class="kw-2">&amp;</span><span class="ident">signature</span>).<span class="ident">unwrap_or</span>(<span class="string">&quot;Unknown Signature&quot;</span>));
+
+<span class="doccomment">/// The single arbiter of ACPI Table types, 
+/// which contains a large table of ACPI signatures to specific table handler functions. 
+/// Each handler invoked by this function will add the specific table
+/// to the given list of `AcpiTables`.
+/// # Arguments
+/// * `acpi_tables`: a mutable reference to the `AcpiTables` that will contain the new table. 
+/// * `signature`: the signature of the ACPI table that is being added. 
+///    This determines which handler is invoked.
+/// * `length`: the total length of the table, which was obtained from its `Sdt` header when originally mapped.
+/// * `phys_addr`: the `PhysicalAddress` of the table, which is used for determining where it exists within the mapped region.
+</span><span class="kw">pub fn </span>acpi_table_handler(
+    acpi_tables: <span class="kw-2">&amp;mut </span>AcpiTables,
+    signature: AcpiSignature,
+    length: usize,
+    phys_addr: PhysicalAddress,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+
+    <span class="kw">match </span><span class="kw-2">&amp;</span>signature {
+        <span class="comment">// TODO: use a trait to handle this, with an associated const of the table signature 
+        //       and an associated type of the root ACPI table for that signature.
+        </span>rsdt::RSDT_SIGNATURE |
+        rsdt::XSDT_SIGNATURE =&gt; rsdt::handle(acpi_tables, signature, length, phys_addr),
+        fadt::FADT_SIGNATURE =&gt; fadt::handle(acpi_tables, signature, length, phys_addr),
+        hpet::HPET_SIGNATURE =&gt; hpet::handle(acpi_tables, signature, length, phys_addr),
+        madt::MADT_SIGNATURE =&gt; madt::handle(acpi_tables, signature, length, phys_addr),
+        dmar::DMAR_SIGNATURE =&gt; dmar::handle(acpi_tables, signature, length, phys_addr),
+        <span class="kw">_ </span>=&gt; {
+            <span class="macro">warn!</span>(<span class="string">&quot;Skipping unsupported ACPI table {:?}&quot;</span>, core::str::from_utf8(<span class="kw-2">&amp;</span>signature).unwrap_or(<span class="string">&quot;Unknown Signature&quot;</span>));
             <span class="prelude-val">Ok</span>(())
-            <span class="comment">// Err(&quot;Found unsupported ACPI table signature&quot;)</span>
-        }
+            <span class="comment">// Err(&quot;Found unsupported ACPI table signature&quot;)
+        </span>}
     }
 }</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="acpi_table_handler" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="acpi_table_handler" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

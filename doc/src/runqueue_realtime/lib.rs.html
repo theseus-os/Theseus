@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/runqueue_realtime/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../runqueue_realtime/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../runqueue_realtime/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../runqueue_realtime/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/runqueue_realtime/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../runqueue_realtime/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -307,309 +301,308 @@
 <span id="301">301</span>
 <span id="302">302</span>
 <span id="303">303</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Runqueue structures for a realtime scheduler using rate monotonic scheduling.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The `RunQueue` structure is essentially a list of `Task`s used for scheduling purposes.</span>
-<span class="doccomment">//! Each `RealtimeTaskRef` element in the runqueue contains a `TaskRef` </span>
-<span class="doccomment">//! representing an underlying task and as well as a `period` value.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! In rate monotonic scheduling, tasks are assigned fixed priorities in order of increasing periods.</span>
-<span class="doccomment">//! Thus, the `period` value of a `RealtimeTaskRef` acts as a form of priority.</span>
-<span class="doccomment">//! Each `RunQueue` consists of a `VecDeque` of `RealtimeTaskRef`s </span>
-<span class="doccomment">//! sorted in increasing order of their `period` values.</span>
-<span class="doccomment">//! The sorting is maintained by inserting each `RealtimeTaskRef` at the proper index</span>
-<span class="doccomment">//! according to its `period` value.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Aperiodic tasks are assigned a `period` value of `None` and are placed at the back of the queue.</span>
-<span class="doccomment">//! Since the scheduler iterates through the runqueue to select the first `Runnable` task,</span>
-<span class="doccomment">//! lower-period tasks are &quot;higher priority&quot; and will be selected first, </span>
-<span class="doccomment">//! with aperiodic tasks being selected only when no periodic tasks are runnable.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Runqueue structures for a realtime scheduler using rate monotonic scheduling.
+//!
+//! The `RunQueue` structure is essentially a list of `Task`s used for scheduling purposes.
+//! Each `RealtimeTaskRef` element in the runqueue contains a `TaskRef` 
+//! representing an underlying task and as well as a `period` value.
+//! 
+//! In rate monotonic scheduling, tasks are assigned fixed priorities in order of increasing periods.
+//! Thus, the `period` value of a `RealtimeTaskRef` acts as a form of priority.
+//! Each `RunQueue` consists of a `VecDeque` of `RealtimeTaskRef`s 
+//! sorted in increasing order of their `period` values.
+//! The sorting is maintained by inserting each `RealtimeTaskRef` at the proper index
+//! according to its `period` value.
+//!
+//! Aperiodic tasks are assigned a `period` value of `None` and are placed at the back of the queue.
+//! Since the scheduler iterates through the runqueue to select the first `Runnable` task,
+//! lower-period tasks are &quot;higher priority&quot; and will be selected first, 
+//! with aperiodic tasks being selected only when no periodic tasks are runnable.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mutex_preemption</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">atomic_linked_list</span>;
+</span><span class="kw">extern crate </span>task;
+<span class="kw">extern crate </span>mutex_preemption;
+<span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>atomic_linked_list;
 
-<span class="kw">use</span> <span class="ident">task::TaskRef</span>;
-<span class="kw">use</span> <span class="ident">mutex_preemption::RwLockPreempt</span>;
-<span class="kw">use</span> <span class="ident">alloc::collections::VecDeque</span>;
-<span class="kw">use</span> <span class="ident">core::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
-<span class="kw">use</span> <span class="ident">atomic_linked_list::atomic_map::AtomicMap</span>;
+<span class="kw">use </span>task::TaskRef;
+<span class="kw">use </span>mutex_preemption::RwLockPreempt;
+<span class="kw">use </span>alloc::collections::VecDeque;
+<span class="kw">use </span>core::ops::{Deref, DerefMut};
+<span class="kw">use </span>atomic_linked_list::atomic_map::AtomicMap;
 
-<span class="doccomment">/// A reference to a task with its period for realtime scheduling.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// `RealtimeTaskRef` implements `Deref` and `DerefMut` traits, which dereferences to `TaskRef`.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RealtimeTaskRef</span> {
-    <span class="doccomment">/// `TaskRef` wrapped by `RealtimeTaskRef`</span>
-    <span class="ident">taskref</span>: <span class="ident">TaskRef</span>,
-    <span class="doccomment">/// `Some` if the task is periodic, `None` if it is aperiodic.</span>
-    <span class="ident">period</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Number of context switches the task has undergone. Not used in scheduling algorithm</span>
-    <span class="ident">context_switches</span>: <span class="ident">usize</span>,
+<span class="doccomment">/// A reference to a task with its period for realtime scheduling.
+///
+/// `RealtimeTaskRef` implements `Deref` and `DerefMut` traits, which dereferences to `TaskRef`.
+</span><span class="attr">#[derive(Debug, Clone)]
+</span><span class="kw">pub struct </span>RealtimeTaskRef {
+    <span class="doccomment">/// `TaskRef` wrapped by `RealtimeTaskRef`
+    </span>taskref: TaskRef,
+    <span class="doccomment">/// `Some` if the task is periodic, `None` if it is aperiodic.
+    </span>period: <span class="prelude-ty">Option</span>&lt;usize&gt;,
+    <span class="doccomment">/// Number of context switches the task has undergone. Not used in scheduling algorithm
+    </span>context_switches: usize,
 }
 
-<span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">RealtimeTaskRef</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">TaskRef</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">TaskRef</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">taskref</span>
+<span class="kw">impl </span>Deref <span class="kw">for </span>RealtimeTaskRef {
+    <span class="kw">type </span>Target = TaskRef;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>TaskRef {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.taskref
     }
 }
 
-<span class="kw">impl</span> <span class="ident">DerefMut</span> <span class="kw">for</span> <span class="ident">RealtimeTaskRef</span> {
-    <span class="kw">fn</span> <span class="ident">deref_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">TaskRef</span> {
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">taskref</span>
+<span class="kw">impl </span>DerefMut <span class="kw">for </span>RealtimeTaskRef {
+    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>TaskRef {
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>.taskref
     }
 }
 
-<span class="kw">impl</span> <span class="ident">RealtimeTaskRef</span> {
-    <span class="doccomment">/// Creates a new `RealtimeTaskRef` that wraps the given `TaskRef`</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">taskref</span>: <span class="ident">TaskRef</span>, <span class="ident">period</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>) -&gt; <span class="ident">RealtimeTaskRef</span> {
-        <span class="ident">RealtimeTaskRef</span> {
-            <span class="ident">taskref</span>: <span class="ident">taskref</span>,
-            <span class="ident">period</span>: <span class="ident">period</span>,
-            <span class="ident">context_switches</span>: <span class="number">0</span>,
+<span class="kw">impl </span>RealtimeTaskRef {
+    <span class="doccomment">/// Creates a new `RealtimeTaskRef` that wraps the given `TaskRef`
+    </span><span class="kw">pub fn </span>new(taskref: TaskRef, period: <span class="prelude-ty">Option</span>&lt;usize&gt;) -&gt; RealtimeTaskRef {
+        RealtimeTaskRef {
+            taskref: taskref,
+            period: period,
+            context_switches: <span class="number">0</span>,
         }
     }
 
-    <span class="doccomment">/// Increment the number of times the task is picked</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">increment_context_switches</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">context_switches</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">context_switches</span>.<span class="ident">saturating_add</span>(<span class="number">1</span>);
+    <span class="doccomment">/// Increment the number of times the task is picked
+    </span><span class="kw">pub fn </span>increment_context_switches(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.context_switches = <span class="self">self</span>.context_switches.saturating_add(<span class="number">1</span>);
     }
 
-    <span class="doccomment">/// Checks whether the `RealtimeTaskRef` refers to a task that is periodic</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_periodic</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">period</span>.<span class="ident">is_some</span>()
+    <span class="doccomment">/// Checks whether the `RealtimeTaskRef` refers to a task that is periodic
+    </span><span class="kw">pub fn </span>is_periodic(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.period.is_some()
     }
 
-    <span class="doccomment">/// Returns `true` if the period of this `RealtimeTaskRef` is shorter (less) than</span>
-    <span class="doccomment">/// the period of the other `RealtimeTaskRef`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Returns `false` if this `RealtimeTaskRef` is aperiodic, i.e. if `period` is `None`.</span>
-    <span class="doccomment">/// Returns `true` if this task is periodic and `other` is aperiodic.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">has_smaller_period</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">RealtimeTaskRef</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">period</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">period_val</span>) =&gt; <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">other_period_val</span>) <span class="op">=</span> <span class="ident">other</span>.<span class="ident">period</span> {
-                <span class="ident">period_val</span> <span class="op">&lt;</span> <span class="ident">other_period_val</span>
-            } <span class="kw">else</span> {
-                <span class="bool-val">true</span>
-            },
-            <span class="prelude-val">None</span> =&gt; <span class="bool-val">false</span>,
+    <span class="doccomment">/// Returns `true` if the period of this `RealtimeTaskRef` is shorter (less) than
+    /// the period of the other `RealtimeTaskRef`.
+    ///
+    /// Returns `false` if this `RealtimeTaskRef` is aperiodic, i.e. if `period` is `None`.
+    /// Returns `true` if this task is periodic and `other` is aperiodic.
+    </span><span class="kw">pub fn </span>has_smaller_period(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>RealtimeTaskRef) -&gt; bool {
+        <span class="kw">match </span><span class="self">self</span>.period {
+            <span class="prelude-val">Some</span>(period_val) =&gt; <span class="kw">if let </span><span class="prelude-val">Some</span>(other_period_val) = other.period {
+                period_val &lt; other_period_val
+            } <span class="kw">else </span>{
+                <span class="bool-val">true
+            </span>},
+            <span class="prelude-val">None </span>=&gt; <span class="bool-val">false</span>,
         }
     }
 }
 
-<span class="doccomment">/// There is one runqueue per core, each core only accesses its own private runqueue</span>
-<span class="doccomment">/// and allows the scheduler to select a task from that runqueue to schedule in</span>
-<span class="kw">static</span> <span class="ident">RUNQUEUES</span>: <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">RwLockPreempt</span><span class="op">&lt;</span><span class="ident">RunQueue</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicMap::new</span>();
+<span class="doccomment">/// There is one runqueue per core, each core only accesses its own private runqueue
+/// and allows the scheduler to select a task from that runqueue to schedule in
+</span><span class="kw">static </span>RUNQUEUES: AtomicMap&lt;u8, RwLockPreempt&lt;RunQueue&gt;&gt; = AtomicMap::new();
 
-<span class="doccomment">/// A list of `Task`s and their associated realtime scheduler data that may be run on a given CPU core.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// In rate monotonic scheduling, tasks are sorted in order of increasing periods.</span>
-<span class="doccomment">/// Thus, the `period` value acts as a form of task &quot;priority&quot;,</span>
-<span class="doccomment">/// with higher priority (shorter period) tasks coming first.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RunQueue</span> {
-    <span class="ident">core</span>: <span class="ident">u8</span>,
-    <span class="ident">queue</span>: <span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">RealtimeTaskRef</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A list of `Task`s and their associated realtime scheduler data that may be run on a given CPU core.
+///
+/// In rate monotonic scheduling, tasks are sorted in order of increasing periods.
+/// Thus, the `period` value acts as a form of task &quot;priority&quot;,
+/// with higher priority (shorter period) tasks coming first.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>RunQueue {
+    core: u8,
+    queue: VecDeque&lt;RealtimeTaskRef&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">RunQueue</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">RealtimeTaskRef</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">RealtimeTaskRef</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">queue</span>
+<span class="kw">impl </span>Deref <span class="kw">for </span>RunQueue {
+    <span class="kw">type </span>Target = VecDeque&lt;RealtimeTaskRef&gt;;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>VecDeque&lt;RealtimeTaskRef&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.queue
     }
 }
 
-<span class="kw">impl</span> <span class="ident">DerefMut</span> <span class="kw">for</span> <span class="ident">RunQueue</span> {
-    <span class="kw">fn</span> <span class="ident">deref_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">RealtimeTaskRef</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">queue</span>
+<span class="kw">impl </span>DerefMut <span class="kw">for </span>RunQueue {
+    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>VecDeque&lt;RealtimeTaskRef&gt; {
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>.queue
     }
 }
 
 
-<span class="kw">impl</span> <span class="ident">RunQueue</span> {
-    <span class="doccomment">/// Moves the `RealtimeTaskRef` at the given `index` in this `RunQueue`</span>
-    <span class="doccomment">/// to the appropriate location in this `RunQueue` based on its period.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Returns a reference to the underlying `Task`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Thus, the `RealtimeTaskRef will be reinserted into the `RunQueue` so the `RunQueue` contains the</span>
-    <span class="doccomment">/// `RealtimeTaskRef`s in order of increasing period. All aperiodic tasks will simply be reinserted at the end of the `RunQueue`</span>
-    <span class="doccomment">/// in order to ensure no aperiodic tasks are selected until there are no periodic tasks ready for execution.</span>
-    <span class="doccomment">/// Afterwards, the number of context switches is incremented by one.</span>
-    <span class="doccomment">/// This function is used when the task is selected by the scheduler.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">update_and_reinsert</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">index</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">TaskRef</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">mut</span> <span class="ident">realtime_taskref</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">remove</span>(<span class="ident">index</span>) {
-            <span class="ident">realtime_taskref</span>.<span class="ident">increment_context_switches</span>();
-            <span class="kw">let</span> <span class="ident">taskref</span> <span class="op">=</span> <span class="ident">realtime_taskref</span>.<span class="ident">taskref</span>.<span class="ident">clone</span>();
-            <span class="self">self</span>.<span class="ident">insert_realtime_taskref_at_proper_location</span>(<span class="ident">realtime_taskref</span>);
-            <span class="prelude-val">Some</span>(<span class="ident">taskref</span>)
+<span class="kw">impl </span>RunQueue {
+    <span class="doccomment">/// Moves the `RealtimeTaskRef` at the given `index` in this `RunQueue`
+    /// to the appropriate location in this `RunQueue` based on its period.
+    ///
+    /// Returns a reference to the underlying `Task`.
+    ///
+    /// Thus, the `RealtimeTaskRef will be reinserted into the `RunQueue` so the `RunQueue` contains the
+    /// `RealtimeTaskRef`s in order of increasing period. All aperiodic tasks will simply be reinserted at the end of the `RunQueue`
+    /// in order to ensure no aperiodic tasks are selected until there are no periodic tasks ready for execution.
+    /// Afterwards, the number of context switches is incremented by one.
+    /// This function is used when the task is selected by the scheduler.
+    </span><span class="kw">pub fn </span>update_and_reinsert(<span class="kw-2">&amp;mut </span><span class="self">self</span>, index: usize) -&gt; <span class="prelude-ty">Option</span>&lt;TaskRef&gt; {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>realtime_taskref) = <span class="self">self</span>.remove(index) {
+            realtime_taskref.increment_context_switches();
+            <span class="kw">let </span>taskref = realtime_taskref.taskref.clone();
+            <span class="self">self</span>.insert_realtime_taskref_at_proper_location(realtime_taskref);
+            <span class="prelude-val">Some</span>(taskref)
         }
-        <span class="kw">else</span> {
-            <span class="prelude-val">None</span>
-        }
+        <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
     }
 
-    <span class="doccomment">/// Creates a new `RunQueue` for the given core, which is an `apic_id`</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">which_core</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">loscd_eval</span>))]</span>
-        <span class="macro">trace!</span>(<span class="string">&quot;Created runqueue (realtime) for core {}&quot;</span>, <span class="ident">which_core</span>);
-        <span class="kw">let</span> <span class="ident">new_rq</span> <span class="op">=</span> <span class="ident">RwLockPreempt::new</span>(<span class="ident">RunQueue</span> {
-            <span class="ident">core</span>: <span class="ident">which_core</span>,
-            <span class="ident">queue</span>: <span class="ident">VecDeque::new</span>(),
+    <span class="doccomment">/// Creates a new `RunQueue` for the given core, which is an `apic_id`
+    </span><span class="kw">pub fn </span>init(which_core: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="attr">#[cfg(not(loscd_eval))]
+        </span><span class="macro">trace!</span>(<span class="string">&quot;Created runqueue (realtime) for core {}&quot;</span>, which_core);
+        <span class="kw">let </span>new_rq = RwLockPreempt::new(RunQueue {
+            core: which_core,
+            queue: VecDeque::new(),
         });
 
-        <span class="kw">if</span> <span class="ident">RUNQUEUES</span>.<span class="ident">insert</span>(<span class="ident">which_core</span>, <span class="ident">new_rq</span>).<span class="ident">is_some</span>() {
-            <span class="macro">error!</span>(<span class="string">&quot;BUG: RunQueue::init(): runqueue already exists for core {}!&quot;</span>, <span class="ident">which_core</span>);
+        <span class="kw">if </span>RUNQUEUES.insert(which_core, new_rq).is_some() {
+            <span class="macro">error!</span>(<span class="string">&quot;BUG: RunQueue::init(): runqueue already exists for core {}!&quot;</span>, which_core);
             <span class="prelude-val">Err</span>(<span class="string">&quot;runqueue already exists for this core&quot;</span>)
         }
-        <span class="kw">else</span> {
-            <span class="comment">// there shouldn&#39;t already be a RunQueue for this core</span>
-            <span class="prelude-val">Ok</span>(())
+        <span class="kw">else </span>{
+            <span class="comment">// there shouldn&#39;t already be a RunQueue for this core
+            </span><span class="prelude-val">Ok</span>(())
         }
     }
 
-    <span class="doccomment">/// Returns `RunQueue` for the given core, which is an `apic_id`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_runqueue</span>(<span class="ident">which_core</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">RwLockPreempt</span><span class="op">&lt;</span><span class="ident">RunQueue</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="ident">RUNQUEUES</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">which_core</span>)
+    <span class="doccomment">/// Returns `RunQueue` for the given core, which is an `apic_id`.
+    </span><span class="kw">pub fn </span>get_runqueue(which_core: u8) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>RwLockPreempt&lt;RunQueue&gt;&gt; {
+        RUNQUEUES.get(<span class="kw-2">&amp;</span>which_core)
     } 
 
-    <span class="doccomment">/// Returns the &quot;least busy&quot; core, which is currently very simple, based on runqueue size.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_least_busy_core</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
-        <span class="ident"><span class="self">Self</span>::get_least_busy_runqueue</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">rq</span><span class="op">|</span> <span class="ident">rq</span>.<span class="ident">read</span>().<span class="ident">core</span>)
+    <span class="doccomment">/// Returns the &quot;least busy&quot; core, which is currently very simple, based on runqueue size.
+    </span><span class="kw">pub fn </span>get_least_busy_core() -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
+        <span class="self">Self</span>::get_least_busy_runqueue().map(|rq| rq.read().core)
     }
 
-    <span class="doccomment">/// Returns the `RunQueue` for the &quot;least busy&quot; core.</span>
-    <span class="doccomment">/// See [`get_least_busy_core()`](#method.get_least_busy_core)</span>
-    <span class="kw">fn</span> <span class="ident">get_least_busy_runqueue</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">RwLockPreempt</span><span class="op">&lt;</span><span class="ident">RunQueue</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">min_rq</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">RwLockPreempt</span><span class="op">&lt;</span><span class="ident">RunQueue</span><span class="op">&gt;</span>, <span class="ident">usize</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="doccomment">/// Returns the `RunQueue` for the &quot;least busy&quot; core.
+    /// See [`get_least_busy_core()`](#method.get_least_busy_core)
+    </span><span class="kw">fn </span>get_least_busy_runqueue() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>RwLockPreempt&lt;RunQueue&gt;&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>min_rq: <span class="prelude-ty">Option</span>&lt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>RwLockPreempt&lt;RunQueue&gt;, usize)&gt; = <span class="prelude-val">None</span>;
 
-        <span class="kw">for</span> (<span class="kw">_</span>, <span class="ident">rq</span>) <span class="kw">in</span> <span class="ident">RUNQUEUES</span>.<span class="ident">iter</span>() {
-            <span class="kw">let</span> <span class="ident">rq_size</span> <span class="op">=</span> <span class="ident">rq</span>.<span class="ident">read</span>().<span class="ident">queue</span>.<span class="ident">len</span>();
+        <span class="kw">for </span>(<span class="kw">_</span>, rq) <span class="kw">in </span>RUNQUEUES.iter() {
+            <span class="kw">let </span>rq_size = rq.read().queue.len();
 
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">min</span>) <span class="op">=</span> <span class="ident">min_rq</span> {
-                <span class="kw">if</span> <span class="ident">rq_size</span> <span class="op">&lt;</span> <span class="ident">min</span>.<span class="number">1</span> {
-                    <span class="ident">min_rq</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">rq</span>, <span class="ident">rq_size</span>));
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(min) = min_rq {
+                <span class="kw">if </span>rq_size &lt; min.<span class="number">1 </span>{
+                    min_rq = <span class="prelude-val">Some</span>((rq, rq_size));
                 }
             }
-            <span class="kw">else</span> {
-                <span class="ident">min_rq</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">rq</span>, <span class="ident">rq_size</span>));
+            <span class="kw">else </span>{
+                min_rq = <span class="prelude-val">Some</span>((rq, rq_size));
             }
         }
 
-        <span class="ident">min_rq</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">m</span><span class="op">|</span> <span class="ident">m</span>.<span class="number">0</span>)
+        min_rq.map(|m| m.<span class="number">0</span>)
     }
 
-    <span class="doccomment">/// Chooses the &quot;least busy&quot; core&#39;s runqueue (based on simple runqueue-size-based load balancing)</span>
-    <span class="doccomment">/// and adds the given `Task` reference to that core&#39;s runqueue.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_task_to_any_runqueue</span>(<span class="ident">task</span>: <span class="ident">TaskRef</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">rq</span> <span class="op">=</span> <span class="ident">RunQueue::get_least_busy_runqueue</span>()
-            .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">RUNQUEUES</span>.<span class="ident">iter</span>().<span class="ident">next</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">r</span><span class="op">|</span> <span class="ident">r</span>.<span class="number">1</span>))
-            .<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t find any runqueues to add the task to!&quot;</span>)<span class="question-mark">?</span>;
+    <span class="doccomment">/// Chooses the &quot;least busy&quot; core&#39;s runqueue (based on simple runqueue-size-based load balancing)
+    /// and adds the given `Task` reference to that core&#39;s runqueue.
+    </span><span class="kw">pub fn </span>add_task_to_any_runqueue(task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>rq = RunQueue::get_least_busy_runqueue()
+            .or_else(|| RUNQUEUES.iter().next().map(|r| r.<span class="number">1</span>))
+            .ok_or(<span class="string">&quot;couldn&#39;t find any runqueues to add the task to!&quot;</span>)<span class="question-mark">?</span>;
 
-        <span class="ident">rq</span>.<span class="ident">write</span>().<span class="ident">add_task</span>(<span class="ident">task</span>, <span class="prelude-val">None</span>)
+        rq.write().add_task(task, <span class="prelude-val">None</span>)
     }
 
-    <span class="doccomment">/// Convenience method that adds the given `Task` reference to given core&#39;s runqueue.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_task_to_specific_runqueue</span>(<span class="ident">which_core</span>: <span class="ident">u8</span>, <span class="ident">task</span>: <span class="ident">TaskRef</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="ident">RunQueue::get_runqueue</span>(<span class="ident">which_core</span>)
-            .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t get RunQueue for the given core&quot;</span>)<span class="question-mark">?</span>
-            .<span class="ident">write</span>()
-            .<span class="ident">add_task</span>(<span class="ident">task</span>, <span class="prelude-val">None</span>)
+    <span class="doccomment">/// Convenience method that adds the given `Task` reference to given core&#39;s runqueue.
+    </span><span class="kw">pub fn </span>add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        RunQueue::get_runqueue(which_core)
+            .ok_or(<span class="string">&quot;Couldn&#39;t get RunQueue for the given core&quot;</span>)<span class="question-mark">?
+            </span>.write()
+            .add_task(task, <span class="prelude-val">None</span>)
     }
 
-    <span class="doccomment">/// Inserts a `RealtimeTaskRef` at its proper position in the queue.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Under the RMS scheduling algorithm, tasks should be sorted in increasing value </span>
-    <span class="doccomment">/// of their periods, with aperiodic tasks being placed at the end.</span>
-    <span class="kw">fn</span> <span class="ident">insert_realtime_taskref_at_proper_location</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">taskref</span>: <span class="ident">RealtimeTaskRef</span>) {
-        <span class="kw">match</span> <span class="ident">taskref</span>.<span class="ident">period</span> {
-            <span class="prelude-val">None</span> =&gt; <span class="self">self</span>.<span class="ident">push_back</span>(<span class="ident">taskref</span>),
+    <span class="doccomment">/// Inserts a `RealtimeTaskRef` at its proper position in the queue.
+    ///
+    /// Under the RMS scheduling algorithm, tasks should be sorted in increasing value 
+    /// of their periods, with aperiodic tasks being placed at the end.
+    </span><span class="kw">fn </span>insert_realtime_taskref_at_proper_location(<span class="kw-2">&amp;mut </span><span class="self">self</span>, taskref: RealtimeTaskRef) {
+        <span class="kw">match </span>taskref.period {
+            <span class="prelude-val">None </span>=&gt; <span class="self">self</span>.push_back(taskref),
             <span class="prelude-val">Some</span>(<span class="kw">_</span>) =&gt; {
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_empty</span>() {
-                    <span class="self">self</span>.<span class="ident">push_back</span>(<span class="ident">taskref</span>);
-                } <span class="kw">else</span> {
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">index_to_insert</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-                    <span class="kw">for</span> (<span class="ident">index</span>, <span class="ident">inserted_taskref</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
-                        <span class="kw">if</span> <span class="ident">taskref</span>.<span class="ident">has_smaller_period</span>(<span class="ident">inserted_taskref</span>) {
-                            <span class="ident">index_to_insert</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">index</span>);
+                <span class="kw">if </span><span class="self">self</span>.is_empty() {
+                    <span class="self">self</span>.push_back(taskref);
+                } <span class="kw">else </span>{
+                    <span class="kw">let </span><span class="kw-2">mut </span>index_to_insert: <span class="prelude-ty">Option</span>&lt;usize&gt; = <span class="prelude-val">None</span>;
+                    <span class="kw">for </span>(index, inserted_taskref) <span class="kw">in </span><span class="self">self</span>.iter().enumerate() {
+                        <span class="kw">if </span>taskref.has_smaller_period(inserted_taskref) {
+                            index_to_insert = <span class="prelude-val">Some</span>(index);
                             <span class="kw">break</span>;
                         }
                     }
 
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">index</span>) <span class="op">=</span> <span class="ident">index_to_insert</span> {
-                        <span class="self">self</span>.<span class="ident">insert</span>(<span class="ident">index</span>, <span class="ident">taskref</span>);
-                    } <span class="kw">else</span> {
-                        <span class="self">self</span>.<span class="ident">push_back</span>(<span class="ident">taskref</span>);
+                    <span class="kw">if let </span><span class="prelude-val">Some</span>(index) = index_to_insert {
+                        <span class="self">self</span>.insert(index, taskref);
+                    } <span class="kw">else </span>{
+                        <span class="self">self</span>.push_back(taskref);
                     }
                 }
             }
         }
     }
 
-    <span class="doccomment">/// Adds a `TaskRef` to this runqueue with the given periodicity value</span>
-    <span class="kw">fn</span> <span class="ident">add_task</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">task</span>: <span class="ident">TaskRef</span>, <span class="ident">period</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="macro">debug!</span>(<span class="string">&quot;Adding task to runqueue_realtime {}, {:?}&quot;</span>, <span class="self">self</span>.<span class="ident">core</span>, <span class="ident">task</span>);
-        <span class="kw">let</span> <span class="ident">realtime_taskref</span> <span class="op">=</span> <span class="ident">RealtimeTaskRef::new</span>(<span class="ident">task</span>, <span class="ident">period</span>);
-        <span class="self">self</span>.<span class="ident">insert_realtime_taskref_at_proper_location</span>(<span class="ident">realtime_taskref</span>);
+    <span class="doccomment">/// Adds a `TaskRef` to this runqueue with the given periodicity value
+    </span><span class="kw">fn </span>add_task(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: TaskRef, period: <span class="prelude-ty">Option</span>&lt;usize&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="macro">debug!</span>(<span class="string">&quot;Adding task to runqueue_realtime {}, {:?}&quot;</span>, <span class="self">self</span>.core, task);
+        <span class="kw">let </span>realtime_taskref = RealtimeTaskRef::new(task, period);
+        <span class="self">self</span>.insert_realtime_taskref_at_proper_location(realtime_taskref);
 
         <span class="prelude-val">Ok</span>(())
     }
     
-    <span class="doccomment">/// The internal function that actually removes the task from the runqueue.</span>
-    <span class="kw">fn</span> <span class="ident">remove_internal</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">task</span>: <span class="kw-2">&amp;</span><span class="ident">TaskRef</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="macro">debug!</span>(<span class="string">&quot;Removing task from runqueue_realtime {}, {:?}&quot;</span>, <span class="self">self</span>.<span class="ident">core</span>, <span class="ident">task</span>);
-        <span class="self">self</span>.<span class="ident">retain</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="ident">x</span>.<span class="ident">taskref</span> <span class="op">!</span><span class="op">=</span> <span class="ident">task</span>);
+    <span class="doccomment">/// The internal function that actually removes the task from the runqueue.
+    </span><span class="kw">fn </span>remove_internal(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="macro">debug!</span>(<span class="string">&quot;Removing task from runqueue_realtime {}, {:?}&quot;</span>, <span class="self">self</span>.core, task);
+        <span class="self">self</span>.retain(|x| <span class="kw-2">&amp;</span>x.taskref != task);
 
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Removes a `TaskRef` from this RunQueue.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">remove_task</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">task</span>: <span class="kw-2">&amp;</span><span class="ident">TaskRef</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">remove_internal</span>(<span class="ident">task</span>)
+    <span class="doccomment">/// Removes a `TaskRef` from this RunQueue.
+    </span><span class="kw">pub fn </span>remove_task(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.remove_internal(task)
     }
 
-    <span class="doccomment">/// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// This is a brute force approach that iterates over all runqueues. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">remove_task_from_all</span>(<span class="ident">task</span>: <span class="kw-2">&amp;</span><span class="ident">TaskRef</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">for</span> (<span class="ident">_core</span>, <span class="ident">rq</span>) <span class="kw">in</span> <span class="ident">RUNQUEUES</span>.<span class="ident">iter</span>() {
-            <span class="ident">rq</span>.<span class="ident">write</span>().<span class="ident">remove_task</span>(<span class="ident">task</span>)<span class="question-mark">?</span>;
+    <span class="doccomment">/// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
+    /// 
+    /// This is a brute force approach that iterates over all runqueues. 
+    </span><span class="kw">pub fn </span>remove_task_from_all(task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">for </span>(_core, rq) <span class="kw">in </span>RUNQUEUES.iter() {
+            rq.write().remove_task(task)<span class="question-mark">?</span>;
         }
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// The internal function that sets the periodicity of a given `Task` in a single `RunQueue`</span>
-    <span class="doccomment">/// then reinserts the `RealtimeTaskRef` at the proper location</span>
-    <span class="kw">fn</span> <span class="ident">set_periodicity_internal</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>, 
-        <span class="ident">task</span>: <span class="kw-2">&amp;</span><span class="ident">TaskRef</span>, 
-        <span class="ident">period</span>: <span class="ident">usize</span>
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">iter</span>().<span class="ident">position</span>(<span class="op">|</span><span class="ident">rt</span><span class="op">|</span> <span class="ident">rt</span>.<span class="ident">taskref</span> <span class="op">==</span> <span class="kw-2">*</span><span class="ident">task</span> ) {
-            <span class="prelude-val">Some</span>(<span class="ident">i</span>) =&gt; {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">mut</span> <span class="ident">realtime_taskref</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">remove</span>(<span class="ident">i</span>) {
-                    <span class="ident">realtime_taskref</span>.<span class="ident">period</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">period</span>);
-                    <span class="self">self</span>.<span class="ident">insert_realtime_taskref_at_proper_location</span>(<span class="ident">realtime_taskref</span>);
+    <span class="doccomment">/// The internal function that sets the periodicity of a given `Task` in a single `RunQueue`
+    /// then reinserts the `RealtimeTaskRef` at the proper location
+    </span><span class="kw">fn </span>set_periodicity_internal(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>, 
+        task: <span class="kw-2">&amp;</span>TaskRef, 
+        period: usize
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">match </span><span class="self">self</span>.iter().position(|rt| rt.taskref == <span class="kw-2">*</span>task ) {
+            <span class="prelude-val">Some</span>(i) =&gt; {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>realtime_taskref) = <span class="self">self</span>.remove(i) {
+                    realtime_taskref.period = <span class="prelude-val">Some</span>(period);
+                    <span class="self">self</span>.insert_realtime_taskref_at_proper_location(realtime_taskref);
                 }
             },
-            <span class="prelude-val">None</span> =&gt; {},
+            <span class="prelude-val">None </span>=&gt; {},
         };
         <span class="prelude-val">Ok</span>(())
     }
 }
 
-<span class="doccomment">/// Set the periodicity of a given `Task` in all the `RunQueue` structures</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_periodicity</span>(<span class="ident">task</span>: <span class="kw-2">&amp;</span><span class="ident">TaskRef</span>, <span class="ident">period</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">for</span> (<span class="ident">_core</span>, <span class="ident">rq</span>) <span class="kw">in</span> <span class="ident">RUNQUEUES</span>.<span class="ident">iter</span>() {
-        <span class="ident">rq</span>.<span class="ident">write</span>().<span class="ident">set_periodicity_internal</span>(<span class="ident">task</span>, <span class="ident">period</span>)<span class="question-mark">?</span>;
+<span class="doccomment">/// Set the periodicity of a given `Task` in all the `RunQueue` structures
+</span><span class="kw">pub fn </span>set_periodicity(task: <span class="kw-2">&amp;</span>TaskRef, period: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">for </span>(_core, rq) <span class="kw">in </span>RUNQUEUES.iter() {
+        rq.write().set_periodicity_internal(task, period)<span class="question-mark">?</span>;
     }
     <span class="prelude-val">Ok</span>(())
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="runqueue_realtime" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="runqueue_realtime" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

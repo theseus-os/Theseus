@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/unwind/src/lsda.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lsda.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../unwind/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../unwind/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../unwind/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/unwind/src/lsda.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lsda.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../unwind/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -308,310 +302,309 @@
 <span id="302">302</span>
 <span id="303">303</span>
 <span id="304">304</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Routines for parsing the gcc-style LSDA (Language-Specific Data Area) in an ELF object file, </span>
-<span class="doccomment">//! which corresponds to an area within a `.gcc_except_table` section. </span>
+</pre><pre class="rust"><code><span class="doccomment">//! Routines for parsing the gcc-style LSDA (Language-Specific Data Area) in an ELF object file, 
+//! which corresponds to an area within a `.gcc_except_table` section. 
 
-<span class="attribute">#![<span class="ident">allow</span>(<span class="ident">nonstandard_style</span>)]</span>
+</span><span class="attr">#![allow(nonstandard_style)]
 
-<span class="kw">use</span> <span class="ident">core::ops::Range</span>;
-<span class="kw">use</span> <span class="ident">gimli</span>::{<span class="ident">Reader</span>, <span class="ident">DwEhPe</span>, <span class="ident">Endianity</span>, <span class="ident">EndianSlice</span>, <span class="ident">constants</span>::<span class="kw-2">*</span>, };
-<span class="kw">use</span> <span class="ident">FallibleIterator</span>;
+</span><span class="kw">use </span>core::ops::Range;
+<span class="kw">use </span>gimli::{Reader, DwEhPe, Endianity, EndianSlice, constants::<span class="kw-2">*</span>, };
+<span class="kw">use </span>FallibleIterator;
 
-<span class="doccomment">/// `GccExceptTableArea` contains the contents of the Language-Specific Data Area (LSDA)</span>
-<span class="doccomment">/// that is used to locate cleanup (run destructors for) a given function during stack unwinding. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Though an object file typically only includes a single `.gcc_except_table` section, it may include multiple.</span>
-<span class="doccomment">/// This struct represents only *one area* of that section, the area that is for cleaning up a single function. </span>
-<span class="doccomment">/// There may exist multiple instances of this struct created as overlays </span>
-<span class="doccomment">/// for different, non-overlapping areas of that one `.gcc_except_table` section.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GccExceptTableArea</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Reader</span><span class="op">&gt;</span> {
-    <span class="ident">reader</span>: <span class="ident">R</span>,
-    <span class="ident">function_start_address</span>: <span class="ident">u64</span>,
+<span class="doccomment">/// `GccExceptTableArea` contains the contents of the Language-Specific Data Area (LSDA)
+/// that is used to locate cleanup (run destructors for) a given function during stack unwinding. 
+/// 
+/// Though an object file typically only includes a single `.gcc_except_table` section, it may include multiple.
+/// This struct represents only *one area* of that section, the area that is for cleaning up a single function. 
+/// There may exist multiple instances of this struct created as overlays 
+/// for different, non-overlapping areas of that one `.gcc_except_table` section.
+</span><span class="attr">#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+</span><span class="kw">pub struct </span>GccExceptTableArea&lt;R: Reader&gt; {
+    reader: R,
+    function_start_address: u64,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;input</span>, <span class="ident">Endian</span>: <span class="ident">Endianity</span><span class="op">&gt;</span> <span class="ident">GccExceptTableArea</span><span class="op">&lt;</span><span class="ident">EndianSlice</span><span class="op">&lt;</span><span class="lifetime">&#39;input</span>, <span class="ident">Endian</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Construct a new `GccExceptTableArea` instance from the given input data,</span>
-    <span class="doccomment">/// which is a slice that typically begins at an LSDA pointer that was parsed</span>
-    <span class="doccomment">/// from a `FrameDescriptionEntry` in the `EhFrame` section.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// The starting address of the function that it corresponds to must aso be provided,</span>
-    <span class="doccomment">/// because this is often used as the default base address for the landing pad</span>
-    <span class="doccomment">/// from which all offsets are calculated.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">data</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;input</span> [<span class="ident">u8</span>], <span class="ident">endian</span>: <span class="ident">Endian</span>, <span class="ident">function_start_address</span>: <span class="ident">u64</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">GccExceptTableArea</span> {
-            <span class="ident">reader</span>: <span class="ident">EndianSlice::new</span>(<span class="ident">data</span>, <span class="ident">endian</span>),
-            <span class="ident">function_start_address</span>,
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;input</span>, Endian: Endianity&gt; GccExceptTableArea&lt;EndianSlice&lt;<span class="lifetime">&#39;input</span>, Endian&gt;&gt; {
+    <span class="doccomment">/// Construct a new `GccExceptTableArea` instance from the given input data,
+    /// which is a slice that typically begins at an LSDA pointer that was parsed
+    /// from a `FrameDescriptionEntry` in the `EhFrame` section.
+    /// 
+    /// The starting address of the function that it corresponds to must aso be provided,
+    /// because this is often used as the default base address for the landing pad
+    /// from which all offsets are calculated.
+    </span><span class="kw">pub fn </span>new(data: <span class="kw-2">&amp;</span><span class="lifetime">&#39;input </span>[u8], endian: Endian, function_start_address: u64) -&gt; <span class="self">Self </span>{
+        GccExceptTableArea {
+            reader: EndianSlice::new(data, endian),
+            function_start_address,
         }
     }
 }
 
-<span class="comment">// impl&lt;R: Reader&gt; Section&lt;R&gt; for GccExceptTableArea&lt;R&gt; {</span>
-<span class="comment">//     // TODO FIXME: this is wrong (temporarily), </span>
-<span class="comment">//     // once we incoporate it into Gimli itself, we can add a GccExceptFrame sectionid.</span>
-<span class="comment">//     fn id() -&gt; SectionId { SectionId::EhFrameHdr }</span>
+<span class="comment">// impl&lt;R: Reader&gt; Section&lt;R&gt; for GccExceptTableArea&lt;R&gt; {
+//     // TODO FIXME: this is wrong (temporarily), 
+//     // once we incoporate it into Gimli itself, we can add a GccExceptFrame sectionid.
+//     fn id() -&gt; SectionId { SectionId::EhFrameHdr }
 
-<span class="comment">//     fn reader(&amp;self) -&gt; &amp;R { &amp;self.reader }</span>
+//     fn reader(&amp;self) -&gt; &amp;R { &amp;self.reader }
 
-<span class="comment">//     fn section_name() -&gt; &amp;&#39;static str {</span>
-<span class="comment">//         &quot;.gcc_except_table&quot;</span>
-<span class="comment">//     }</span>
-<span class="comment">// }</span>
+//     fn section_name() -&gt; &amp;&#39;static str {
+//         &quot;.gcc_except_table&quot;
+//     }
+// }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Reader</span><span class="op">&gt;</span> <span class="ident">GccExceptTableArea</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Parses the .gcc_except_table entries from the very top of the LSDA area.</span>
-    <span class="doccomment">/// This only parses the two headers that are guaranteed to exist,</span>
-    <span class="doccomment">/// the other dynamically-sized entries should be parsed elsewhere using the result of this function.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// The flow of this code was partially inspired by rust&#39;s stdlib `libpanic_unwind/dwarf/eh.rs` file.</span>
-    <span class="doccomment">/// &lt;https://github.com/rust-lang/rust/blob/master/src/libpanic_unwind/dwarf/eh.rs&gt;</span>
-    <span class="kw">fn</span> <span class="ident">parse_from_beginning</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">gimli::Result</span><span class="op">&lt;</span>(<span class="ident">LsdaHeader</span>, <span class="ident">CallSiteTableHeader</span>, <span class="ident">R</span>)<span class="op">&gt;</span> {
-        <span class="comment">// Clone the internal `Reader` to avoid modifying the offset position of the original provided reader.</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reader</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">reader</span>.<span class="ident">clone</span>();
+</span><span class="kw">impl</span>&lt;R: Reader&gt; GccExceptTableArea&lt;R&gt; {
+    <span class="doccomment">/// Parses the .gcc_except_table entries from the very top of the LSDA area.
+    /// This only parses the two headers that are guaranteed to exist,
+    /// the other dynamically-sized entries should be parsed elsewhere using the result of this function.
+    /// 
+    /// The flow of this code was partially inspired by rust&#39;s stdlib `libpanic_unwind/dwarf/eh.rs` file.
+    /// &lt;https://github.com/rust-lang/rust/blob/master/src/libpanic_unwind/dwarf/eh.rs&gt;
+    </span><span class="kw">fn </span>parse_from_beginning(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; gimli::Result&lt;(LsdaHeader, CallSiteTableHeader, R)&gt; {
+        <span class="comment">// Clone the internal `Reader` to avoid modifying the offset position of the original provided reader.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>reader = <span class="self">self</span>.reader.clone();
 
-        <span class="comment">// First, parse the top-level header, which comes at the very beginning</span>
-        <span class="kw">let</span> <span class="ident">lsda_header</span> <span class="op">=</span> <span class="ident">LsdaHeader::parse</span>(<span class="kw-2">&amp;mut</span> <span class="ident">reader</span>)<span class="question-mark">?</span>;
-        <span class="comment">// debug!(&quot;{:#X?}&quot;, lsda_header);</span>
+        <span class="comment">// First, parse the top-level header, which comes at the very beginning
+        </span><span class="kw">let </span>lsda_header = LsdaHeader::parse(<span class="kw-2">&amp;mut </span>reader)<span class="question-mark">?</span>;
+        <span class="comment">// debug!(&quot;{:#X?}&quot;, lsda_header);
 
-        <span class="comment">// Second, parse the call site table header, which comes right after the top-level LSDA header</span>
-        <span class="kw">let</span> <span class="ident">call_site_table_header</span> <span class="op">=</span> <span class="ident">CallSiteTableHeader::parse</span>(<span class="kw-2">&amp;mut</span> <span class="ident">reader</span>)<span class="question-mark">?</span>;
-        <span class="comment">// debug!(&quot;{:#X?}&quot;, call_site_table_header);</span>
+        // Second, parse the call site table header, which comes right after the top-level LSDA header
+        </span><span class="kw">let </span>call_site_table_header = CallSiteTableHeader::parse(<span class="kw-2">&amp;mut </span>reader)<span class="question-mark">?</span>;
+        <span class="comment">// debug!(&quot;{:#X?}&quot;, call_site_table_header);
 
-        <span class="prelude-val">Ok</span>((<span class="ident">lsda_header</span>, <span class="ident">call_site_table_header</span>, <span class="ident">reader</span>))
+        </span><span class="prelude-val">Ok</span>((lsda_header, call_site_table_header, reader))
     }
 
-    <span class="doccomment">/// Returns an iterator over all of the call site entries</span>
-    <span class="doccomment">/// found in this area of this .gcc_except_table section.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Can be used with the `FallibleIterator` trait. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">call_site_table_entries</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">gimli::Result</span><span class="op">&lt;</span><span class="ident">CallSiteTableIterator</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> (<span class="ident">lsda_header</span>, <span class="ident">call_site_table_header</span>, <span class="ident">reader</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">parse_from_beginning</span>()<span class="question-mark">?</span>;
-        <span class="comment">// set up the call site table iterator so it knows when to stop parsing entries.        </span>
-        <span class="kw">let</span> <span class="ident">end_of_call_site_table</span> <span class="op">=</span> <span class="ident">reader</span>.<span class="ident">offset_id</span>().<span class="number">0</span> <span class="op">+</span> <span class="ident">call_site_table_header</span>.<span class="ident">length</span>;
+    <span class="doccomment">/// Returns an iterator over all of the call site entries
+    /// found in this area of this .gcc_except_table section.
+    /// 
+    /// Can be used with the `FallibleIterator` trait. 
+    </span><span class="kw">pub fn </span>call_site_table_entries(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; gimli::Result&lt;CallSiteTableIterator&lt;R&gt;&gt; {
+        <span class="kw">let </span>(lsda_header, call_site_table_header, reader) = <span class="self">self</span>.parse_from_beginning()<span class="question-mark">?</span>;
+        <span class="comment">// set up the call site table iterator so it knows when to stop parsing entries.        
+        </span><span class="kw">let </span>end_of_call_site_table = reader.offset_id().<span class="number">0 </span>+ call_site_table_header.length;
 
-        <span class="prelude-val">Ok</span>(<span class="ident">CallSiteTableIterator</span> {
-            <span class="ident">call_site_table_encoding</span>: <span class="ident">call_site_table_header</span>.<span class="ident">encoding</span>,
-            <span class="ident">end_of_call_site_table</span>,
-            <span class="ident">landing_pad_base</span>: <span class="ident">lsda_header</span>.<span class="ident">landing_pad_base</span>.<span class="ident">unwrap_or</span>(<span class="self">self</span>.<span class="ident">function_start_address</span>),
-            <span class="ident">reader</span>, 
+        <span class="prelude-val">Ok</span>(CallSiteTableIterator {
+            call_site_table_encoding: call_site_table_header.encoding,
+            end_of_call_site_table,
+            landing_pad_base: lsda_header.landing_pad_base.unwrap_or(<span class="self">self</span>.function_start_address),
+            reader, 
         })
     }
 
-    <span class="doccomment">/// Iterates over the call site table and finds the entry that matches the given instruction pointer (IP), </span>
-    <span class="doccomment">/// i.e., the entry that covers the range of addresses that the `ip` falls within.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">call_site_table_entry_for_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">address</span>: <span class="ident">u64</span>) -&gt; <span class="ident">gimli::Result</span><span class="op">&lt;</span><span class="ident">CallSiteTableEntry</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">iter</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">call_site_table_entries</span>()<span class="question-mark">?</span>;
-        <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">entry</span>) <span class="op">=</span> <span class="ident">iter</span>.<span class="ident">next</span>()<span class="question-mark">?</span> {
-            <span class="kw">if</span> <span class="ident">entry</span>.<span class="ident">range_of_covered_addresses</span>().<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">address</span>) {
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">entry</span>);
+    <span class="doccomment">/// Iterates over the call site table and finds the entry that matches the given instruction pointer (IP), 
+    /// i.e., the entry that covers the range of addresses that the `ip` falls within.
+    </span><span class="kw">pub fn </span>call_site_table_entry_for_address(<span class="kw-2">&amp;</span><span class="self">self</span>, address: u64) -&gt; gimli::Result&lt;CallSiteTableEntry&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>iter = <span class="self">self</span>.call_site_table_entries()<span class="question-mark">?</span>;
+        <span class="kw">while let </span><span class="prelude-val">Some</span>(entry) = iter.next()<span class="question-mark">? </span>{
+            <span class="kw">if </span>entry.range_of_covered_addresses().contains(<span class="kw-2">&amp;</span>address) {
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(entry);
             }
         }
-        <span class="prelude-val">Err</span>(<span class="ident">gimli::Error::NoUnwindInfoForAddress</span>)
+        <span class="prelude-val">Err</span>(gimli::Error::NoUnwindInfoForAddress)
     }
 }
 
-<span class="doccomment">/// The header of an LSDA section, which is at the very beginning of the area </span>
-<span class="doccomment">/// in the .gcc_except_table section that was pointed to by a stack frame&#39;s LSDA pointer. </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="kw">struct</span> <span class="ident">LsdaHeader</span> {
-    <span class="doccomment">/// The encoding used to read the next value `landing_pad_base`.</span>
-    <span class="ident">landing_pad_base_encoding</span>: <span class="ident">DwEhPe</span>,
-    <span class="doccomment">/// If the above `landing_pad_base_encoding` is not `DW_EH_PE_omit`,</span>
-    <span class="doccomment">/// then this is the value that should be used as the base address of the landing pad,</span>
-    <span class="doccomment">/// which is used by all the offsets specified in the LSDA call site tables and action tables.</span>
-    <span class="doccomment">/// It is decoded using the above `landing_pad_base_encoding`, </span>
-    <span class="doccomment">/// which is typically the uleb128 encoding, but not always guaranteed to be.</span>
-    <span class="doccomment">/// Otherwise, if `DW_EH_PE_omit`, the default value is the starting function address</span>
-    <span class="doccomment">/// specified in the FDE (FrameDescriptionEntry) corresponding to this LSDA.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Typically, this will be the virtual address of the function that this cleanup routine is for;</span>
-    <span class="doccomment">/// such cleanup routines are usually at the end of the function&#39;s text section.</span>
-    <span class="ident">landing_pad_base</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The encoding used to read pointer values in the type table.</span>
-    <span class="ident">type_table_encoding</span>: <span class="ident">DwEhPe</span>,
-    <span class="doccomment">/// If the above `type_table_encoding` is not `DW_EH_PE_omit`, </span>
-    <span class="doccomment">/// this is the offset to the type table, starting from the end of this header. </span>
-    <span class="doccomment">/// This is always encoded as a uleb128 value.</span>
-    <span class="doccomment">/// If it was `DW_EH_PE_omit` above, then there is no type table,</span>
-    <span class="doccomment">/// which is quite common in Rust-compiled object files.</span>
-    <span class="ident">type_table_offset</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
+<span class="doccomment">/// The header of an LSDA section, which is at the very beginning of the area 
+/// in the .gcc_except_table section that was pointed to by a stack frame&#39;s LSDA pointer. 
+</span><span class="attr">#[derive(Debug)]
+#[allow(dead_code)]
+</span><span class="kw">struct </span>LsdaHeader {
+    <span class="doccomment">/// The encoding used to read the next value `landing_pad_base`.
+    </span>landing_pad_base_encoding: DwEhPe,
+    <span class="doccomment">/// If the above `landing_pad_base_encoding` is not `DW_EH_PE_omit`,
+    /// then this is the value that should be used as the base address of the landing pad,
+    /// which is used by all the offsets specified in the LSDA call site tables and action tables.
+    /// It is decoded using the above `landing_pad_base_encoding`, 
+    /// which is typically the uleb128 encoding, but not always guaranteed to be.
+    /// Otherwise, if `DW_EH_PE_omit`, the default value is the starting function address
+    /// specified in the FDE (FrameDescriptionEntry) corresponding to this LSDA.
+    /// 
+    /// Typically, this will be the virtual address of the function that this cleanup routine is for;
+    /// such cleanup routines are usually at the end of the function&#39;s text section.
+    </span>landing_pad_base: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+    <span class="doccomment">/// The encoding used to read pointer values in the type table.
+    </span>type_table_encoding: DwEhPe,
+    <span class="doccomment">/// If the above `type_table_encoding` is not `DW_EH_PE_omit`, 
+    /// this is the offset to the type table, starting from the end of this header. 
+    /// This is always encoded as a uleb128 value.
+    /// If it was `DW_EH_PE_omit` above, then there is no type table,
+    /// which is quite common in Rust-compiled object files.
+    </span>type_table_offset: <span class="prelude-ty">Option</span>&lt;u64&gt;,
 }
-<span class="kw">impl</span> <span class="ident">LsdaHeader</span> {
-    <span class="kw">fn</span> <span class="ident">parse</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">gimli::Reader</span><span class="op">&gt;</span>(<span class="ident">reader</span>: <span class="kw-2">&amp;mut</span> <span class="ident">R</span>) -&gt; <span class="ident">gimli::Result</span><span class="op">&lt;</span><span class="ident">LsdaHeader</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">lp_encoding</span> <span class="op">=</span> <span class="ident">DwEhPe</span>(<span class="ident">reader</span>.<span class="ident">read_u8</span>()<span class="question-mark">?</span>);
-        <span class="kw">let</span> <span class="ident">lp</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">lp_encoding</span> <span class="op">==</span> <span class="ident">DW_EH_PE_omit</span> {
-            <span class="prelude-val">None</span>
-        } <span class="kw">else</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">read_encoded_pointer</span>(<span class="ident">reader</span>, <span class="ident">lp_encoding</span>)<span class="question-mark">?</span>)
+<span class="kw">impl </span>LsdaHeader {
+    <span class="kw">fn </span>parse&lt;R: gimli::Reader&gt;(reader: <span class="kw-2">&amp;mut </span>R) -&gt; gimli::Result&lt;LsdaHeader&gt; {
+        <span class="kw">let </span>lp_encoding = DwEhPe(reader.read_u8()<span class="question-mark">?</span>);
+        <span class="kw">let </span>lp = <span class="kw">if </span>lp_encoding == DW_EH_PE_omit {
+            <span class="prelude-val">None
+        </span>} <span class="kw">else </span>{
+            <span class="prelude-val">Some</span>(read_encoded_pointer(reader, lp_encoding)<span class="question-mark">?</span>)
         };
 
-        <span class="kw">let</span> <span class="ident">tt_encoding</span> <span class="op">=</span> <span class="ident">DwEhPe</span>(<span class="ident">reader</span>.<span class="ident">read_u8</span>()<span class="question-mark">?</span>);
-        <span class="kw">let</span> <span class="ident">tt_offset</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">tt_encoding</span> <span class="op">==</span> <span class="ident">DW_EH_PE_omit</span> {
-            <span class="prelude-val">None</span>
-        } <span class="kw">else</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">read_encoded_pointer</span>(<span class="ident">reader</span>, <span class="ident">DW_EH_PE_uleb128</span>)<span class="question-mark">?</span>)
+        <span class="kw">let </span>tt_encoding = DwEhPe(reader.read_u8()<span class="question-mark">?</span>);
+        <span class="kw">let </span>tt_offset = <span class="kw">if </span>tt_encoding == DW_EH_PE_omit {
+            <span class="prelude-val">None
+        </span>} <span class="kw">else </span>{
+            <span class="prelude-val">Some</span>(read_encoded_pointer(reader, DW_EH_PE_uleb128)<span class="question-mark">?</span>)
         };
 
-        <span class="prelude-val">Ok</span>(<span class="ident">LsdaHeader</span>{
-            <span class="ident">landing_pad_base_encoding</span>: <span class="ident">lp_encoding</span>,
-            <span class="ident">landing_pad_base</span>: <span class="ident">lp</span>,
-            <span class="ident">type_table_encoding</span>: <span class="ident">tt_encoding</span>,
-            <span class="ident">type_table_offset</span>: <span class="ident">tt_offset</span>,
+        <span class="prelude-val">Ok</span>(LsdaHeader{
+            landing_pad_base_encoding: lp_encoding,
+            landing_pad_base: lp,
+            type_table_encoding: tt_encoding,
+            type_table_offset: tt_offset,
         })
     }
 }
 
 
-<span class="doccomment">/// The header of the call site table, which defines the length of the table </span>
-<span class="doccomment">/// and the encoding format used to parse address values in the table.</span>
-<span class="doccomment">/// The call site table comes immediately after the `LsdaHeader`.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">struct</span> <span class="ident">CallSiteTableHeader</span> {
-    <span class="doccomment">/// The encoding of items in the call site table.</span>
-    <span class="ident">encoding</span>: <span class="ident">DwEhPe</span>,
-    <span class="doccomment">/// The total length of the entire call site table, in bytes.</span>
-    <span class="doccomment">/// This is always encoded in uleb128.</span>
-    <span class="ident">length</span>: <span class="ident">u64</span>,
+<span class="doccomment">/// The header of the call site table, which defines the length of the table 
+/// and the encoding format used to parse address values in the table.
+/// The call site table comes immediately after the `LsdaHeader`.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">struct </span>CallSiteTableHeader {
+    <span class="doccomment">/// The encoding of items in the call site table.
+    </span>encoding: DwEhPe,
+    <span class="doccomment">/// The total length of the entire call site table, in bytes.
+    /// This is always encoded in uleb128.
+    </span>length: u64,
 }
-<span class="kw">impl</span> <span class="ident">CallSiteTableHeader</span> {
-    <span class="kw">fn</span> <span class="ident">parse</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">gimli::Reader</span><span class="op">&gt;</span>(<span class="ident">reader</span>: <span class="kw-2">&amp;mut</span> <span class="ident">R</span>) -&gt; <span class="ident">gimli::Result</span><span class="op">&lt;</span><span class="ident">CallSiteTableHeader</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">encoding</span> <span class="op">=</span> <span class="ident">DwEhPe</span>(<span class="ident">reader</span>.<span class="ident">read_u8</span>()<span class="question-mark">?</span>);
-        <span class="kw">let</span> <span class="ident">length</span> <span class="op">=</span> <span class="ident">read_encoded_pointer</span>(<span class="ident">reader</span>, <span class="ident">DW_EH_PE_uleb128</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">CallSiteTableHeader</span> {
-            <span class="ident">encoding</span>, 
-            <span class="ident">length</span>
+<span class="kw">impl </span>CallSiteTableHeader {
+    <span class="kw">fn </span>parse&lt;R: gimli::Reader&gt;(reader: <span class="kw-2">&amp;mut </span>R) -&gt; gimli::Result&lt;CallSiteTableHeader&gt; {
+        <span class="kw">let </span>encoding = DwEhPe(reader.read_u8()<span class="question-mark">?</span>);
+        <span class="kw">let </span>length = read_encoded_pointer(reader, DW_EH_PE_uleb128)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(CallSiteTableHeader {
+            encoding, 
+            length
         })
     }
 }
 
 
-<span class="doccomment">/// An entry in the call site table, which defines landing pad functions and additional actions</span>
-<span class="doccomment">/// that should be executed when unwinding a given a stack frame. </span>
-<span class="doccomment">/// The relevant entry for a particular stack frame can be found based on the range of addresses it covers.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CallSiteTableEntry</span> {
-    <span class="doccomment">/// An offset from the landing pad base address (top of function section)</span>
-    <span class="doccomment">/// that specifies the first (starting) address that is covered by this entry.</span>
-    <span class="ident">starting_offset</span>: <span class="ident">u64</span>,
-    <span class="doccomment">/// The length (from the above `starting_offset`) that specifies</span>
-    <span class="doccomment">/// the range of addresses covered by this entry.</span>
-    <span class="ident">length</span>: <span class="ident">u64</span>,
-    <span class="doccomment">/// The offset from the `landing_pad_base` at which the landing pad entry function exists.</span>
-    <span class="doccomment">/// If `0`, then there is no landing pad function that should be run.</span>
-    <span class="ident">landing_pad_offset</span>: <span class="ident">u64</span>,
-    <span class="doccomment">/// The offset into the action table that specifies what additional action to undertake.</span>
-    <span class="doccomment">/// If `0`, there is no action;</span>
-    <span class="doccomment">/// otherwise, this value plus 1 (`action_offset + 1`) should be used to locate the action table entry.</span>
-    <span class="ident">action_offset</span>: <span class="ident">u64</span>,
+<span class="doccomment">/// An entry in the call site table, which defines landing pad functions and additional actions
+/// that should be executed when unwinding a given a stack frame. 
+/// The relevant entry for a particular stack frame can be found based on the range of addresses it covers.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>CallSiteTableEntry {
+    <span class="doccomment">/// An offset from the landing pad base address (top of function section)
+    /// that specifies the first (starting) address that is covered by this entry.
+    </span>starting_offset: u64,
+    <span class="doccomment">/// The length (from the above `starting_offset`) that specifies
+    /// the range of addresses covered by this entry.
+    </span>length: u64,
+    <span class="doccomment">/// The offset from the `landing_pad_base` at which the landing pad entry function exists.
+    /// If `0`, then there is no landing pad function that should be run.
+    </span>landing_pad_offset: u64,
+    <span class="doccomment">/// The offset into the action table that specifies what additional action to undertake.
+    /// If `0`, there is no action;
+    /// otherwise, this value plus 1 (`action_offset + 1`) should be used to locate the action table entry.
+    </span>action_offset: u64,
 
-    <span class="doccomment">/// The starting address of the function that this GccExceptTableArea pertains to.</span>
-    <span class="doccomment">/// This is not actually part of the table entry as defined in the gcc LSDA spec,</span>
-    <span class="doccomment">/// it comes from the top-level LSDA header and is replicated here for convenience. </span>
-    <span class="ident">landing_pad_base</span>: <span class="ident">u64</span>
+    <span class="doccomment">/// The starting address of the function that this GccExceptTableArea pertains to.
+    /// This is not actually part of the table entry as defined in the gcc LSDA spec,
+    /// it comes from the top-level LSDA header and is replicated here for convenience. 
+    </span>landing_pad_base: u64
 }
-<span class="kw">impl</span> <span class="ident">CallSiteTableEntry</span> {
-    <span class="kw">fn</span> <span class="ident">parse</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">gimli::Reader</span><span class="op">&gt;</span>(
-        <span class="ident">reader</span>: <span class="kw-2">&amp;mut</span> <span class="ident">R</span>,
-        <span class="ident">call_site_encoding</span>: <span class="ident">DwEhPe</span>,
-        <span class="ident">landing_pad_base</span>: <span class="ident">u64</span>,
-    ) -&gt; <span class="ident">gimli::Result</span><span class="op">&lt;</span><span class="ident">CallSiteTableEntry</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">cs_start</span>  <span class="op">=</span> <span class="ident">read_encoded_pointer</span>(<span class="ident">reader</span>, <span class="ident">call_site_encoding</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">cs_length</span> <span class="op">=</span> <span class="ident">read_encoded_pointer</span>(<span class="ident">reader</span>, <span class="ident">call_site_encoding</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">cs_lp</span>     <span class="op">=</span> <span class="ident">read_encoded_pointer</span>(<span class="ident">reader</span>, <span class="ident">call_site_encoding</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">cs_action</span> <span class="op">=</span> <span class="ident">read_encoded_pointer</span>(<span class="ident">reader</span>, <span class="ident">DW_EH_PE_uleb128</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">CallSiteTableEntry</span> {
-            <span class="ident">starting_offset</span>: <span class="ident">cs_start</span>,
-            <span class="ident">length</span>: <span class="ident">cs_length</span>,
-            <span class="ident">landing_pad_offset</span>: <span class="ident">cs_lp</span>,
-            <span class="ident">action_offset</span>: <span class="ident">cs_action</span>,
-            <span class="ident">landing_pad_base</span>,
+<span class="kw">impl </span>CallSiteTableEntry {
+    <span class="kw">fn </span>parse&lt;R: gimli::Reader&gt;(
+        reader: <span class="kw-2">&amp;mut </span>R,
+        call_site_encoding: DwEhPe,
+        landing_pad_base: u64,
+    ) -&gt; gimli::Result&lt;CallSiteTableEntry&gt; {
+        <span class="kw">let </span>cs_start  = read_encoded_pointer(reader, call_site_encoding)<span class="question-mark">?</span>;
+        <span class="kw">let </span>cs_length = read_encoded_pointer(reader, call_site_encoding)<span class="question-mark">?</span>;
+        <span class="kw">let </span>cs_lp     = read_encoded_pointer(reader, call_site_encoding)<span class="question-mark">?</span>;
+        <span class="kw">let </span>cs_action = read_encoded_pointer(reader, DW_EH_PE_uleb128)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(CallSiteTableEntry {
+            starting_offset: cs_start,
+            length: cs_length,
+            landing_pad_offset: cs_lp,
+            action_offset: cs_action,
+            landing_pad_base,
         })
     }
 
-    <span class="doccomment">/// The range of addresses (instruction pointers) that are covered by this entry. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">range_of_covered_addresses</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
-        (<span class="self">self</span>.<span class="ident">landing_pad_base</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">starting_offset</span>) .. (<span class="self">self</span>.<span class="ident">landing_pad_base</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">starting_offset</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">length</span>)
+    <span class="doccomment">/// The range of addresses (instruction pointers) that are covered by this entry. 
+    </span><span class="kw">pub fn </span>range_of_covered_addresses(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Range&lt;u64&gt; {
+        (<span class="self">self</span>.landing_pad_base + <span class="self">self</span>.starting_offset) .. (<span class="self">self</span>.landing_pad_base + <span class="self">self</span>.starting_offset + <span class="self">self</span>.length)
     }
 
-    <span class="doccomment">/// The address of the actual landing pad, i.e., the cleanup routine that should run, if one exists.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">landing_pad_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">landing_pad_offset</span> <span class="op">==</span> <span class="number">0</span> { 
-            <span class="prelude-val">None</span>
-        } <span class="kw">else</span> {
-            <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">landing_pad_base</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">landing_pad_offset</span>)
+    <span class="doccomment">/// The address of the actual landing pad, i.e., the cleanup routine that should run, if one exists.
+    </span><span class="kw">pub fn </span>landing_pad_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;u64&gt; {
+        <span class="kw">if </span><span class="self">self</span>.landing_pad_offset == <span class="number">0 </span>{ 
+            <span class="prelude-val">None
+        </span>} <span class="kw">else </span>{
+            <span class="prelude-val">Some</span>(<span class="self">self</span>.landing_pad_base + <span class="self">self</span>.landing_pad_offset)
         }
     }
 
-    <span class="doccomment">/// The offset into the action table that specifies which additional action should be undertaken</span>
-    <span class="doccomment">/// when invoking this landing pad cleanup routine, if one exists. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">action_offset</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">action_offset</span> <span class="op">==</span> <span class="number">0</span> { 
-            <span class="comment">// no action to perform</span>
-            <span class="prelude-val">None</span>
-        } <span class="kw">else</span> {
-            <span class="comment">// the gcc_except_table docs specify that 1 must be added to the action offset if it is not zero.</span>
-            <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">action_offset</span> <span class="op">+</span> <span class="number">1</span>)
+    <span class="doccomment">/// The offset into the action table that specifies which additional action should be undertaken
+    /// when invoking this landing pad cleanup routine, if one exists. 
+    </span><span class="kw">pub fn </span>action_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;u64&gt; {
+        <span class="kw">if </span><span class="self">self</span>.action_offset == <span class="number">0 </span>{ 
+            <span class="comment">// no action to perform
+            </span><span class="prelude-val">None
+        </span>} <span class="kw">else </span>{
+            <span class="comment">// the gcc_except_table docs specify that 1 must be added to the action offset if it is not zero.
+            </span><span class="prelude-val">Some</span>(<span class="self">self</span>.action_offset + <span class="number">1</span>)
         }
     }
 }
 
-<span class="doccomment">/// An iterator over all of the entries in a GccExceptTableArea&#39;s call site table.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Can be used with the `FallibleIterator` trait.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CallSiteTableIterator</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Reader</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// The encoding of pointers in the call site table.</span>
-    <span class="ident">call_site_table_encoding</span>: <span class="ident">DwEhPe</span>,
-    <span class="doccomment">/// This is the ending bound for the following `reader` to parse,</span>
-    <span class="doccomment">/// i.e., the reader offset right after the final call site table entry.</span>
-    <span class="ident">end_of_call_site_table</span>: <span class="ident">u64</span>,
-    <span class="doccomment">/// The starting address of the function that this GccExceptTableArea pertains to.</span>
-    <span class="ident">landing_pad_base</span>: <span class="ident">u64</span>,
-    <span class="doccomment">/// This reader must be queued up to the beginning of the first call site table entry,</span>
-    <span class="doccomment">/// i.e., right after the end of the call site table header.</span>
-    <span class="ident">reader</span>: <span class="ident">R</span>,
+<span class="doccomment">/// An iterator over all of the entries in a GccExceptTableArea&#39;s call site table.
+/// 
+/// Can be used with the `FallibleIterator` trait.
+</span><span class="kw">pub struct </span>CallSiteTableIterator&lt;R: Reader&gt; {
+    <span class="doccomment">/// The encoding of pointers in the call site table.
+    </span>call_site_table_encoding: DwEhPe,
+    <span class="doccomment">/// This is the ending bound for the following `reader` to parse,
+    /// i.e., the reader offset right after the final call site table entry.
+    </span>end_of_call_site_table: u64,
+    <span class="doccomment">/// The starting address of the function that this GccExceptTableArea pertains to.
+    </span>landing_pad_base: u64,
+    <span class="doccomment">/// This reader must be queued up to the beginning of the first call site table entry,
+    /// i.e., right after the end of the call site table header.
+    </span>reader: R,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Reader</span><span class="op">&gt;</span> <span class="ident">FallibleIterator</span> <span class="kw">for</span> <span class="ident">CallSiteTableIterator</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">CallSiteTableEntry</span>;
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">gimli::Error</span>;
+<span class="kw">impl</span>&lt;R: Reader&gt; FallibleIterator <span class="kw">for </span>CallSiteTableIterator&lt;R&gt; {
+    <span class="kw">type </span>Item = CallSiteTableEntry;
+    <span class="kw">type </span>Error = gimli::Error;
 
-    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">reader</span>.<span class="ident">offset_id</span>().<span class="number">0</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">end_of_call_site_table</span> {
-            <span class="kw">let</span> <span class="ident">entry</span> <span class="op">=</span> <span class="ident">CallSiteTableEntry::parse</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">reader</span>, <span class="self">self</span>.<span class="ident">call_site_table_encoding</span>, <span class="self">self</span>.<span class="ident">landing_pad_base</span>)<span class="question-mark">?</span>;
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">action_offset</span>) <span class="op">=</span> <span class="ident">entry</span>.<span class="ident">action_offset</span>() {
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-                <span class="macro">warn!</span>(<span class="string">&quot;unsupported/unhandled call site action, offset (with 1 added): {:#X}&quot;</span>, <span class="ident">action_offset</span>);
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt;, <span class="self">Self</span>::Error&gt; {
+        <span class="kw">if </span><span class="self">self</span>.reader.offset_id().<span class="number">0 </span>&lt; <span class="self">self</span>.end_of_call_site_table {
+            <span class="kw">let </span>entry = CallSiteTableEntry::parse(<span class="kw-2">&amp;mut </span><span class="self">self</span>.reader, <span class="self">self</span>.call_site_table_encoding, <span class="self">self</span>.landing_pad_base)<span class="question-mark">?</span>;
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(action_offset) = entry.action_offset() {
+                <span class="attr">#[cfg(not(downtime_eval))]
+                </span><span class="macro">warn!</span>(<span class="string">&quot;unsupported/unhandled call site action, offset (with 1 added): {:#X}&quot;</span>, action_offset);
             }
-            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">entry</span>))
-        } <span class="kw">else</span> {
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(entry))
+        } <span class="kw">else </span>{
             <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
         }
     }
 }
 
-<span class="doccomment">/// Decodes the next pointer from the given `reader` (a stream of bytes) using the given `encoding` format. </span>
-<span class="kw">fn</span> <span class="ident">read_encoded_pointer</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">gimli::Reader</span><span class="op">&gt;</span>(<span class="ident">reader</span>: <span class="kw-2">&amp;mut</span> <span class="ident">R</span>, <span class="ident">encoding</span>: <span class="ident">DwEhPe</span>) -&gt; <span class="ident">gimli::Result</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
-    <span class="kw">match</span> <span class="ident">encoding</span> {
-        <span class="ident">DW_EH_PE_omit</span>     =&gt; <span class="prelude-val">Err</span>(<span class="ident">gimli::Error::CannotParseOmitPointerEncoding</span>),
-        <span class="ident">DW_EH_PE_absptr</span>   =&gt; <span class="ident">reader</span>.<span class="ident">read_u64</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span> <span class="kw">as</span> <span class="ident">u64</span>),
-        <span class="ident">DW_EH_PE_uleb128</span>  =&gt; <span class="ident">reader</span>.<span class="ident">read_uleb128</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span> <span class="kw">as</span> <span class="ident">u64</span>),
-        <span class="ident">DW_EH_PE_udata2</span>   =&gt; <span class="ident">reader</span>.<span class="ident">read_u16</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span> <span class="kw">as</span> <span class="ident">u64</span>),
-        <span class="ident">DW_EH_PE_udata4</span>   =&gt; <span class="ident">reader</span>.<span class="ident">read_u32</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span> <span class="kw">as</span> <span class="ident">u64</span>),
-        <span class="ident">DW_EH_PE_udata8</span>   =&gt; <span class="ident">reader</span>.<span class="ident">read_u64</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span> <span class="kw">as</span> <span class="ident">u64</span>),
-        <span class="ident">DW_EH_PE_sleb128</span>  =&gt; <span class="ident">reader</span>.<span class="ident">read_sleb128</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span> <span class="kw">as</span> <span class="ident">u64</span>),
-        <span class="ident">DW_EH_PE_sdata2</span>   =&gt; <span class="ident">reader</span>.<span class="ident">read_i16</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span> <span class="kw">as</span> <span class="ident">u64</span>),
-        <span class="ident">DW_EH_PE_sdata4</span>   =&gt; <span class="ident">reader</span>.<span class="ident">read_i32</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span> <span class="kw">as</span> <span class="ident">u64</span>),
-        <span class="ident">DW_EH_PE_sdata8</span>   =&gt; <span class="ident">reader</span>.<span class="ident">read_i64</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">v</span> <span class="kw">as</span> <span class="ident">u64</span>),
-        <span class="kw">_</span> =&gt; {
+<span class="doccomment">/// Decodes the next pointer from the given `reader` (a stream of bytes) using the given `encoding` format. 
+</span><span class="kw">fn </span>read_encoded_pointer&lt;R: gimli::Reader&gt;(reader: <span class="kw-2">&amp;mut </span>R, encoding: DwEhPe) -&gt; gimli::Result&lt;u64&gt; {
+    <span class="kw">match </span>encoding {
+        DW_EH_PE_omit     =&gt; <span class="prelude-val">Err</span>(gimli::Error::CannotParseOmitPointerEncoding),
+        DW_EH_PE_absptr   =&gt; reader.read_u64().map(|v| v <span class="kw">as </span>u64),
+        DW_EH_PE_uleb128  =&gt; reader.read_uleb128().map(|v| v <span class="kw">as </span>u64),
+        DW_EH_PE_udata2   =&gt; reader.read_u16().map(|v| v <span class="kw">as </span>u64),
+        DW_EH_PE_udata4   =&gt; reader.read_u32().map(|v| v <span class="kw">as </span>u64),
+        DW_EH_PE_udata8   =&gt; reader.read_u64().map(|v| v <span class="kw">as </span>u64),
+        DW_EH_PE_sleb128  =&gt; reader.read_sleb128().map(|v| v <span class="kw">as </span>u64),
+        DW_EH_PE_sdata2   =&gt; reader.read_i16().map(|v| v <span class="kw">as </span>u64),
+        DW_EH_PE_sdata4   =&gt; reader.read_i32().map(|v| v <span class="kw">as </span>u64),
+        DW_EH_PE_sdata8   =&gt; reader.read_i64().map(|v| v <span class="kw">as </span>u64),
+        <span class="kw">_ </span>=&gt; {
             <span class="macro">error!</span>(<span class="string">&quot;read_encoded_pointer(): unsupported pointer encoding: {:#X}: {:?}&quot;</span>, 
-                <span class="ident">encoding</span>.<span class="number">0</span>,
-                <span class="ident">encoding</span>.<span class="ident">static_string</span>()
+                encoding.<span class="number">0</span>,
+                encoding.static_string()
             );
-            <span class="prelude-val">Err</span>(<span class="ident">gimli::Error::UnknownPointerEncoding</span>)
+            <span class="prelude-val">Err</span>(gimli::Error::UnknownPointerEncoding)
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="unwind" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="unwind" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

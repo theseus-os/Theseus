@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ixgbe/src/test_packets.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>test_packets.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../ixgbe/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../ixgbe/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../ixgbe/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ixgbe/src/test_packets.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>test_packets.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../ixgbe/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -91,21 +85,21 @@
 <span id="85">85</span>
 <span id="86">86</span>
 <span id="87">87</span>
-</pre><pre class="rust"><code><span class="doccomment">//! A set of functions to create packets for testing the NIC transmission functionality.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! A set of functions to create packets for testing the NIC transmission functionality.
 
-<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">get_ixgbe_nic</span>, <span class="ident">NetworkInterfaceCard</span>, <span class="ident">TransmitBuffer</span>};
-<span class="kw">use</span> <span class="ident">pci::PciLocation</span>;
+</span><span class="kw">use super</span>::{get_ixgbe_nic, NetworkInterfaceCard, TransmitBuffer};
+<span class="kw">use </span>pci::PciLocation;
 
-<span class="doccomment">/// Sends a dhcp request packet on the ixgbe NIC.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dhcp_request_packet</span>(<span class="ident">nic_id</span>: <span class="ident">PciLocation</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">transmit_buffer</span> <span class="op">=</span> <span class="ident">create_dhcp_test_packet</span>()<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">ixgbe_nc</span> <span class="op">=</span> <span class="ident">get_ixgbe_nic</span>(<span class="ident">nic_id</span>)<span class="question-mark">?</span>;
-    <span class="ident">ixgbe_nc</span>.<span class="ident">lock</span>().<span class="ident">send_packet</span>(<span class="ident">transmit_buffer</span>)
+<span class="doccomment">/// Sends a dhcp request packet on the ixgbe NIC.
+</span><span class="kw">pub fn </span>dhcp_request_packet(nic_id: PciLocation) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>transmit_buffer = create_dhcp_test_packet()<span class="question-mark">?</span>;
+    <span class="kw">let </span>ixgbe_nc = get_ixgbe_nic(nic_id)<span class="question-mark">?</span>;
+    ixgbe_nc.lock().send_packet(transmit_buffer)
 }
 
-<span class="doccomment">/// Creates a `TransmitBuffer` containing a dhcp packet.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_dhcp_test_packet</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">TransmitBuffer</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">packet</span>: [<span class="ident">u8</span>; <span class="number">314</span>] <span class="op">=</span> [
+<span class="doccomment">/// Creates a `TransmitBuffer` containing a dhcp packet.
+</span><span class="kw">pub fn </span>create_dhcp_test_packet() -&gt; <span class="prelude-ty">Result</span>&lt;TransmitBuffer, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>packet: [u8; <span class="number">314</span>] = [
         <span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0x00</span>, <span class="number">0x1f</span>, <span class="number">0xc6</span>, <span class="number">0x9c</span>, <span class="number">0x89</span>, <span class="number">0x4c</span>, <span class="number">0x08</span>, <span class="number">0x00</span>, <span class="number">0x45</span>,
         <span class="number">0x00</span>, <span class="number">0x01</span>, <span class="number">0x2c</span>, <span class="number">0xa8</span>, <span class="number">0x36</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0xfa</span>, <span class="number">0x11</span>, <span class="number">0x17</span>, <span class="number">0x8b</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>,
         <span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0xff</span>, <span class="number">0x00</span>, <span class="number">0x44</span>, <span class="number">0x00</span>, <span class="number">0x43</span>, <span class="number">0x01</span>, <span class="number">0x18</span>, <span class="number">0x59</span>, <span class="number">0x1f</span>, <span class="number">0x01</span>, <span class="number">0x01</span>, <span class="number">0x06</span>,
@@ -128,56 +122,55 @@
         <span class="number">0x3d</span>, <span class="number">0x07</span>, <span class="number">0x01</span>, <span class="number">0x00</span>, <span class="number">0x1f</span>, <span class="number">0xc6</span>, <span class="number">0x9c</span>, <span class="number">0x89</span>, <span class="number">0x4c</span>, <span class="number">0x32</span>, <span class="number">0x04</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>,
         <span class="number">0x37</span>, <span class="number">0x04</span>, <span class="number">0x01</span>, <span class="number">0x03</span>, <span class="number">0x06</span>, <span class="number">0x2a</span>, <span class="number">0xff</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>,
     ];
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">transmit_buffer</span> <span class="op">=</span> <span class="ident">TransmitBuffer::new</span>(<span class="ident">packet</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u16</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>transmit_buffer = TransmitBuffer::new(packet.len() <span class="kw">as </span>u16)<span class="question-mark">?</span>;
     { 
-        <span class="kw">let</span> <span class="ident">buffer</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">transmit_buffer</span>.<span class="ident">as_slice_mut</span>(<span class="number">0</span>, <span class="number">314</span>)<span class="question-mark">?</span>;
-        <span class="ident">buffer</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">packet</span>);
+        <span class="kw">let </span>buffer: <span class="kw-2">&amp;mut </span>[u8] = transmit_buffer.as_slice_mut(<span class="number">0</span>, <span class="number">314</span>)<span class="question-mark">?</span>;
+        buffer.copy_from_slice(<span class="kw-2">&amp;</span>packet);
     }
-    <span class="prelude-val">Ok</span>(<span class="ident">transmit_buffer</span>)
+    <span class="prelude-val">Ok</span>(transmit_buffer)
 }
 
-<span class="doccomment">/// Creates a `TransmitBuffer` that contains a packet with only the ethernet header.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_raw_packet</span>(
-    <span class="ident">dest_mac_address</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], 
-    <span class="ident">source_mac_address</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], 
-    <span class="ident">message</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">TransmitBuffer</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="doccomment">/// Creates a `TransmitBuffer` that contains a packet with only the ethernet header.
+</span><span class="kw">pub fn </span>create_raw_packet(
+    dest_mac_address: <span class="kw-2">&amp;</span>[u8], 
+    source_mac_address: <span class="kw-2">&amp;</span>[u8], 
+    message: <span class="kw-2">&amp;</span>[u8]
+) -&gt; <span class="prelude-ty">Result</span>&lt;TransmitBuffer, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     
-    <span class="kw">const</span> <span class="ident">ETHER_TYPE_LEN</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">2</span>;
-    <span class="kw">const</span> <span class="ident">MAC_ADDR_LEN</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">6</span>;
-    <span class="kw">const</span> <span class="ident">ETHERNET_HEADER_LEN</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">MAC_ADDR_LEN</span> <span class="op">*</span> <span class="number">2</span> <span class="op">+</span> <span class="ident">ETHER_TYPE_LEN</span>;
-    <span class="kw">const</span> <span class="ident">MIN_PACKET_LEN</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">46</span>;
+    <span class="kw">const </span>ETHER_TYPE_LEN: usize = <span class="number">2</span>;
+    <span class="kw">const </span>MAC_ADDR_LEN: usize = <span class="number">6</span>;
+    <span class="kw">const </span>ETHERNET_HEADER_LEN: usize = MAC_ADDR_LEN * <span class="number">2 </span>+ ETHER_TYPE_LEN;
+    <span class="kw">const </span>MIN_PACKET_LEN: usize = <span class="number">46</span>;
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">len</span> <span class="op">=</span> <span class="ident">message</span>.<span class="ident">len</span>() <span class="kw">as</span> <span class="ident">u16</span>;
-    <span class="kw">if</span> <span class="ident">len</span> <span class="op">&gt;</span> <span class="number">1500</span> {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Too long for a raw packet&quot;</span>);
+    <span class="kw">let </span><span class="kw-2">mut </span>len = message.len() <span class="kw">as </span>u16;
+    <span class="kw">if </span>len &gt; <span class="number">1500 </span>{
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Too long for a raw packet&quot;</span>);
     }
-    <span class="kw">if</span> <span class="ident">len</span> <span class="op">&lt;</span> <span class="ident">MIN_PACKET_LEN</span> <span class="kw">as</span> <span class="ident">u16</span> {
-        <span class="ident">len</span> <span class="op">=</span> <span class="number">46</span>;
-    }
-
-    <span class="kw">let</span> <span class="ident">ether_type</span>: [<span class="ident">u8</span>; <span class="ident">ETHER_TYPE_LEN</span>] <span class="op">=</span> [(<span class="ident">len</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">8</span>) <span class="kw">as</span> <span class="ident">u8</span>, <span class="ident">len</span> <span class="kw">as</span> <span class="ident">u8</span>];
-
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">transmit_buffer</span> <span class="op">=</span> <span class="ident">TransmitBuffer::new</span>(<span class="ident">ETHERNET_HEADER_LEN</span> <span class="kw">as</span> <span class="ident">u16</span> <span class="op">+</span> <span class="ident">len</span>)<span class="question-mark">?</span>;
-    { 
-        <span class="kw">let</span> <span class="ident">buffer</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">transmit_buffer</span>.<span class="ident">as_slice_mut</span>(<span class="number">0</span>, <span class="ident">MAC_ADDR_LEN</span>)<span class="question-mark">?</span>;
-        <span class="ident">buffer</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">dest_mac_address</span>);
-    }
-    { 
-        <span class="kw">let</span> <span class="ident">buffer</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">transmit_buffer</span>.<span class="ident">as_slice_mut</span>(<span class="number">6</span>, <span class="ident">MAC_ADDR_LEN</span>)<span class="question-mark">?</span>;
-        <span class="ident">buffer</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">source_mac_address</span>);
-    }
-    { 
-        <span class="kw">let</span> <span class="ident">buffer</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">transmit_buffer</span>.<span class="ident">as_slice_mut</span>(<span class="number">12</span>, <span class="ident">ETHER_TYPE_LEN</span>)<span class="question-mark">?</span>;
-        <span class="ident">buffer</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">ether_type</span>);
-    }
-    { 
-        <span class="kw">let</span> <span class="ident">buffer</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">transmit_buffer</span>.<span class="ident">as_slice_mut</span>(<span class="number">14</span>, <span class="ident">message</span>.<span class="ident">len</span>())<span class="question-mark">?</span>;
-        <span class="ident">buffer</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">message</span>);
+    <span class="kw">if </span>len &lt; MIN_PACKET_LEN <span class="kw">as </span>u16 {
+        len = <span class="number">46</span>;
     }
 
-    <span class="prelude-val">Ok</span>(<span class="ident">transmit_buffer</span>)
+    <span class="kw">let </span>ether_type: [u8; ETHER_TYPE_LEN] = [(len &gt;&gt; <span class="number">8</span>) <span class="kw">as </span>u8, len <span class="kw">as </span>u8];
+
+    <span class="kw">let </span><span class="kw-2">mut </span>transmit_buffer = TransmitBuffer::new(ETHERNET_HEADER_LEN <span class="kw">as </span>u16 + len)<span class="question-mark">?</span>;
+    { 
+        <span class="kw">let </span>buffer: <span class="kw-2">&amp;mut </span>[u8] = transmit_buffer.as_slice_mut(<span class="number">0</span>, MAC_ADDR_LEN)<span class="question-mark">?</span>;
+        buffer.copy_from_slice(<span class="kw-2">&amp;</span>dest_mac_address);
+    }
+    { 
+        <span class="kw">let </span>buffer: <span class="kw-2">&amp;mut </span>[u8] = transmit_buffer.as_slice_mut(<span class="number">6</span>, MAC_ADDR_LEN)<span class="question-mark">?</span>;
+        buffer.copy_from_slice(<span class="kw-2">&amp;</span>source_mac_address);
+    }
+    { 
+        <span class="kw">let </span>buffer: <span class="kw-2">&amp;mut </span>[u8] = transmit_buffer.as_slice_mut(<span class="number">12</span>, ETHER_TYPE_LEN)<span class="question-mark">?</span>;
+        buffer.copy_from_slice(<span class="kw-2">&amp;</span>ether_type);
+    }
+    { 
+        <span class="kw">let </span>buffer: <span class="kw-2">&amp;mut </span>[u8] = transmit_buffer.as_slice_mut(<span class="number">14</span>, message.len())<span class="question-mark">?</span>;
+        buffer.copy_from_slice(<span class="kw-2">&amp;</span>message);
+    }
+
+    <span class="prelude-val">Ok</span>(transmit_buffer)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ixgbe" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ixgbe" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

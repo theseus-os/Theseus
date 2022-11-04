@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ps2/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../ps2/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../ps2/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../ps2/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ps2/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../ps2/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -515,233 +509,233 @@
 <span id="509">509</span>
 <span id="510">510</span>
 <span id="511">511</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
+</pre><pre class="rust"><code><span class="attr">#![no_std]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">port_io</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
+#[macro_use]
+</span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>port_io;
+<span class="kw">extern crate </span>spin;
 
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">port_io::Port</span>;
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
+<span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>port_io::Port;
+<span class="kw">use </span>spin::Mutex;
 
-<span class="kw">static</span> <span class="ident">PS2_PORT</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Port</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">Port::new</span>(<span class="number">0x60</span>));
-<span class="kw">static</span> <span class="ident">PS2_COMMAND_PORT</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Port</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">Port::new</span>(<span class="number">0x64</span>));
+<span class="kw">static </span>PS2_PORT: Mutex&lt;Port&lt;u8&gt;&gt; = Mutex::new(Port::new(<span class="number">0x60</span>));
+<span class="kw">static </span>PS2_COMMAND_PORT: Mutex&lt;Port&lt;u8&gt;&gt; = Mutex::new(Port::new(<span class="number">0x64</span>));
 
-<span class="doccomment">/// clean the PS2 data port (0x60) output buffer</span>
-<span class="doccomment">/// also return the vec of data previously in the buffer which may be useful</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ps2_clean_buffer</span>() -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer_data</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-    <span class="kw">loop</span> {
-        <span class="comment">// if no more data in the output buffer</span>
-        <span class="kw">if</span> <span class="ident">ps2_status_register</span>() <span class="op">&amp;</span> <span class="number">0x01</span> <span class="op">==</span> <span class="number">0</span> {
+<span class="doccomment">/// clean the PS2 data port (0x60) output buffer
+/// also return the vec of data previously in the buffer which may be useful
+</span><span class="kw">pub fn </span>ps2_clean_buffer() -&gt; Vec&lt;u8&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>buffer_data = Vec::new();
+    <span class="kw">loop </span>{
+        <span class="comment">// if no more data in the output buffer
+        </span><span class="kw">if </span>ps2_status_register() &amp; <span class="number">0x01 </span>== <span class="number">0 </span>{
             <span class="kw">break</span>;
-        } <span class="kw">else</span> {
-            <span class="ident">buffer_data</span>.<span class="ident">push</span>(<span class="ident">ps2_read_data</span>());
+        } <span class="kw">else </span>{
+            buffer_data.push(ps2_read_data());
         }
     }
-    <span class="ident">buffer_data</span>
+    buffer_data
 }
 
-<span class="doccomment">/// write command to the command ps2 port (0x64)</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ps2_write_command</span>(<span class="ident">value</span>: <span class="ident">u8</span>) {
-    <span class="kw">unsafe</span> {
-        <span class="ident">PS2_COMMAND_PORT</span>.<span class="ident">lock</span>().<span class="ident">write</span>(<span class="ident">value</span>);
+<span class="doccomment">/// write command to the command ps2 port (0x64)
+</span><span class="kw">pub fn </span>ps2_write_command(value: u8) {
+    <span class="kw">unsafe </span>{
+        PS2_COMMAND_PORT.lock().write(value);
     }
 }
 
-<span class="doccomment">/// read the ps2 status register</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ps2_status_register</span>() -&gt; <span class="ident">u8</span> {
-    <span class="ident">PS2_COMMAND_PORT</span>.<span class="ident">lock</span>().<span class="ident">read</span>()
+<span class="doccomment">/// read the ps2 status register
+</span><span class="kw">pub fn </span>ps2_status_register() -&gt; u8 {
+    PS2_COMMAND_PORT.lock().read()
 }
 
-<span class="doccomment">/// read dat from ps2 data port (0x60)</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ps2_read_data</span>() -&gt; <span class="ident">u8</span> {
-    <span class="ident">PS2_PORT</span>.<span class="ident">lock</span>().<span class="ident">read</span>()
+<span class="doccomment">/// read dat from ps2 data port (0x60)
+</span><span class="kw">pub fn </span>ps2_read_data() -&gt; u8 {
+    PS2_PORT.lock().read()
 }
 
-<span class="doccomment">/// read the config of the ps2 port</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ps2_read_config</span>() -&gt; <span class="ident">u8</span> {
-    <span class="ident">ps2_write_command</span>(<span class="number">0x20</span>);
-    <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
-    <span class="ident">config</span>
+<span class="doccomment">/// read the config of the ps2 port
+</span><span class="kw">pub fn </span>ps2_read_config() -&gt; u8 {
+    ps2_write_command(<span class="number">0x20</span>);
+    <span class="kw">let </span>config = ps2_read_data();
+    config
 }
 
-<span class="doccomment">/// write the new config to the ps2 command port (0x64)</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ps2_write_config</span>(<span class="ident">value</span>: <span class="ident">u8</span>) {
-    <span class="ident">ps2_write_command</span>(<span class="number">0x60</span>);
-    <span class="kw">unsafe</span> { <span class="ident">PS2_PORT</span>.<span class="ident">lock</span>().<span class="ident">write</span>(<span class="ident">value</span>) };
+<span class="doccomment">/// write the new config to the ps2 command port (0x64)
+</span><span class="kw">pub fn </span>ps2_write_config(value: u8) {
+    ps2_write_command(<span class="number">0x60</span>);
+    <span class="kw">unsafe </span>{ PS2_PORT.lock().write(value) };
 }
 
-<span class="doccomment">/// initialize the first ps2 data port</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_ps2_port1</span>() {
-    <span class="comment">//disable PS2 ports first</span>
-    <span class="ident">ps2_write_command</span>(<span class="number">0xA7</span>);
-    <span class="ident">ps2_write_command</span>(<span class="number">0xAD</span>);
+<span class="doccomment">/// initialize the first ps2 data port
+</span><span class="kw">pub fn </span>init_ps2_port1() {
+    <span class="comment">//disable PS2 ports first
+    </span>ps2_write_command(<span class="number">0xA7</span>);
+    ps2_write_command(<span class="number">0xAD</span>);
 
-    <span class="comment">// clean the output buffer of ps2 to avoid conflicts</span>
-    <span class="ident">ps2_clean_buffer</span>();
+    <span class="comment">// clean the output buffer of ps2 to avoid conflicts
+    </span>ps2_clean_buffer();
 
-    <span class="comment">// set the configuration</span>
-    {
-        <span class="comment">// read the old configuration</span>
-        <span class="kw">let</span> <span class="ident">old_config</span> <span class="op">=</span> <span class="ident">ps2_read_config</span>();
+    <span class="comment">// set the configuration
+    </span>{
+        <span class="comment">// read the old configuration
+        </span><span class="kw">let </span>old_config = ps2_read_config();
 
-        <span class="comment">// set the new configuration</span>
-        <span class="kw">let</span> <span class="ident">new_config</span> <span class="op">=</span> (<span class="ident">old_config</span> <span class="op">&amp;</span> <span class="number">0xEF</span>) <span class="op">|</span> <span class="number">0x01</span>;
-        <span class="ident">ps2_write_config</span>(<span class="ident">new_config</span>);
+        <span class="comment">// set the new configuration
+        </span><span class="kw">let </span>new_config = (old_config &amp; <span class="number">0xEF</span>) | <span class="number">0x01</span>;
+        ps2_write_config(new_config);
     }
 
-    <span class="ident">ps2_write_command</span>(<span class="number">0xAE</span>);
+    ps2_write_command(<span class="number">0xAE</span>);
 }
 
-<span class="doccomment">/// test the first ps2 data port</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">test_ps2_port1</span>() {
-    <span class="comment">// test the ps2 controller</span>
-    {
-        <span class="ident">ps2_write_command</span>(<span class="number">0xAA</span>);
-        <span class="kw">let</span> <span class="ident">test_flag</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
-        <span class="kw">if</span> <span class="ident">test_flag</span> <span class="op">==</span> <span class="number">0xFC</span> {
+<span class="doccomment">/// test the first ps2 data port
+</span><span class="kw">pub fn </span>test_ps2_port1() {
+    <span class="comment">// test the ps2 controller
+    </span>{
+        ps2_write_command(<span class="number">0xAA</span>);
+        <span class="kw">let </span>test_flag = ps2_read_data();
+        <span class="kw">if </span>test_flag == <span class="number">0xFC </span>{
             <span class="macro">warn!</span>(<span class="string">&quot;ps2 controller test failed!!!&quot;</span>)
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">test_flag</span> <span class="op">==</span> <span class="number">0x55</span> {
+        } <span class="kw">else if </span>test_flag == <span class="number">0x55 </span>{
             <span class="macro">info!</span>(<span class="string">&quot;ps2 controller test pass!!!&quot;</span>)
         }
     }
 
-    <span class="comment">// test the first ps2 data port</span>
-    {
-        <span class="ident">ps2_write_command</span>(<span class="number">0xAB</span>);
-        <span class="kw">let</span> <span class="ident">test_flag</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
-        <span class="kw">match</span> <span class="ident">test_flag</span> {
-            <span class="number">0x00</span> =&gt; <span class="macro">info!</span>(<span class="string">&quot;first ps2 port test pass!!!&quot;</span>),
-            <span class="number">0x01</span> =&gt; <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port clock line stuck low&quot;</span>),
-            <span class="number">0x02</span> =&gt; <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port clock line stuck high&quot;</span>),
-            <span class="number">0x03</span> =&gt; <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port data line stuck low&quot;</span>),
-            <span class="number">0x04</span> =&gt; <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port data line stuck high&quot;</span>),
-            <span class="kw">_</span> =&gt; {}
+    <span class="comment">// test the first ps2 data port
+    </span>{
+        ps2_write_command(<span class="number">0xAB</span>);
+        <span class="kw">let </span>test_flag = ps2_read_data();
+        <span class="kw">match </span>test_flag {
+            <span class="number">0x00 </span>=&gt; <span class="macro">info!</span>(<span class="string">&quot;first ps2 port test pass!!!&quot;</span>),
+            <span class="number">0x01 </span>=&gt; <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port clock line stuck low&quot;</span>),
+            <span class="number">0x02 </span>=&gt; <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port clock line stuck high&quot;</span>),
+            <span class="number">0x03 </span>=&gt; <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port data line stuck low&quot;</span>),
+            <span class="number">0x04 </span>=&gt; <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port data line stuck high&quot;</span>),
+            <span class="kw">_ </span>=&gt; {}
         }
     }
 
-    <span class="comment">// enable PS2 interrupt and see the new config</span>
-    {
-        <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">ps2_read_config</span>();
-        <span class="kw">if</span> <span class="ident">config</span> <span class="op">&amp;</span> <span class="number">0x01</span> <span class="op">==</span> <span class="number">0x01</span> {
+    <span class="comment">// enable PS2 interrupt and see the new config
+    </span>{
+        <span class="kw">let </span>config = ps2_read_config();
+        <span class="kw">if </span>config &amp; <span class="number">0x01 </span>== <span class="number">0x01 </span>{
             <span class="macro">info!</span>(<span class="string">&quot;first ps2 port interrupt enabled&quot;</span>)
-        } <span class="kw">else</span> {
+        } <span class="kw">else </span>{
             <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port interrupt disabled&quot;</span>)
         }
-        <span class="kw">if</span> <span class="ident">config</span> <span class="op">&amp;</span> <span class="number">0x10</span> <span class="op">!</span><span class="op">=</span> <span class="number">0x10</span> {
+        <span class="kw">if </span>config &amp; <span class="number">0x10 </span>!= <span class="number">0x10 </span>{
             <span class="macro">info!</span>(<span class="string">&quot;first ps2 data port enabled&quot;</span>)
-        } <span class="kw">else</span> {
+        } <span class="kw">else </span>{
             <span class="macro">warn!</span>(<span class="string">&quot;first ps2 data port disabled&quot;</span>)
         }
     }
 }
 
-<span class="doccomment">/// initialize the second ps2 data port</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_ps2_port2</span>() {
-    <span class="comment">//disable PS2 ports first</span>
-    {
-        <span class="ident">ps2_write_command</span>(<span class="number">0xA7</span>);
-        <span class="ident">ps2_write_command</span>(<span class="number">0xAD</span>);
+<span class="doccomment">/// initialize the second ps2 data port
+</span><span class="kw">pub fn </span>init_ps2_port2() {
+    <span class="comment">//disable PS2 ports first
+    </span>{
+        ps2_write_command(<span class="number">0xA7</span>);
+        ps2_write_command(<span class="number">0xAD</span>);
     }
 
-    <span class="comment">// clean the output buffer of ps2</span>
-    <span class="ident">ps2_clean_buffer</span>();
-    <span class="comment">// set the configuration</span>
-    {
-        <span class="comment">// read the old configuration</span>
-        <span class="kw">let</span> <span class="ident">old_config</span> <span class="op">=</span> <span class="ident">ps2_read_config</span>();
+    <span class="comment">// clean the output buffer of ps2
+    </span>ps2_clean_buffer();
+    <span class="comment">// set the configuration
+    </span>{
+        <span class="comment">// read the old configuration
+        </span><span class="kw">let </span>old_config = ps2_read_config();
 
-        <span class="comment">// set the new configuration</span>
-        <span class="kw">let</span> <span class="ident">new_config</span> <span class="op">=</span> (<span class="ident">old_config</span> <span class="op">&amp;</span> <span class="number">0xDF</span>) <span class="op">|</span> <span class="number">0x02</span>;
-        <span class="ident">ps2_write_config</span>(<span class="ident">new_config</span>);
+        <span class="comment">// set the new configuration
+        </span><span class="kw">let </span>new_config = (old_config &amp; <span class="number">0xDF</span>) | <span class="number">0x02</span>;
+        ps2_write_config(new_config);
     }
     {
-        <span class="ident">ps2_write_command</span>(<span class="number">0xAE</span>);
-        <span class="ident">ps2_write_command</span>(<span class="number">0xA8</span>);
+        ps2_write_command(<span class="number">0xAE</span>);
+        ps2_write_command(<span class="number">0xA8</span>);
     }
 }
 
-<span class="doccomment">/// test the second ps2 data port</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">test_ps2_port2</span>() {
-    <span class="comment">// test the ps2 controller</span>
-    {
-        <span class="ident">ps2_write_command</span>(<span class="number">0xAA</span>);
-        <span class="kw">let</span> <span class="ident">test_flag</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
-        <span class="kw">if</span> <span class="ident">test_flag</span> <span class="op">==</span> <span class="number">0xFC</span> {
+<span class="doccomment">/// test the second ps2 data port
+</span><span class="kw">pub fn </span>test_ps2_port2() {
+    <span class="comment">// test the ps2 controller
+    </span>{
+        ps2_write_command(<span class="number">0xAA</span>);
+        <span class="kw">let </span>test_flag = ps2_read_data();
+        <span class="kw">if </span>test_flag == <span class="number">0xFC </span>{
             <span class="macro">warn!</span>(<span class="string">&quot;ps2 controller test failed!!!&quot;</span>)
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">test_flag</span> <span class="op">==</span> <span class="number">0x55</span> {
+        } <span class="kw">else if </span>test_flag == <span class="number">0x55 </span>{
             <span class="macro">info!</span>(<span class="string">&quot;ps2 controller test pass!!!&quot;</span>)
         }
     }
-    <span class="comment">// test the second ps2 data port</span>
-    {
-        <span class="ident">ps2_write_command</span>(<span class="number">0xA9</span>);
-        <span class="kw">let</span> <span class="ident">test_flag</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
-        <span class="kw">match</span> <span class="ident">test_flag</span> {
-            <span class="number">0x00</span> =&gt; <span class="macro">info!</span>(<span class="string">&quot;second ps2 port test pass!!!&quot;</span>),
-            <span class="number">0x01</span> =&gt; <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port clock line stuck low&quot;</span>),
-            <span class="number">0x02</span> =&gt; <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port clock line stuck high&quot;</span>),
-            <span class="number">0x03</span> =&gt; <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port data line stuck low&quot;</span>),
-            <span class="number">0x04</span> =&gt; <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port data line stuck high&quot;</span>),
-            <span class="kw">_</span> =&gt; {}
+    <span class="comment">// test the second ps2 data port
+    </span>{
+        ps2_write_command(<span class="number">0xA9</span>);
+        <span class="kw">let </span>test_flag = ps2_read_data();
+        <span class="kw">match </span>test_flag {
+            <span class="number">0x00 </span>=&gt; <span class="macro">info!</span>(<span class="string">&quot;second ps2 port test pass!!!&quot;</span>),
+            <span class="number">0x01 </span>=&gt; <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port clock line stuck low&quot;</span>),
+            <span class="number">0x02 </span>=&gt; <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port clock line stuck high&quot;</span>),
+            <span class="number">0x03 </span>=&gt; <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port data line stuck low&quot;</span>),
+            <span class="number">0x04 </span>=&gt; <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port data line stuck high&quot;</span>),
+            <span class="kw">_ </span>=&gt; {}
         }
     }
-    <span class="comment">// enable PS2 interrupt and see the new config</span>
-    {
-        <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">ps2_read_config</span>();
-        <span class="kw">if</span> <span class="ident">config</span> <span class="op">&amp;</span> <span class="number">0x02</span> <span class="op">==</span> <span class="number">0x02</span> {
+    <span class="comment">// enable PS2 interrupt and see the new config
+    </span>{
+        <span class="kw">let </span>config = ps2_read_config();
+        <span class="kw">if </span>config &amp; <span class="number">0x02 </span>== <span class="number">0x02 </span>{
             <span class="macro">info!</span>(<span class="string">&quot;second ps2 port interrupt enabled&quot;</span>)
-        } <span class="kw">else</span> {
+        } <span class="kw">else </span>{
             <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port interrupt disabled&quot;</span>)
         }
-        <span class="kw">if</span> <span class="ident">config</span> <span class="op">&amp;</span> <span class="number">0x20</span> <span class="op">!</span><span class="op">=</span> <span class="number">0x20</span> {
+        <span class="kw">if </span>config &amp; <span class="number">0x20 </span>!= <span class="number">0x20 </span>{
             <span class="macro">info!</span>(<span class="string">&quot;second ps2 data port enabled&quot;</span>)
-        } <span class="kw">else</span> {
+        } <span class="kw">else </span>{
             <span class="macro">warn!</span>(<span class="string">&quot;second ps2 data port disabled&quot;</span>)
         }
     }
 }
 
-<span class="doccomment">/// write data to the first ps2 data port and return the response</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">data_to_port1</span>(<span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="ident">u8</span> {
-    <span class="kw">unsafe</span> { <span class="ident">PS2_PORT</span>.<span class="ident">lock</span>().<span class="ident">write</span>(<span class="ident">value</span>) };
-    <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
-    <span class="ident">response</span>
+<span class="doccomment">/// write data to the first ps2 data port and return the response
+</span><span class="kw">pub fn </span>data_to_port1(value: u8) -&gt; u8 {
+    <span class="kw">unsafe </span>{ PS2_PORT.lock().write(value) };
+    <span class="kw">let </span>response = ps2_read_data();
+    response
 }
 
-<span class="doccomment">/// write data to the second ps2 data port and return the response</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">data_to_port2</span>(<span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="ident">u8</span> {
-    <span class="ident">ps2_write_command</span>(<span class="number">0xD4</span>);
-    <span class="ident">data_to_port1</span>(<span class="ident">value</span>)
+<span class="doccomment">/// write data to the second ps2 data port and return the response
+</span><span class="kw">pub fn </span>data_to_port2(value: u8) -&gt; u8 {
+    ps2_write_command(<span class="number">0xD4</span>);
+    data_to_port1(value)
 }
 
-<span class="doccomment">/// write command to the keyboard and return the result</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">command_to_keyboard</span>(<span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">data_to_port1</span>(<span class="ident">value</span>);
+<span class="doccomment">/// write command to the keyboard and return the result
+</span><span class="kw">pub fn </span>command_to_keyboard(value: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>response = data_to_port1(value);
 
-    <span class="kw">match</span> <span class="ident">response</span> {
-        <span class="number">0xFA</span> =&gt; {
-            <span class="comment">// keyboard acknowledges the command</span>
-            <span class="prelude-val">Ok</span>(())
+    <span class="kw">match </span>response {
+        <span class="number">0xFA </span>=&gt; {
+            <span class="comment">// keyboard acknowledges the command
+            </span><span class="prelude-val">Ok</span>(())
         }
 
-        <span class="number">0xFE</span> =&gt; {
-            <span class="comment">// keyboard doesn&#39;t acknowledge the command</span>
-            <span class="prelude-val">Err</span>(<span class="string">&quot;Fail to send the command to the keyboard&quot;</span>)
+        <span class="number">0xFE </span>=&gt; {
+            <span class="comment">// keyboard doesn&#39;t acknowledge the command
+            </span><span class="prelude-val">Err</span>(<span class="string">&quot;Fail to send the command to the keyboard&quot;</span>)
         }
 
-        <span class="kw">_</span> =&gt; {
-            <span class="kw">for</span> <span class="ident">_x</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">14</span> {
-                <span class="comment">// wait for response</span>
-                <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
-                <span class="kw">if</span> <span class="ident">response</span> <span class="op">==</span> <span class="number">0xFA</span> {
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
-                } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">response</span> <span class="op">==</span> <span class="number">0xfe</span> {
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Please resend the command to the keyboard&quot;</span>);
+        <span class="kw">_ </span>=&gt; {
+            <span class="kw">for </span>_x <span class="kw">in </span><span class="number">0</span>..<span class="number">14 </span>{
+                <span class="comment">// wait for response
+                </span><span class="kw">let </span>response = ps2_read_data();
+                <span class="kw">if </span>response == <span class="number">0xFA </span>{
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(());
+                } <span class="kw">else if </span>response == <span class="number">0xfe </span>{
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Please resend the command to the keyboard&quot;</span>);
                 }
             }
             <span class="prelude-val">Err</span>(<span class="string">&quot;command is not acknowledged&quot;</span>)
@@ -749,163 +743,163 @@
     }
 }
 
-<span class="doccomment">/// write command to the mouse and return the result</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">command_to_mouse</span>(<span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="comment">// if the mouse doesn&#39;t acknowledge the command return error</span>
-    <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">data_to_port2</span>(<span class="ident">value</span>);
-    <span class="kw">if</span> <span class="ident">response</span> <span class="op">!</span><span class="op">=</span> <span class="number">0xFA</span> {
-        <span class="kw">for</span> <span class="ident">_x</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">14</span> {
-            <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
+<span class="doccomment">/// write command to the mouse and return the result
+</span><span class="kw">pub fn </span>command_to_mouse(value: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="comment">// if the mouse doesn&#39;t acknowledge the command return error
+    </span><span class="kw">let </span>response = data_to_port2(value);
+    <span class="kw">if </span>response != <span class="number">0xFA </span>{
+        <span class="kw">for </span>_x <span class="kw">in </span><span class="number">0</span>..<span class="number">14 </span>{
+            <span class="kw">let </span>response = ps2_read_data();
 
-            <span class="kw">if</span> <span class="ident">response</span> <span class="op">==</span> <span class="number">0xFA</span> {
-                <span class="comment">//                info!(&quot;mouse command is responded !!!!&quot;);</span>
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+            <span class="kw">if </span>response == <span class="number">0xFA </span>{
+                <span class="comment">//                info!(&quot;mouse command is responded !!!!&quot;);
+                </span><span class="kw">return </span><span class="prelude-val">Ok</span>(());
             }
         }
         <span class="macro">warn!</span>(<span class="string">&quot;mouse command to second port is not accepted&quot;</span>);
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;mouse command is not responded!!!&quot;</span>);
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;mouse command is not responded!!!&quot;</span>);
     }
-    <span class="comment">//    info!(&quot;mouse command is responded !!!!&quot;);</span>
-    <span class="prelude-val">Ok</span>(())
+    <span class="comment">//    info!(&quot;mouse command is responded !!!!&quot;);
+    </span><span class="prelude-val">Ok</span>(())
 }
 
-<span class="doccomment">/// write data to the second ps2 output buffer</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_to_second_output_buffer</span>(<span class="ident">value</span>: <span class="ident">u8</span>) {
-    <span class="ident">ps2_write_command</span>(<span class="number">0xD3</span>);
-    <span class="kw">unsafe</span> { <span class="ident">PS2_PORT</span>.<span class="ident">lock</span>().<span class="ident">write</span>(<span class="ident">value</span>) };
+<span class="doccomment">/// write data to the second ps2 output buffer
+</span><span class="kw">pub fn </span>write_to_second_output_buffer(value: u8) {
+    ps2_write_command(<span class="number">0xD3</span>);
+    <span class="kw">unsafe </span>{ PS2_PORT.lock().write(value) };
 }
 
-<span class="doccomment">/// read mouse data packet</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_mouse_packet</span>() -&gt; <span class="ident">u32</span> {
-    <span class="comment">// since nowadays almost every mouse has scroll, so there is a 4 byte packet</span>
-    <span class="comment">// which means that only mouse with ID 3 or 4 can be applied this function</span>
-    <span class="comment">// because the mouse is initialized to have ID 3 or 4, so this function can</span>
-    <span class="comment">// handle the mouse data packet</span>
+<span class="doccomment">/// read mouse data packet
+</span><span class="kw">pub fn </span>handle_mouse_packet() -&gt; u32 {
+    <span class="comment">// since nowadays almost every mouse has scroll, so there is a 4 byte packet
+    // which means that only mouse with ID 3 or 4 can be applied this function
+    // because the mouse is initialized to have ID 3 or 4, so this function can
+    // handle the mouse data packet
 
-    <span class="kw">let</span> <span class="ident">byte_1</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>() <span class="kw">as</span> <span class="ident">u32</span>;
-    <span class="kw">let</span> <span class="ident">byte_2</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>() <span class="kw">as</span> <span class="ident">u32</span>;
-    <span class="kw">let</span> <span class="ident">byte_3</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>() <span class="kw">as</span> <span class="ident">u32</span>;
-    <span class="kw">let</span> <span class="ident">byte_4</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>() <span class="kw">as</span> <span class="ident">u32</span>;
-    <span class="kw">let</span> <span class="ident">readdata</span> <span class="op">=</span> (<span class="ident">byte_4</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">24</span>) <span class="op">|</span> (<span class="ident">byte_3</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>) <span class="op">|</span> (<span class="ident">byte_2</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">8</span>) <span class="op">|</span> <span class="ident">byte_1</span>;
-    <span class="ident">readdata</span>
+    </span><span class="kw">let </span>byte_1 = ps2_read_data() <span class="kw">as </span>u32;
+    <span class="kw">let </span>byte_2 = ps2_read_data() <span class="kw">as </span>u32;
+    <span class="kw">let </span>byte_3 = ps2_read_data() <span class="kw">as </span>u32;
+    <span class="kw">let </span>byte_4 = ps2_read_data() <span class="kw">as </span>u32;
+    <span class="kw">let </span>readdata = (byte_4 &lt;&lt; <span class="number">24</span>) | (byte_3 &lt;&lt; <span class="number">16</span>) | (byte_2 &lt;&lt; <span class="number">8</span>) | byte_1;
+    readdata
 }
 
-<span class="doccomment">/// set ps2 mouse&#39;s sampling rate</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_sampling_rate</span>(<span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="comment">// if command is not acknowledged</span>
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_mouse</span>(<span class="number">0xF3</span>) {
+<span class="doccomment">/// set ps2 mouse&#39;s sampling rate
+</span><span class="kw">pub fn </span>set_sampling_rate(value: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="comment">// if command is not acknowledged
+    </span><span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = command_to_mouse(<span class="number">0xF3</span>) {
         <span class="prelude-val">Err</span>(<span class="string">&quot;set mouse sampling rate failled, please try again&quot;</span>)
-    } <span class="kw">else</span> {
-        <span class="comment">// if second byte command is not acknowledged</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_mouse</span>(<span class="ident">value</span>) {
+    } <span class="kw">else </span>{
+        <span class="comment">// if second byte command is not acknowledged
+        </span><span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = command_to_mouse(value) {
             <span class="prelude-val">Err</span>(<span class="string">&quot;set mouse sampling rate failled, please try again&quot;</span>)
-        } <span class="kw">else</span> {
+        } <span class="kw">else </span>{
             <span class="prelude-val">Ok</span>(())
         }
     }
 }
 
-<span class="doccomment">/// set the mouse ID (3 or 4 ) by magic sequence</span>
-<span class="doccomment">/// 3 means that the mouse has scroll</span>
-<span class="doccomment">/// 4 means that the mouse has scroll, fourth and fifth buttons</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_mouse_id</span>(<span class="ident">id</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="comment">// stop the mouse&#39;s streaming before trying to set the ID</span>
-    <span class="comment">// if fail to stop the streaming, return error</span>
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">mouse_packet_streaming</span>(<span class="bool-val">false</span>) {
+<span class="doccomment">/// set the mouse ID (3 or 4 ) by magic sequence
+/// 3 means that the mouse has scroll
+/// 4 means that the mouse has scroll, fourth and fifth buttons
+</span><span class="kw">pub fn </span>set_mouse_id(id: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="comment">// stop the mouse&#39;s streaming before trying to set the ID
+    // if fail to stop the streaming, return error
+    </span><span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = mouse_packet_streaming(<span class="bool-val">false</span>) {
         <span class="macro">warn!</span>(<span class="string">&quot;fail to stop streaming, before trying to read mouse id&quot;</span>);
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
-    } <span class="kw">else</span> {
-        <span class="comment">// set the id to 3</span>
-        <span class="kw">if</span> <span class="ident">id</span> <span class="op">==</span> <span class="number">3</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">set_sampling_rate</span>(<span class="number">200</span>) {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
+    } <span class="kw">else </span>{
+        <span class="comment">// set the id to 3
+        </span><span class="kw">if </span>id == <span class="number">3 </span>{
+            <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = set_sampling_rate(<span class="number">200</span>) {
                 <span class="macro">warn!</span>(<span class="string">&quot;fail to stop streaming, before trying to read mouse id&quot;</span>);
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
             }
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">set_sampling_rate</span>(<span class="number">100</span>) {
+            <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = set_sampling_rate(<span class="number">100</span>) {
                 <span class="macro">warn!</span>(<span class="string">&quot;fail to stop streaming, before trying to read mouse id&quot;</span>);
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
             }
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">set_sampling_rate</span>(<span class="number">80</span>) {
+            <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = set_sampling_rate(<span class="number">80</span>) {
                 <span class="macro">warn!</span>(<span class="string">&quot;fail to stop streaming, before trying to read mouse id&quot;</span>);
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
             }
         }
-        <span class="comment">// set the id to 4</span>
-        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">id</span> <span class="op">==</span> <span class="number">4</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">set_sampling_rate</span>(<span class="number">200</span>) {
+        <span class="comment">// set the id to 4
+        </span><span class="kw">else if </span>id == <span class="number">4 </span>{
+            <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = set_sampling_rate(<span class="number">200</span>) {
                 <span class="macro">warn!</span>(<span class="string">&quot;fail to stop streaming, before trying to read mouse id&quot;</span>);
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
             }
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">set_sampling_rate</span>(<span class="number">100</span>) {
+            <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = set_sampling_rate(<span class="number">100</span>) {
                 <span class="macro">warn!</span>(<span class="string">&quot;fail to stop streaming, before trying to read mouse id&quot;</span>);
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
             }
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">set_sampling_rate</span>(<span class="number">80</span>) {
+            <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = set_sampling_rate(<span class="number">80</span>) {
                 <span class="macro">warn!</span>(<span class="string">&quot;fail to stop streaming, before trying to read mouse id&quot;</span>);
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
             }
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">set_sampling_rate</span>(<span class="number">200</span>) {
+            <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = set_sampling_rate(<span class="number">200</span>) {
                 <span class="macro">warn!</span>(<span class="string">&quot;fail to stop streaming, before trying to read mouse id&quot;</span>);
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
             }
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">set_sampling_rate</span>(<span class="number">200</span>) {
+            <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = set_sampling_rate(<span class="number">200</span>) {
                 <span class="macro">warn!</span>(<span class="string">&quot;fail to stop streaming, before trying to read mouse id&quot;</span>);
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
             }
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">set_sampling_rate</span>(<span class="number">80</span>) {
+            <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = set_sampling_rate(<span class="number">80</span>) {
                 <span class="macro">warn!</span>(<span class="string">&quot;fail to stop streaming, before trying to read mouse id&quot;</span>);
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
             }
-        } <span class="kw">else</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;invalid id to be set to a mouse, please re-enter the id number&quot;</span>);
+        } <span class="kw">else </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;invalid id to be set to a mouse, please re-enter the id number&quot;</span>);
         }
     }
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">mouse_packet_streaming</span>(<span class="bool-val">true</span>) {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;set mouse id without re-starting the streaming, please open it manually&quot;</span>);
-    } <span class="kw">else</span> {
-        <span class="comment">//        info!(&quot;set mouse id properly without error&quot;);</span>
-        <span class="prelude-val">Ok</span>(())
+    <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = mouse_packet_streaming(<span class="bool-val">true</span>) {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;set mouse id without re-starting the streaming, please open it manually&quot;</span>);
+    } <span class="kw">else </span>{
+        <span class="comment">//        info!(&quot;set mouse id properly without error&quot;);
+        </span><span class="prelude-val">Ok</span>(())
     }
 }
 
-<span class="doccomment">/// check the mouse&#39;s id</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_mouse_id</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="comment">// stop the streaming before trying to read the mouse&#39;s id</span>
-    <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">mouse_packet_streaming</span>(<span class="bool-val">false</span>);
-    <span class="kw">match</span> <span class="ident">result</span> {
-        <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
-            <span class="macro">warn!</span>(<span class="string">&quot;check_mouse_id(): please try read the mouse id later, error: {}&quot;</span>, <span class="ident">e</span>);
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
+<span class="doccomment">/// check the mouse&#39;s id
+</span><span class="kw">pub fn </span>check_mouse_id() -&gt; <span class="prelude-ty">Result</span>&lt;u8, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="comment">// stop the streaming before trying to read the mouse&#39;s id
+    </span><span class="kw">let </span>result = mouse_packet_streaming(<span class="bool-val">false</span>);
+    <span class="kw">match </span>result {
+        <span class="prelude-val">Err</span>(e) =&gt; {
+            <span class="macro">warn!</span>(<span class="string">&quot;check_mouse_id(): please try read the mouse id later, error: {}&quot;</span>, e);
+            <span class="kw">return </span><span class="prelude-val">Err</span>(e);
         }
-        <span class="prelude-val">Ok</span>(<span class="ident">_buffer_data</span>) =&gt; {
-            <span class="kw">let</span> <span class="ident">id_num</span>: <span class="ident">u8</span>;
-            <span class="comment">// check whether the command is acknowledged</span>
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">command_to_mouse</span>(<span class="number">0xF2</span>) {
+        <span class="prelude-val">Ok</span>(_buffer_data) =&gt; {
+            <span class="kw">let </span>id_num: u8;
+            <span class="comment">// check whether the command is acknowledged
+            </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = command_to_mouse(<span class="number">0xF2</span>) {
                 <span class="macro">warn!</span>(<span class="string">&quot;check_mouse_id(): command not accepted, please try again.&quot;</span>);
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
-            } <span class="kw">else</span> {
-                <span class="ident">id_num</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
+                <span class="kw">return </span><span class="prelude-val">Err</span>(e);
+            } <span class="kw">else </span>{
+                id_num = ps2_read_data();
             }
-            <span class="comment">// begin streaming again</span>
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">mouse_packet_streaming</span>(<span class="bool-val">true</span>) {
+            <span class="comment">// begin streaming again
+            </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = mouse_packet_streaming(<span class="bool-val">true</span>) {
                 <span class="macro">warn!</span>(<span class="string">&quot;the streaming of mouse is disabled,please open it manually&quot;</span>);
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
+                <span class="kw">return </span><span class="prelude-val">Err</span>(e);
             }
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">id_num</span>);
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(id_num);
         }
     }
 }
 
-<span class="doccomment">/// reset the mouse</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset_mouse</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_mouse</span>(<span class="number">0xFF</span>) {
+<span class="doccomment">/// reset the mouse
+</span><span class="kw">pub fn </span>reset_mouse() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = command_to_mouse(<span class="number">0xFF</span>) {
         <span class="prelude-val">Err</span>(<span class="string">&quot;reset mouse failled please try again&quot;</span>)
-    } <span class="kw">else</span> {
-        <span class="kw">for</span> <span class="ident">_x</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">14</span> {
-            <span class="kw">let</span> <span class="ident">more_bytes</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
-            <span class="kw">if</span> <span class="ident">more_bytes</span> <span class="op">==</span> <span class="number">0xAA</span> {
-                <span class="comment">// command reset mouse succeeded</span>
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+    } <span class="kw">else </span>{
+        <span class="kw">for </span>_x <span class="kw">in </span><span class="number">0</span>..<span class="number">14 </span>{
+            <span class="kw">let </span>more_bytes = ps2_read_data();
+            <span class="kw">if </span>more_bytes == <span class="number">0xAA </span>{
+                <span class="comment">// command reset mouse succeeded
+                </span><span class="kw">return </span><span class="prelude-val">Ok</span>(());
             }
         }
         <span class="macro">warn!</span>(<span class="string">&quot;disable streaming failed&quot;</span>);
@@ -913,119 +907,118 @@
     }
 }
 
-<span class="doccomment">/// resend the most recent packet again</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mouse_resend</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_mouse</span>(<span class="number">0xFE</span>) {
+<span class="doccomment">/// resend the most recent packet again
+</span><span class="kw">pub fn </span>mouse_resend() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = command_to_mouse(<span class="number">0xFE</span>) {
         <span class="prelude-val">Err</span>(<span class="string">&quot;mouse resend request failled, please request again&quot;</span>)
-    } <span class="kw">else</span> {
-        <span class="comment">// mouse resend request succeeded</span>
-        <span class="prelude-val">Ok</span>(())
+    } <span class="kw">else </span>{
+        <span class="comment">// mouse resend request succeeded
+        </span><span class="prelude-val">Ok</span>(())
     }
 }
 
-<span class="doccomment">/// enable or disable the packet streaming</span>
-<span class="doccomment">/// also return the vec of data previously in the buffer which may be useful</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mouse_packet_streaming</span>(<span class="ident">enable</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">if</span> <span class="ident">enable</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_mouse</span>(<span class="number">0xf4</span>) {
+<span class="doccomment">/// enable or disable the packet streaming
+/// also return the vec of data previously in the buffer which may be useful
+</span><span class="kw">pub fn </span>mouse_packet_streaming(enable: bool) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;u8&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">if </span>enable {
+        <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = command_to_mouse(<span class="number">0xf4</span>) {
             <span class="macro">warn!</span>(<span class="string">&quot;enable streaming failed&quot;</span>);
             <span class="prelude-val">Err</span>(<span class="string">&quot;enable mouse streaming failed&quot;</span>)
-        } <span class="kw">else</span> {
-            <span class="comment">// info!(&quot;enable streaming succeeded!!&quot;);</span>
-            <span class="prelude-val">Ok</span>(<span class="ident">Vec::new</span>())
+        } <span class="kw">else </span>{
+            <span class="comment">// info!(&quot;enable streaming succeeded!!&quot;);
+            </span><span class="prelude-val">Ok</span>(Vec::new())
         }
     }
-    <span class="kw">else</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer_data</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-        <span class="kw">if</span> <span class="ident">data_to_port2</span>(<span class="number">0xf5</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0xfa</span> {
-            <span class="kw">for</span> <span class="ident">x</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">15</span> {
-                <span class="kw">if</span> <span class="ident">x</span> <span class="op">==</span> <span class="number">14</span> {
+    <span class="kw">else </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>buffer_data = Vec::new();
+        <span class="kw">if </span>data_to_port2(<span class="number">0xf5</span>) != <span class="number">0xfa </span>{
+            <span class="kw">for </span>x <span class="kw">in </span><span class="number">0</span>..<span class="number">15 </span>{
+                <span class="kw">if </span>x == <span class="number">14 </span>{
                     <span class="macro">warn!</span>(<span class="string">&quot;disable mouse streaming failed&quot;</span>);
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;disable mouse streaming failed&quot;</span>);
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;disable mouse streaming failed&quot;</span>);
                 }
-                <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
+                <span class="kw">let </span>response = ps2_read_data();
 
-                <span class="kw">if</span> <span class="ident">response</span> <span class="op">!</span><span class="op">=</span> <span class="number">0xfa</span> {
-                    <span class="ident">buffer_data</span>.<span class="ident">push</span>(<span class="ident">response</span>);
-                } <span class="kw">else</span> {
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">buffer_data</span>);
+                <span class="kw">if </span>response != <span class="number">0xfa </span>{
+                    buffer_data.push(response);
+                } <span class="kw">else </span>{
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(buffer_data);
                 }
             }
         }
-        <span class="prelude-val">Ok</span>(<span class="ident">buffer_data</span>)
+        <span class="prelude-val">Ok</span>(buffer_data)
     } 
 }
 
-<span class="doccomment">/// set the resolution of the mouse</span>
-<span class="doccomment">/// parameter :</span>
-<span class="doccomment">/// 0x00: 1 count/mm; 0x01 2 count/mm;</span>
-<span class="doccomment">/// 0x02 4 count/mm; 0x03 8 count/mm;</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mouse_resolution</span>(<span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_mouse</span>(<span class="number">0xE8</span>) {
+<span class="doccomment">/// set the resolution of the mouse
+/// parameter :
+/// 0x00: 1 count/mm; 0x01 2 count/mm;
+/// 0x02 4 count/mm; 0x03 8 count/mm;
+</span><span class="kw">pub fn </span>mouse_resolution(value: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = command_to_mouse(<span class="number">0xE8</span>) {
         <span class="macro">warn!</span>(<span class="string">&quot;command set mouse resolution is not accepted&quot;</span>);
         <span class="prelude-val">Err</span>(<span class="string">&quot;set mouse resolution failed!!!&quot;</span>)
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_mouse</span>(<span class="ident">value</span>) {
+    } <span class="kw">else if let </span><span class="prelude-val">Err</span>(_e) = command_to_mouse(value) {
             <span class="macro">warn!</span>(<span class="string">&quot;the resolution value is not accepted&quot;</span>);
             <span class="prelude-val">Err</span>(<span class="string">&quot;set mouse resolution failed!!!&quot;</span>)
-    } <span class="kw">else</span> {
-            <span class="comment">// info!(&quot;set mouse resolution succeeded!!!&quot;);</span>
-            <span class="prelude-val">Ok</span>(())
+    } <span class="kw">else </span>{
+            <span class="comment">// info!(&quot;set mouse resolution succeeded!!!&quot;);
+            </span><span class="prelude-val">Ok</span>(())
     }
 }
 
-<span class="doccomment">///set LED status of the keyboard</span>
-<span class="doccomment">/// parameter :</span>
-<span class="doccomment">/// 0: ScrollLock; 1: NumberLock; 2: CapsLock</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">keyboard_led</span>(<span class="ident">value</span>: <span class="ident">u8</span>) {
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_keyboard</span>(<span class="number">0xED</span>) {
+<span class="doccomment">///set LED status of the keyboard
+/// parameter :
+/// 0: ScrollLock; 1: NumberLock; 2: CapsLock
+</span><span class="kw">pub fn </span>keyboard_led(value: u8) {
+    <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = command_to_keyboard(<span class="number">0xED</span>) {
         <span class="macro">warn!</span>(<span class="string">&quot;failed to set the keyboard led&quot;</span>);
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_keyboard</span>(<span class="ident">value</span>) {
+    } <span class="kw">else if let </span><span class="prelude-val">Err</span>(_e) = command_to_keyboard(value) {
         <span class="macro">warn!</span>(<span class="string">&quot;failed to set the keyboard led&quot;</span>);
     }
 }
 
-<span class="doccomment">/// set the scancode set of the keyboard</span>
-<span class="doccomment">/// 0: get the current set; 1: set 1</span>
-<span class="doccomment">/// 2: set 2; 3: set 3</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">keyboard_scancode_set</span>(<span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_keyboard</span>(<span class="number">0xF0</span>) {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;failed to set the keyboard scancode set&quot;</span>);
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_keyboard</span>(<span class="ident">value</span>) {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;failed to set the keyboard scancode set&quot;</span>);
+<span class="doccomment">/// set the scancode set of the keyboard
+/// 0: get the current set; 1: set 1
+/// 2: set 2; 3: set 3
+</span><span class="kw">pub fn </span>keyboard_scancode_set(value: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = command_to_keyboard(<span class="number">0xF0</span>) {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;failed to set the keyboard scancode set&quot;</span>);
+    } <span class="kw">else if let </span><span class="prelude-val">Err</span>(_e) = command_to_keyboard(value) {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;failed to set the keyboard scancode set&quot;</span>);
     }
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">KeyboardType</span> {
-    <span class="ident">MF2Keyboard</span>,
-    <span class="ident">MF2KeyboardWithPSControllerTranslator</span>,
-    <span class="ident">AncientATKeyboard</span>,
+<span class="kw">pub enum </span>KeyboardType {
+    MF2Keyboard,
+    MF2KeyboardWithPSControllerTranslator,
+    AncientATKeyboard,
 }
 
-<span class="doccomment">///detect the keyboard&#39;s type</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">keyboard_detect</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">KeyboardType</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="comment">//    let reply = data_to_port1(0xF2);</span>
-    <span class="comment">//    info!(&quot;{:x}&quot;,reply);</span>
-    <span class="comment">//    match reply {</span>
-    <span class="comment">//        0xAB =&gt; Ok(&quot;MF2 keyboard with translation enabled in the PS/Controller&quot;),</span>
-    <span class="comment">//        0x41 =&gt; Ok(&quot;MF2 keyboard with translation enabled in the PS/Controller&quot;),</span>
-    <span class="comment">//        0xC1 =&gt; Ok(&quot;MF2 keyboard with translation enabled in the PS/Controller&quot;),</span>
-    <span class="comment">//        0x83 =&gt; Ok(&quot;MF2 keyboard&quot;),</span>
-    <span class="comment">//        _=&gt; Err(&quot;Ancient AT keyboard with translation enabled in the PS/Controller (not possible for the second PS/2 port)&quot;)</span>
-    <span class="comment">//    }</span>
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">command_to_keyboard</span>(<span class="number">0xF2</span>) {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
-    } <span class="kw">else</span> {
-        <span class="kw">let</span> <span class="ident">reply</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
-        <span class="kw">match</span> <span class="ident">reply</span> {
-            <span class="number">0xAB</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::MF2KeyboardWithPSControllerTranslator</span>),
-            <span class="number">0x41</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::MF2KeyboardWithPSControllerTranslator</span>),
-            <span class="number">0xC1</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::MF2KeyboardWithPSControllerTranslator</span>),
-            <span class="number">0x83</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::MF2Keyboard</span>),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::AncientATKeyboard</span>),
+<span class="doccomment">///detect the keyboard&#39;s type
+</span><span class="kw">pub fn </span>keyboard_detect() -&gt; <span class="prelude-ty">Result</span>&lt;KeyboardType, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="comment">//    let reply = data_to_port1(0xF2);
+    //    info!(&quot;{:x}&quot;,reply);
+    //    match reply {
+    //        0xAB =&gt; Ok(&quot;MF2 keyboard with translation enabled in the PS/Controller&quot;),
+    //        0x41 =&gt; Ok(&quot;MF2 keyboard with translation enabled in the PS/Controller&quot;),
+    //        0xC1 =&gt; Ok(&quot;MF2 keyboard with translation enabled in the PS/Controller&quot;),
+    //        0x83 =&gt; Ok(&quot;MF2 keyboard&quot;),
+    //        _=&gt; Err(&quot;Ancient AT keyboard with translation enabled in the PS/Controller (not possible for the second PS/2 port)&quot;)
+    //    }
+    </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = command_to_keyboard(<span class="number">0xF2</span>) {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(e);
+    } <span class="kw">else </span>{
+        <span class="kw">let </span>reply = ps2_read_data();
+        <span class="kw">match </span>reply {
+            <span class="number">0xAB </span>=&gt; <span class="prelude-val">Ok</span>(KeyboardType::MF2KeyboardWithPSControllerTranslator),
+            <span class="number">0x41 </span>=&gt; <span class="prelude-val">Ok</span>(KeyboardType::MF2KeyboardWithPSControllerTranslator),
+            <span class="number">0xC1 </span>=&gt; <span class="prelude-val">Ok</span>(KeyboardType::MF2KeyboardWithPSControllerTranslator),
+            <span class="number">0x83 </span>=&gt; <span class="prelude-val">Ok</span>(KeyboardType::MF2Keyboard),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Ok</span>(KeyboardType::AncientATKeyboard),
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ps2" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ps2" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

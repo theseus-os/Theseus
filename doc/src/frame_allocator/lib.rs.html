@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/frame_allocator/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../frame_allocator/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../frame_allocator/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../frame_allocator/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/frame_allocator/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../frame_allocator/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -1063,688 +1057,688 @@
 <span id="1057">1057</span>
 <span id="1058">1058</span>
 <span id="1059">1059</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Provides an allocator for physical memory frames.</span>
-<span class="doccomment">//! The minimum unit of allocation is a single frame. </span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This is currently a modified and more complex version of the `page_allocator` crate.</span>
-<span class="doccomment">//! TODO: extract the common code and create a generic allocator that can be specialized to allocate pages or frames.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! This also supports early allocation of frames before heap allocation is available, </span>
-<span class="doccomment">//! and does so behind the scenes using the same single interface. </span>
-<span class="doccomment">//! Early pre-heap allocations are limited to tracking a small number of available chunks (currently 32).</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Once heap allocation is available, it uses a dynamically-allocated list of frame chunks to track allocations.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! The core allocation function is [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html), </span>
-<span class="doccomment">//! but there are several convenience functions that offer simpler interfaces for general usage. </span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! # Notes and Missing Features</span>
-<span class="doccomment">//! This allocator currently does **not** merge freed chunks (de-fragmentation). </span>
-<span class="doccomment">//! We don&#39;t need to do so until we actually run out of address space or until </span>
-<span class="doccomment">//! a requested address is in a chunk that needs to be merged.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Provides an allocator for physical memory frames.
+//! The minimum unit of allocation is a single frame. 
+//!
+//! This is currently a modified and more complex version of the `page_allocator` crate.
+//! TODO: extract the common code and create a generic allocator that can be specialized to allocate pages or frames.
+//! 
+//! This also supports early allocation of frames before heap allocation is available, 
+//! and does so behind the scenes using the same single interface. 
+//! Early pre-heap allocations are limited to tracking a small number of available chunks (currently 32).
+//! 
+//! Once heap allocation is available, it uses a dynamically-allocated list of frame chunks to track allocations.
+//! 
+//! The core allocation function is [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html), 
+//! but there are several convenience functions that offer simpler interfaces for general usage. 
+//!
+//! # Notes and Missing Features
+//! This allocator currently does **not** merge freed chunks (de-fragmentation). 
+//! We don&#39;t need to do so until we actually run out of address space or until 
+//! a requested address is in a chunk that needs to be merged.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory_structs</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">static_assertions</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">intrusive_collections</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>kernel_config;
+<span class="kw">extern crate </span>memory_structs;
+<span class="kw">extern crate </span>spin;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
+<span class="kw">extern crate </span>intrusive_collections;
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">test</span>;
+<span class="attr">#[cfg(test)]
+</span><span class="kw">mod </span>test;
 
-<span class="kw">mod</span> <span class="ident">static_array_rb_tree</span>;
-<span class="comment">// mod static_array_linked_list;</span>
-
-
-<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">borrow::Borrow</span>, <span class="ident">cmp</span>::{<span class="ident">Ordering</span>, <span class="ident">min</span>, <span class="ident">max</span>}, <span class="ident">fmt</span>, <span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>}, <span class="ident">marker::PhantomData</span>};
-<span class="kw">use</span> <span class="ident">kernel_config::memory</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">memory_structs</span>::{<span class="ident">PhysicalAddress</span>, <span class="ident">Frame</span>, <span class="ident">FrameRange</span>};
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">intrusive_collections::Bound</span>;
-<span class="kw">use</span> <span class="ident">static_array_rb_tree</span>::<span class="kw-2">*</span>;
-
-<span class="kw">const</span> <span class="ident">FRAME_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">PAGE_SIZE</span>;
-<span class="kw">const</span> <span class="ident">MIN_FRAME</span>: <span class="ident">Frame</span> <span class="op">=</span> <span class="ident">Frame::containing_address</span>(<span class="ident">PhysicalAddress::zero</span>());
-<span class="kw">const</span> <span class="ident">MAX_FRAME</span>: <span class="ident">Frame</span> <span class="op">=</span> <span class="ident">Frame::containing_address</span>(<span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">usize::MAX</span>));
-
-<span class="comment">// Note: we keep separate lists for &quot;free, general-purpose&quot; areas and &quot;reserved&quot; areas, as it&#39;s much faster. </span>
-
-<span class="doccomment">/// The single, system-wide list of free physical memory frames available for general usage. </span>
-<span class="kw">static</span> <span class="ident">FREE_GENERAL_FRAMES_LIST</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">StaticArrayRBTree::empty</span>()); 
-<span class="doccomment">/// The single, system-wide list of free physical memory frames reserved for specific usage. </span>
-<span class="kw">static</span> <span class="ident">FREE_RESERVED_FRAMES_LIST</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">StaticArrayRBTree::empty</span>()); 
-
-<span class="doccomment">/// The fixed list of all known regions that are available for general use.</span>
-<span class="doccomment">/// This does not indicate whether these regions are currently allocated, </span>
-<span class="doccomment">/// rather just where they exist and which regions are known to this allocator.</span>
-<span class="kw">static</span> <span class="ident">GENERAL_REGIONS</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">StaticArrayRBTree::empty</span>());
-<span class="doccomment">/// The fixed list of all known regions that are reserved for specific purposes. </span>
-<span class="doccomment">/// This does not indicate whether these regions are currently allocated, </span>
-<span class="doccomment">/// rather just where they exist and which regions are known to this allocator.</span>
-<span class="kw">static</span> <span class="ident">RESERVED_REGIONS</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">StaticArrayRBTree::empty</span>());
+<span class="kw">mod </span>static_array_rb_tree;
+<span class="comment">// mod static_array_linked_list;
 
 
-<span class="doccomment">/// Initialize the frame allocator with the given list of available and reserved physical memory regions.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Any regions in either of the lists may overlap, this is checked for and handled properly.</span>
-<span class="doccomment">/// Reserved regions take priority -- if a reserved region partially or fully overlaps any part of a free region,</span>
-<span class="doccomment">/// that portion will be considered reserved, not free. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// The iterator (`R`) over reserved physical memory regions must be cloneable, </span>
-<span class="doccomment">/// as this runs before heap allocation is available, and we may need to iterate over it multiple times. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// ## Return</span>
-<span class="doccomment">/// Upon success, this function returns a callback function that allows the caller</span>
-<span class="doccomment">/// (the memory subsystem init function) to convert a range of unmapped frames </span>
-<span class="doccomment">/// back into an [`AllocatedFrames`] object.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">R</span>, <span class="ident">P</span><span class="op">&gt;</span>(
-    <span class="ident">free_physical_memory_areas</span>: <span class="ident">F</span>,
-    <span class="ident">reserved_physical_memory_areas</span>: <span class="ident">R</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw">fn</span>(<span class="ident">FrameRange</span>) -&gt; <span class="ident">AllocatedFrames</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> 
-    <span class="kw">where</span> <span class="ident">P</span>: <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">PhysicalMemoryRegion</span><span class="op">&gt;</span>,
-          <span class="ident">F</span>: <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">P</span><span class="op">&gt;</span>,
-          <span class="ident">R</span>: <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">P</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span>,
+</span><span class="kw">use </span>core::{borrow::Borrow, cmp::{Ordering, min, max}, fmt, ops::{Deref, DerefMut}, marker::PhantomData};
+<span class="kw">use </span>kernel_config::memory::<span class="kw-2">*</span>;
+<span class="kw">use </span>memory_structs::{PhysicalAddress, Frame, FrameRange};
+<span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>intrusive_collections::Bound;
+<span class="kw">use </span>static_array_rb_tree::<span class="kw-2">*</span>;
+
+<span class="kw">const </span>FRAME_SIZE: usize = PAGE_SIZE;
+<span class="kw">const </span>MIN_FRAME: Frame = Frame::containing_address(PhysicalAddress::zero());
+<span class="kw">const </span>MAX_FRAME: Frame = Frame::containing_address(PhysicalAddress::new_canonical(usize::MAX));
+
+<span class="comment">// Note: we keep separate lists for &quot;free, general-purpose&quot; areas and &quot;reserved&quot; areas, as it&#39;s much faster. 
+
+</span><span class="doccomment">/// The single, system-wide list of free physical memory frames available for general usage. 
+</span><span class="kw">static </span>FREE_GENERAL_FRAMES_LIST: Mutex&lt;StaticArrayRBTree&lt;Chunk&gt;&gt; = Mutex::new(StaticArrayRBTree::empty()); 
+<span class="doccomment">/// The single, system-wide list of free physical memory frames reserved for specific usage. 
+</span><span class="kw">static </span>FREE_RESERVED_FRAMES_LIST: Mutex&lt;StaticArrayRBTree&lt;Chunk&gt;&gt; = Mutex::new(StaticArrayRBTree::empty()); 
+
+<span class="doccomment">/// The fixed list of all known regions that are available for general use.
+/// This does not indicate whether these regions are currently allocated, 
+/// rather just where they exist and which regions are known to this allocator.
+</span><span class="kw">static </span>GENERAL_REGIONS: Mutex&lt;StaticArrayRBTree&lt;Chunk&gt;&gt; = Mutex::new(StaticArrayRBTree::empty());
+<span class="doccomment">/// The fixed list of all known regions that are reserved for specific purposes. 
+/// This does not indicate whether these regions are currently allocated, 
+/// rather just where they exist and which regions are known to this allocator.
+</span><span class="kw">static </span>RESERVED_REGIONS: Mutex&lt;StaticArrayRBTree&lt;Chunk&gt;&gt; = Mutex::new(StaticArrayRBTree::empty());
+
+
+<span class="doccomment">/// Initialize the frame allocator with the given list of available and reserved physical memory regions.
+///
+/// Any regions in either of the lists may overlap, this is checked for and handled properly.
+/// Reserved regions take priority -- if a reserved region partially or fully overlaps any part of a free region,
+/// that portion will be considered reserved, not free. 
+/// 
+/// The iterator (`R`) over reserved physical memory regions must be cloneable, 
+/// as this runs before heap allocation is available, and we may need to iterate over it multiple times. 
+/// 
+/// ## Return
+/// Upon success, this function returns a callback function that allows the caller
+/// (the memory subsystem init function) to convert a range of unmapped frames 
+/// back into an [`AllocatedFrames`] object.
+</span><span class="kw">pub fn </span>init&lt;F, R, P&gt;(
+    free_physical_memory_areas: F,
+    reserved_physical_memory_areas: R,
+) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">fn</span>(FrameRange) -&gt; AllocatedFrames, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; 
+    <span class="kw">where </span>P: Borrow&lt;PhysicalMemoryRegion&gt;,
+          F: IntoIterator&lt;Item = P&gt;,
+          R: IntoIterator&lt;Item = P&gt; + Clone,
 {
-    <span class="kw">if</span>  <span class="ident">FREE_GENERAL_FRAMES_LIST</span> .<span class="ident">lock</span>().<span class="ident">len</span>() <span class="op">!</span><span class="op">=</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span>
-        <span class="ident">FREE_RESERVED_FRAMES_LIST</span>.<span class="ident">lock</span>().<span class="ident">len</span>() <span class="op">!</span><span class="op">=</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span>
-        <span class="ident">GENERAL_REGIONS</span>          .<span class="ident">lock</span>().<span class="ident">len</span>() <span class="op">!</span><span class="op">=</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span>
-        <span class="ident">RESERVED_REGIONS</span>         .<span class="ident">lock</span>().<span class="ident">len</span>() <span class="op">!</span><span class="op">=</span> <span class="number">0</span> 
-    {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: Frame allocator was already initialized, cannot be initialized twice.&quot;</span>);
+    <span class="kw">if  </span>FREE_GENERAL_FRAMES_LIST .lock().len() != <span class="number">0 </span>||
+        FREE_RESERVED_FRAMES_LIST.lock().len() != <span class="number">0 </span>||
+        GENERAL_REGIONS          .lock().len() != <span class="number">0 </span>||
+        RESERVED_REGIONS         .lock().len() != <span class="number">0 
+    </span>{
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: Frame allocator was already initialized, cannot be initialized twice.&quot;</span>);
     }
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">free_list</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>; <span class="number">32</span>] <span class="op">=</span> <span class="ident">Default::default</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">free_list_idx</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reserved_list</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>; <span class="number">32</span>] <span class="op">=</span> <span class="ident">Default::default</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reserved_list_idx</span> <span class="op">=</span> <span class="number">0</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>free_list: [<span class="prelude-ty">Option</span>&lt;Chunk&gt;; <span class="number">32</span>] = Default::default();
+    <span class="kw">let </span><span class="kw-2">mut </span>free_list_idx = <span class="number">0</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>reserved_list: [<span class="prelude-ty">Option</span>&lt;Chunk&gt;; <span class="number">32</span>] = Default::default();
+    <span class="kw">let </span><span class="kw-2">mut </span>reserved_list_idx = <span class="number">0</span>;
 
-    <span class="comment">// Populate the list of free regions for general-purpose usage.</span>
-    <span class="kw">for</span> <span class="ident">area</span> <span class="kw">in</span> <span class="ident">free_physical_memory_areas</span>.<span class="ident">into_iter</span>() {
-        <span class="kw">let</span> <span class="ident">area</span> <span class="op">=</span> <span class="ident">area</span>.<span class="ident">borrow</span>();
-        <span class="comment">// debug!(&quot;Frame Allocator: looking to add free physical memory area: {:?}&quot;, area);</span>
-        <span class="ident">check_and_add_free_region</span>(
-            <span class="kw-2">&amp;</span><span class="ident">area</span>,
-            <span class="kw-2">&amp;mut</span> <span class="ident">free_list</span>,
-            <span class="kw-2">&amp;mut</span> <span class="ident">free_list_idx</span>,
-            <span class="ident">reserved_physical_memory_areas</span>.<span class="ident">clone</span>(),
+    <span class="comment">// Populate the list of free regions for general-purpose usage.
+    </span><span class="kw">for </span>area <span class="kw">in </span>free_physical_memory_areas.into_iter() {
+        <span class="kw">let </span>area = area.borrow();
+        <span class="comment">// debug!(&quot;Frame Allocator: looking to add free physical memory area: {:?}&quot;, area);
+        </span>check_and_add_free_region(
+            <span class="kw-2">&amp;</span>area,
+            <span class="kw-2">&amp;mut </span>free_list,
+            <span class="kw-2">&amp;mut </span>free_list_idx,
+            reserved_physical_memory_areas.clone(),
         );
     }
 
-    <span class="comment">// Insert all of the reserved memory areas into the list of free reserved regions,</span>
-    <span class="comment">// while de-duplicating overlapping areas by merging them.</span>
-    <span class="kw">for</span> <span class="ident">reserved</span> <span class="kw">in</span> <span class="ident">reserved_physical_memory_areas</span>.<span class="ident">into_iter</span>() {
-        <span class="kw">let</span> <span class="ident">reserved</span> <span class="op">=</span> <span class="ident">reserved</span>.<span class="ident">borrow</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">reserved_was_merged</span> <span class="op">=</span> <span class="bool-val">false</span>;
-        <span class="kw">for</span> <span class="ident">existing</span> <span class="kw">in</span> <span class="ident">reserved_list</span>[..<span class="ident">reserved_list_idx</span>].<span class="ident">iter_mut</span>().<span class="ident">flatten</span>() {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">_overlap</span>) <span class="op">=</span> <span class="ident">existing</span>.<span class="ident">overlap</span>(<span class="ident">reserved</span>) {
-                <span class="comment">// merge the `reserved` range into the `existing` range</span>
-                <span class="ident">existing</span>.<span class="ident">frames</span> <span class="op">=</span> <span class="ident">FrameRange::new</span>(
-                    <span class="ident">min</span>(<span class="kw-2">*</span><span class="ident">existing</span>.<span class="ident">start</span>(), <span class="kw-2">*</span><span class="ident">reserved</span>.<span class="ident">start</span>()),
-                    <span class="ident">max</span>(<span class="kw-2">*</span><span class="ident">existing</span>.<span class="ident">end</span>(),   <span class="kw-2">*</span><span class="ident">reserved</span>.<span class="ident">end</span>()),
+    <span class="comment">// Insert all of the reserved memory areas into the list of free reserved regions,
+    // while de-duplicating overlapping areas by merging them.
+    </span><span class="kw">for </span>reserved <span class="kw">in </span>reserved_physical_memory_areas.into_iter() {
+        <span class="kw">let </span>reserved = reserved.borrow();
+        <span class="kw">let </span><span class="kw-2">mut </span>reserved_was_merged = <span class="bool-val">false</span>;
+        <span class="kw">for </span>existing <span class="kw">in </span>reserved_list[..reserved_list_idx].iter_mut().flatten() {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(_overlap) = existing.overlap(reserved) {
+                <span class="comment">// merge the `reserved` range into the `existing` range
+                </span>existing.frames = FrameRange::new(
+                    min(<span class="kw-2">*</span>existing.start(), <span class="kw-2">*</span>reserved.start()),
+                    max(<span class="kw-2">*</span>existing.end(),   <span class="kw-2">*</span>reserved.end()),
                 );
-                <span class="ident">reserved_was_merged</span> <span class="op">=</span> <span class="bool-val">true</span>;
+                reserved_was_merged = <span class="bool-val">true</span>;
                 <span class="kw">break</span>;
             }
         }
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">reserved_was_merged</span> {
-            <span class="ident">reserved_list</span>[<span class="ident">reserved_list_idx</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Chunk</span> {
-                <span class="ident">typ</span>:  <span class="ident">MemoryRegionType::Reserved</span>,
-                <span class="ident">frames</span>: <span class="ident">reserved</span>.<span class="ident">frames</span>.<span class="ident">clone</span>(),
+        <span class="kw">if </span>!reserved_was_merged {
+            reserved_list[reserved_list_idx] = <span class="prelude-val">Some</span>(Chunk {
+                typ:  MemoryRegionType::Reserved,
+                frames: reserved.frames.clone(),
             });
-            <span class="ident">reserved_list_idx</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+            reserved_list_idx += <span class="number">1</span>;
         }
     }
 
 
-    <span class="comment">// Finally, one last sanity check -- ensure no two regions overlap. </span>
-    <span class="kw">let</span> <span class="ident">all_areas</span> <span class="op">=</span> <span class="ident">free_list</span>[..<span class="ident">free_list_idx</span>].<span class="ident">iter</span>().<span class="ident">flatten</span>()
-        .<span class="ident">chain</span>(<span class="ident">reserved_list</span>[..<span class="ident">reserved_list_idx</span>].<span class="ident">iter</span>().<span class="ident">flatten</span>());
-    <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">elem</span>) <span class="kw">in</span> <span class="ident">all_areas</span>.<span class="ident">clone</span>().<span class="ident">enumerate</span>() {
-        <span class="kw">let</span> <span class="ident">next_idx</span> <span class="op">=</span> <span class="ident">i</span> <span class="op">+</span> <span class="number">1</span>;
-        <span class="kw">for</span> <span class="ident">other</span> <span class="kw">in</span> <span class="ident">all_areas</span>.<span class="ident">clone</span>().<span class="ident">skip</span>(<span class="ident">next_idx</span>) {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">overlap</span>) <span class="op">=</span> <span class="ident">elem</span>.<span class="ident">overlap</span>(<span class="ident">other</span>) {
+    <span class="comment">// Finally, one last sanity check -- ensure no two regions overlap. 
+    </span><span class="kw">let </span>all_areas = free_list[..free_list_idx].iter().flatten()
+        .chain(reserved_list[..reserved_list_idx].iter().flatten());
+    <span class="kw">for </span>(i, elem) <span class="kw">in </span>all_areas.clone().enumerate() {
+        <span class="kw">let </span>next_idx = i + <span class="number">1</span>;
+        <span class="kw">for </span>other <span class="kw">in </span>all_areas.clone().skip(next_idx) {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(overlap) = elem.overlap(other) {
                 <span class="macro">panic!</span>(<span class="string">&quot;BUG: frame allocator free list had overlapping ranges: \n \t {:?} and {:?} overlap at {:?}&quot;</span>,
-                    <span class="ident">elem</span>, <span class="ident">other</span>, <span class="ident">overlap</span>,
+                    elem, other, overlap,
                 );
             }
         }
     }
 
-    <span class="kw-2">*</span><span class="ident">FREE_GENERAL_FRAMES_LIST</span>.<span class="ident">lock</span>()  <span class="op">=</span> <span class="ident">StaticArrayRBTree::new</span>(<span class="ident">free_list</span>.<span class="ident">clone</span>());
-    <span class="kw-2">*</span><span class="ident">FREE_RESERVED_FRAMES_LIST</span>.<span class="ident">lock</span>() <span class="op">=</span> <span class="ident">StaticArrayRBTree::new</span>(<span class="ident">reserved_list</span>.<span class="ident">clone</span>());
-    <span class="kw-2">*</span><span class="ident">GENERAL_REGIONS</span>.<span class="ident">lock</span>()           <span class="op">=</span> <span class="ident">StaticArrayRBTree::new</span>(<span class="ident">free_list</span>);
-    <span class="kw-2">*</span><span class="ident">RESERVED_REGIONS</span>.<span class="ident">lock</span>()          <span class="op">=</span> <span class="ident">StaticArrayRBTree::new</span>(<span class="ident">reserved_list</span>);
+    <span class="kw-2">*</span>FREE_GENERAL_FRAMES_LIST.lock()  = StaticArrayRBTree::new(free_list.clone());
+    <span class="kw-2">*</span>FREE_RESERVED_FRAMES_LIST.lock() = StaticArrayRBTree::new(reserved_list.clone());
+    <span class="kw-2">*</span>GENERAL_REGIONS.lock()           = StaticArrayRBTree::new(free_list);
+    <span class="kw-2">*</span>RESERVED_REGIONS.lock()          = StaticArrayRBTree::new(reserved_list);
 
-    <span class="prelude-val">Ok</span>(<span class="ident">into_allocated_frames</span>)
+    <span class="prelude-val">Ok</span>(into_allocated_frames)
 }
 
 
-<span class="doccomment">/// The main logic of the initialization routine </span>
-<span class="doccomment">/// used to populate the list of free frame chunks.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This function recursively iterates over the given `area` of frames</span>
-<span class="doccomment">/// and adds any ranges of frames within that `area` that are not covered by</span>
-<span class="doccomment">/// the given list of `reserved_physical_memory_areas`.</span>
-<span class="kw">fn</span> <span class="ident">check_and_add_free_region</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">R</span><span class="op">&gt;</span>(
-    <span class="ident">area</span>: <span class="kw-2">&amp;</span><span class="ident">FrameRange</span>,
-    <span class="ident">free_list</span>: <span class="kw-2">&amp;mut</span> [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>; <span class="number">32</span>],
-    <span class="ident">free_list_idx</span>: <span class="kw-2">&amp;mut</span> <span class="ident">usize</span>,
-    <span class="ident">reserved_physical_memory_areas</span>: <span class="ident">R</span>,
+<span class="doccomment">/// The main logic of the initialization routine 
+/// used to populate the list of free frame chunks.
+///
+/// This function recursively iterates over the given `area` of frames
+/// and adds any ranges of frames within that `area` that are not covered by
+/// the given list of `reserved_physical_memory_areas`.
+</span><span class="kw">fn </span>check_and_add_free_region&lt;P, R&gt;(
+    area: <span class="kw-2">&amp;</span>FrameRange,
+    free_list: <span class="kw-2">&amp;mut </span>[<span class="prelude-ty">Option</span>&lt;Chunk&gt;; <span class="number">32</span>],
+    free_list_idx: <span class="kw-2">&amp;mut </span>usize,
+    reserved_physical_memory_areas: R,
 )
-    <span class="kw">where</span> <span class="ident">P</span>: <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">PhysicalMemoryRegion</span><span class="op">&gt;</span>,
-          <span class="ident">R</span>: <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">P</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span>,
+    <span class="kw">where </span>P: Borrow&lt;PhysicalMemoryRegion&gt;,
+          R: IntoIterator&lt;Item = P&gt; + Clone,
 {
-    <span class="comment">// This will be set to the frame that is the start of the current free region. </span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">current_start</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">area</span>.<span class="ident">start</span>();
-    <span class="comment">// This will be set to the frame that is the end of the current free region. </span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">current_end</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">area</span>.<span class="ident">end</span>();
-    <span class="comment">// trace!(&quot;looking at sub-area {:X?} to {:X?}&quot;, current_start, current_end);</span>
+    <span class="comment">// This will be set to the frame that is the start of the current free region. 
+    </span><span class="kw">let </span><span class="kw-2">mut </span>current_start = <span class="kw-2">*</span>area.start();
+    <span class="comment">// This will be set to the frame that is the end of the current free region. 
+    </span><span class="kw">let </span><span class="kw-2">mut </span>current_end = <span class="kw-2">*</span>area.end();
+    <span class="comment">// trace!(&quot;looking at sub-area {:X?} to {:X?}&quot;, current_start, current_end);
 
-    <span class="kw">for</span> <span class="ident">reserved</span> <span class="kw">in</span> <span class="ident">reserved_physical_memory_areas</span>.<span class="ident">clone</span>().<span class="ident">into_iter</span>() {
-        <span class="kw">let</span> <span class="ident">reserved</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">reserved</span>.<span class="ident">borrow</span>().<span class="ident">frames</span>;
-        <span class="comment">// trace!(&quot;\t Comparing with reserved area {:X?}&quot;, reserved);</span>
-        <span class="kw">if</span> <span class="ident">reserved</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">current_start</span>) {
-            <span class="comment">// info!(&quot;\t\t moving current_start from {:X?} to {:X?}&quot;, current_start, *reserved.end() + 1);</span>
-            <span class="ident">current_start</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">reserved</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span>;
+    </span><span class="kw">for </span>reserved <span class="kw">in </span>reserved_physical_memory_areas.clone().into_iter() {
+        <span class="kw">let </span>reserved = <span class="kw-2">&amp;</span>reserved.borrow().frames;
+        <span class="comment">// trace!(&quot;\t Comparing with reserved area {:X?}&quot;, reserved);
+        </span><span class="kw">if </span>reserved.contains(<span class="kw-2">&amp;</span>current_start) {
+            <span class="comment">// info!(&quot;\t\t moving current_start from {:X?} to {:X?}&quot;, current_start, *reserved.end() + 1);
+            </span>current_start = <span class="kw-2">*</span>reserved.end() + <span class="number">1</span>;
         }
-        <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="ident">current_start</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">reserved</span>.<span class="ident">start</span>() <span class="op">&amp;&amp;</span> <span class="ident">reserved</span>.<span class="ident">start</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">current_end</span> {
-            <span class="comment">// Advance up to the frame right before this reserved region started.</span>
-            <span class="comment">// info!(&quot;\t\t moving current_end from {:X?} to {:X?}&quot;, current_end, min(current_end, *reserved.start() - 1));</span>
-            <span class="ident">current_end</span> <span class="op">=</span> <span class="ident">min</span>(<span class="ident">current_end</span>, <span class="kw-2">*</span><span class="ident">reserved</span>.<span class="ident">start</span>() <span class="op">-</span> <span class="number">1</span>);
-            <span class="kw">if</span> <span class="ident">area</span>.<span class="ident">end</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">reserved</span>.<span class="ident">end</span>() {
-                <span class="comment">// Optimization here: the rest of the current area is reserved,</span>
-                <span class="comment">// so there&#39;s no need to keep iterating over the reserved areas.</span>
-                <span class="comment">// info!(&quot;\t !!! skipping the rest of the area&quot;);</span>
-                <span class="kw">break</span>;
-            } <span class="kw">else</span> {
-                <span class="kw">let</span> <span class="ident">after</span> <span class="op">=</span> <span class="ident">FrameRange::new</span>(<span class="kw-2">*</span><span class="ident">reserved</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span>, <span class="kw-2">*</span><span class="ident">area</span>.<span class="ident">end</span>());
-                <span class="comment">// warn!(&quot;moving on to after {:X?}&quot;, after);</span>
-                <span class="comment">// Here: the current area extends past this current reserved area,</span>
-                <span class="comment">// so there might be another free area that starts after this reserved area.</span>
-                <span class="ident">check_and_add_free_region</span>(
-                    <span class="kw-2">&amp;</span><span class="ident">after</span>,
-                    <span class="ident">free_list</span>,
-                    <span class="ident">free_list_idx</span>,
-                    <span class="ident">reserved_physical_memory_areas</span>.<span class="ident">clone</span>(),
+        <span class="kw">if </span><span class="kw-2">&amp;</span>current_start &lt;= reserved.start() &amp;&amp; reserved.start() &lt;= <span class="kw-2">&amp;</span>current_end {
+            <span class="comment">// Advance up to the frame right before this reserved region started.
+            // info!(&quot;\t\t moving current_end from {:X?} to {:X?}&quot;, current_end, min(current_end, *reserved.start() - 1));
+            </span>current_end = min(current_end, <span class="kw-2">*</span>reserved.start() - <span class="number">1</span>);
+            <span class="kw">if </span>area.end() &lt;= reserved.end() {
+                <span class="comment">// Optimization here: the rest of the current area is reserved,
+                // so there&#39;s no need to keep iterating over the reserved areas.
+                // info!(&quot;\t !!! skipping the rest of the area&quot;);
+                </span><span class="kw">break</span>;
+            } <span class="kw">else </span>{
+                <span class="kw">let </span>after = FrameRange::new(<span class="kw-2">*</span>reserved.end() + <span class="number">1</span>, <span class="kw-2">*</span>area.end());
+                <span class="comment">// warn!(&quot;moving on to after {:X?}&quot;, after);
+                // Here: the current area extends past this current reserved area,
+                // so there might be another free area that starts after this reserved area.
+                </span>check_and_add_free_region(
+                    <span class="kw-2">&amp;</span>after,
+                    free_list,
+                    free_list_idx,
+                    reserved_physical_memory_areas.clone(),
                 );
             }
         }
     }
 
-    <span class="kw">let</span> <span class="ident">new_area</span> <span class="op">=</span> <span class="ident">FrameRange::new</span>(<span class="ident">current_start</span>, <span class="ident">current_end</span>);
-    <span class="kw">if</span> <span class="ident">new_area</span>.<span class="ident">size_in_frames</span>() <span class="op">&gt;</span> <span class="number">0</span> {
-        <span class="ident">free_list</span>[<span class="kw-2">*</span><span class="ident">free_list_idx</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Chunk</span> {
-            <span class="ident">typ</span>:  <span class="ident">MemoryRegionType::Free</span>,
-            <span class="ident">frames</span>: <span class="ident">new_area</span>,
+    <span class="kw">let </span>new_area = FrameRange::new(current_start, current_end);
+    <span class="kw">if </span>new_area.size_in_frames() &gt; <span class="number">0 </span>{
+        free_list[<span class="kw-2">*</span>free_list_idx] = <span class="prelude-val">Some</span>(Chunk {
+            typ:  MemoryRegionType::Free,
+            frames: new_area,
         });
-        <span class="kw-2">*</span><span class="ident">free_list_idx</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        <span class="kw-2">*</span>free_list_idx += <span class="number">1</span>;
     }
 }
 
 
-<span class="doccomment">/// A region of physical memory.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PhysicalMemoryRegion</span> {
-    <span class="kw">pub</span> <span class="ident">frames</span>: <span class="ident">FrameRange</span>,
-    <span class="kw">pub</span> <span class="ident">typ</span>: <span class="ident">MemoryRegionType</span>,
+<span class="doccomment">/// A region of physical memory.
+</span><span class="attr">#[derive(Clone, Debug)]
+</span><span class="kw">pub struct </span>PhysicalMemoryRegion {
+    <span class="kw">pub </span>frames: FrameRange,
+    <span class="kw">pub </span>typ: MemoryRegionType,
 }
-<span class="kw">impl</span> <span class="ident">PhysicalMemoryRegion</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">frames</span>: <span class="ident">FrameRange</span>, <span class="ident">typ</span>: <span class="ident">MemoryRegionType</span>) -&gt; <span class="ident">PhysicalMemoryRegion</span> {
-        <span class="ident">PhysicalMemoryRegion</span> { <span class="ident">frames</span>, <span class="ident">typ</span> }
+<span class="kw">impl </span>PhysicalMemoryRegion {
+    <span class="kw">pub fn </span>new(frames: FrameRange, typ: MemoryRegionType) -&gt; PhysicalMemoryRegion {
+        PhysicalMemoryRegion { frames, typ }
     }
 }
-<span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">PhysicalMemoryRegion</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">FrameRange</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">FrameRange</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">frames</span>
+<span class="kw">impl </span>Deref <span class="kw">for </span>PhysicalMemoryRegion {
+    <span class="kw">type </span>Target = FrameRange;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>FrameRange {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.frames
     }
 }
 
-<span class="doccomment">/// Types of physical memory. See each variant&#39;s documentation.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">MemoryRegionType</span> {
-    <span class="doccomment">/// Memory that is available for any general purpose.</span>
-    <span class="ident">Free</span>,
-    <span class="doccomment">/// Memory that is reserved for special use and is only ever allocated from if specifically requested. </span>
-    <span class="doccomment">/// This includes custom memory regions added by third parties, e.g., </span>
-    <span class="doccomment">/// device memory discovered and added by device drivers later during runtime.</span>
-    <span class="ident">Reserved</span>,
-    <span class="doccomment">/// Memory of an unknown type.</span>
-    <span class="doccomment">/// This is a default value that acts as a sanity check, because it is invalid</span>
-    <span class="doccomment">/// to do any real work (e.g., allocation, access) with an unknown memory region.</span>
-    <span class="ident">Unknown</span>,
+<span class="doccomment">/// Types of physical memory. See each variant&#39;s documentation.
+</span><span class="attr">#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+</span><span class="kw">pub enum </span>MemoryRegionType {
+    <span class="doccomment">/// Memory that is available for any general purpose.
+    </span>Free,
+    <span class="doccomment">/// Memory that is reserved for special use and is only ever allocated from if specifically requested. 
+    /// This includes custom memory regions added by third parties, e.g., 
+    /// device memory discovered and added by device drivers later during runtime.
+    </span>Reserved,
+    <span class="doccomment">/// Memory of an unknown type.
+    /// This is a default value that acts as a sanity check, because it is invalid
+    /// to do any real work (e.g., allocation, access) with an unknown memory region.
+    </span>Unknown,
 }
 
-<span class="doccomment">/// A range of contiguous frames.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Ordering and Equality</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// `Chunk` implements the `Ord` trait, and its total ordering is ONLY based on</span>
-<span class="doccomment">/// its **starting** `Frame`. This is useful so we can store `Chunk`s in a sorted collection.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Similarly, `Chunk` implements equality traits, `Eq` and `PartialEq`,</span>
-<span class="doccomment">/// both of which are also based ONLY on the **starting** `Frame` of the `Chunk`.</span>
-<span class="doccomment">/// Thus, comparing two `Chunk`s with the `==` or `!=` operators may not work as expected.</span>
-<span class="doccomment">/// since it ignores their actual range of frames.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">struct</span> <span class="ident">Chunk</span> {
-    <span class="doccomment">/// The type of this memory chunk, e.g., whether it&#39;s in a free or reserved region.</span>
-    <span class="ident">typ</span>: <span class="ident">MemoryRegionType</span>,
-    <span class="doccomment">/// The Frames covered by this chunk, an inclusive range. </span>
-    <span class="ident">frames</span>: <span class="ident">FrameRange</span>,
+<span class="doccomment">/// A range of contiguous frames.
+///
+/// # Ordering and Equality
+///
+/// `Chunk` implements the `Ord` trait, and its total ordering is ONLY based on
+/// its **starting** `Frame`. This is useful so we can store `Chunk`s in a sorted collection.
+///
+/// Similarly, `Chunk` implements equality traits, `Eq` and `PartialEq`,
+/// both of which are also based ONLY on the **starting** `Frame` of the `Chunk`.
+/// Thus, comparing two `Chunk`s with the `==` or `!=` operators may not work as expected.
+/// since it ignores their actual range of frames.
+</span><span class="attr">#[derive(Debug, Clone, Eq)]
+</span><span class="kw">struct </span>Chunk {
+    <span class="doccomment">/// The type of this memory chunk, e.g., whether it&#39;s in a free or reserved region.
+    </span>typ: MemoryRegionType,
+    <span class="doccomment">/// The Frames covered by this chunk, an inclusive range. 
+    </span>frames: FrameRange,
 }
-<span class="kw">impl</span> <span class="ident">Chunk</span> {
-    <span class="kw">fn</span> <span class="ident">as_allocated_frames</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">AllocatedFrames</span> {
-        <span class="ident">AllocatedFrames</span> {
-            <span class="ident">frames</span>: <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">clone</span>(),
+<span class="kw">impl </span>Chunk {
+    <span class="kw">fn </span>as_allocated_frames(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AllocatedFrames {
+        AllocatedFrames {
+            frames: <span class="self">self</span>.frames.clone(),
         }
     }
 
-    <span class="doccomment">/// Returns a new `Chunk` with an empty range of frames. </span>
-    <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="ident">Chunk</span> {
-        <span class="ident">Chunk</span> {
-            <span class="ident">typ</span>: <span class="ident">MemoryRegionType::Unknown</span>,
-            <span class="ident">frames</span>: <span class="ident">FrameRange::empty</span>(),
+    <span class="doccomment">/// Returns a new `Chunk` with an empty range of frames. 
+    </span><span class="kw">const fn </span>empty() -&gt; Chunk {
+        Chunk {
+            typ: MemoryRegionType::Unknown,
+            frames: FrameRange::empty(),
         }
     }
 }
-<span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">Chunk</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">FrameRange</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">FrameRange</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">frames</span>
+<span class="kw">impl </span>Deref <span class="kw">for </span>Chunk {
+    <span class="kw">type </span>Target = FrameRange;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>FrameRange {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.frames
     }
 }
-<span class="kw">impl</span> <span class="ident">Ord</span> <span class="kw">for</span> <span class="ident">Chunk</span> {
-    <span class="kw">fn</span> <span class="ident">cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="ident">Ordering</span> {
-        <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">start</span>().<span class="ident">cmp</span>(<span class="ident">other</span>.<span class="ident">frames</span>.<span class="ident">start</span>())
+<span class="kw">impl </span>Ord <span class="kw">for </span>Chunk {
+    <span class="kw">fn </span>cmp(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; Ordering {
+        <span class="self">self</span>.frames.start().cmp(other.frames.start())
     }
 }
-<span class="kw">impl</span> <span class="ident">PartialOrd</span> <span class="kw">for</span> <span class="ident">Chunk</span> {
-    <span class="kw">fn</span> <span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span> {
-        <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">cmp</span>(<span class="ident">other</span>))
+<span class="kw">impl </span>PartialOrd <span class="kw">for </span>Chunk {
+    <span class="kw">fn </span>partial_cmp(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Ordering&gt; {
+        <span class="prelude-val">Some</span>(<span class="self">self</span>.cmp(other))
     }
 }
-<span class="kw">impl</span> <span class="ident">PartialEq</span> <span class="kw">for</span> <span class="ident">Chunk</span> {
-    <span class="kw">fn</span> <span class="ident">eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">start</span>() <span class="op">==</span> <span class="ident">other</span>.<span class="ident">frames</span>.<span class="ident">start</span>()
+<span class="kw">impl </span>PartialEq <span class="kw">for </span>Chunk {
+    <span class="kw">fn </span>eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; bool {
+        <span class="self">self</span>.frames.start() == other.frames.start()
     }
 }
-<span class="kw">impl</span> <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">Frame</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;_</span> <span class="ident">Chunk</span> {
-    <span class="kw">fn</span> <span class="ident">borrow</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Frame</span> {
-        <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">start</span>()
-    }
-}
-
-
-<span class="doccomment">/// Represents a range of allocated physical memory [`Frame`]s; derefs to [`FrameRange`].</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// These frames are not immediately accessible because they&#39;re not yet mapped</span>
-<span class="doccomment">/// by any virtual memory pages.</span>
-<span class="doccomment">/// You must do that separately in order to create a `MappedPages` type,</span>
-<span class="doccomment">/// which can then be used to access the contents of these frames.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This object represents ownership of the range of allocated physical frames;</span>
-<span class="doccomment">/// if this object falls out of scope, its allocated frames will be auto-deallocated upon drop. </span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AllocatedFrames</span> {
-    <span class="ident">frames</span>: <span class="ident">FrameRange</span>,
-}
-
-<span class="comment">// AllocatedFrames must not be Cloneable, and it must not expose its inner frames as mutable.</span>
-<span class="macro">assert_not_impl_any!</span>(<span class="ident">AllocatedFrames</span>: <span class="ident">DerefMut</span>, <span class="ident">Clone</span>);
-
-<span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">AllocatedFrames</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">FrameRange</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">FrameRange</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">frames</span>
-    }
-}
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">AllocatedFrames</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;AllocatedFrames({:?})&quot;</span>, <span class="self">self</span>.<span class="ident">frames</span>)
+<span class="kw">impl </span>Borrow&lt;Frame&gt; <span class="kw">for </span><span class="kw-2">&amp;</span><span class="lifetime">&#39;_ </span>Chunk {
+    <span class="kw">fn </span>borrow(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Frame {
+        <span class="self">self</span>.frames.start()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">AllocatedFrames</span> {
-    <span class="doccomment">/// Returns an empty AllocatedFrames object that performs no frame allocation. </span>
-    <span class="doccomment">/// Can be used as a placeholder, but will not permit any real usage. </span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="ident">AllocatedFrames</span> {
-        <span class="ident">AllocatedFrames</span> {
-            <span class="ident">frames</span>: <span class="ident">FrameRange::empty</span>()
+
+<span class="doccomment">/// Represents a range of allocated physical memory [`Frame`]s; derefs to [`FrameRange`].
+/// 
+/// These frames are not immediately accessible because they&#39;re not yet mapped
+/// by any virtual memory pages.
+/// You must do that separately in order to create a `MappedPages` type,
+/// which can then be used to access the contents of these frames.
+/// 
+/// This object represents ownership of the range of allocated physical frames;
+/// if this object falls out of scope, its allocated frames will be auto-deallocated upon drop. 
+</span><span class="kw">pub struct </span>AllocatedFrames {
+    frames: FrameRange,
+}
+
+<span class="comment">// AllocatedFrames must not be Cloneable, and it must not expose its inner frames as mutable.
+</span><span class="macro">assert_not_impl_any!</span>(AllocatedFrames: DerefMut, Clone);
+
+<span class="kw">impl </span>Deref <span class="kw">for </span>AllocatedFrames {
+    <span class="kw">type </span>Target = FrameRange;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>FrameRange {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.frames
+    }
+}
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>AllocatedFrames {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;AllocatedFrames({:?})&quot;</span>, <span class="self">self</span>.frames)
+    }
+}
+
+<span class="kw">impl </span>AllocatedFrames {
+    <span class="doccomment">/// Returns an empty AllocatedFrames object that performs no frame allocation. 
+    /// Can be used as a placeholder, but will not permit any real usage. 
+    </span><span class="kw">pub const fn </span>empty() -&gt; AllocatedFrames {
+        AllocatedFrames {
+            frames: FrameRange::empty()
         }
     }
 
-    <span class="doccomment">/// Merges the given `AllocatedFrames` object `other` into this `AllocatedFrames` object (`self`).</span>
-    <span class="doccomment">/// This is just for convenience and usability purposes, it performs no allocation or remapping.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The given `other` must be physically contiguous with `self`, i.e., come immediately before or after `self`.</span>
-    <span class="doccomment">/// That is, either `self.start == other.end + 1` or `self.end + 1 == other.start` must be true. </span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If either of those conditions are met, `self` is modified and `Ok(())` is returned,</span>
-    <span class="doccomment">/// otherwise `Err(other)` is returned.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">merge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="ident">AllocatedFrames</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">AllocatedFrames</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>() <span class="op">==</span> <span class="kw-2">*</span><span class="ident">other</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span> {
-            <span class="comment">// `other` comes contiguously before `self`</span>
-            <span class="self">self</span>.<span class="ident">frames</span> <span class="op">=</span> <span class="ident">FrameRange::new</span>(<span class="kw-2">*</span><span class="ident">other</span>.<span class="ident">start</span>(), <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>());
+    <span class="doccomment">/// Merges the given `AllocatedFrames` object `other` into this `AllocatedFrames` object (`self`).
+    /// This is just for convenience and usability purposes, it performs no allocation or remapping.
+    ///
+    /// The given `other` must be physically contiguous with `self`, i.e., come immediately before or after `self`.
+    /// That is, either `self.start == other.end + 1` or `self.end + 1 == other.start` must be true. 
+    ///
+    /// If either of those conditions are met, `self` is modified and `Ok(())` is returned,
+    /// otherwise `Err(other)` is returned.
+    </span><span class="kw">pub fn </span>merge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, other: AllocatedFrames) -&gt; <span class="prelude-ty">Result</span>&lt;(), AllocatedFrames&gt; {
+        <span class="kw">if </span><span class="kw-2">*</span><span class="self">self</span>.start() == <span class="kw-2">*</span>other.end() + <span class="number">1 </span>{
+            <span class="comment">// `other` comes contiguously before `self`
+            </span><span class="self">self</span>.frames = FrameRange::new(<span class="kw-2">*</span>other.start(), <span class="kw-2">*</span><span class="self">self</span>.end());
         } 
-        <span class="kw">else</span> <span class="kw">if</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span> <span class="op">==</span> <span class="kw-2">*</span><span class="ident">other</span>.<span class="ident">start</span>() {
-            <span class="comment">// `self` comes contiguously before `other`</span>
-            <span class="self">self</span>.<span class="ident">frames</span> <span class="op">=</span> <span class="ident">FrameRange::new</span>(<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>(), <span class="kw-2">*</span><span class="ident">other</span>.<span class="ident">end</span>());
+        <span class="kw">else if </span><span class="kw-2">*</span><span class="self">self</span>.end() + <span class="number">1 </span>== <span class="kw-2">*</span>other.start() {
+            <span class="comment">// `self` comes contiguously before `other`
+            </span><span class="self">self</span>.frames = FrameRange::new(<span class="kw-2">*</span><span class="self">self</span>.start(), <span class="kw-2">*</span>other.end());
         }
-        <span class="kw">else</span> {
-            <span class="comment">// non-contiguous</span>
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">other</span>);
+        <span class="kw">else </span>{
+            <span class="comment">// non-contiguous
+            </span><span class="kw">return </span><span class="prelude-val">Err</span>(other);
         }
 
-        <span class="comment">// ensure the now-merged AllocatedFrames doesn&#39;t run its drop handler and free its frames.</span>
-        <span class="ident">core::mem::forget</span>(<span class="ident">other</span>); 
+        <span class="comment">// ensure the now-merged AllocatedFrames doesn&#39;t run its drop handler and free its frames.
+        </span>core::mem::forget(other); 
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Splits this `AllocatedFrames` into two separate `AllocatedFrames` objects:</span>
-    <span class="doccomment">/// * `[beginning : at_frame - 1]`</span>
-    <span class="doccomment">/// * `[at_frame : end]`</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// This function follows the behavior of [`core::slice::split_at()`],</span>
-    <span class="doccomment">/// thus, either one of the returned `AllocatedFrames` objects may be empty. </span>
-    <span class="doccomment">/// * If `at_frame == self.start`, the first returned `AllocatedFrames` object will be empty.</span>
-    <span class="doccomment">/// * If `at_frame == self.end + 1`, the second returned `AllocatedFrames` object will be empty.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Returns an `Err` containing this `AllocatedFrames` if `at_frame` is otherwise out of bounds.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">split</span>(<span class="self">self</span>, <span class="ident">at_frame</span>: <span class="ident">Frame</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">AllocatedFrames</span>), <span class="ident">AllocatedFrames</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">end_of_first</span> <span class="op">=</span> <span class="ident">at_frame</span> <span class="op">-</span> <span class="number">1</span>;
+    <span class="doccomment">/// Splits this `AllocatedFrames` into two separate `AllocatedFrames` objects:
+    /// * `[beginning : at_frame - 1]`
+    /// * `[at_frame : end]`
+    /// 
+    /// This function follows the behavior of [`core::slice::split_at()`],
+    /// thus, either one of the returned `AllocatedFrames` objects may be empty. 
+    /// * If `at_frame == self.start`, the first returned `AllocatedFrames` object will be empty.
+    /// * If `at_frame == self.end + 1`, the second returned `AllocatedFrames` object will be empty.
+    /// 
+    /// Returns an `Err` containing this `AllocatedFrames` if `at_frame` is otherwise out of bounds.
+    /// 
+    /// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at
+    </span><span class="kw">pub fn </span>split(<span class="self">self</span>, at_frame: Frame) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedFrames, AllocatedFrames), AllocatedFrames&gt; {
+        <span class="kw">let </span>end_of_first = at_frame - <span class="number">1</span>;
 
-        <span class="kw">let</span> (<span class="ident">first</span>, <span class="ident">second</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">at_frame</span> <span class="op">==</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>() <span class="op">&amp;&amp;</span> <span class="ident">at_frame</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() {
-            <span class="kw">let</span> <span class="ident">first</span>  <span class="op">=</span> <span class="ident">FrameRange::empty</span>();
-            <span class="kw">let</span> <span class="ident">second</span> <span class="op">=</span> <span class="ident">FrameRange::new</span>(<span class="ident">at_frame</span>, <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>());
-            (<span class="ident">first</span>, <span class="ident">second</span>)
+        <span class="kw">let </span>(first, second) = <span class="kw">if </span>at_frame == <span class="kw-2">*</span><span class="self">self</span>.start() &amp;&amp; at_frame &lt;= <span class="kw-2">*</span><span class="self">self</span>.end() {
+            <span class="kw">let </span>first  = FrameRange::empty();
+            <span class="kw">let </span>second = FrameRange::new(at_frame, <span class="kw-2">*</span><span class="self">self</span>.end());
+            (first, second)
         } 
-        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">at_frame</span> <span class="op">==</span> (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span>) <span class="op">&amp;&amp;</span> <span class="ident">end_of_first</span> <span class="op">&gt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>() {
-            <span class="kw">let</span> <span class="ident">first</span>  <span class="op">=</span> <span class="ident">FrameRange::new</span>(<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>(), <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>()); 
-            <span class="kw">let</span> <span class="ident">second</span> <span class="op">=</span> <span class="ident">FrameRange::empty</span>();
-            (<span class="ident">first</span>, <span class="ident">second</span>)
+        <span class="kw">else if </span>at_frame == (<span class="kw-2">*</span><span class="self">self</span>.end() + <span class="number">1</span>) &amp;&amp; end_of_first &gt;= <span class="kw-2">*</span><span class="self">self</span>.start() {
+            <span class="kw">let </span>first  = FrameRange::new(<span class="kw-2">*</span><span class="self">self</span>.start(), <span class="kw-2">*</span><span class="self">self</span>.end()); 
+            <span class="kw">let </span>second = FrameRange::empty();
+            (first, second)
         }
-        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">at_frame</span> <span class="op">&gt;</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>() <span class="op">&amp;&amp;</span> <span class="ident">end_of_first</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() {
-            <span class="kw">let</span> <span class="ident">first</span>  <span class="op">=</span> <span class="ident">FrameRange::new</span>(<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">end_of_first</span>);
-            <span class="kw">let</span> <span class="ident">second</span> <span class="op">=</span> <span class="ident">FrameRange::new</span>(<span class="ident">at_frame</span>, <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>());
-            (<span class="ident">first</span>, <span class="ident">second</span>)
+        <span class="kw">else if </span>at_frame &gt; <span class="kw-2">*</span><span class="self">self</span>.start() &amp;&amp; end_of_first &lt;= <span class="kw-2">*</span><span class="self">self</span>.end() {
+            <span class="kw">let </span>first  = FrameRange::new(<span class="kw-2">*</span><span class="self">self</span>.start(), end_of_first);
+            <span class="kw">let </span>second = FrameRange::new(at_frame, <span class="kw-2">*</span><span class="self">self</span>.end());
+            (first, second)
         }
-        <span class="kw">else</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="self">self</span>);
+        <span class="kw">else </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="self">self</span>);
         };
 
-        <span class="comment">// ensure the original AllocatedFrames doesn&#39;t run its drop handler and free its frames.</span>
-        <span class="ident">core::mem::forget</span>(<span class="self">self</span>);   
+        <span class="comment">// ensure the original AllocatedFrames doesn&#39;t run its drop handler and free its frames.
+        </span>core::mem::forget(<span class="self">self</span>);   
         <span class="prelude-val">Ok</span>((
-            <span class="ident">AllocatedFrames</span> { <span class="ident">frames</span>: <span class="ident">first</span> }, 
-            <span class="ident">AllocatedFrames</span> { <span class="ident">frames</span>: <span class="ident">second</span> },
+            AllocatedFrames { frames: first }, 
+            AllocatedFrames { frames: second },
         ))
     }
 
-    <span class="doccomment">/// Returns an `AllocatedFrame` if this `AllocatedFrames` object contains only one frame.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// ## Panic</span>
-    <span class="doccomment">/// Panics if this `AllocatedFrame` contains multiple frames or zero frames.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_allocated_frame</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">AllocatedFrame</span> {
-        <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">size_in_frames</span>() <span class="op">==</span> <span class="number">1</span>);
-        <span class="ident">AllocatedFrame</span> {
-            <span class="ident">frame</span>: <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>(),
-            <span class="ident">_phantom</span>: <span class="ident">PhantomData</span>,
+    <span class="doccomment">/// Returns an `AllocatedFrame` if this `AllocatedFrames` object contains only one frame.
+    /// 
+    /// ## Panic
+    /// Panics if this `AllocatedFrame` contains multiple frames or zero frames.
+    </span><span class="kw">pub fn </span>as_allocated_frame(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AllocatedFrame {
+        <span class="macro">assert!</span>(<span class="self">self</span>.size_in_frames() == <span class="number">1</span>);
+        AllocatedFrame {
+            frame: <span class="kw-2">*</span><span class="self">self</span>.start(),
+            _phantom: PhantomData,
         }
     }
 }
 
-<span class="doccomment">/// This function is a callback used to convert `UnmappedFrames` into `AllocatedFrames`.</span>
-<span class="doccomment">/// `UnmappedFrames` represents frames that have been unmapped from a page that had</span>
-<span class="doccomment">/// exclusively mapped them, indicating that no others pages have been mapped </span>
-<span class="doccomment">/// to those same frames, and thus, they can be safely deallocated.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This exists to break the cyclic dependency cycle between this crate and</span>
-<span class="doccomment">/// the `page_table_entry` crate, since `page_table_entry` must depend on types</span>
-<span class="doccomment">/// from this crate in order to enforce safety when modifying page table entries.</span>
-<span class="kw">fn</span> <span class="ident">into_allocated_frames</span>(<span class="ident">frames</span>: <span class="ident">FrameRange</span>) -&gt; <span class="ident">AllocatedFrames</span> {
-    <span class="ident">AllocatedFrames</span> { <span class="ident">frames</span> }
+<span class="doccomment">/// This function is a callback used to convert `UnmappedFrames` into `AllocatedFrames`.
+/// `UnmappedFrames` represents frames that have been unmapped from a page that had
+/// exclusively mapped them, indicating that no others pages have been mapped 
+/// to those same frames, and thus, they can be safely deallocated.
+/// 
+/// This exists to break the cyclic dependency cycle between this crate and
+/// the `page_table_entry` crate, since `page_table_entry` must depend on types
+/// from this crate in order to enforce safety when modifying page table entries.
+</span><span class="kw">fn </span>into_allocated_frames(frames: FrameRange) -&gt; AllocatedFrames {
+    AllocatedFrames { frames }
 }
 
-<span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">AllocatedFrames</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">size_in_frames</span>() <span class="op">==</span> <span class="number">0</span> { <span class="kw">return</span>; }
+<span class="kw">impl </span>Drop <span class="kw">for </span>AllocatedFrames {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">if </span><span class="self">self</span>.size_in_frames() == <span class="number">0 </span>{ <span class="kw">return</span>; }
 
-        <span class="kw">let</span> (<span class="ident">list</span>, <span class="ident">typ</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">frame_is_in_list</span>(<span class="kw-2">&amp;</span><span class="ident">RESERVED_REGIONS</span>.<span class="ident">lock</span>(), <span class="self">self</span>.<span class="ident">start</span>()) {
-            (<span class="kw-2">&amp;</span><span class="ident">FREE_RESERVED_FRAMES_LIST</span>, <span class="ident">MemoryRegionType::Reserved</span>)
-        } <span class="kw">else</span> {
-            (<span class="kw-2">&amp;</span><span class="ident">FREE_GENERAL_FRAMES_LIST</span>, <span class="ident">MemoryRegionType::Free</span>)
+        <span class="kw">let </span>(list, typ) = <span class="kw">if </span>frame_is_in_list(<span class="kw-2">&amp;</span>RESERVED_REGIONS.lock(), <span class="self">self</span>.start()) {
+            (<span class="kw-2">&amp;</span>FREE_RESERVED_FRAMES_LIST, MemoryRegionType::Reserved)
+        } <span class="kw">else </span>{
+            (<span class="kw-2">&amp;</span>FREE_GENERAL_FRAMES_LIST, MemoryRegionType::Free)
         };
-        <span class="comment">// trace!(&quot;frame_allocator: deallocating {:?}, typ {:?}&quot;, self, typ);</span>
+        <span class="comment">// trace!(&quot;frame_allocator: deallocating {:?}, typ {:?}&quot;, self, typ);
 
-        <span class="comment">// Simply add the newly-deallocated chunk to the free frames list.</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">locked_list</span> <span class="op">=</span> <span class="ident">list</span>.<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">locked_list</span>.<span class="ident">insert</span>(<span class="ident">Chunk</span> {
-            <span class="ident">typ</span>,
-            <span class="ident">frames</span>: <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">clone</span>(),
+        // Simply add the newly-deallocated chunk to the free frames list.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>locked_list = list.lock();
+        <span class="kw">let </span>res = locked_list.insert(Chunk {
+            typ,
+            frames: <span class="self">self</span>.frames.clone(),
         });
-        <span class="kw">match</span> <span class="ident">res</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">_inserted_free_chunk</span>) =&gt; <span class="kw">return</span>,
-            <span class="prelude-val">Err</span>(<span class="ident">c</span>) =&gt; <span class="macro">error!</span>(<span class="string">&quot;BUG: couldn&#39;t insert deallocated chunk {:?} into free frame list&quot;</span>, <span class="ident">c</span>),
+        <span class="kw">match </span>res {
+            <span class="prelude-val">Ok</span>(_inserted_free_chunk) =&gt; <span class="kw">return</span>,
+            <span class="prelude-val">Err</span>(c) =&gt; <span class="macro">error!</span>(<span class="string">&quot;BUG: couldn&#39;t insert deallocated chunk {:?} into free frame list&quot;</span>, c),
         }
         
-        <span class="comment">// Here, we could optionally use above `_inserted_free_chunk` to merge the adjacent (contiguous) chunks</span>
-        <span class="comment">// before or after the newly-inserted free chunk. </span>
-        <span class="comment">// However, there&#39;s no *need* to do so until we actually run out of address space or until </span>
-        <span class="comment">// a requested address is in a chunk that needs to be merged.</span>
-        <span class="comment">// Thus, for performance, we save that for those future situations.</span>
-    }
+        <span class="comment">// Here, we could optionally use above `_inserted_free_chunk` to merge the adjacent (contiguous) chunks
+        // before or after the newly-inserted free chunk. 
+        // However, there&#39;s no *need* to do so until we actually run out of address space or until 
+        // a requested address is in a chunk that needs to be merged.
+        // Thus, for performance, we save that for those future situations.
+    </span>}
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;f</span><span class="op">&gt;</span> <span class="ident">IntoIterator</span> <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;f</span> <span class="ident">AllocatedFrames</span> {
-    <span class="kw">type</span> <span class="ident">IntoIter</span> <span class="op">=</span> <span class="ident">AllocatedFramesIter</span><span class="op">&lt;</span><span class="lifetime">&#39;f</span><span class="op">&gt;</span>;
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">AllocatedFrame</span><span class="op">&lt;</span><span class="lifetime">&#39;f</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">into_iter</span>(<span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::IntoIter</span> {
-        <span class="ident">AllocatedFramesIter</span> {
-            <span class="ident">_owner</span>: <span class="self">self</span>,
-            <span class="ident">range</span>: <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">clone</span>(),
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;f</span>&gt; IntoIterator <span class="kw">for </span><span class="kw-2">&amp;</span><span class="lifetime">&#39;f </span>AllocatedFrames {
+    <span class="kw">type </span>IntoIter = AllocatedFramesIter&lt;<span class="lifetime">&#39;f</span>&gt;;
+    <span class="kw">type </span>Item = AllocatedFrame&lt;<span class="lifetime">&#39;f</span>&gt;;
+    <span class="kw">fn </span>into_iter(<span class="self">self</span>) -&gt; <span class="self">Self</span>::IntoIter {
+        AllocatedFramesIter {
+            _owner: <span class="self">self</span>,
+            range: <span class="self">self</span>.frames.clone(),
         }
     }
 }
 
-<span class="doccomment">/// An iterator over each [`AllocatedFrame`] in a range of [`AllocatedFrames`].</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// We must implement our own iterator type here in order to tie the lifetime `&#39;f`</span>
-<span class="doccomment">/// of a returned `AllocatedFrame&lt;&#39;f&gt;` type to the lifetime of its containing `AllocatedFrames`.</span>
-<span class="doccomment">/// This is because the underlying type of `AllocatedFrames` is a [`FrameRange`],</span>
-<span class="doccomment">/// which itself is a [`core::ops::RangeInclusive`] of [`Frame`]s, and unfortunately the</span>
-<span class="doccomment">/// `RangeInclusive` type doesn&#39;t implement an immutable iterator.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Iterating through a `RangeInclusive` actually modifies its own internal range,</span>
-<span class="doccomment">/// so we must avoid doing that because it would break the semantics of a `FrameRange`.</span>
-<span class="doccomment">/// In fact, this is why [`FrameRange`] only implements `IntoIterator` but</span>
-<span class="doccomment">/// does not implement [`Iterator`] itself.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AllocatedFramesIter</span><span class="op">&lt;</span><span class="lifetime">&#39;f</span><span class="op">&gt;</span> {
-    <span class="ident">_owner</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;f</span> <span class="ident">AllocatedFrames</span>,
-    <span class="ident">range</span>: <span class="ident">FrameRange</span>,
+<span class="doccomment">/// An iterator over each [`AllocatedFrame`] in a range of [`AllocatedFrames`].
+/// 
+/// We must implement our own iterator type here in order to tie the lifetime `&#39;f`
+/// of a returned `AllocatedFrame&lt;&#39;f&gt;` type to the lifetime of its containing `AllocatedFrames`.
+/// This is because the underlying type of `AllocatedFrames` is a [`FrameRange`],
+/// which itself is a [`core::ops::RangeInclusive`] of [`Frame`]s, and unfortunately the
+/// `RangeInclusive` type doesn&#39;t implement an immutable iterator.
+/// 
+/// Iterating through a `RangeInclusive` actually modifies its own internal range,
+/// so we must avoid doing that because it would break the semantics of a `FrameRange`.
+/// In fact, this is why [`FrameRange`] only implements `IntoIterator` but
+/// does not implement [`Iterator`] itself.
+</span><span class="kw">pub struct </span>AllocatedFramesIter&lt;<span class="lifetime">&#39;f</span>&gt; {
+    _owner: <span class="kw-2">&amp;</span><span class="lifetime">&#39;f </span>AllocatedFrames,
+    range: FrameRange,
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;f</span><span class="op">&gt;</span> <span class="ident">Iterator</span> <span class="kw">for</span> <span class="ident">AllocatedFramesIter</span><span class="op">&lt;</span><span class="lifetime">&#39;f</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">AllocatedFrame</span><span class="op">&lt;</span><span class="lifetime">&#39;f</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">range</span>.<span class="ident">next</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">frame</span><span class="op">|</span>
-            <span class="ident">AllocatedFrame</span> {
-                <span class="ident">frame</span>, <span class="ident">_phantom</span>: <span class="ident">PhantomData</span>,
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;f</span>&gt; Iterator <span class="kw">for </span>AllocatedFramesIter&lt;<span class="lifetime">&#39;f</span>&gt; {
+    <span class="kw">type </span>Item = AllocatedFrame&lt;<span class="lifetime">&#39;f</span>&gt;;
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
+        <span class="self">self</span>.range.next().map(|frame|
+            AllocatedFrame {
+                frame, _phantom: PhantomData,
             }
         )
     }
 }
 
-<span class="doccomment">/// A reference to a single frame within a range of `AllocatedFrames`.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// The lifetime of this type is tied to the lifetime of its owning `AllocatedFrames`.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AllocatedFrame</span><span class="op">&lt;</span><span class="lifetime">&#39;f</span><span class="op">&gt;</span> {
-    <span class="ident">frame</span>: <span class="ident">Frame</span>,
-    <span class="ident">_phantom</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;f</span> <span class="ident">Frame</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A reference to a single frame within a range of `AllocatedFrames`.
+/// 
+/// The lifetime of this type is tied to the lifetime of its owning `AllocatedFrames`.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>AllocatedFrame&lt;<span class="lifetime">&#39;f</span>&gt; {
+    frame: Frame,
+    _phantom: PhantomData&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;f </span>Frame&gt;,
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;f</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">AllocatedFrame</span><span class="op">&lt;</span><span class="lifetime">&#39;f</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">Frame</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Target</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">frame</span>
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;f</span>&gt; Deref <span class="kw">for </span>AllocatedFrame&lt;<span class="lifetime">&#39;f</span>&gt; {
+    <span class="kw">type </span>Target = Frame;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.frame
     }
 }
-<span class="macro">assert_not_impl_any!</span>(<span class="ident">AllocatedFrame</span>: <span class="ident">DerefMut</span>, <span class="ident">Clone</span>);
+<span class="macro">assert_not_impl_any!</span>(AllocatedFrame: DerefMut, Clone);
 
 
-<span class="doccomment">/// A series of pending actions related to frame allocator bookkeeping,</span>
-<span class="doccomment">/// which may result in heap allocation. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// The actions are triggered upon dropping this struct. </span>
-<span class="doccomment">/// This struct can be returned from the `allocate_frames()` family of functions </span>
-<span class="doccomment">/// in order to allow the caller to precisely control when those actions </span>
-<span class="doccomment">/// that may result in heap allocation should occur. </span>
-<span class="doccomment">/// Such actions include adding chunks to lists of free frames or frames in use. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// The vast majority of use cases don&#39;t care about such precise control, </span>
-<span class="doccomment">/// so you can simply drop this struct at any time or ignore it</span>
-<span class="doccomment">/// with a `let _ = ...` binding to instantly drop it. </span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// A reference to the list into which we will insert the free general-purpose `Chunk`s.</span>
-    <span class="ident">free_list</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;list</span> <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A reference to the list into which we will insert the free &quot;reserved&quot; `Chunk`s.</span>
-    <span class="ident">reserved_list</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;list</span> <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A free chunk that needs to be added back to the free list.</span>
-    <span class="ident">free1</span>: <span class="ident">Chunk</span>,
-    <span class="doccomment">/// Another free chunk that needs to be added back to the free list.</span>
-    <span class="ident">free2</span>: <span class="ident">Chunk</span>,
+<span class="doccomment">/// A series of pending actions related to frame allocator bookkeeping,
+/// which may result in heap allocation. 
+/// 
+/// The actions are triggered upon dropping this struct. 
+/// This struct can be returned from the `allocate_frames()` family of functions 
+/// in order to allow the caller to precisely control when those actions 
+/// that may result in heap allocation should occur. 
+/// Such actions include adding chunks to lists of free frames or frames in use. 
+/// 
+/// The vast majority of use cases don&#39;t care about such precise control, 
+/// so you can simply drop this struct at any time or ignore it
+/// with a `let _ = ...` binding to instantly drop it. 
+</span><span class="kw">pub struct </span>DeferredAllocAction&lt;<span class="lifetime">&#39;list</span>&gt; {
+    <span class="doccomment">/// A reference to the list into which we will insert the free general-purpose `Chunk`s.
+    </span>free_list: <span class="kw-2">&amp;</span><span class="lifetime">&#39;list </span>Mutex&lt;StaticArrayRBTree&lt;Chunk&gt;&gt;,
+    <span class="doccomment">/// A reference to the list into which we will insert the free &quot;reserved&quot; `Chunk`s.
+    </span>reserved_list: <span class="kw-2">&amp;</span><span class="lifetime">&#39;list </span>Mutex&lt;StaticArrayRBTree&lt;Chunk&gt;&gt;,
+    <span class="doccomment">/// A free chunk that needs to be added back to the free list.
+    </span>free1: Chunk,
+    <span class="doccomment">/// Another free chunk that needs to be added back to the free list.
+    </span>free2: Chunk,
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">F1</span>, <span class="ident">F2</span><span class="op">&gt;</span>(<span class="ident">free1</span>: <span class="ident">F1</span>, <span class="ident">free2</span>: <span class="ident">F2</span>) -&gt; <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> 
-        <span class="kw">where</span> <span class="ident">F1</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-              <span class="ident">F2</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;list</span>&gt; DeferredAllocAction&lt;<span class="lifetime">&#39;list</span>&gt; {
+    <span class="kw">fn </span>new&lt;F1, F2&gt;(free1: F1, free2: F2) -&gt; DeferredAllocAction&lt;<span class="lifetime">&#39;list</span>&gt; 
+        <span class="kw">where </span>F1: Into&lt;<span class="prelude-ty">Option</span>&lt;Chunk&gt;&gt;,
+              F2: Into&lt;<span class="prelude-ty">Option</span>&lt;Chunk&gt;&gt;,
     {
-        <span class="kw">let</span> <span class="ident">free1</span> <span class="op">=</span> <span class="ident">free1</span>.<span class="ident">into</span>().<span class="ident">unwrap_or_else</span>(<span class="ident">Chunk::empty</span>);
-        <span class="kw">let</span> <span class="ident">free2</span> <span class="op">=</span> <span class="ident">free2</span>.<span class="ident">into</span>().<span class="ident">unwrap_or_else</span>(<span class="ident">Chunk::empty</span>);
-        <span class="ident">DeferredAllocAction</span> {
-            <span class="ident">free_list</span>: <span class="kw-2">&amp;</span><span class="ident">FREE_GENERAL_FRAMES_LIST</span>,
-            <span class="ident">reserved_list</span>: <span class="kw-2">&amp;</span><span class="ident">FREE_RESERVED_FRAMES_LIST</span>,
-            <span class="ident">free1</span>,
-            <span class="ident">free2</span>
+        <span class="kw">let </span>free1 = free1.into().unwrap_or_else(Chunk::empty);
+        <span class="kw">let </span>free2 = free2.into().unwrap_or_else(Chunk::empty);
+        DeferredAllocAction {
+            free_list: <span class="kw-2">&amp;</span>FREE_GENERAL_FRAMES_LIST,
+            reserved_list: <span class="kw-2">&amp;</span>FREE_RESERVED_FRAMES_LIST,
+            free1,
+            free2
         }
     }
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="comment">// Insert all of the chunks, both allocated and free ones, into the list. </span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">free1</span>.<span class="ident">size_in_frames</span>() <span class="op">&gt;</span> <span class="number">0</span> {
-            <span class="kw">match</span> <span class="self">self</span>.<span class="ident">free1</span>.<span class="ident">typ</span> {
-                <span class="ident">MemoryRegionType::Free</span>     =&gt; { <span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">free1</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>(); }
-                <span class="ident">MemoryRegionType::Reserved</span> =&gt; { <span class="self">self</span>.<span class="ident">reserved_list</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">free1</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>(); }
-                <span class="kw">_</span> =&gt; <span class="macro">error!</span>(<span class="string">&quot;BUG likely: DeferredAllocAction encountered free1 chunk {:?} of a type Unknown&quot;</span>, <span class="self">self</span>.<span class="ident">free1</span>),
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;list</span>&gt; Drop <span class="kw">for </span>DeferredAllocAction&lt;<span class="lifetime">&#39;list</span>&gt; {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="comment">// Insert all of the chunks, both allocated and free ones, into the list. 
+        </span><span class="kw">if </span><span class="self">self</span>.free1.size_in_frames() &gt; <span class="number">0 </span>{
+            <span class="kw">match </span><span class="self">self</span>.free1.typ {
+                MemoryRegionType::Free     =&gt; { <span class="self">self</span>.free_list.lock().insert(<span class="self">self</span>.free1.clone()).unwrap(); }
+                MemoryRegionType::Reserved =&gt; { <span class="self">self</span>.reserved_list.lock().insert(<span class="self">self</span>.free1.clone()).unwrap(); }
+                <span class="kw">_ </span>=&gt; <span class="macro">error!</span>(<span class="string">&quot;BUG likely: DeferredAllocAction encountered free1 chunk {:?} of a type Unknown&quot;</span>, <span class="self">self</span>.free1),
             }
         }
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">free2</span>.<span class="ident">size_in_frames</span>() <span class="op">&gt;</span> <span class="number">0</span> {
-            <span class="kw">match</span> <span class="self">self</span>.<span class="ident">free2</span>.<span class="ident">typ</span> {
-                <span class="ident">MemoryRegionType::Free</span>     =&gt; { <span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">free2</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>(); }
-                <span class="ident">MemoryRegionType::Reserved</span> =&gt; { <span class="self">self</span>.<span class="ident">reserved_list</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">free2</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>(); }
-                <span class="kw">_</span> =&gt; <span class="macro">error!</span>(<span class="string">&quot;BUG likely: DeferredAllocAction encountered free2 chunk {:?} of a type Unknown&quot;</span>, <span class="self">self</span>.<span class="ident">free2</span>),
+        <span class="kw">if </span><span class="self">self</span>.free2.size_in_frames() &gt; <span class="number">0 </span>{
+            <span class="kw">match </span><span class="self">self</span>.free2.typ {
+                MemoryRegionType::Free     =&gt; { <span class="self">self</span>.free_list.lock().insert(<span class="self">self</span>.free2.clone()).unwrap(); }
+                MemoryRegionType::Reserved =&gt; { <span class="self">self</span>.reserved_list.lock().insert(<span class="self">self</span>.free2.clone()).unwrap(); }
+                <span class="kw">_ </span>=&gt; <span class="macro">error!</span>(<span class="string">&quot;BUG likely: DeferredAllocAction encountered free2 chunk {:?} of a type Unknown&quot;</span>, <span class="self">self</span>.free2),
             };
         }
     }
 }
 
 
-<span class="doccomment">/// Possible allocation errors.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">enum</span> <span class="ident">AllocationError</span> {
-    <span class="doccomment">/// The requested address was not free: it was already allocated, or is outside the range of this allocator.</span>
-    <span class="ident">AddressNotFree</span>(<span class="ident">Frame</span>, <span class="ident">usize</span>),
-    <span class="doccomment">/// The address space was full, or there was not a large-enough chunk </span>
-    <span class="doccomment">/// or enough remaining chunks that could satisfy the requested allocation size.</span>
-    <span class="ident">OutOfAddressSpace</span>(<span class="ident">usize</span>),
+<span class="doccomment">/// Possible allocation errors.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">enum </span>AllocationError {
+    <span class="doccomment">/// The requested address was not free: it was already allocated, or is outside the range of this allocator.
+    </span>AddressNotFree(Frame, usize),
+    <span class="doccomment">/// The address space was full, or there was not a large-enough chunk 
+    /// or enough remaining chunks that could satisfy the requested allocation size.
+    </span>OutOfAddressSpace(usize),
 }
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">AllocationError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">alloc_err</span>: <span class="ident">AllocationError</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
-        <span class="kw">match</span> <span class="ident">alloc_err</span> {
-            <span class="ident">AllocationError::AddressNotFree</span>(..) =&gt; <span class="string">&quot;address was in use or outside of this frame allocator&#39;s range&quot;</span>,
-            <span class="ident">AllocationError::OutOfAddressSpace</span>(..) =&gt; <span class="string">&quot;out of physical address space&quot;</span>,
+<span class="kw">impl </span>From&lt;AllocationError&gt; <span class="kw">for </span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str {
+    <span class="kw">fn </span>from(alloc_err: AllocationError) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str {
+        <span class="kw">match </span>alloc_err {
+            AllocationError::AddressNotFree(..) =&gt; <span class="string">&quot;address was in use or outside of this frame allocator&#39;s range&quot;</span>,
+            AllocationError::OutOfAddressSpace(..) =&gt; <span class="string">&quot;out of physical address space&quot;</span>,
         }
     }
 }
 
 
-<span class="doccomment">/// Searches the given `list` for the chunk that contains the range of frames from</span>
-<span class="doccomment">/// `requested_frame` to `requested_frame + num_frames`.</span>
-<span class="kw">fn</span> <span class="ident">find_specific_chunk</span>(
-    <span class="ident">list</span>: <span class="kw-2">&amp;mut</span> <span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>,
-    <span class="ident">requested_frame</span>: <span class="ident">Frame</span>,
-    <span class="ident">num_frames</span>: <span class="ident">usize</span>
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="ident">AllocationError</span><span class="op">&gt;</span> {
+<span class="doccomment">/// Searches the given `list` for the chunk that contains the range of frames from
+/// `requested_frame` to `requested_frame + num_frames`.
+</span><span class="kw">fn </span>find_specific_chunk(
+    list: <span class="kw-2">&amp;mut </span>StaticArrayRBTree&lt;Chunk&gt;,
+    requested_frame: Frame,
+    num_frames: usize
+) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedFrames, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), AllocationError&gt; {
 
-    <span class="comment">// The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.</span>
-    <span class="kw">let</span> <span class="ident">requested_end_frame</span> <span class="op">=</span> <span class="ident">requested_frame</span> <span class="op">+</span> (<span class="ident">num_frames</span> <span class="op">-</span> <span class="number">1</span>);
+    <span class="comment">// The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
+    </span><span class="kw">let </span>requested_end_frame = requested_frame + (num_frames - <span class="number">1</span>);
 
-    <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="ident">list</span>.<span class="number">0</span> {
-        <span class="ident">Inner::Array</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">arr</span>) =&gt; {
-            <span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="ident">arr</span>.<span class="ident">iter_mut</span>() {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">elem</span> {
-                    <span class="kw">if</span> <span class="ident">requested_frame</span> <span class="op">&gt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">start</span>() <span class="op">&amp;&amp;</span> <span class="ident">requested_end_frame</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">end</span>() {
-                        <span class="comment">// Here: `chunk` was big enough and did contain the requested address.</span>
-                        <span class="kw">return</span> <span class="ident">allocate_from_chosen_chunk</span>(<span class="ident">requested_frame</span>, <span class="ident">num_frames</span>, <span class="kw-2">&amp;</span><span class="ident">chunk</span>.<span class="ident">clone</span>(), <span class="ident">ValueRefMut::Array</span>(<span class="ident">elem</span>));
+    <span class="kw">match </span><span class="kw-2">&amp;mut </span>list.<span class="number">0 </span>{
+        Inner::Array(<span class="kw-2">ref mut </span>arr) =&gt; {
+            <span class="kw">for </span>elem <span class="kw">in </span>arr.iter_mut() {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(chunk) = elem {
+                    <span class="kw">if </span>requested_frame &gt;= <span class="kw-2">*</span>chunk.start() &amp;&amp; requested_end_frame &lt;= <span class="kw-2">*</span>chunk.end() {
+                        <span class="comment">// Here: `chunk` was big enough and did contain the requested address.
+                        </span><span class="kw">return </span>allocate_from_chosen_chunk(requested_frame, num_frames, <span class="kw-2">&amp;</span>chunk.clone(), ValueRefMut::Array(elem));
                     }
                 }
             }
         }
-        <span class="ident">Inner::RBTree</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">tree</span>) =&gt; {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor_mut</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">upper_bound_mut</span>(<span class="ident">Bound::Included</span>(<span class="kw-2">&amp;</span><span class="ident">requested_frame</span>));
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">cursor_mut</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">deref</span>().<span class="ident">clone</span>()) {
-                <span class="kw">if</span> <span class="ident">chunk</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">requested_frame</span>) {
-                    <span class="kw">if</span> <span class="ident">requested_end_frame</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">end</span>() {
-                        <span class="kw">return</span> <span class="ident">allocate_from_chosen_chunk</span>(<span class="ident">requested_frame</span>, <span class="ident">num_frames</span>, <span class="kw-2">&amp;</span><span class="ident">chunk</span>, <span class="ident">ValueRefMut::RBTree</span>(<span class="ident">cursor_mut</span>));
-                    } <span class="kw">else</span> {
-                        <span class="comment">// We found the chunk containing the requested address, but it was too small to cover all of the requested frames.</span>
-                        <span class="comment">// Let&#39;s try to merge the next-highest contiguous chunk to see if those two chunks together </span>
-                        <span class="comment">// cover enough frames to fulfill the allocation request.</span>
-                        <span class="comment">//</span>
-                        <span class="comment">// trace!(&quot;Frame allocator: found chunk containing requested address, but it was too small. \</span>
-                        <span class="comment">//     Attempting to merge multiple chunks during an allocation. \</span>
-                        <span class="comment">//     Requested address: {:?}, num_frames: {}, chunk: {:?}&quot;,</span>
-                        <span class="comment">//     requested_frame, num_frames, chunk,</span>
-                        <span class="comment">// );</span>
-                        <span class="kw">let</span> <span class="ident">next_contiguous_chunk</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span> <span class="op">=</span> {
-                            <span class="kw">let</span> <span class="ident">next_cursor</span> <span class="op">=</span> <span class="ident">cursor_mut</span>.<span class="ident">peek_next</span>();
-                            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">next_chunk</span>) <span class="op">=</span> <span class="ident">next_cursor</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">deref</span>()) {
-                                <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span> <span class="op">==</span> <span class="kw-2">*</span><span class="ident">next_chunk</span>.<span class="ident">start</span>() {
-                                    <span class="comment">// Here: next chunk was contiguous with the original chunk. </span>
-                                    <span class="kw">if</span> <span class="ident">requested_end_frame</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">next_chunk</span>.<span class="ident">end</span>() {
-                                        <span class="comment">// trace!(&quot;Frame allocator: found suitably-large contiguous next {:?} after initial too-small {:?}&quot;, next_chunk, chunk);</span>
-                                        <span class="prelude-val">Some</span>(<span class="ident">next_chunk</span>.<span class="ident">clone</span>())
-                                    } <span class="kw">else</span> {
+        Inner::RBTree(<span class="kw-2">ref mut </span>tree) =&gt; {
+            <span class="kw">let </span><span class="kw-2">mut </span>cursor_mut = tree.upper_bound_mut(Bound::Included(<span class="kw-2">&amp;</span>requested_frame));
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(chunk) = cursor_mut.get().map(|w| w.deref().clone()) {
+                <span class="kw">if </span>chunk.contains(<span class="kw-2">&amp;</span>requested_frame) {
+                    <span class="kw">if </span>requested_end_frame &lt;= <span class="kw-2">*</span>chunk.end() {
+                        <span class="kw">return </span>allocate_from_chosen_chunk(requested_frame, num_frames, <span class="kw-2">&amp;</span>chunk, ValueRefMut::RBTree(cursor_mut));
+                    } <span class="kw">else </span>{
+                        <span class="comment">// We found the chunk containing the requested address, but it was too small to cover all of the requested frames.
+                        // Let&#39;s try to merge the next-highest contiguous chunk to see if those two chunks together 
+                        // cover enough frames to fulfill the allocation request.
+                        //
+                        // trace!(&quot;Frame allocator: found chunk containing requested address, but it was too small. \
+                        //     Attempting to merge multiple chunks during an allocation. \
+                        //     Requested address: {:?}, num_frames: {}, chunk: {:?}&quot;,
+                        //     requested_frame, num_frames, chunk,
+                        // );
+                        </span><span class="kw">let </span>next_contiguous_chunk: <span class="prelude-ty">Option</span>&lt;Chunk&gt; = {
+                            <span class="kw">let </span>next_cursor = cursor_mut.peek_next();
+                            <span class="kw">if let </span><span class="prelude-val">Some</span>(next_chunk) = next_cursor.get().map(|w| w.deref()) {
+                                <span class="kw">if </span><span class="kw-2">*</span>chunk.end() + <span class="number">1 </span>== <span class="kw-2">*</span>next_chunk.start() {
+                                    <span class="comment">// Here: next chunk was contiguous with the original chunk. 
+                                    </span><span class="kw">if </span>requested_end_frame &lt;= <span class="kw-2">*</span>next_chunk.end() {
+                                        <span class="comment">// trace!(&quot;Frame allocator: found suitably-large contiguous next {:?} after initial too-small {:?}&quot;, next_chunk, chunk);
+                                        </span><span class="prelude-val">Some</span>(next_chunk.clone())
+                                    } <span class="kw">else </span>{
                                         <span class="macro">todo!</span>(<span class="string">&quot;Frame allocator: found chunk containing requested address, but it was too small. \
                                             Theseus does not yet support merging more than two chunks during an allocation request. \
                                             Requested address: {:?}, num_frames: {}, chunk: {:?}, next_chunk {:?}&quot;</span>,
-                                            <span class="ident">requested_frame</span>, <span class="ident">num_frames</span>, <span class="ident">chunk</span>, <span class="ident">next_chunk</span>
+                                            requested_frame, num_frames, chunk, next_chunk
                                         );
-                                        <span class="comment">// None</span>
-                                    }
-                                } <span class="kw">else</span> {
-                                    <span class="macro">trace!</span>(<span class="string">&quot;Frame allocator: next {:?} was not contiguously above initial too-small {:?}&quot;</span>, <span class="ident">next_chunk</span>, <span class="ident">chunk</span>);
-                                    <span class="prelude-val">None</span>
-                                }
-                            } <span class="kw">else</span> {
-                                <span class="macro">trace!</span>(<span class="string">&quot;Frame allocator: couldn&#39;t get next chunk above initial too-small {:?}&quot;</span>, <span class="ident">chunk</span>);
-                                <span class="prelude-val">None</span>
-                            }
+                                        <span class="comment">// None
+                                    </span>}
+                                } <span class="kw">else </span>{
+                                    <span class="macro">trace!</span>(<span class="string">&quot;Frame allocator: next {:?} was not contiguously above initial too-small {:?}&quot;</span>, next_chunk, chunk);
+                                    <span class="prelude-val">None
+                                </span>}
+                            } <span class="kw">else </span>{
+                                <span class="macro">trace!</span>(<span class="string">&quot;Frame allocator: couldn&#39;t get next chunk above initial too-small {:?}&quot;</span>, chunk);
+                                <span class="prelude-val">None
+                            </span>}
                         };
-                        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">mut</span> <span class="ident">next_chunk</span>) <span class="op">=</span> <span class="ident">next_contiguous_chunk</span> {
-                            <span class="comment">// We found a suitable chunk that came contiguously after the initial too-small chunk. </span>
-                            <span class="comment">// Remove the initial chunk (since we have a cursor pointing to it already) </span>
-                            <span class="comment">// and &quot;merge&quot; it into this `next_chunk`.</span>
-                            <span class="kw">let</span> <span class="ident">_removed_initial_chunk</span> <span class="op">=</span> <span class="ident">cursor_mut</span>.<span class="ident">remove</span>();
-                            <span class="comment">// trace!(&quot;Frame allocator: removed suitably-large contiguous next {:?} after initial too-small {:?}&quot;, _removed_initial_chunk, chunk);</span>
-                            <span class="comment">// Here, `cursor_mut` has been moved forward to point to the `next_chunk` now. </span>
-                            <span class="ident">next_chunk</span>.<span class="ident">frames</span> <span class="op">=</span> <span class="ident">FrameRange::new</span>(<span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">start</span>(), <span class="kw-2">*</span><span class="ident">next_chunk</span>.<span class="ident">end</span>());
-                            <span class="kw">return</span> <span class="ident">allocate_from_chosen_chunk</span>(<span class="ident">requested_frame</span>, <span class="ident">num_frames</span>, <span class="kw-2">&amp;</span><span class="ident">next_chunk</span>, <span class="ident">ValueRefMut::RBTree</span>(<span class="ident">cursor_mut</span>));
+                        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>next_chunk) = next_contiguous_chunk {
+                            <span class="comment">// We found a suitable chunk that came contiguously after the initial too-small chunk. 
+                            // Remove the initial chunk (since we have a cursor pointing to it already) 
+                            // and &quot;merge&quot; it into this `next_chunk`.
+                            </span><span class="kw">let </span>_removed_initial_chunk = cursor_mut.remove();
+                            <span class="comment">// trace!(&quot;Frame allocator: removed suitably-large contiguous next {:?} after initial too-small {:?}&quot;, _removed_initial_chunk, chunk);
+                            // Here, `cursor_mut` has been moved forward to point to the `next_chunk` now. 
+                            </span>next_chunk.frames = FrameRange::new(<span class="kw-2">*</span>chunk.start(), <span class="kw-2">*</span>next_chunk.end());
+                            <span class="kw">return </span>allocate_from_chosen_chunk(requested_frame, num_frames, <span class="kw-2">&amp;</span>next_chunk, ValueRefMut::RBTree(cursor_mut));
                         }
                     }
                 }
@@ -1752,376 +1746,375 @@
         }
     }
 
-    <span class="prelude-val">Err</span>(<span class="ident">AllocationError::AddressNotFree</span>(<span class="ident">requested_frame</span>, <span class="ident">num_frames</span>))
+    <span class="prelude-val">Err</span>(AllocationError::AddressNotFree(requested_frame, num_frames))
 }
 
 
-<span class="doccomment">/// Searches the given `list` for any chunk large enough to hold at least `num_frames`.</span>
-<span class="kw">fn</span> <span class="ident">find_any_chunk</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span>(
-    <span class="ident">list</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;list</span> <span class="kw-2">mut</span> <span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>,
-    <span class="ident">num_frames</span>: <span class="ident">usize</span>
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="ident">AllocationError</span><span class="op">&gt;</span> {
-    <span class="comment">// During the first pass, we ignore designated regions.</span>
-    <span class="kw">match</span> <span class="ident">list</span>.<span class="number">0</span> {
-        <span class="ident">Inner::Array</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">arr</span>) =&gt; {
-            <span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="ident">arr</span>.<span class="ident">iter_mut</span>() {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">elem</span> {
-                    <span class="comment">// Skip chunks that are too-small or in the designated regions.</span>
-                    <span class="kw">if</span>  <span class="ident">chunk</span>.<span class="ident">size_in_frames</span>() <span class="op">&lt;</span> <span class="ident">num_frames</span> <span class="op">|</span><span class="op">|</span> <span class="ident">chunk</span>.<span class="ident">typ</span> <span class="op">!</span><span class="op">=</span> <span class="ident">MemoryRegionType::Free</span> {
+<span class="doccomment">/// Searches the given `list` for any chunk large enough to hold at least `num_frames`.
+</span><span class="kw">fn </span>find_any_chunk&lt;<span class="lifetime">&#39;list</span>&gt;(
+    list: <span class="kw-2">&amp;</span><span class="lifetime">&#39;list </span><span class="kw-2">mut </span>StaticArrayRBTree&lt;Chunk&gt;,
+    num_frames: usize
+) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedFrames, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), AllocationError&gt; {
+    <span class="comment">// During the first pass, we ignore designated regions.
+    </span><span class="kw">match </span>list.<span class="number">0 </span>{
+        Inner::Array(<span class="kw-2">ref mut </span>arr) =&gt; {
+            <span class="kw">for </span>elem <span class="kw">in </span>arr.iter_mut() {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(chunk) = elem {
+                    <span class="comment">// Skip chunks that are too-small or in the designated regions.
+                    </span><span class="kw">if  </span>chunk.size_in_frames() &lt; num_frames || chunk.typ != MemoryRegionType::Free {
                         <span class="kw">continue</span>;
                     } 
-                    <span class="kw">else</span> {
-                        <span class="kw">return</span> <span class="ident">allocate_from_chosen_chunk</span>(<span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">start</span>(), <span class="ident">num_frames</span>, <span class="kw-2">&amp;</span><span class="ident">chunk</span>.<span class="ident">clone</span>(), <span class="ident">ValueRefMut::Array</span>(<span class="ident">elem</span>));
+                    <span class="kw">else </span>{
+                        <span class="kw">return </span>allocate_from_chosen_chunk(<span class="kw-2">*</span>chunk.start(), num_frames, <span class="kw-2">&amp;</span>chunk.clone(), ValueRefMut::Array(elem));
                     }
                 }
             }
         }
-        <span class="ident">Inner::RBTree</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">tree</span>) =&gt; {
-            <span class="comment">// Because we allocate new frames by peeling them off from the beginning part of a chunk, </span>
-            <span class="comment">// it&#39;s MUCH faster to start the search for free frames from higher addresses moving down. </span>
-            <span class="comment">// This results in an O(1) allocation time in the general case, until all address ranges are already in use.</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">upper_bound_mut</span>(<span class="ident">Bound</span>::<span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="ident">::Unbounded</span>);
-            <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">cursor</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">deref</span>()) {
-                <span class="kw">if</span> <span class="ident">num_frames</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">chunk</span>.<span class="ident">size_in_frames</span>() <span class="op">&amp;&amp;</span> <span class="ident">chunk</span>.<span class="ident">typ</span> <span class="op">==</span> <span class="ident">MemoryRegionType::Free</span> {
-                    <span class="kw">return</span> <span class="ident">allocate_from_chosen_chunk</span>(<span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">start</span>(), <span class="ident">num_frames</span>, <span class="kw-2">&amp;</span><span class="ident">chunk</span>.<span class="ident">clone</span>(), <span class="ident">ValueRefMut::RBTree</span>(<span class="ident">cursor</span>));
+        Inner::RBTree(<span class="kw-2">ref mut </span>tree) =&gt; {
+            <span class="comment">// Because we allocate new frames by peeling them off from the beginning part of a chunk, 
+            // it&#39;s MUCH faster to start the search for free frames from higher addresses moving down. 
+            // This results in an O(1) allocation time in the general case, until all address ranges are already in use.
+            </span><span class="kw">let </span><span class="kw-2">mut </span>cursor = tree.upper_bound_mut(Bound::&lt;<span class="kw-2">&amp;</span>Chunk&gt;::Unbounded);
+            <span class="kw">while let </span><span class="prelude-val">Some</span>(chunk) = cursor.get().map(|w| w.deref()) {
+                <span class="kw">if </span>num_frames &lt;= chunk.size_in_frames() &amp;&amp; chunk.typ == MemoryRegionType::Free {
+                    <span class="kw">return </span>allocate_from_chosen_chunk(<span class="kw-2">*</span>chunk.start(), num_frames, <span class="kw-2">&amp;</span>chunk.clone(), ValueRefMut::RBTree(cursor));
                 }
                 <span class="macro">warn!</span>(<span class="string">&quot;Frame allocator: inefficient scenario: had to search multiple chunks \
                     (skipping {:?}) while trying to allocate {} frames at any address.&quot;</span>,
-                    <span class="ident">chunk</span>, <span class="ident">num_frames</span>
+                    chunk, num_frames
                 );
-                <span class="ident">cursor</span>.<span class="ident">move_prev</span>();
+                cursor.move_prev();
             }
         }
     }
 
     <span class="macro">error!</span>(<span class="string">&quot;frame_allocator: non-reserved chunks are all allocated (requested {} frames). \
-        TODO: we could attempt to merge free chunks here.&quot;</span>, <span class="ident">num_frames</span>
+        TODO: we could attempt to merge free chunks here.&quot;</span>, num_frames
     );
 
-    <span class="prelude-val">Err</span>(<span class="ident">AllocationError::OutOfAddressSpace</span>(<span class="ident">num_frames</span>))
+    <span class="prelude-val">Err</span>(AllocationError::OutOfAddressSpace(num_frames))
 }
 
 
 
-<span class="doccomment">/// The final part of the main allocation routine that splits the given chosen chunk</span>
-<span class="doccomment">/// into multiple smaller chunks, thereby &quot;allocating&quot; frames from it.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This function breaks up that chunk into multiple ones and returns an `AllocatedFrames` </span>
-<span class="doccomment">/// from (part of) that chunk, ranging from `start_frame` to `start_frame + num_frames`.</span>
-<span class="kw">fn</span> <span class="ident">allocate_from_chosen_chunk</span>(
-    <span class="ident">start_frame</span>: <span class="ident">Frame</span>,
-    <span class="ident">num_frames</span>: <span class="ident">usize</span>,
-    <span class="ident">chosen_chunk</span>: <span class="kw-2">&amp;</span><span class="ident">Chunk</span>,
-    <span class="kw-2">mut</span> <span class="ident">chosen_chunk_ref</span>: <span class="ident">ValueRefMut</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="ident">AllocationError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> (<span class="ident">new_allocation</span>, <span class="ident">before</span>, <span class="ident">after</span>) <span class="op">=</span> <span class="ident">split_chosen_chunk</span>(<span class="ident">start_frame</span>, <span class="ident">num_frames</span>, <span class="ident">chosen_chunk</span>);
+<span class="doccomment">/// The final part of the main allocation routine that splits the given chosen chunk
+/// into multiple smaller chunks, thereby &quot;allocating&quot; frames from it.
+///
+/// This function breaks up that chunk into multiple ones and returns an `AllocatedFrames` 
+/// from (part of) that chunk, ranging from `start_frame` to `start_frame + num_frames`.
+</span><span class="kw">fn </span>allocate_from_chosen_chunk(
+    start_frame: Frame,
+    num_frames: usize,
+    chosen_chunk: <span class="kw-2">&amp;</span>Chunk,
+    <span class="kw-2">mut </span>chosen_chunk_ref: ValueRefMut&lt;Chunk&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedFrames, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), AllocationError&gt; {
+    <span class="kw">let </span>(new_allocation, before, after) = split_chosen_chunk(start_frame, num_frames, chosen_chunk);
 
-    <span class="comment">// Remove the chosen chunk from the free frame list.</span>
-    <span class="kw">let</span> <span class="ident">_removed_chunk</span> <span class="op">=</span> <span class="ident">chosen_chunk_ref</span>.<span class="ident">remove</span>();
+    <span class="comment">// Remove the chosen chunk from the free frame list.
+    </span><span class="kw">let </span>_removed_chunk = chosen_chunk_ref.remove();
 
-    <span class="comment">// TODO: Re-use the allocated wrapper if possible, rather than allocate a new one entirely.</span>
-    <span class="comment">// if let RemovedValue::RBTree(Some(wrapper_adapter)) = _removed_chunk { ... }</span>
+    <span class="comment">// TODO: Re-use the allocated wrapper if possible, rather than allocate a new one entirely.
+    // if let RemovedValue::RBTree(Some(wrapper_adapter)) = _removed_chunk { ... }
 
-    <span class="prelude-val">Ok</span>((
-        <span class="ident">new_allocation</span>.<span class="ident">as_allocated_frames</span>(),
-        <span class="ident">DeferredAllocAction::new</span>(<span class="ident">before</span>, <span class="ident">after</span>),
+    </span><span class="prelude-val">Ok</span>((
+        new_allocation.as_allocated_frames(),
+        DeferredAllocAction::new(before, after),
     ))
 
 }
 
-<span class="doccomment">/// An inner function that breaks up the given chunk into multiple smaller chunks.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Returns a tuple of three chunks:</span>
-<span class="doccomment">/// 1. The `Chunk` containing the requested range of frames starting at `start_frame`.</span>
-<span class="doccomment">/// 2. The range of frames in the `chosen_chunk` that came before the beginning of the requested frame range.</span>
-<span class="doccomment">/// 3. The range of frames in the `chosen_chunk` that came after the end of the requested frame range.</span>
-<span class="kw">fn</span> <span class="ident">split_chosen_chunk</span>(
-    <span class="ident">start_frame</span>: <span class="ident">Frame</span>,
-    <span class="ident">num_frames</span>: <span class="ident">usize</span>,
-    <span class="ident">chosen_chunk</span>: <span class="kw-2">&amp;</span><span class="ident">Chunk</span>,
-) -&gt; (<span class="ident">Chunk</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>) {
-    <span class="comment">// The new allocated chunk might start in the middle of an existing chunk,</span>
-    <span class="comment">// so we need to break up that existing chunk into 3 possible chunks: before, newly-allocated, and after.</span>
-    <span class="comment">//</span>
-    <span class="comment">// Because Frames and PhysicalAddresses use saturating add/subtract, we need to double-check that </span>
-    <span class="comment">// we don&#39;t create overlapping duplicate Chunks at either the very minimum or the very maximum of the address space.</span>
-    <span class="kw">let</span> <span class="ident">new_allocation</span> <span class="op">=</span> <span class="ident">Chunk</span> {
-        <span class="ident">typ</span>: <span class="ident">chosen_chunk</span>.<span class="ident">typ</span>,
-        <span class="comment">// The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.</span>
-        <span class="ident">frames</span>: <span class="ident">FrameRange::new</span>(<span class="ident">start_frame</span>, <span class="ident">start_frame</span> <span class="op">+</span> (<span class="ident">num_frames</span> <span class="op">-</span> <span class="number">1</span>)),
+<span class="doccomment">/// An inner function that breaks up the given chunk into multiple smaller chunks.
+/// 
+/// Returns a tuple of three chunks:
+/// 1. The `Chunk` containing the requested range of frames starting at `start_frame`.
+/// 2. The range of frames in the `chosen_chunk` that came before the beginning of the requested frame range.
+/// 3. The range of frames in the `chosen_chunk` that came after the end of the requested frame range.
+</span><span class="kw">fn </span>split_chosen_chunk(
+    start_frame: Frame,
+    num_frames: usize,
+    chosen_chunk: <span class="kw-2">&amp;</span>Chunk,
+) -&gt; (Chunk, <span class="prelude-ty">Option</span>&lt;Chunk&gt;, <span class="prelude-ty">Option</span>&lt;Chunk&gt;) {
+    <span class="comment">// The new allocated chunk might start in the middle of an existing chunk,
+    // so we need to break up that existing chunk into 3 possible chunks: before, newly-allocated, and after.
+    //
+    // Because Frames and PhysicalAddresses use saturating add/subtract, we need to double-check that 
+    // we don&#39;t create overlapping duplicate Chunks at either the very minimum or the very maximum of the address space.
+    </span><span class="kw">let </span>new_allocation = Chunk {
+        typ: chosen_chunk.typ,
+        <span class="comment">// The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
+        </span>frames: FrameRange::new(start_frame, start_frame + (num_frames - <span class="number">1</span>)),
     };
-    <span class="kw">let</span> <span class="ident">before</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">start_frame</span> <span class="op">==</span> <span class="ident">MIN_FRAME</span> {
-        <span class="prelude-val">None</span>
-    } <span class="kw">else</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">Chunk</span> {
-            <span class="ident">typ</span>: <span class="ident">chosen_chunk</span>.<span class="ident">typ</span>,
-            <span class="ident">frames</span>: <span class="ident">FrameRange::new</span>(<span class="kw-2">*</span><span class="ident">chosen_chunk</span>.<span class="ident">start</span>(), <span class="kw-2">*</span><span class="ident">new_allocation</span>.<span class="ident">start</span>() <span class="op">-</span> <span class="number">1</span>),
+    <span class="kw">let </span>before = <span class="kw">if </span>start_frame == MIN_FRAME {
+        <span class="prelude-val">None
+    </span>} <span class="kw">else </span>{
+        <span class="prelude-val">Some</span>(Chunk {
+            typ: chosen_chunk.typ,
+            frames: FrameRange::new(<span class="kw-2">*</span>chosen_chunk.start(), <span class="kw-2">*</span>new_allocation.start() - <span class="number">1</span>),
         })
     };
-    <span class="kw">let</span> <span class="ident">after</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">new_allocation</span>.<span class="ident">end</span>() <span class="op">==</span> <span class="kw-2">&amp;</span><span class="ident">MAX_FRAME</span> { 
-        <span class="prelude-val">None</span>
-    } <span class="kw">else</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">Chunk</span> {
-            <span class="ident">typ</span>: <span class="ident">chosen_chunk</span>.<span class="ident">typ</span>,
-            <span class="ident">frames</span>: <span class="ident">FrameRange::new</span>(<span class="kw-2">*</span><span class="ident">new_allocation</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span>, <span class="kw-2">*</span><span class="ident">chosen_chunk</span>.<span class="ident">end</span>()),
+    <span class="kw">let </span>after = <span class="kw">if </span>new_allocation.end() == <span class="kw-2">&amp;</span>MAX_FRAME { 
+        <span class="prelude-val">None
+    </span>} <span class="kw">else </span>{
+        <span class="prelude-val">Some</span>(Chunk {
+            typ: chosen_chunk.typ,
+            frames: FrameRange::new(<span class="kw-2">*</span>new_allocation.end() + <span class="number">1</span>, <span class="kw-2">*</span>chosen_chunk.end()),
         })
     };
 
-    <span class="comment">// some sanity checks -- these can be removed or disabled for better performance</span>
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">b</span>) <span class="op">=</span> <span class="ident">before</span> {
-        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">new_allocation</span>.<span class="ident">contains</span>(<span class="ident">b</span>.<span class="ident">end</span>()));
-        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">b</span>.<span class="ident">contains</span>(<span class="ident">new_allocation</span>.<span class="ident">start</span>()));
+    <span class="comment">// some sanity checks -- these can be removed or disabled for better performance
+    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>b) = before {
+        <span class="macro">assert!</span>(!new_allocation.contains(b.end()));
+        <span class="macro">assert!</span>(!b.contains(new_allocation.start()));
     }
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">a</span>) <span class="op">=</span> <span class="ident">after</span> {
-        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">new_allocation</span>.<span class="ident">contains</span>(<span class="ident">a</span>.<span class="ident">start</span>()));
-        <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">a</span>.<span class="ident">contains</span>(<span class="ident">new_allocation</span>.<span class="ident">end</span>()));
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>a) = after {
+        <span class="macro">assert!</span>(!new_allocation.contains(a.start()));
+        <span class="macro">assert!</span>(!a.contains(new_allocation.end()));
     }
 
-    (<span class="ident">new_allocation</span>, <span class="ident">before</span>, <span class="ident">after</span>)
+    (new_allocation, before, after)
 }
 
 
-<span class="doccomment">/// Returns whether the given `Frame` is contained within the given `list`.</span>
-<span class="kw">fn</span> <span class="ident">frame_is_in_list</span>(
-    <span class="ident">list</span>: <span class="kw-2">&amp;</span><span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>,
-    <span class="ident">frame</span>: <span class="kw-2">&amp;</span><span class="ident">Frame</span>,
-) -&gt; <span class="ident">bool</span> {
-    <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">list</span>.<span class="number">0</span> {
-        <span class="ident">Inner::Array</span>(<span class="kw-2">ref</span> <span class="ident">arr</span>) =&gt; {
-            <span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="ident">arr</span>.<span class="ident">iter</span>() {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">elem</span> {
-                    <span class="kw">if</span> <span class="ident">chunk</span>.<span class="ident">contains</span>(<span class="ident">frame</span>) { 
-                        <span class="kw">return</span> <span class="bool-val">true</span>;
+<span class="doccomment">/// Returns whether the given `Frame` is contained within the given `list`.
+</span><span class="kw">fn </span>frame_is_in_list(
+    list: <span class="kw-2">&amp;</span>StaticArrayRBTree&lt;Chunk&gt;,
+    frame: <span class="kw-2">&amp;</span>Frame,
+) -&gt; bool {
+    <span class="kw">match </span><span class="kw-2">&amp;</span>list.<span class="number">0 </span>{
+        Inner::Array(<span class="kw-2">ref </span>arr) =&gt; {
+            <span class="kw">for </span>elem <span class="kw">in </span>arr.iter() {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(chunk) = elem {
+                    <span class="kw">if </span>chunk.contains(frame) { 
+                        <span class="kw">return </span><span class="bool-val">true</span>;
                     }
                 }
             }
         }
-        <span class="ident">Inner::RBTree</span>(<span class="kw-2">ref</span> <span class="ident">tree</span>) =&gt; {     
-            <span class="kw">let</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">upper_bound</span>(<span class="ident">Bound::Included</span>(<span class="ident">frame</span>));
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">cursor</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">deref</span>()) {
-                <span class="kw">if</span> <span class="ident">chunk</span>.<span class="ident">contains</span>(<span class="ident">frame</span>) {
-                    <span class="kw">return</span> <span class="bool-val">true</span>;
+        Inner::RBTree(<span class="kw-2">ref </span>tree) =&gt; {     
+            <span class="kw">let </span>cursor = tree.upper_bound(Bound::Included(frame));
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(chunk) = cursor.get().map(|w| w.deref()) {
+                <span class="kw">if </span>chunk.contains(frame) {
+                    <span class="kw">return </span><span class="bool-val">true</span>;
                 }
             }
         }
     }
 
-    <span class="bool-val">false</span>
-}
+    <span class="bool-val">false
+</span>}
 
 
-<span class="doccomment">/// Adds the given `frames` to the given `list` as a Chunk of reserved frames. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Returns the range of **new** frames that were added to the list, </span>
-<span class="doccomment">/// which will be a subset of the given input `frames`.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Currently, this function adds no new frames at all if any frames within the given `frames` list</span>
-<span class="doccomment">/// overlap any existing regions at all. </span>
-<span class="doccomment">/// TODO: handle partially-overlapping regions by extending existing regions on either end.</span>
-<span class="kw">fn</span> <span class="ident">add_reserved_region</span>(
-    <span class="ident">list</span>: <span class="kw-2">&amp;mut</span> <span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>,
-    <span class="ident">frames</span>: <span class="ident">FrameRange</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">FrameRange</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="doccomment">/// Adds the given `frames` to the given `list` as a Chunk of reserved frames. 
+/// 
+/// Returns the range of **new** frames that were added to the list, 
+/// which will be a subset of the given input `frames`.
+///
+/// Currently, this function adds no new frames at all if any frames within the given `frames` list
+/// overlap any existing regions at all. 
+/// TODO: handle partially-overlapping regions by extending existing regions on either end.
+</span><span class="kw">fn </span>add_reserved_region(
+    list: <span class="kw-2">&amp;mut </span>StaticArrayRBTree&lt;Chunk&gt;,
+    frames: FrameRange,
+) -&gt; <span class="prelude-ty">Result</span>&lt;FrameRange, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 
-    <span class="comment">// Check whether the reserved region overlaps any existing regions.</span>
-    <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="ident">list</span>.<span class="number">0</span> {
-        <span class="ident">Inner::Array</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">arr</span>) =&gt; {
-            <span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="ident">arr</span>.<span class="ident">iter</span>() {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">elem</span> {
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">_overlap</span>) <span class="op">=</span> <span class="ident">chunk</span>.<span class="ident">overlap</span>(<span class="kw-2">&amp;</span><span class="ident">frames</span>) {
-                        <span class="comment">// trace!(&quot;Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}&quot;,</span>
-                        <span class="comment">//     frames, _overlap, chunk</span>
-                        <span class="comment">// );</span>
-                        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Failed to add reserved region that overlapped with existing reserved regions (array).&quot;</span>);
+    <span class="comment">// Check whether the reserved region overlaps any existing regions.
+    </span><span class="kw">match </span><span class="kw-2">&amp;mut </span>list.<span class="number">0 </span>{
+        Inner::Array(<span class="kw-2">ref mut </span>arr) =&gt; {
+            <span class="kw">for </span>elem <span class="kw">in </span>arr.iter() {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(chunk) = elem {
+                    <span class="kw">if let </span><span class="prelude-val">Some</span>(_overlap) = chunk.overlap(<span class="kw-2">&amp;</span>frames) {
+                        <span class="comment">// trace!(&quot;Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}&quot;,
+                        //     frames, _overlap, chunk
+                        // );
+                        </span><span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Failed to add reserved region that overlapped with existing reserved regions (array).&quot;</span>);
                     }
                 }
             }
         }
-        <span class="ident">Inner::RBTree</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">tree</span>) =&gt; {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor_mut</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">upper_bound_mut</span>(<span class="ident">Bound::Included</span>(<span class="ident">frames</span>.<span class="ident">start</span>()));
-            <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">cursor_mut</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">deref</span>()) {
-                <span class="kw">if</span> <span class="ident">chunk</span>.<span class="ident">start</span>() <span class="op">&gt;</span> <span class="ident">frames</span>.<span class="ident">end</span>() {
-                    <span class="comment">// We&#39;re iterating in ascending order over a sorted tree,</span>
-                    <span class="comment">// so we can stop looking for overlapping regions once we pass the end of the new frames to add.</span>
-                    <span class="kw">break</span>;
+        Inner::RBTree(<span class="kw-2">ref mut </span>tree) =&gt; {
+            <span class="kw">let </span><span class="kw-2">mut </span>cursor_mut = tree.upper_bound_mut(Bound::Included(frames.start()));
+            <span class="kw">while let </span><span class="prelude-val">Some</span>(chunk) = cursor_mut.get().map(|w| w.deref()) {
+                <span class="kw">if </span>chunk.start() &gt; frames.end() {
+                    <span class="comment">// We&#39;re iterating in ascending order over a sorted tree,
+                    // so we can stop looking for overlapping regions once we pass the end of the new frames to add.
+                    </span><span class="kw">break</span>;
                 }
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">_overlap</span>) <span class="op">=</span> <span class="ident">chunk</span>.<span class="ident">overlap</span>(<span class="kw-2">&amp;</span><span class="ident">frames</span>) {
-                    <span class="comment">// trace!(&quot;Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}&quot;,</span>
-                    <span class="comment">//     frames, _overlap, chunk</span>
-                    <span class="comment">// );</span>
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Failed to add reserved region that overlapped with existing reserved regions (RBTree).&quot;</span>);
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(_overlap) = chunk.overlap(<span class="kw-2">&amp;</span>frames) {
+                    <span class="comment">// trace!(&quot;Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}&quot;,
+                    //     frames, _overlap, chunk
+                    // );
+                    </span><span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Failed to add reserved region that overlapped with existing reserved regions (RBTree).&quot;</span>);
                 }
-                <span class="ident">cursor_mut</span>.<span class="ident">move_next</span>();
+                cursor_mut.move_next();
             }
         }
     }
 
-    <span class="ident">list</span>.<span class="ident">insert</span>(<span class="ident">Chunk</span> {
-        <span class="ident">typ</span>: <span class="ident">MemoryRegionType::Reserved</span>,
-        <span class="ident">frames</span>: <span class="ident">frames</span>.<span class="ident">clone</span>(),
-    }).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_c</span><span class="op">|</span> <span class="string">&quot;BUG: Failed to insert non-overlapping frames into list.&quot;</span>)<span class="question-mark">?</span>;
+    list.insert(Chunk {
+        typ: MemoryRegionType::Reserved,
+        frames: frames.clone(),
+    }).map_err(|_c| <span class="string">&quot;BUG: Failed to insert non-overlapping frames into list.&quot;</span>)<span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>(<span class="ident">frames</span>)
+    <span class="prelude-val">Ok</span>(frames)
 }
 
 
-<span class="doccomment">/// The core frame allocation routine that allocates the given number of physical frames,</span>
-<span class="doccomment">/// optionally at the requested starting `PhysicalAddress`.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This simply reserves a range of frames; it does not perform any memory mapping. </span>
-<span class="doccomment">/// Thus, the memory represented by the returned `AllocatedFrames` isn&#39;t directly accessible</span>
-<span class="doccomment">/// until you map virtual pages to them.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Allocation is based on a red-black tree and is thus `O(log(n))`.</span>
-<span class="doccomment">/// Fragmentation isn&#39;t cleaned up until we&#39;re out of address space, but that&#39;s not really a big deal.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `requested_paddr`: if `Some`, the returned `AllocatedFrames` will start at the `Frame`</span>
-<span class="doccomment">///   containing this `PhysicalAddress`. </span>
-<span class="doccomment">///   If `None`, the first available `Frame` range will be used, starting at any random physical address.</span>
-<span class="doccomment">/// * `num_frames`: the number of `Frame`s to be allocated. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Return</span>
-<span class="doccomment">/// If successful, returns a tuple of two items:</span>
-<span class="doccomment">/// * the frames that were allocated, and</span>
-<span class="doccomment">/// * an opaque struct representing details of bookkeeping-related actions that may cause heap allocation. </span>
-<span class="doccomment">///   Those actions are deferred until this returned `DeferredAllocAction` struct object is dropped, </span>
-<span class="doccomment">///   allowing the caller (such as the heap implementation itself) to control when heap allocation may occur.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_frames_deferred</span>(
-    <span class="ident">requested_paddr</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">PhysicalAddress</span><span class="op">&gt;</span>,
-    <span class="ident">num_frames</span>: <span class="ident">usize</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">if</span> <span class="ident">num_frames</span> <span class="op">==</span> <span class="number">0</span> {
+<span class="doccomment">/// The core frame allocation routine that allocates the given number of physical frames,
+/// optionally at the requested starting `PhysicalAddress`.
+/// 
+/// This simply reserves a range of frames; it does not perform any memory mapping. 
+/// Thus, the memory represented by the returned `AllocatedFrames` isn&#39;t directly accessible
+/// until you map virtual pages to them.
+/// 
+/// Allocation is based on a red-black tree and is thus `O(log(n))`.
+/// Fragmentation isn&#39;t cleaned up until we&#39;re out of address space, but that&#39;s not really a big deal.
+/// 
+/// # Arguments
+/// * `requested_paddr`: if `Some`, the returned `AllocatedFrames` will start at the `Frame`
+///   containing this `PhysicalAddress`. 
+///   If `None`, the first available `Frame` range will be used, starting at any random physical address.
+/// * `num_frames`: the number of `Frame`s to be allocated. 
+/// 
+/// # Return
+/// If successful, returns a tuple of two items:
+/// * the frames that were allocated, and
+/// * an opaque struct representing details of bookkeeping-related actions that may cause heap allocation. 
+///   Those actions are deferred until this returned `DeferredAllocAction` struct object is dropped, 
+///   allowing the caller (such as the heap implementation itself) to control when heap allocation may occur.
+</span><span class="kw">pub fn </span>allocate_frames_deferred(
+    requested_paddr: <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;,
+    num_frames: usize,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedFrames, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">if </span>num_frames == <span class="number">0 </span>{
         <span class="macro">warn!</span>(<span class="string">&quot;frame_allocator: requested an allocation of 0 frames... stupid!&quot;</span>);
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;cannot allocate zero frames&quot;</span>);
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;cannot allocate zero frames&quot;</span>);
     }
     
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">paddr</span>) <span class="op">=</span> <span class="ident">requested_paddr</span> {
-        <span class="kw">let</span> <span class="ident">start_frame</span> <span class="op">=</span> <span class="ident">Frame::containing_address</span>(<span class="ident">paddr</span>);
-        <span class="kw">let</span> <span class="ident">end_frame</span> <span class="op">=</span> <span class="ident">start_frame</span> <span class="op">+</span> (<span class="ident">num_frames</span> <span class="op">-</span> <span class="number">1</span>);
-        <span class="comment">// Try to allocate the frames at the specific address.</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">free_reserved_frames_list</span> <span class="op">=</span> <span class="ident">FREE_RESERVED_FRAMES_LIST</span>.<span class="ident">lock</span>();
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">success</span>) <span class="op">=</span> <span class="ident">find_specific_chunk</span>(<span class="kw-2">&amp;mut</span> <span class="ident">free_reserved_frames_list</span>, <span class="ident">start_frame</span>, <span class="ident">num_frames</span>) {
-            <span class="prelude-val">Ok</span>(<span class="ident">success</span>)
-        } <span class="kw">else</span> {
-            <span class="comment">// If allocation failed, then the requested `start_frame` may be found in the general-purpose list</span>
-            <span class="comment">// or may represent a new, previously-unknown reserved region that we must add.</span>
-            <span class="comment">// We first attempt to allocate it from the general-purpose free regions.</span>
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">result</span>) <span class="op">=</span> <span class="ident">find_specific_chunk</span>(<span class="kw-2">&amp;mut</span> <span class="ident">FREE_GENERAL_FRAMES_LIST</span>.<span class="ident">lock</span>(), <span class="ident">start_frame</span>, <span class="ident">num_frames</span>) {
-                <span class="prelude-val">Ok</span>(<span class="ident">result</span>)
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(paddr) = requested_paddr {
+        <span class="kw">let </span>start_frame = Frame::containing_address(paddr);
+        <span class="kw">let </span>end_frame = start_frame + (num_frames - <span class="number">1</span>);
+        <span class="comment">// Try to allocate the frames at the specific address.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>free_reserved_frames_list = FREE_RESERVED_FRAMES_LIST.lock();
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(success) = find_specific_chunk(<span class="kw-2">&amp;mut </span>free_reserved_frames_list, start_frame, num_frames) {
+            <span class="prelude-val">Ok</span>(success)
+        } <span class="kw">else </span>{
+            <span class="comment">// If allocation failed, then the requested `start_frame` may be found in the general-purpose list
+            // or may represent a new, previously-unknown reserved region that we must add.
+            // We first attempt to allocate it from the general-purpose free regions.
+            </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(result) = find_specific_chunk(<span class="kw-2">&amp;mut </span>FREE_GENERAL_FRAMES_LIST.lock(), start_frame, num_frames) {
+                <span class="prelude-val">Ok</span>(result)
             } 
-            <span class="comment">// If we failed to allocate the requested frames from the general list,</span>
-            <span class="comment">// we can add a new reserved region containing them,</span>
-            <span class="comment">// but ONLY if those frames are *NOT* in the general-purpose region.</span>
-            <span class="kw">else</span> <span class="kw">if</span> {
-                <span class="kw">let</span> <span class="ident">g</span> <span class="op">=</span> <span class="ident">GENERAL_REGIONS</span>.<span class="ident">lock</span>();  
-                <span class="op">!</span><span class="ident">frame_is_in_list</span>(<span class="kw-2">&amp;</span><span class="ident">g</span>, <span class="kw-2">&amp;</span><span class="ident">start_frame</span>) <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">frame_is_in_list</span>(<span class="kw-2">&amp;</span><span class="ident">g</span>, <span class="kw-2">&amp;</span><span class="ident">end_frame</span>)
+            <span class="comment">// If we failed to allocate the requested frames from the general list,
+            // we can add a new reserved region containing them,
+            // but ONLY if those frames are *NOT* in the general-purpose region.
+            </span><span class="kw">else if </span>{
+                <span class="kw">let </span>g = GENERAL_REGIONS.lock();  
+                !frame_is_in_list(<span class="kw-2">&amp;</span>g, <span class="kw-2">&amp;</span>start_frame) &amp;&amp; !frame_is_in_list(<span class="kw-2">&amp;</span>g, <span class="kw-2">&amp;</span>end_frame)
             } {
-                <span class="kw">let</span> <span class="ident">frames</span> <span class="op">=</span> <span class="ident">FrameRange::new</span>(<span class="ident">start_frame</span>, <span class="ident">end_frame</span>);
-                <span class="kw">let</span> <span class="ident">new_reserved_frames</span> <span class="op">=</span> <span class="ident">add_reserved_region</span>(<span class="kw-2">&amp;mut</span> <span class="ident">RESERVED_REGIONS</span>.<span class="ident">lock</span>(), <span class="ident">frames</span>)<span class="question-mark">?</span>;
-                <span class="comment">// If we successfully added a new reserved region,</span>
-                <span class="comment">// then add those frames to the actual list of *available* reserved regions.</span>
-                <span class="kw">let</span> <span class="ident">_new_free_reserved_frames</span> <span class="op">=</span> <span class="ident">add_reserved_region</span>(<span class="kw-2">&amp;mut</span> <span class="ident">free_reserved_frames_list</span>, <span class="ident">new_reserved_frames</span>.<span class="ident">clone</span>())<span class="question-mark">?</span>;
-                <span class="macro">assert_eq!</span>(<span class="ident">new_reserved_frames</span>, <span class="ident">_new_free_reserved_frames</span>);
-                <span class="ident">find_specific_chunk</span>(<span class="kw-2">&amp;mut</span> <span class="ident">free_reserved_frames_list</span>, <span class="ident">start_frame</span>, <span class="ident">num_frames</span>)
+                <span class="kw">let </span>frames = FrameRange::new(start_frame, end_frame);
+                <span class="kw">let </span>new_reserved_frames = add_reserved_region(<span class="kw-2">&amp;mut </span>RESERVED_REGIONS.lock(), frames)<span class="question-mark">?</span>;
+                <span class="comment">// If we successfully added a new reserved region,
+                // then add those frames to the actual list of *available* reserved regions.
+                </span><span class="kw">let </span>_new_free_reserved_frames = add_reserved_region(<span class="kw-2">&amp;mut </span>free_reserved_frames_list, new_reserved_frames.clone())<span class="question-mark">?</span>;
+                <span class="macro">assert_eq!</span>(new_reserved_frames, _new_free_reserved_frames);
+                find_specific_chunk(<span class="kw-2">&amp;mut </span>free_reserved_frames_list, start_frame, num_frames)
             } 
-            <span class="kw">else</span> {
-                <span class="prelude-val">Err</span>(<span class="ident">AllocationError::AddressNotFree</span>(<span class="ident">start_frame</span>, <span class="ident">num_frames</span>))
+            <span class="kw">else </span>{
+                <span class="prelude-val">Err</span>(AllocationError::AddressNotFree(start_frame, num_frames))
             }
         }
-    } <span class="kw">else</span> {
-        <span class="ident">find_any_chunk</span>(<span class="kw-2">&amp;mut</span> <span class="ident">FREE_GENERAL_FRAMES_LIST</span>.<span class="ident">lock</span>(), <span class="ident">num_frames</span>)
-    }.<span class="ident">map_err</span>(<span class="ident">From::from</span>) <span class="comment">// convert from AllocationError to &amp;str</span>
-}
+    } <span class="kw">else </span>{
+        find_any_chunk(<span class="kw-2">&amp;mut </span>FREE_GENERAL_FRAMES_LIST.lock(), num_frames)
+    }.map_err(From::from) <span class="comment">// convert from AllocationError to &amp;str
+</span>}
 
 
-<span class="doccomment">/// Similar to [`allocated_frames_deferred()`](fn.allocate_frames_deferred.html),</span>
-<span class="doccomment">/// but accepts a size value for the allocated frames in number of bytes instead of number of frames. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This function still allocates whole frames by rounding up the number of bytes. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_frames_by_bytes_deferred</span>(
-    <span class="ident">requested_paddr</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">PhysicalAddress</span><span class="op">&gt;</span>,
-    <span class="ident">num_bytes</span>: <span class="ident">usize</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">actual_num_bytes</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">paddr</span>) <span class="op">=</span> <span class="ident">requested_paddr</span> {
-        <span class="ident">num_bytes</span> <span class="op">+</span> (<span class="ident">paddr</span>.<span class="ident">value</span>() <span class="op">%</span> <span class="ident">FRAME_SIZE</span>)
-    } <span class="kw">else</span> {
-        <span class="ident">num_bytes</span>
+<span class="doccomment">/// Similar to [`allocated_frames_deferred()`](fn.allocate_frames_deferred.html),
+/// but accepts a size value for the allocated frames in number of bytes instead of number of frames. 
+/// 
+/// This function still allocates whole frames by rounding up the number of bytes. 
+</span><span class="kw">pub fn </span>allocate_frames_by_bytes_deferred(
+    requested_paddr: <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;,
+    num_bytes: usize,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedFrames, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>actual_num_bytes = <span class="kw">if let </span><span class="prelude-val">Some</span>(paddr) = requested_paddr {
+        num_bytes + (paddr.value() % FRAME_SIZE)
+    } <span class="kw">else </span>{
+        num_bytes
     };
-    <span class="kw">let</span> <span class="ident">num_frames</span> <span class="op">=</span> (<span class="ident">actual_num_bytes</span> <span class="op">+</span> <span class="ident">FRAME_SIZE</span> <span class="op">-</span> <span class="number">1</span>) <span class="op">/</span> <span class="ident">FRAME_SIZE</span>; <span class="comment">// round up</span>
-    <span class="ident">allocate_frames_deferred</span>(<span class="ident">requested_paddr</span>, <span class="ident">num_frames</span>)
+    <span class="kw">let </span>num_frames = (actual_num_bytes + FRAME_SIZE - <span class="number">1</span>) / FRAME_SIZE; <span class="comment">// round up
+    </span>allocate_frames_deferred(requested_paddr, num_frames)
 }
 
 
-<span class="doccomment">/// Allocates the given number of frames with no constraints on the starting physical address.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_frames</span>(<span class="ident">num_frames</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AllocatedFrames</span><span class="op">&gt;</span> {
-    <span class="ident">allocate_frames_deferred</span>(<span class="prelude-val">None</span>, <span class="ident">num_frames</span>)
-        .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">af</span>, <span class="ident">_action</span>)<span class="op">|</span> <span class="ident">af</span>)
-        .<span class="ident">ok</span>()
+<span class="doccomment">/// Allocates the given number of frames with no constraints on the starting physical address.
+/// 
+/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. 
+</span><span class="kw">pub fn </span>allocate_frames(num_frames: usize) -&gt; <span class="prelude-ty">Option</span>&lt;AllocatedFrames&gt; {
+    allocate_frames_deferred(<span class="prelude-val">None</span>, num_frames)
+        .map(|(af, _action)| af)
+        .ok()
 }
 
 
-<span class="doccomment">/// Allocates frames with no constraints on the starting physical address, </span>
-<span class="doccomment">/// with a size given by the number of bytes. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This function still allocates whole frames by rounding up the number of bytes. </span>
-<span class="doccomment">/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_frames_by_bytes</span>(<span class="ident">num_bytes</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AllocatedFrames</span><span class="op">&gt;</span> {
-    <span class="ident">allocate_frames_by_bytes_deferred</span>(<span class="prelude-val">None</span>, <span class="ident">num_bytes</span>)
-        .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">af</span>, <span class="ident">_action</span>)<span class="op">|</span> <span class="ident">af</span>)
-        .<span class="ident">ok</span>()
+<span class="doccomment">/// Allocates frames with no constraints on the starting physical address, 
+/// with a size given by the number of bytes. 
+/// 
+/// This function still allocates whole frames by rounding up the number of bytes. 
+/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. 
+</span><span class="kw">pub fn </span>allocate_frames_by_bytes(num_bytes: usize) -&gt; <span class="prelude-ty">Option</span>&lt;AllocatedFrames&gt; {
+    allocate_frames_by_bytes_deferred(<span class="prelude-val">None</span>, num_bytes)
+        .map(|(af, _action)| af)
+        .ok()
 }
 
 
-<span class="doccomment">/// Allocates frames starting at the given `PhysicalAddress` with a size given in number of bytes. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This function still allocates whole frames by rounding up the number of bytes. </span>
-<span class="doccomment">/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_frames_by_bytes_at</span>(<span class="ident">paddr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">num_bytes</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">AllocatedFrames</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="ident">allocate_frames_by_bytes_deferred</span>(<span class="prelude-val">Some</span>(<span class="ident">paddr</span>), <span class="ident">num_bytes</span>)
-        .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">af</span>, <span class="ident">_action</span>)<span class="op">|</span> <span class="ident">af</span>)
+<span class="doccomment">/// Allocates frames starting at the given `PhysicalAddress` with a size given in number of bytes. 
+/// 
+/// This function still allocates whole frames by rounding up the number of bytes. 
+/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. 
+</span><span class="kw">pub fn </span>allocate_frames_by_bytes_at(paddr: PhysicalAddress, num_bytes: usize) -&gt; <span class="prelude-ty">Result</span>&lt;AllocatedFrames, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    allocate_frames_by_bytes_deferred(<span class="prelude-val">Some</span>(paddr), num_bytes)
+        .map(|(af, _action)| af)
 }
 
 
-<span class="doccomment">/// Allocates the given number of frames starting at (inclusive of) the frame containing the given `PhysicalAddress`.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_frames_at</span>(<span class="ident">paddr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">num_frames</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">AllocatedFrames</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="ident">allocate_frames_deferred</span>(<span class="prelude-val">Some</span>(<span class="ident">paddr</span>), <span class="ident">num_frames</span>)
-        .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">af</span>, <span class="ident">_action</span>)<span class="op">|</span> <span class="ident">af</span>)
+<span class="doccomment">/// Allocates the given number of frames starting at (inclusive of) the frame containing the given `PhysicalAddress`.
+/// 
+/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. 
+</span><span class="kw">pub fn </span>allocate_frames_at(paddr: PhysicalAddress, num_frames: usize) -&gt; <span class="prelude-ty">Result</span>&lt;AllocatedFrames, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    allocate_frames_deferred(<span class="prelude-val">Some</span>(paddr), num_frames)
+        .map(|(af, _action)| af)
 }
 
 
-<span class="doccomment">/// Converts the frame allocator from using static memory (a primitive array) to dynamically-allocated memory.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Call this function once heap allocation is available. </span>
-<span class="doccomment">/// Calling this multiple times is unnecessary but harmless, as it will do nothing after the first invocation.</span>
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span> 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">convert_to_heap_allocated</span>() {
-    <span class="ident">FREE_GENERAL_FRAMES_LIST</span>.<span class="ident">lock</span>().<span class="ident">convert_to_heap_allocated</span>();
-    <span class="ident">FREE_RESERVED_FRAMES_LIST</span>.<span class="ident">lock</span>().<span class="ident">convert_to_heap_allocated</span>();
-    <span class="ident">GENERAL_REGIONS</span>.<span class="ident">lock</span>().<span class="ident">convert_to_heap_allocated</span>();
-    <span class="ident">RESERVED_REGIONS</span>.<span class="ident">lock</span>().<span class="ident">convert_to_heap_allocated</span>();
+<span class="doccomment">/// Converts the frame allocator from using static memory (a primitive array) to dynamically-allocated memory.
+/// 
+/// Call this function once heap allocation is available. 
+/// Calling this multiple times is unnecessary but harmless, as it will do nothing after the first invocation.
+</span><span class="attr">#[doc(hidden)] 
+</span><span class="kw">pub fn </span>convert_to_heap_allocated() {
+    FREE_GENERAL_FRAMES_LIST.lock().convert_to_heap_allocated();
+    FREE_RESERVED_FRAMES_LIST.lock().convert_to_heap_allocated();
+    GENERAL_REGIONS.lock().convert_to_heap_allocated();
+    RESERVED_REGIONS.lock().convert_to_heap_allocated();
 }
 
-<span class="doccomment">/// A debugging function used to dump the full internal state of the frame allocator. </span>
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span> 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dump_frame_allocator_state</span>() {
+<span class="doccomment">/// A debugging function used to dump the full internal state of the frame allocator. 
+</span><span class="attr">#[doc(hidden)] 
+</span><span class="kw">pub fn </span>dump_frame_allocator_state() {
     <span class="macro">debug!</span>(<span class="string">&quot;----------------- FREE GENERAL FRAMES ---------------&quot;</span>);
-    <span class="ident">FREE_GENERAL_FRAMES_LIST</span>.<span class="ident">lock</span>().<span class="ident">iter</span>().<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">debug!</span>(<span class="string">&quot;\t {:?}&quot;</span>, <span class="ident">e</span>) );
+    FREE_GENERAL_FRAMES_LIST.lock().iter().for_each(|e| <span class="macro">debug!</span>(<span class="string">&quot;\t {:?}&quot;</span>, e) );
     <span class="macro">debug!</span>(<span class="string">&quot;-----------------------------------------------------&quot;</span>);
     <span class="macro">debug!</span>(<span class="string">&quot;----------------- FREE RESERVED FRAMES --------------&quot;</span>);
-    <span class="ident">FREE_RESERVED_FRAMES_LIST</span>.<span class="ident">lock</span>().<span class="ident">iter</span>().<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">debug!</span>(<span class="string">&quot;\t {:?}&quot;</span>, <span class="ident">e</span>) );
+    FREE_RESERVED_FRAMES_LIST.lock().iter().for_each(|e| <span class="macro">debug!</span>(<span class="string">&quot;\t {:?}&quot;</span>, e) );
     <span class="macro">debug!</span>(<span class="string">&quot;-----------------------------------------------------&quot;</span>);
     <span class="macro">debug!</span>(<span class="string">&quot;------------------ GENERAL REGIONS -----------------&quot;</span>);
-    <span class="ident">GENERAL_REGIONS</span>.<span class="ident">lock</span>().<span class="ident">iter</span>().<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">debug!</span>(<span class="string">&quot;\t {:?}&quot;</span>, <span class="ident">e</span>) );
+    GENERAL_REGIONS.lock().iter().for_each(|e| <span class="macro">debug!</span>(<span class="string">&quot;\t {:?}&quot;</span>, e) );
     <span class="macro">debug!</span>(<span class="string">&quot;-----------------------------------------------------&quot;</span>);
     <span class="macro">debug!</span>(<span class="string">&quot;------------------ RESERVED REGIONS -----------------&quot;</span>);
-    <span class="ident">RESERVED_REGIONS</span>.<span class="ident">lock</span>().<span class="ident">iter</span>().<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">debug!</span>(<span class="string">&quot;\t {:?}&quot;</span>, <span class="ident">e</span>) );
+    RESERVED_REGIONS.lock().iter().for_each(|e| <span class="macro">debug!</span>(<span class="string">&quot;\t {:?}&quot;</span>, e) );
     <span class="macro">debug!</span>(<span class="string">&quot;-----------------------------------------------------&quot;</span>);
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="frame_allocator" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="frame_allocator" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

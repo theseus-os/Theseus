@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/tss/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../tss/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../tss/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../tss/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/tss/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../tss/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -60,61 +54,60 @@
 <span id="54">54</span>
 <span id="55">55</span>
 <span id="56">56</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
+</pre><pre class="rust"><code><span class="attr">#![no_std]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">atomic_linked_list</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">x86_64</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">apic</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
+#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>atomic_linked_list;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>x86_64;
+<span class="kw">extern crate </span>apic;
+<span class="kw">extern crate </span>spin;
 
-<span class="kw">use</span> <span class="ident">x86_64::structures::tss::TaskStateSegment</span>;
-<span class="kw">use</span> <span class="ident">atomic_linked_list::atomic_map::AtomicMap</span>;
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">memory::VirtualAddress</span>;
-
-
-<span class="doccomment">/// The index of the double fault stack in a TaskStateSegment (TSS)</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DOUBLE_FAULT_IST_INDEX</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
-
-<span class="doccomment">/// The TSS list, one per core, indexed by a key of apic_id.</span>
-<span class="kw">static</span> <span class="ident">TSS</span>: <span class="ident">AtomicMap</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">TaskStateSegment</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicMap::new</span>();
+<span class="kw">use </span>x86_64::structures::tss::TaskStateSegment;
+<span class="kw">use </span>atomic_linked_list::atomic_map::AtomicMap;
+<span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>memory::VirtualAddress;
 
 
-<span class="doccomment">/// Sets the current core&#39;s TSS privilege stack 0 (RSP0) entry, which points to the stack that </span>
-<span class="doccomment">/// the x86_64 hardware automatically switches to when transitioning from Ring 3 -&gt; Ring 0.</span>
-<span class="doccomment">/// Should be set to an address within the current userspace task&#39;s kernel stack.</span>
-<span class="doccomment">/// WARNING: If set incorrectly, the OS will crash upon an interrupt from userspace into kernel space!!</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tss_set_rsp0</span>(<span class="ident">new_privilege_stack_top</span>: <span class="ident">VirtualAddress</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">my_apic_id</span> <span class="op">=</span> <span class="ident">apic::get_my_apic_id</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tss_entry</span> <span class="op">=</span> <span class="ident">TSS</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">my_apic_id</span>).<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-        <span class="macro">error!</span>(<span class="string">&quot;tss_set_rsp0(): couldn&#39;t find TSS for apic {}&quot;</span>, <span class="ident">my_apic_id</span>);
-        <span class="string">&quot;No TSS for the current core&#39;s apid id&quot;</span> 
-    })<span class="question-mark">?</span>.<span class="ident">lock</span>();
-    <span class="ident">tss_entry</span>.<span class="ident">privilege_stack_table</span>[<span class="number">0</span>] <span class="op">=</span> <span class="ident">x86_64::VirtAddr::new</span>(<span class="ident">new_privilege_stack_top</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
-    <span class="comment">// trace!(&quot;tss_set_rsp0: new TSS {:?}&quot;, tss_entry);</span>
-    <span class="prelude-val">Ok</span>(())
+<span class="doccomment">/// The index of the double fault stack in a TaskStateSegment (TSS)
+</span><span class="kw">pub const </span>DOUBLE_FAULT_IST_INDEX: usize = <span class="number">0</span>;
+
+<span class="doccomment">/// The TSS list, one per core, indexed by a key of apic_id.
+</span><span class="kw">static </span>TSS: AtomicMap&lt;u8, Mutex&lt;TaskStateSegment&gt;&gt; = AtomicMap::new();
+
+
+<span class="doccomment">/// Sets the current core&#39;s TSS privilege stack 0 (RSP0) entry, which points to the stack that 
+/// the x86_64 hardware automatically switches to when transitioning from Ring 3 -&gt; Ring 0.
+/// Should be set to an address within the current userspace task&#39;s kernel stack.
+/// WARNING: If set incorrectly, the OS will crash upon an interrupt from userspace into kernel space!!
+</span><span class="kw">pub fn </span>tss_set_rsp0(new_privilege_stack_top: VirtualAddress) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>my_apic_id = apic::get_my_apic_id();
+    <span class="kw">let </span><span class="kw-2">mut </span>tss_entry = TSS.get(<span class="kw-2">&amp;</span>my_apic_id).ok_or_else(|| {
+        <span class="macro">error!</span>(<span class="string">&quot;tss_set_rsp0(): couldn&#39;t find TSS for apic {}&quot;</span>, my_apic_id);
+        <span class="string">&quot;No TSS for the current core&#39;s apid id&quot; 
+    </span>})<span class="question-mark">?</span>.lock();
+    tss_entry.privilege_stack_table[<span class="number">0</span>] = x86_64::VirtAddr::new(new_privilege_stack_top.value() <span class="kw">as </span>u64);
+    <span class="comment">// trace!(&quot;tss_set_rsp0: new TSS {:?}&quot;, tss_entry);
+    </span><span class="prelude-val">Ok</span>(())
 }
 
 
-<span class="doccomment">/// set up TSS entry for the given AP core. </span>
-<span class="doccomment">/// Returns a reference to a Mutex wrapping the new TSS entry.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_tss</span>(
-    <span class="ident">apic_id</span>: <span class="ident">u8</span>, 
-    <span class="ident">double_fault_stack_top_unusable</span>: <span class="ident">VirtualAddress</span>, 
-    <span class="ident">privilege_stack_top_unusable</span>: <span class="ident">VirtualAddress</span>
-) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">TaskStateSegment</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tss</span> <span class="op">=</span> <span class="ident">TaskStateSegment::new</span>();
-    <span class="comment">// TSS.RSP0 is used in kernel space after a transition from Ring 3 -&gt; Ring 0</span>
-    <span class="ident">tss</span>.<span class="ident">privilege_stack_table</span>[<span class="number">0</span>] <span class="op">=</span> <span class="ident">x86_64::VirtAddr::new</span>(<span class="ident">privilege_stack_top_unusable</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
-    <span class="ident">tss</span>.<span class="ident">interrupt_stack_table</span>[<span class="ident">DOUBLE_FAULT_IST_INDEX</span>] <span class="op">=</span> <span class="ident">x86_64::VirtAddr::new</span>(<span class="ident">double_fault_stack_top_unusable</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
+<span class="doccomment">/// set up TSS entry for the given AP core. 
+/// Returns a reference to a Mutex wrapping the new TSS entry.
+</span><span class="kw">pub fn </span>create_tss(
+    apic_id: u8, 
+    double_fault_stack_top_unusable: VirtualAddress, 
+    privilege_stack_top_unusable: VirtualAddress
+) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Mutex&lt;TaskStateSegment&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>tss = TaskStateSegment::new();
+    <span class="comment">// TSS.RSP0 is used in kernel space after a transition from Ring 3 -&gt; Ring 0
+    </span>tss.privilege_stack_table[<span class="number">0</span>] = x86_64::VirtAddr::new(privilege_stack_top_unusable.value() <span class="kw">as </span>u64);
+    tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = x86_64::VirtAddr::new(double_fault_stack_top_unusable.value() <span class="kw">as </span>u64);
 
-    <span class="comment">// insert into TSS list</span>
-    <span class="ident">TSS</span>.<span class="ident">insert</span>(<span class="ident">apic_id</span>, <span class="ident">Mutex::new</span>(<span class="ident">tss</span>));
-    <span class="kw">let</span> <span class="ident">tss_ref</span> <span class="op">=</span> <span class="ident">TSS</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">apic_id</span>).<span class="ident">unwrap</span>(); <span class="comment">// safe to unwrap since we just added it to the list</span>
-    <span class="comment">// debug!(&quot;Created TSS for apic {}, TSS: {:?}&quot;, apic_id, tss_ref);</span>
-    <span class="ident">tss_ref</span>
+    <span class="comment">// insert into TSS list
+    </span>TSS.insert(apic_id, Mutex::new(tss));
+    <span class="kw">let </span>tss_ref = TSS.get(<span class="kw-2">&amp;</span>apic_id).unwrap(); <span class="comment">// safe to unwrap since we just added it to the list
+    // debug!(&quot;Created TSS for apic {}, TSS: {:?}&quot;, apic_id, tss_ref);
+    </span>tss_ref
 }</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tss" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tss" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

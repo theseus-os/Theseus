@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/event_types/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../event_types/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../event_types/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../event_types/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/event_types/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../event_types/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -105,107 +99,106 @@
 <span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
+</pre><pre class="rust"><code><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">keycodes_ascii</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mouse_data</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">shapes</span>;
+</span><span class="kw">extern crate </span>keycodes_ascii;
+<span class="kw">extern crate </span>mouse_data;
+<span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>shapes;
 
-<span class="kw">use</span> <span class="ident">keycodes_ascii::KeyEvent</span>;
-<span class="kw">use</span> <span class="ident">mouse_data::MouseEvent</span>;
-<span class="kw">use</span> <span class="ident">alloc::string::String</span>;
-<span class="kw">use</span> <span class="ident">shapes</span>::{<span class="ident">Coord</span>, <span class="ident">Rectangle</span>};
+<span class="kw">use </span>keycodes_ascii::KeyEvent;
+<span class="kw">use </span>mouse_data::MouseEvent;
+<span class="kw">use </span>alloc::string::String;
+<span class="kw">use </span>shapes::{Coord, Rectangle};
 
-<span class="doccomment">/// An event describing mouse position rather than movement differential from last event.</span>
-<span class="doccomment">/// It contains two position, `coodinate` for the relative position in each window, and `gcoordinate` for global absolute position of the screen.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MousePositionEvent</span> {
-    <span class="doccomment">/// the relative position in window</span>
-    <span class="kw">pub</span> <span class="ident">coordinate</span>: <span class="ident">Coord</span>,
-    <span class="doccomment">/// the global position in window</span>
-    <span class="kw">pub</span> <span class="ident">gcoordinate</span>: <span class="ident">Coord</span>,
-    <span class="doccomment">/// whether the mouse is scrolling up</span>
-    <span class="kw">pub</span> <span class="ident">scrolling_up</span>: <span class="ident">bool</span>,
-    <span class="doccomment">/// whether the mouse is scrolling down</span>
-    <span class="kw">pub</span> <span class="ident">scrolling_down</span>: <span class="ident">bool</span>,
-    <span class="doccomment">/// whether the left button holds</span>
-    <span class="kw">pub</span> <span class="ident">left_button_hold</span>: <span class="ident">bool</span>,
-    <span class="doccomment">/// whether the right button holds</span>
-    <span class="kw">pub</span> <span class="ident">right_button_hold</span>: <span class="ident">bool</span>,
-    <span class="doccomment">/// whether the fourth button holds</span>
-    <span class="kw">pub</span> <span class="ident">fourth_button_hold</span>: <span class="ident">bool</span>,
-    <span class="doccomment">/// whether the fifth button holds</span>
-    <span class="kw">pub</span> <span class="ident">fifth_button_hold</span>: <span class="ident">bool</span>,
+<span class="doccomment">/// An event describing mouse position rather than movement differential from last event.
+/// It contains two position, `coodinate` for the relative position in each window, and `gcoordinate` for global absolute position of the screen.
+</span><span class="attr">#[derive(Debug, Clone)]
+</span><span class="kw">pub struct </span>MousePositionEvent {
+    <span class="doccomment">/// the relative position in window
+    </span><span class="kw">pub </span>coordinate: Coord,
+    <span class="doccomment">/// the global position in window
+    </span><span class="kw">pub </span>gcoordinate: Coord,
+    <span class="doccomment">/// whether the mouse is scrolling up
+    </span><span class="kw">pub </span>scrolling_up: bool,
+    <span class="doccomment">/// whether the mouse is scrolling down
+    </span><span class="kw">pub </span>scrolling_down: bool,
+    <span class="doccomment">/// whether the left button holds
+    </span><span class="kw">pub </span>left_button_hold: bool,
+    <span class="doccomment">/// whether the right button holds
+    </span><span class="kw">pub </span>right_button_hold: bool,
+    <span class="doccomment">/// whether the fourth button holds
+    </span><span class="kw">pub </span>fourth_button_hold: bool,
+    <span class="doccomment">/// whether the fifth button holds
+    </span><span class="kw">pub </span>fifth_button_hold: bool,
 }
 
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">MousePositionEvent</span>  {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
-        <span class="ident">MousePositionEvent</span> {
-            <span class="ident">coordinate</span>: <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>),
-            <span class="ident">gcoordinate</span>: <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>),
-            <span class="ident">scrolling_up</span>: <span class="bool-val">false</span>,
-            <span class="ident">scrolling_down</span>: <span class="bool-val">false</span>,
-            <span class="ident">left_button_hold</span>: <span class="bool-val">false</span>,
-            <span class="ident">right_button_hold</span>: <span class="bool-val">false</span>,
-            <span class="ident">fourth_button_hold</span>: <span class="bool-val">false</span>,
-            <span class="ident">fifth_button_hold</span>: <span class="bool-val">false</span>,
+<span class="kw">impl </span>Default <span class="kw">for </span>MousePositionEvent  {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        MousePositionEvent {
+            coordinate: Coord::new(<span class="number">0</span>, <span class="number">0</span>),
+            gcoordinate: Coord::new(<span class="number">0</span>, <span class="number">0</span>),
+            scrolling_up: <span class="bool-val">false</span>,
+            scrolling_down: <span class="bool-val">false</span>,
+            left_button_hold: <span class="bool-val">false</span>,
+            right_button_hold: <span class="bool-val">false</span>,
+            fourth_button_hold: <span class="bool-val">false</span>,
+            fifth_button_hold: <span class="bool-val">false</span>,
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Event</span> {
-    <span class="doccomment">/// An input event from a keyboard</span>
-    <span class="ident">KeyboardEvent</span>(<span class="ident">KeyboardInputEvent</span>),
-    <span class="doccomment">/// An input event from a mouse</span>
-    <span class="ident">MouseMovementEvent</span>(<span class="ident">MouseEvent</span>),
-    <span class="doccomment">/// An event indicating that another entity wants to print the given `String`.</span>
-    <span class="ident">OutputEvent</span>(<span class="ident">String</span>),
-    <span class="doccomment">/// Tells an application that the window manager has resized or moved its window</span>
-    <span class="doccomment">/// so that it knows to refresh its display and perform any necessary tasks, such as text reflow.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// The new position and size of the window is given by the `Rectangle` within,</span>
-    <span class="doccomment">/// and represents the content area within the window that is accessible to the application,</span>
-    <span class="doccomment">/// which excludes the window title bar, borders, etc. </span>
-    <span class="ident">WindowResizeEvent</span>(<span class="ident">Rectangle</span>),
-    <span class="doccomment">/// The event tells application about mouse&#39;s position currently (including relative to a window and relative to a screen)</span>
-    <span class="ident">MousePositionEvent</span>(<span class="ident">MousePositionEvent</span>),
-    <span class="ident">ExitEvent</span>,
+<span class="attr">#[derive(Debug, Clone)]
+</span><span class="kw">pub enum </span>Event {
+    <span class="doccomment">/// An input event from a keyboard
+    </span>KeyboardEvent(KeyboardInputEvent),
+    <span class="doccomment">/// An input event from a mouse
+    </span>MouseMovementEvent(MouseEvent),
+    <span class="doccomment">/// An event indicating that another entity wants to print the given `String`.
+    </span>OutputEvent(String),
+    <span class="doccomment">/// Tells an application that the window manager has resized or moved its window
+    /// so that it knows to refresh its display and perform any necessary tasks, such as text reflow.
+    /// 
+    /// The new position and size of the window is given by the `Rectangle` within,
+    /// and represents the content area within the window that is accessible to the application,
+    /// which excludes the window title bar, borders, etc. 
+    </span>WindowResizeEvent(Rectangle),
+    <span class="doccomment">/// The event tells application about mouse&#39;s position currently (including relative to a window and relative to a screen)
+    </span>MousePositionEvent(MousePositionEvent),
+    ExitEvent,
 }
 
-<span class="kw">impl</span> <span class="ident">Event</span> {
-    <span class="doccomment">/// Create a new keyboard event</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_keyboard_event</span>(<span class="ident">kev</span>: <span class="ident">KeyEvent</span>) -&gt; <span class="ident">Event</span> {
-        <span class="ident">Event::KeyboardEvent</span>(<span class="ident">KeyboardInputEvent::new</span>(<span class="ident">kev</span>))
+<span class="kw">impl </span>Event {
+    <span class="doccomment">/// Create a new keyboard event
+    </span><span class="kw">pub fn </span>new_keyboard_event(kev: KeyEvent) -&gt; Event {
+        Event::KeyboardEvent(KeyboardInputEvent::new(kev))
     }
 
-    <span class="doccomment">/// Create a new output event</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_output_event</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>(<span class="ident">s</span>: <span class="ident">S</span>) -&gt; <span class="ident">Event</span> <span class="kw">where</span> <span class="ident">S</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-        <span class="ident">Event::OutputEvent</span>(<span class="ident">s</span>.<span class="ident">into</span>())
+    <span class="doccomment">/// Create a new output event
+    </span><span class="kw">pub fn </span>new_output_event&lt;S&gt;(s: S) -&gt; Event <span class="kw">where </span>S: Into&lt;String&gt; {
+        Event::OutputEvent(s.into())
     }
 
-    <span class="doccomment">/// Create a new window resize event</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_window_resize_event</span>(<span class="ident">new_position</span>: <span class="ident">Rectangle</span>) -&gt; <span class="ident">Event</span> {
-        <span class="ident">Event::WindowResizeEvent</span>(<span class="ident">new_position</span>)
+    <span class="doccomment">/// Create a new window resize event
+    </span><span class="kw">pub fn </span>new_window_resize_event(new_position: Rectangle) -&gt; Event {
+        Event::WindowResizeEvent(new_position)
     }
 }
 
-<span class="doccomment">/// A keyboard event, indicating that one or more keys were pressed or released.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">KeyboardInputEvent</span> {
-    <span class="doccomment">/// The key input event from i/o device</span>
-    <span class="kw">pub</span> <span class="ident">key_event</span>: <span class="ident">KeyEvent</span>,
+<span class="doccomment">/// A keyboard event, indicating that one or more keys were pressed or released.
+</span><span class="attr">#[derive(Debug, Clone)]
+</span><span class="kw">pub struct </span>KeyboardInputEvent {
+    <span class="doccomment">/// The key input event from i/o device
+    </span><span class="kw">pub </span>key_event: KeyEvent,
 }
 
-<span class="kw">impl</span> <span class="ident">KeyboardInputEvent</span> {
-    <span class="doccomment">/// Create a new key board input event. `key` is the key input from the keyboard</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">key</span>: <span class="ident">KeyEvent</span>) -&gt; <span class="ident">KeyboardInputEvent</span> {
-        <span class="ident">KeyboardInputEvent</span> { 
-            <span class="ident">key_event</span>: <span class="ident">key</span> 
+<span class="kw">impl </span>KeyboardInputEvent {
+    <span class="doccomment">/// Create a new key board input event. `key` is the key input from the keyboard
+    </span><span class="kw">pub fn </span>new(key: KeyEvent) -&gt; KeyboardInputEvent {
+        KeyboardInputEvent { 
+            key_event: key 
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="event_types" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="event_types" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/fault_log/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../fault_log/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../fault_log/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../fault_log/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/fault_log/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../fault_log/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -277,278 +271,277 @@
 <span id="271">271</span>
 <span id="272">272</span>
 <span id="273">273</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This crate logs all the faults occuring within Theseus. </span>
-<span class="doccomment">//! Maintains a list of exceptions and panics that has occured since booting up. </span>
-<span class="doccomment">//! This crate does not hold reference to any task or app. </span>
-<span class="doccomment">//! </span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate logs all the faults occuring within Theseus. 
+//! Maintains a list of exceptions and panics that has occured since booting up. 
+//! This crate does not hold reference to any task or app. 
+//! 
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">drain_filter</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(drain_filter)]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">vga_buffer</span>; <span class="comment">// for println_raw!()</span>
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">print</span>; <span class="comment">// for regular println!()</span>
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">apic</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
+#[macro_use] </span><span class="kw">extern crate </span>vga_buffer; <span class="comment">// for println_raw!()
+</span><span class="attr">#[macro_use] </span><span class="kw">extern crate </span>print; <span class="comment">// for regular println!()
+</span><span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>task;
+<span class="kw">extern crate </span>apic;
+<span class="kw">extern crate </span>irq_safety;
 
-<span class="kw">use</span> <span class="ident">alloc</span>::{
-    <span class="ident">string</span>::{<span class="ident">String</span>,<span class="ident">ToString</span>},
-    <span class="ident">vec::Vec</span>,
+<span class="kw">use </span>alloc::{
+    string::{String,ToString},
+    vec::Vec,
 };
-<span class="kw">use</span> <span class="ident">memory::VirtualAddress</span>;
-<span class="kw">use</span> <span class="ident">apic::get_my_apic_id</span>;
-<span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
-<span class="kw">use</span> <span class="ident">core::panic::PanicInfo</span>;
+<span class="kw">use </span>memory::VirtualAddress;
+<span class="kw">use </span>apic::get_my_apic_id;
+<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>core::panic::PanicInfo;
 
-<span class="doccomment">/// The possible faults (panics and exceptions) encountered </span>
-<span class="doccomment">/// during operations.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">FaultType</span> {
-    <span class="ident">PageFault</span>,
-    <span class="ident">GeneralProtectionFault</span>,
-    <span class="ident">SegmentNotPresent</span>,
-    <span class="ident">InvalidTSS</span>,
-    <span class="ident">DoubleFault</span>,
-    <span class="ident">DeviceNotAvailable</span>,
-    <span class="ident">InvalidOpCode</span>,
-    <span class="ident">BoundRangeExceeded</span>,
-    <span class="ident">Overflow</span>,
-    <span class="ident">NMI</span>,
-    <span class="ident">DivideByZero</span>,
-    <span class="ident">Panic</span>,
-    <span class="ident">UnknownException</span>(<span class="ident">u8</span>)
+<span class="doccomment">/// The possible faults (panics and exceptions) encountered 
+/// during operations.
+</span><span class="attr">#[derive(Debug, Clone)]
+</span><span class="kw">pub enum </span>FaultType {
+    PageFault,
+    GeneralProtectionFault,
+    SegmentNotPresent,
+    InvalidTSS,
+    DoubleFault,
+    DeviceNotAvailable,
+    InvalidOpCode,
+    BoundRangeExceeded,
+    Overflow,
+    NMI,
+    DivideByZero,
+    Panic,
+    UnknownException(u8)
 }
 
-<span class="doccomment">/// Utility function to get Fault type from exception number. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_exception_number</span>(<span class="ident">num</span>: <span class="ident">u8</span>) -&gt; <span class="ident">FaultType</span> {
-    <span class="kw">match</span> <span class="ident">num</span> {
-        <span class="number">0x0</span> =&gt; <span class="ident">FaultType::DivideByZero</span>,
-        <span class="number">0x2</span> =&gt; <span class="ident">FaultType::NMI</span>,
-        <span class="number">0x4</span> =&gt; <span class="ident">FaultType::Overflow</span>,
-        <span class="number">0x5</span> =&gt; <span class="ident">FaultType::BoundRangeExceeded</span>,
-        <span class="number">0x6</span> =&gt; <span class="ident">FaultType::InvalidOpCode</span>,
-        <span class="number">0x7</span> =&gt; <span class="ident">FaultType::DeviceNotAvailable</span>,
-        <span class="number">0x8</span> =&gt; <span class="ident">FaultType::DoubleFault</span>,
-        <span class="number">0xA</span> =&gt; <span class="ident">FaultType::InvalidTSS</span>,
-        <span class="number">0xB</span> =&gt; <span class="ident">FaultType::SegmentNotPresent</span>,
-        <span class="number">0xD</span> =&gt; <span class="ident">FaultType::GeneralProtectionFault</span>,
-        <span class="number">0xE</span> =&gt; <span class="ident">FaultType::PageFault</span>,
-        <span class="ident">num</span> =&gt; <span class="ident">FaultType::UnknownException</span>(<span class="ident">num</span>),
+<span class="doccomment">/// Utility function to get Fault type from exception number. 
+</span><span class="kw">pub fn </span>from_exception_number(num: u8) -&gt; FaultType {
+    <span class="kw">match </span>num {
+        <span class="number">0x0 </span>=&gt; FaultType::DivideByZero,
+        <span class="number">0x2 </span>=&gt; FaultType::NMI,
+        <span class="number">0x4 </span>=&gt; FaultType::Overflow,
+        <span class="number">0x5 </span>=&gt; FaultType::BoundRangeExceeded,
+        <span class="number">0x6 </span>=&gt; FaultType::InvalidOpCode,
+        <span class="number">0x7 </span>=&gt; FaultType::DeviceNotAvailable,
+        <span class="number">0x8 </span>=&gt; FaultType::DoubleFault,
+        <span class="number">0xA </span>=&gt; FaultType::InvalidTSS,
+        <span class="number">0xB </span>=&gt; FaultType::SegmentNotPresent,
+        <span class="number">0xD </span>=&gt; FaultType::GeneralProtectionFault,
+        <span class="number">0xE </span>=&gt; FaultType::PageFault,
+        num =&gt; FaultType::UnknownException(num),
     }
 }
 
-<span class="doccomment">/// The different types of recovery procedures used for the </span>
-<span class="doccomment">/// observed fault</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">RecoveryAction</span> {
-    <span class="doccomment">/// No action taken on this fault.</span>
-    <span class="prelude-val">None</span>,
-    <span class="doccomment">/// Task restarted only. No crate replaced.</span>
-    <span class="ident">TaskRestarted</span>,
-    <span class="doccomment">/// Crate where fault is observed is replaced, and then task restarted.</span>
-    <span class="ident">FaultCrateReplaced</span>,
-    <span class="doccomment">/// Different Crate than the crate where fault is observed is restrated. </span>
-    <span class="doccomment">/// This option is taken when the same fault is observed multiple times.  </span>
-    <span class="ident">IterativelyCrateReplaced</span>,
-    <span class="doccomment">/// This fault is handled as a recovery for different fault. </span>
-    <span class="doccomment">/// Used when additional faults occur during unwinding.  </span>
-    <span class="ident">MultipleFaultRecovery</span>
+<span class="doccomment">/// The different types of recovery procedures used for the 
+/// observed fault
+</span><span class="attr">#[derive(Debug, Clone, PartialEq)]
+</span><span class="kw">pub enum </span>RecoveryAction {
+    <span class="doccomment">/// No action taken on this fault.
+    </span><span class="prelude-val">None</span>,
+    <span class="doccomment">/// Task restarted only. No crate replaced.
+    </span>TaskRestarted,
+    <span class="doccomment">/// Crate where fault is observed is replaced, and then task restarted.
+    </span>FaultCrateReplaced,
+    <span class="doccomment">/// Different Crate than the crate where fault is observed is restrated. 
+    /// This option is taken when the same fault is observed multiple times.  
+    </span>IterativelyCrateReplaced,
+    <span class="doccomment">/// This fault is handled as a recovery for different fault. 
+    /// Used when additional faults occur during unwinding.  
+    </span>MultipleFaultRecovery
 }
 
 
-<span class="doccomment">/// A data structure to hold information about each fault. </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FaultEntry</span> {
-    <span class="doccomment">/// Type of fault</span>
-    <span class="kw">pub</span> <span class="ident">fault_type</span>: <span class="ident">FaultType</span>,
-    <span class="doccomment">/// Error code returned with the exception</span>
-    <span class="kw">pub</span> <span class="ident">error_code</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The core error occured</span>
-    <span class="kw">pub</span> <span class="ident">core</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Task runnning immediately before the Exception</span>
-    <span class="kw">pub</span> <span class="ident">running_task</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// If available the application crate that spawned the task</span>
-    <span class="kw">pub</span> <span class="ident">running_app_crate</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// For page faults the address the program attempted to access. None for other faults</span>
-    <span class="kw">pub</span> <span class="ident">address_accessed</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Address at which exception occured</span>
-    <span class="kw">pub</span> <span class="ident">instruction_pointer</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span>,    
-    <span class="doccomment">/// Crate the address at which exception occured located</span>
-    <span class="kw">pub</span> <span class="ident">crate_error_occured</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// List of crates reloaded from memory to recover from fault</span>
-    <span class="kw">pub</span> <span class="ident">replaced_crates</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Recovery Action taken as a result of the fault</span>
-    <span class="kw">pub</span> <span class="ident">action_taken</span>: <span class="ident">RecoveryAction</span>,
+<span class="doccomment">/// A data structure to hold information about each fault. 
+</span><span class="attr">#[derive(Debug, Clone)]
+</span><span class="kw">pub struct </span>FaultEntry {
+    <span class="doccomment">/// Type of fault
+    </span><span class="kw">pub </span>fault_type: FaultType,
+    <span class="doccomment">/// Error code returned with the exception
+    </span><span class="kw">pub </span>error_code: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+    <span class="doccomment">/// The core error occured
+    </span><span class="kw">pub </span>core: <span class="prelude-ty">Option</span>&lt;u8&gt;,
+    <span class="doccomment">/// Task runnning immediately before the Exception
+    </span><span class="kw">pub </span>running_task: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    <span class="doccomment">/// If available the application crate that spawned the task
+    </span><span class="kw">pub </span>running_app_crate: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    <span class="doccomment">/// For page faults the address the program attempted to access. None for other faults
+    </span><span class="kw">pub </span>address_accessed: <span class="prelude-ty">Option</span>&lt;VirtualAddress&gt;,
+    <span class="doccomment">/// Address at which exception occured
+    </span><span class="kw">pub </span>instruction_pointer: <span class="prelude-ty">Option</span>&lt;VirtualAddress&gt;,    
+    <span class="doccomment">/// Crate the address at which exception occured located
+    </span><span class="kw">pub </span>crate_error_occured: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    <span class="doccomment">/// List of crates reloaded from memory to recover from fault
+    </span><span class="kw">pub </span>replaced_crates: Vec&lt;String&gt;,
+    <span class="doccomment">/// Recovery Action taken as a result of the fault
+    </span><span class="kw">pub </span>action_taken: RecoveryAction,
 }
 
-<span class="kw">impl</span> <span class="ident">FaultEntry</span> {
-    <span class="doccomment">/// Returns an empty `FaultEntry` with only `fault_type` field filled.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span> (
-        <span class="ident">fault_type</span>: <span class="ident">FaultType</span>
-    ) -&gt; <span class="ident">FaultEntry</span> {
-        <span class="ident">FaultEntry</span> {
-            <span class="ident">fault_type</span>: <span class="ident">fault_type</span>,
-            <span class="ident">error_code</span>: <span class="prelude-val">None</span>,
-            <span class="ident">core</span>: <span class="prelude-val">None</span>,
-            <span class="ident">running_task</span>: <span class="prelude-val">None</span>,
-            <span class="ident">running_app_crate</span>: <span class="prelude-val">None</span>,
-            <span class="ident">address_accessed</span>: <span class="prelude-val">None</span>,
-            <span class="ident">instruction_pointer</span>: <span class="prelude-val">None</span>,
-            <span class="ident">crate_error_occured</span>: <span class="prelude-val">None</span>,
-            <span class="ident">replaced_crates</span>: <span class="ident">Vec</span>::<span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="ident">::new</span>(),
-            <span class="ident">action_taken</span>: <span class="ident">RecoveryAction::None</span>,
+<span class="kw">impl </span>FaultEntry {
+    <span class="doccomment">/// Returns an empty `FaultEntry` with only `fault_type` field filled.
+    </span><span class="kw">pub fn </span>new (
+        fault_type: FaultType
+    ) -&gt; FaultEntry {
+        FaultEntry {
+            fault_type: fault_type,
+            error_code: <span class="prelude-val">None</span>,
+            core: <span class="prelude-val">None</span>,
+            running_task: <span class="prelude-val">None</span>,
+            running_app_crate: <span class="prelude-val">None</span>,
+            address_accessed: <span class="prelude-val">None</span>,
+            instruction_pointer: <span class="prelude-val">None</span>,
+            crate_error_occured: <span class="prelude-val">None</span>,
+            replaced_crates: Vec::&lt;String&gt;::new(),
+            action_taken: RecoveryAction::None,
         }
     }
 }
 
 
-<span class="doccomment">/// The structure to hold the list of all faults so far occured in the system</span>
-<span class="kw">static</span> <span class="ident">FAULT_LIST</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FaultEntry</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">Vec::new</span>());
+<span class="doccomment">/// The structure to hold the list of all faults so far occured in the system
+</span><span class="kw">static </span>FAULT_LIST: MutexIrqSafe&lt;Vec&lt;FaultEntry&gt;&gt; = MutexIrqSafe::new(Vec::new());
 
-<span class="doccomment">/// Clears the log of faults so far occured in the system </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear_fault_log</span>() {
-    <span class="ident">FAULT_LIST</span>.<span class="ident">lock</span>().<span class="ident">clear</span>();
+<span class="doccomment">/// Clears the log of faults so far occured in the system 
+</span><span class="kw">pub fn </span>clear_fault_log() {
+    FAULT_LIST.lock().clear();
 }
 
-<span class="doccomment">/// Internal function to populate the remaining fields of fault entry. </span>
-<span class="doccomment">/// Common logic for both panics and exceptions.</span>
-<span class="kw">fn</span> <span class="ident">update_and_insert_fault_entry_internal</span>(
-    <span class="kw-2">mut</span> <span class="ident">fe</span>: <span class="ident">FaultEntry</span>,
-    <span class="ident">instruction_pointer</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, 
+<span class="doccomment">/// Internal function to populate the remaining fields of fault entry. 
+/// Common logic for both panics and exceptions.
+</span><span class="kw">fn </span>update_and_insert_fault_entry_internal(
+    <span class="kw-2">mut </span>fe: FaultEntry,
+    instruction_pointer: <span class="prelude-ty">Option</span>&lt;usize&gt;, 
 ) {
 
-    <span class="comment">// Add the core the fault was detected</span>
-    <span class="ident">fe</span>.<span class="ident">core</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">get_my_apic_id</span>());
+    <span class="comment">// Add the core the fault was detected
+    </span>fe.core = <span class="prelude-val">Some</span>(get_my_apic_id());
 
-    <span class="comment">// If current task cannot be obtained we will just add `fault_entry` to </span>
-    <span class="comment">// the `fault_log` and return.</span>
-    <span class="kw">let</span> <span class="ident">curr_task</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">task::get_my_current_task</span>() {
-        <span class="prelude-val">Some</span>(<span class="ident">x</span>) =&gt; <span class="ident">x</span>,
-        <span class="kw">_</span> =&gt; {
-            <span class="ident">FAULT_LIST</span>.<span class="ident">lock</span>().<span class="ident">push</span>(<span class="ident">fe</span>);
-            <span class="kw">return</span>
-        },
+    <span class="comment">// If current task cannot be obtained we will just add `fault_entry` to 
+    // the `fault_log` and return.
+    </span><span class="kw">let </span>curr_task = <span class="kw">match </span>task::get_my_current_task() {
+        <span class="prelude-val">Some</span>(x) =&gt; x,
+        <span class="kw">_ </span>=&gt; {
+            FAULT_LIST.lock().push(fe);
+            <span class="kw">return
+        </span>},
     };
 
-    <span class="kw">let</span> <span class="ident">namespace</span> <span class="op">=</span> <span class="ident">curr_task</span>.<span class="ident">get_namespace</span>();
+    <span class="kw">let </span>namespace = curr_task.get_namespace();
 
-    <span class="comment">// Add name of current task</span>
-    <span class="ident">fe</span>.<span class="ident">running_task</span> <span class="op">=</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">curr_task</span>.<span class="ident">name</span>.<span class="ident">clone</span>())
+    <span class="comment">// Add name of current task
+    </span>fe.running_task = {
+        <span class="prelude-val">Some</span>(curr_task.name.clone())
     };
 
-    <span class="comment">// If task is from an application add application crate name. `None` if not </span>
-    <span class="ident">fe</span>.<span class="ident">running_app_crate</span> <span class="op">=</span> {
-        <span class="ident">curr_task</span>.<span class="ident">app_crate</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">lock_as_ref</span>().<span class="ident">crate_name</span>.<span class="ident">to_string</span>())
+    <span class="comment">// If task is from an application add application crate name. `None` if not 
+    </span>fe.running_app_crate = {
+        curr_task.app_crate.as_ref().map(|x| x.lock_as_ref().crate_name.to_string())
     };
 
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">instruction_pointer</span>) <span class="op">=</span> <span class="ident">instruction_pointer</span> {
-        <span class="kw">let</span> <span class="ident">instruction_pointer</span> <span class="op">=</span> <span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">instruction_pointer</span>);
-        <span class="ident">fe</span>.<span class="ident">instruction_pointer</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">instruction_pointer</span>);
-        <span class="ident">fe</span>.<span class="ident">crate_error_occured</span> <span class="op">=</span> <span class="ident">namespace</span>.<span class="ident">get_crate_containing_address</span>(<span class="ident">instruction_pointer</span>.<span class="ident">clone</span>(), <span class="bool-val">false</span>)
-                                        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">lock_as_ref</span>().<span class="ident">crate_name</span>.<span class="ident">to_string</span>());
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(instruction_pointer) = instruction_pointer {
+        <span class="kw">let </span>instruction_pointer = VirtualAddress::new_canonical(instruction_pointer);
+        fe.instruction_pointer = <span class="prelude-val">Some</span>(instruction_pointer);
+        fe.crate_error_occured = namespace.get_crate_containing_address(instruction_pointer.clone(), <span class="bool-val">false</span>)
+                                        .map(|x| x.lock_as_ref().crate_name.to_string());
     };
 
-    <span class="comment">// Push the fault entry.</span>
-    <span class="ident">FAULT_LIST</span>.<span class="ident">lock</span>().<span class="ident">push</span>(<span class="ident">fe</span>);
+    <span class="comment">// Push the fault entry.
+    </span>FAULT_LIST.lock().push(fe);
 }
 
-<span class="doccomment">/// Add a new exception instance to the fault log. </span>
-<span class="doccomment">/// Generally it will have `fault_type` and `instruction_pointer`. </span>
-<span class="doccomment">/// If `error_code` is provided with exception it will be send to </span>
-<span class="doccomment">/// the function as `Some(error_code)`. </span>
-<span class="doccomment">/// If the exception is a page fault the address attempted to accesss </span>
-<span class="doccomment">/// will also be send to the function as `Some(address_accessed)`</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">log_exception</span> (
-    <span class="ident">fault_type</span>: <span class="ident">u8</span>,
-    <span class="ident">instruction_pointer</span>: <span class="ident">usize</span>,
-    <span class="ident">error_code</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
-    <span class="ident">address_accessed</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>
+<span class="doccomment">/// Add a new exception instance to the fault log. 
+/// Generally it will have `fault_type` and `instruction_pointer`. 
+/// If `error_code` is provided with exception it will be send to 
+/// the function as `Some(error_code)`. 
+/// If the exception is a page fault the address attempted to accesss 
+/// will also be send to the function as `Some(address_accessed)`
+</span><span class="kw">pub fn </span>log_exception (
+    fault_type: u8,
+    instruction_pointer: usize,
+    error_code: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+    address_accessed: <span class="prelude-ty">Option</span>&lt;usize&gt;
 ) {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fe</span> <span class="op">=</span> <span class="ident">FaultEntry::new</span>(<span class="ident">from_exception_number</span>(<span class="ident">fault_type</span>));
-    <span class="ident">fe</span>.<span class="ident">error_code</span> <span class="op">=</span> <span class="ident">error_code</span>;
-    <span class="ident">fe</span>.<span class="ident">address_accessed</span>  <span class="op">=</span> <span class="ident">address_accessed</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">address</span><span class="op">|</span> <span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">address</span>));
-    <span class="ident">update_and_insert_fault_entry_internal</span>(<span class="ident">fe</span>, <span class="prelude-val">Some</span>(<span class="ident">instruction_pointer</span>));
+    <span class="kw">let </span><span class="kw-2">mut </span>fe = FaultEntry::new(from_exception_number(fault_type));
+    fe.error_code = error_code;
+    fe.address_accessed  = address_accessed.map(|address| VirtualAddress::new_canonical(address));
+    update_and_insert_fault_entry_internal(fe, <span class="prelude-val">Some</span>(instruction_pointer));
 }
 
-<span class="doccomment">/// Add a new panic instance to the fault log. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">log_panic_entry</span>(<span class="ident">panic_info</span>: <span class="kw-2">&amp;</span><span class="ident">PanicInfo</span>) {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fe</span> <span class="op">=</span> <span class="ident">FaultEntry::new</span>(<span class="ident">FaultType::Panic</span>);
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">location</span>) <span class="op">=</span> <span class="ident">panic_info</span>.<span class="ident">location</span>() {
-        <span class="comment">// debug!(&quot;panic occurred in file &#39;{}&#39; at line {}&quot;, location.file(), location.line());</span>
-        <span class="kw">let</span> <span class="ident">panic_file</span> <span class="op">=</span> <span class="ident">location</span>.<span class="ident">file</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">error_crate_iter</span> <span class="op">=</span> <span class="ident">panic_file</span>.<span class="ident">split</span>(<span class="string">&#39;/&#39;</span>);
-        <span class="ident">error_crate_iter</span>.<span class="ident">next</span>();
-        <span class="kw">let</span> <span class="ident">error_crate_name_simple</span> <span class="op">=</span> <span class="ident">error_crate_iter</span>.<span class="ident">next</span>().<span class="ident">unwrap_or</span>(<span class="ident">panic_file</span>);
-        <span class="macro">debug!</span>(<span class="string">&quot;panic file {}&quot;</span>,<span class="ident">error_crate_name_simple</span>);
-        <span class="ident">fe</span>.<span class="ident">crate_error_occured</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">error_crate_name_simple</span>.<span class="ident">to_string</span>());
-    } <span class="kw">else</span> {
+<span class="doccomment">/// Add a new panic instance to the fault log. 
+</span><span class="kw">pub fn </span>log_panic_entry(panic_info: <span class="kw-2">&amp;</span>PanicInfo) {
+    <span class="kw">let </span><span class="kw-2">mut </span>fe = FaultEntry::new(FaultType::Panic);
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(location) = panic_info.location() {
+        <span class="comment">// debug!(&quot;panic occurred in file &#39;{}&#39; at line {}&quot;, location.file(), location.line());
+        </span><span class="kw">let </span>panic_file = location.file();
+        <span class="kw">let </span><span class="kw-2">mut </span>error_crate_iter = panic_file.split(<span class="string">&#39;/&#39;</span>);
+        error_crate_iter.next();
+        <span class="kw">let </span>error_crate_name_simple = error_crate_iter.next().unwrap_or(panic_file);
+        <span class="macro">debug!</span>(<span class="string">&quot;panic file {}&quot;</span>,error_crate_name_simple);
+        fe.crate_error_occured = <span class="prelude-val">Some</span>(error_crate_name_simple.to_string());
+    } <span class="kw">else </span>{
         <span class="macro">debug!</span>(<span class="string">&quot;panic occurred but can&#39;t get location information...&quot;</span>);
     }
-    <span class="ident">update_and_insert_fault_entry_internal</span>(<span class="ident">fe</span>, <span class="prelude-val">None</span>);
+    update_and_insert_fault_entry_internal(fe, <span class="prelude-val">None</span>);
 }
 
-<span class="doccomment">/// Removes the unhandled faults from the fault log and returns. </span>
-<span class="doccomment">/// Is useful when we update the recovery detail about unhandled exceptions. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">remove_unhandled_exceptions</span>() -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">FaultEntry</span><span class="op">&gt;</span> {
-    <span class="ident">FAULT_LIST</span>.<span class="ident">lock</span>().<span class="ident">drain_filter</span>(<span class="op">|</span><span class="ident">fe</span><span class="op">|</span> <span class="ident">fe</span>.<span class="ident">action_taken</span> <span class="op">==</span> <span class="ident">RecoveryAction::None</span>).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()
+<span class="doccomment">/// Removes the unhandled faults from the fault log and returns. 
+/// Is useful when we update the recovery detail about unhandled exceptions. 
+</span><span class="kw">pub fn </span>remove_unhandled_exceptions() -&gt; Vec&lt;FaultEntry&gt; {
+    FAULT_LIST.lock().drain_filter(|fe| fe.action_taken == RecoveryAction::None).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
 }
 
-<span class="doccomment">/// calls println!() and then println_raw!()</span>
-<span class="macro">macro_rules!</span> <span class="ident">println_both</span> {
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>:<span class="ident">expr</span>) =&gt; {
-        <span class="macro">print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>, <span class="string">&quot;\n&quot;</span>));
-        <span class="macro">print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>, <span class="string">&quot;\n&quot;</span>));
+<span class="doccomment">/// calls println!() and then println_raw!()
+</span><span class="macro">macro_rules! </span>println_both {
+    (<span class="macro-nonterminal">$fmt</span>:expr) =&gt; {
+        <span class="macro">print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>));
+        <span class="macro">print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>));
     };
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>:<span class="ident">expr</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) =&gt; {
-        <span class="macro">print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>)<span class="kw-2">*</span>);
-        <span class="macro">print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>)<span class="kw-2">*</span>);
+    (<span class="macro-nonterminal">$fmt</span>:expr, $(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; {
+        <span class="macro">print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>);
+        <span class="macro">print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>);
     };
 }
 
-<span class="doccomment">/// Prints the fault log</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">print_fault_log</span>() {
+<span class="doccomment">/// Prints the fault log
+</span><span class="kw">pub fn </span>print_fault_log() {
     <span class="macro">println_both!</span>(<span class="string">&quot;------------------ FAULT LOG ---------------------------&quot;</span>);
-    <span class="kw">let</span> <span class="ident">list</span> <span class="op">=</span> <span class="ident">FAULT_LIST</span>.<span class="ident">lock</span>();
-    <span class="kw">for</span> <span class="ident">x</span> <span class="kw">in</span> <span class="ident">list</span>.<span class="ident">iter</span>() {
-        <span class="macro">println_both!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">x</span>);
+    <span class="kw">let </span>list = FAULT_LIST.lock();
+    <span class="kw">for </span>x <span class="kw">in </span>list.iter() {
+        <span class="macro">println_both!</span>(<span class="string">&quot;{:?}&quot;</span>, x);
     }
     <span class="macro">println_both!</span>(<span class="string">&quot;------------------ END OF LOG --------------------------&quot;</span>);
 }
 
-<span class="doccomment">/// Add a `FaultEntry` to fault log.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">log_handled_fault</span>(<span class="ident">fe</span>: <span class="ident">FaultEntry</span>){
-    <span class="ident">FAULT_LIST</span>.<span class="ident">lock</span>().<span class="ident">push</span>(<span class="ident">fe</span>);
+<span class="doccomment">/// Add a `FaultEntry` to fault log.
+</span><span class="kw">pub fn </span>log_handled_fault(fe: FaultEntry){
+    FAULT_LIST.lock().push(fe);
 }
 
-<span class="doccomment">/// Provides the most recent entry in the log for given crate</span>
-<span class="doccomment">/// Utility function for iterative crate replacement</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_the_most_recent_match</span>(<span class="ident">error_crate</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FaultEntry</span><span class="op">&gt;</span> {
+<span class="doccomment">/// Provides the most recent entry in the log for given crate
+/// Utility function for iterative crate replacement
+</span><span class="kw">pub fn </span>get_the_most_recent_match(error_crate: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;FaultEntry&gt; {
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-    <span class="macro">debug!</span>(<span class="string">&quot;getting the most recent match&quot;</span>);
+    <span class="attr">#[cfg(not(downtime_eval))]
+    </span><span class="macro">debug!</span>(<span class="string">&quot;getting the most recent match&quot;</span>);
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fe</span> :<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FaultEntry</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">for</span> <span class="ident">fault_entry</span> <span class="kw">in</span> <span class="ident">FAULT_LIST</span>.<span class="ident">lock</span>().<span class="ident">iter</span>() {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">crate_error_occured</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">fault_entry</span>.<span class="ident">crate_error_occured</span> {
-            <span class="kw">let</span> <span class="ident">error_crate_name</span> <span class="op">=</span> <span class="ident">crate_error_occured</span>.<span class="ident">clone</span>();
-            <span class="kw">let</span> <span class="ident">error_crate_name_simple</span> <span class="op">=</span> <span class="ident">error_crate_name</span>.<span class="ident">split</span>(<span class="string">&#39;-&#39;</span>).<span class="ident">next</span>().<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="ident">error_crate_name</span>);
-            <span class="kw">if</span> <span class="ident">error_crate_name_simple</span> <span class="op">==</span> <span class="ident">error_crate</span> {
-                <span class="kw">let</span> <span class="ident">item</span> <span class="op">=</span> <span class="ident">fault_entry</span>.<span class="ident">clone</span>();
-                <span class="ident">fe</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">item</span>);
+    <span class="kw">let </span><span class="kw-2">mut </span>fe :<span class="prelude-ty">Option</span>&lt;FaultEntry&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">for </span>fault_entry <span class="kw">in </span>FAULT_LIST.lock().iter() {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(crate_error_occured) = <span class="kw-2">&amp;</span>fault_entry.crate_error_occured {
+            <span class="kw">let </span>error_crate_name = crate_error_occured.clone();
+            <span class="kw">let </span>error_crate_name_simple = error_crate_name.split(<span class="string">&#39;-&#39;</span>).next().unwrap_or(<span class="kw-2">&amp;</span>error_crate_name);
+            <span class="kw">if </span>error_crate_name_simple == error_crate {
+                <span class="kw">let </span>item = fault_entry.clone();
+                fe = <span class="prelude-val">Some</span>(item);
             }
         }
     }
 
-    <span class="kw">if</span> <span class="ident">fe</span>.<span class="ident">is_none</span>(){
+    <span class="kw">if </span>fe.is_none(){
 
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-        <span class="macro">debug!</span>(<span class="string">&quot;No recent entries for the given crate {}&quot;</span>, <span class="ident">error_crate</span>);
+        <span class="attr">#[cfg(not(downtime_eval))]
+        </span><span class="macro">debug!</span>(<span class="string">&quot;No recent entries for the given crate {}&quot;</span>, error_crate);
     }
-    <span class="ident">fe</span>
+    fe
 }</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="fault_log" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="fault_log" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

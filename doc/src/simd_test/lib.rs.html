@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/simd_test/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../simd_test/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../simd_test/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../simd_test/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/simd_test/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../simd_test/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -78,79 +72,78 @@
 <span id="72">72</span>
 <span id="73">73</span>
 <span id="74">74</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">portable_simd</span>)]</span>
+</pre><pre class="rust"><code><span class="attr">#![no_std]
+#![feature(portable_simd)]
 
-<span class="comment">// The entire crate is only built if both `simd_personality` and `sse2` are enabled.</span>
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">cfg_if</span>;
-<span class="macro">cfg_if!</span> { <span class="kw">if</span> <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">all</span>(<span class="ident">simd_personality</span>, <span class="ident">target_feature</span> <span class="op">=</span> <span class="string">&quot;sse2&quot;</span>))]</span> {
+</span><span class="comment">// The entire crate is only built if both `simd_personality` and `sse2` are enabled.
+</span><span class="attr">#[macro_use] </span><span class="kw">extern crate </span>cfg_if;
+<span class="macro">cfg_if! </span>{ <span class="kw">if </span><span class="attr">#[cfg(all(simd_personality, target_feature = <span class="string">&quot;sse2&quot;</span>))] </span>{
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">core_simd</span>;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>core_simd;
 
-<span class="kw">use</span> <span class="ident">core_simd::f64x4</span>;
+<span class="kw">use </span>core_simd::f64x4;
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">test1</span>(<span class="kw">_</span>: ()) {
+<span class="kw">pub fn </span>test1(<span class="kw">_</span>: ()) {
     <span class="macro">warn!</span>(<span class="string">&quot;at the top of simd_test::test1! simd_personality: {}, sse2: {}, avx: {}&quot;</span>, 
-        <span class="macro">cfg!</span>(<span class="ident">simd_personality</span>),
-        <span class="macro">cfg!</span>(<span class="ident">target_feature</span> <span class="op">=</span> <span class="string">&quot;sse2&quot;</span>),
-        <span class="macro">cfg!</span>(<span class="ident">target_feature</span> <span class="op">=</span> <span class="string">&quot;avx&quot;</span>)
+        <span class="macro">cfg!</span>(simd_personality),
+        <span class="macro">cfg!</span>(target_feature = <span class="string">&quot;sse2&quot;</span>),
+        <span class="macro">cfg!</span>(target_feature = <span class="string">&quot;avx&quot;</span>)
     );
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">f64x4::from_array</span>([<span class="number">1.111</span>, <span class="number">11.11</span>, <span class="number">111.1</span>, <span class="number">1111.0</span>]);
-    <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">f64x4::from_array</span>([<span class="number">0.0</span>, <span class="number">0.0</span>, <span class="number">0.0</span>, <span class="number">0.0</span>]);
+    <span class="kw">let </span><span class="kw-2">mut </span>x = f64x4::from_array([<span class="number">1.111</span>, <span class="number">11.11</span>, <span class="number">111.1</span>, <span class="number">1111.0</span>]);
+    <span class="kw">let </span>y = f64x4::from_array([<span class="number">0.0</span>, <span class="number">0.0</span>, <span class="number">0.0</span>, <span class="number">0.0</span>]);
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">loop_ctr</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="kw">loop</span> {
-        <span class="ident">x</span> <span class="op">=</span> <span class="ident">add</span>(<span class="ident">x</span>, <span class="ident">y</span>);
-        <span class="kw">if</span> <span class="ident">loop_ctr</span> <span class="op">%</span> <span class="number">5000000</span> <span class="op">==</span> <span class="number">0</span> {
-            <span class="macro">debug!</span>(<span class="string">&quot;SIMD TEST1 (should be 1.111, 11.11, 111.1, 1111): {:?}&quot;</span>, <span class="ident">x</span>);
+    <span class="kw">let </span><span class="kw-2">mut </span>loop_ctr = <span class="number">0</span>;
+    <span class="kw">loop </span>{
+        x = add(x, y);
+        <span class="kw">if </span>loop_ctr % <span class="number">5000000 </span>== <span class="number">0 </span>{
+            <span class="macro">debug!</span>(<span class="string">&quot;SIMD TEST1 (should be 1.111, 11.11, 111.1, 1111): {:?}&quot;</span>, x);
         }
-        <span class="ident">loop_ctr</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        loop_ctr += <span class="number">1</span>;
     }
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">test2</span>(<span class="kw">_</span>: ()) {
+<span class="kw">pub fn </span>test2(<span class="kw">_</span>: ()) {
     <span class="macro">warn!</span>(<span class="string">&quot;at the top of simd_test::test1! simd_personality: {}, sse2: {}, avx: {}&quot;</span>, 
-        <span class="macro">cfg!</span>(<span class="ident">simd_personality</span>),
-        <span class="macro">cfg!</span>(<span class="ident">target_feature</span> <span class="op">=</span> <span class="string">&quot;sse2&quot;</span>),
-        <span class="macro">cfg!</span>(<span class="ident">target_feature</span> <span class="op">=</span> <span class="string">&quot;avx&quot;</span>)
+        <span class="macro">cfg!</span>(simd_personality),
+        <span class="macro">cfg!</span>(target_feature = <span class="string">&quot;sse2&quot;</span>),
+        <span class="macro">cfg!</span>(target_feature = <span class="string">&quot;avx&quot;</span>)
     );
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">f64x4::from_array</span>([<span class="number">2.222</span>, <span class="number">22.22</span>, <span class="number">222.2</span>, <span class="number">2222.0</span>]);
-    <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">f64x4::from_array</span>([<span class="number">0.0</span>, <span class="number">0.0</span>, <span class="number">0.0</span>, <span class="number">0.0</span>]);
+    <span class="kw">let </span><span class="kw-2">mut </span>x = f64x4::from_array([<span class="number">2.222</span>, <span class="number">22.22</span>, <span class="number">222.2</span>, <span class="number">2222.0</span>]);
+    <span class="kw">let </span>y = f64x4::from_array([<span class="number">0.0</span>, <span class="number">0.0</span>, <span class="number">0.0</span>, <span class="number">0.0</span>]);
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">loop_ctr</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="kw">loop</span> {
-        <span class="ident">x</span> <span class="op">=</span> <span class="ident">add</span>(<span class="ident">x</span>, <span class="ident">y</span>);
-        <span class="kw">if</span> <span class="ident">loop_ctr</span> <span class="op">%</span> <span class="number">5000000</span> <span class="op">==</span> <span class="number">0</span> {
-            <span class="macro">trace!</span>(<span class="string">&quot;SIMD TEST2 (should be 2.222, 22.22, 222.2, 2222): {:?}&quot;</span>, <span class="ident">x</span>);
+    <span class="kw">let </span><span class="kw-2">mut </span>loop_ctr = <span class="number">0</span>;
+    <span class="kw">loop </span>{
+        x = add(x, y);
+        <span class="kw">if </span>loop_ctr % <span class="number">5000000 </span>== <span class="number">0 </span>{
+            <span class="macro">trace!</span>(<span class="string">&quot;SIMD TEST2 (should be 2.222, 22.22, 222.2, 2222): {:?}&quot;</span>, x);
         }
-        <span class="ident">loop_ctr</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        loop_ctr += <span class="number">1</span>;
     }
 }
 
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">test_short</span>(<span class="kw">_</span>: ()) {
+<span class="kw">pub fn </span>test_short(<span class="kw">_</span>: ()) {
     <span class="macro">warn!</span>(<span class="string">&quot;at the top of simd_test::test1! simd_personality: {}, sse2: {}, avx: {}&quot;</span>, 
-        <span class="macro">cfg!</span>(<span class="ident">simd_personality</span>),
-        <span class="macro">cfg!</span>(<span class="ident">target_feature</span> <span class="op">=</span> <span class="string">&quot;sse2&quot;</span>),
-        <span class="macro">cfg!</span>(<span class="ident">target_feature</span> <span class="op">=</span> <span class="string">&quot;avx&quot;</span>)
+        <span class="macro">cfg!</span>(simd_personality),
+        <span class="macro">cfg!</span>(target_feature = <span class="string">&quot;sse2&quot;</span>),
+        <span class="macro">cfg!</span>(target_feature = <span class="string">&quot;avx&quot;</span>)
     );
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">f64x4::from_array</span>([<span class="number">3.333</span>, <span class="number">33.33</span>, <span class="number">333.3</span>, <span class="number">3333.0</span>]);
-    <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">f64x4::from_array</span>([<span class="number">0.0</span>, <span class="number">0.0</span>, <span class="number">0.0</span>, <span class="number">0.0</span>]);
+    <span class="kw">let </span><span class="kw-2">mut </span>x = f64x4::from_array([<span class="number">3.333</span>, <span class="number">33.33</span>, <span class="number">333.3</span>, <span class="number">3333.0</span>]);
+    <span class="kw">let </span>y = f64x4::from_array([<span class="number">0.0</span>, <span class="number">0.0</span>, <span class="number">0.0</span>, <span class="number">0.0</span>]);
 
-    <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">10</span> {
-        <span class="ident">x</span> <span class="op">=</span> <span class="ident">add</span>(<span class="ident">x</span>, <span class="ident">y</span>);
-        <span class="macro">trace!</span>(<span class="string">&quot;SIMD TEST_SHORT [{}] (should be 3.333, 33.33, 333.3, 3333): {:?}&quot;</span>, <span class="ident">i</span>, <span class="ident">x</span>);
+    <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..<span class="number">10 </span>{
+        x = add(x, y);
+        <span class="macro">trace!</span>(<span class="string">&quot;SIMD TEST_SHORT [{}] (should be 3.333, 33.33, 333.3, 3333): {:?}&quot;</span>, i, x);
     }
 }
 
 
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
-<span class="kw">fn</span> <span class="ident">add</span> (<span class="ident">a</span>: <span class="ident">f64x4</span>, <span class="ident">b</span>: <span class="ident">f64x4</span>) -&gt; <span class="ident">f64x4</span> {
-    <span class="ident">a</span> <span class="op">+</span> <span class="ident">b</span>
+<span class="attr">#[inline(never)]
+</span><span class="kw">fn </span>add (a: f64x4, b: f64x4) -&gt; f64x4 {
+    a + b
 }
 
 }} <span class="comment">// end of cfg_if block</span></code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="simd_test" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="simd_test" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

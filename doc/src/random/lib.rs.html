@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/random/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../random/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../random/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../random/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/random/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../random/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -154,63 +148,63 @@
 <span id="148">148</span>
 <span id="149">149</span>
 <span id="150">150</span>
-</pre><pre class="rust"><code><span class="doccomment">//! A cryptographically secure source of randomness.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The randomness is provided by a global, cryptographically secure</span>
-<span class="doccomment">//! pseudorandom number generator. More specifically,</span>
-<span class="doccomment">//! [`rand_chacha::ChaCha20Rng`].</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The CSPRNG is instantiated using [`lazy_static`] and hence it is initialized</span>
-<span class="doccomment">//! lazily on the first request for randomness. It attempts to obtains a seed</span>
-<span class="doccomment">//! from the following sources in order:</span>
-<span class="doccomment">//! - `RDSEED`</span>
-<span class="doccomment">//! - `RDRAND`</span>
-<span class="doccomment">//! - `TSC`</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! An error will be logged if the `TSC` is used as it is not a high quality</span>
-<span class="doccomment">//! source of randomness.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! If a consumer requires one-off randomness, [`next_u32`], [`next_u64`], or</span>
-<span class="doccomment">//! [`fill_bytes`] should be used. Otherwise, [`init_rng`] should be used to</span>
-<span class="doccomment">//! seed a local PRNG, which can then be used as a source of randomness. Using a</span>
-<span class="doccomment">//! local PRNG avoids contention on the global CSPRNG and allows for PRNGs</span>
-<span class="doccomment">//! better suited for the task (e.g. non-crypto PRNGs).</span>
+</pre><pre class="rust"><code><span class="doccomment">//! A cryptographically secure source of randomness.
+//!
+//! The randomness is provided by a global, cryptographically secure
+//! pseudorandom number generator. More specifically,
+//! [`rand_chacha::ChaCha20Rng`].
+//!
+//! The CSPRNG is instantiated using [`lazy_static`] and hence it is initialized
+//! lazily on the first request for randomness. It attempts to obtains a seed
+//! from the following sources in order:
+//! - `RDSEED`
+//! - `RDRAND`
+//! - `TSC`
+//!
+//! An error will be logged if the `TSC` is used as it is not a high quality
+//! source of randomness.
+//!
+//! If a consumer requires one-off randomness, [`next_u32`], [`next_u64`], or
+//! [`fill_bytes`] should be used. Otherwise, [`init_rng`] should be used to
+//! seed a local PRNG, which can then be used as a source of randomness. Using a
+//! local PRNG avoids contention on the global CSPRNG and allows for PRNGs
+//! better suited for the task (e.g. non-crypto PRNGs).
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">use</span> <span class="ident">rand_chacha</span>::{
-    <span class="ident">rand_core</span>::{<span class="ident">RngCore</span>, <span class="ident">SeedableRng</span>},
-    <span class="ident">ChaCha20Rng</span>,
+</span><span class="kw">use </span>rand_chacha::{
+    rand_core::{RngCore, SeedableRng},
+    ChaCha20Rng,
 };
-<span class="kw">use</span> <span class="ident">spin::mutex::Mutex</span>;
+<span class="kw">use </span>spin::mutex::Mutex;
 
-<span class="macro">lazy_static::lazy_static!</span> {
-    <span class="doccomment">/// The global random number generator.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This PRNG is cryptographically-secure. It can be directly accessed using</span>
-    <span class="doccomment">/// [`next_u32`], [`next_u64`], and [`fill_bytes`] for one-off randomness.</span>
-    <span class="doccomment">/// However, it should mostly be used to seed local PRNGs using</span>
-    <span class="doccomment">/// [`init_rng`].</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Using a single global CSPRNG allows us to feed it with entropy from</span>
-    <span class="doccomment">/// device drivers and such.</span>
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">CSPRNG</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">ChaCha20Rng</span><span class="op">&gt;</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="ident">seed</span> <span class="op">=</span> <span class="ident">rdseed_seed</span>()
-            .<span class="ident">or_else</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">rdrand_seed</span>())
-            .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">tsc_seed</span>());
-        <span class="ident">Mutex::new</span>(<span class="ident">ChaCha20Rng::from_seed</span>(<span class="ident">seed</span>))
+<span class="macro">lazy_static::lazy_static! </span>{
+    <span class="doccomment">/// The global random number generator.
+    ///
+    /// This PRNG is cryptographically-secure. It can be directly accessed using
+    /// [`next_u32`], [`next_u64`], and [`fill_bytes`] for one-off randomness.
+    /// However, it should mostly be used to seed local PRNGs using
+    /// [`init_rng`].
+    ///
+    /// Using a single global CSPRNG allows us to feed it with entropy from
+    /// device drivers and such.
+    </span><span class="kw">static </span><span class="kw-2">ref </span>CSPRNG: Mutex&lt;ChaCha20Rng&gt; = {
+        <span class="kw">let </span>seed = rdseed_seed()
+            .or_else(|<span class="kw">_</span>| rdrand_seed())
+            .unwrap_or_else(|<span class="kw">_</span>| tsc_seed());
+        Mutex::new(ChaCha20Rng::from_seed(seed))
     };
 }
 
-<span class="doccomment">/// Tries to generate a 32 byte seed using the RDSEED x86 instruction.</span>
-<span class="kw">fn</span> <span class="ident">rdseed_seed</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>], ()<span class="op">&gt;</span> {
-    <span class="kw">match</span> <span class="ident">rdrand::RdSeed::new</span>() {
-        <span class="prelude-val">Ok</span>(<span class="kw-2">mut</span> <span class="ident">generator</span>) =&gt; {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">seed</span> <span class="op">=</span> [<span class="number">0</span>; <span class="number">32</span>];
-            <span class="kw">match</span> <span class="ident">generator</span>.<span class="ident">try_fill_bytes</span>(<span class="kw-2">&amp;mut</span> <span class="ident">seed</span>) {
+<span class="doccomment">/// Tries to generate a 32 byte seed using the RDSEED x86 instruction.
+</span><span class="kw">fn </span>rdseed_seed() -&gt; <span class="prelude-ty">Result</span>&lt;[u8; <span class="number">32</span>], ()&gt; {
+    <span class="kw">match </span>rdrand::RdSeed::new() {
+        <span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>generator) =&gt; {
+            <span class="kw">let </span><span class="kw-2">mut </span>seed = [<span class="number">0</span>; <span class="number">32</span>];
+            <span class="kw">match </span>generator.try_fill_bytes(<span class="kw-2">&amp;mut </span>seed) {
                 <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {
                     <span class="macro">log::info!</span>(<span class="string">&quot;using RDSEED for CSPRNG seed&quot;</span>);
-                    <span class="prelude-val">Ok</span>(<span class="ident">seed</span>)
+                    <span class="prelude-val">Ok</span>(seed)
                 }
                 <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
                     <span class="macro">log::warn!</span>(<span class="string">&quot;failed to generate seed from RDSEED&quot;</span>);
@@ -225,15 +219,15 @@
     }
 }
 
-<span class="doccomment">/// Tries to generate a 32 byte seed using the RDRAND x86 instruction.</span>
-<span class="kw">fn</span> <span class="ident">rdrand_seed</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">32</span>], ()<span class="op">&gt;</span> {
-    <span class="kw">match</span> <span class="ident">rdrand::RdRand::new</span>() {
-        <span class="prelude-val">Ok</span>(<span class="kw-2">mut</span> <span class="ident">generator</span>) =&gt; {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">seed</span> <span class="op">=</span> [<span class="number">0</span>; <span class="number">32</span>];
-            <span class="kw">match</span> <span class="ident">generator</span>.<span class="ident">try_fill_bytes</span>(<span class="kw-2">&amp;mut</span> <span class="ident">seed</span>) {
+<span class="doccomment">/// Tries to generate a 32 byte seed using the RDRAND x86 instruction.
+</span><span class="kw">fn </span>rdrand_seed() -&gt; <span class="prelude-ty">Result</span>&lt;[u8; <span class="number">32</span>], ()&gt; {
+    <span class="kw">match </span>rdrand::RdRand::new() {
+        <span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>generator) =&gt; {
+            <span class="kw">let </span><span class="kw-2">mut </span>seed = [<span class="number">0</span>; <span class="number">32</span>];
+            <span class="kw">match </span>generator.try_fill_bytes(<span class="kw-2">&amp;mut </span>seed) {
                 <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {
                     <span class="macro">log::info!</span>(<span class="string">&quot;using RDRAND for CSPRNG seed&quot;</span>);
-                    <span class="prelude-val">Ok</span>(<span class="ident">seed</span>)
+                    <span class="prelude-val">Ok</span>(seed)
                 }
                 <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
                     <span class="macro">log::warn!</span>(<span class="string">&quot;failed to generate seed from RDRAND&quot;</span>);
@@ -248,62 +242,61 @@
     }
 }
 
-<span class="doccomment">/// Generates a 32 byte seed using the TSC.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The TSC isn&#39;t a high quality source of randomness and so it is only used as</span>
-<span class="doccomment">/// a last resort if both RDSEED and RDRAND fail.</span>
-<span class="kw">fn</span> <span class="ident">tsc_seed</span>() -&gt; [<span class="ident">u8</span>; <span class="number">32</span>] {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">seed</span> <span class="op">=</span> [<span class="number">0</span>; <span class="number">32</span>];
+<span class="doccomment">/// Generates a 32 byte seed using the TSC.
+///
+/// The TSC isn&#39;t a high quality source of randomness and so it is only used as
+/// a last resort if both RDSEED and RDRAND fail.
+</span><span class="kw">fn </span>tsc_seed() -&gt; [u8; <span class="number">32</span>] {
+    <span class="kw">let </span><span class="kw-2">mut </span>seed = [<span class="number">0</span>; <span class="number">32</span>];
 
-    <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">seed</span>.<span class="ident">len</span>() {
-        <span class="comment">// The last byte is the _most_ random.</span>
-        <span class="ident">seed</span>[<span class="ident">i</span>] <span class="op">=</span> <span class="ident">u128::from</span>(<span class="ident">tsc::tsc_ticks</span>()).<span class="ident">to_be_bytes</span>()[<span class="number">15</span>];
+    <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..seed.len() {
+        <span class="comment">// The last byte is the _most_ random.
+        </span>seed[i] = u128::from(tsc::tsc_ticks()).to_be_bytes()[<span class="number">15</span>];
     }
 
-    <span class="comment">// The TSC isn&#39;t a high quality source of randomness.</span>
-    <span class="macro">log::error!</span>(<span class="string">&quot;using TSC for CSPRNG seed - this is not ok&quot;</span>);
-    <span class="ident">seed</span>
+    <span class="comment">// The TSC isn&#39;t a high quality source of randomness.
+    </span><span class="macro">log::error!</span>(<span class="string">&quot;using TSC for CSPRNG seed - this is not ok&quot;</span>);
+    seed
 }
 
-<span class="doccomment">/// Returns a random [`u32`].</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Consider using [`init_rng`] if calling this function in a loop, or if you</span>
-<span class="doccomment">/// don&#39;t require cryptographically secure random numbers.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">next_u32</span>() -&gt; <span class="ident">u32</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">csprng</span> <span class="op">=</span> <span class="ident">CSPRNG</span>.<span class="ident">lock</span>();
-    <span class="ident">csprng</span>.<span class="ident">next_u32</span>()
+<span class="doccomment">/// Returns a random [`u32`].
+///
+/// Consider using [`init_rng`] if calling this function in a loop, or if you
+/// don&#39;t require cryptographically secure random numbers.
+</span><span class="kw">pub fn </span>next_u32() -&gt; u32 {
+    <span class="kw">let </span><span class="kw-2">mut </span>csprng = CSPRNG.lock();
+    csprng.next_u32()
 }
 
-<span class="doccomment">/// Returns a random [`u64`].</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Consider using [`init_rng`] if calling this function in a loop, or if you</span>
-<span class="doccomment">/// don&#39;t require cryptographically secure random numbers.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">next_u64</span>() -&gt; <span class="ident">u64</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">csprng</span> <span class="op">=</span> <span class="ident">CSPRNG</span>.<span class="ident">lock</span>();
-    <span class="ident">csprng</span>.<span class="ident">next_u64</span>()
+<span class="doccomment">/// Returns a random [`u64`].
+///
+/// Consider using [`init_rng`] if calling this function in a loop, or if you
+/// don&#39;t require cryptographically secure random numbers.
+</span><span class="kw">pub fn </span>next_u64() -&gt; u64 {
+    <span class="kw">let </span><span class="kw-2">mut </span>csprng = CSPRNG.lock();
+    csprng.next_u64()
 }
 
-<span class="doccomment">/// Fills `dest` with random data.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Consider using [`init_rng`] if calling this function in a loop, or if you</span>
-<span class="doccomment">/// don&#39;t require cryptographically secure random numbers.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fill_bytes</span>(<span class="ident">dest</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>]) {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">csprng</span> <span class="op">=</span> <span class="ident">CSPRNG</span>.<span class="ident">lock</span>();
-    <span class="ident">csprng</span>.<span class="ident">fill_bytes</span>(<span class="ident">dest</span>);
+<span class="doccomment">/// Fills `dest` with random data.
+///
+/// Consider using [`init_rng`] if calling this function in a loop, or if you
+/// don&#39;t require cryptographically secure random numbers.
+</span><span class="kw">pub fn </span>fill_bytes(dest: <span class="kw-2">&amp;mut </span>[u8]) {
+    <span class="kw">let </span><span class="kw-2">mut </span>csprng = CSPRNG.lock();
+    csprng.fill_bytes(dest);
 }
 
-<span class="doccomment">/// Initialises a `T` RNG.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Directly accessing the global CSPRNG can be expensive and so it is often</span>
-<span class="doccomment">/// better to seed a local PRNG from the global CSPRNG. Using a local PRNG</span>
-<span class="doccomment">/// also allows for much faster cryptographically insecure PRNGs to be used.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_rng</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, ()<span class="op">&gt;</span>
-<span class="kw">where</span>
-    <span class="ident">T</span>: <span class="ident">SeedableRng</span>,
+<span class="doccomment">/// Initialises a `T` RNG.
+///
+/// Directly accessing the global CSPRNG can be expensive and so it is often
+/// better to seed a local PRNG from the global CSPRNG. Using a local PRNG
+/// also allows for much faster cryptographically insecure PRNGs to be used.
+</span><span class="kw">pub fn </span>init_rng&lt;T&gt;() -&gt; <span class="prelude-ty">Result</span>&lt;T, ()&gt;
+<span class="kw">where
+    </span>T: SeedableRng,
 {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">csprng</span> <span class="op">=</span> <span class="ident">CSPRNG</span>.<span class="ident">lock</span>();
-    <span class="ident">T::from_rng</span>(<span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">csprng</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> ())
+    <span class="kw">let </span><span class="kw-2">mut </span>csprng = CSPRNG.lock();
+    T::from_rng(<span class="kw-2">&amp;mut *</span>csprng).map_err(|<span class="kw">_</span>| ())
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="random" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="random" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

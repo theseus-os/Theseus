@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/tlb_shootdown/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../tlb_shootdown/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../tlb_shootdown/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../tlb_shootdown/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/tlb_shootdown/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../tlb_shootdown/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -108,110 +102,109 @@
 <span id="102">102</span>
 <span id="103">103</span>
 <span id="104">104</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Support for broadcasting and handling TLB shootdown IPIs. </span>
+</pre><pre class="rust"><code><span class="doccomment">//! Support for broadcasting and handling TLB shootdown IPIs. 
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="comment">// #[macro_use] extern crate log;</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">apic</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">x86_64</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pause</span>;
-
-
-<span class="kw">use</span> <span class="ident">core::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">AtomicU8</span>, <span class="ident">Ordering</span>};
-<span class="kw">use</span> <span class="ident">irq_safety</span>::{<span class="ident">hold_interrupts</span>, <span class="ident">RwLockIrqSafe</span>};
-<span class="kw">use</span> <span class="ident">memory::PageRange</span>;
-<span class="kw">use</span> <span class="ident">apic</span>::{<span class="ident">LocalApic</span>, <span class="ident">get_my_apic</span>, <span class="ident">cpu_count</span>, <span class="ident">LapicIpiDestination</span>};
-<span class="kw">use</span> <span class="ident">pause::spin_loop_hint</span>;
+</span><span class="comment">// #[macro_use] extern crate log;
+</span><span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>apic;
+<span class="kw">extern crate </span>x86_64;
+<span class="kw">extern crate </span>pause;
 
 
-<span class="doccomment">/// The number of remaining cores that still need to handle the curerent TLB shootdown IPI</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">TLB_SHOOTDOWN_IPI_COUNT</span>: <span class="ident">AtomicU8</span> <span class="op">=</span> <span class="ident">AtomicU8::new</span>(<span class="number">0</span>);
-<span class="doccomment">/// The lock that makes sure only one set of TLB shootdown IPIs is concurrently happening</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">TLB_SHOOTDOWN_IPI_LOCK</span>: <span class="ident">AtomicBool</span> <span class="op">=</span> <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>);
-<span class="doccomment">/// The range of pages for a TLB shootdown IPI.</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">TLB_SHOOTDOWN_IPI_PAGES</span>: <span class="ident">RwLockIrqSafe</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">PageRange</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">RwLockIrqSafe::new</span>(<span class="prelude-val">None</span>);
+<span class="kw">use </span>core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+<span class="kw">use </span>irq_safety::{hold_interrupts, RwLockIrqSafe};
+<span class="kw">use </span>memory::PageRange;
+<span class="kw">use </span>apic::{LocalApic, get_my_apic, cpu_count, LapicIpiDestination};
+<span class="kw">use </span>pause::spin_loop_hint;
 
 
-<span class="doccomment">/// Initializes data, functions, and structures for the TLB shootdown. </span>
-<span class="doccomment">/// TODO: redesign this, it&#39;s weird and silly just to set one callback.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>() {
-    <span class="ident">memory::set_broadcast_tlb_shootdown_cb</span>(<span class="ident">broadcast_tlb_shootdown</span>);
+<span class="doccomment">/// The number of remaining cores that still need to handle the curerent TLB shootdown IPI
+</span><span class="kw">pub static </span>TLB_SHOOTDOWN_IPI_COUNT: AtomicU8 = AtomicU8::new(<span class="number">0</span>);
+<span class="doccomment">/// The lock that makes sure only one set of TLB shootdown IPIs is concurrently happening
+</span><span class="kw">pub static </span>TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(<span class="bool-val">false</span>);
+<span class="doccomment">/// The range of pages for a TLB shootdown IPI.
+</span><span class="kw">pub static </span>TLB_SHOOTDOWN_IPI_PAGES: RwLockIrqSafe&lt;<span class="prelude-ty">Option</span>&lt;PageRange&gt;&gt; = RwLockIrqSafe::new(<span class="prelude-val">None</span>);
+
+
+<span class="doccomment">/// Initializes data, functions, and structures for the TLB shootdown. 
+/// TODO: redesign this, it&#39;s weird and silly just to set one callback.
+</span><span class="kw">pub fn </span>init() {
+    memory::set_broadcast_tlb_shootdown_cb(broadcast_tlb_shootdown);
 }
 
 
-<span class="doccomment">/// Broadcasts TLB shootdown IPI to all other AP cores.</span>
-<span class="doccomment">/// Do not invoke this directly, but rather pass it as a callback to the memory subsystem,</span>
-<span class="doccomment">/// which will invoke it as needed (on remap/unmap operations).</span>
-<span class="kw">fn</span> <span class="ident">broadcast_tlb_shootdown</span>(<span class="ident">pages_to_invalidate</span>: <span class="ident">PageRange</span>) {
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">my_lapic</span>) <span class="op">=</span> <span class="ident">get_my_apic</span>() {
-        <span class="comment">// log::info!(&quot;broadcast_tlb_shootdown():  AP {}, pages: {:?}&quot;, my_lapic.read().apic_id(), pages_to_invalidate);</span>
-        <span class="ident">send_tlb_shootdown_ipi</span>(<span class="kw-2">&amp;mut</span> <span class="ident">my_lapic</span>.<span class="ident">write</span>(), <span class="ident">pages_to_invalidate</span>);
+<span class="doccomment">/// Broadcasts TLB shootdown IPI to all other AP cores.
+/// Do not invoke this directly, but rather pass it as a callback to the memory subsystem,
+/// which will invoke it as needed (on remap/unmap operations).
+</span><span class="kw">fn </span>broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(my_lapic) = get_my_apic() {
+        <span class="comment">// log::info!(&quot;broadcast_tlb_shootdown():  AP {}, pages: {:?}&quot;, my_lapic.read().apic_id(), pages_to_invalidate);
+        </span>send_tlb_shootdown_ipi(<span class="kw-2">&amp;mut </span>my_lapic.write(), pages_to_invalidate);
     }
 }
 
 
-<span class="doccomment">/// Handles a TLB shootdown ipi by flushing the `VirtualAddress`es </span>
-<span class="doccomment">/// covered by the given range of `pages_to_invalidate`.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// There is no need to invoke this directly, it will be called by an IPI interrupt handler.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_tlb_shootdown_ipi</span>(<span class="ident">pages_to_invalidate</span>: <span class="ident">PageRange</span>) {
-    <span class="comment">// log::trace!(&quot;handle_tlb_shootdown_ipi(): AP {}, pages: {:?}&quot;, apic::get_my_apic_id(), pages_to_invalidate);</span>
+<span class="doccomment">/// Handles a TLB shootdown ipi by flushing the `VirtualAddress`es 
+/// covered by the given range of `pages_to_invalidate`.
+/// 
+/// There is no need to invoke this directly, it will be called by an IPI interrupt handler.
+</span><span class="kw">pub fn </span>handle_tlb_shootdown_ipi(pages_to_invalidate: PageRange) {
+    <span class="comment">// log::trace!(&quot;handle_tlb_shootdown_ipi(): AP {}, pages: {:?}&quot;, apic::get_my_apic_id(), pages_to_invalidate);
 
-    <span class="kw">for</span> <span class="ident">page</span> <span class="kw">in</span> <span class="ident">pages_to_invalidate</span> {
-        <span class="ident">x86_64::instructions::tlb::flush</span>(<span class="ident">x86_64::VirtAddr::new</span>(<span class="ident">page</span>.<span class="ident">start_address</span>().<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>));
+    </span><span class="kw">for </span>page <span class="kw">in </span>pages_to_invalidate {
+        x86_64::instructions::tlb::flush(x86_64::VirtAddr::new(page.start_address().value() <span class="kw">as </span>u64));
     }
-    <span class="ident">TLB_SHOOTDOWN_IPI_COUNT</span>.<span class="ident">fetch_sub</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
+    TLB_SHOOTDOWN_IPI_COUNT.fetch_sub(<span class="number">1</span>, Ordering::SeqCst);
 }
 
 
-<span class="doccomment">/// Sends an IPI to all other cores (except me) to trigger </span>
-<span class="doccomment">/// a TLB flush of the given pages&#39; virtual addresses.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">send_tlb_shootdown_ipi</span>(<span class="ident">my_lapic</span>: <span class="kw-2">&amp;mut</span> <span class="ident">LocalApic</span>, <span class="ident">pages_to_invalidate</span>: <span class="ident">PageRange</span>) {        
-    <span class="comment">// skip sending IPIs if there are no other cores running</span>
-    <span class="kw">let</span> <span class="ident">cpu_count</span> <span class="op">=</span> <span class="ident">cpu_count</span>();
-    <span class="kw">if</span> <span class="ident">cpu_count</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">1</span> {
+<span class="doccomment">/// Sends an IPI to all other cores (except me) to trigger 
+/// a TLB flush of the given pages&#39; virtual addresses.
+</span><span class="kw">pub fn </span>send_tlb_shootdown_ipi(my_lapic: <span class="kw-2">&amp;mut </span>LocalApic, pages_to_invalidate: PageRange) {        
+    <span class="comment">// skip sending IPIs if there are no other cores running
+    </span><span class="kw">let </span>cpu_count = cpu_count();
+    <span class="kw">if </span>cpu_count &lt;= <span class="number">1 </span>{
         <span class="kw">return</span>;
     }
 
-    <span class="comment">// log::trace!(&quot;send_tlb_shootdown_ipi(): from AP {}, cpu_count: {}, {:?}&quot;, my_lapic.apic_id(), cpu_count, pages_to_invalidate);</span>
+    <span class="comment">// log::trace!(&quot;send_tlb_shootdown_ipi(): from AP {}, cpu_count: {}, {:?}&quot;, my_lapic.apic_id(), cpu_count, pages_to_invalidate);
 
-    <span class="comment">// interrupts must be disabled here, because this IPI sequence must be fully synchronous with other cores,</span>
-    <span class="comment">// and we wouldn&#39;t want this core to be interrupted while coordinating IPI responses across multiple cores.</span>
-    <span class="kw">let</span> <span class="ident">_held_ints</span> <span class="op">=</span> <span class="ident">hold_interrupts</span>(); 
+    // interrupts must be disabled here, because this IPI sequence must be fully synchronous with other cores,
+    // and we wouldn&#39;t want this core to be interrupted while coordinating IPI responses across multiple cores.
+    </span><span class="kw">let </span>_held_ints = hold_interrupts(); 
 
-    <span class="comment">// acquire lock</span>
-    <span class="comment">// TODO: add timeout!!</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">old_lock_val</span> <span class="op">=</span> <span class="ident">TLB_SHOOTDOWN_IPI_LOCK</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>);
-    <span class="kw">loop</span> {
-        <span class="kw">match</span> <span class="ident">TLB_SHOOTDOWN_IPI_LOCK</span>.<span class="ident">compare_exchange_weak</span>(<span class="ident">old_lock_val</span>, <span class="bool-val">true</span>, <span class="ident">Ordering::AcqRel</span>, <span class="ident">Ordering::Relaxed</span>) { 
+    <span class="comment">// acquire lock
+    // TODO: add timeout!!
+    </span><span class="kw">let </span><span class="kw-2">mut </span>old_lock_val = TLB_SHOOTDOWN_IPI_LOCK.load(Ordering::Relaxed);
+    <span class="kw">loop </span>{
+        <span class="kw">match </span>TLB_SHOOTDOWN_IPI_LOCK.compare_exchange_weak(old_lock_val, <span class="bool-val">true</span>, Ordering::AcqRel, Ordering::Relaxed) { 
             <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="kw">break</span>,
-            <span class="prelude-val">Err</span>(<span class="ident">v</span>) =&gt; <span class="ident">old_lock_val</span> <span class="op">=</span> <span class="ident">v</span>,
+            <span class="prelude-val">Err</span>(v) =&gt; old_lock_val = v,
         }
-        <span class="ident">spin_loop_hint</span>();
+        spin_loop_hint();
     }
 
-    <span class="kw-2">*</span><span class="ident">TLB_SHOOTDOWN_IPI_PAGES</span>.<span class="ident">write</span>() <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">pages_to_invalidate</span>);
-    <span class="ident">TLB_SHOOTDOWN_IPI_COUNT</span>.<span class="ident">store</span>(<span class="ident">cpu_count</span> <span class="op">-</span> <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>); <span class="comment">// -1 to exclude this core </span>
+    <span class="kw-2">*</span>TLB_SHOOTDOWN_IPI_PAGES.write() = <span class="prelude-val">Some</span>(pages_to_invalidate);
+    TLB_SHOOTDOWN_IPI_COUNT.store(cpu_count - <span class="number">1</span>, Ordering::SeqCst); <span class="comment">// -1 to exclude this core 
 
-    <span class="comment">// let&#39;s try to use NMI instead, since it will interrupt everyone forcibly and result in the fastest handling</span>
-    <span class="ident">my_lapic</span>.<span class="ident">send_nmi_ipi</span>(<span class="ident">LapicIpiDestination::AllButMe</span>); <span class="comment">// send IPI to all other cores but this one</span>
+    // let&#39;s try to use NMI instead, since it will interrupt everyone forcibly and result in the fastest handling
+    </span>my_lapic.send_nmi_ipi(LapicIpiDestination::AllButMe); <span class="comment">// send IPI to all other cores but this one
 
-    <span class="comment">// wait for all other cores to handle this IPI</span>
-    <span class="comment">// it must be a blocking, synchronous operation to ensure stale TLB entries don&#39;t cause problems</span>
-    <span class="comment">// TODO: add timeout!!</span>
-    <span class="kw">while</span> <span class="ident">TLB_SHOOTDOWN_IPI_COUNT</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) <span class="op">&gt;</span> <span class="number">0</span> { 
-        <span class="ident">spin_loop_hint</span>();
+    // wait for all other cores to handle this IPI
+    // it must be a blocking, synchronous operation to ensure stale TLB entries don&#39;t cause problems
+    // TODO: add timeout!!
+    </span><span class="kw">while </span>TLB_SHOOTDOWN_IPI_COUNT.load(Ordering::Relaxed) &gt; <span class="number">0 </span>{ 
+        spin_loop_hint();
     }
 
-    <span class="comment">// clear TLB shootdown data</span>
-    <span class="kw-2">*</span><span class="ident">TLB_SHOOTDOWN_IPI_PAGES</span>.<span class="ident">write</span>() <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="comment">// clear TLB shootdown data
+    </span><span class="kw-2">*</span>TLB_SHOOTDOWN_IPI_PAGES.write() = <span class="prelude-val">None</span>;
 
-    <span class="comment">// release lock</span>
-    <span class="ident">TLB_SHOOTDOWN_IPI_LOCK</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::Release</span>); 
+    <span class="comment">// release lock
+    </span>TLB_SHOOTDOWN_IPI_LOCK.store(<span class="bool-val">false</span>, Ordering::Release); 
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tlb_shootdown" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tlb_shootdown" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

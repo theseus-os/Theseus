@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/vga_buffer/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../vga_buffer/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../vga_buffer/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../vga_buffer/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/vga_buffer/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../vga_buffer/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -184,186 +178,185 @@
 <span id="178">178</span>
 <span id="179">179</span>
 <span id="180">180</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Support for basic printing to a simple 80x25 text-mode VGA buffer. </span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Does not support scrolling, cursors, or any other features of a regular drawn framebuffer.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Support for basic printing to a simple 80x25 text-mode VGA buffer. 
+//!
+//! Does not support scrolling, cursors, or any other features of a regular drawn framebuffer.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">ptr_internals</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(ptr_internals)]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">logger</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">volatile</span>;
-
-
-<span class="kw">use</span> <span class="ident">core::fmt</span>;
-<span class="kw">use</span> <span class="ident">core::ptr::Unique</span>;
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">volatile::Volatile</span>;
-<span class="kw">use</span> <span class="ident">kernel_config::memory::KERNEL_OFFSET</span>;
+</span><span class="kw">extern crate </span>kernel_config;
+<span class="kw">extern crate </span>logger;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>volatile;
 
 
-<span class="doccomment">/// defined by x86&#39;s physical memory maps</span>
-<span class="kw">const</span> <span class="ident">VGA_BUFFER_VIRTUAL_ADDR</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0xb8000</span> <span class="op">+</span> <span class="ident">KERNEL_OFFSET</span>;
-
-<span class="doccomment">/// height of the VGA text window</span>
-<span class="kw">const</span> <span class="ident">BUFFER_HEIGHT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">25</span>;
-<span class="doccomment">/// width of the VGA text window</span>
-<span class="kw">const</span> <span class="ident">BUFFER_WIDTH</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">80</span>;
+<span class="kw">use </span>core::fmt;
+<span class="kw">use </span>core::ptr::Unique;
+<span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>volatile::Volatile;
+<span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
 
 
-<span class="doccomment">/// The singleton VGA writer instance that writes to the VGA text buffer.</span>
-<span class="kw">static</span> <span class="ident">EARLY_VGA_WRITER</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">VgaBuffer</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(
-    <span class="ident">VgaBuffer</span> {
-        <span class="ident">column_position</span>: <span class="number">0</span>,
-        <span class="comment">// SAFE: the assembly boot up code ensures this is mapped into memory.</span>
-        <span class="ident">buffer</span>: <span class="kw">unsafe</span> { <span class="ident">Unique::new_unchecked</span>((<span class="ident">VGA_BUFFER_VIRTUAL_ADDR</span>) <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span>) },
+<span class="doccomment">/// defined by x86&#39;s physical memory maps
+</span><span class="kw">const </span>VGA_BUFFER_VIRTUAL_ADDR: usize = <span class="number">0xb8000 </span>+ KERNEL_OFFSET;
+
+<span class="doccomment">/// height of the VGA text window
+</span><span class="kw">const </span>BUFFER_HEIGHT: usize = <span class="number">25</span>;
+<span class="doccomment">/// width of the VGA text window
+</span><span class="kw">const </span>BUFFER_WIDTH: usize = <span class="number">80</span>;
+
+
+<span class="doccomment">/// The singleton VGA writer instance that writes to the VGA text buffer.
+</span><span class="kw">static </span>EARLY_VGA_WRITER: Mutex&lt;VgaBuffer&gt; = Mutex::new(
+    VgaBuffer {
+        column_position: <span class="number">0</span>,
+        <span class="comment">// SAFE: the assembly boot up code ensures this is mapped into memory.
+        </span>buffer: <span class="kw">unsafe </span>{ Unique::new_unchecked((VGA_BUFFER_VIRTUAL_ADDR) <span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>) },
     }
 );
 
-<span class="attribute">#[<span class="ident">macro_export</span>]</span>
-<span class="macro">macro_rules!</span> <span class="ident">print_raw</span> {
-    ($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) =&gt; ({
-        <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::print_args_raw</span>(<span class="macro">format_args!</span>($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>)<span class="kw-2">*</span>));
+<span class="attr">#[macro_export]
+</span><span class="macro">macro_rules! </span>print_raw {
+    ($(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; ({
+        <span class="kw">let _ </span>= <span class="macro-nonterminal">$crate::print_args_raw</span>(<span class="macro">format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
     });
 }
 
-<span class="attribute">#[<span class="ident">macro_export</span>]</span>
-<span class="macro">macro_rules!</span> <span class="ident">println_raw</span> {
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>:<span class="ident">expr</span>) =&gt; (<span class="macro">print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>, <span class="string">&quot;\n&quot;</span>)));
-    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>:<span class="ident">expr</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) =&gt; (<span class="macro">print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>)<span class="kw-2">*</span>));
+<span class="attr">#[macro_export]
+</span><span class="macro">macro_rules! </span>println_raw {
+    (<span class="macro-nonterminal">$fmt</span>:expr) =&gt; (<span class="macro">print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>)));
+    (<span class="macro-nonterminal">$fmt</span>:expr, $(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; (<span class="macro">print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
 }
 
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">print_args_raw</span>(<span class="ident">args</span>: <span class="ident">fmt::Arguments</span>) -&gt; <span class="ident">fmt::Result</span> {
-    <span class="kw">use</span> <span class="ident">core::fmt::Write</span>;
-    <span class="ident">EARLY_VGA_WRITER</span>.<span class="ident">lock</span>().<span class="ident">write_fmt</span>(<span class="ident">args</span>)
+<span class="attr">#[doc(hidden)]
+</span><span class="kw">pub fn </span>print_args_raw(args: fmt::Arguments) -&gt; fmt::Result {
+    <span class="kw">use </span>core::fmt::Write;
+    EARLY_VGA_WRITER.lock().write_fmt(args)
 }
 
 
-<span class="kw">type</span> <span class="ident">VgaTextBufferLine</span> <span class="op">=</span> [<span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">ScreenChar</span><span class="op">&gt;</span>; <span class="ident">BUFFER_WIDTH</span>];
-<span class="kw">type</span> <span class="ident">VgaTextBuffer</span>     <span class="op">=</span> [<span class="ident">VgaTextBufferLine</span>; <span class="ident">BUFFER_HEIGHT</span>];
+<span class="kw">type </span>VgaTextBufferLine = [Volatile&lt;ScreenChar&gt;; BUFFER_WIDTH];
+<span class="kw">type </span>VgaTextBuffer     = [VgaTextBufferLine; BUFFER_HEIGHT];
 
 
-<span class="kw">struct</span> <span class="ident">VgaBuffer</span> {
-    <span class="ident">column_position</span>: <span class="ident">usize</span>,
-    <span class="ident">buffer</span>: <span class="ident">Unique</span><span class="op">&lt;</span><span class="ident">VgaTextBuffer</span><span class="op">&gt;</span>,
+<span class="kw">struct </span>VgaBuffer {
+    column_position: usize,
+    buffer: Unique&lt;VgaTextBuffer&gt;,
 }
-<span class="kw">impl</span> <span class="ident">VgaBuffer</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_byte</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">byte</span>: <span class="ident">u8</span>) {
-        <span class="kw">match</span> <span class="ident">byte</span> {
-            <span class="string">b&#39;\n&#39;</span> =&gt; <span class="self">self</span>.<span class="ident">new_line</span>(),
-            <span class="ident">byte</span> =&gt; {
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">column_position</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">BUFFER_WIDTH</span> {
-                    <span class="self">self</span>.<span class="ident">new_line</span>();
+<span class="kw">impl </span>VgaBuffer {
+    <span class="kw">pub fn </span>write_byte(<span class="kw-2">&amp;mut </span><span class="self">self</span>, byte: u8) {
+        <span class="kw">match </span>byte {
+            <span class="string">b&#39;\n&#39; </span>=&gt; <span class="self">self</span>.new_line(),
+            byte =&gt; {
+                <span class="kw">if </span><span class="self">self</span>.column_position &gt;= BUFFER_WIDTH {
+                    <span class="self">self</span>.new_line();
                 }
-                <span class="kw">let</span> <span class="ident">row</span> <span class="op">=</span> <span class="ident">BUFFER_HEIGHT</span> <span class="op">-</span> <span class="number">1</span>;
-                <span class="kw">let</span> <span class="ident">col</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">column_position</span>;
+                <span class="kw">let </span>row = BUFFER_HEIGHT - <span class="number">1</span>;
+                <span class="kw">let </span>col = <span class="self">self</span>.column_position;
 
-                <span class="self">self</span>.<span class="ident">buffer</span>()[<span class="ident">row</span>][<span class="ident">col</span>].<span class="ident">write</span>(
-                    <span class="ident">ScreenChar</span> {
-                        <span class="ident">ascii_character</span>: <span class="ident">byte</span>,
-                        <span class="ident">color_code</span>: <span class="ident">ColorCode::default</span>(),
+                <span class="self">self</span>.buffer()[row][col].write(
+                    ScreenChar {
+                        ascii_character: byte,
+                        color_code: ColorCode::default(),
                     }
                 );
-                <span class="self">self</span>.<span class="ident">column_position</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                <span class="self">self</span>.column_position += <span class="number">1</span>;
             }
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">new_line</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">for</span> <span class="ident">row</span> <span class="kw">in</span> <span class="number">1</span>..<span class="ident">BUFFER_HEIGHT</span> {
-            <span class="kw">for</span> <span class="ident">col</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">BUFFER_WIDTH</span> {
-                <span class="kw">let</span> <span class="ident">character</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">buffer</span>()[<span class="ident">row</span>][<span class="ident">col</span>].<span class="ident">read</span>();
-                <span class="self">self</span>.<span class="ident">buffer</span>()[<span class="ident">row</span> <span class="op">-</span> <span class="number">1</span>][<span class="ident">col</span>].<span class="ident">write</span>(<span class="ident">character</span>);
+    <span class="kw">fn </span>new_line(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">for </span>row <span class="kw">in </span><span class="number">1</span>..BUFFER_HEIGHT {
+            <span class="kw">for </span>col <span class="kw">in </span><span class="number">0</span>..BUFFER_WIDTH {
+                <span class="kw">let </span>character = <span class="self">self</span>.buffer()[row][col].read();
+                <span class="self">self</span>.buffer()[row - <span class="number">1</span>][col].write(character);
             }
         }
-        <span class="self">self</span>.<span class="ident">clear_row</span>(<span class="ident">BUFFER_HEIGHT</span> <span class="op">-</span> <span class="number">1</span>);
-        <span class="self">self</span>.<span class="ident">column_position</span> <span class="op">=</span> <span class="number">0</span>;
+        <span class="self">self</span>.clear_row(BUFFER_HEIGHT - <span class="number">1</span>);
+        <span class="self">self</span>.column_position = <span class="number">0</span>;
     }
 
-    <span class="kw">fn</span> <span class="ident">clear_row</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">row</span>: <span class="ident">usize</span>) {
-        <span class="kw">let</span> <span class="ident">blank</span> <span class="op">=</span> <span class="ident">ScreenChar</span> {
-            <span class="ident">ascii_character</span>: <span class="string">b&#39; &#39;</span>,
-            <span class="ident">color_code</span>: <span class="ident">ColorCode::default</span>()
+    <span class="kw">fn </span>clear_row(<span class="kw-2">&amp;mut </span><span class="self">self</span>, row: usize) {
+        <span class="kw">let </span>blank = ScreenChar {
+            ascii_character: <span class="string">b&#39; &#39;</span>,
+            color_code: ColorCode::default()
         };
-        <span class="kw">for</span> <span class="ident">col</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">BUFFER_WIDTH</span> {
-            <span class="self">self</span>.<span class="ident">buffer</span>()[<span class="ident">row</span>][<span class="ident">col</span>].<span class="ident">write</span>(<span class="ident">blank</span>);
+        <span class="kw">for </span>col <span class="kw">in </span><span class="number">0</span>..BUFFER_WIDTH {
+            <span class="self">self</span>.buffer()[row][col].write(blank);
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">buffer</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> [<span class="ident">VgaTextBufferLine</span>] {
-        <span class="comment">// SAFE: mutability is protected by the lock surrounding the RawVgaBuffer instance</span>
-        <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">buffer</span>.<span class="ident">as_mut</span>() }
+    <span class="kw">fn </span>buffer(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>[VgaTextBufferLine] {
+        <span class="comment">// SAFE: mutability is protected by the lock surrounding the RawVgaBuffer instance
+        </span><span class="kw">unsafe </span>{ <span class="self">self</span>.buffer.as_mut() }
     }
 }
-<span class="kw">impl</span> <span class="ident">fmt::Write</span> <span class="kw">for</span> <span class="ident">VgaBuffer</span> {
-    <span class="kw">fn</span> <span class="ident">write_str</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">::core::fmt::Result</span> {
+<span class="kw">impl </span>fmt::Write <span class="kw">for </span>VgaBuffer {
+    <span class="kw">fn </span>write_str(<span class="kw-2">&amp;mut </span><span class="self">self</span>, s: <span class="kw-2">&amp;</span>str) -&gt; ::core::fmt::Result {
         
-        <span class="comment">// mirror DIRECTLY to serial port, do not use the log statements</span>
-        <span class="comment">// because that can introduce an infinite loop when mirror_to_serial is enabled.</span>
-        <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">logger::write_str</span>(<span class="ident">s</span>); 
+        <span class="comment">// mirror DIRECTLY to serial port, do not use the log statements
+        // because that can introduce an infinite loop when mirror_to_serial is enabled.
+        </span><span class="kw">let </span>ret = logger::write_str(s); 
         
-        <span class="kw">for</span> <span class="ident">byte</span> <span class="kw">in</span> <span class="ident">s</span>.<span class="ident">bytes</span>() {
-            <span class="self">self</span>.<span class="ident">write_byte</span>(<span class="ident">byte</span>)
+        <span class="kw">for </span>byte <span class="kw">in </span>s.bytes() {
+            <span class="self">self</span>.write_byte(byte)
         }
-        <span class="ident">ret</span>
+        ret
     }
 }
 
 
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Color</span> {
-    <span class="ident">Black</span> <span class="op">=</span> <span class="number">0</span>,
-    <span class="ident">Blue</span> <span class="op">=</span> <span class="number">1</span>,
-    <span class="ident">Green</span> <span class="op">=</span> <span class="number">2</span>,
-    <span class="ident">Cyan</span> <span class="op">=</span> <span class="number">3</span>,
-    <span class="ident">Red</span> <span class="op">=</span> <span class="number">4</span>,
-    <span class="ident">Magenta</span> <span class="op">=</span> <span class="number">5</span>,
-    <span class="ident">Brown</span> <span class="op">=</span> <span class="number">6</span>,
-    <span class="ident">LightGray</span> <span class="op">=</span> <span class="number">7</span>,
-    <span class="ident">DarkGray</span> <span class="op">=</span> <span class="number">8</span>,
-    <span class="ident">LightBlue</span> <span class="op">=</span> <span class="number">9</span>,
-    <span class="ident">LightGreen</span> <span class="op">=</span> <span class="number">10</span>,
-    <span class="ident">LightCyan</span> <span class="op">=</span> <span class="number">11</span>,
-    <span class="ident">LightRed</span> <span class="op">=</span> <span class="number">12</span>,
-    <span class="ident">Pink</span> <span class="op">=</span> <span class="number">13</span>,
-    <span class="ident">Yellow</span> <span class="op">=</span> <span class="number">14</span>,
-    <span class="ident">White</span> <span class="op">=</span> <span class="number">15</span>,
+<span class="attr">#[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+</span><span class="kw">pub enum </span>Color {
+    Black = <span class="number">0</span>,
+    Blue = <span class="number">1</span>,
+    Green = <span class="number">2</span>,
+    Cyan = <span class="number">3</span>,
+    Red = <span class="number">4</span>,
+    Magenta = <span class="number">5</span>,
+    Brown = <span class="number">6</span>,
+    LightGray = <span class="number">7</span>,
+    DarkGray = <span class="number">8</span>,
+    LightBlue = <span class="number">9</span>,
+    LightGreen = <span class="number">10</span>,
+    LightCyan = <span class="number">11</span>,
+    LightRed = <span class="number">12</span>,
+    Pink = <span class="number">13</span>,
+    Yellow = <span class="number">14</span>,
+    White = <span class="number">15</span>,
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ColorCode</span>(<span class="ident">u8</span>);
+<span class="attr">#[derive(Debug, Clone, Copy)]
+</span><span class="kw">pub struct </span>ColorCode(u8);
 
-<span class="kw">impl</span> <span class="ident">ColorCode</span> {
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">foreground</span>: <span class="ident">Color</span>, <span class="ident">background</span>: <span class="ident">Color</span>) -&gt; <span class="ident">ColorCode</span> {
-        <span class="ident">ColorCode</span>((<span class="ident">background</span> <span class="kw">as</span> <span class="ident">u8</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">4</span> <span class="op">|</span> (<span class="ident">foreground</span> <span class="kw">as</span> <span class="ident">u8</span>))
+<span class="kw">impl </span>ColorCode {
+    <span class="kw">pub const fn </span>new(foreground: Color, background: Color) -&gt; ColorCode {
+        ColorCode((background <span class="kw">as </span>u8) &lt;&lt; <span class="number">4 </span>| (foreground <span class="kw">as </span>u8))
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">ColorCode</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="ident">ColorCode</span> {
-        <span class="ident">ColorCode::new</span>(<span class="ident">Color::LightGreen</span>, <span class="ident">Color::Black</span>)
+<span class="kw">impl </span>Default <span class="kw">for </span>ColorCode {
+    <span class="kw">fn </span>default() -&gt; ColorCode {
+        ColorCode::new(Color::LightGreen, Color::Black)
     }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ScreenChar</span> {
-    <span class="ident">ascii_character</span>: <span class="ident">u8</span>,
-    <span class="ident">color_code</span>: <span class="ident">ColorCode</span>,
+<span class="attr">#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>ScreenChar {
+    ascii_character: u8,
+    color_code: ColorCode,
 }
-<span class="kw">impl</span> <span class="ident">ScreenChar</span> {
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">ascii</span>: <span class="ident">u8</span>, <span class="ident">color</span>: <span class="ident">ColorCode</span>) -&gt; <span class="ident">ScreenChar</span> {
-        <span class="ident">ScreenChar</span> {
-            <span class="ident">ascii_character</span>: <span class="ident">ascii</span>,
-            <span class="ident">color_code</span>: <span class="ident">color</span>,
+<span class="kw">impl </span>ScreenChar {
+    <span class="kw">pub const fn </span>new(ascii: u8, color: ColorCode) -&gt; ScreenChar {
+        ScreenChar {
+            ascii_character: ascii,
+            color_code: color,
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="vga_buffer" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="vga_buffer" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

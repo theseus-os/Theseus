@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/framebuffer_drawer/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../framebuffer_drawer/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../framebuffer_drawer/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../framebuffer_drawer/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/framebuffer_drawer/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../framebuffer_drawer/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -197,198 +191,197 @@
 <span id="191">191</span>
 <span id="192">192</span>
 <span id="193">193</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This crate contains a series of basic draw functions to draw onto a framebuffer.</span>
-<span class="doccomment">//! Displayables invoke these basic functions to display themselves onto a framebuffer.</span>
-<span class="doccomment">//! The coordinate in these interfaces is relative to the origin(top-left point) of the framebuffer.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate contains a series of basic draw functions to draw onto a framebuffer.
+//! Displayables invoke these basic functions to display themselves onto a framebuffer.
+//! The coordinate in these interfaces is relative to the origin(top-left point) of the framebuffer.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">framebuffer</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">shapes</span>;
+</span><span class="kw">extern crate </span>framebuffer;
+<span class="kw">extern crate </span>shapes;
 
-<span class="kw">use</span> <span class="ident">framebuffer</span>::{<span class="ident">Framebuffer</span>, <span class="ident">Pixel</span>};
-<span class="kw">use</span> <span class="ident">shapes::Coord</span>;
+<span class="kw">use </span>framebuffer::{Framebuffer, Pixel};
+<span class="kw">use </span>shapes::Coord;
 
-<span class="doccomment">/// Draws a line in a framebuffer. The part exceeding the boundary of the framebuffer will be ignored.</span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `framebuffer`: the framebuffer to draw in.</span>
-<span class="doccomment">/// * `start`: the start coordinate of the line relative to the origin(top-left point) of the framebuffer.</span>
-<span class="doccomment">/// * `end`: the end coordinate of the line relative to the origin(top-left point) of the framebuffer.</span>
-<span class="doccomment">/// * `color`: the color of the line.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">draw_line</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Pixel</span><span class="op">&gt;</span>(
-    <span class="ident">framebuffer</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">P</span><span class="op">&gt;</span>,
-    <span class="ident">start</span>: <span class="ident">Coord</span>,
-    <span class="ident">end</span>: <span class="ident">Coord</span>,
-    <span class="ident">pixel</span>: <span class="ident">P</span>,
+<span class="doccomment">/// Draws a line in a framebuffer. The part exceeding the boundary of the framebuffer will be ignored.
+/// # Arguments
+/// * `framebuffer`: the framebuffer to draw in.
+/// * `start`: the start coordinate of the line relative to the origin(top-left point) of the framebuffer.
+/// * `end`: the end coordinate of the line relative to the origin(top-left point) of the framebuffer.
+/// * `color`: the color of the line.
+</span><span class="kw">pub fn </span>draw_line&lt;P: Pixel&gt;(
+    framebuffer: <span class="kw-2">&amp;mut </span>Framebuffer&lt;P&gt;,
+    start: Coord,
+    end: Coord,
+    pixel: P,
 ) {
-    <span class="kw">let</span> <span class="ident">width</span>: <span class="ident">isize</span> <span class="op">=</span> <span class="ident">end</span>.<span class="ident">x</span> <span class="op">-</span> <span class="ident">start</span>.<span class="ident">x</span>;
-    <span class="kw">let</span> <span class="ident">height</span>: <span class="ident">isize</span> <span class="op">=</span> <span class="ident">end</span>.<span class="ident">y</span> <span class="op">-</span> <span class="ident">start</span>.<span class="ident">y</span>;
+    <span class="kw">let </span>width: isize = end.x - start.x;
+    <span class="kw">let </span>height: isize = end.y - start.y;
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">line_in_buffer</span> <span class="op">=</span> <span class="bool-val">false</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>line_in_buffer = <span class="bool-val">false</span>;
     
-    <span class="comment">// compare the x distance and y distance. Increase/Decrease the longer one at every step.</span>
-    <span class="kw">if</span> <span class="ident">width</span>.<span class="ident">abs</span>() <span class="op">&gt;</span> <span class="ident">height</span>.<span class="ident">abs</span>() {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">y</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">start</span>.<span class="ident">x</span>;
+    <span class="comment">// compare the x distance and y distance. Increase/Decrease the longer one at every step.
+    </span><span class="kw">if </span>width.abs() &gt; height.abs() {
+        <span class="kw">let </span><span class="kw-2">mut </span>y;
+        <span class="kw">let </span><span class="kw-2">mut </span>x = start.x;
 
-        <span class="comment">// if the end.x is larger than start.x, increase x in the loop. Otherwise decrease it.</span>
-        <span class="kw">let</span> <span class="ident">step</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">width</span> <span class="op">&gt;</span> <span class="number">0</span> { <span class="number">1</span> } <span class="kw">else</span> { <span class="op">-</span><span class="number">1</span> };
-        <span class="kw">loop</span> {
-            <span class="kw">if</span> <span class="ident">x</span> <span class="op">==</span> <span class="ident">end</span>.<span class="ident">x</span> {
+        <span class="comment">// if the end.x is larger than start.x, increase x in the loop. Otherwise decrease it.
+        </span><span class="kw">let </span>step = <span class="kw">if </span>width &gt; <span class="number">0 </span>{ <span class="number">1 </span>} <span class="kw">else </span>{ -<span class="number">1 </span>};
+        <span class="kw">loop </span>{
+            <span class="kw">if </span>x == end.x {
                 <span class="kw">break</span>;
             }
-            <span class="ident">y</span> <span class="op">=</span> (<span class="ident">x</span> <span class="op">-</span> <span class="ident">start</span>.<span class="ident">x</span>) <span class="op">*</span> <span class="ident">height</span> <span class="op">/</span> <span class="ident">width</span> <span class="op">+</span> <span class="ident">start</span>.<span class="ident">y</span>;
-            <span class="kw">let</span> <span class="ident">coordinate</span> <span class="op">=</span> <span class="ident">Coord::new</span>(<span class="ident">x</span>, <span class="ident">y</span>);
-            <span class="kw">if</span> <span class="ident">framebuffer</span>.<span class="ident">contains</span>(<span class="ident">coordinate</span>) {
-                <span class="ident">line_in_buffer</span> <span class="op">=</span> <span class="bool-val">true</span>;
-                <span class="ident">framebuffer</span>.<span class="ident">draw_pixel</span>(<span class="ident">coordinate</span>, <span class="ident">pixel</span>);
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">line_in_buffer</span> {
-                <span class="comment">// the part exceeds the buffer will be ignored</span>
-                <span class="kw">break</span>;
+            y = (x - start.x) * height / width + start.y;
+            <span class="kw">let </span>coordinate = Coord::new(x, y);
+            <span class="kw">if </span>framebuffer.contains(coordinate) {
+                line_in_buffer = <span class="bool-val">true</span>;
+                framebuffer.draw_pixel(coordinate, pixel);
+            } <span class="kw">else if </span>line_in_buffer {
+                <span class="comment">// the part exceeds the buffer will be ignored
+                </span><span class="kw">break</span>;
             }
-            <span class="ident">x</span> <span class="op">+</span><span class="op">=</span> <span class="ident">step</span>;
+            x += step;
         }
-    } <span class="kw">else</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">start</span>.<span class="ident">y</span>;
-        <span class="kw">let</span> <span class="ident">step</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">height</span> <span class="op">&gt;</span> <span class="number">0</span> { <span class="number">1</span> } <span class="kw">else</span> { <span class="op">-</span><span class="number">1</span> };
-        <span class="kw">loop</span> {
-            <span class="kw">if</span> <span class="ident">y</span> <span class="op">==</span> <span class="ident">end</span>.<span class="ident">y</span> {
+    } <span class="kw">else </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>x;
+        <span class="kw">let </span><span class="kw-2">mut </span>y = start.y;
+        <span class="kw">let </span>step = <span class="kw">if </span>height &gt; <span class="number">0 </span>{ <span class="number">1 </span>} <span class="kw">else </span>{ -<span class="number">1 </span>};
+        <span class="kw">loop </span>{
+            <span class="kw">if </span>y == end.y {
                 <span class="kw">break</span>;
             }
-            <span class="ident">x</span> <span class="op">=</span> (<span class="ident">y</span> <span class="op">-</span> <span class="ident">start</span>.<span class="ident">y</span>) <span class="op">*</span> <span class="ident">width</span> <span class="op">/</span> <span class="ident">height</span> <span class="op">+</span> <span class="ident">start</span>.<span class="ident">x</span>;
-            <span class="kw">let</span> <span class="ident">coordinate</span> <span class="op">=</span> <span class="ident">Coord::new</span>(<span class="ident">x</span>, <span class="ident">y</span>);
-            <span class="kw">if</span> <span class="ident">framebuffer</span>.<span class="ident">contains</span>(<span class="ident">coordinate</span>) {
-                <span class="ident">line_in_buffer</span> <span class="op">=</span> <span class="bool-val">true</span>;
-                <span class="ident">framebuffer</span>.<span class="ident">draw_pixel</span>(<span class="ident">coordinate</span>, <span class="ident">pixel</span>);
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">line_in_buffer</span> {
-                <span class="comment">// the part exceeds the buffer will be ignored</span>
-                <span class="kw">break</span>;
+            x = (y - start.y) * width / height + start.x;
+            <span class="kw">let </span>coordinate = Coord::new(x, y);
+            <span class="kw">if </span>framebuffer.contains(coordinate) {
+                line_in_buffer = <span class="bool-val">true</span>;
+                framebuffer.draw_pixel(coordinate, pixel);
+            } <span class="kw">else if </span>line_in_buffer {
+                <span class="comment">// the part exceeds the buffer will be ignored
+                </span><span class="kw">break</span>;
             }
-            <span class="ident">y</span> <span class="op">+</span><span class="op">=</span> <span class="ident">step</span>;
+            y += step;
         }
     }
 }
 
-<span class="doccomment">/// Draws a rectangle in a framebuffer.</span>
-<span class="doccomment">/// The part exceeding the boundary of the framebuffer will be ignored.</span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `framebuffer`: the framebuffer to draw in.</span>
-<span class="doccomment">/// * `coordinate`: the left top coordinate of the rectangle relative to the origin(top-left point) of the framebuffer.</span>
-<span class="doccomment">/// * `width`: the width of the rectangle in number of pixels.</span>
-<span class="doccomment">/// * `height`: the height of the rectangle in number of pixels.</span>
-<span class="doccomment">/// * `color`: the color of the rectangle&#39;s border.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">draw_rectangle</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Pixel</span><span class="op">&gt;</span>(
-    <span class="ident">framebuffer</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">P</span><span class="op">&gt;</span>,
-    <span class="ident">coordinate</span>: <span class="ident">Coord</span>,
-    <span class="ident">width</span>: <span class="ident">usize</span>,
-    <span class="ident">height</span>: <span class="ident">usize</span>,
-    <span class="ident">pixel</span>: <span class="ident">P</span>,
+<span class="doccomment">/// Draws a rectangle in a framebuffer.
+/// The part exceeding the boundary of the framebuffer will be ignored.
+/// # Arguments
+/// * `framebuffer`: the framebuffer to draw in.
+/// * `coordinate`: the left top coordinate of the rectangle relative to the origin(top-left point) of the framebuffer.
+/// * `width`: the width of the rectangle in number of pixels.
+/// * `height`: the height of the rectangle in number of pixels.
+/// * `color`: the color of the rectangle&#39;s border.
+</span><span class="kw">pub fn </span>draw_rectangle&lt;P: Pixel&gt;(
+    framebuffer: <span class="kw-2">&amp;mut </span>Framebuffer&lt;P&gt;,
+    coordinate: Coord,
+    width: usize,
+    height: usize,
+    pixel: P,
 ) {
-    <span class="kw">let</span> (<span class="ident">buffer_width</span>, <span class="ident">buffer_height</span>) <span class="op">=</span> <span class="ident">framebuffer</span>.<span class="ident">get_size</span>();
+    <span class="kw">let </span>(buffer_width, buffer_height) = framebuffer.get_size();
 
-    <span class="comment">// return if the rectangle is not within the framebuffer</span>
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">framebuffer</span>.<span class="ident">overlaps_with</span>(<span class="ident">coordinate</span>, <span class="ident">width</span>, <span class="ident">height</span>){
-        <span class="kw">return</span>
-    }
+    <span class="comment">// return if the rectangle is not within the framebuffer
+    </span><span class="kw">if </span>!framebuffer.overlaps_with(coordinate, width, height){
+        <span class="kw">return
+    </span>}
 
-    <span class="comment">// draw the part within the framebuffer</span>
-    <span class="kw">let</span> <span class="ident">start_x</span> <span class="op">=</span> <span class="ident">core::cmp::max</span>(<span class="ident">coordinate</span>.<span class="ident">x</span>, <span class="number">0</span>);
-    <span class="kw">let</span> <span class="ident">start_y</span> <span class="op">=</span> <span class="ident">core::cmp::max</span>(<span class="ident">coordinate</span>.<span class="ident">y</span>, <span class="number">0</span>);
-    <span class="kw">let</span> <span class="ident">end_x</span> <span class="op">=</span> <span class="ident">core::cmp::min</span>(<span class="ident">coordinate</span>.<span class="ident">x</span> <span class="op">+</span> <span class="ident">width</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">buffer_width</span> <span class="kw">as</span> <span class="ident">isize</span>);
-    <span class="kw">let</span> <span class="ident">end_y</span> <span class="op">=</span> <span class="ident">core::cmp::min</span>(<span class="ident">coordinate</span>.<span class="ident">y</span> <span class="op">+</span> <span class="ident">height</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">buffer_height</span> <span class="kw">as</span> <span class="ident">isize</span>);
+    <span class="comment">// draw the part within the framebuffer
+    </span><span class="kw">let </span>start_x = core::cmp::max(coordinate.x, <span class="number">0</span>);
+    <span class="kw">let </span>start_y = core::cmp::max(coordinate.y, <span class="number">0</span>);
+    <span class="kw">let </span>end_x = core::cmp::min(coordinate.x + width <span class="kw">as </span>isize, buffer_width <span class="kw">as </span>isize);
+    <span class="kw">let </span>end_y = core::cmp::min(coordinate.y + height <span class="kw">as </span>isize, buffer_height <span class="kw">as </span>isize);
 
-    <span class="comment">// draw the four lines of the rectangle.</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">top</span> <span class="op">=</span> <span class="ident">Coord::new</span>(<span class="ident">start_x</span>, <span class="ident">start_y</span>);
-    <span class="kw">let</span> <span class="ident">end_y_offset</span> <span class="op">=</span> <span class="ident">end_y</span> <span class="op">-</span> <span class="ident">start_y</span> <span class="op">-</span> <span class="number">1</span>;
-    <span class="kw">loop</span> {
-        <span class="kw">if</span> <span class="ident">top</span>.<span class="ident">x</span> <span class="op">==</span> <span class="ident">end_x</span> {
+    <span class="comment">// draw the four lines of the rectangle.
+    </span><span class="kw">let </span><span class="kw-2">mut </span>top = Coord::new(start_x, start_y);
+    <span class="kw">let </span>end_y_offset = end_y - start_y - <span class="number">1</span>;
+    <span class="kw">loop </span>{
+        <span class="kw">if </span>top.x == end_x {
             <span class="kw">break</span>;
         }
-        <span class="kw">if</span> <span class="ident">coordinate</span>.<span class="ident">y</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="ident">framebuffer</span>.<span class="ident">draw_pixel</span>(<span class="ident">top</span>, <span class="ident">pixel</span>);
+        <span class="kw">if </span>coordinate.y &gt;= <span class="number">0 </span>{
+            framebuffer.draw_pixel(top, pixel);
         }
-        <span class="kw">if</span> (<span class="ident">coordinate</span>.<span class="ident">y</span> <span class="op">+</span> <span class="ident">height</span> <span class="kw">as</span> <span class="ident">isize</span>) <span class="op">&lt;</span> <span class="ident">buffer_height</span> <span class="kw">as</span> <span class="ident">isize</span> { 
-            <span class="ident">framebuffer</span>.<span class="ident">draw_pixel</span>(<span class="ident">top</span> <span class="op">+</span> (<span class="number">0</span>, <span class="ident">end_y_offset</span>), <span class="ident">pixel</span>);
+        <span class="kw">if </span>(coordinate.y + height <span class="kw">as </span>isize) &lt; buffer_height <span class="kw">as </span>isize { 
+            framebuffer.draw_pixel(top + (<span class="number">0</span>, end_y_offset), pixel);
         }
-        <span class="ident">top</span>.<span class="ident">x</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        top.x += <span class="number">1</span>;
     }
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">left</span> <span class="op">=</span> <span class="ident">Coord::new</span>(<span class="ident">start_x</span>, <span class="ident">start_y</span>); 
-    <span class="kw">let</span> <span class="ident">end_x_offset</span> <span class="op">=</span> <span class="ident">end_x</span> <span class="op">-</span> <span class="ident">start_x</span> <span class="op">-</span> <span class="number">1</span>;
-    <span class="kw">loop</span> {
-        <span class="kw">if</span> <span class="ident">left</span>.<span class="ident">y</span> <span class="op">==</span> <span class="ident">end_y</span> {
+    <span class="kw">let </span><span class="kw-2">mut </span>left = Coord::new(start_x, start_y); 
+    <span class="kw">let </span>end_x_offset = end_x - start_x - <span class="number">1</span>;
+    <span class="kw">loop </span>{
+        <span class="kw">if </span>left.y == end_y {
             <span class="kw">break</span>;
         }
-        <span class="kw">if</span> <span class="ident">coordinate</span>.<span class="ident">x</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="ident">framebuffer</span>.<span class="ident">draw_pixel</span>(<span class="ident">left</span>, <span class="ident">pixel</span>);
+        <span class="kw">if </span>coordinate.x &gt;= <span class="number">0 </span>{
+            framebuffer.draw_pixel(left, pixel);
         }
-        <span class="kw">if</span> (<span class="ident">coordinate</span>.<span class="ident">x</span> <span class="op">+</span> <span class="ident">width</span> <span class="kw">as</span> <span class="ident">isize</span>) <span class="op">&lt;</span> <span class="ident">buffer_width</span> <span class="kw">as</span> <span class="ident">isize</span> {
-            <span class="ident">framebuffer</span>.<span class="ident">draw_pixel</span>(<span class="ident">left</span> <span class="op">+</span> (<span class="ident">end_x_offset</span>, <span class="number">0</span>), <span class="ident">pixel</span>);
+        <span class="kw">if </span>(coordinate.x + width <span class="kw">as </span>isize) &lt; buffer_width <span class="kw">as </span>isize {
+            framebuffer.draw_pixel(left + (end_x_offset, <span class="number">0</span>), pixel);
         }
-        <span class="ident">left</span>.<span class="ident">y</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        left.y += <span class="number">1</span>;
     }
 }
 
-<span class="doccomment">/// Fills a rectangle in a framebuffer with color.</span>
-<span class="doccomment">/// The part exceeding the boundary of the framebuffer will be ignored.</span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `framebuffer`: the framebuffer to draw in.</span>
-<span class="doccomment">/// * `coordinate`: the left top coordinate of the retangle relative to the origin(top-left point) of the framebuffer.</span>
-<span class="doccomment">/// * `width`: the width of the rectangle in number of pixels.</span>
-<span class="doccomment">/// * `height`: the height of the rectangle in number of pixels.</span>
-<span class="doccomment">/// * `pixel`: the value of pixels in the rectangle.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fill_rectangle</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Pixel</span><span class="op">&gt;</span>(
-    <span class="ident">framebuffer</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">P</span><span class="op">&gt;</span>,
-    <span class="ident">coordinate</span>: <span class="ident">Coord</span>,
-    <span class="ident">width</span>: <span class="ident">usize</span>,
-    <span class="ident">height</span>: <span class="ident">usize</span>,
-    <span class="ident">pixel</span>: <span class="ident">P</span>,
+<span class="doccomment">/// Fills a rectangle in a framebuffer with color.
+/// The part exceeding the boundary of the framebuffer will be ignored.
+/// # Arguments
+/// * `framebuffer`: the framebuffer to draw in.
+/// * `coordinate`: the left top coordinate of the retangle relative to the origin(top-left point) of the framebuffer.
+/// * `width`: the width of the rectangle in number of pixels.
+/// * `height`: the height of the rectangle in number of pixels.
+/// * `pixel`: the value of pixels in the rectangle.
+</span><span class="kw">pub fn </span>fill_rectangle&lt;P: Pixel&gt;(
+    framebuffer: <span class="kw-2">&amp;mut </span>Framebuffer&lt;P&gt;,
+    coordinate: Coord,
+    width: usize,
+    height: usize,
+    pixel: P,
 ) {
-    <span class="kw">let</span> (<span class="ident">buffer_width</span>, <span class="ident">buffer_height</span>) <span class="op">=</span> <span class="ident">framebuffer</span>.<span class="ident">get_size</span>();
-    <span class="comment">// return if the rectangle is not within the framebuffer</span>
-    <span class="kw">if</span> <span class="op">!</span><span class="ident">framebuffer</span>.<span class="ident">overlaps_with</span>(<span class="ident">coordinate</span>, <span class="ident">width</span>, <span class="ident">height</span>){
-        <span class="kw">return</span>
-    }
+    <span class="kw">let </span>(buffer_width, buffer_height) = framebuffer.get_size();
+    <span class="comment">// return if the rectangle is not within the framebuffer
+    </span><span class="kw">if </span>!framebuffer.overlaps_with(coordinate, width, height){
+        <span class="kw">return
+    </span>}
 
-    <span class="comment">// draw the part within the framebuffer</span>
-    <span class="kw">let</span> <span class="ident">start_x</span> <span class="op">=</span> <span class="ident">core::cmp::max</span>(<span class="ident">coordinate</span>.<span class="ident">x</span>, <span class="number">0</span>);
-    <span class="kw">let</span> <span class="ident">start_y</span> <span class="op">=</span> <span class="ident">core::cmp::max</span>(<span class="ident">coordinate</span>.<span class="ident">y</span>, <span class="number">0</span>);
-    <span class="kw">let</span> <span class="ident">end_x</span> <span class="op">=</span> <span class="ident">core::cmp::min</span>(<span class="ident">coordinate</span>.<span class="ident">x</span> <span class="op">+</span> <span class="ident">width</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">buffer_width</span> <span class="kw">as</span> <span class="ident">isize</span>);
-    <span class="kw">let</span> <span class="ident">end_y</span> <span class="op">=</span> <span class="ident">core::cmp::min</span>(<span class="ident">coordinate</span>.<span class="ident">y</span> <span class="op">+</span> <span class="ident">height</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">buffer_height</span> <span class="kw">as</span> <span class="ident">isize</span>);
+    <span class="comment">// draw the part within the framebuffer
+    </span><span class="kw">let </span>start_x = core::cmp::max(coordinate.x, <span class="number">0</span>);
+    <span class="kw">let </span>start_y = core::cmp::max(coordinate.y, <span class="number">0</span>);
+    <span class="kw">let </span>end_x = core::cmp::min(coordinate.x + width <span class="kw">as </span>isize, buffer_width <span class="kw">as </span>isize);
+    <span class="kw">let </span>end_y = core::cmp::min(coordinate.y + height <span class="kw">as </span>isize, buffer_height <span class="kw">as </span>isize);
 
-    <span class="comment">// draw every pixel line by line</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">coordinate</span> <span class="op">=</span> <span class="ident">Coord::new</span>(<span class="ident">start_x</span>, <span class="ident">start_y</span>);
-    <span class="kw">loop</span> {
-        <span class="kw">loop</span> {
-            <span class="ident">framebuffer</span>.<span class="ident">draw_pixel</span>(<span class="ident">coordinate</span>, <span class="ident">pixel</span>);
-            <span class="ident">coordinate</span>.<span class="ident">x</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-            <span class="kw">if</span> <span class="ident">coordinate</span>.<span class="ident">x</span> <span class="op">==</span> <span class="ident">end_x</span> {
+    <span class="comment">// draw every pixel line by line
+    </span><span class="kw">let </span><span class="kw-2">mut </span>coordinate = Coord::new(start_x, start_y);
+    <span class="kw">loop </span>{
+        <span class="kw">loop </span>{
+            framebuffer.draw_pixel(coordinate, pixel);
+            coordinate.x += <span class="number">1</span>;
+            <span class="kw">if </span>coordinate.x == end_x {
                 <span class="kw">break</span>;
             }
         }
-        <span class="ident">coordinate</span>.<span class="ident">y</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-        <span class="kw">if</span> <span class="ident">coordinate</span>.<span class="ident">y</span> <span class="op">==</span> <span class="ident">end_y</span> {
+        coordinate.y += <span class="number">1</span>;
+        <span class="kw">if </span>coordinate.y == end_y {
             <span class="kw">break</span>;
         }
-        <span class="ident">coordinate</span>.<span class="ident">x</span> <span class="op">=</span> <span class="ident">start_x</span>;
+        coordinate.x = start_x;
     }
 }
 
-<span class="doccomment">/// Draw a circle in the framebuffer. `coordinate` is the position of the center of the circle relative to the top-left corner of the framebuffer and `r` is the radius</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">draw_circle</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Pixel</span><span class="op">&gt;</span>(<span class="ident">framebuffer</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">P</span><span class="op">&gt;</span>, <span class="ident">center</span>: <span class="ident">Coord</span>, <span class="ident">r</span>: <span class="ident">usize</span>, <span class="ident">pixel</span>: <span class="ident">P</span>) {
-    <span class="kw">let</span> <span class="ident">r2</span> <span class="op">=</span> (<span class="ident">r</span> <span class="op">*</span> <span class="ident">r</span>) <span class="kw">as</span> <span class="ident">isize</span>;
-    <span class="kw">for</span> <span class="ident">y</span> <span class="kw">in</span> <span class="ident">center</span>.<span class="ident">y</span> <span class="op">-</span> <span class="ident">r</span> <span class="kw">as</span> <span class="ident">isize</span>..<span class="ident">center</span>.<span class="ident">y</span> <span class="op">+</span> <span class="ident">r</span> <span class="kw">as</span> <span class="ident">isize</span> {
-        <span class="kw">for</span> <span class="ident">x</span> <span class="kw">in</span> <span class="ident">center</span>.<span class="ident">x</span> <span class="op">-</span> <span class="ident">r</span> <span class="kw">as</span> <span class="ident">isize</span>..<span class="ident">center</span>.<span class="ident">x</span> <span class="op">+</span> <span class="ident">r</span> <span class="kw">as</span> <span class="ident">isize</span> {
-            <span class="kw">let</span> <span class="ident">coordinate</span> <span class="op">=</span> <span class="ident">Coord::new</span>(<span class="ident">x</span>, <span class="ident">y</span>);
-            <span class="kw">if</span> <span class="ident">framebuffer</span>.<span class="ident">contains</span>(<span class="ident">coordinate</span>) {
-                <span class="kw">let</span> <span class="ident">d</span> <span class="op">=</span> <span class="ident">coordinate</span> <span class="op">-</span> <span class="ident">center</span>;
-                <span class="kw">if</span> <span class="ident">d</span>.<span class="ident">x</span> <span class="op">*</span> <span class="ident">d</span>.<span class="ident">x</span> <span class="op">+</span> <span class="ident">d</span>.<span class="ident">y</span> <span class="op">*</span> <span class="ident">d</span>.<span class="ident">y</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">r2</span> {
-                    <span class="ident">framebuffer</span>.<span class="ident">draw_pixel</span>(<span class="ident">coordinate</span>, <span class="ident">pixel</span>);
+<span class="doccomment">/// Draw a circle in the framebuffer. `coordinate` is the position of the center of the circle relative to the top-left corner of the framebuffer and `r` is the radius
+</span><span class="kw">pub fn </span>draw_circle&lt;P: Pixel&gt;(framebuffer: <span class="kw-2">&amp;mut </span>Framebuffer&lt;P&gt;, center: Coord, r: usize, pixel: P) {
+    <span class="kw">let </span>r2 = (r * r) <span class="kw">as </span>isize;
+    <span class="kw">for </span>y <span class="kw">in </span>center.y - r <span class="kw">as </span>isize..center.y + r <span class="kw">as </span>isize {
+        <span class="kw">for </span>x <span class="kw">in </span>center.x - r <span class="kw">as </span>isize..center.x + r <span class="kw">as </span>isize {
+            <span class="kw">let </span>coordinate = Coord::new(x, y);
+            <span class="kw">if </span>framebuffer.contains(coordinate) {
+                <span class="kw">let </span>d = coordinate - center;
+                <span class="kw">if </span>d.x * d.x + d.y * d.y &lt;= r2 {
+                    framebuffer.draw_pixel(coordinate, pixel);
                 }
             }
         }
     }
 }</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="framebuffer_drawer" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="framebuffer_drawer" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

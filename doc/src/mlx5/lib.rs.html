@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx5/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../mlx5/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../mlx5/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../mlx5/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx5/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../mlx5/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -686,688 +680,687 @@
 <span id="680">680</span>
 <span id="681">681</span>
 <span id="682">682</span>
-</pre><pre class="rust"><code><span class="doccomment">//! A mlx5 driver for a ConnectX-5 100GbE Network Interface Card.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Currently the following steps are completed </span>
-<span class="doccomment">//! * reading the device PCI space and mapping the initialization segment</span>
-<span class="doccomment">//! * setting up a command queue to pass commands to the NIC</span>
-<span class="doccomment">//! * setting up a single send and receive queue</span>
-<span class="doccomment">//! * functions to send packets</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! All information is taken from the Mellanox Adapters Programmer’s Reference Manual (PRM) Rev 0.54,</span>
-<span class="doccomment">//! unless otherwise specified. </span>
+</pre><pre class="rust"><code><span class="doccomment">//! A mlx5 driver for a ConnectX-5 100GbE Network Interface Card.
+//! 
+//! Currently the following steps are completed 
+//! * reading the device PCI space and mapping the initialization segment
+//! * setting up a command queue to pass commands to the NIC
+//! * setting up a single send and receive queue
+//! * functions to send packets
+//! 
+//! All information is taken from the Mellanox Adapters Programmer’s Reference Manual (PRM) Rev 0.54,
+//! unless otherwise specified. 
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pci</span>; 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">nic_initialization</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mlx_ethernet</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory_structs</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">nic_buffers</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mpmc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
+#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>pci; 
+<span class="kw">extern crate </span>nic_initialization;
+<span class="kw">extern crate </span>mlx_ethernet;
+<span class="kw">extern crate </span>kernel_config;
+<span class="kw">extern crate </span>memory_structs;
+<span class="kw">extern crate </span>nic_buffers;
+<span class="kw">extern crate </span>mpmc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>lazy_static;
 
 
-<span class="kw">use</span> <span class="ident">spin::Once</span>; 
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PhysicalAddress</span>, <span class="ident">MappedPages</span>, <span class="ident">create_contiguous_mapping</span>, <span class="ident">BorrowedMappedPages</span>, <span class="ident">Mutable</span>};
-<span class="kw">use</span> <span class="ident">pci::PciDevice</span>;
-<span class="kw">use</span> <span class="ident">nic_initialization</span>::{<span class="ident">NIC_MAPPING_FLAGS</span>, <span class="ident">allocate_memory</span>, <span class="ident">init_rx_buf_pool</span>};
-<span class="kw">use</span> <span class="ident">mlx_ethernet</span>::{
-    <span class="ident">command_queue</span>::{<span class="ident">AccessRegisterOpMod</span>, <span class="ident">CommandBuilder</span>, <span class="ident">CommandOpcode</span>, <span class="ident">CommandQueue</span>, <span class="ident">CommandQueueEntry</span>, <span class="ident">HCACapabilities</span>, <span class="ident">ManagePagesOpMod</span>, <span class="ident">QueryHcaCapCurrentOpMod</span>, <span class="ident">QueryHcaCapMaxOpMod</span>, <span class="ident">QueryPagesOpMod</span>}, 
-    <span class="ident">completion_queue</span>::{<span class="ident">CompletionQueue</span>, <span class="ident">CompletionQueueEntry</span>, <span class="ident">CompletionQueueDoorbellRecord</span>}, 
-    <span class="ident">event_queue</span>::{<span class="ident">EventQueue</span>, <span class="ident">EventQueueEntry</span>}, 
-    <span class="ident">initialization_segment::InitializationSegment</span>, 
-    <span class="ident">receive_queue::ReceiveQueue</span>, 
-    <span class="ident">send_queue::SendQueue</span>,
-    <span class="ident">work_queue</span>::{<span class="ident">WorkQueueEntrySend</span>, <span class="ident">WorkQueueEntryReceive</span>, <span class="ident">DoorbellRecord</span>}
+<span class="kw">use </span>spin::Once; 
+<span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedMappedPages, Mutable};
+<span class="kw">use </span>pci::PciDevice;
+<span class="kw">use </span>nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory, init_rx_buf_pool};
+<span class="kw">use </span>mlx_ethernet::{
+    command_queue::{AccessRegisterOpMod, CommandBuilder, CommandOpcode, CommandQueue, CommandQueueEntry, HCACapabilities, ManagePagesOpMod, QueryHcaCapCurrentOpMod, QueryHcaCapMaxOpMod, QueryPagesOpMod}, 
+    completion_queue::{CompletionQueue, CompletionQueueEntry, CompletionQueueDoorbellRecord}, 
+    event_queue::{EventQueue, EventQueueEntry}, 
+    initialization_segment::InitializationSegment, 
+    receive_queue::ReceiveQueue, 
+    send_queue::SendQueue,
+    work_queue::{WorkQueueEntrySend, WorkQueueEntryReceive, DoorbellRecord}
 };
-<span class="kw">use</span> <span class="ident">kernel_config::memory::PAGE_SIZE</span>;
-<span class="kw">use</span> <span class="ident">nic_buffers</span>::{<span class="ident">TransmitBuffer</span>, <span class="ident">ReceiveBuffer</span>};
+<span class="kw">use </span>kernel_config::memory::PAGE_SIZE;
+<span class="kw">use </span>nic_buffers::{TransmitBuffer, ReceiveBuffer};
 
-<span class="doccomment">/// Vendor ID for Mellanox</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MLX_VEND</span>:             <span class="ident">u16</span> <span class="op">=</span> <span class="number">0x15B3</span>;
-<span class="doccomment">/// Device ID for the ConnectX-5-EX NIC</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CONNECTX5_EX_DEV</span>:     <span class="ident">u16</span> <span class="op">=</span> <span class="number">0x1019</span>; 
-<span class="doccomment">/// Device ID for the ConnectX-5 NIC</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CONNECTX5_DEV</span>:        <span class="ident">u16</span> <span class="op">=</span> <span class="number">0x1017</span>;
-<span class="doccomment">/// For the send queue, we compress all the completion queue entries to the first entry.</span>
-<span class="kw">const</span> <span class="ident">NUM_CQ_ENTRIES_SEND</span>:      <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>; 
+<span class="doccomment">/// Vendor ID for Mellanox
+</span><span class="kw">pub const </span>MLX_VEND:             u16 = <span class="number">0x15B3</span>;
+<span class="doccomment">/// Device ID for the ConnectX-5-EX NIC
+</span><span class="kw">pub const </span>CONNECTX5_EX_DEV:     u16 = <span class="number">0x1019</span>; 
+<span class="doccomment">/// Device ID for the ConnectX-5 NIC
+</span><span class="kw">pub const </span>CONNECTX5_DEV:        u16 = <span class="number">0x1017</span>;
+<span class="doccomment">/// For the send queue, we compress all the completion queue entries to the first entry.
+</span><span class="kw">const </span>NUM_CQ_ENTRIES_SEND:      usize = <span class="number">1</span>; 
 
-<span class="doccomment">/// How many [`ReceiveBuffers`] are preallocated for this driver to use. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Warning</span>
-<span class="doccomment">/// Right now we manually make sure this matches the mlx5 init arguments.</span>
-<span class="doccomment">/// We need to update the whole RX buffer pool design to be per queue.</span>
-<span class="kw">const</span> <span class="ident">RX_BUFFER_POOL_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">512</span>; 
+<span class="doccomment">/// How many [`ReceiveBuffers`] are preallocated for this driver to use. 
+/// 
+/// # Warning
+/// Right now we manually make sure this matches the mlx5 init arguments.
+/// We need to update the whole RX buffer pool design to be per queue.
+</span><span class="kw">const </span>RX_BUFFER_POOL_SIZE: usize = <span class="number">512</span>; 
 
-<span class="macro">lazy_static!</span> {
-    <span class="doccomment">/// The pool of pre-allocated receive buffers that are used by the NIC</span>
-    <span class="doccomment">/// and temporarily given to higher layers in the networking stack.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Note</span>
-    <span class="doccomment">/// The capacity always has to be greater than the number of buffers in the queue, which is why we multiply by 2.</span>
-    <span class="doccomment">/// I&#39;m not sure why that is, but if we try to add packets &gt;= capacity, the addition does not make any progress.</span>
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">RX_BUFFER_POOL</span>: <span class="ident">mpmc::Queue</span><span class="op">&lt;</span><span class="ident">ReceiveBuffer</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">mpmc::Queue::with_capacity</span>(<span class="ident">RX_BUFFER_POOL_SIZE</span> <span class="op">*</span> <span class="number">2</span>);
+<span class="macro">lazy_static! </span>{
+    <span class="doccomment">/// The pool of pre-allocated receive buffers that are used by the NIC
+    /// and temporarily given to higher layers in the networking stack.
+    /// 
+    /// # Note
+    /// The capacity always has to be greater than the number of buffers in the queue, which is why we multiply by 2.
+    /// I&#39;m not sure why that is, but if we try to add packets &gt;= capacity, the addition does not make any progress.
+    </span><span class="kw">static </span><span class="kw-2">ref </span>RX_BUFFER_POOL: mpmc::Queue&lt;ReceiveBuffer&gt; = mpmc::Queue::with_capacity(RX_BUFFER_POOL_SIZE * <span class="number">2</span>);
 }
 
-<span class="doccomment">/// The singleton connectx-5 NIC.</span>
-<span class="doccomment">/// TODO: Allow for multiple NICs</span>
-<span class="kw">static</span> <span class="ident">CONNECTX5_NIC</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">ConnectX5Nic</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+<span class="doccomment">/// The singleton connectx-5 NIC.
+/// TODO: Allow for multiple NICs
+</span><span class="kw">static </span>CONNECTX5_NIC: Once&lt;MutexIrqSafe&lt;ConnectX5Nic&gt;&gt; = Once::new();
 
-<span class="doccomment">/// Returns a reference to the NIC wrapped in a MutexIrqSafe,</span>
-<span class="doccomment">/// if it exists and has been initialized.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_mlx5_nic</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">ConnectX5Nic</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-    <span class="ident">CONNECTX5_NIC</span>.<span class="ident">get</span>()
+<span class="doccomment">/// Returns a reference to the NIC wrapped in a MutexIrqSafe,
+/// if it exists and has been initialized.
+</span><span class="kw">pub fn </span>get_mlx5_nic() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;ConnectX5Nic&gt;&gt; {
+    CONNECTX5_NIC.get()
 }
 
-<span class="doccomment">/// Struct representing a ConnectX-5 network interface card.</span>
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ConnectX5Nic</span> {
-    <span class="doccomment">/// Initialization segment base address</span>
-    <span class="ident">mem_base</span>: <span class="ident">PhysicalAddress</span>,
-    <span class="doccomment">/// Initialization segment</span>
-    <span class="ident">init_segment</span>: <span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">InitializationSegment</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Command Queue</span>
-    <span class="ident">command_queue</span>: <span class="ident">CommandQueue</span>,
-    <span class="doccomment">/// Boot pages passed to the NIC. Once transferred, they should not be accessed by the driver.</span>
-    <span class="ident">boot_pages</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Init pages passed to the NIC. Once transferred, they should not be accessed by the driver.</span>
-    <span class="ident">init_pages</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Regular pages passed to the NIC. Once transferred, they should not be accessed by the driver.</span>
-    <span class="ident">regular_pages</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// MAC address of the device</span>
-    <span class="ident">mac_addr</span>: [<span class="ident">u8</span>; <span class="number">6</span>],
-    <span class="doccomment">/// The maximum capabilities supported by the device</span>
-    <span class="ident">max_capabilities</span>: <span class="ident">HCACapabilities</span>,
-    <span class="doccomment">/// The maximum MTU supported by the device</span>
-    <span class="ident">max_mtu</span>: <span class="ident">u16</span>,
-    <span class="doccomment">/// Event queue which currently only reports page request events</span>
-    <span class="ident">event_queue</span>: <span class="ident">EventQueue</span>,
-    <span class="doccomment">/// Buffer of transmit descriptors</span>
-    <span class="ident">send_queue</span>: <span class="ident">SendQueue</span>,
-    <span class="doccomment">/// The completion queue where packet transmission is reported</span>
-    <span class="ident">send_completion_queue</span>: <span class="ident">CompletionQueue</span>,
-    <span class="doccomment">/// Buffer of receive descriptors</span>
-    <span class="ident">receive_queue</span>: <span class="ident">ReceiveQueue</span>,
+<span class="doccomment">/// Struct representing a ConnectX-5 network interface card.
+</span><span class="attr">#[allow(dead_code)]
+</span><span class="kw">pub struct </span>ConnectX5Nic {
+    <span class="doccomment">/// Initialization segment base address
+    </span>mem_base: PhysicalAddress,
+    <span class="doccomment">/// Initialization segment
+    </span>init_segment: BorrowedMappedPages&lt;InitializationSegment, Mutable&gt;,
+    <span class="doccomment">/// Command Queue
+    </span>command_queue: CommandQueue,
+    <span class="doccomment">/// Boot pages passed to the NIC. Once transferred, they should not be accessed by the driver.
+    </span>boot_pages: Vec&lt;MappedPages&gt;,
+    <span class="doccomment">/// Init pages passed to the NIC. Once transferred, they should not be accessed by the driver.
+    </span>init_pages: Vec&lt;MappedPages&gt;,
+    <span class="doccomment">/// Regular pages passed to the NIC. Once transferred, they should not be accessed by the driver.
+    </span>regular_pages: Vec&lt;MappedPages&gt;,
+    <span class="doccomment">/// MAC address of the device
+    </span>mac_addr: [u8; <span class="number">6</span>],
+    <span class="doccomment">/// The maximum capabilities supported by the device
+    </span>max_capabilities: HCACapabilities,
+    <span class="doccomment">/// The maximum MTU supported by the device
+    </span>max_mtu: u16,
+    <span class="doccomment">/// Event queue which currently only reports page request events
+    </span>event_queue: EventQueue,
+    <span class="doccomment">/// Buffer of transmit descriptors
+    </span>send_queue: SendQueue,
+    <span class="doccomment">/// The completion queue where packet transmission is reported
+    </span>send_completion_queue: CompletionQueue,
+    <span class="doccomment">/// Buffer of receive descriptors
+    </span>receive_queue: ReceiveQueue,
 }
 
-<span class="doccomment">/// Functions that setup the NIC struct and transmit packets.</span>
-<span class="kw">impl</span> <span class="ident">ConnectX5Nic</span> {
+<span class="doccomment">/// Functions that setup the NIC struct and transmit packets.
+</span><span class="kw">impl </span>ConnectX5Nic {
 
-    <span class="doccomment">/// Initializes the new ConnectX-5 network interface card that is connected as the given PciDevice.</span>
-    <span class="doccomment">/// (steps taken from the PRM, Section 7.2: HCA Driver Start-up)</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `mlx5_pci_dev`: Contains the pci device information for this NIC.</span>
-    <span class="doccomment">/// * `num_tx_descs`: The number of descriptors in each transmit queue.</span>
-    <span class="doccomment">/// * `num_rx_descs`: The number of descriptors in each receive queue.</span>
-    <span class="doccomment">/// * `mtu`: Maximum Transmission Unit in bytes</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(
-        <span class="ident">mlx5_pci_dev</span>: <span class="kw-2">&amp;</span><span class="ident">PciDevice</span>, 
-        <span class="ident">num_tx_descs</span>: <span class="ident">usize</span>, 
-        <span class="ident">num_rx_descs</span>: <span class="ident">usize</span>, 
-        <span class="ident">mtu</span>: <span class="ident">u16</span>
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">ConnectX5Nic</span><span class="op">&gt;</span> , <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">sq_size_in_bytes</span> <span class="op">=</span> <span class="ident">num_tx_descs</span> <span class="op">*</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">WorkQueueEntrySend</span><span class="op">&gt;</span>();
-        <span class="kw">let</span> <span class="ident">rq_size_in_bytes</span> <span class="op">=</span> <span class="ident">num_rx_descs</span> <span class="op">*</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">WorkQueueEntryReceive</span><span class="op">&gt;</span>();
+    <span class="doccomment">/// Initializes the new ConnectX-5 network interface card that is connected as the given PciDevice.
+    /// (steps taken from the PRM, Section 7.2: HCA Driver Start-up)
+    /// 
+    /// # Arguments
+    /// * `mlx5_pci_dev`: Contains the pci device information for this NIC.
+    /// * `num_tx_descs`: The number of descriptors in each transmit queue.
+    /// * `num_rx_descs`: The number of descriptors in each receive queue.
+    /// * `mtu`: Maximum Transmission Unit in bytes
+    </span><span class="kw">pub fn </span>init(
+        mlx5_pci_dev: <span class="kw-2">&amp;</span>PciDevice, 
+        num_tx_descs: usize, 
+        num_rx_descs: usize, 
+        mtu: u16
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;ConnectX5Nic&gt; , <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>sq_size_in_bytes = num_tx_descs * core::mem::size_of::&lt;WorkQueueEntrySend&gt;();
+        <span class="kw">let </span>rq_size_in_bytes = num_rx_descs * core::mem::size_of::&lt;WorkQueueEntryReceive&gt;();
         
-        <span class="comment">// because the RX and TX queues have to be contiguous and we are using MappedPages to split ownership of the queues,</span>
-        <span class="comment">// the RX queue must end on a page boundary</span>
-        <span class="kw">if</span> <span class="ident">rq_size_in_bytes</span> <span class="op">%</span> <span class="ident">PAGE_SIZE</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;RQ size in bytes must be a multiple of the page size.&quot;</span>);
+        <span class="comment">// because the RX and TX queues have to be contiguous and we are using MappedPages to split ownership of the queues,
+        // the RX queue must end on a page boundary
+        </span><span class="kw">if </span>rq_size_in_bytes % PAGE_SIZE != <span class="number">0 </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;RQ size in bytes must be a multiple of the page size.&quot;</span>);
         }
 
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">num_tx_descs</span>.<span class="ident">is_power_of_two</span>() <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="ident">num_rx_descs</span>.<span class="ident">is_power_of_two</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;The number of descriptors must be a power of two.&quot;</span>);
+        <span class="kw">if </span>!num_tx_descs.is_power_of_two() || !num_rx_descs.is_power_of_two() {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;The number of descriptors must be a power of two.&quot;</span>);
         } 
 
-        <span class="comment">// set the bus mastering bit for this PciDevice, which allows it to use DMA</span>
-        <span class="ident">mlx5_pci_dev</span>.<span class="ident">pci_set_command_bus_master_bit</span>();
+        <span class="comment">// set the bus mastering bit for this PciDevice, which allows it to use DMA
+        </span>mlx5_pci_dev.pci_set_command_bus_master_bit();
 
-        <span class="comment">// retrieve the memory-mapped base address of the initialization segment</span>
-        <span class="kw">let</span> <span class="ident">mem_base</span> <span class="op">=</span> <span class="ident">mlx5_pci_dev</span>.<span class="ident">determine_mem_base</span>(<span class="number">0</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;mlx5 mem base = {}&quot;</span>, <span class="ident">mem_base</span>);
+        <span class="comment">// retrieve the memory-mapped base address of the initialization segment
+        </span><span class="kw">let </span>mem_base = mlx5_pci_dev.determine_mem_base(<span class="number">0</span>)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;mlx5 mem base = {}&quot;</span>, mem_base);
 
-        <span class="kw">let</span> <span class="ident">mem_size</span> <span class="op">=</span> <span class="ident">mlx5_pci_dev</span>.<span class="ident">determine_mem_size</span>(<span class="number">0</span>);
-        <span class="macro">trace!</span>(<span class="string">&quot;mlx5 mem size = {}&quot;</span>, <span class="ident">mem_size</span>);
+        <span class="kw">let </span>mem_size = mlx5_pci_dev.determine_mem_size(<span class="number">0</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;mlx5 mem size = {}&quot;</span>, mem_size);
 
-        <span class="comment">// map pages to the physical address given by mem_base as that is the intialization segment</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">init_segment</span> <span class="op">=</span> <span class="ident">ConnectX5Nic::map_init_segment</span>(<span class="ident">mem_base</span>)<span class="question-mark">?</span>;
+        <span class="comment">// map pages to the physical address given by mem_base as that is the intialization segment
+        </span><span class="kw">let </span><span class="kw-2">mut </span>init_segment = ConnectX5Nic::map_init_segment(mem_base)<span class="question-mark">?</span>;
 
-        <span class="macro">trace!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">init_segment</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="kw-2">&amp;*</span>init_segment);
         
-        <span class="comment">// find number of entries in command queue and stride</span>
-        <span class="kw">let</span> <span class="ident">num_cmdq_entries</span> <span class="op">=</span> <span class="ident">init_segment</span>.<span class="ident">num_cmdq_entries</span>() <span class="kw">as</span> <span class="ident">usize</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;mlx5 cmdq entries = {}&quot;</span>, <span class="ident">num_cmdq_entries</span>);
+        <span class="comment">// find number of entries in command queue and stride
+        </span><span class="kw">let </span>num_cmdq_entries = init_segment.num_cmdq_entries() <span class="kw">as </span>usize;
+        <span class="macro">trace!</span>(<span class="string">&quot;mlx5 cmdq entries = {}&quot;</span>, num_cmdq_entries);
 
-        <span class="comment">// find command queue entry stride, the number of bytes between the start of two adjacent entries.</span>
-        <span class="kw">let</span> <span class="ident">cmdq_stride</span> <span class="op">=</span> <span class="ident">init_segment</span>.<span class="ident">cmdq_entry_stride</span>() <span class="kw">as</span> <span class="ident">usize</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;mlx5 cmdq stride = {}&quot;</span>, <span class="ident">cmdq_stride</span>);
+        <span class="comment">// find command queue entry stride, the number of bytes between the start of two adjacent entries.
+        </span><span class="kw">let </span>cmdq_stride = init_segment.cmdq_entry_stride() <span class="kw">as </span>usize;
+        <span class="macro">trace!</span>(<span class="string">&quot;mlx5 cmdq stride = {}&quot;</span>, cmdq_stride);
         
-        <span class="comment">// We assume that the stride is equal to the size of the entry.</span>
-        <span class="kw">if</span> <span class="ident">cmdq_stride</span> <span class="op">!</span><span class="op">=</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">CommandQueueEntry</span><span class="op">&gt;</span>() {
+        <span class="comment">// We assume that the stride is equal to the size of the entry.
+        </span><span class="kw">if </span>cmdq_stride != core::mem::size_of::&lt;CommandQueueEntry&gt;() {
             <span class="macro">error!</span>(<span class="string">&quot;Command Queue layout is no longer accurate due to invalid assumption.&quot;</span>);
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Command Queue layout is no longer accurate due to invalid assumption.&quot;</span>);
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Command Queue layout is no longer accurate due to invalid assumption.&quot;</span>);
         }
 
-        <span class="comment">// calculate size of command queue</span>
-        <span class="kw">let</span> <span class="ident">size_in_bytes_of_cmdq</span> <span class="op">=</span> <span class="ident">num_cmdq_entries</span> <span class="op">*</span> <span class="ident">cmdq_stride</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;total size in bytes of cmdq = {}&quot;</span>, <span class="ident">size_in_bytes_of_cmdq</span>);
+        <span class="comment">// calculate size of command queue
+        </span><span class="kw">let </span>size_in_bytes_of_cmdq = num_cmdq_entries * cmdq_stride;
+        <span class="macro">trace!</span>(<span class="string">&quot;total size in bytes of cmdq = {}&quot;</span>, size_in_bytes_of_cmdq);
     
-        <span class="comment">// allocate mapped pages for the command queue</span>
-        <span class="kw">let</span> (<span class="ident">cmdq_mapped_pages</span>, <span class="ident">cmdq_starting_phys_addr</span>) <span class="op">=</span> <span class="ident">create_contiguous_mapping</span>(<span class="ident">size_in_bytes_of_cmdq</span>, <span class="ident">NIC_MAPPING_FLAGS</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;cmdq mem base = {}&quot;</span>, <span class="ident">cmdq_starting_phys_addr</span>);
+        <span class="comment">// allocate mapped pages for the command queue
+        </span><span class="kw">let </span>(cmdq_mapped_pages, cmdq_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_cmdq, NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;cmdq mem base = {}&quot;</span>, cmdq_starting_phys_addr);
     
-        <span class="comment">// cast our physically-contiguous MappedPages into a slice of command queue entries</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cmdq</span> <span class="op">=</span> <span class="ident">CommandQueue::create</span>(
-            <span class="ident">cmdq_mapped_pages</span>.<span class="ident">into_borrowed_slice_mut</span>(<span class="number">0</span>, <span class="ident">num_cmdq_entries</span>).<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>,
-            <span class="ident">num_cmdq_entries</span>
+        <span class="comment">// cast our physically-contiguous MappedPages into a slice of command queue entries
+        </span><span class="kw">let </span><span class="kw-2">mut </span>cmdq = CommandQueue::create(
+            cmdq_mapped_pages.into_borrowed_slice_mut(<span class="number">0</span>, num_cmdq_entries).map_err(|(_mp, err)| err)<span class="question-mark">?</span>,
+            num_cmdq_entries
         )<span class="question-mark">?</span>;
 
-        <span class="comment">// write physical location of command queue to initialization segment</span>
-        <span class="ident">init_segment</span>.<span class="ident">set_physical_address_of_cmdq</span>(<span class="ident">cmdq_starting_phys_addr</span>)<span class="question-mark">?</span>;
+        <span class="comment">// write physical location of command queue to initialization segment
+        </span>init_segment.set_physical_address_of_cmdq(cmdq_starting_phys_addr)<span class="question-mark">?</span>;
 
-        <span class="comment">// Read initializing field from initialization segment until it is cleared</span>
-        <span class="kw">while</span> <span class="ident">init_segment</span>.<span class="ident">device_is_initializing</span>() {}
+        <span class="comment">// Read initializing field from initialization segment until it is cleared
+        </span><span class="kw">while </span>init_segment.device_is_initializing() {}
         <span class="macro">trace!</span>(<span class="string">&quot;initializing field is cleared.&quot;</span>);
 
-        <span class="comment">// Execute ENABLE_HCA command</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(<span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::EnableHca</span>), <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;EnableHCA: {:?}&quot;</span>, <span class="ident">cmdq</span>.<span class="ident">get_command_status</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>);
+        <span class="comment">// Execute ENABLE_HCA command
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(CommandBuilder::new(CommandOpcode::EnableHca), <span class="kw-2">&amp;mut </span>init_segment)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;EnableHCA: {:?}&quot;</span>, cmdq.get_command_status(completed_cmd)<span class="question-mark">?</span>);
 
-        <span class="comment">// execute QUERY_ISSI</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>( <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::QueryIssi</span>), <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">current_issi</span>, <span class="ident">available_issi</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_query_issi_command_output</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;QueryISSI: {:?}, issi version :{}, available: {:#X}&quot;</span>, <span class="ident">status</span>, <span class="ident">current_issi</span>, <span class="ident">available_issi</span>);
+        <span class="comment">// execute QUERY_ISSI
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command( CommandBuilder::new(CommandOpcode::QueryIssi), <span class="kw-2">&amp;mut </span>init_segment)<span class="question-mark">?</span>;
+        <span class="kw">let </span>(current_issi, available_issi, status) = cmdq.get_query_issi_command_output(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;QueryISSI: {:?}, issi version :{}, available: {:#X}&quot;</span>, status, current_issi, available_issi);
         
-        <span class="comment">// execute SET_ISSI</span>
-        <span class="kw">const</span> <span class="ident">ISSI_VERSION_1</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x2</span>;
-        <span class="kw">if</span> <span class="ident">available_issi</span> <span class="op">&amp;</span> <span class="ident">ISSI_VERSION_1</span> <span class="op">==</span> <span class="ident">ISSI_VERSION_1</span> {
-            <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>( <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::SetIssi</span>), <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>)<span class="question-mark">?</span>;
-            <span class="macro">trace!</span>(<span class="string">&quot;SetISSI: {:?}&quot;</span>, <span class="ident">cmdq</span>.<span class="ident">get_command_status</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>);
-        } <span class="kw">else</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;ISSI indicated by PRM is not supported&quot;</span>);
+        <span class="comment">// execute SET_ISSI
+        </span><span class="kw">const </span>ISSI_VERSION_1: u8 = <span class="number">0x2</span>;
+        <span class="kw">if </span>available_issi &amp; ISSI_VERSION_1 == ISSI_VERSION_1 {
+            <span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command( CommandBuilder::new(CommandOpcode::SetIssi), <span class="kw-2">&amp;mut </span>init_segment)<span class="question-mark">?</span>;
+            <span class="macro">trace!</span>(<span class="string">&quot;SetISSI: {:?}&quot;</span>, cmdq.get_command_status(completed_cmd)<span class="question-mark">?</span>);
+        } <span class="kw">else </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;ISSI indicated by PRM is not supported&quot;</span>);
         }
         
-        <span class="comment">// Query pages for boot</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::QueryPages</span>).<span class="ident">opmod</span>(<span class="ident">QueryPagesOpMod::BootPages</span> <span class="kw">as</span> <span class="ident">u16</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// Query pages for boot
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::QueryPages).opmod(QueryPagesOpMod::BootPages <span class="kw">as </span>u16), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">num_boot_pages</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_query_pages_command_output</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;QueryPages: {:?}, num boot pages: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">num_boot_pages</span>);
+        <span class="kw">let </span>(num_boot_pages, status) = cmdq.get_query_pages_command_output(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;QueryPages: {:?}, num boot pages: {:?}&quot;</span>, status, num_boot_pages);
         
-        <span class="comment">// Allocate pages for boot</span>
-        <span class="kw">let</span> (<span class="ident">boot_mp</span>, <span class="ident">boot_pa</span>) <span class="op">=</span> <span class="ident"><span class="self">Self</span>::allocate_pages_for_nic</span>(<span class="ident">num_boot_pages</span> <span class="kw">as</span> <span class="ident">usize</span>)<span class="question-mark">?</span>;
+        <span class="comment">// Allocate pages for boot
+        </span><span class="kw">let </span>(boot_mp, boot_pa) = <span class="self">Self</span>::allocate_pages_for_nic(num_boot_pages <span class="kw">as </span>usize)<span class="question-mark">?</span>;
         
-        <span class="comment">// execute MANAGE_PAGES command to transfer boot pages to device</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::ManagePages</span>)
-                .<span class="ident">opmod</span>(<span class="ident">ManagePagesOpMod::AllocationSuccess</span> <span class="kw">as</span> <span class="ident">u16</span>)
-                .<span class="ident">allocated_pages</span>(<span class="ident">boot_pa</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// execute MANAGE_PAGES command to transfer boot pages to device
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::ManagePages)
+                .opmod(ManagePagesOpMod::AllocationSuccess <span class="kw">as </span>u16)
+                .allocated_pages(boot_pa), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;ManagePages boot: {:?}&quot;</span>, <span class="ident">cmdq</span>.<span class="ident">get_command_status</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;ManagePages boot: {:?}&quot;</span>, cmdq.get_command_status(completed_cmd)<span class="question-mark">?</span>);
         
-        <span class="comment">// Query current HCA capabilities</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::QueryHcaCap</span>)
-                .<span class="ident">opmod</span>(<span class="ident">QueryHcaCapCurrentOpMod::GeneralDeviceCapabilities</span> <span class="kw">as</span> <span class="ident">u16</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// Query current HCA capabilities
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::QueryHcaCap)
+                .opmod(QueryHcaCapCurrentOpMod::GeneralDeviceCapabilities <span class="kw">as </span>u16), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">current_capabilities</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_device_capabilities</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;QueryHCACap:{:?}, current capabilities: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">current_capabilities</span>);
+        <span class="kw">let </span>(current_capabilities, status) = cmdq.get_device_capabilities(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;QueryHCACap:{:?}, current capabilities: {:?}&quot;</span>, status, current_capabilities);
 
-        <span class="comment">// Query maximum HCA capabilities</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::QueryHcaCap</span>)
-                .<span class="ident">opmod</span>(<span class="ident">QueryHcaCapMaxOpMod::GeneralDeviceCapabilities</span> <span class="kw">as</span> <span class="ident">u16</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// Query maximum HCA capabilities
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::QueryHcaCap)
+                .opmod(QueryHcaCapMaxOpMod::GeneralDeviceCapabilities <span class="kw">as </span>u16), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">max_capabilities</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_device_capabilities</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;QueryHCACap:{:?}, max capabilities: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">max_capabilities</span>);
+        <span class="kw">let </span>(max_capabilities, status) = cmdq.get_device_capabilities(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;QueryHCACap:{:?}, max capabilities: {:?}&quot;</span>, status, max_capabilities);
 
-        <span class="comment">// Query pages for init</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::QueryPages</span>)
-                .<span class="ident">opmod</span>(<span class="ident">QueryPagesOpMod::InitPages</span> <span class="kw">as</span> <span class="ident">u16</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// Query pages for init
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::QueryPages)
+                .opmod(QueryPagesOpMod::InitPages <span class="kw">as </span>u16), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">num_init_pages</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_query_pages_command_output</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;QueryPages: {:?}, num init pages: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">num_init_pages</span>);
+        <span class="kw">let </span>(num_init_pages, status) = cmdq.get_query_pages_command_output(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;QueryPages: {:?}, num init pages: {:?}&quot;</span>, status, num_init_pages);
 
-        <span class="kw">let</span> <span class="ident">init_mp</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">num_init_pages</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="comment">// Allocate pages for init</span>
-            <span class="kw">let</span> (<span class="ident">init_mp</span>, <span class="ident">init_pa</span>) <span class="op">=</span> <span class="ident"><span class="self">Self</span>::allocate_pages_for_nic</span>(<span class="ident">num_init_pages</span> <span class="kw">as</span> <span class="ident">usize</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>init_mp = <span class="kw">if </span>num_init_pages != <span class="number">0 </span>{
+            <span class="comment">// Allocate pages for init
+            </span><span class="kw">let </span>(init_mp, init_pa) = <span class="self">Self</span>::allocate_pages_for_nic(num_init_pages <span class="kw">as </span>usize)<span class="question-mark">?</span>;
 
-            <span class="comment">// execute MANAGE_PAGES command to transfer init pages to device</span>
-            <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-                <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::ManagePages</span>)
-                    .<span class="ident">opmod</span>(<span class="ident">ManagePagesOpMod::AllocationSuccess</span> <span class="kw">as</span> <span class="ident">u16</span>)
-                    .<span class="ident">allocated_pages</span>(<span class="ident">init_pa</span>), 
-                <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+            <span class="comment">// execute MANAGE_PAGES command to transfer init pages to device
+            </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+                CommandBuilder::new(CommandOpcode::ManagePages)
+                    .opmod(ManagePagesOpMod::AllocationSuccess <span class="kw">as </span>u16)
+                    .allocated_pages(init_pa), 
+                <span class="kw-2">&amp;mut </span>init_segment
             )<span class="question-mark">?</span>;
-            <span class="macro">trace!</span>(<span class="string">&quot;ManagePages init: {:?}&quot;</span>, <span class="ident">cmdq</span>.<span class="ident">get_command_status</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>);
-            <span class="ident">init_mp</span>
-        } <span class="kw">else</span> { 
-            <span class="macro">vec!</span>(<span class="ident">MappedPages::empty</span>()) 
+            <span class="macro">trace!</span>(<span class="string">&quot;ManagePages init: {:?}&quot;</span>, cmdq.get_command_status(completed_cmd)<span class="question-mark">?</span>);
+            init_mp
+        } <span class="kw">else </span>{ 
+            <span class="macro">vec!</span>(MappedPages::empty()) 
         };
 
-        <span class="comment">// execute INIT_HCA</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::InitHca</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// execute INIT_HCA
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::InitHca), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;InitHCA: {:?}&quot;</span>, <span class="ident">cmdq</span>.<span class="ident">get_command_status</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;InitHCA: {:?}&quot;</span>, cmdq.get_command_status(completed_cmd)<span class="question-mark">?</span>);
 
-        <span class="comment">// Query regular pages</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::QueryPages</span>)
-                .<span class="ident">opmod</span>(<span class="ident">QueryPagesOpMod::RegularPages</span> <span class="kw">as</span> <span class="ident">u16</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// Query regular pages
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::QueryPages)
+                .opmod(QueryPagesOpMod::RegularPages <span class="kw">as </span>u16), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">num_reg_pages</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_query_pages_command_output</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;QueryPages: {:?}, num regular pages: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">num_reg_pages</span>);
+        <span class="kw">let </span>(num_reg_pages, status) = cmdq.get_query_pages_command_output(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;QueryPages: {:?}, num regular pages: {:?}&quot;</span>, status, num_reg_pages);
 
-        <span class="kw">let</span> <span class="ident">reg_mp</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">num_reg_pages</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="comment">// Allocate regular pages</span>
-            <span class="kw">let</span> (<span class="ident">reg_mp</span>, <span class="ident">reg_pa</span>) <span class="op">=</span> <span class="ident"><span class="self">Self</span>::allocate_pages_for_nic</span>(<span class="ident">num_reg_pages</span> <span class="kw">as</span> <span class="ident">usize</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>reg_mp = <span class="kw">if </span>num_reg_pages != <span class="number">0 </span>{
+            <span class="comment">// Allocate regular pages
+            </span><span class="kw">let </span>(reg_mp, reg_pa) = <span class="self">Self</span>::allocate_pages_for_nic(num_reg_pages <span class="kw">as </span>usize)<span class="question-mark">?</span>;
 
-            <span class="comment">// execute MANAGE_PAGES command to transfer regular pages to device</span>
-            <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-                <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::ManagePages</span>)
-                    .<span class="ident">opmod</span>(<span class="ident">ManagePagesOpMod::AllocationSuccess</span> <span class="kw">as</span> <span class="ident">u16</span>)
-                    .<span class="ident">allocated_pages</span>(<span class="ident">reg_pa</span>), 
-                <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+            <span class="comment">// execute MANAGE_PAGES command to transfer regular pages to device
+            </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+                CommandBuilder::new(CommandOpcode::ManagePages)
+                    .opmod(ManagePagesOpMod::AllocationSuccess <span class="kw">as </span>u16)
+                    .allocated_pages(reg_pa), 
+                <span class="kw-2">&amp;mut </span>init_segment
             )<span class="question-mark">?</span>;
-            <span class="macro">trace!</span>(<span class="string">&quot;ManagePages regular: {:?}&quot;</span>, <span class="ident">cmdq</span>.<span class="ident">get_command_status</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>);
-            <span class="ident">reg_mp</span>
-        } <span class="kw">else</span> { 
-            <span class="macro">vec!</span>(<span class="ident">MappedPages::empty</span>()) 
+            <span class="macro">trace!</span>(<span class="string">&quot;ManagePages regular: {:?}&quot;</span>, cmdq.get_command_status(completed_cmd)<span class="question-mark">?</span>);
+            reg_mp
+        } <span class="kw">else </span>{ 
+            <span class="macro">vec!</span>(MappedPages::empty()) 
         };
         
-        <span class="comment">// execute QUERY_NIC_VPORT_CONTEXT to find the mac address</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::QueryNicVportContext</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// execute QUERY_NIC_VPORT_CONTEXT to find the mac address
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::QueryNicVportContext), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">mac_addr</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_vport_mac_address</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;QueryNicVportContext: {:?}, mac address: {:#X?}&quot;</span>, <span class="ident">status</span>, <span class="ident">mac_addr</span>);
+        <span class="kw">let </span>(mac_addr, status) = cmdq.get_vport_mac_address(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;QueryNicVportContext: {:?}, mac address: {:#X?}&quot;</span>, status, mac_addr);
 
-        <span class="comment">// execute QUERY_VPORT_STATE to find the link status</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::QueryVportState</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// execute QUERY_VPORT_STATE to find the link status
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::QueryVportState), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">tx_speed</span>, <span class="ident">admin_state</span>, <span class="ident">state</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_vport_state</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;QueryVportState: {:?}, tx_speed: {:#X}, admin_state:{:#X}, state: {:#X}&quot;</span>, <span class="ident">status</span>, <span class="ident">tx_speed</span>, <span class="ident">admin_state</span>, <span class="ident">state</span>); 
+        <span class="kw">let </span>(tx_speed, admin_state, state, status) = cmdq.get_vport_state(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;QueryVportState: {:?}, tx_speed: {:#X}, admin_state:{:#X}, state: {:#X}&quot;</span>, status, tx_speed, admin_state, state); 
         
-        <span class="comment">// execute ACCESS_REGISTER to get the maximum mtu</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::AccessRegister</span>)
-                .<span class="ident">opmod</span>(<span class="ident">AccessRegisterOpMod::Read</span> <span class="kw">as</span> <span class="ident">u16</span>),
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// execute ACCESS_REGISTER to get the maximum mtu
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::AccessRegister)
+                .opmod(AccessRegisterOpMod::Read <span class="kw">as </span>u16),
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">max_mtu</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_max_mtu</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;AccessRegister: {:?}, max_mtu: {}&quot;</span>, <span class="ident">status</span>, <span class="ident">max_mtu</span>); 
+        <span class="kw">let </span>(max_mtu, status) = cmdq.get_max_mtu(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;AccessRegister: {:?}, max_mtu: {}&quot;</span>, status, max_mtu); 
 
-        <span class="comment">// return an error if the MTU is greater than the maximum MTU</span>
-        <span class="kw">if</span> <span class="ident">mtu</span> <span class="op">&gt;</span> <span class="ident">max_mtu</span> { <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Required MTU is greater than maximum MTU!&quot;</span>); }
+        <span class="comment">// return an error if the MTU is greater than the maximum MTU
+        </span><span class="kw">if </span>mtu &gt; max_mtu { <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Required MTU is greater than maximum MTU!&quot;</span>); }
 
-        <span class="comment">// execute ACCESS_REGISTER to set the mtu</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::AccessRegister</span>)
-                .<span class="ident">opmod</span>(<span class="ident">AccessRegisterOpMod::Write</span> <span class="kw">as</span> <span class="ident">u16</span>)
-                .<span class="ident">mtu</span>(<span class="ident">mtu</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// execute ACCESS_REGISTER to set the mtu
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::AccessRegister)
+                .opmod(AccessRegisterOpMod::Write <span class="kw">as </span>u16)
+                .mtu(mtu), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_command_status</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;AccessRegister: {:?}&quot;</span>, <span class="ident">status</span>); 
+        <span class="kw">let </span>status = cmdq.get_command_status(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;AccessRegister: {:?}&quot;</span>, status); 
     
-        <span class="comment">// execute MODIFY_NIC_VPORT_CONTEXT to set the mtu</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::ModifyNicVportContext</span>)
-                .<span class="ident">mtu</span>(<span class="ident">mtu</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// execute MODIFY_NIC_VPORT_CONTEXT to set the mtu
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::ModifyNicVportContext)
+                .mtu(mtu), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_command_status</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;ModifyNicVportContext: {:?}&quot;</span>, <span class="ident">status</span>); 
+        <span class="kw">let </span>status = cmdq.get_command_status(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;ModifyNicVportContext: {:?}&quot;</span>, status); 
 
-        <span class="comment">// execute ALLOC_UAR</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::AllocUar</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// execute ALLOC_UAR
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::AllocUar), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">uar</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_uar</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;AllocUar: {:?}, UAR: {}&quot;</span>, <span class="ident">status</span>, <span class="ident">uar</span>);        
+        <span class="kw">let </span>(uar, status) = cmdq.get_uar(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;AllocUar: {:?}, UAR: {}&quot;</span>, status, uar);        
 
-        <span class="comment">// execute CREATE_EQ for page request event</span>
-        <span class="comment">// 1. Allocate pages for EQ</span>
-        <span class="kw">let</span> <span class="ident">num_eq_entries</span> <span class="op">=</span> <span class="number">64</span>;
-        <span class="kw">let</span> (<span class="ident">eq_mp</span>, <span class="ident">eq_pa</span>) <span class="op">=</span> <span class="ident">create_contiguous_mapping</span>(<span class="ident">num_eq_entries</span> <span class="op">*</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">EventQueueEntry</span><span class="op">&gt;</span>(), <span class="ident">NIC_MAPPING_FLAGS</span>)<span class="question-mark">?</span>;
+        <span class="comment">// execute CREATE_EQ for page request event
+        // 1. Allocate pages for EQ
+        </span><span class="kw">let </span>num_eq_entries = <span class="number">64</span>;
+        <span class="kw">let </span>(eq_mp, eq_pa) = create_contiguous_mapping(num_eq_entries * core::mem::size_of::&lt;EventQueueEntry&gt;(), NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
     
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::CreateEq</span>)
-                .<span class="ident">allocated_pages</span>(<span class="macro">vec!</span>(<span class="ident">eq_pa</span>))
-                .<span class="ident">uar</span>(<span class="ident">uar</span>)
-                .<span class="ident">queue_size</span>(<span class="ident">num_eq_entries</span> <span class="kw">as</span> <span class="ident">u32</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::CreateEq)
+                .allocated_pages(<span class="macro">vec!</span>(eq_pa))
+                .uar(uar)
+                .queue_size(num_eq_entries <span class="kw">as </span>u32), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">eqn</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_eq_number</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="comment">// 2. Initialize the EQ</span>
-        <span class="kw">let</span> <span class="ident">event_queue</span> <span class="op">=</span> <span class="ident">EventQueue::init</span>(<span class="ident">eq_mp</span>, <span class="ident">num_eq_entries</span>, <span class="ident">eqn</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;CreateEq: {:?}, eqn: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">eqn</span>); 
+        <span class="kw">let </span>(eqn, status) = cmdq.get_eq_number(completed_cmd)<span class="question-mark">?</span>;
+        <span class="comment">// 2. Initialize the EQ
+        </span><span class="kw">let </span>event_queue = EventQueue::init(eq_mp, num_eq_entries, eqn)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;CreateEq: {:?}, eqn: {:?}&quot;</span>, status, eqn); 
 
-        <span class="comment">// #[cfg(mlx_verbose_log)]</span>
-        <span class="comment">// {</span>
-        <span class="comment">//     event_queue.dump()</span>
-        <span class="comment">// }</span>
+        <span class="comment">// #[cfg(mlx_verbose_log)]
+        // {
+        //     event_queue.dump()
+        // }
 
-        <span class="comment">// execute ALLOC_PD</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::AllocPd</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        // execute ALLOC_PD
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::AllocPd), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">pd</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_protection_domain</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;AllocPd: {:?}, protection domain: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">pd</span>);
+        <span class="kw">let </span>(pd, status) = cmdq.get_protection_domain(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;AllocPd: {:?}, protection domain: {:?}&quot;</span>, status, pd);
 
-        <span class="comment">// execute ALLOC_TRANSPORT_DOMAIN</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::AllocTransportDomain</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// execute ALLOC_TRANSPORT_DOMAIN
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::AllocTransportDomain), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">td</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_transport_domain</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;AllocTransportDomain: {:?}, transport domain: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">td</span>);
+        <span class="kw">let </span>(td, status) = cmdq.get_transport_domain(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;AllocTransportDomain: {:?}, transport domain: {:?}&quot;</span>, status, td);
 
-        <span class="comment">// execute QUERY_SPECIAL_CONTEXTS</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::QuerySpecialContexts</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// execute QUERY_SPECIAL_CONTEXTS
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::QuerySpecialContexts), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">rlkey</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_reserved_lkey</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;QuerySpecialContexts: {:?}, rlkey: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">rlkey</span>);
+        <span class="kw">let </span>(rlkey, status) = cmdq.get_reserved_lkey(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;QuerySpecialContexts: {:?}, rlkey: {:?}&quot;</span>, status, rlkey);
         
-        <span class="comment">// execute CREATE_CQ for SQ </span>
+        <span class="comment">// execute CREATE_CQ for SQ 
 
-        <span class="comment">// 1. Allocate pages for CQ</span>
-        <span class="kw">let</span> (<span class="ident">cq_mp</span>, <span class="ident">cq_pa</span>) <span class="op">=</span> <span class="ident">create_contiguous_mapping</span>(<span class="ident">NUM_CQ_ENTRIES_SEND</span> <span class="op">*</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">CompletionQueueEntry</span><span class="op">&gt;</span>(), <span class="ident">NIC_MAPPING_FLAGS</span>)<span class="question-mark">?</span>;
+        // 1. Allocate pages for CQ
+        </span><span class="kw">let </span>(cq_mp, cq_pa) = create_contiguous_mapping(NUM_CQ_ENTRIES_SEND * core::mem::size_of::&lt;CompletionQueueEntry&gt;(), NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
 
-        <span class="comment">// 2. Allocate page for doorbell</span>
-        <span class="kw">let</span> (<span class="ident">db_page</span>, <span class="ident">db_pa</span>) <span class="op">=</span> <span class="ident">create_contiguous_mapping</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">CompletionQueueDoorbellRecord</span><span class="op">&gt;</span>(), <span class="ident">NIC_MAPPING_FLAGS</span>)<span class="question-mark">?</span>;
+        <span class="comment">// 2. Allocate page for doorbell
+        </span><span class="kw">let </span>(db_page, db_pa) = create_contiguous_mapping(core::mem::size_of::&lt;CompletionQueueDoorbellRecord&gt;(), NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
         
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::CreateCq</span>) 
-                .<span class="ident">allocated_pages</span>(<span class="macro">vec!</span>(<span class="ident">cq_pa</span>))
-                .<span class="ident">uar</span>(<span class="ident">uar</span>)
-                .<span class="ident">queue_size</span>(<span class="ident">NUM_CQ_ENTRIES_SEND</span> <span class="kw">as</span> <span class="ident">u32</span>)
-                .<span class="ident">eqn</span>(<span class="ident">eqn</span>)
-                .<span class="ident">db_page</span>(<span class="ident">db_pa</span>)
-                .<span class="ident">collapsed_cq</span>(), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::CreateCq) 
+                .allocated_pages(<span class="macro">vec!</span>(cq_pa))
+                .uar(uar)
+                .queue_size(NUM_CQ_ENTRIES_SEND <span class="kw">as </span>u32)
+                .eqn(eqn)
+                .db_page(db_pa)
+                .collapsed_cq(), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">cqn_s</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_cq_number</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="comment">// 3. Initialize the CQ</span>
-        <span class="kw">let</span> <span class="ident">send_completion_queue</span> <span class="op">=</span> <span class="ident">CompletionQueue::init</span>(<span class="ident">cq_mp</span>, <span class="ident">NUM_CQ_ENTRIES_SEND</span>, <span class="ident">db_page</span>, <span class="ident">cqn_s</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;CreateCq: {:?}, cqn_s: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">cqn_s</span>);
+        <span class="kw">let </span>(cqn_s, status) = cmdq.get_cq_number(completed_cmd)<span class="question-mark">?</span>;
+        <span class="comment">// 3. Initialize the CQ
+        </span><span class="kw">let </span>send_completion_queue = CompletionQueue::init(cq_mp, NUM_CQ_ENTRIES_SEND, db_page, cqn_s)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;CreateCq: {:?}, cqn_s: {:?}&quot;</span>, status, cqn_s);
 
-        <span class="comment">// #[cfg(mlx_verbose_log)]</span>
-        <span class="comment">// {</span>
-        <span class="comment">//     send_completion_queue.dump()</span>
-        <span class="comment">// }</span>
+        <span class="comment">// #[cfg(mlx_verbose_log)]
+        // {
+        //     send_completion_queue.dump()
+        // }
 
-        <span class="comment">// execute CREATE_CQ for RQ</span>
+        // execute CREATE_CQ for RQ
 
-        <span class="comment">// 1. Allocate pages for CQ</span>
-        <span class="kw">let</span> <span class="ident">cq_entries_r</span> <span class="op">=</span> <span class="ident">num_rx_descs</span>; 
-        <span class="kw">let</span> (<span class="ident">cq_mp</span>, <span class="ident">cq_pa</span>) <span class="op">=</span> <span class="ident">create_contiguous_mapping</span>(<span class="ident">cq_entries_r</span> <span class="op">*</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">CompletionQueueEntry</span><span class="op">&gt;</span>(), <span class="ident">NIC_MAPPING_FLAGS</span>)<span class="question-mark">?</span>;
-        <span class="comment">// 2. Allocate page for doorbell</span>
-        <span class="kw">let</span> (<span class="ident">db_page</span>, <span class="ident">db_pa</span>) <span class="op">=</span> <span class="ident">create_contiguous_mapping</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">CompletionQueueDoorbellRecord</span><span class="op">&gt;</span>(), <span class="ident">NIC_MAPPING_FLAGS</span>)<span class="question-mark">?</span>;
+        // 1. Allocate pages for CQ
+        </span><span class="kw">let </span>cq_entries_r = num_rx_descs; 
+        <span class="kw">let </span>(cq_mp, cq_pa) = create_contiguous_mapping(cq_entries_r * core::mem::size_of::&lt;CompletionQueueEntry&gt;(), NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+        <span class="comment">// 2. Allocate page for doorbell
+        </span><span class="kw">let </span>(db_page, db_pa) = create_contiguous_mapping(core::mem::size_of::&lt;CompletionQueueDoorbellRecord&gt;(), NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
         
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::CreateCq</span>) 
-                .<span class="ident">allocated_pages</span>(<span class="macro">vec!</span>(<span class="ident">cq_pa</span>))
-                .<span class="ident">uar</span>(<span class="ident">uar</span>)
-                .<span class="ident">queue_size</span>(<span class="ident">cq_entries_r</span> <span class="kw">as</span> <span class="ident">u32</span>)
-                .<span class="ident">eqn</span>(<span class="ident">eqn</span>)
-                .<span class="ident">db_page</span>(<span class="ident">db_pa</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::CreateCq) 
+                .allocated_pages(<span class="macro">vec!</span>(cq_pa))
+                .uar(uar)
+                .queue_size(cq_entries_r <span class="kw">as </span>u32)
+                .eqn(eqn)
+                .db_page(db_pa), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">cqn_r</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_cq_number</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="comment">// 3. Initialize the CQ</span>
-        <span class="kw">let</span> <span class="ident">completion_queue_r</span> <span class="op">=</span> <span class="ident">CompletionQueue::init</span>(<span class="ident">cq_mp</span>, <span class="ident">cq_entries_r</span>, <span class="ident">db_page</span>, <span class="ident">cqn_r</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;CreateCq: {:?}, cqn_r: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">cqn_r</span>);
+        <span class="kw">let </span>(cqn_r, status) = cmdq.get_cq_number(completed_cmd)<span class="question-mark">?</span>;
+        <span class="comment">// 3. Initialize the CQ
+        </span><span class="kw">let </span>completion_queue_r = CompletionQueue::init(cq_mp, cq_entries_r, db_page, cqn_r)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;CreateCq: {:?}, cqn_r: {:?}&quot;</span>, status, cqn_r);
         
-        <span class="comment">// execute CREATE_TIS</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::CreateTis</span>)
-                .<span class="ident">td</span>(<span class="ident">td</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// execute CREATE_TIS
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::CreateTis)
+                .td(td), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">tisn</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_tis_context_number</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;CreateTis: {:?}, tisn: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">tisn</span>);
+        <span class="kw">let </span>(tisn, status) = cmdq.get_tis_context_number(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;CreateTis: {:?}, tisn: {:?}&quot;</span>, status, tisn);
 
-        <span class="comment">// Allocate pages for RQ and SQ, they have to be contiguous      </span>
-        <span class="kw">let</span> (<span class="ident">q_mp</span>, <span class="ident">q_pa</span>) <span class="op">=</span> <span class="ident">create_contiguous_mapping</span>(<span class="ident">rq_size_in_bytes</span> <span class="op">+</span> <span class="ident">sq_size_in_bytes</span>, <span class="ident">NIC_MAPPING_FLAGS</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">vaddr</span> <span class="op">=</span> <span class="ident">q_mp</span>.<span class="ident">start_address</span>();
-        <span class="kw">let</span> (<span class="ident">rq_mp</span>, <span class="ident">sq_mp</span>) <span class="op">=</span> <span class="ident">q_mp</span>.<span class="ident">split</span>(<span class="ident">memory_structs::Page::containing_address</span>(<span class="ident">vaddr</span> <span class="op">+</span> <span class="ident">rq_size_in_bytes</span>))
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;Could not split MappedPages&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">sq_pa</span> <span class="op">=</span> <span class="ident">q_pa</span> <span class="op">+</span> <span class="ident">rq_size_in_bytes</span>;
-        <span class="macro">debug!</span>(<span class="string">&quot;RQ paddr: {:?}, SQ paddr: {:?}, RQ vaddr: {:?}, SQ vaddr: {:?}&quot;</span>, <span class="ident">q_pa</span>, <span class="ident">sq_pa</span>, <span class="ident">rq_mp</span>.<span class="ident">start_address</span>(), <span class="ident">sq_mp</span>.<span class="ident">start_address</span>());
+        <span class="comment">// Allocate pages for RQ and SQ, they have to be contiguous      
+        </span><span class="kw">let </span>(q_mp, q_pa) = create_contiguous_mapping(rq_size_in_bytes + sq_size_in_bytes, NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+        <span class="kw">let </span>vaddr = q_mp.start_address();
+        <span class="kw">let </span>(rq_mp, sq_mp) = q_mp.split(memory_structs::Page::containing_address(vaddr + rq_size_in_bytes))
+            .map_err(|_e| <span class="string">&quot;Could not split MappedPages&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>sq_pa = q_pa + rq_size_in_bytes;
+        <span class="macro">debug!</span>(<span class="string">&quot;RQ paddr: {:?}, SQ paddr: {:?}, RQ vaddr: {:?}, SQ vaddr: {:?}&quot;</span>, q_pa, sq_pa, rq_mp.start_address(), sq_mp.start_address());
 
-        <span class="comment">// Allocate page for SQ/RQ doorbell</span>
-        <span class="kw">let</span> (<span class="ident">db_page</span>, <span class="ident">db_pa</span>) <span class="op">=</span> <span class="ident">create_contiguous_mapping</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DoorbellRecord</span><span class="op">&gt;</span>(), <span class="ident">NIC_MAPPING_FLAGS</span>)<span class="question-mark">?</span>;
-        <span class="macro">debug!</span>(<span class="string">&quot;doorbell: {:#x}&quot;</span>, <span class="ident">db_pa</span>);
+        <span class="comment">// Allocate page for SQ/RQ doorbell
+        </span><span class="kw">let </span>(db_page, db_pa) = create_contiguous_mapping(core::mem::size_of::&lt;DoorbellRecord&gt;(), NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+        <span class="macro">debug!</span>(<span class="string">&quot;doorbell: {:#x}&quot;</span>, db_pa);
 
-        <span class="comment">// Allocate page for UAR. </span>
-        <span class="comment">// For the given uar number i, the page is the ith page from the memory base retrieved from the PCI BAR</span>
-        <span class="kw">let</span> <span class="ident">uar_mem_base</span> <span class="op">=</span> <span class="ident">mem_base</span> <span class="op">+</span> ((<span class="ident">uar</span> <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">*</span> <span class="ident">PAGE_SIZE</span>);
-        <span class="kw">let</span> <span class="ident">uar_page</span> <span class="op">=</span> <span class="ident">allocate_memory</span>(<span class="ident">uar_mem_base</span>, <span class="ident">PAGE_SIZE</span>)<span class="question-mark">?</span>;
-        <span class="macro">debug!</span>(<span class="string">&quot;mmio: {:?}, uar: {:?}&quot;</span>, <span class="ident">mem_base</span>, <span class="ident">uar_mem_base</span>);
+        <span class="comment">// Allocate page for UAR. 
+        // For the given uar number i, the page is the ith page from the memory base retrieved from the PCI BAR
+        </span><span class="kw">let </span>uar_mem_base = mem_base + ((uar <span class="kw">as </span>usize) * PAGE_SIZE);
+        <span class="kw">let </span>uar_page = allocate_memory(uar_mem_base, PAGE_SIZE)<span class="question-mark">?</span>;
+        <span class="macro">debug!</span>(<span class="string">&quot;mmio: {:?}, uar: {:?}&quot;</span>, mem_base, uar_mem_base);
 
-        <span class="comment">// Create the SQ</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::CreateSq</span>) 
-                .<span class="ident">allocated_pages</span>(<span class="macro">vec!</span>(<span class="ident">sq_pa</span>)) 
-                .<span class="ident">uar</span>(<span class="ident">uar</span>) 
-                .<span class="ident">queue_size</span>(<span class="ident">num_tx_descs</span> <span class="kw">as</span> <span class="ident">u32</span>)
-                .<span class="ident">db_page</span>(<span class="ident">db_pa</span>)
-                .<span class="ident">cqn</span>(<span class="ident">cqn_s</span>) 
-                .<span class="ident">tisn</span>(<span class="ident">tisn</span>) 
-                .<span class="ident">pd</span>(<span class="ident">pd</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// Create the SQ
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::CreateSq) 
+                .allocated_pages(<span class="macro">vec!</span>(sq_pa)) 
+                .uar(uar) 
+                .queue_size(num_tx_descs <span class="kw">as </span>u32)
+                .db_page(db_pa)
+                .cqn(cqn_s) 
+                .tisn(tisn) 
+                .pd(pd), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">sqn</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_send_queue_number</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">send_queue</span> <span class="op">=</span> <span class="ident">SendQueue::create</span>(
-            <span class="ident">sq_mp</span>, 
-            <span class="ident">num_tx_descs</span>, 
-            <span class="ident">db_page</span>, 
-            <span class="ident">uar_page</span>, 
-            <span class="ident">sqn</span>, 
-            <span class="ident">tisn</span>, 
-            <span class="ident">rlkey</span>
+        <span class="kw">let </span>(sqn, status) = cmdq.get_send_queue_number(completed_cmd)<span class="question-mark">?</span>;
+        <span class="kw">let </span>send_queue = SendQueue::create(
+            sq_mp, 
+            num_tx_descs, 
+            db_page, 
+            uar_page, 
+            sqn, 
+            tisn, 
+            rlkey
         )<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;Create SQ status: {:?}, number: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">sqn</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;Create SQ status: {:?}, number: {:?}&quot;</span>, status, sqn);
         
-        <span class="comment">// #[cfg(mlx_verbose_log)]</span>
-        <span class="comment">// {</span>
-        <span class="comment">//     send_queue.dump()</span>
-        <span class="comment">// }</span>
+        <span class="comment">// #[cfg(mlx_verbose_log)]
+        // {
+        //     send_queue.dump()
+        // }
 
-        <span class="comment">// initialize the rx buffer pool</span>
-        <span class="ident">init_rx_buf_pool</span>(<span class="ident">num_rx_descs</span>, <span class="ident">mtu</span>, <span class="kw-2">&amp;</span><span class="ident">RX_BUFFER_POOL</span>)<span class="question-mark">?</span>;
+        // initialize the rx buffer pool
+        </span>init_rx_buf_pool(num_rx_descs, mtu, <span class="kw-2">&amp;</span>RX_BUFFER_POOL)<span class="question-mark">?</span>;
 
-        <span class="comment">// Create the RQ</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::CreateRq</span>) 
-                .<span class="ident">allocated_pages</span>(<span class="macro">vec!</span>(<span class="ident">q_pa</span>)) 
-                .<span class="ident">queue_size</span>(<span class="ident">num_rx_descs</span> <span class="kw">as</span> <span class="ident">u32</span>)
-                .<span class="ident">db_page</span>(<span class="ident">db_pa</span>)
-                .<span class="ident">cqn</span>(<span class="ident">cqn_r</span>) 
-                .<span class="ident">pd</span>(<span class="ident">pd</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// Create the RQ
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::CreateRq) 
+                .allocated_pages(<span class="macro">vec!</span>(q_pa)) 
+                .queue_size(num_rx_descs <span class="kw">as </span>u32)
+                .db_page(db_pa)
+                .cqn(cqn_r) 
+                .pd(pd), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">rqn</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_receive_queue_number</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">receive_queue</span> <span class="op">=</span> <span class="ident">ReceiveQueue::create</span>(
-            <span class="ident">rq_mp</span>, 
-            <span class="ident">num_rx_descs</span>, 
-            <span class="ident">mtu</span> <span class="kw">as</span> <span class="ident">u32</span>, 
-            <span class="kw-2">&amp;</span><span class="ident">RX_BUFFER_POOL</span>, 
-            <span class="ident">rqn</span>, 
-            <span class="ident">rlkey</span>, 
-            <span class="ident">completion_queue_r</span>
+        <span class="kw">let </span>(rqn, status) = cmdq.get_receive_queue_number(completed_cmd)<span class="question-mark">?</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>receive_queue = ReceiveQueue::create(
+            rq_mp, 
+            num_rx_descs, 
+            mtu <span class="kw">as </span>u32, 
+            <span class="kw-2">&amp;</span>RX_BUFFER_POOL, 
+            rqn, 
+            rlkey, 
+            completion_queue_r
         )<span class="question-mark">?</span>;
-        <span class="ident">receive_queue</span>.<span class="ident">refill</span>()<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;Create RQ status: {:?}, number: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">rqn</span>);
+        receive_queue.refill()<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;Create RQ status: {:?}, number: {:?}&quot;</span>, status, rqn);
 
-        <span class="comment">// MODIFY_SQ</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::ModifySq</span>) 
-                .<span class="ident">sqn</span>(<span class="ident">sqn</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// MODIFY_SQ
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::ModifySq) 
+                .sqn(sqn), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;Modify SQ status: {:?}&quot;</span>, <span class="ident">cmdq</span>.<span class="ident">get_command_status</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;Modify SQ status: {:?}&quot;</span>, cmdq.get_command_status(completed_cmd)<span class="question-mark">?</span>);
 
-        <span class="comment">// MODIFY_RQ</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::ModifyRq</span>) 
-                .<span class="ident">rqn</span>(<span class="ident">rqn</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// MODIFY_RQ
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::ModifyRq) 
+                .rqn(rqn), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;Modify RQ status: {:?}&quot;</span>, <span class="ident">cmdq</span>.<span class="ident">get_command_status</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;Modify RQ status: {:?}&quot;</span>, cmdq.get_command_status(completed_cmd)<span class="question-mark">?</span>);
 
-        <span class="comment">// QUERY_SQ</span>
-        <span class="comment">// let completed_cmd = cmdq.create_and_execute_command(</span>
-        <span class="comment">//     CommandBuilder::new(CommandOpcode::QuerySq)</span>
-        <span class="comment">//         .sqn(sqn), </span>
-        <span class="comment">//     &amp;mut init_segment</span>
-        <span class="comment">// )?;</span>
-        <span class="comment">// let (state, status) = cmdq.get_sq_state(completed_cmd)?;</span>
-        <span class="comment">// trace!(&quot;Query SQ status: {:?}, state: {:?}&quot;, status, state);</span>
+        <span class="comment">// QUERY_SQ
+        // let completed_cmd = cmdq.create_and_execute_command(
+        //     CommandBuilder::new(CommandOpcode::QuerySq)
+        //         .sqn(sqn), 
+        //     &amp;mut init_segment
+        // )?;
+        // let (state, status) = cmdq.get_sq_state(completed_cmd)?;
+        // trace!(&quot;Query SQ status: {:?}, state: {:?}&quot;, status, state);
 
-        <span class="comment">// execute QUERY_VPORT_STATE</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::QueryVportState</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        // execute QUERY_VPORT_STATE
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::QueryVportState), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">tx_speed</span>, <span class="ident">admin_state</span>, <span class="ident">state</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_vport_state</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;Query Vport State status: {:?}, tx_speed: {:#X}, admin_state:{:#X}, state: {:#X}&quot;</span>, <span class="ident">status</span>, <span class="ident">tx_speed</span>, <span class="ident">admin_state</span>, <span class="ident">state</span>); 
+        <span class="kw">let </span>(tx_speed, admin_state, state, status) = cmdq.get_vport_state(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;Query Vport State status: {:?}, tx_speed: {:#X}, admin_state:{:#X}, state: {:#X}&quot;</span>, status, tx_speed, admin_state, state); 
 
-        <span class="comment">// Create a flow table</span>
-        <span class="comment">// currently we only create 1 rule, the wildcard rule.</span>
-        <span class="kw">const</span> <span class="ident">NUM_RULES</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">1</span>;
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::CreateFlowTable</span>)
-                .<span class="ident">queue_size</span>(<span class="ident">NUM_RULES</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// Create a flow table
+        // currently we only create 1 rule, the wildcard rule.
+        </span><span class="kw">const </span>NUM_RULES: u32 = <span class="number">1</span>;
+        <span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::CreateFlowTable)
+                .queue_size(NUM_RULES), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">ft_id</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_flow_table_id</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;Create FT status: {:?}, id: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">ft_id</span>);
+        <span class="kw">let </span>(ft_id, status) = cmdq.get_flow_table_id(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;Create FT status: {:?}, id: {:?}&quot;</span>, status, ft_id);
 
-        <span class="comment">// create the wildcard flow group</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::CreateFlowGroup</span>)
-                .<span class="ident">flow_table_id</span>(<span class="ident">ft_id</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// create the wildcard flow group
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::CreateFlowGroup)
+                .flow_table_id(ft_id), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">fg_id</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_flow_group_id</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;Create FG status: {:?}, id: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">fg_id</span>);
+        <span class="kw">let </span>(fg_id, status) = cmdq.get_flow_group_id(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;Create FG status: {:?}, id: {:?}&quot;</span>, status, fg_id);
 
-        <span class="comment">// create a TIR object for the RQ</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::CreateTir</span>)
-                .<span class="ident">rqn</span>(<span class="ident">rqn</span>)
-                .<span class="ident">td</span>(<span class="ident">td</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// create a TIR object for the RQ
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::CreateTir)
+                .rqn(rqn)
+                .td(td), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">tirn</span>, <span class="ident">status</span>) <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">get_tir_context_number</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;Create TIR status: {:?}, tirn: {:?}&quot;</span>, <span class="ident">status</span>, <span class="ident">tirn</span>);
+        <span class="kw">let </span>(tirn, status) = cmdq.get_tir_context_number(completed_cmd)<span class="question-mark">?</span>;
+        <span class="macro">trace!</span>(<span class="string">&quot;Create TIR status: {:?}, tirn: {:?}&quot;</span>, status, tirn);
 
-        <span class="comment">// add the wildcard entry to the flow table</span>
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::SetFlowTableEntry</span>)
-                .<span class="ident">flow_table_id</span>(<span class="ident">ft_id</span>)
-                .<span class="ident">flow_group_id</span>(<span class="ident">fg_id</span>)
-                .<span class="ident">tirn</span>(<span class="ident">tirn</span>), 
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="comment">// add the wildcard entry to the flow table
+        </span><span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::SetFlowTableEntry)
+                .flow_table_id(ft_id)
+                .flow_group_id(fg_id)
+                .tirn(tirn), 
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;Set FT entry status: {:?}&quot;</span>, <span class="ident">cmdq</span>.<span class="ident">get_command_status</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;Set FT entry status: {:?}&quot;</span>, cmdq.get_command_status(completed_cmd)<span class="question-mark">?</span>);
 
-        <span class="kw">let</span> <span class="ident">completed_cmd</span> <span class="op">=</span> <span class="ident">cmdq</span>.<span class="ident">create_and_execute_command</span>(
-            <span class="ident">CommandBuilder::new</span>(<span class="ident">CommandOpcode::SetFlowTableRoot</span>)
-                .<span class="ident">flow_table_id</span>(<span class="ident">ft_id</span>),
-            <span class="kw-2">&amp;mut</span> <span class="ident">init_segment</span>
+        <span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::SetFlowTableRoot)
+                .flow_table_id(ft_id),
+            <span class="kw-2">&amp;mut </span>init_segment
         )<span class="question-mark">?</span>;
-        <span class="macro">trace!</span>(<span class="string">&quot;Set FT root status: {:?}&quot;</span>, <span class="ident">cmdq</span>.<span class="ident">get_command_status</span>(<span class="ident">completed_cmd</span>)<span class="question-mark">?</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;Set FT root status: {:?}&quot;</span>, cmdq.get_command_status(completed_cmd)<span class="question-mark">?</span>);
 
 
-        <span class="kw">let</span> <span class="ident">mlx5_nic</span> <span class="op">=</span> <span class="ident">ConnectX5Nic</span> {
-            <span class="ident">mem_base</span>,
-            <span class="ident">init_segment</span>,
-            <span class="ident">command_queue</span>: <span class="ident">cmdq</span>, 
-            <span class="ident">boot_pages</span>: <span class="ident">boot_mp</span>,
-            <span class="ident">init_pages</span>: <span class="ident">init_mp</span>,
-            <span class="ident">regular_pages</span>: <span class="ident">reg_mp</span>,
-            <span class="ident">mac_addr</span>,
-            <span class="ident">max_capabilities</span>,
-            <span class="ident">max_mtu</span>,
-            <span class="ident">event_queue</span>,
-            <span class="ident">send_completion_queue</span>: <span class="ident">send_completion_queue</span>,
-            <span class="ident">send_queue</span>,
-            <span class="ident">receive_queue</span>
+        <span class="kw">let </span>mlx5_nic = ConnectX5Nic {
+            mem_base,
+            init_segment,
+            command_queue: cmdq, 
+            boot_pages: boot_mp,
+            init_pages: init_mp,
+            regular_pages: reg_mp,
+            mac_addr,
+            max_capabilities,
+            max_mtu,
+            event_queue,
+            send_completion_queue: send_completion_queue,
+            send_queue,
+            receive_queue
         };
         
-        <span class="kw">let</span> <span class="ident">nic_ref</span> <span class="op">=</span> <span class="ident">CONNECTX5_NIC</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">mlx5_nic</span>));
-        <span class="prelude-val">Ok</span>(<span class="ident">nic_ref</span>)
+        <span class="kw">let </span>nic_ref = CONNECTX5_NIC.call_once(|| MutexIrqSafe::new(mlx5_nic));
+        <span class="prelude-val">Ok</span>(nic_ref)
     }
     
-    <span class="doccomment">/// Returns the memory-mapped initialization segment of the NIC</span>
-    <span class="kw">fn</span> <span class="ident">map_init_segment</span>(<span class="ident">mem_base</span>: <span class="ident">PhysicalAddress</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BorrowedMappedPages</span><span class="op">&lt;</span><span class="ident">InitializationSegment</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="ident">allocate_memory</span>(<span class="ident">mem_base</span>, <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">InitializationSegment</span><span class="op">&gt;</span>())<span class="question-mark">?</span>
-            .<span class="ident">into_borrowed_mut</span>(<span class="number">0</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)
+    <span class="doccomment">/// Returns the memory-mapped initialization segment of the NIC
+    </span><span class="kw">fn </span>map_init_segment(mem_base: PhysicalAddress) -&gt; <span class="prelude-ty">Result</span>&lt;BorrowedMappedPages&lt;InitializationSegment, Mutable&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        allocate_memory(mem_base, core::mem::size_of::&lt;InitializationSegment&gt;())<span class="question-mark">?
+            </span>.into_borrowed_mut(<span class="number">0</span>)
+            .map_err(|(_mp, err)| err)
     }
 
-    <span class="doccomment">/// Allocates `num_pages` [`MappedPages`] each of the standard kernel page size [`PAGE_SIZE`].</span>
-    <span class="doccomment">/// Returns a vector of the [`MappedPages`] and a vector of the [`PhysicalAddress`] of the pages.</span>
-    <span class="kw">fn</span> <span class="ident">allocate_pages_for_nic</span>(<span class="ident">num_pages</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">PhysicalAddress</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">mp</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">num_pages</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">paddr</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">num_pages</span>);
-        <span class="kw">for</span> <span class="kw">_</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">num_pages</span> {
-            <span class="kw">let</span> (<span class="ident">page</span>, <span class="ident">pa</span>) <span class="op">=</span> <span class="ident">create_contiguous_mapping</span>(<span class="ident">PAGE_SIZE</span>, <span class="ident">NIC_MAPPING_FLAGS</span>)<span class="question-mark">?</span>;
-            <span class="ident">mp</span>.<span class="ident">push</span>(<span class="ident">page</span>);
-            <span class="ident">paddr</span>.<span class="ident">push</span>(<span class="ident">pa</span>);
+    <span class="doccomment">/// Allocates `num_pages` [`MappedPages`] each of the standard kernel page size [`PAGE_SIZE`].
+    /// Returns a vector of the [`MappedPages`] and a vector of the [`PhysicalAddress`] of the pages.
+    </span><span class="kw">fn </span>allocate_pages_for_nic(num_pages: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(Vec&lt;MappedPages&gt;, Vec&lt;PhysicalAddress&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>mp = Vec::with_capacity(num_pages);
+        <span class="kw">let </span><span class="kw-2">mut </span>paddr = Vec::with_capacity(num_pages);
+        <span class="kw">for _ in </span><span class="number">0</span>..num_pages {
+            <span class="kw">let </span>(page, pa) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+            mp.push(page);
+            paddr.push(pa);
         }
-        <span class="prelude-val">Ok</span>((<span class="ident">mp</span>, <span class="ident">paddr</span>))
+        <span class="prelude-val">Ok</span>((mp, paddr))
     }
 
-    <span class="doccomment">/// Returns the MAC address of the physical function </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mac_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [<span class="ident">u8</span>; <span class="number">6</span>] {
-        <span class="self">self</span>.<span class="ident">mac_addr</span>
+    <span class="doccomment">/// Returns the MAC address of the physical function 
+    </span><span class="kw">pub fn </span>mac_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [u8; <span class="number">6</span>] {
+        <span class="self">self</span>.mac_addr
     }
 
-    <span class="doccomment">/// Adds a packet to be sent to the transmit queue and returns once it is sent.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="ident">TransmitBuffer</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">packet_length</span> <span class="op">=</span> <span class="ident">buffer</span>.<span class="ident">length</span>;
-        <span class="kw">let</span> <span class="ident">wqe_counter</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">send_queue</span>.<span class="ident">send</span>(<span class="ident">buffer</span>.<span class="ident">phys_addr</span>, <span class="ident">buffer</span>.<span class="ident">as_slice</span>(<span class="number">0</span>, <span class="ident">packet_length</span> <span class="kw">as</span> <span class="ident">usize</span>)<span class="question-mark">?</span>);
-        <span class="comment">// self.send_completion_queue.wqe_posted(wqe_counter);</span>
-        <span class="self">self</span>.<span class="ident">send_completion_queue</span>.<span class="ident">check_packet_transmission</span>(<span class="number">0</span>, <span class="ident">wqe_counter</span>);
-        <span class="self">self</span>.<span class="ident">send_completion_queue</span>.<span class="ident">dump</span>();
+    <span class="doccomment">/// Adds a packet to be sent to the transmit queue and returns once it is sent.
+    </span><span class="kw">pub fn </span>send(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buffer: TransmitBuffer) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>packet_length = buffer.length;
+        <span class="kw">let </span>wqe_counter = <span class="self">self</span>.send_queue.send(buffer.phys_addr, buffer.as_slice(<span class="number">0</span>, packet_length <span class="kw">as </span>usize)<span class="question-mark">?</span>);
+        <span class="comment">// self.send_completion_queue.wqe_posted(wqe_counter);
+        </span><span class="self">self</span>.send_completion_queue.check_packet_transmission(<span class="number">0</span>, wqe_counter);
+        <span class="self">self</span>.send_completion_queue.dump();
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Adds a packet to be sent to the transmit queue.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">send_fastpath</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buffer_addr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
-        <span class="self">self</span>.<span class="ident">send_queue</span>.<span class="ident">send</span>(<span class="ident">buffer_addr</span>, <span class="ident">buffer</span>);
+    <span class="doccomment">/// Adds a packet to be sent to the transmit queue.
+    </span><span class="kw">pub fn </span>send_fastpath(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buffer_addr: PhysicalAddress, buffer: <span class="kw-2">&amp;</span>[u8]) {
+        <span class="self">self</span>.send_queue.send(buffer_addr, buffer);
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx5" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx5" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

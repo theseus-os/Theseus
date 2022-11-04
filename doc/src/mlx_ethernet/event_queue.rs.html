@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/event_queue.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>event_queue.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../mlx_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mlx_ethernet/src/event_queue.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>event_queue.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../mlx_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -156,158 +150,157 @@
 <span id="150">150</span>
 <span id="151">151</span>
 <span id="152">152</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Event Queues (EQ) are circular buffers used by the HCA to report completion events, errors and other asynchronous events.</span>
-<span class="doccomment">//! This module defines the layout of an EQ, the context used to initialize an EQ and related functions.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! (PRM Section 8.19: Events and Interrupts)</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Event Queues (EQ) are circular buffers used by the HCA to report completion events, errors and other asynchronous events.
+//! This module defines the layout of an EQ, the context used to initialize an EQ and related functions.
+//! 
+//! (PRM Section 8.19: Events and Interrupts)
 
-<span class="kw">use</span> <span class="ident">zerocopy</span>::{<span class="ident">U32</span>, <span class="ident">FromBytes</span>};
-<span class="kw">use</span> <span class="ident">volatile::Volatile</span>;
-<span class="kw">use</span> <span class="ident">byteorder::BigEndian</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">MappedPages</span>, <span class="ident">BorrowedSliceMappedPages</span>, <span class="ident">Mutable</span>};
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_imports</span>)]</span>
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">log_page_size</span>, <span class="ident">Cqn</span>, <span class="ident">Eqn</span>, <span class="ident">UAR_MASK</span>, <span class="ident">LOG_QUEUE_SIZE_MASK</span>, <span class="ident">LOG_QUEUE_SIZE_SHIFT</span>, <span class="ident">LOG_PAGE_SIZE_SHIFT</span>, <span class="ident">HW_OWNERSHIP</span>,
-    <span class="ident">command_queue::CommandOpcode</span>
+</span><span class="kw">use </span>zerocopy::{U32, FromBytes};
+<span class="kw">use </span>volatile::Volatile;
+<span class="kw">use </span>byteorder::BigEndian;
+<span class="kw">use </span>memory::{MappedPages, BorrowedSliceMappedPages, Mutable};
+<span class="attr">#[allow(unused_imports)]
+</span><span class="kw">use crate</span>::{
+    log_page_size, Cqn, Eqn, UAR_MASK, LOG_QUEUE_SIZE_MASK, LOG_QUEUE_SIZE_SHIFT, LOG_PAGE_SIZE_SHIFT, HW_OWNERSHIP,
+    command_queue::CommandOpcode
 };
 
 
-<span class="doccomment">/// The data structure containing EQ initialization parameters.</span>
-<span class="doccomment">/// It is passed to the HCA at the time of EQ creation.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// (PRM Section 8.19.17: Event Queue Context)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">EventQueueContext</span> {      
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `status`: occupies bits [31:28]</span>
-    <span class="doccomment">/// * `ec`: if set all the EQE&#39;s are collapsed to the first, occupies bit 18</span>
-    <span class="doccomment">/// * `st`: event delivery state machine, occupies bits [11:8] </span>
-    <span class="ident">status</span>:             <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>, 
-    <span class="ident">_padding1</span>:          <span class="ident">u32</span>,
-    <span class="doccomment">/// This field must be set to zero</span>
-    <span class="ident">page_offset</span>:        <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `log_eq_size`: Log (base 2) of the EQ size (in entries), occupies bits [28:24]</span>
-    <span class="doccomment">/// * `uar_page`: UAR page this EQ can be accessed through, occupies bits [23:0]</span>
-    <span class="ident">uar_log_eq_size</span>:    <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding2</span>:          <span class="ident">u32</span>,
-    <span class="doccomment">/// MSI-X table entry index to be used to signal interrupts on this EQ</span>
-    <span class="ident">intr</span>:               <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Log (base 2) of page size in units of 4KiB</span>
-    <span class="ident">log_pg_size</span>:        <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding3</span>:          [<span class="ident">u8</span>;<span class="number">12</span>],
-    <span class="doccomment">/// Consumer counter. The counter is incremented for each EQE polled from the EQ.</span>
-    <span class="ident">consumer_counter</span>:   <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Producer Counter. The counter is incremented for each EQE that is written by the HW to the EQ.</span>
-    <span class="ident">producer_counter</span>:   <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding4</span>:          [<span class="ident">u8</span>;<span class="number">16</span>],
+<span class="doccomment">/// The data structure containing EQ initialization parameters.
+/// It is passed to the HCA at the time of EQ creation.
+/// 
+/// (PRM Section 8.19.17: Event Queue Context)
+</span><span class="attr">#[derive(FromBytes, Default)]
+#[repr(C)]
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>EventQueueContext {      
+    <span class="doccomment">/// A multi-part field:
+    /// * `status`: occupies bits [31:28]
+    /// * `ec`: if set all the EQE&#39;s are collapsed to the first, occupies bit 18
+    /// * `st`: event delivery state machine, occupies bits [11:8] 
+    </span>status:             Volatile&lt;U32&lt;BigEndian&gt;&gt;, 
+    _padding1:          u32,
+    <span class="doccomment">/// This field must be set to zero
+    </span>page_offset:        Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// A multi-part field:
+    /// * `log_eq_size`: Log (base 2) of the EQ size (in entries), occupies bits [28:24]
+    /// * `uar_page`: UAR page this EQ can be accessed through, occupies bits [23:0]
+    </span>uar_log_eq_size:    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding2:          u32,
+    <span class="doccomment">/// MSI-X table entry index to be used to signal interrupts on this EQ
+    </span>intr:               Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// Log (base 2) of page size in units of 4KiB
+    </span>log_pg_size:        Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding3:          [u8;<span class="number">12</span>],
+    <span class="doccomment">/// Consumer counter. The counter is incremented for each EQE polled from the EQ.
+    </span>consumer_counter:   Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    <span class="doccomment">/// Producer Counter. The counter is incremented for each EQE that is written by the HW to the EQ.
+    </span>producer_counter:   Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding4:          [u8;<span class="number">16</span>],
 }
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">EventQueueContext</span><span class="op">&gt;</span>(), <span class="number">64</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;EventQueueContext&gt;(), <span class="number">64</span>);
 
-<span class="kw">impl</span> <span class="ident">EventQueueContext</span> {
-    <span class="doccomment">/// Create and initialize the fields of the EQ context.</span>
-    <span class="doccomment">/// The EQ context is then passed to the HCA when creating the EQ.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `uar_page`: UAR page the EQ can be accessed through. </span>
-    <span class="doccomment">/// * `eq_size`: number of entries in the EQ.</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">uar_page</span>: <span class="ident">u32</span>, <span class="ident">eq_size</span>: <span class="ident">u32</span>) -&gt; <span class="ident">EventQueueContext</span> {
-        <span class="comment">// set all entries to zero</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctxt</span> <span class="op">=</span> <span class="ident">EventQueueContext::default</span>();
+<span class="kw">impl </span>EventQueueContext {
+    <span class="doccomment">/// Create and initialize the fields of the EQ context.
+    /// The EQ context is then passed to the HCA when creating the EQ.
+    /// 
+    /// # Arguments
+    /// * `uar_page`: UAR page the EQ can be accessed through. 
+    /// * `eq_size`: number of entries in the EQ.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>init(uar_page: u32, eq_size: u32) -&gt; EventQueueContext {
+        <span class="comment">// set all entries to zero
+        </span><span class="kw">let </span><span class="kw-2">mut </span>ctxt = EventQueueContext::default();
 
-        <span class="comment">// initialize all other required fields</span>
-        <span class="kw">let</span> <span class="ident">uar</span> <span class="op">=</span> <span class="ident">uar_page</span> <span class="op">&amp;</span> <span class="ident">UAR_MASK</span>;
-        <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> (<span class="ident">libm::log2</span>(<span class="ident">eq_size</span> <span class="kw">as</span> <span class="ident">f64</span>) <span class="kw">as</span> <span class="ident">u32</span> <span class="op">&amp;</span> <span class="ident">LOG_QUEUE_SIZE_MASK</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_QUEUE_SIZE_SHIFT</span>;
-        <span class="ident">ctxt</span>.<span class="ident">uar_log_eq_size</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">uar</span> <span class="op">|</span> <span class="ident">size</span>));
+        <span class="comment">// initialize all other required fields
+        </span><span class="kw">let </span>uar = uar_page &amp; UAR_MASK;
+        <span class="kw">let </span>size = (libm::log2(eq_size <span class="kw">as </span>f64) <span class="kw">as </span>u32 &amp; LOG_QUEUE_SIZE_MASK) &lt;&lt; LOG_QUEUE_SIZE_SHIFT;
+        ctxt.uar_log_eq_size.write(U32::new(uar | size));
         
-        <span class="kw">let</span> <span class="ident">log_eq_page_size</span> <span class="op">=</span> <span class="ident">log_page_size</span>(<span class="ident">eq_size</span> <span class="op">*</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">EventQueueEntry</span><span class="op">&gt;</span>() <span class="kw">as</span> <span class="ident">u32</span>);
-        <span class="ident">ctxt</span>.<span class="ident">log_pg_size</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">log_eq_page_size</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_PAGE_SIZE_SHIFT</span>));
-        <span class="ident">ctxt</span>
+        <span class="kw">let </span>log_eq_page_size = log_page_size(eq_size * core::mem::size_of::&lt;EventQueueEntry&gt;() <span class="kw">as </span>u32);
+        ctxt.log_pg_size.write(U32::new(log_eq_page_size &lt;&lt; LOG_PAGE_SIZE_SHIFT));
+        ctxt
     }
 
-    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">mailbox_offset</span>() -&gt; <span class="ident">usize</span> { <span class="number">0</span> }
+    <span class="doccomment">/// Offset that this context is written to in the mailbox buffer
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>mailbox_offset() -&gt; usize { <span class="number">0 </span>}
 }
 
-<span class="doccomment">/// The layout of an entry in the EQ buffer.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// (PRM Section 8.19.2.2: EQE Format)</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>, <span class="ident">Default</span>, <span class="ident">Debug</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">EventQueueEntry</span> {
-    <span class="ident">event_type</span>: <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">_padding1</span>: [<span class="ident">u8</span>; <span class="number">28</span>],
-    <span class="doccomment">/// delivers auxiliary data to handle the event</span>
-    <span class="ident">event_data</span>: <span class="ident">Volatile</span><span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">28</span>]<span class="op">&gt;</span>,
-    <span class="doccomment">/// A multi-part field:</span>
-    <span class="doccomment">/// * `signature`: byte-wise XOR of EQE, occupies bits \[15:8\]</span>
-    <span class="doccomment">/// * `owner`: owner of the entry, occupies bit 0</span>
-    <span class="ident">signature_owner</span>: <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">U32</span><span class="op">&lt;</span><span class="ident">BigEndian</span><span class="op">&gt;</span><span class="op">&gt;</span>
+<span class="doccomment">/// The layout of an entry in the EQ buffer.
+/// 
+/// (PRM Section 8.19.2.2: EQE Format)
+</span><span class="attr">#[derive(FromBytes, Default, Debug)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>EventQueueEntry {
+    event_type: Volatile&lt;U32&lt;BigEndian&gt;&gt;,
+    _padding1: [u8; <span class="number">28</span>],
+    <span class="doccomment">/// delivers auxiliary data to handle the event
+    </span>event_data: Volatile&lt;[u8; <span class="number">28</span>]&gt;,
+    <span class="doccomment">/// A multi-part field:
+    /// * `signature`: byte-wise XOR of EQE, occupies bits \[15:8\]
+    /// * `owner`: owner of the entry, occupies bit 0
+    </span>signature_owner: Volatile&lt;U32&lt;BigEndian&gt;&gt;
 }
 
-<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">EventQueueEntry</span><span class="op">&gt;</span>(), <span class="number">64</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;EventQueueEntry&gt;(), <span class="number">64</span>);
 
-<span class="kw">impl</span> <span class="ident">EventQueueEntry</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="comment">// set all fields to zero</span>
-        <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">EventQueueEntry::default</span>();
-        <span class="comment">// all EQEs must initially be set to HW ownership</span>
-        <span class="self">self</span>.<span class="ident">signature_owner</span>.<span class="ident">write</span>(<span class="ident">U32::new</span>(<span class="ident">HW_OWNERSHIP</span>)); 
-        <span class="comment">// Snabb, I believe, has this wrong. </span>
-        <span class="comment">// They are setting the ownership bit within the padding field</span>
-    }
+<span class="kw">impl </span>EventQueueEntry {
+    <span class="kw">pub fn </span>init(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="comment">// set all fields to zero
+        </span><span class="kw-2">*</span><span class="self">self </span>= EventQueueEntry::default();
+        <span class="comment">// all EQEs must initially be set to HW ownership
+        </span><span class="self">self</span>.signature_owner.write(U32::new(HW_OWNERSHIP)); 
+        <span class="comment">// Snabb, I believe, has this wrong. 
+        // They are setting the ownership bit within the padding field
+    </span>}
 
-    <span class="doccomment">/// Prints out the fields of an EQE in the format used by other drivers (e.g. Linux, Snabb)</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dump</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">i</span>: <span class="ident">usize</span>) {
-        <span class="macro">debug!</span>(<span class="string">&quot;EQE {}&quot;</span>, <span class="ident">i</span>);
-        <span class="kw">unsafe</span> {
-            <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">EventQueueEntry</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">u32</span>;
-            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span><span class="ident">ptr</span>).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">1</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">2</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">3</span>)).<span class="ident">to_be</span>());
-            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">4</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">5</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">6</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">7</span>)).<span class="ident">to_be</span>());
-            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">8</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">9</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">10</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">11</span>)).<span class="ident">to_be</span>());
-            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x} \n&quot;</span>, (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">12</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">13</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">14</span>)).<span class="ident">to_be</span>(), (<span class="kw-2">*</span><span class="ident">ptr</span>.<span class="ident">offset</span>(<span class="number">15</span>)).<span class="ident">to_be</span>());
+    <span class="doccomment">/// Prints out the fields of an EQE in the format used by other drivers (e.g. Linux, Snabb)
+    </span><span class="kw">pub fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>, i: usize) {
+        <span class="macro">debug!</span>(<span class="string">&quot;EQE {}&quot;</span>, i);
+        <span class="kw">unsafe </span>{
+            <span class="kw">let </span>ptr = <span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span>EventQueueEntry <span class="kw">as </span><span class="kw-2">*const </span>u32;
+            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span>ptr).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">1</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">2</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">3</span>)).to_be());
+            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span>ptr.offset(<span class="number">4</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">5</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">6</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">7</span>)).to_be());
+            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x}&quot;</span>, (<span class="kw-2">*</span>ptr.offset(<span class="number">8</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">9</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">10</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">11</span>)).to_be());
+            <span class="macro">debug!</span>(<span class="string">&quot;{:#010x} {:#010x} {:#010x} {:#010x} \n&quot;</span>, (<span class="kw-2">*</span>ptr.offset(<span class="number">12</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">13</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">14</span>)).to_be(), (<span class="kw-2">*</span>ptr.offset(<span class="number">15</span>)).to_be());
         }
     }
 
  }
 
-<span class="doccomment">/// A data structure that contains the EQ buffer </span>
-<span class="doccomment">/// and is used to interact with the EQ once initialized.</span>
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">EventQueue</span> {
-    <span class="doccomment">/// Physically-contiguous event queue entries</span>
-    <span class="ident">entries</span>: <span class="ident">BorrowedSliceMappedPages</span><span class="op">&lt;</span><span class="ident">EventQueueEntry</span>, <span class="ident">Mutable</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// EQ number that is returned by the [`CommandOpcode::CreateEq`] command</span>
-    <span class="ident">eqn</span>: <span class="ident">Eqn</span>
+<span class="doccomment">/// A data structure that contains the EQ buffer 
+/// and is used to interact with the EQ once initialized.
+</span><span class="attr">#[allow(dead_code)]
+</span><span class="kw">pub struct </span>EventQueue {
+    <span class="doccomment">/// Physically-contiguous event queue entries
+    </span>entries: BorrowedSliceMappedPages&lt;EventQueueEntry, Mutable&gt;,
+    <span class="doccomment">/// EQ number that is returned by the [`CommandOpcode::CreateEq`] command
+    </span>eqn: Eqn
 }
 
-<span class="kw">impl</span> <span class="ident">EventQueue</span> {
-    <span class="doccomment">/// Creates an event queue by mapping the buffer as a slice of [`EventQueueEntry`]s.</span>
-    <span class="doccomment">/// Each EQE is set to an initial state.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `mp`: memory that is to be transformed into a slice of EQEs. </span>
-    <span class="doccomment">/// The starting physical address should have been passed to the HCA when creating the EQ.</span>
-    <span class="doccomment">/// * `num_entries`: number of entries in the EQ</span>
-    <span class="doccomment">/// * `eqn`: EQ number returned by the HCA</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">mp</span>: <span class="ident">MappedPages</span>, <span class="ident">num_entries</span>: <span class="ident">usize</span>, <span class="ident">eqn</span>: <span class="ident">Eqn</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">EventQueue</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">entries</span> <span class="op">=</span> <span class="ident">mp</span>.<span class="ident">into_borrowed_slice_mut</span>::<span class="op">&lt;</span><span class="ident">EventQueueEntry</span><span class="op">&gt;</span>(<span class="number">0</span>, <span class="ident">num_entries</span>)
-            .<span class="ident">map_err</span>(<span class="op">|</span>(<span class="ident">_mp</span>, <span class="ident">err</span>)<span class="op">|</span> <span class="ident">err</span>)<span class="question-mark">?</span>;
-        <span class="kw">for</span> <span class="ident">eqe</span> <span class="kw">in</span> <span class="ident">entries</span>.<span class="ident">iter_mut</span>() {
-            <span class="ident">eqe</span>.<span class="ident">init</span>()
+<span class="kw">impl </span>EventQueue {
+    <span class="doccomment">/// Creates an event queue by mapping the buffer as a slice of [`EventQueueEntry`]s.
+    /// Each EQE is set to an initial state.
+    /// 
+    /// # Arguments
+    /// * `mp`: memory that is to be transformed into a slice of EQEs. 
+    /// The starting physical address should have been passed to the HCA when creating the EQ.
+    /// * `num_entries`: number of entries in the EQ
+    /// * `eqn`: EQ number returned by the HCA
+    </span><span class="kw">pub fn </span>init(mp: MappedPages, num_entries: usize, eqn: Eqn) -&gt; <span class="prelude-ty">Result</span>&lt;EventQueue, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>entries = mp.into_borrowed_slice_mut::&lt;EventQueueEntry&gt;(<span class="number">0</span>, num_entries)
+            .map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
+        <span class="kw">for </span>eqe <span class="kw">in </span>entries.iter_mut() {
+            eqe.init()
         }
-        <span class="prelude-val">Ok</span>( <span class="ident">EventQueue</span> { <span class="ident">entries</span>, <span class="ident">eqn</span> } )
+        <span class="prelude-val">Ok</span>( EventQueue { entries, eqn } )
     }
 
-    <span class="doccomment">/// Prints out all entries in the EQ</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dump</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">eqe</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">entries</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
-            <span class="ident">eqe</span>.<span class="ident">dump</span>(<span class="ident">i</span>)
+    <span class="doccomment">/// Prints out all entries in the EQ
+    </span><span class="kw">pub fn </span>dump(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">for </span>(i, eqe) <span class="kw">in </span><span class="self">self</span>.entries.iter().enumerate() {
+            eqe.dump(i)
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mlx_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

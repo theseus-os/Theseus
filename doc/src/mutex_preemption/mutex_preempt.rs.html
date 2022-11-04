@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mutex_preemption/src/mutex_preempt.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mutex_preempt.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../mutex_preemption/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../mutex_preemption/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../mutex_preemption/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mutex_preemption/src/mutex_preempt.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mutex_preempt.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../mutex_preemption/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -170,172 +164,171 @@
 <span id="164">164</span>
 <span id="165">165</span>
 <span id="166">166</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">fmt</span>, <span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>}};
-<span class="kw">use</span> <span class="ident">preemption</span>::{<span class="ident">PreemptionGuard</span>, <span class="ident">hold_preemption</span>};
-<span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
-<span class="kw">use</span> <span class="ident">lockable</span>::{<span class="ident">Lockable</span>, <span class="ident">LockableSized</span>};
+</pre><pre class="rust"><code><span class="kw">use </span>core::{fmt, ops::{Deref, DerefMut}};
+<span class="kw">use </span>preemption::{PreemptionGuard, hold_preemption};
+<span class="kw">use </span>spin::{Mutex, MutexGuard};
+<span class="kw">use </span>lockable::{Lockable, LockableSized};
 
-<span class="doccomment">/// A mutual exclusion wrapper based on [`spin::Mutex`] that ensures preemption</span>
-<span class="doccomment">/// is disabled on the current CPU for as long as the lock guard is held.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MutexPreempt</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> {
-    <span class="ident">lock</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A mutual exclusion wrapper based on [`spin::Mutex`] that ensures preemption
+/// is disabled on the current CPU for as long as the lock guard is held.
+</span><span class="kw">pub struct </span>MutexPreempt&lt;T: <span class="question-mark">?</span>Sized&gt; {
+    lock: Mutex&lt;T&gt;,
 }
 
-<span class="doccomment">/// A guard that allows the locked data to be accessed, during which mutual exclusion is guaranteed.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// When the guard falls out of scope, the lock will be automatically released,</span>
-<span class="doccomment">/// which then notifies any `Task`s waiting on the lock.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MutexPreemptGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="ident">guard</span>: <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>,
-    <span class="comment">// `_preemption_guard` will be dropped after `guard`.</span>
-    <span class="comment">// Rust guarantees that fields are dropped in the order of declaration.</span>
-    <span class="ident">_preemption_guard</span>: <span class="ident">PreemptionGuard</span>,
+<span class="doccomment">/// A guard that allows the locked data to be accessed, during which mutual exclusion is guaranteed.
+///
+/// When the guard falls out of scope, the lock will be automatically released,
+/// which then notifies any `Task`s waiting on the lock.
+</span><span class="kw">pub struct </span>MutexPreemptGuard&lt;<span class="lifetime">&#39;a</span>, T: <span class="question-mark">?</span>Sized + <span class="lifetime">&#39;a</span>&gt; {
+    guard: MutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;,
+    <span class="comment">// `_preemption_guard` will be dropped after `guard`.
+    // Rust guarantees that fields are dropped in the order of declaration.
+    </span>_preemption_guard: PreemptionGuard,
 }
 
-<span class="comment">// Same unsafe impls as `std::sync::Mutex`</span>
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">MutexPreempt</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {}
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Send</span> <span class="kw">for</span> <span class="ident">MutexPreempt</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {}
+<span class="comment">// Same unsafe impls as `std::sync::Mutex`
+</span><span class="kw">unsafe impl</span>&lt;T: <span class="question-mark">?</span>Sized + Send&gt; Sync <span class="kw">for </span>MutexPreempt&lt;T&gt; {}
+<span class="kw">unsafe impl</span>&lt;T: <span class="question-mark">?</span>Sized + Send&gt; Send <span class="kw">for </span>MutexPreempt&lt;T&gt; {}
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">MutexPreempt</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Creates a new lock wrapping the supplied data.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">data</span>: <span class="ident">T</span>) -&gt; <span class="ident">MutexPreempt</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">MutexPreempt</span> {
-            <span class="ident">lock</span>: <span class="ident">Mutex::new</span>(<span class="ident">data</span>),
+<span class="kw">impl</span>&lt;T&gt; MutexPreempt&lt;T&gt; {
+    <span class="doccomment">/// Creates a new lock wrapping the supplied data.
+    </span><span class="kw">pub const fn </span>new(data: T) -&gt; MutexPreempt&lt;T&gt; {
+        MutexPreempt {
+            lock: Mutex::new(data),
         }
     }
 
-    <span class="doccomment">/// Consumes this MutexPreempt, returning the underlying data.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_inner</span>(<span class="self">self</span>) -&gt; <span class="ident">T</span> {
-        <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">into_inner</span>()
+    <span class="doccomment">/// Consumes this MutexPreempt, returning the underlying data.
+    </span><span class="attr">#[inline(always)]
+    </span><span class="kw">pub fn </span>into_inner(<span class="self">self</span>) -&gt; T {
+        <span class="self">self</span>.lock.into_inner()
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">MutexPreempt</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Spins until the lock can be acquired, upon which preemption is disabled </span>
-    <span class="doccomment">/// for the duration that the returned guard is held.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The returned value may be dereferenced for data access</span>
-    <span class="doccomment">/// and the lock will be dropped when the guard falls out of scope.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// ```</span>
-    <span class="doccomment">/// let mylock = irq_safety::MutexPreempt::new(0);</span>
-    <span class="doccomment">/// {</span>
-    <span class="doccomment">///     let mut data = mylock.lock();</span>
-    <span class="doccomment">///     // The lock is now locked and the data can be accessed</span>
-    <span class="doccomment">///     *data += 1;</span>
-    <span class="doccomment">///     // The lock is implicitly dropped</span>
-    <span class="doccomment">/// }</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// ```</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">MutexPreemptGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="kw">loop</span> {
-            <span class="kw">match</span> <span class="self">self</span>.<span class="ident">try_lock</span>() {
-                <span class="prelude-val">Some</span>(<span class="ident">guard</span>) =&gt; <span class="kw">return</span> <span class="ident">guard</span>,
-                <span class="kw">_</span> =&gt; {}
+<span class="kw">impl</span>&lt;T: <span class="question-mark">?</span>Sized&gt; MutexPreempt&lt;T&gt; {
+    <span class="doccomment">/// Spins until the lock can be acquired, upon which preemption is disabled 
+    /// for the duration that the returned guard is held.
+    ///
+    /// The returned value may be dereferenced for data access
+    /// and the lock will be dropped when the guard falls out of scope.
+    ///
+    /// ```
+    /// let mylock = irq_safety::MutexPreempt::new(0);
+    /// {
+    ///     let mut data = mylock.lock();
+    ///     // The lock is now locked and the data can be accessed
+    ///     *data += 1;
+    ///     // The lock is implicitly dropped
+    /// }
+    ///
+    /// ```
+    </span><span class="attr">#[inline(always)]
+    </span><span class="kw">pub fn </span>lock(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; MutexPreemptGuard&lt;T&gt; {
+        <span class="kw">loop </span>{
+            <span class="kw">match </span><span class="self">self</span>.try_lock() {
+                <span class="prelude-val">Some</span>(guard) =&gt; <span class="kw">return </span>guard,
+                <span class="kw">_ </span>=&gt; {}
             }
         }
     }
 
-    <span class="doccomment">/// Returns `true` if the lock is currently held.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This function provides no synchronization guarantees and so its result should be considered &#39;out of date&#39;</span>
-    <span class="doccomment">/// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_locked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">is_locked</span>()
+    <span class="doccomment">/// Returns `true` if the lock is currently held.
+    ///
+    /// # Safety
+    ///
+    /// This function provides no synchronization guarantees and so its result should be considered &#39;out of date&#39;
+    /// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.
+    </span><span class="attr">#[inline(always)]
+    </span><span class="kw">pub fn </span>is_locked(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.lock.is_locked()
     }
 
-    <span class="doccomment">/// Force unlock the spinlock.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This is *extremely* unsafe if the lock is not held by the current</span>
-    <span class="doccomment">/// thread. However, this can be useful in some instances for exposing the</span>
-    <span class="doccomment">/// lock to FFI that doesn&#39;t know how to deal with RAII.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If the lock isn&#39;t held, this is a no-op.</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">force_unlock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">force_unlock</span>()
+    <span class="doccomment">/// Force unlock the spinlock.
+    ///
+    /// This is *extremely* unsafe if the lock is not held by the current
+    /// thread. However, this can be useful in some instances for exposing the
+    /// lock to FFI that doesn&#39;t know how to deal with RAII.
+    ///
+    /// If the lock isn&#39;t held, this is a no-op.
+    </span><span class="kw">pub unsafe fn </span>force_unlock(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.lock.force_unlock()
     }
 
-    <span class="doccomment">/// Tries to lock the MutexPreempt. If it is already locked, it will return None. Otherwise it returns</span>
-    <span class="doccomment">/// a guard within Some.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_lock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MutexPreemptGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">is_locked</span>() { <span class="kw">return</span> <span class="prelude-val">None</span>; }
-        <span class="kw">let</span> <span class="ident">_preemption_guard</span> <span class="op">=</span> <span class="ident">hold_preemption</span>();
-        <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">try_lock</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">guard</span><span class="op">|</span> <span class="ident">MutexPreemptGuard</span> {
-            <span class="ident">guard</span>,
-            <span class="ident">_preemption_guard</span>,
+    <span class="doccomment">/// Tries to lock the MutexPreempt. If it is already locked, it will return None. Otherwise it returns
+    /// a guard within Some.
+    </span><span class="attr">#[inline(always)]
+    </span><span class="kw">pub fn </span>try_lock(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;MutexPreemptGuard&lt;T&gt;&gt; {
+        <span class="kw">if </span><span class="self">self</span>.lock.is_locked() { <span class="kw">return </span><span class="prelude-val">None</span>; }
+        <span class="kw">let </span>_preemption_guard = hold_preemption();
+        <span class="self">self</span>.lock.try_lock().map(|guard| MutexPreemptGuard {
+            guard,
+            _preemption_guard,
         })
     }
 
-    <span class="doccomment">/// Returns a mutable reference to the underlying data.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Since this call borrows the [`MutexPreempt`] mutably, and a mutable reference is guaranteed to be exclusive in Rust,</span>
-    <span class="doccomment">/// no actual locking needs to take place -- the mutable borrow statically guarantees no locks exist. As such,</span>
-    <span class="doccomment">/// this is a &#39;zero-cost&#39; operation.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Example</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// ```</span>
-    <span class="doccomment">/// let mut lock = irq_safety::MutexPreempt::new(0);</span>
-    <span class="doccomment">/// *lock.get_mut() = 10;</span>
-    <span class="doccomment">/// assert_eq!(*lock.lock(), 10);</span>
-    <span class="doccomment">/// ```</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">T</span> {
-        <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">get_mut</span>()
+    <span class="doccomment">/// Returns a mutable reference to the underlying data.
+    ///
+    /// Since this call borrows the [`MutexPreempt`] mutably, and a mutable reference is guaranteed to be exclusive in Rust,
+    /// no actual locking needs to take place -- the mutable borrow statically guarantees no locks exist. As such,
+    /// this is a &#39;zero-cost&#39; operation.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let mut lock = irq_safety::MutexPreempt::new(0);
+    /// *lock.get_mut() = 10;
+    /// assert_eq!(*lock.lock(), 10);
+    /// ```
+    </span><span class="attr">#[inline(always)]
+    </span><span class="kw">pub fn </span>get_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>T {
+        <span class="self">self</span>.lock.get_mut()
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">fmt::Debug</span><span class="op">&gt;</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">MutexPreempt</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">try_lock</span>() {
-            <span class="prelude-val">Some</span>(<span class="ident">guard</span>) =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;MutexPreempt {{ data: {:?} }}&quot;</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">guard</span>),
-            <span class="prelude-val">None</span> =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;MutexPreempt {{ &lt;locked&gt; }}&quot;</span>),
+<span class="kw">impl</span>&lt;T: <span class="question-mark">?</span>Sized + fmt::Debug&gt; fmt::Debug <span class="kw">for </span>MutexPreempt&lt;T&gt; {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        <span class="kw">match </span><span class="self">self</span>.lock.try_lock() {
+            <span class="prelude-val">Some</span>(guard) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;MutexPreempt {{ data: {:?} }}&quot;</span>, <span class="kw-2">&amp;*</span>guard),
+            <span class="prelude-val">None </span>=&gt; <span class="macro">write!</span>(f, <span class="string">&quot;MutexPreempt {{ &lt;locked&gt; }}&quot;</span>),
         }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">Default</span><span class="op">&gt;</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">MutexPreempt</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="ident">MutexPreempt</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">MutexPreempt::new</span>(<span class="ident">Default::default</span>())
+<span class="kw">impl</span>&lt;T: <span class="question-mark">?</span>Sized + Default&gt; Default <span class="kw">for </span>MutexPreempt&lt;T&gt; {
+    <span class="kw">fn </span>default() -&gt; MutexPreempt&lt;T&gt; {
+        MutexPreempt::new(Default::default())
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">MutexPreemptGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: <span class="question-mark">?</span>Sized&gt; Deref <span class="kw">for </span>MutexPreemptGuard&lt;<span class="lifetime">&#39;a</span>, T&gt; {
+    <span class="kw">type </span>Target = T;
 
-    <span class="kw">fn</span> <span class="ident">deref</span><span class="op">&lt;</span><span class="lifetime">&#39;b</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;b</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;b</span> <span class="ident">T</span> { 
-        <span class="op">&amp;</span> <span class="kw-2">*</span>(<span class="self">self</span>.<span class="ident">guard</span>) 
+    <span class="kw">fn </span>deref&lt;<span class="lifetime">&#39;b</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;b </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;b </span>T { 
+        &amp; <span class="kw-2">*</span>(<span class="self">self</span>.guard) 
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">DerefMut</span> <span class="kw">for</span> <span class="ident">MutexPreemptGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">deref_mut</span><span class="op">&lt;</span><span class="lifetime">&#39;b</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;b</span> <span class="kw-2">mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;b</span> <span class="kw-2">mut</span> <span class="ident">T</span> { 
-        <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span>(<span class="self">self</span>.<span class="ident">guard</span>)
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: <span class="question-mark">?</span>Sized&gt; DerefMut <span class="kw">for </span>MutexPreemptGuard&lt;<span class="lifetime">&#39;a</span>, T&gt; {
+    <span class="kw">fn </span>deref_mut&lt;<span class="lifetime">&#39;b</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;b </span><span class="kw-2">mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;b </span><span class="kw-2">mut </span>T { 
+        <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.guard)
     }
 }
 
-<span class="doccomment">/// Implement `Lockable` for [`MutexPreempt`].</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Lockable</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">MutexPreempt</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">T</span>: <span class="lifetime">&#39;t</span> <span class="op">+</span> <span class="question-mark">?</span><span class="ident">Sized</span> {
-    <span class="kw">type</span> <span class="ident">Guard</span> <span class="op">=</span> <span class="ident">MutexPreemptGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span>;
-    <span class="kw">type</span> <span class="ident">GuardMut</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::Guard</span>;
+<span class="doccomment">/// Implement `Lockable` for [`MutexPreempt`].
+</span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;t</span>, T&gt; Lockable&lt;<span class="lifetime">&#39;t</span>, T&gt; <span class="kw">for </span>MutexPreempt&lt;T&gt; <span class="kw">where </span>T: <span class="lifetime">&#39;t </span>+ <span class="question-mark">?</span>Sized {
+    <span class="kw">type </span>Guard = MutexPreemptGuard&lt;<span class="lifetime">&#39;t</span>, T&gt;;
+    <span class="kw">type </span>GuardMut = <span class="self">Self</span>::Guard;
 
-    <span class="kw">fn</span> <span class="ident">lock</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::Guard</span> { <span class="self">self</span>.<span class="ident">lock</span>() }
-    <span class="kw">fn</span> <span class="ident">try_lock</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Guard</span><span class="op">&gt;</span> { <span class="self">self</span>.<span class="ident">try_lock</span>() }
-    <span class="kw">fn</span> <span class="ident">lock_mut</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::GuardMut</span> { <span class="self">self</span>.<span class="ident">lock</span>() }
-    <span class="kw">fn</span> <span class="ident">try_lock_mut</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::GuardMut</span><span class="op">&gt;</span> { <span class="self">self</span>.<span class="ident">try_lock</span>() }
-    <span class="kw">fn</span> <span class="ident">is_locked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> { <span class="self">self</span>.<span class="ident">is_locked</span>() }
-    <span class="kw">fn</span> <span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="kw-2">mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">T</span> { <span class="self">self</span>.<span class="ident">get_mut</span>() }
+    <span class="kw">fn </span>lock(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span><span class="self">self</span>) -&gt; <span class="self">Self</span>::Guard { <span class="self">self</span>.lock() }
+    <span class="kw">fn </span>try_lock(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Guard&gt; { <span class="self">self</span>.try_lock() }
+    <span class="kw">fn </span>lock_mut(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span><span class="self">self</span>) -&gt; <span class="self">Self</span>::GuardMut { <span class="self">self</span>.lock() }
+    <span class="kw">fn </span>try_lock_mut(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::GuardMut&gt; { <span class="self">self</span>.try_lock() }
+    <span class="kw">fn </span>is_locked(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool { <span class="self">self</span>.is_locked() }
+    <span class="kw">fn </span>get_mut(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span><span class="kw-2">mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>T { <span class="self">self</span>.get_mut() }
 }
-<span class="doccomment">/// Implement `LockableSized` for [`MutexPreempt`].</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="ident">LockableSized</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">MutexPreempt</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">T</span>: <span class="lifetime">&#39;t</span> <span class="op">+</span> <span class="ident">Sized</span> {
-    <span class="kw">fn</span> <span class="ident">into_inner</span>(<span class="self">self</span>) -&gt; <span class="ident">T</span> { <span class="self">self</span>.<span class="ident">into_inner</span>() }
+<span class="doccomment">/// Implement `LockableSized` for [`MutexPreempt`].
+</span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;t</span>, T&gt; LockableSized&lt;<span class="lifetime">&#39;t</span>, T&gt; <span class="kw">for </span>MutexPreempt&lt;T&gt; <span class="kw">where </span>T: <span class="lifetime">&#39;t </span>+ Sized {
+    <span class="kw">fn </span>into_inner(<span class="self">self</span>) -&gt; T { <span class="self">self</span>.into_inner() }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mutex_preemption" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mutex_preemption" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

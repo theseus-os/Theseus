@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/thread_local_macro/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../thread_local_macro/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../thread_local_macro/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../thread_local_macro/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/thread_local_macro/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../thread_local_macro/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -619,528 +613,528 @@
 <span id="613">613</span>
 <span id="614">614</span>
 <span id="615">615</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Provides a `thread_local!()` macro, a helper to instantiate lazily-initialized </span>
-<span class="doccomment">//! thread-local storage (TLS) variables.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! The primary difference between using this crate&#39;s `thread_local!()` macro</span>
-<span class="doccomment">//! and directly using the `#[thread_local]` attribute is that `static` items</span>
-<span class="doccomment">//! tagged with the `#[thread_local]` attribute will *never* be dropped,</span>
-<span class="doccomment">//! just like all other `static`s.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! However, static items defined in a `thread_local!()` macro block will be</span>
-<span class="doccomment">//! destructed (e.g., dropped, destroyed) when that task exits.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! # Rust std-based implementation notes</span>
-<span class="doccomment">//! The code in this crate is adapted from [this version of the `thread_local!()` macro]</span>
-<span class="doccomment">//! from the Rust standard library.</span>
-<span class="doccomment">//! The main design has been left unchanged, but we have removed most of the configuration blocks</span>
-<span class="doccomment">//! for complex platform-specific or OS-specific behavior.</span>
-<span class="doccomment">//! Because Theseus supports the `#[thread_local]` attribute, we can directly use the </span>
-<span class="doccomment">//! TLS &quot;fast path&quot;, which the Rust standard library refers to as the &quot;FastLocalInnerKey&quot;.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! ## Unsafety</span>
-<span class="doccomment">//! We could probably could remove most of the unsafe code from this implementation,</span>
-<span class="doccomment">//! because we don&#39;t have to account for the various raw platform-specific interfaces </span>
-<span class="doccomment">//! or using raw libc types like the original Rust std implementation does.</span>
-<span class="doccomment">//! However, I have chosen to leave the code as close as possible to the original </span>
-<span class="doccomment">//! Rust std implementation in order to make updates as easy as possible,</span>
-<span class="doccomment">//! for if and when the Rust std version changes and we wish to track/merge in those changes.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! [this version of the `thread_local!()` macro]: https://github.com/rust-lang/rust/blob/3f14f4b3cec811017079564e16a92a1dc9870f41/library/std/src/thread/local.rs</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Provides a `thread_local!()` macro, a helper to instantiate lazily-initialized 
+//! thread-local storage (TLS) variables.
+//! 
+//! The primary difference between using this crate&#39;s `thread_local!()` macro
+//! and directly using the `#[thread_local]` attribute is that `static` items
+//! tagged with the `#[thread_local]` attribute will *never* be dropped,
+//! just like all other `static`s.
+//! 
+//! However, static items defined in a `thread_local!()` macro block will be
+//! destructed (e.g., dropped, destroyed) when that task exits.
+//! 
+//! # Rust std-based implementation notes
+//! The code in this crate is adapted from [this version of the `thread_local!()` macro]
+//! from the Rust standard library.
+//! The main design has been left unchanged, but we have removed most of the configuration blocks
+//! for complex platform-specific or OS-specific behavior.
+//! Because Theseus supports the `#[thread_local]` attribute, we can directly use the 
+//! TLS &quot;fast path&quot;, which the Rust standard library refers to as the &quot;FastLocalInnerKey&quot;.
+//! 
+//! ## Unsafety
+//! We could probably could remove most of the unsafe code from this implementation,
+//! because we don&#39;t have to account for the various raw platform-specific interfaces 
+//! or using raw libc types like the original Rust std implementation does.
+//! However, I have chosen to leave the code as close as possible to the original 
+//! Rust std implementation in order to make updates as easy as possible,
+//! for if and when the Rust std version changes and we wish to track/merge in those changes.
+//! 
+//! [this version of the `thread_local!()` macro]: https://github.com/rust-lang/rust/blob/3f14f4b3cec811017079564e16a92a1dc9870f41/library/std/src/thread/local.rs
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">thread_local</span>)]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">allow_internal_unstable</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(thread_local)]
+#![feature(allow_internal_unstable)]
 
-<span class="comment">// The code from Rust std uses unsafe blocks within unsafe functions,</span>
-<span class="comment">// so we preserve that here (for now).</span>
-<span class="attribute">#![<span class="ident">allow</span>(<span class="ident">unused_unsafe</span>)]</span>
+</span><span class="comment">// The code from Rust std uses unsafe blocks within unsafe functions,
+// so we preserve that here (for now).
+</span><span class="attr">#![allow(unused_unsafe)]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">static_assertions</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
 
-<span class="kw">use</span> <span class="ident">core::cell::RefCell</span>;
+<span class="kw">use </span>core::cell::RefCell;
 
-<span class="doccomment">/// The set of TLS objects that have been initialized by a task</span>
-<span class="doccomment">/// and need a destructor to be run after that task exits.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// We store these TLS destructors in a raw TLS object itself</span>
-<span class="doccomment">/// which is okay as long as this object itself doesn&#39;t require a destructor.</span>
-<span class="doccomment">/// We achieve this condition in two parts:</span>
-<span class="doccomment">/// 1. We statically assert that the `TlsObjectDestructor` doesn&#39;t implement [`Drop`],</span>
-<span class="doccomment">///    which makes sense because it only holds raw pointer values and function pointers.</span>
-<span class="doccomment">/// 2. The actual `Vec` is drained upon task exit by the task cleanup functions</span>
-<span class="doccomment">///    in the `spawn` crate`, ensuring that there is no `Vec` memory itself</span>
-<span class="doccomment">///    to actually be deallocated, as the contents of this `Vec` have been cleared.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Note that this will always be safe even if the two conditions **aren&#39;t** met, </span>
-<span class="doccomment">/// because the only thing that will happen there is a memory leak.</span>
-<span class="attribute">#[<span class="ident">thread_local</span>]</span>
-<span class="kw">static</span> <span class="ident">TLS_DESTRUCTORS</span>: <span class="ident">RefCell</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">TlsObjectDestructor</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">RefCell::new</span>(<span class="ident">Vec::new</span>());
+<span class="doccomment">/// The set of TLS objects that have been initialized by a task
+/// and need a destructor to be run after that task exits.
+///
+/// We store these TLS destructors in a raw TLS object itself
+/// which is okay as long as this object itself doesn&#39;t require a destructor.
+/// We achieve this condition in two parts:
+/// 1. We statically assert that the `TlsObjectDestructor` doesn&#39;t implement [`Drop`],
+///    which makes sense because it only holds raw pointer values and function pointers.
+/// 2. The actual `Vec` is drained upon task exit by the task cleanup functions
+///    in the `spawn` crate`, ensuring that there is no `Vec` memory itself
+///    to actually be deallocated, as the contents of this `Vec` have been cleared.
+/// 
+/// Note that this will always be safe even if the two conditions **aren&#39;t** met, 
+/// because the only thing that will happen there is a memory leak.
+</span><span class="attr">#[thread_local]
+</span><span class="kw">static </span>TLS_DESTRUCTORS: RefCell&lt;Vec&lt;TlsObjectDestructor&gt;&gt; = RefCell::new(Vec::new());
 
-<span class="doccomment">/// A TLS data object that has been initialized and requires a destructor to be run.</span>
-<span class="doccomment">/// The destructor should be invoked when the task containing this `TlsObjectDestructor` exits.</span>
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TlsObjectDestructor</span> {
-    <span class="doccomment">/// The raw pointer to the object that needs to be dropped.</span>
-    <span class="kw">pub</span> <span class="ident">object_ptr</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>,
-    <span class="doccomment">/// The destructor function that should be invoked with `object_ptr` as its only parameter.</span>
-    <span class="doccomment">/// The function itself must be an unsafe one, as it dereferences raw pointers.</span>
-    <span class="kw">pub</span> <span class="ident">dtor</span>: <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span>(<span class="kw-2">*mut</span> <span class="ident">u8</span>),
+<span class="doccomment">/// A TLS data object that has been initialized and requires a destructor to be run.
+/// The destructor should be invoked when the task containing this `TlsObjectDestructor` exits.
+</span><span class="attr">#[doc(hidden)]
+</span><span class="kw">pub struct </span>TlsObjectDestructor {
+    <span class="doccomment">/// The raw pointer to the object that needs to be dropped.
+    </span><span class="kw">pub </span>object_ptr: <span class="kw-2">*mut </span>u8,
+    <span class="doccomment">/// The destructor function that should be invoked with `object_ptr` as its only parameter.
+    /// The function itself must be an unsafe one, as it dereferences raw pointers.
+    </span><span class="kw">pub </span>dtor: <span class="kw">unsafe extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn</span>(<span class="kw-2">*mut </span>u8),
 }
-<span class="comment">// See the above [`TLS_DESTRUCTORS`] docs for why this is necessary.</span>
-<span class="macro">const_assert!</span>(<span class="op">!</span><span class="ident">core::mem::needs_drop</span>::<span class="op">&lt;</span><span class="ident">TlsObjectDestructor</span><span class="op">&gt;</span>());
+<span class="comment">// See the above [`TLS_DESTRUCTORS`] docs for why this is necessary.
+</span><span class="macro">const_assert!</span>(!core::mem::needs_drop::&lt;TlsObjectDestructor&gt;());
 
-<span class="doccomment">/// Takes ownership of the list of [`TlsObjectDestructor`]s</span>
-<span class="doccomment">/// for TLS objects that have been initialized in this current task&#39;s TLS area.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This is only intended to be used by the task cleanup functions</span>
-<span class="doccomment">/// after the current task has exited.</span>
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_current_tls_destructors</span>() -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">TlsObjectDestructor</span><span class="op">&gt;</span> {
-    <span class="ident">TLS_DESTRUCTORS</span>.<span class="ident">take</span>()
-}
-
-<span class="doccomment">/// Adds the given destructor callback to the current task&#39;s list of</span>
-<span class="doccomment">/// TLS destructors that should be run when that task exits.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `a`: the pointer to the object that will be destructed.</span>
-<span class="doccomment">/// * `dtor`: the function that should be invoked to destruct the object pointed to by `a`.</span>
-<span class="doccomment">///   When the current task exits, this function will be invoked with `a`</span>
-<span class="doccomment">///   as its only argument, at which point the `dtor` function should drop `a`.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Currently the only value of `dtor` that is used is a type-specific monomorphized</span>
-<span class="doccomment">/// version of the above [`fast::destroy_value()`] function.</span>
-<span class="kw">fn</span> <span class="ident">register_dtor</span>(<span class="ident">object_ptr</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>, <span class="ident">dtor</span>: <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span>(<span class="kw-2">*mut</span> <span class="ident">u8</span>)) {
-    <span class="ident">TLS_DESTRUCTORS</span>.<span class="ident">borrow_mut</span>().<span class="ident">push</span>(<span class="ident">TlsObjectDestructor</span> { <span class="ident">object_ptr</span>, <span class="ident">dtor</span> });
+<span class="doccomment">/// Takes ownership of the list of [`TlsObjectDestructor`]s
+/// for TLS objects that have been initialized in this current task&#39;s TLS area.
+/// 
+/// This is only intended to be used by the task cleanup functions
+/// after the current task has exited.
+</span><span class="attr">#[doc(hidden)]
+</span><span class="kw">pub fn </span>take_current_tls_destructors() -&gt; Vec&lt;TlsObjectDestructor&gt; {
+    TLS_DESTRUCTORS.take()
 }
 
-
-<span class="comment">//////////////////////////////////////////////////////////////////////////////////////</span>
-<span class="comment">//// Everything below here is a modified version of thread_local!() from Rust std ////</span>
-<span class="comment">//////////////////////////////////////////////////////////////////////////////////////</span>
-
-<span class="kw">use</span> <span class="ident">core::cell</span>::{<span class="ident">Cell</span>, <span class="ident">UnsafeCell</span>};
-<span class="kw">use</span> <span class="ident">core::fmt</span>;
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">core::option</span>;
-<span class="kw">use</span> <span class="ident">core::mem</span>;
-<span class="kw">use</span> <span class="ident">core::hint</span>;
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-
-<span class="doccomment">/// A thread-local storage key which owns its contents.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This TLS object is instantiated the [`thread_local!`] macro and offers </span>
-<span class="doccomment">/// one primary method to access it: the [`with`] method.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The [`with`] method yields a reference to the contained value which cannot be</span>
-<span class="doccomment">/// sent across threads or escape the given closure.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Initialization and Destruction</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Initialization is lazily performed dynamically on the first call to [`with`]</span>
-<span class="doccomment">/// within a thread ([`task::Task`]), and values that implement [`Drop`] get destructed</span>
-<span class="doccomment">/// when a thread exits.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// A `LocalKey`&#39;s initializer cannot recursively depend on itself, and using</span>
-<span class="doccomment">/// a `LocalKey` in this way will cause the initializer to infinitely recurse</span>
-<span class="doccomment">/// on the first call to `with`.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Examples</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// ```ignore</span>
-<span class="doccomment">/// use core::cell::RefCell;</span>
-<span class="doccomment">/// use spawn::new_task_builder;</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// thread_local!(static FOO: RefCell&lt;u32&gt; = RefCell::new(1));</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// FOO.with(|f| {</span>
-<span class="doccomment">///     assert_eq!(*f.borrow(), 1);</span>
-<span class="doccomment">///     *f.borrow_mut() = 2;</span>
-<span class="doccomment">/// });</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// // each thread starts out with the initial value of 1</span>
-<span class="doccomment">/// let t = new_task_builder(</span>
-<span class="doccomment">///     move |_: ()| {</span>
-<span class="doccomment">///         FOO.with(|f| {</span>
-<span class="doccomment">///             assert_eq!(*f.borrow(), 1);</span>
-<span class="doccomment">///             *f.borrow_mut() = 3;</span>
-<span class="doccomment">///         });</span>
-<span class="doccomment">///     },</span>
-<span class="doccomment">///     (), // empty arg</span>
-<span class="doccomment">/// ).spawn().unwrap();</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// // wait for the new task to exit</span>
-<span class="doccomment">/// t.join();</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// // we retain our original value of 2 despite the child thread</span>
-<span class="doccomment">/// FOO.with(|f| {</span>
-<span class="doccomment">///     assert_eq!(*f.borrow(), 2);</span>
-<span class="doccomment">/// });</span>
-<span class="doccomment">/// ```</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// [`with`]: LocalKey::with</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LocalKey</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="lifetime">&#39;static</span><span class="op">&gt;</span> {
-    <span class="comment">// This outer `LocalKey&lt;T&gt;` type is what&#39;s going to be stored in statics,</span>
-    <span class="comment">// but actual data inside will be tagged with #[thread_local].</span>
-    <span class="comment">// It&#39;s not valid for a true static to reference a #[thread_local] static,</span>
-    <span class="comment">// so we get around that by exposing an accessor through a layer of function</span>
-    <span class="comment">// indirection (this thunk).</span>
-    <span class="comment">//</span>
-    <span class="comment">// Note that the thunk is itself unsafe because the returned lifetime of the</span>
-    <span class="comment">// slot where data lives, `&#39;static`, is not actually valid. The lifetime</span>
-    <span class="comment">// here is actually slightly shorter than the currently running thread!</span>
-    <span class="comment">//</span>
-    <span class="comment">// Although this is an extra layer of indirection, it should in theory be</span>
-    <span class="comment">// trivially devirtualizable by LLVM because the value of `inner` never</span>
-    <span class="comment">// changes and the constant should be readonly within a crate. This mainly</span>
-    <span class="comment">// only runs into problems when TLS statics are exported across crates.</span>
-    <span class="ident">inner</span>: <span class="kw">unsafe</span> <span class="kw">fn</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span><span class="op">&gt;</span>,
+<span class="doccomment">/// Adds the given destructor callback to the current task&#39;s list of
+/// TLS destructors that should be run when that task exits.
+/// 
+/// # Arguments
+/// * `a`: the pointer to the object that will be destructed.
+/// * `dtor`: the function that should be invoked to destruct the object pointed to by `a`.
+///   When the current task exits, this function will be invoked with `a`
+///   as its only argument, at which point the `dtor` function should drop `a`.
+/// 
+/// Currently the only value of `dtor` that is used is a type-specific monomorphized
+/// version of the above [`fast::destroy_value()`] function.
+</span><span class="kw">fn </span>register_dtor(object_ptr: <span class="kw-2">*mut </span>u8, dtor: <span class="kw">unsafe extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn</span>(<span class="kw-2">*mut </span>u8)) {
+    TLS_DESTRUCTORS.borrow_mut().push(TlsObjectDestructor { object_ptr, dtor });
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">LocalKey</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;LocalKey&quot;</span>).<span class="ident">finish_non_exhaustive</span>()
+
+<span class="comment">//////////////////////////////////////////////////////////////////////////////////////
+//// Everything below here is a modified version of thread_local!() from Rust std ////
+//////////////////////////////////////////////////////////////////////////////////////
+
+</span><span class="kw">use </span>core::cell::{Cell, UnsafeCell};
+<span class="kw">use </span>core::fmt;
+<span class="attr">#[doc(hidden)]
+</span><span class="kw">pub use </span>core::option;
+<span class="kw">use </span>core::mem;
+<span class="kw">use </span>core::hint;
+<span class="kw">use </span>alloc::vec::Vec;
+
+<span class="doccomment">/// A thread-local storage key which owns its contents.
+///
+/// This TLS object is instantiated the [`thread_local!`] macro and offers 
+/// one primary method to access it: the [`with`] method.
+///
+/// The [`with`] method yields a reference to the contained value which cannot be
+/// sent across threads or escape the given closure.
+///
+/// # Initialization and Destruction
+///
+/// Initialization is lazily performed dynamically on the first call to [`with`]
+/// within a thread ([`task::Task`]), and values that implement [`Drop`] get destructed
+/// when a thread exits.
+///
+/// A `LocalKey`&#39;s initializer cannot recursively depend on itself, and using
+/// a `LocalKey` in this way will cause the initializer to infinitely recurse
+/// on the first call to `with`.
+///
+/// # Examples
+///
+/// ```ignore
+/// use core::cell::RefCell;
+/// use spawn::new_task_builder;
+///
+/// thread_local!(static FOO: RefCell&lt;u32&gt; = RefCell::new(1));
+///
+/// FOO.with(|f| {
+///     assert_eq!(*f.borrow(), 1);
+///     *f.borrow_mut() = 2;
+/// });
+///
+/// // each thread starts out with the initial value of 1
+/// let t = new_task_builder(
+///     move |_: ()| {
+///         FOO.with(|f| {
+///             assert_eq!(*f.borrow(), 1);
+///             *f.borrow_mut() = 3;
+///         });
+///     },
+///     (), // empty arg
+/// ).spawn().unwrap();
+///
+/// // wait for the new task to exit
+/// t.join();
+///
+/// // we retain our original value of 2 despite the child thread
+/// FOO.with(|f| {
+///     assert_eq!(*f.borrow(), 2);
+/// });
+/// ```
+///
+/// [`with`]: LocalKey::with
+</span><span class="kw">pub struct </span>LocalKey&lt;T: <span class="lifetime">&#39;static</span>&gt; {
+    <span class="comment">// This outer `LocalKey&lt;T&gt;` type is what&#39;s going to be stored in statics,
+    // but actual data inside will be tagged with #[thread_local].
+    // It&#39;s not valid for a true static to reference a #[thread_local] static,
+    // so we get around that by exposing an accessor through a layer of function
+    // indirection (this thunk).
+    //
+    // Note that the thunk is itself unsafe because the returned lifetime of the
+    // slot where data lives, `&#39;static`, is not actually valid. The lifetime
+    // here is actually slightly shorter than the currently running thread!
+    //
+    // Although this is an extra layer of indirection, it should in theory be
+    // trivially devirtualizable by LLVM because the value of `inner` never
+    // changes and the constant should be readonly within a crate. This mainly
+    // only runs into problems when TLS statics are exported across crates.
+    </span>inner: <span class="kw">unsafe fn</span>() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>T&gt;,
+}
+
+<span class="kw">impl</span>&lt;T: <span class="lifetime">&#39;static</span>&gt; fmt::Debug <span class="kw">for </span>LocalKey&lt;T&gt; {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        f.debug_struct(<span class="string">&quot;LocalKey&quot;</span>).finish_non_exhaustive()
     }
 }
 
-<span class="doccomment">/// Declare a new thread local storage key of type [`LocalKey`].</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Syntax</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The macro wraps any number of static declarations and makes them thread local.</span>
-<span class="doccomment">/// Publicity and attributes for each static are allowed. Example:</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// ```</span>
-<span class="doccomment">/// use core::cell::RefCell;</span>
-<span class="doccomment">/// thread_local! {</span>
-<span class="doccomment">///     pub static FOO: RefCell&lt;u32&gt; = RefCell::new(1);</span>
-<span class="doccomment">///</span>
-<span class="doccomment">///     #[allow(unused)]</span>
-<span class="doccomment">///     static BAR: RefCell&lt;f32&gt; = RefCell::new(1.0);</span>
-<span class="doccomment">/// }</span>
-<span class="doccomment">/// # fn main() {}</span>
-<span class="doccomment">/// ```</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// See [`LocalKey`] documentation for more information.</span>
-<span class="attribute">#[<span class="ident">macro_export</span>]</span>
-<span class="macro">macro_rules!</span> <span class="ident">thread_local</span> {
-    <span class="comment">// empty (base case for the recursion)</span>
-    () =&gt; {};
+<span class="doccomment">/// Declare a new thread local storage key of type [`LocalKey`].
+///
+/// # Syntax
+///
+/// The macro wraps any number of static declarations and makes them thread local.
+/// Publicity and attributes for each static are allowed. Example:
+///
+/// ```
+/// use core::cell::RefCell;
+/// thread_local! {
+///     pub static FOO: RefCell&lt;u32&gt; = RefCell::new(1);
+///
+///     #[allow(unused)]
+///     static BAR: RefCell&lt;f32&gt; = RefCell::new(1.0);
+/// }
+/// # fn main() {}
+/// ```
+///
+/// See [`LocalKey`] documentation for more information.
+</span><span class="attr">#[macro_export]
+</span><span class="macro">macro_rules! </span>thread_local {
+    <span class="comment">// empty (base case for the recursion)
+    </span>() =&gt; {};
 
-    ($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="kw">const</span> { <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span> }; $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">rest</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) =&gt; (
-        <span class="macro-nonterminal">$</span><span class="macro">crate::__thread_local_inner!</span>($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>, <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>);
-        <span class="macro-nonterminal">$</span><span class="macro">crate::thread_local!</span>($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">rest</span>)<span class="kw-2">*</span>);
+    ($(<span class="attr">#[<span class="macro-nonterminal">$attr</span>:meta]</span>)* <span class="macro-nonterminal">$vis</span>:vis <span class="kw">static </span><span class="macro-nonterminal">$name</span>:ident: <span class="macro-nonterminal">$t</span>:ty = <span class="kw">const </span>{ <span class="macro-nonterminal">$init</span>:expr }; $(<span class="macro-nonterminal">$rest</span>:tt)<span class="kw-2">*</span>) =&gt; (
+        <span class="macro-nonterminal">$</span><span class="macro">crate::__thread_local_inner!</span>($(<span class="attr">#[<span class="macro-nonterminal">$attr</span>]</span>)* <span class="macro-nonterminal">$vis $name</span>, <span class="macro-nonterminal">$t</span>, <span class="kw">const </span><span class="macro-nonterminal">$init</span>);
+        <span class="macro-nonterminal">$</span><span class="macro">crate::thread_local!</span>($(<span class="macro-nonterminal">$rest</span>)<span class="kw-2">*</span>);
     );
 
-    ($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="kw">const</span> { <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span> }) =&gt; (
-        <span class="macro-nonterminal">$</span><span class="macro">crate::__thread_local_inner!</span>($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>, <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>);
+    ($(<span class="attr">#[<span class="macro-nonterminal">$attr</span>:meta]</span>)* <span class="macro-nonterminal">$vis</span>:vis <span class="kw">static </span><span class="macro-nonterminal">$name</span>:ident: <span class="macro-nonterminal">$t</span>:ty = <span class="kw">const </span>{ <span class="macro-nonterminal">$init</span>:expr }) =&gt; (
+        <span class="macro-nonterminal">$</span><span class="macro">crate::__thread_local_inner!</span>($(<span class="attr">#[<span class="macro-nonterminal">$attr</span>]</span>)* <span class="macro-nonterminal">$vis $name</span>, <span class="macro-nonterminal">$t</span>, <span class="kw">const </span><span class="macro-nonterminal">$init</span>);
     );
 
-    <span class="comment">// process multiple declarations</span>
-    ($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span>; $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">rest</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) =&gt; (
-        <span class="macro-nonterminal">$</span><span class="macro">crate::__thread_local_inner!</span>($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>);
-        <span class="macro-nonterminal">$</span><span class="macro">crate::thread_local!</span>($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">rest</span>)<span class="kw-2">*</span>);
+    <span class="comment">// process multiple declarations
+    </span>($(<span class="attr">#[<span class="macro-nonterminal">$attr</span>:meta]</span>)* <span class="macro-nonterminal">$vis</span>:vis <span class="kw">static </span><span class="macro-nonterminal">$name</span>:ident: <span class="macro-nonterminal">$t</span>:ty = <span class="macro-nonterminal">$init</span>:expr; $(<span class="macro-nonterminal">$rest</span>:tt)<span class="kw-2">*</span>) =&gt; (
+        <span class="macro-nonterminal">$</span><span class="macro">crate::__thread_local_inner!</span>($(<span class="attr">#[<span class="macro-nonterminal">$attr</span>]</span>)* <span class="macro-nonterminal">$vis $name</span>, <span class="macro-nonterminal">$t</span>, <span class="macro-nonterminal">$init</span>);
+        <span class="macro-nonterminal">$</span><span class="macro">crate::thread_local!</span>($(<span class="macro-nonterminal">$rest</span>)<span class="kw-2">*</span>);
     );
 
-    <span class="comment">// handle a single declaration</span>
-    ($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span>) =&gt; (
-        <span class="macro-nonterminal">$</span><span class="macro">crate::__thread_local_inner!</span>($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>);
+    <span class="comment">// handle a single declaration
+    </span>($(<span class="attr">#[<span class="macro-nonterminal">$attr</span>:meta]</span>)* <span class="macro-nonterminal">$vis</span>:vis <span class="kw">static </span><span class="macro-nonterminal">$name</span>:ident: <span class="macro-nonterminal">$t</span>:ty = <span class="macro-nonterminal">$init</span>:expr) =&gt; (
+        <span class="macro-nonterminal">$</span><span class="macro">crate::__thread_local_inner!</span>($(<span class="attr">#[<span class="macro-nonterminal">$attr</span>]</span>)* <span class="macro-nonterminal">$vis $name</span>, <span class="macro-nonterminal">$t</span>, <span class="macro-nonterminal">$init</span>);
     );
 }
 
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-<span class="attribute">#[<span class="ident">macro_export</span>]</span>
-<span class="comment">// This allows the `thread_local!()` macro to be used in a foreign crate</span>
-<span class="comment">// without that crate having to specify the `#![feature(thread_local)]`.</span>
-<span class="comment">// This is also done in the Rust standard library, so it&#39;s completely fine to do.</span>
-<span class="attribute">#[<span class="ident">allow_internal_unstable</span>(<span class="ident">thread_local</span>)]</span>
-<span class="macro">macro_rules!</span> <span class="ident">__thread_local_inner</span> {
-    <span class="comment">// used to generate the `LocalKey` value for const-initialized thread locals</span>
-    (@<span class="ident">key</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span>, <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span>) =&gt; {{
-        <span class="attribute">#[<span class="ident">inline</span>]</span>
-        <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">__getit</span>() -&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::option::Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span> {
+<span class="attr">#[doc(hidden)]
+#[macro_export]
+</span><span class="comment">// This allows the `thread_local!()` macro to be used in a foreign crate
+// without that crate having to specify the `#![feature(thread_local)]`.
+// This is also done in the Rust standard library, so it&#39;s completely fine to do.
+</span><span class="attr">#[allow_internal_unstable(thread_local)]
+</span><span class="macro">macro_rules! </span>__thread_local_inner {
+    <span class="comment">// used to generate the `LocalKey` value for const-initialized thread locals
+    </span>(@key <span class="macro-nonterminal">$t</span>:ty, <span class="kw">const </span><span class="macro-nonterminal">$init</span>:expr) =&gt; {{
+        <span class="attr">#[inline]
+        </span><span class="kw">unsafe fn </span>__getit() -&gt; <span class="macro-nonterminal">$crate::option::Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="macro-nonterminal">$t</span>&gt; {
 
-            <span class="comment">// Theseus supports `#[thread_local]`, so use it directly.</span>
-            {
-                <span class="comment">// If a dtor isn&#39;t needed we can do something &quot;very raw&quot; and</span>
-                <span class="comment">// just get going.</span>
-                <span class="kw">if</span> <span class="op">!</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::mem::needs_drop</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span>() {
-                    <span class="attribute">#[<span class="ident">thread_local</span>]</span>
-                    <span class="kw">static</span> <span class="kw-2">mut</span> <span class="ident">VAL</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>;
-                    <span class="kw">unsafe</span> {
-                        <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">VAL</span>)
+            <span class="comment">// Theseus supports `#[thread_local]`, so use it directly.
+            </span>{
+                <span class="comment">// If a dtor isn&#39;t needed we can do something &quot;very raw&quot; and
+                // just get going.
+                </span><span class="kw">if </span>!<span class="macro-nonterminal">$crate::mem::needs_drop</span>::&lt;<span class="macro-nonterminal">$t</span>&gt;() {
+                    <span class="attr">#[thread_local]
+                    </span><span class="kw">static </span><span class="kw-2">mut </span>VAL: <span class="macro-nonterminal">$t </span>= <span class="macro-nonterminal">$init</span>;
+                    <span class="kw">unsafe </span>{
+                        <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>VAL)
                     }
                 }
 
-                <span class="attribute">#[<span class="ident">thread_local</span>]</span>
-                <span class="kw">static</span> <span class="kw-2">mut</span> <span class="ident">VAL</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>;
-                <span class="comment">// 0 == dtor not registered</span>
-                <span class="comment">// 1 == dtor registered, dtor not run</span>
-                <span class="comment">// 2 == dtor registered and is running or has run</span>
-                <span class="attribute">#[<span class="ident">thread_local</span>]</span>
-                <span class="kw">static</span> <span class="kw-2">mut</span> <span class="ident">STATE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0</span>;
+                <span class="attr">#[thread_local]
+                </span><span class="kw">static </span><span class="kw-2">mut </span>VAL: <span class="macro-nonterminal">$t </span>= <span class="macro-nonterminal">$init</span>;
+                <span class="comment">// 0 == dtor not registered
+                // 1 == dtor registered, dtor not run
+                // 2 == dtor registered and is running or has run
+                </span><span class="attr">#[thread_local]
+                </span><span class="kw">static </span><span class="kw-2">mut </span>STATE: u8 = <span class="number">0</span>;
 
-                <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">destroy</span>(<span class="ident">ptr</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>) {
-                    <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="ident">ptr</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>;
+                <span class="kw">unsafe extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>destroy(ptr: <span class="kw-2">*mut </span>u8) {
+                    <span class="kw">let </span>ptr = ptr <span class="kw">as </span><span class="kw-2">*mut </span><span class="macro-nonterminal">$t</span>;
 
-                    <span class="kw">unsafe</span> {
-                        <span class="macro">assert_eq!</span>(<span class="ident">STATE</span>, <span class="number">1</span>);
-                        <span class="ident">STATE</span> <span class="op">=</span> <span class="number">2</span>;
-                        <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::ptr::drop_in_place</span>(<span class="ident">ptr</span>);
+                    <span class="kw">unsafe </span>{
+                        <span class="macro">assert_eq!</span>(STATE, <span class="number">1</span>);
+                        STATE = <span class="number">2</span>;
+                        <span class="macro-nonterminal">$crate::ptr::drop_in_place</span>(ptr);
                     }
                 }
 
-                <span class="kw">unsafe</span> {
-                    <span class="kw">match</span> <span class="ident">STATE</span> {
-                        <span class="comment">// 0 == we haven&#39;t registered a destructor, so do</span>
-                        <span class="comment">//   so now.</span>
-                        <span class="number">0</span> =&gt; {
-                            <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::fast::Key</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span><span class="ident">::register_dtor</span>(
-                                <span class="macro-nonterminal">$</span><span class="macro">crate::ptr::addr_of_mut!</span>(<span class="macro-nonterminal">VAL</span>) <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">u8</span>,
-                                <span class="ident">destroy</span>,
+                <span class="kw">unsafe </span>{
+                    <span class="kw">match </span>STATE {
+                        <span class="comment">// 0 == we haven&#39;t registered a destructor, so do
+                        //   so now.
+                        </span><span class="number">0 </span>=&gt; {
+                            <span class="macro-nonterminal">$crate::fast::Key</span>::&lt;<span class="macro-nonterminal">$t</span>&gt;::register_dtor(
+                                <span class="macro-nonterminal">$</span><span class="macro">crate::ptr::addr_of_mut!</span>(<span class="macro-nonterminal">VAL</span>) <span class="kw">as </span><span class="kw-2">*mut </span>u8,
+                                destroy,
                             );
-                            <span class="ident">STATE</span> <span class="op">=</span> <span class="number">1</span>;
-                            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">VAL</span>)
+                            STATE = <span class="number">1</span>;
+                            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>VAL)
                         }
-                        <span class="comment">// 1 == the destructor is registered and the value</span>
-                        <span class="comment">//   is valid, so return the pointer.</span>
-                        <span class="number">1</span> =&gt; <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">VAL</span>),
-                        <span class="comment">// otherwise the destructor has already run, so we</span>
-                        <span class="comment">// can&#39;t give access.</span>
-                        <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
+                        <span class="comment">// 1 == the destructor is registered and the value
+                        //   is valid, so return the pointer.
+                        </span><span class="number">1 </span>=&gt; <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>VAL),
+                        <span class="comment">// otherwise the destructor has already run, so we
+                        // can&#39;t give access.
+                        </span><span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
                     }
                 }
             }
         }
 
-        <span class="kw">unsafe</span> {
-            <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::LocalKey::new</span>(<span class="ident">__getit</span>)
+        <span class="kw">unsafe </span>{
+            <span class="macro-nonterminal">$crate::LocalKey::new</span>(__getit)
         }
     }};
 
-    <span class="comment">// used to generate the `LocalKey` value for `thread_local!`</span>
-    (@<span class="ident">key</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span>) =&gt; {
+    <span class="comment">// used to generate the `LocalKey` value for `thread_local!`
+    </span>(@key <span class="macro-nonterminal">$t</span>:ty, <span class="macro-nonterminal">$init</span>:expr) =&gt; {
         {
-            <span class="attribute">#[<span class="ident">inline</span>]</span>
-            <span class="kw">fn</span> <span class="ident">__init</span>() -&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span> { <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span> }
+            <span class="attr">#[inline]
+            </span><span class="kw">fn </span>__init() -&gt; <span class="macro-nonterminal">$t </span>{ <span class="macro-nonterminal">$init </span>}
 
-            <span class="attribute">#[<span class="ident">inline</span>]</span>
-            <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">__getit</span>() -&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::option::Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span> {
-                <span class="attribute">#[<span class="ident">thread_local</span>]</span>
-                <span class="kw">static</span> <span class="ident">__KEY</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::fast::Key</span><span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span> <span class="op">=</span>
-                    <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::fast::Key::new</span>();
+            <span class="attr">#[inline]
+            </span><span class="kw">unsafe fn </span>__getit() -&gt; <span class="macro-nonterminal">$crate::option::Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="macro-nonterminal">$t</span>&gt; {
+                <span class="attr">#[thread_local]
+                </span><span class="kw">static </span>__KEY: <span class="macro-nonterminal">$crate::fast::Key</span>&lt;<span class="macro-nonterminal">$t</span>&gt; =
+                    <span class="macro-nonterminal">$crate::fast::Key::new</span>();
 
-                <span class="comment">// FIXME: remove the #[allow(...)] marker when macros don&#39;t</span>
-                <span class="comment">// raise warning for missing/extraneous unsafe blocks anymore.</span>
-                <span class="comment">// See https://github.com/rust-lang/rust/issues/74838.</span>
-                <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_unsafe</span>)]</span>
-                <span class="kw">unsafe</span> { <span class="ident">__KEY</span>.<span class="ident">get</span>(<span class="ident">__init</span>) }
+                <span class="comment">// FIXME: remove the #[allow(...)] marker when macros don&#39;t
+                // raise warning for missing/extraneous unsafe blocks anymore.
+                // See https://github.com/rust-lang/rust/issues/74838.
+                </span><span class="attr">#[allow(unused_unsafe)]
+                </span><span class="kw">unsafe </span>{ __KEY.get(__init) }
             }
 
-            <span class="kw">unsafe</span> {
-                <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::LocalKey::new</span>(<span class="ident">__getit</span>)
+            <span class="kw">unsafe </span>{
+                <span class="macro-nonterminal">$crate::LocalKey::new</span>(__getit)
             }
         }
     };
-    ($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) =&gt; {
-        $(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::LocalKey</span><span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span> <span class="op">=</span>
-            <span class="macro-nonterminal">$</span><span class="macro">crate::__thread_local_inner!</span>(@<span class="macro-nonterminal">key</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>)<span class="kw-2">*</span>);
+    ($(<span class="attr">#[<span class="macro-nonterminal">$attr</span>:meta]</span>)* <span class="macro-nonterminal">$vis</span>:vis <span class="macro-nonterminal">$name</span>:ident, <span class="macro-nonterminal">$t</span>:ty, $(<span class="macro-nonterminal">$init</span>:tt)<span class="kw-2">*</span>) =&gt; {
+        $(<span class="attr">#[<span class="macro-nonterminal">$attr</span>]</span>)* <span class="macro-nonterminal">$vis </span><span class="kw">const </span><span class="macro-nonterminal">$name</span>: <span class="macro-nonterminal">$crate::LocalKey</span>&lt;<span class="macro-nonterminal">$t</span>&gt; =
+            <span class="macro-nonterminal">$</span><span class="macro">crate::__thread_local_inner!</span>(@<span class="macro-nonterminal">key $t</span>, $(<span class="macro-nonterminal">$init</span>)<span class="kw-2">*</span>);
     }
 }
 
-<span class="doccomment">/// An error returned by [`LocalKey::try_with`](struct.LocalKey.html#method.try_with).</span>
-<span class="attribute">#[<span class="ident">non_exhaustive</span>]</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AccessError</span>;
+<span class="doccomment">/// An error returned by [`LocalKey::try_with`](struct.LocalKey.html#method.try_with).
+</span><span class="attr">#[non_exhaustive]
+#[derive(Clone, Copy, Eq, PartialEq)]
+</span><span class="kw">pub struct </span>AccessError;
 
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">AccessError</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;AccessError&quot;</span>).<span class="ident">finish</span>()
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>AccessError {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        f.debug_struct(<span class="string">&quot;AccessError&quot;</span>).finish()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">AccessError</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="ident">fmt::Display::fmt</span>(<span class="string">&quot;already destroyed&quot;</span>, <span class="ident">f</span>)
+<span class="kw">impl </span>fmt::Display <span class="kw">for </span>AccessError {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        fmt::Display::fmt(<span class="string">&quot;already destroyed&quot;</span>, f)
     }
 }
 
-<span class="comment">// The `Error` trait is not in the core library yet, so we can&#39;t use it.</span>
-<span class="comment">// impl Error for AccessError {}</span>
+<span class="comment">// The `Error` trait is not in the core library yet, so we can&#39;t use it.
+// impl Error for AccessError {}
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">LocalKey</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">inner</span>: <span class="kw">unsafe</span> <span class="kw">fn</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span><span class="op">&gt;</span>) -&gt; <span class="ident">LocalKey</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">LocalKey</span> { <span class="ident">inner</span> }
+</span><span class="kw">impl</span>&lt;T: <span class="lifetime">&#39;static</span>&gt; LocalKey&lt;T&gt; {
+    <span class="attr">#[doc(hidden)]
+    </span><span class="kw">pub const unsafe fn </span>new(inner: <span class="kw">unsafe fn</span>() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>T&gt;) -&gt; LocalKey&lt;T&gt; {
+        LocalKey { inner }
     }
 
-    <span class="doccomment">/// Acquires a reference to the value in this TLS key.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This will lazily initialize the value if this thread has not referenced</span>
-    <span class="doccomment">/// this key yet.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Panics</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This function will `panic!()` if the key currently has its</span>
-    <span class="doccomment">/// destructor running, and it **may** panic if the destructor has</span>
-    <span class="doccomment">/// previously been run for this thread.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">R</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">f</span>: <span class="ident">F</span>) -&gt; <span class="ident">R</span>
-    <span class="kw">where</span>
-        <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) -&gt; <span class="ident">R</span>,
+    <span class="doccomment">/// Acquires a reference to the value in this TLS key.
+    ///
+    /// This will lazily initialize the value if this thread has not referenced
+    /// this key yet.
+    ///
+    /// # Panics
+    ///
+    /// This function will `panic!()` if the key currently has its
+    /// destructor running, and it **may** panic if the destructor has
+    /// previously been run for this thread.
+    </span><span class="kw">pub fn </span>with&lt;F, R&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, f: F) -&gt; R
+    <span class="kw">where
+        </span>F: FnOnce(<span class="kw-2">&amp;</span>T) -&gt; R,
     {
-        <span class="self">self</span>.<span class="ident">try_with</span>(<span class="ident">f</span>).<span class="ident">expect</span>(
+        <span class="self">self</span>.try_with(f).expect(
             <span class="string">&quot;cannot access a Thread Local Storage value \
              during or after destruction&quot;</span>,
         )
     }
 
-    <span class="doccomment">/// Acquires a reference to the value in this TLS key.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This will lazily initialize the value if this thread has not referenced</span>
-    <span class="doccomment">/// this key yet. If the key has been destroyed (which may happen if this is called</span>
-    <span class="doccomment">/// in a destructor), this function will return an [`AccessError`].</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Panics</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This function will still `panic!()` if the key is uninitialized and the</span>
-    <span class="doccomment">/// key&#39;s initializer panics.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_with</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">R</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">f</span>: <span class="ident">F</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">AccessError</span><span class="op">&gt;</span>
-    <span class="kw">where</span>
-        <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) -&gt; <span class="ident">R</span>,
+    <span class="doccomment">/// Acquires a reference to the value in this TLS key.
+    ///
+    /// This will lazily initialize the value if this thread has not referenced
+    /// this key yet. If the key has been destroyed (which may happen if this is called
+    /// in a destructor), this function will return an [`AccessError`].
+    ///
+    /// # Panics
+    ///
+    /// This function will still `panic!()` if the key is uninitialized and the
+    /// key&#39;s initializer panics.
+    </span><span class="attr">#[inline]
+    </span><span class="kw">pub fn </span>try_with&lt;F, R&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">self</span>, f: F) -&gt; <span class="prelude-ty">Result</span>&lt;R, AccessError&gt;
+    <span class="kw">where
+        </span>F: FnOnce(<span class="kw-2">&amp;</span>T) -&gt; R,
     {
-        <span class="kw">unsafe</span> {
-            <span class="kw">let</span> <span class="ident">thread_local</span> <span class="op">=</span> (<span class="self">self</span>.<span class="ident">inner</span>)().<span class="ident">ok_or</span>(<span class="ident">AccessError</span>)<span class="question-mark">?</span>;
-            <span class="prelude-val">Ok</span>(<span class="ident">f</span>(<span class="ident">thread_local</span>))
+        <span class="kw">unsafe </span>{
+            <span class="kw">let </span>thread_local = (<span class="self">self</span>.inner)().ok_or(AccessError)<span class="question-mark">?</span>;
+            <span class="prelude-val">Ok</span>(f(thread_local))
         }
     }
 }
 
-<span class="kw">mod</span> <span class="ident">lazy</span> {
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::UnsafeCell</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::hint</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mem</span>;
+<span class="kw">mod </span>lazy {
+    <span class="kw">use </span><span class="kw">crate</span>::UnsafeCell;
+    <span class="kw">use </span><span class="kw">crate</span>::hint;
+    <span class="kw">use </span><span class="kw">crate</span>::mem;
 
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LazyKeyInner</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">inner</span>: <span class="ident">UnsafeCell</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="kw">pub struct </span>LazyKeyInner&lt;T&gt; {
+        inner: UnsafeCell&lt;<span class="prelude-ty">Option</span>&lt;T&gt;&gt;,
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">LazyKeyInner</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">LazyKeyInner</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-            <span class="ident">LazyKeyInner</span> { <span class="ident">inner</span>: <span class="ident">UnsafeCell::new</span>(<span class="prelude-val">None</span>) }
+    <span class="kw">impl</span>&lt;T&gt; LazyKeyInner&lt;T&gt; {
+        <span class="kw">pub const fn </span>new() -&gt; LazyKeyInner&lt;T&gt; {
+            LazyKeyInner { inner: UnsafeCell::new(<span class="prelude-val">None</span>) }
         }
 
-        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span><span class="op">&gt;</span> {
-            <span class="comment">// SAFETY: The caller must ensure no reference is ever handed out to</span>
-            <span class="comment">// the inner cell nor mutable reference to the Option&lt;T&gt; inside said</span>
-            <span class="comment">// cell. This make it safe to hand a reference, though the lifetime</span>
-            <span class="comment">// of &#39;static is itself unsafe, making the get method unsafe.</span>
-            <span class="kw">unsafe</span> { (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">get</span>()).<span class="ident">as_ref</span>() }
+        <span class="kw">pub unsafe fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>T&gt; {
+            <span class="comment">// SAFETY: The caller must ensure no reference is ever handed out to
+            // the inner cell nor mutable reference to the Option&lt;T&gt; inside said
+            // cell. This make it safe to hand a reference, though the lifetime
+            // of &#39;static is itself unsafe, making the get method unsafe.
+            </span><span class="kw">unsafe </span>{ (<span class="kw-2">*</span><span class="self">self</span>.inner.get()).as_ref() }
         }
 
-        <span class="doccomment">/// The caller must ensure that no reference is active: this method</span>
-        <span class="doccomment">/// needs unique access.</span>
-        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">initialize</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">FnOnce</span>() -&gt; <span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">init</span>: <span class="ident">F</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span> {
-            <span class="comment">// Execute the initialization up front, *then* move it into our slot,</span>
-            <span class="comment">// just in case initialization fails.</span>
-            <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">init</span>();
-            <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">get</span>();
+        <span class="doccomment">/// The caller must ensure that no reference is active: this method
+        /// needs unique access.
+        </span><span class="kw">pub unsafe fn </span>initialize&lt;F: FnOnce() -&gt; T&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, init: F) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>T {
+            <span class="comment">// Execute the initialization up front, *then* move it into our slot,
+            // just in case initialization fails.
+            </span><span class="kw">let </span>value = init();
+            <span class="kw">let </span>ptr = <span class="self">self</span>.inner.get();
 
-            <span class="comment">// SAFETY:</span>
-            <span class="comment">//</span>
-            <span class="comment">// note that this can in theory just be `*ptr = Some(value)`, but due to</span>
-            <span class="comment">// the compiler will currently codegen that pattern with something like:</span>
-            <span class="comment">//</span>
-            <span class="comment">//      ptr::drop_in_place(ptr)</span>
-            <span class="comment">//      ptr::write(ptr, Some(value))</span>
-            <span class="comment">//</span>
-            <span class="comment">// Due to this pattern it&#39;s possible for the destructor of the value in</span>
-            <span class="comment">// `ptr` (e.g., if this is being recursively initialized) to re-access</span>
-            <span class="comment">// TLS, in which case there will be a `&amp;` and `&amp;mut` pointer to the same</span>
-            <span class="comment">// value (an aliasing violation). To avoid setting the &quot;I&#39;m running a</span>
-            <span class="comment">// destructor&quot; flag we just use `mem::replace` which should sequence the</span>
-            <span class="comment">// operations a little differently and make this safe to call.</span>
-            <span class="comment">//</span>
-            <span class="comment">// The precondition also ensures that we are the only one accessing</span>
-            <span class="comment">// `self` at the moment so replacing is fine.</span>
-            <span class="kw">unsafe</span> {
-                <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">mem::replace</span>(<span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">ptr</span>, <span class="prelude-val">Some</span>(<span class="ident">value</span>));
+            <span class="comment">// SAFETY:
+            //
+            // note that this can in theory just be `*ptr = Some(value)`, but due to
+            // the compiler will currently codegen that pattern with something like:
+            //
+            //      ptr::drop_in_place(ptr)
+            //      ptr::write(ptr, Some(value))
+            //
+            // Due to this pattern it&#39;s possible for the destructor of the value in
+            // `ptr` (e.g., if this is being recursively initialized) to re-access
+            // TLS, in which case there will be a `&amp;` and `&amp;mut` pointer to the same
+            // value (an aliasing violation). To avoid setting the &quot;I&#39;m running a
+            // destructor&quot; flag we just use `mem::replace` which should sequence the
+            // operations a little differently and make this safe to call.
+            //
+            // The precondition also ensures that we are the only one accessing
+            // `self` at the moment so replacing is fine.
+            </span><span class="kw">unsafe </span>{
+                <span class="kw">let _ </span>= mem::replace(<span class="kw-2">&amp;mut *</span>ptr, <span class="prelude-val">Some</span>(value));
             }
 
-            <span class="comment">// SAFETY: With the call to `mem::replace` it is guaranteed there is</span>
-            <span class="comment">// a `Some` behind `ptr`, not a `None` so `unreachable_unchecked`</span>
-            <span class="comment">// will never be reached.</span>
-            <span class="kw">unsafe</span> {
-                <span class="comment">// After storing `Some` we want to get a reference to the contents of</span>
-                <span class="comment">// what we just stored. While we could use `unwrap` here and it should</span>
-                <span class="comment">// always work it empirically doesn&#39;t seem to always get optimized away,</span>
-                <span class="comment">// which means that using something like `try_with` can pull in</span>
-                <span class="comment">// panicking code and cause a large size bloat.</span>
-                <span class="kw">match</span> <span class="kw-2">*</span><span class="ident">ptr</span> {
-                    <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">x</span>) =&gt; <span class="ident">x</span>,
-                    <span class="prelude-val">None</span> =&gt; <span class="ident">hint::unreachable_unchecked</span>(),
+            <span class="comment">// SAFETY: With the call to `mem::replace` it is guaranteed there is
+            // a `Some` behind `ptr`, not a `None` so `unreachable_unchecked`
+            // will never be reached.
+            </span><span class="kw">unsafe </span>{
+                <span class="comment">// After storing `Some` we want to get a reference to the contents of
+                // what we just stored. While we could use `unwrap` here and it should
+                // always work it empirically doesn&#39;t seem to always get optimized away,
+                // which means that using something like `try_with` can pull in
+                // panicking code and cause a large size bloat.
+                </span><span class="kw">match </span><span class="kw-2">*</span>ptr {
+                    <span class="prelude-val">Some</span>(<span class="kw-2">ref </span>x) =&gt; x,
+                    <span class="prelude-val">None </span>=&gt; hint::unreachable_unchecked(),
                 }
             }
         }
 
-        <span class="doccomment">/// The other methods hand out references while taking &amp;self.</span>
-        <span class="doccomment">/// As such, callers of this method must ensure no `&amp;` and `&amp;mut` are</span>
-        <span class="doccomment">/// available and used at the same time.</span>
-        <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
-        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">take</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-            <span class="comment">// SAFETY: See doc comment for this method.</span>
-            <span class="kw">unsafe</span> { (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">get</span>()).<span class="ident">take</span>() }
+        <span class="doccomment">/// The other methods hand out references while taking &amp;self.
+        /// As such, callers of this method must ensure no `&amp;` and `&amp;mut` are
+        /// available and used at the same time.
+        </span><span class="attr">#[allow(unused)]
+        </span><span class="kw">pub unsafe fn </span>take(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;T&gt; {
+            <span class="comment">// SAFETY: See doc comment for this method.
+            </span><span class="kw">unsafe </span>{ (<span class="kw-2">*</span><span class="self">self</span>.inner.get()).take() }
         }
     }
 }
 
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">fast</span> {
-    <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::lazy::LazyKeyInner</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::Cell</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::fmt</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mem</span>;
-    <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::register_dtor</span>;
+<span class="attr">#[doc(hidden)]
+</span><span class="kw">pub mod </span>fast {
+    <span class="kw">use </span><span class="kw">super</span>::lazy::LazyKeyInner;
+    <span class="kw">use </span><span class="kw">crate</span>::Cell;
+    <span class="kw">use </span><span class="kw">crate</span>::fmt;
+    <span class="kw">use </span><span class="kw">crate</span>::mem;
+    <span class="kw">use </span><span class="kw">super</span>::register_dtor;
 
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
-    <span class="kw">enum</span> <span class="ident">DtorState</span> {
-        <span class="ident">Unregistered</span>,
-        <span class="ident">Registered</span>,
-        <span class="ident">RunningOrHasRun</span>,
+    <span class="attr">#[derive(Copy, Clone)]
+    </span><span class="kw">enum </span>DtorState {
+        Unregistered,
+        Registered,
+        RunningOrHasRun,
     }
 
-    <span class="comment">// This data structure has been carefully constructed so that the fast path</span>
-    <span class="comment">// only contains one branch on x86. That optimization is necessary to avoid</span>
-    <span class="comment">// duplicated tls lookups on OSX.</span>
-    <span class="comment">//</span>
-    <span class="comment">// LLVM issue: https://bugs.llvm.org/show_bug.cgi?id=41722</span>
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Key</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="comment">// If `LazyKeyInner::get` returns `None`, that indicates either:</span>
-        <span class="comment">//   * The value has never been initialized</span>
-        <span class="comment">//   * The value is being recursively initialized</span>
-        <span class="comment">//   * The value has already been destroyed or is being destroyed</span>
-        <span class="comment">// To determine which kind of `None`, check `dtor_state`.</span>
-        <span class="comment">//</span>
-        <span class="comment">// This is very optimizer friendly for the fast path - initialized but</span>
-        <span class="comment">// not yet dropped.</span>
-        <span class="ident">inner</span>: <span class="ident">LazyKeyInner</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+    <span class="comment">// This data structure has been carefully constructed so that the fast path
+    // only contains one branch on x86. That optimization is necessary to avoid
+    // duplicated tls lookups on OSX.
+    //
+    // LLVM issue: https://bugs.llvm.org/show_bug.cgi?id=41722
+    </span><span class="kw">pub struct </span>Key&lt;T&gt; {
+        <span class="comment">// If `LazyKeyInner::get` returns `None`, that indicates either:
+        //   * The value has never been initialized
+        //   * The value is being recursively initialized
+        //   * The value has already been destroyed or is being destroyed
+        // To determine which kind of `None`, check `dtor_state`.
+        //
+        // This is very optimizer friendly for the fast path - initialized but
+        // not yet dropped.
+        </span>inner: LazyKeyInner&lt;T&gt;,
 
-        <span class="comment">// Metadata to keep track of the state of the destructor. Remember that</span>
-        <span class="comment">// this variable is thread-local, not global.</span>
-        <span class="ident">dtor_state</span>: <span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">DtorState</span><span class="op">&gt;</span>,
+        <span class="comment">// Metadata to keep track of the state of the destructor. Remember that
+        // this variable is thread-local, not global.
+        </span>dtor_state: Cell&lt;DtorState&gt;,
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">Key</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
-            <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;Key&quot;</span>).<span class="ident">finish_non_exhaustive</span>()
+    <span class="kw">impl</span>&lt;T&gt; fmt::Debug <span class="kw">for </span>Key&lt;T&gt; {
+        <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+            f.debug_struct(<span class="string">&quot;Key&quot;</span>).finish_non_exhaustive()
         }
     }
 
-    <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Key</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">Key</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-            <span class="ident">Key</span> { <span class="ident">inner</span>: <span class="ident">LazyKeyInner::new</span>(), <span class="ident">dtor_state</span>: <span class="ident">Cell::new</span>(<span class="ident">DtorState::Unregistered</span>) }
+    <span class="kw">impl</span>&lt;T&gt; Key&lt;T&gt; {
+        <span class="kw">pub const fn </span>new() -&gt; Key&lt;T&gt; {
+            Key { inner: LazyKeyInner::new(), dtor_state: Cell::new(DtorState::Unregistered) }
         }
 
         <span class="comment">/*
@@ -1154,86 +1148,85 @@
                 register_dtor(a, dtor);
             }
         }
-        */</span>
+        */
 
-        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">get</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">FnOnce</span>() -&gt; <span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">init</span>: <span class="ident">F</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span><span class="op">&gt;</span> {
-            <span class="comment">// SAFETY: See the definitions of `LazyKeyInner::get` and</span>
-            <span class="comment">// `try_initialize` for more informations.</span>
-            <span class="comment">//</span>
-            <span class="comment">// The caller must ensure no mutable references are ever active to</span>
-            <span class="comment">// the inner cell or the inner T when this is called.</span>
-            <span class="comment">// The `try_initialize` is dependant on the passed `init` function</span>
-            <span class="comment">// for this.</span>
-            <span class="kw">unsafe</span> {
-                <span class="kw">match</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">get</span>() {
-                    <span class="prelude-val">Some</span>(<span class="ident">val</span>) =&gt; <span class="prelude-val">Some</span>(<span class="ident">val</span>),
-                    <span class="prelude-val">None</span> =&gt; <span class="self">self</span>.<span class="ident">try_initialize</span>(<span class="ident">init</span>),
+        </span><span class="kw">pub unsafe fn </span>get&lt;F: FnOnce() -&gt; T&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, init: F) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>T&gt; {
+            <span class="comment">// SAFETY: See the definitions of `LazyKeyInner::get` and
+            // `try_initialize` for more informations.
+            //
+            // The caller must ensure no mutable references are ever active to
+            // the inner cell or the inner T when this is called.
+            // The `try_initialize` is dependant on the passed `init` function
+            // for this.
+            </span><span class="kw">unsafe </span>{
+                <span class="kw">match </span><span class="self">self</span>.inner.get() {
+                    <span class="prelude-val">Some</span>(val) =&gt; <span class="prelude-val">Some</span>(val),
+                    <span class="prelude-val">None </span>=&gt; <span class="self">self</span>.try_initialize(init),
                 }
             }
         }
 
-        <span class="comment">// `try_initialize` is only called once per fast thread local variable,</span>
-        <span class="comment">// except in corner cases where thread_local dtors reference other</span>
-        <span class="comment">// thread_local&#39;s, or it is being recursively initialized.</span>
-        <span class="comment">//</span>
-        <span class="comment">// Macos: Inlining this function can cause two `tlv_get_addr` calls to</span>
-        <span class="comment">// be performed for every call to `Key::get`.</span>
-        <span class="comment">// LLVM issue: https://bugs.llvm.org/show_bug.cgi?id=41722</span>
-        <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
-        <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">try_initialize</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">FnOnce</span>() -&gt; <span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">init</span>: <span class="ident">F</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span><span class="op">&gt;</span> {
-            <span class="comment">// SAFETY: See comment above (this function doc).</span>
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">mem::needs_drop</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>() <span class="op">|</span><span class="op">|</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">try_register_dtor</span>() } {
-                <span class="comment">// SAFETY: See comment above (his function doc).</span>
-                <span class="prelude-val">Some</span>(<span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">initialize</span>(<span class="ident">init</span>) })
-            } <span class="kw">else</span> {
-                <span class="prelude-val">None</span>
-            }
+        <span class="comment">// `try_initialize` is only called once per fast thread local variable,
+        // except in corner cases where thread_local dtors reference other
+        // thread_local&#39;s, or it is being recursively initialized.
+        //
+        // Macos: Inlining this function can cause two `tlv_get_addr` calls to
+        // be performed for every call to `Key::get`.
+        // LLVM issue: https://bugs.llvm.org/show_bug.cgi?id=41722
+        </span><span class="attr">#[inline(never)]
+        </span><span class="kw">unsafe fn </span>try_initialize&lt;F: FnOnce() -&gt; T&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, init: F) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>T&gt; {
+            <span class="comment">// SAFETY: See comment above (this function doc).
+            </span><span class="kw">if </span>!mem::needs_drop::&lt;T&gt;() || <span class="kw">unsafe </span>{ <span class="self">self</span>.try_register_dtor() } {
+                <span class="comment">// SAFETY: See comment above (his function doc).
+                </span><span class="prelude-val">Some</span>(<span class="kw">unsafe </span>{ <span class="self">self</span>.inner.initialize(init) })
+            } <span class="kw">else </span>{
+                <span class="prelude-val">None
+            </span>}
         }
 
-        <span class="comment">// `try_register_dtor` is only called once per fast thread local</span>
-        <span class="comment">// variable, except in corner cases where thread_local dtors reference</span>
-        <span class="comment">// other thread_local&#39;s, or it is being recursively initialized.</span>
-        <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">try_register_dtor</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-            <span class="kw">match</span> <span class="self">self</span>.<span class="ident">dtor_state</span>.<span class="ident">get</span>() {
-                <span class="ident">DtorState::Unregistered</span> =&gt; {
-                    <span class="comment">// SAFETY: dtor registration happens before initialization.</span>
-                    <span class="comment">// Passing `self` as a pointer while using `destroy_value&lt;T&gt;`</span>
-                    <span class="comment">// is safe because the function will build a pointer to a</span>
-                    <span class="comment">// Key&lt;T&gt;, which is the type of self and so find the correct</span>
-                    <span class="comment">// size.</span>
-                    <span class="kw">unsafe</span> { <span class="ident">register_dtor</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">u8</span>, <span class="ident">destroy_value</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) };
-                    <span class="self">self</span>.<span class="ident">dtor_state</span>.<span class="ident">set</span>(<span class="ident">DtorState::Registered</span>);
-                    <span class="bool-val">true</span>
-                }
-                <span class="ident">DtorState::Registered</span> =&gt; {
-                    <span class="comment">// recursively initialized</span>
-                    <span class="bool-val">true</span>
-                }
-                <span class="ident">DtorState::RunningOrHasRun</span> =&gt; <span class="bool-val">false</span>,
+        <span class="comment">// `try_register_dtor` is only called once per fast thread local
+        // variable, except in corner cases where thread_local dtors reference
+        // other thread_local&#39;s, or it is being recursively initialized.
+        </span><span class="kw">unsafe fn </span>try_register_dtor(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+            <span class="kw">match </span><span class="self">self</span>.dtor_state.get() {
+                DtorState::Unregistered =&gt; {
+                    <span class="comment">// SAFETY: dtor registration happens before initialization.
+                    // Passing `self` as a pointer while using `destroy_value&lt;T&gt;`
+                    // is safe because the function will build a pointer to a
+                    // Key&lt;T&gt;, which is the type of self and so find the correct
+                    // size.
+                    </span><span class="kw">unsafe </span>{ register_dtor(<span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*mut </span>u8, destroy_value::&lt;T&gt;) };
+                    <span class="self">self</span>.dtor_state.set(DtorState::Registered);
+                    <span class="bool-val">true
+                </span>}
+                DtorState::Registered =&gt; {
+                    <span class="comment">// recursively initialized
+                    </span><span class="bool-val">true
+                </span>}
+                DtorState::RunningOrHasRun =&gt; <span class="bool-val">false</span>,
             }
         }
     }
 
-    <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">destroy_value</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">ptr</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>) {
-        <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="ident">ptr</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">Key</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>;
+    <span class="kw">unsafe extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>destroy_value&lt;T&gt;(ptr: <span class="kw-2">*mut </span>u8) {
+        <span class="kw">let </span>ptr = ptr <span class="kw">as </span><span class="kw-2">*mut </span>Key&lt;T&gt;;
 
-        <span class="comment">// SAFETY:</span>
-        <span class="comment">//</span>
-        <span class="comment">// The pointer `ptr` has been built just above and comes from</span>
-        <span class="comment">// `try_register_dtor` where it is originally a Key&lt;T&gt; coming from `self`,</span>
-        <span class="comment">// making it non-NUL and of the correct type.</span>
-        <span class="comment">//</span>
-        <span class="comment">// Right before we run the user destructor be sure to set the</span>
-        <span class="comment">// `Option&lt;T&gt;` to `None`, and `dtor_state` to `RunningOrHasRun`. This</span>
-        <span class="comment">// causes future calls to `get` to run `try_initialize_drop` again,</span>
-        <span class="comment">// which will now fail, and return `None`.</span>
-        <span class="kw">unsafe</span> {
-            <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="ident">ptr</span>).<span class="ident">inner</span>.<span class="ident">take</span>();
-            (<span class="kw-2">*</span><span class="ident">ptr</span>).<span class="ident">dtor_state</span>.<span class="ident">set</span>(<span class="ident">DtorState::RunningOrHasRun</span>);
-            <span class="ident">drop</span>(<span class="ident">value</span>);
+        <span class="comment">// SAFETY:
+        //
+        // The pointer `ptr` has been built just above and comes from
+        // `try_register_dtor` where it is originally a Key&lt;T&gt; coming from `self`,
+        // making it non-NUL and of the correct type.
+        //
+        // Right before we run the user destructor be sure to set the
+        // `Option&lt;T&gt;` to `None`, and `dtor_state` to `RunningOrHasRun`. This
+        // causes future calls to `get` to run `try_initialize_drop` again,
+        // which will now fail, and return `None`.
+        </span><span class="kw">unsafe </span>{
+            <span class="kw">let </span>value = (<span class="kw-2">*</span>ptr).inner.take();
+            (<span class="kw-2">*</span>ptr).dtor_state.set(DtorState::RunningOrHasRun);
+            drop(value);
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="thread_local_macro" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="thread_local_macro" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

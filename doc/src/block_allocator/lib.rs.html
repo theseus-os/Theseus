@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/block_allocator/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../block_allocator/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../block_allocator/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../block_allocator/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/block_allocator/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../block_allocator/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -135,136 +129,135 @@
 <span id="129">129</span>
 <span id="130">130</span>
 <span id="131">131</span>
-</pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md</span>
-<span class="comment">// file at the top-level directory of this distribution.</span>
-<span class="comment">//</span>
-<span class="comment">// Licensed under the Apache License, Version 2.0 &lt;LICENSE-APACHE or</span>
-<span class="comment">// http://www.apache.org/licenses/LICENSE-2.0&gt; or the MIT license</span>
-<span class="comment">// &lt;LICENSE-MIT or http://opensource.org/licenses/MIT&gt;, at your</span>
-<span class="comment">// option. This file may not be copied, modified, or distributed</span>
-<span class="comment">// except according to those terms.</span>
-<span class="comment">//</span>
-<span class="comment">// Allocator code taken from Philipp Oppermann&#39;s blog &quot;Writing an OS in Rust&quot; (https://github.com/phil-opp/blog_os/tree/post-11)</span>
-<span class="comment">// and modified by Ramla Ijaz</span>
+</pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
+// file at the top-level directory of this distribution.
+//
+// Licensed under the Apache License, Version 2.0 &lt;LICENSE-APACHE or
+// http://www.apache.org/licenses/LICENSE-2.0&gt; or the MIT license
+// &lt;LICENSE-MIT or http://opensource.org/licenses/MIT&gt;, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.
+//
+// Allocator code taken from Philipp Oppermann&#39;s blog &quot;Writing an OS in Rust&quot; (https://github.com/phil-opp/blog_os/tree/post-11)
+// and modified by Ramla Ijaz
 
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">const_mut_refs</span>)]</span>
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![feature(const_mut_refs)]
+#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">linked_list_allocator</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>linked_list_allocator;
 
-<span class="kw">use</span> <span class="ident">alloc::alloc::Layout</span>;
-<span class="kw">use</span> <span class="ident">core</span>::{
-    <span class="ident">mem</span>,
-    <span class="ident">ptr</span>::{<span class="self">self</span>, <span class="ident">NonNull</span>},
+<span class="kw">use </span>alloc::alloc::Layout;
+<span class="kw">use </span>core::{
+    mem,
+    ptr::{<span class="self">self</span>, NonNull},
 };
 
-<span class="doccomment">/// The block sizes to use.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// The sizes must each be power of 2 because they are also used as</span>
-<span class="doccomment">/// the block alignment (alignments must be always powers of 2).</span>
-<span class="kw">const</span> <span class="ident">BLOCK_SIZES</span>: <span class="kw-2">&amp;</span>[<span class="ident">usize</span>] <span class="op">=</span> <span class="kw-2">&amp;</span>[<span class="number">8</span>, <span class="number">16</span>, <span class="number">32</span>, <span class="number">64</span>, <span class="number">128</span>, <span class="number">256</span>, <span class="number">512</span>, <span class="number">1024</span>, <span class="number">2048</span>];
+<span class="doccomment">/// The block sizes to use.
+///
+/// The sizes must each be power of 2 because they are also used as
+/// the block alignment (alignments must be always powers of 2).
+</span><span class="kw">const </span>BLOCK_SIZES: <span class="kw-2">&amp;</span>[usize] = <span class="kw-2">&amp;</span>[<span class="number">8</span>, <span class="number">16</span>, <span class="number">32</span>, <span class="number">64</span>, <span class="number">128</span>, <span class="number">256</span>, <span class="number">512</span>, <span class="number">1024</span>, <span class="number">2048</span>];
 
-<span class="doccomment">/// Choose an appropriate block size for the given layout.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Returns an index into the `BLOCK_SIZES` array.</span>
-<span class="kw">fn</span> <span class="ident">list_index</span>(<span class="ident">layout</span>: <span class="kw-2">&amp;</span><span class="ident">Layout</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">required_block_size</span> <span class="op">=</span> <span class="ident">layout</span>.<span class="ident">size</span>().<span class="ident">max</span>(<span class="ident">layout</span>.<span class="ident">align</span>());
-    <span class="ident">BLOCK_SIZES</span>.<span class="ident">iter</span>().<span class="ident">position</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">required_block_size</span>)
+<span class="doccomment">/// Choose an appropriate block size for the given layout.
+///
+/// Returns an index into the `BLOCK_SIZES` array.
+</span><span class="kw">fn </span>list_index(layout: <span class="kw-2">&amp;</span>Layout) -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt; {
+    <span class="kw">let </span>required_block_size = layout.size().max(layout.align());
+    BLOCK_SIZES.iter().position(|<span class="kw-2">&amp;</span>s| s &gt;= required_block_size)
 }
 
-<span class="kw">struct</span> <span class="ident">ListNode</span> {
-    <span class="ident">next</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">ListNode</span><span class="op">&gt;</span>,
+<span class="kw">struct </span>ListNode {
+    next: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>ListNode&gt;,
 }
 
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FixedSizeBlockAllocator</span> {
-    <span class="ident">list_heads</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">ListNode</span><span class="op">&gt;</span>; <span class="ident">BLOCK_SIZES</span>.<span class="ident">len</span>()],
-    <span class="ident">fallback_allocator</span>: <span class="ident">linked_list_allocator::Heap</span>,
+<span class="kw">pub struct </span>FixedSizeBlockAllocator {
+    list_heads: [<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>ListNode&gt;; BLOCK_SIZES.len()],
+    fallback_allocator: linked_list_allocator::Heap,
 }
 
-<span class="kw">impl</span> <span class="ident">FixedSizeBlockAllocator</span> {
+<span class="kw">impl </span>FixedSizeBlockAllocator {
 
-    <span class="doccomment">/// Creates an empty FixedSizeBlockAllocator.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
-        <span class="kw">const</span> <span class="ident">SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">BLOCK_SIZES</span>.<span class="ident">len</span>();
-        <span class="kw">const</span> <span class="ident">INIT_VALUE</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">ListNode</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-        <span class="ident">FixedSizeBlockAllocator</span> {
-            <span class="ident">list_heads</span>: [<span class="ident">INIT_VALUE</span>; <span class="ident">SIZE</span>],
-            <span class="ident">fallback_allocator</span>: <span class="ident">linked_list_allocator::Heap::empty</span>(),
+    <span class="doccomment">/// Creates an empty FixedSizeBlockAllocator.
+    </span><span class="kw">pub const fn </span>new() -&gt; <span class="self">Self </span>{
+        <span class="kw">const </span>SIZE: usize = BLOCK_SIZES.len();
+        <span class="kw">const </span>INIT_VALUE: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="kw-2">mut </span>ListNode&gt; = <span class="prelude-val">None</span>;
+        FixedSizeBlockAllocator {
+            list_heads: [INIT_VALUE; SIZE],
+            fallback_allocator: linked_list_allocator::Heap::empty(),
         }
     }
 
-    <span class="doccomment">/// Initialize the allocator with the given heap bounds.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This function is unsafe because the caller must guarantee that the given</span>
-    <span class="doccomment">/// heap bounds are valid and that the heap is unused. This method must be</span>
-    <span class="doccomment">/// called only once.</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">heap_start</span>: <span class="ident">usize</span>, <span class="ident">heap_size</span>: <span class="ident">usize</span>) {
-        <span class="self">self</span>.<span class="ident">fallback_allocator</span>.<span class="ident">init</span>(<span class="ident">heap_start</span>, <span class="ident">heap_size</span>);
+    <span class="doccomment">/// Initialize the allocator with the given heap bounds.
+    ///
+    /// This function is unsafe because the caller must guarantee that the given
+    /// heap bounds are valid and that the heap is unused. This method must be
+    /// called only once.
+    </span><span class="kw">pub unsafe fn </span>init(<span class="kw-2">&amp;mut </span><span class="self">self</span>, heap_start: usize, heap_size: usize) {
+        <span class="self">self</span>.fallback_allocator.init(heap_start, heap_size);
     }
 
-    <span class="doccomment">/// Allocates using the fallback allocator.</span>
-    <span class="kw">fn</span> <span class="ident">fallback_alloc</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) -&gt; <span class="kw-2">*mut</span> <span class="ident">u8</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">fallback_allocator</span>.<span class="ident">allocate_first_fit</span>(<span class="ident">layout</span>) {
-            <span class="prelude-val">Ok</span>(<span class="ident">ptr</span>) =&gt; <span class="ident">ptr</span>.<span class="ident">as_ptr</span>(),
-            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="ident">ptr::null_mut</span>(),
+    <span class="doccomment">/// Allocates using the fallback allocator.
+    </span><span class="kw">fn </span>fallback_alloc(<span class="kw-2">&amp;mut </span><span class="self">self</span>, layout: Layout) -&gt; <span class="kw-2">*mut </span>u8 {
+        <span class="kw">match </span><span class="self">self</span>.fallback_allocator.allocate_first_fit(layout) {
+            <span class="prelude-val">Ok</span>(ptr) =&gt; ptr.as_ptr(),
+            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; ptr::null_mut(),
         }
     }
 
-    <span class="doccomment">/// Allocates a chunk of the given size with the given alignment. Returns a pointer to the</span>
-    <span class="doccomment">/// beginning of that chunk if it was successful. Else it returns a null pointer.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Allocator first tries to find the smallest block size that is greater or equal to the required size. </span>
-    <span class="doccomment">/// If a block of that size is available then it is returned, </span>
-    <span class="doccomment">/// otherwise it tries to allocate from the fallback allocator.</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">allocate</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) -&gt; <span class="kw-2">*mut</span> <span class="ident">u8</span> {
-        <span class="kw">match</span> <span class="ident">list_index</span>(<span class="kw-2">&amp;</span><span class="ident">layout</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">index</span>) =&gt; {
-                <span class="kw">match</span> <span class="self">self</span>.<span class="ident">list_heads</span>[<span class="ident">index</span>].<span class="ident">take</span>() {
-                    <span class="prelude-val">Some</span>(<span class="ident">node</span>) =&gt; {
-                        <span class="self">self</span>.<span class="ident">list_heads</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="ident">node</span>.<span class="ident">next</span>.<span class="ident">take</span>();
-                        <span class="ident">node</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">ListNode</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">u8</span>
+    <span class="doccomment">/// Allocates a chunk of the given size with the given alignment. Returns a pointer to the
+    /// beginning of that chunk if it was successful. Else it returns a null pointer.
+    /// 
+    /// Allocator first tries to find the smallest block size that is greater or equal to the required size. 
+    /// If a block of that size is available then it is returned, 
+    /// otherwise it tries to allocate from the fallback allocator.
+    </span><span class="kw">pub unsafe fn </span>allocate(<span class="kw-2">&amp;mut </span><span class="self">self</span>, layout: Layout) -&gt; <span class="kw-2">*mut </span>u8 {
+        <span class="kw">match </span>list_index(<span class="kw-2">&amp;</span>layout) {
+            <span class="prelude-val">Some</span>(index) =&gt; {
+                <span class="kw">match </span><span class="self">self</span>.list_heads[index].take() {
+                    <span class="prelude-val">Some</span>(node) =&gt; {
+                        <span class="self">self</span>.list_heads[index] = node.next.take();
+                        node <span class="kw">as </span><span class="kw-2">*mut </span>ListNode <span class="kw">as </span><span class="kw-2">*mut </span>u8
                     }
-                    <span class="prelude-val">None</span> =&gt; {
-                        <span class="comment">// no block exists in list =&gt; allocate new block</span>
-                        <span class="kw">let</span> <span class="ident">block_size</span> <span class="op">=</span> <span class="ident">BLOCK_SIZES</span>[<span class="ident">index</span>];
-                        <span class="comment">// only works if all block sizes are a power of 2</span>
-                        <span class="kw">let</span> <span class="ident">block_align</span> <span class="op">=</span> <span class="ident">block_size</span>;
-                        <span class="kw">let</span> <span class="ident">layout</span> <span class="op">=</span> <span class="ident">Layout::from_size_align</span>(<span class="ident">block_size</span>, <span class="ident">block_align</span>).<span class="ident">unwrap</span>();
-                        <span class="self">self</span>.<span class="ident">fallback_alloc</span>(<span class="ident">layout</span>)
+                    <span class="prelude-val">None </span>=&gt; {
+                        <span class="comment">// no block exists in list =&gt; allocate new block
+                        </span><span class="kw">let </span>block_size = BLOCK_SIZES[index];
+                        <span class="comment">// only works if all block sizes are a power of 2
+                        </span><span class="kw">let </span>block_align = block_size;
+                        <span class="kw">let </span>layout = Layout::from_size_align(block_size, block_align).unwrap();
+                        <span class="self">self</span>.fallback_alloc(layout)
                     }
                 }
             }
-            <span class="prelude-val">None</span> =&gt; <span class="self">self</span>.<span class="ident">fallback_alloc</span>(<span class="ident">layout</span>),
+            <span class="prelude-val">None </span>=&gt; <span class="self">self</span>.fallback_alloc(layout),
         }
     } 
 
-    <span class="doccomment">/// Frees the given allocation. `ptr` must be a pointer returned</span>
-    <span class="doccomment">/// by a call to the `allocate` function with identical size and alignment. Undefined</span>
-    <span class="doccomment">/// behavior may occur for invalid arguments, thus this function is unsafe.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// If the allocation returned is one of the fixed block sizes, </span>
-    <span class="doccomment">/// then it is returned to the head of the block list.</span>
-    <span class="doccomment">/// Otherwise, it is deallocated using the fallback allocator.</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">deallocate</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">ptr</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) {
-         <span class="kw">match</span> <span class="ident">list_index</span>(<span class="kw-2">&amp;</span><span class="ident">layout</span>) {
-            <span class="prelude-val">Some</span>(<span class="ident">index</span>) =&gt; {
-                <span class="kw">let</span> <span class="ident">new_node</span> <span class="op">=</span> <span class="ident">ListNode</span> {
-                    <span class="ident">next</span>: <span class="self">self</span>.<span class="ident">list_heads</span>[<span class="ident">index</span>].<span class="ident">take</span>(),
+    <span class="doccomment">/// Frees the given allocation. `ptr` must be a pointer returned
+    /// by a call to the `allocate` function with identical size and alignment. Undefined
+    /// behavior may occur for invalid arguments, thus this function is unsafe.
+    /// 
+    /// If the allocation returned is one of the fixed block sizes, 
+    /// then it is returned to the head of the block list.
+    /// Otherwise, it is deallocated using the fallback allocator.
+    </span><span class="kw">pub unsafe fn </span>deallocate(<span class="kw-2">&amp;mut </span><span class="self">self</span>, ptr: <span class="kw-2">*mut </span>u8, layout: Layout) {
+         <span class="kw">match </span>list_index(<span class="kw-2">&amp;</span>layout) {
+            <span class="prelude-val">Some</span>(index) =&gt; {
+                <span class="kw">let </span>new_node = ListNode {
+                    next: <span class="self">self</span>.list_heads[index].take(),
                 };
-                <span class="comment">// verify that block has size and alignment required for storing node</span>
-                <span class="macro">assert!</span>(<span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="ident">ListNode</span><span class="op">&gt;</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">BLOCK_SIZES</span>[<span class="ident">index</span>]);
-                <span class="macro">assert!</span>(<span class="ident">mem::align_of</span>::<span class="op">&lt;</span><span class="ident">ListNode</span><span class="op">&gt;</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">BLOCK_SIZES</span>[<span class="ident">index</span>]);
-                <span class="kw">let</span> <span class="ident">new_node_ptr</span> <span class="op">=</span> <span class="ident">ptr</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">ListNode</span>;
-                <span class="ident">new_node_ptr</span>.<span class="ident">write</span>(<span class="ident">new_node</span>);
-                <span class="self">self</span>.<span class="ident">list_heads</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">new_node_ptr</span>);
+                <span class="comment">// verify that block has size and alignment required for storing node
+                </span><span class="macro">assert!</span>(mem::size_of::&lt;ListNode&gt;() &lt;= BLOCK_SIZES[index]);
+                <span class="macro">assert!</span>(mem::align_of::&lt;ListNode&gt;() &lt;= BLOCK_SIZES[index]);
+                <span class="kw">let </span>new_node_ptr = ptr <span class="kw">as </span><span class="kw-2">*mut </span>ListNode;
+                new_node_ptr.write(new_node);
+                <span class="self">self</span>.list_heads[index] = <span class="prelude-val">Some</span>(<span class="kw-2">&amp;mut *</span>new_node_ptr);
             }
-            <span class="prelude-val">None</span> =&gt; {
-                <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="ident">NonNull::new</span>(<span class="ident">ptr</span>).<span class="ident">unwrap</span>();
-                <span class="self">self</span>.<span class="ident">fallback_allocator</span>.<span class="ident">deallocate</span>(<span class="ident">ptr</span>, <span class="ident">layout</span>);
+            <span class="prelude-val">None </span>=&gt; {
+                <span class="kw">let </span>ptr = NonNull::new(ptr).unwrap();
+                <span class="self">self</span>.fallback_allocator.deallocate(ptr, layout);
             }
         }
     }
 }</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="block_allocator" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="block_allocator" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

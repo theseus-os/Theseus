@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ota_update_client/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../ota_update_client/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../ota_update_client/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../ota_update_client/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ota_update_client/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../ota_update_client/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -469,471 +463,470 @@
 <span id="463">463</span>
 <span id="464">464</span>
 <span id="465">465</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Functions to communicate with a network server that provides over-the-air live update functionality.</span>
-<span class="doccomment">//! </span>
+</pre><pre class="rust"><code><span class="doccomment">//! Functions to communicate with a network server that provides over-the-air live update functionality.
+//! 
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">slice_concat_ext</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(slice_concat_ext)]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">smoltcp</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">network_manager</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">hpet</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spawn</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">sha3</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">percent_encoding</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">rand</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">http_client</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">itertools</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">smoltcp_helper</span>;
+#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>smoltcp;
+<span class="kw">extern crate </span>network_manager;
+<span class="kw">extern crate </span>hpet;
+<span class="kw">extern crate </span>spawn;
+<span class="kw">extern crate </span>task;
+<span class="kw">extern crate </span>sha3;
+<span class="kw">extern crate </span>percent_encoding;
+<span class="kw">extern crate </span>rand;
+<span class="kw">extern crate </span>http_client;
+<span class="kw">extern crate </span>itertools;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>smoltcp_helper;
 
 
-<span class="kw">use</span> <span class="ident">core::str</span>;
-<span class="kw">use</span> <span class="ident">alloc</span>::{
-    <span class="ident">vec::Vec</span>,
-    <span class="ident">collections::BTreeSet</span>,
-    <span class="ident">string</span>::{<span class="ident">String</span>, <span class="ident">ToString</span>},
+<span class="kw">use </span>core::str;
+<span class="kw">use </span>alloc::{
+    vec::Vec,
+    collections::BTreeSet,
+    string::{String, ToString},
 };
-<span class="kw">use</span> <span class="ident">itertools::Itertools</span>;
-<span class="kw">use</span> <span class="ident">hpet::get_hpet</span>;
-<span class="kw">use</span> <span class="ident">smoltcp</span>::{
-    <span class="ident">wire</span>::{<span class="ident">Ipv4Address</span>, <span class="ident">IpEndpoint</span>},
-    <span class="ident">socket</span>::{<span class="ident">SocketSet</span>, <span class="ident">TcpSocket</span>, <span class="ident">TcpSocketBuffer</span>, <span class="ident">TcpState</span>},
+<span class="kw">use </span>itertools::Itertools;
+<span class="kw">use </span>hpet::get_hpet;
+<span class="kw">use </span>smoltcp::{
+    wire::{Ipv4Address, IpEndpoint},
+    socket::{SocketSet, TcpSocket, TcpSocketBuffer, TcpState},
 };
-<span class="kw">use</span> <span class="ident">sha3</span>::{<span class="ident">Digest</span>, <span class="ident">Sha3_512</span>};
-<span class="kw">use</span> <span class="ident">percent_encoding</span>::{<span class="ident">DEFAULT_ENCODE_SET</span>, <span class="ident">utf8_percent_encode</span>};
-<span class="kw">use</span> <span class="ident">network_manager</span>::{<span class="ident">NetworkInterfaceRef</span>};
-<span class="kw">use</span> <span class="ident">rand</span>::{
-    <span class="ident">SeedableRng</span>,
-    <span class="ident">RngCore</span>,
-    <span class="ident">rngs::SmallRng</span>
+<span class="kw">use </span>sha3::{Digest, Sha3_512};
+<span class="kw">use </span>percent_encoding::{DEFAULT_ENCODE_SET, utf8_percent_encode};
+<span class="kw">use </span>network_manager::{NetworkInterfaceRef};
+<span class="kw">use </span>rand::{
+    SeedableRng,
+    RngCore,
+    rngs::SmallRng
 };
-<span class="kw">use</span> <span class="ident">http_client</span>::{<span class="ident">HttpResponse</span>, <span class="ident">ConnectedTcpSocket</span>, <span class="ident">send_request</span>, <span class="ident">check_http_request</span>};
-<span class="kw">use</span> <span class="ident">smoltcp_helper</span>::{<span class="ident">STARTING_FREE_PORT</span>, <span class="ident">connect</span>, <span class="ident">millis_since</span>, <span class="ident">poll_iface</span>};
+<span class="kw">use </span>http_client::{HttpResponse, ConnectedTcpSocket, send_request, check_http_request};
+<span class="kw">use </span>smoltcp_helper::{STARTING_FREE_PORT, connect, millis_since, poll_iface};
 
-<span class="doccomment">/// The IP address of the update server.</span>
-<span class="kw">const</span> <span class="ident">DEFAULT_DESTINATION_IP_ADDR</span>: [<span class="ident">u8</span>; <span class="number">4</span>] <span class="op">=</span> [<span class="number">10</span>, <span class="number">0</span>, <span class="number">2</span>, <span class="number">2</span>]; <span class="comment">// the IP of the host machine when running on QEMU.</span>
+<span class="doccomment">/// The IP address of the update server.
+</span><span class="kw">const </span>DEFAULT_DESTINATION_IP_ADDR: [u8; <span class="number">4</span>] = [<span class="number">10</span>, <span class="number">0</span>, <span class="number">2</span>, <span class="number">2</span>]; <span class="comment">// the IP of the host machine when running on QEMU.
 
-<span class="doccomment">/// The TCP port on the update server that listens for update requests </span>
-<span class="kw">const</span> <span class="ident">DEFAULT_DESTINATION_PORT</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">8090</span>;
+</span><span class="doccomment">/// The TCP port on the update server that listens for update requests 
+</span><span class="kw">const </span>DEFAULT_DESTINATION_PORT: u16 = <span class="number">8090</span>;
 
-<span class="doccomment">/// The default remote endpoint, server IP and port, of the update server.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">default_remote_endpoint</span>() -&gt; <span class="ident">IpEndpoint</span> {
-    <span class="ident">IpEndpoint::new</span>(
-        <span class="ident">Ipv4Address::from_bytes</span>(<span class="kw-2">&amp;</span><span class="ident">DEFAULT_DESTINATION_IP_ADDR</span>).<span class="ident">into</span>(), 
-        <span class="ident">DEFAULT_DESTINATION_PORT</span>
+<span class="doccomment">/// The default remote endpoint, server IP and port, of the update server.
+</span><span class="kw">pub fn </span>default_remote_endpoint() -&gt; IpEndpoint {
+    IpEndpoint::new(
+        Ipv4Address::from_bytes(<span class="kw-2">&amp;</span>DEFAULT_DESTINATION_IP_ADDR).into(), 
+        DEFAULT_DESTINATION_PORT
     )
 }
 
-<span class="doccomment">/// The time limit in milliseconds to wait for a response to an HTTP request.</span>
-<span class="kw">const</span> <span class="ident">HTTP_REQUEST_TIMEOUT_MILLIS</span>: <span class="ident">u64</span> <span class="op">=</span> <span class="number">10000</span>;
+<span class="doccomment">/// The time limit in milliseconds to wait for a response to an HTTP request.
+</span><span class="kw">const </span>HTTP_REQUEST_TIMEOUT_MILLIS: u64 = <span class="number">10000</span>;
 
-<span class="doccomment">/// The path of the update builds file, located at the root of the build server.</span>
-<span class="doccomment">/// This file contains the list of all update build instances available,</span>
-<span class="doccomment">/// listed in reverse chronological order (most recent builds first).</span>
-<span class="kw">const</span> <span class="ident">UPDATE_BUILDS_PATH</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;/updates.txt&quot;</span>;
+<span class="doccomment">/// The path of the update builds file, located at the root of the build server.
+/// This file contains the list of all update build instances available,
+/// listed in reverse chronological order (most recent builds first).
+</span><span class="kw">const </span>UPDATE_BUILDS_PATH: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;/updates.txt&quot;</span>;
 
-<span class="doccomment">/// The name (and relative path) of the listing file inside each update build directory,</span>
-<span class="doccomment">/// which contains the names of all crate object files that were built.  </span>
-<span class="kw">const</span> <span class="ident">LISTING_FILE_NAME</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;listing.txt&quot;</span>;
+<span class="doccomment">/// The name (and relative path) of the listing file inside each update build directory,
+/// which contains the names of all crate object files that were built.  
+</span><span class="kw">const </span>LISTING_FILE_NAME: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;listing.txt&quot;</span>;
 
-<span class="doccomment">/// The name (and relative path) of the diff file inside each update build directory,</span>
-<span class="doccomment">/// which contains the mapping of old crates to new crates, indicating how a swap should take place. </span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DIFF_FILE_NAME</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;diff.txt&quot;</span>;
+<span class="doccomment">/// The name (and relative path) of the diff file inside each update build directory,
+/// which contains the mapping of old crates to new crates, indicating how a swap should take place. 
+</span><span class="kw">pub const </span>DIFF_FILE_NAME: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;diff.txt&quot;</span>;
 
-<span class="doccomment">/// The name of the directory containing the checksums of each crate object file</span>
-<span class="doccomment">/// inside of a given update build.</span>
-<span class="kw">const</span> <span class="ident">CHECKSUMS_DIR_NAME</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;checksums&quot;</span>;
+<span class="doccomment">/// The name of the directory containing the checksums of each crate object file
+/// inside of a given update build.
+</span><span class="kw">const </span>CHECKSUMS_DIR_NAME: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;checksums&quot;</span>;
 
-<span class="doccomment">/// The file extension that is appended onto each crate object file&#39;s checksum file.</span>
-<span class="kw">const</span> <span class="ident">CHECKSUM_FILE_EXTENSION</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;.sha512&quot;</span>;
+<span class="doccomment">/// The file extension that is appended onto each crate object file&#39;s checksum file.
+</span><span class="kw">const </span>CHECKSUM_FILE_EXTENSION: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;.sha512&quot;</span>;
 
 
 
-<span class="doccomment">/// A file that has been downloaded over the network, </span>
-<span class="doccomment">/// including its name and a byte array containing its contents.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DownloadedFile</span> {
-    <span class="kw">pub</span> <span class="ident">name</span>: <span class="ident">String</span>,
-    <span class="kw">pub</span> <span class="ident">content</span>: <span class="ident">HttpResponse</span>,
+<span class="doccomment">/// A file that has been downloaded over the network, 
+/// including its name and a byte array containing its contents.
+</span><span class="kw">pub struct </span>DownloadedFile {
+    <span class="kw">pub </span>name: String,
+    <span class="kw">pub </span>content: HttpResponse,
 }
 
 
-<span class="doccomment">/// An enum used for specifying which crate files to download from an update build&#39;s listing.</span>
-<span class="doccomment">/// To download all crates, pass an empty `Exclude` set.</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">CrateSet</span> {
-    <span class="doccomment">/// The set of crates to include, i.e., only these crates will be downloaded.</span>
-    <span class="ident">Include</span>(<span class="ident">BTreeSet</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>),
-    <span class="doccomment">/// The set of crates to exclude, i.e., all crates except for these will be downloaded.</span>
-    <span class="ident">Exclude</span>(<span class="ident">BTreeSet</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>),
+<span class="doccomment">/// An enum used for specifying which crate files to download from an update build&#39;s listing.
+/// To download all crates, pass an empty `Exclude` set.
+</span><span class="kw">pub enum </span>CrateSet {
+    <span class="doccomment">/// The set of crates to include, i.e., only these crates will be downloaded.
+    </span>Include(BTreeSet&lt;String&gt;),
+    <span class="doccomment">/// The set of crates to exclude, i.e., all crates except for these will be downloaded.
+    </span>Exclude(BTreeSet&lt;String&gt;),
 }
-<span class="kw">impl</span> <span class="ident">CrateSet</span> {
-    <span class="doccomment">/// Returns true if this `CrateSet` specifies that the given `crate_file_name` is included.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">includes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">crate_file_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">CrateSet::Include</span>(<span class="ident">crates_to_include</span>) =&gt; <span class="ident">crates_to_include</span>.<span class="ident">contains</span>(<span class="ident">crate_file_name</span>),
-            <span class="ident">CrateSet::Exclude</span>(<span class="ident">crates_to_exclude</span>) =&gt; <span class="op">!</span><span class="ident">crates_to_exclude</span>.<span class="ident">contains</span>(<span class="ident">crate_file_name</span>),
+<span class="kw">impl </span>CrateSet {
+    <span class="doccomment">/// Returns true if this `CrateSet` specifies that the given `crate_file_name` is included.
+    </span><span class="kw">pub fn </span>includes(<span class="kw-2">&amp;</span><span class="self">self</span>, crate_file_name: <span class="kw-2">&amp;</span>str) -&gt; bool {
+        <span class="kw">match </span><span class="self">self </span>{
+            CrateSet::Include(crates_to_include) =&gt; crates_to_include.contains(crate_file_name),
+            CrateSet::Exclude(crates_to_exclude) =&gt; !crates_to_exclude.contains(crate_file_name),
         }
     }
 }
 
 
-<span class="doccomment">/// Connects to the update server over the given network interface</span>
-<span class="doccomment">/// and downloads the list of available update builds.</span>
-<span class="doccomment">/// An update build is a compiled instance of Theseus that contains all crates&#39; object files.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">download_available_update_builds</span>(
-    <span class="ident">iface</span>: <span class="kw-2">&amp;</span><span class="ident">NetworkInterfaceRef</span>,
-    <span class="ident">remote_endpoint</span>: <span class="ident">IpEndpoint</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="ident">download_string_file</span>(<span class="ident">iface</span>, <span class="ident">remote_endpoint</span>, <span class="ident">UPDATE_BUILDS_PATH</span>)
+<span class="doccomment">/// Connects to the update server over the given network interface
+/// and downloads the list of available update builds.
+/// An update build is a compiled instance of Theseus that contains all crates&#39; object files.
+</span><span class="kw">pub fn </span>download_available_update_builds(
+    iface: <span class="kw-2">&amp;</span>NetworkInterfaceRef,
+    remote_endpoint: IpEndpoint,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;String&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    download_string_file(iface, remote_endpoint, UPDATE_BUILDS_PATH)
 }
 
 
-<span class="doccomment">/// Connects to the update server over the given network interface</span>
-<span class="doccomment">/// and downloads the list of crates present in the given update build.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">download_listing</span>(
-    <span class="ident">iface</span>: <span class="kw-2">&amp;</span><span class="ident">NetworkInterfaceRef</span>,
-    <span class="ident">remote_endpoint</span>: <span class="ident">IpEndpoint</span>,
-    <span class="ident">update_build</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="ident">download_string_file</span>(<span class="ident">iface</span>, <span class="ident">remote_endpoint</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;/{}/{}&quot;</span>, <span class="ident">update_build</span>, <span class="ident">LISTING_FILE_NAME</span>))
+<span class="doccomment">/// Connects to the update server over the given network interface
+/// and downloads the list of crates present in the given update build.
+</span><span class="kw">pub fn </span>download_listing(
+    iface: <span class="kw-2">&amp;</span>NetworkInterfaceRef,
+    remote_endpoint: IpEndpoint,
+    update_build: <span class="kw-2">&amp;</span>str,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;String&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    download_string_file(iface, remote_endpoint, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;/{}/{}&quot;</span>, update_build, LISTING_FILE_NAME))
 }
 
 
-<span class="doccomment">/// Connects to the update server over the given network interface</span>
-<span class="doccomment">/// and downloads the diff file in the given update build,</span>
-<span class="doccomment">/// which dictates which crates should be swapped.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">download_diff</span>(
-    <span class="ident">iface</span>: <span class="kw-2">&amp;</span><span class="ident">NetworkInterfaceRef</span>,
-    <span class="ident">remote_endpoint</span>: <span class="ident">IpEndpoint</span>,
-    <span class="ident">update_build</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="ident">download_string_file</span>(<span class="ident">iface</span>, <span class="ident">remote_endpoint</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;/{}/{}&quot;</span>, <span class="ident">update_build</span>, <span class="ident">DIFF_FILE_NAME</span>))
+<span class="doccomment">/// Connects to the update server over the given network interface
+/// and downloads the diff file in the given update build,
+/// which dictates which crates should be swapped.
+</span><span class="kw">pub fn </span>download_diff(
+    iface: <span class="kw-2">&amp;</span>NetworkInterfaceRef,
+    remote_endpoint: IpEndpoint,
+    update_build: <span class="kw-2">&amp;</span>str,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;String&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    download_string_file(iface, remote_endpoint, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;/{}/{}&quot;</span>, update_build, DIFF_FILE_NAME))
 }
 
 
-<span class="doccomment">/// Convenience function for downloading files and returning their contents as Strings per line. </span>
-<span class="kw">fn</span> <span class="ident">download_string_file</span>(
-    <span class="ident">iface</span>: <span class="kw-2">&amp;</span><span class="ident">NetworkInterfaceRef</span>,
-    <span class="ident">remote_endpoint</span>: <span class="ident">IpEndpoint</span>,
-    <span class="ident">file_path</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">file</span> <span class="op">=</span> <span class="ident">download_file</span>(<span class="ident">iface</span>, <span class="ident">remote_endpoint</span>, <span class="ident">file_path</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">content</span> <span class="op">=</span> <span class="ident">file</span>.<span class="ident">content</span>.<span class="ident">as_result_err_str</span>()<span class="question-mark">?</span>;
-    <span class="ident">as_lines</span>(<span class="ident">content</span>)
+<span class="doccomment">/// Convenience function for downloading files and returning their contents as Strings per line. 
+</span><span class="kw">fn </span>download_string_file(
+    iface: <span class="kw-2">&amp;</span>NetworkInterfaceRef,
+    remote_endpoint: IpEndpoint,
+    file_path: <span class="kw-2">&amp;</span>str,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;String&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>file = download_file(iface, remote_endpoint, file_path)<span class="question-mark">?</span>;
+    <span class="kw">let </span>content = file.content.as_result_err_str()<span class="question-mark">?</span>;
+    as_lines(content)
 }
 
 
-<span class="doccomment">/// Convenience function for converting a byte stream</span>
-<span class="doccomment">/// that is delimited by newlines into a list of Strings.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_lines</span>(<span class="ident">bytes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="ident">str::from_utf8</span>(<span class="ident">bytes</span>)
-        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;couldn&#39;t convert file into a UTF8 string&quot;</span>)
-        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">files</span><span class="op">|</span> <span class="ident">files</span>.<span class="ident">lines</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">String::from</span>(<span class="ident">s</span>)).<span class="ident">collect</span>())
+<span class="doccomment">/// Convenience function for converting a byte stream
+/// that is delimited by newlines into a list of Strings.
+</span><span class="kw">pub fn </span>as_lines(bytes: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;String&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    str::from_utf8(bytes)
+        .map_err(|_e| <span class="string">&quot;couldn&#39;t convert file into a UTF8 string&quot;</span>)
+        .map(|files| files.lines().map(|s| String::from(s)).collect())
 }
 
 
-<span class="doccomment">/// A representation of an diff file used to define an evolutionary crate swapping update.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Diff</span> {
-    <span class="doccomment">/// A list of tuples in which the first element is the old crate and the second element is the new crate.</span>
-    <span class="doccomment">/// If the first element is the empty string, the second element is a new addition (replacing nothing),</span>
-    <span class="doccomment">/// and if the second element is the empty string, the first element is to be removed without replacement.</span>
-    <span class="kw">pub</span> <span class="ident">pairs</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">String</span>, <span class="ident">String</span>)<span class="op">&gt;</span>,
-    <span class="doccomment">/// The list of state transfer functions which should be applied at the end of a crate swapping operation.</span>
-    <span class="kw">pub</span> <span class="ident">state_transfer_functions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A representation of an diff file used to define an evolutionary crate swapping update.
+</span><span class="kw">pub struct </span>Diff {
+    <span class="doccomment">/// A list of tuples in which the first element is the old crate and the second element is the new crate.
+    /// If the first element is the empty string, the second element is a new addition (replacing nothing),
+    /// and if the second element is the empty string, the first element is to be removed without replacement.
+    </span><span class="kw">pub </span>pairs: Vec&lt;(String, String)&gt;,
+    <span class="doccomment">/// The list of state transfer functions which should be applied at the end of a crate swapping operation.
+    </span><span class="kw">pub </span>state_transfer_functions: Vec&lt;String&gt;,
 }
 
 
-<span class="doccomment">/// Parses a series of diff lines into a representation of an update diff.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `diffs`: a list of lines, in which each line is a diff entry.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Example diff entry formats</span>
-<span class="doccomment">/// ```</span>
-<span class="doccomment">/// a#ps.o -&gt; a#ps.o</span>
-<span class="doccomment">/// k#runqueue-d04869f0baadb1bd.o -&gt; k#runqueue-d04869f0baadb1bd.o</span>
-<span class="doccomment">/// - k#scheduler-7f6134ffbb934a27.o</span>
-<span class="doccomment">/// + k#spawn-f1c87a8fc4e03893.o</span>
-<span class="doccomment">/// ```</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">parse_diff_lines</span>(<span class="ident">diffs</span>: <span class="kw-2">&amp;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Diff</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">pairs</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">String</span>, <span class="ident">String</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">diffs</span>.<span class="ident">len</span>());
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">state_transfer_functions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-    <span class="kw">for</span> <span class="ident">diff</span> <span class="kw">in</span> <span class="ident">diffs</span> {
-        <span class="comment">// addition of new crate</span>
-        <span class="kw">if</span> <span class="ident">diff</span>.<span class="ident">starts_with</span>(<span class="string">&#39;+&#39;</span>) {
-            <span class="ident">pairs</span>.<span class="ident">push</span>((
-                <span class="ident">String::new</span>(), 
-                <span class="ident">diff</span>.<span class="ident">get</span>(<span class="number">1</span>..).<span class="ident">ok_or</span>(<span class="string">&quot;error parsing (+) diff line&quot;</span>)<span class="question-mark">?</span>.<span class="ident">trim</span>().<span class="ident">to_string</span>(),
+<span class="doccomment">/// Parses a series of diff lines into a representation of an update diff.
+/// 
+/// # Arguments
+/// * `diffs`: a list of lines, in which each line is a diff entry.
+/// 
+/// # Example diff entry formats
+/// ```
+/// a#ps.o -&gt; a#ps.o
+/// k#runqueue-d04869f0baadb1bd.o -&gt; k#runqueue-d04869f0baadb1bd.o
+/// - k#scheduler-7f6134ffbb934a27.o
+/// + k#spawn-f1c87a8fc4e03893.o
+/// ```
+</span><span class="kw">pub fn </span>parse_diff_lines(diffs: <span class="kw-2">&amp;</span>Vec&lt;String&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Diff, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>pairs: Vec&lt;(String, String)&gt; = Vec::with_capacity(diffs.len());
+    <span class="kw">let </span><span class="kw-2">mut </span>state_transfer_functions: Vec&lt;String&gt; = Vec::new();
+    <span class="kw">for </span>diff <span class="kw">in </span>diffs {
+        <span class="comment">// addition of new crate
+        </span><span class="kw">if </span>diff.starts_with(<span class="string">&#39;+&#39;</span>) {
+            pairs.push((
+                String::new(), 
+                diff.get(<span class="number">1</span>..).ok_or(<span class="string">&quot;error parsing (+) diff line&quot;</span>)<span class="question-mark">?</span>.trim().to_string(),
             ));
         } 
-        <span class="comment">// removal of old crate</span>
-        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">diff</span>.<span class="ident">starts_with</span>(<span class="string">&#39;-&#39;</span>) {
-            <span class="ident">pairs</span>.<span class="ident">push</span>((
-                <span class="ident">diff</span>.<span class="ident">get</span>(<span class="number">1</span>..).<span class="ident">ok_or</span>(<span class="string">&quot;error parsing (-) diff line&quot;</span>)<span class="question-mark">?</span>.<span class="ident">trim</span>().<span class="ident">to_string</span>(), 
-                <span class="ident">String::new</span>()
+        <span class="comment">// removal of old crate
+        </span><span class="kw">else if </span>diff.starts_with(<span class="string">&#39;-&#39;</span>) {
+            pairs.push((
+                diff.get(<span class="number">1</span>..).ok_or(<span class="string">&quot;error parsing (-) diff line&quot;</span>)<span class="question-mark">?</span>.trim().to_string(), 
+                String::new()
             ));
         }
-        <span class="comment">// replacement of old crate with new crate</span>
-        <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">old</span>, <span class="ident">new</span>)) <span class="op">=</span> <span class="ident">diff</span>.<span class="ident">split</span>(<span class="string">&quot;-&gt;&quot;</span>).<span class="ident">collect_tuple</span>() {
-            <span class="ident">pairs</span>.<span class="ident">push</span>((<span class="ident">old</span>.<span class="ident">trim</span>().<span class="ident">to_string</span>(), <span class="ident">new</span>.<span class="ident">trim</span>().<span class="ident">to_string</span>()));
+        <span class="comment">// replacement of old crate with new crate
+        </span><span class="kw">else if let </span><span class="prelude-val">Some</span>((old, new)) = diff.split(<span class="string">&quot;-&gt;&quot;</span>).collect_tuple() {
+            pairs.push((old.trim().to_string(), new.trim().to_string()));
         }
-        <span class="comment">// state transfer function</span>
-        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">diff</span>.<span class="ident">starts_with</span>(<span class="string">&#39;@&#39;</span>) {
-            <span class="ident">state_transfer_functions</span>.<span class="ident">push</span>(
-                <span class="ident">diff</span>.<span class="ident">get</span>(<span class="number">1</span>..).<span class="ident">ok_or</span>(<span class="string">&quot;error parsing (@state_transfer) diff line&quot;</span>)<span class="question-mark">?</span>.<span class="ident">trim</span>().<span class="ident">to_string</span>(),
+        <span class="comment">// state transfer function
+        </span><span class="kw">else if </span>diff.starts_with(<span class="string">&#39;@&#39;</span>) {
+            state_transfer_functions.push(
+                diff.get(<span class="number">1</span>..).ok_or(<span class="string">&quot;error parsing (@state_transfer) diff line&quot;</span>)<span class="question-mark">?</span>.trim().to_string(),
             )
         }
-        <span class="kw">else</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;parse_diff_lines(): error parsing diff line: {:?}&quot;</span>, <span class="ident">diff</span>);
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;error parsing diff line&quot;</span>);
+        <span class="kw">else </span>{
+            <span class="macro">error!</span>(<span class="string">&quot;parse_diff_lines(): error parsing diff line: {:?}&quot;</span>, diff);
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;error parsing diff line&quot;</span>);
         }
     }
 
-    <span class="prelude-val">Ok</span>(<span class="ident">Diff</span> { <span class="ident">pairs</span>, <span class="ident">state_transfer_functions</span> })
+    <span class="prelude-val">Ok</span>(Diff { pairs, state_transfer_functions })
 }
 
 
 
-<span class="doccomment">/// Connects to the update server over the given network interface</span>
-<span class="doccomment">/// and downloads the object files for the specified `crates`.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// It also downloads the checksum file for each crate object file </span>
-<span class="doccomment">/// in order to verify that each object file was completely downloaded correctly.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// A list of available update builds can be obtained by calling `download_available_update_builds()`.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `iface`: a reference to an initialized network interface for sockets to use.</span>
-<span class="doccomment">/// * `update_build`: the string name of the update build that the downloaded crates will belong to.</span>
-<span class="doccomment">/// * `crates`: a set of crate names, e.g., &quot;k#my_crate-3d0cd20d4e1d4ba9.o&quot;,</span>
-<span class="doccomment">///    that will be downloaded from the given `update_build` on the server. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Returns the list of crate object files (as `DownloadedFile`s) in the given `update_build`.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">download_crates</span>(
-    <span class="ident">iface</span>: <span class="kw-2">&amp;</span><span class="ident">NetworkInterfaceRef</span>, 
-    <span class="ident">remote_endpoint</span>: <span class="ident">IpEndpoint</span>,
-    <span class="ident">update_build</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>,
-    <span class="ident">crates</span>: <span class="ident">BTreeSet</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">DownloadedFile</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="doccomment">/// Connects to the update server over the given network interface
+/// and downloads the object files for the specified `crates`.
+/// 
+/// It also downloads the checksum file for each crate object file 
+/// in order to verify that each object file was completely downloaded correctly.
+/// 
+/// A list of available update builds can be obtained by calling `download_available_update_builds()`.
+/// 
+/// # Arguments
+/// * `iface`: a reference to an initialized network interface for sockets to use.
+/// * `update_build`: the string name of the update build that the downloaded crates will belong to.
+/// * `crates`: a set of crate names, e.g., &quot;k#my_crate-3d0cd20d4e1d4ba9.o&quot;,
+///    that will be downloaded from the given `update_build` on the server. 
+/// 
+/// Returns the list of crate object files (as `DownloadedFile`s) in the given `update_build`.
+</span><span class="kw">pub fn </span>download_crates(
+    iface: <span class="kw-2">&amp;</span>NetworkInterfaceRef, 
+    remote_endpoint: IpEndpoint,
+    update_build: <span class="kw-2">&amp;</span>str,
+    crates: BTreeSet&lt;String&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;DownloadedFile&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">paths_to_download</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-    <span class="kw">for</span> <span class="ident">file_name</span> <span class="kw">in</span> <span class="ident">crates</span>.<span class="ident">iter</span>() {
-        <span class="kw">let</span> <span class="ident">path</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;/{}/{}&quot;</span>, <span class="ident">update_build</span>, <span class="ident">file_name</span>);
-        <span class="kw">let</span> <span class="ident">path_sha</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;/{}/{}/{}{}&quot;</span>, <span class="ident">update_build</span>, <span class="ident">CHECKSUMS_DIR_NAME</span>, <span class="ident">file_name</span>, <span class="ident">CHECKSUM_FILE_EXTENSION</span>);
-        <span class="ident">paths_to_download</span>.<span class="ident">push</span>(<span class="ident">path</span>);
-        <span class="ident">paths_to_download</span>.<span class="ident">push</span>(<span class="ident">path_sha</span>);
+    <span class="kw">let </span><span class="kw-2">mut </span>paths_to_download: Vec&lt;String&gt; = Vec::new();
+    <span class="kw">for </span>file_name <span class="kw">in </span>crates.iter() {
+        <span class="kw">let </span>path = <span class="macro">format!</span>(<span class="string">&quot;/{}/{}&quot;</span>, update_build, file_name);
+        <span class="kw">let </span>path_sha = <span class="macro">format!</span>(<span class="string">&quot;/{}/{}/{}{}&quot;</span>, update_build, CHECKSUMS_DIR_NAME, file_name, CHECKSUM_FILE_EXTENSION);
+        paths_to_download.push(path);
+        paths_to_download.push(path_sha);
     }
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">crate_object_files</span> <span class="op">=</span> <span class="ident">download_files</span>(<span class="ident">iface</span>, <span class="ident">remote_endpoint</span>, <span class="ident">paths_to_download</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>crate_object_files = download_files(iface, remote_endpoint, paths_to_download)<span class="question-mark">?</span>;
 
-    <span class="comment">// iterate through each file downloaded, and verify the sha512 hashes</span>
-    <span class="kw">for</span> <span class="ident">chunk</span> <span class="kw">in</span> <span class="ident">crate_object_files</span>.<span class="ident">chunks</span>(<span class="number">2</span>) {
-        <span class="kw">match</span> <span class="ident">chunk</span> {
-            [<span class="ident">file</span>, <span class="ident">hash_file</span>] =&gt; {
-                <span class="kw">let</span> <span class="ident">hash_file_str</span> <span class="op">=</span> <span class="ident">hash_file</span>.<span class="ident">content</span>.<span class="ident">as_result_err_str</span>()
-                    .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">content</span><span class="op">|</span> <span class="ident">str::from_utf8</span>(<span class="ident">content</span>)
-                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;couldn&#39;t convert downloaded hash file into a UTF8 string&quot;</span>)
+    <span class="comment">// iterate through each file downloaded, and verify the sha512 hashes
+    </span><span class="kw">for </span>chunk <span class="kw">in </span>crate_object_files.chunks(<span class="number">2</span>) {
+        <span class="kw">match </span>chunk {
+            [file, hash_file] =&gt; {
+                <span class="kw">let </span>hash_file_str = hash_file.content.as_result_err_str()
+                    .and_then(|content| str::from_utf8(content)
+                        .map_err(|_e| <span class="string">&quot;couldn&#39;t convert downloaded hash file into a UTF8 string&quot;</span>)
                     )<span class="question-mark">?</span>;
                     
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">hash_value</span>) <span class="op">=</span> <span class="ident">hash_file_str</span>.<span class="ident">split_whitespace</span>().<span class="ident">next</span>() {
-                    <span class="kw">if</span> <span class="ident">verify_hash</span>(<span class="ident">file</span>.<span class="ident">content</span>.<span class="ident">as_result_err_str</span>()<span class="question-mark">?</span>, <span class="ident">hash_value</span>) {
-                        <span class="comment">// success! the hash matched, so the file was properly downloaded</span>
-                    } <span class="kw">else</span> {
-                        <span class="macro">error!</span>(<span class="string">&quot;ota_update_client: downloaded file {:?} did not match the expected hash value! Try downloading it again.&quot;</span>, <span class="ident">file</span>.<span class="ident">name</span>);
-                        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;ota_update_client: downloaded file did not match the expected hash value&quot;</span>);
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(hash_value) = hash_file_str.split_whitespace().next() {
+                    <span class="kw">if </span>verify_hash(file.content.as_result_err_str()<span class="question-mark">?</span>, hash_value) {
+                        <span class="comment">// success! the hash matched, so the file was properly downloaded
+                    </span>} <span class="kw">else </span>{
+                        <span class="macro">error!</span>(<span class="string">&quot;ota_update_client: downloaded file {:?} did not match the expected hash value! Try downloading it again.&quot;</span>, file.name);
+                        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;ota_update_client: downloaded file did not match the expected hash value&quot;</span>);
                     }
-                } <span class="kw">else</span> {
-                    <span class="macro">error!</span>(<span class="string">&quot;ota_update_client: hash file {:?} had unexpected contents: it should start with a 64-digit hex hash value.&quot;</span>, <span class="ident">hash_file</span>.<span class="ident">name</span>);
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;ota_update_client: hash file had unexpected contents&quot;</span>);
+                } <span class="kw">else </span>{
+                    <span class="macro">error!</span>(<span class="string">&quot;ota_update_client: hash file {:?} had unexpected contents: it should start with a 64-digit hex hash value.&quot;</span>, hash_file.name);
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;ota_update_client: hash file had unexpected contents&quot;</span>);
                 }
             }
-            <span class="kw">_</span> =&gt; {
+            <span class="kw">_ </span>=&gt; {
                 <span class="macro">error!</span>(<span class="string">&quot;ota_update_client: missing crate object file or hash file for downloaded file pair {:?}, cannot verify file integrity.&quot;</span>, 
-                    <span class="ident">chunk</span>.<span class="ident">iter</span>().<span class="ident">next</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">f</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="ident">f</span>.<span class="ident">name</span>)
+                    chunk.iter().next().map(|f| <span class="kw-2">&amp;</span>f.name)
                 );
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;ota_update_client: missing crate object file or hash file for downloaded file pair&quot;</span>);
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;ota_update_client: missing crate object file or hash file for downloaded file pair&quot;</span>);
             }
         }
     }
 
-    <span class="comment">// All hashes are verified, just return the crate object files themselves without the hash files</span>
-    <span class="ident">crate_object_files</span>.<span class="ident">retain</span>(<span class="op">|</span><span class="ident">file</span><span class="op">|</span> <span class="op">!</span><span class="ident">file</span>.<span class="ident">name</span>.<span class="ident">ends_with</span>(<span class="ident">CHECKSUM_FILE_EXTENSION</span>));
+    <span class="comment">// All hashes are verified, just return the crate object files themselves without the hash files
+    </span>crate_object_files.retain(|file| !file.name.ends_with(CHECKSUM_FILE_EXTENSION));
 
-    <span class="prelude-val">Ok</span>(<span class="ident">crate_object_files</span>)
+    <span class="prelude-val">Ok</span>(crate_object_files)
 }
 
 
-<span class="doccomment">/// A convenience function for downloading just one file. See `download_files()`.</span>
-<span class="kw">fn</span> <span class="ident">download_file</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">AsRef</span><span class="op">&lt;</span><span class="ident">str</span><span class="op">&gt;</span><span class="op">&gt;</span>(
-    <span class="ident">iface</span>: <span class="kw-2">&amp;</span><span class="ident">NetworkInterfaceRef</span>,
-    <span class="ident">remote_endpoint</span>: <span class="ident">IpEndpoint</span>, 
-    <span class="ident">absolute_path</span>: <span class="ident">S</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">DownloadedFile</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="doccomment">/// A convenience function for downloading just one file. See `download_files()`.
+</span><span class="kw">fn </span>download_file&lt;S: AsRef&lt;str&gt;&gt;(
+    iface: <span class="kw-2">&amp;</span>NetworkInterfaceRef,
+    remote_endpoint: IpEndpoint, 
+    absolute_path: S,
+) -&gt; <span class="prelude-ty">Result</span>&lt;DownloadedFile, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     
-    <span class="ident">download_files</span>(<span class="ident">iface</span>, <span class="ident">remote_endpoint</span>, <span class="macro">vec!</span>[<span class="ident">absolute_path</span>])<span class="question-mark">?</span>
-        .<span class="ident">into_iter</span>()
-        .<span class="ident">next</span>()
-        .<span class="ident">ok_or</span>(<span class="string">&quot;no file received from the server&quot;</span>)
+    download_files(iface, remote_endpoint, <span class="macro">vec!</span>[absolute_path])<span class="question-mark">?
+        </span>.into_iter()
+        .next()
+        .ok_or(<span class="string">&quot;no file received from the server&quot;</span>)
 }
 
 
-<span class="doccomment">/// Connects to the update server over the given network interface</span>
-<span class="doccomment">/// and downloads the given files, each specified with its full absolute path on the update server.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Returns an error if any of the given `absolute_paths` didn&#39;t exist, </span>
-<span class="doccomment">/// or if there was any other error on the remote server.</span>
-<span class="kw">fn</span> <span class="ident">download_files</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">AsRef</span><span class="op">&lt;</span><span class="ident">str</span><span class="op">&gt;</span><span class="op">&gt;</span>(
-    <span class="ident">iface</span>: <span class="kw-2">&amp;</span><span class="ident">NetworkInterfaceRef</span>,
-    <span class="ident">remote_endpoint</span>: <span class="ident">IpEndpoint</span>,
-    <span class="ident">absolute_paths</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">DownloadedFile</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">if</span> <span class="ident">absolute_paths</span>.<span class="ident">is_empty</span>() { 
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;no download paths given&quot;</span>);
+<span class="doccomment">/// Connects to the update server over the given network interface
+/// and downloads the given files, each specified with its full absolute path on the update server.
+/// 
+/// Returns an error if any of the given `absolute_paths` didn&#39;t exist, 
+/// or if there was any other error on the remote server.
+</span><span class="kw">fn </span>download_files&lt;S: AsRef&lt;str&gt;&gt;(
+    iface: <span class="kw-2">&amp;</span>NetworkInterfaceRef,
+    remote_endpoint: IpEndpoint,
+    absolute_paths: Vec&lt;S&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;DownloadedFile&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">if </span>absolute_paths.is_empty() { 
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;no download paths given&quot;</span>);
     }
 
-    <span class="kw">let</span> <span class="ident">startup_time</span> <span class="op">=</span> <span class="macro">hpet_ticks!</span>();
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rng</span> <span class="op">=</span> <span class="ident">SmallRng::seed_from_u64</span>(<span class="ident">startup_time</span>);
-    <span class="kw">let</span> <span class="ident">rng_upper_bound</span> <span class="op">=</span> <span class="ident">u16::max_value</span>() <span class="op">-</span> <span class="ident">STARTING_FREE_PORT</span>;
+    <span class="kw">let </span>startup_time = <span class="macro">hpet_ticks!</span>();
+    <span class="kw">let </span><span class="kw-2">mut </span>rng = SmallRng::seed_from_u64(startup_time);
+    <span class="kw">let </span>rng_upper_bound = u16::max_value() - STARTING_FREE_PORT;
 
-    <span class="comment">// the below items may be overwritten on each loop iteration, if the socket was closed and we need to create a new one</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">local_port</span> <span class="op">=</span> <span class="ident">STARTING_FREE_PORT</span> <span class="op">+</span> (<span class="ident">rng</span>.<span class="ident">next_u32</span>() <span class="kw">as</span> <span class="ident">u16</span> <span class="op">%</span> <span class="ident">rng_upper_bound</span>);
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tcp_rx_buffer</span> <span class="op">=</span> <span class="ident">TcpSocketBuffer::new</span>(<span class="macro">vec!</span>[<span class="number">0</span>; <span class="number">4096</span>]);
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tcp_tx_buffer</span> <span class="op">=</span> <span class="ident">TcpSocketBuffer::new</span>(<span class="macro">vec!</span>[<span class="number">0</span>; <span class="number">4096</span>]);
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tcp_socket</span> <span class="op">=</span> <span class="ident">TcpSocket::new</span>(<span class="ident">tcp_rx_buffer</span>, <span class="ident">tcp_tx_buffer</span>);
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sockets</span> <span class="op">=</span> <span class="ident">SocketSet::new</span>(<span class="ident">Vec::with_capacity</span>(<span class="number">1</span>));
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tcp_handle</span> <span class="op">=</span> <span class="ident">sockets</span>.<span class="ident">add</span>(<span class="ident">tcp_socket</span>);
+    <span class="comment">// the below items may be overwritten on each loop iteration, if the socket was closed and we need to create a new one
+    </span><span class="kw">let </span><span class="kw-2">mut </span>local_port = STARTING_FREE_PORT + (rng.next_u32() <span class="kw">as </span>u16 % rng_upper_bound);
+    <span class="kw">let </span><span class="kw-2">mut </span>tcp_rx_buffer = TcpSocketBuffer::new(<span class="macro">vec!</span>[<span class="number">0</span>; <span class="number">4096</span>]);
+    <span class="kw">let </span><span class="kw-2">mut </span>tcp_tx_buffer = TcpSocketBuffer::new(<span class="macro">vec!</span>[<span class="number">0</span>; <span class="number">4096</span>]);
+    <span class="kw">let </span><span class="kw-2">mut </span>tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
+    <span class="kw">let </span><span class="kw-2">mut </span>sockets = SocketSet::new(Vec::with_capacity(<span class="number">1</span>));
+    <span class="kw">let </span><span class="kw-2">mut </span>tcp_handle = sockets.add(tcp_socket);
 
-    <span class="comment">// first, attempt to connect the socket to the remote server</span>
-    <span class="ident">connect</span>(<span class="ident">iface</span>, <span class="kw-2">&amp;mut</span> <span class="ident">sockets</span>, <span class="ident">tcp_handle</span>, <span class="ident">remote_endpoint</span>, <span class="ident">local_port</span>, <span class="ident">startup_time</span>)<span class="question-mark">?</span>;
+    <span class="comment">// first, attempt to connect the socket to the remote server
+    </span>connect(iface, <span class="kw-2">&amp;mut </span>sockets, tcp_handle, remote_endpoint, local_port, startup_time)<span class="question-mark">?</span>;
     <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: socket connected successfully!&quot;</span>);
 
-    <span class="comment">// iterate over the provided list of file paths, and retrieve each one via HTTP</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">downloaded_files</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">DownloadedFile</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">absolute_paths</span>.<span class="ident">len</span>());
-    <span class="kw">let</span> <span class="ident">last_index</span> <span class="op">=</span> <span class="ident">absolute_paths</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="number">1</span>;
-    <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">path</span>) <span class="kw">in</span> <span class="ident">absolute_paths</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
-        <span class="kw">let</span> <span class="ident">path</span> <span class="op">=</span> <span class="ident">path</span>.<span class="ident">as_ref</span>();
-        <span class="kw">let</span> <span class="ident">is_last_request</span> <span class="op">=</span> <span class="ident">i</span> <span class="op">==</span> <span class="ident">last_index</span>;
+    <span class="comment">// iterate over the provided list of file paths, and retrieve each one via HTTP
+    </span><span class="kw">let </span><span class="kw-2">mut </span>downloaded_files: Vec&lt;DownloadedFile&gt; = Vec::with_capacity(absolute_paths.len());
+    <span class="kw">let </span>last_index = absolute_paths.len() - <span class="number">1</span>;
+    <span class="kw">for </span>(i, path) <span class="kw">in </span>absolute_paths.iter().enumerate() {
+        <span class="kw">let </span>path = path.as_ref();
+        <span class="kw">let </span>is_last_request = i == last_index;
 
-        <span class="kw">let</span> <span class="ident">http_request</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">method</span> <span class="op">=</span> <span class="string">&quot;GET&quot;</span>;
-            <span class="kw">let</span> <span class="ident">uri</span> <span class="op">=</span> <span class="ident">utf8_percent_encode</span>(<span class="ident">path</span>, <span class="ident">DEFAULT_ENCODE_SET</span>);
-            <span class="kw">let</span> <span class="ident">version</span> <span class="op">=</span> <span class="string">&quot;HTTP/1.1&quot;</span>;
-            <span class="kw">let</span> <span class="ident">connection</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">is_last_request</span> { <span class="string">&quot;Connection: close&quot;</span> } <span class="kw">else</span> { <span class="string">&quot;Connection: keep-alive&quot;</span> };
+        <span class="kw">let </span>http_request = {
+            <span class="kw">let </span>method = <span class="string">&quot;GET&quot;</span>;
+            <span class="kw">let </span>uri = utf8_percent_encode(path, DEFAULT_ENCODE_SET);
+            <span class="kw">let </span>version = <span class="string">&quot;HTTP/1.1&quot;</span>;
+            <span class="kw">let </span>connection = <span class="kw">if </span>is_last_request { <span class="string">&quot;Connection: close&quot; </span>} <span class="kw">else </span>{ <span class="string">&quot;Connection: keep-alive&quot; </span>};
             <span class="macro">format!</span>(<span class="string">&quot;{} {} {}\r\n{}\r\n{}\r\n\r\n&quot;</span>,
-                <span class="ident">method</span>,
-                <span class="ident">uri</span>,
-                <span class="ident">version</span>,
-                <span class="macro">format_args!</span>(<span class="string">&quot;Host: {}:{}&quot;</span>, <span class="ident">remote_endpoint</span>.<span class="ident">addr</span>, <span class="ident">remote_endpoint</span>.<span class="ident">port</span>), <span class="comment">// host</span>
-                <span class="ident">connection</span>
+                method,
+                uri,
+                version,
+                <span class="macro">format_args!</span>(<span class="string">&quot;Host: {}:{}&quot;</span>, remote_endpoint.addr, remote_endpoint.port), <span class="comment">// host
+                </span>connection
             )
         };
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">check_http_request</span>(<span class="ident">http_request</span>.<span class="ident">as_bytes</span>()) {
-            <span class="macro">error!</span>(<span class="string">&quot;ota_update_client: created improper/incomplete HTTP request: {:?}.&quot;</span>, <span class="ident">http_request</span>);
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;ota_update_client: created improper/incomplete HTTP request&quot;</span>);
+        <span class="kw">if </span>!check_http_request(http_request.as_bytes()) {
+            <span class="macro">error!</span>(<span class="string">&quot;ota_update_client: created improper/incomplete HTTP request: {:?}.&quot;</span>, http_request);
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;ota_update_client: created improper/incomplete HTTP request&quot;</span>);
         }
 
-        <span class="comment">// Check that the socket is still connected. If not, we need to create a new one and connect it before use. </span>
-        <span class="comment">// if !is_connected(&amp;mut sockets, tcp_handle) {</span>
-        <span class="comment">// for now, we just always close the old socket and connect a new one</span>
-        {
+        <span class="comment">// Check that the socket is still connected. If not, we need to create a new one and connect it before use. 
+        // if !is_connected(&amp;mut sockets, tcp_handle) {
+        // for now, we just always close the old socket and connect a new one
+        </span>{
             <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: remote endpoint closed socket after response, opening a new socket.&quot;</span>);
-            <span class="comment">// first, close the existing socket</span>
-            {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">sockets</span>.<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">TcpSocket</span><span class="op">&gt;</span>(<span class="ident">tcp_handle</span>);
-                <span class="ident">socket</span>.<span class="ident">close</span>(); 
-                <span class="ident">socket</span>.<span class="ident">abort</span>(); 
+            <span class="comment">// first, close the existing socket
+            </span>{
+                <span class="kw">let </span><span class="kw-2">mut </span>socket = sockets.get::&lt;TcpSocket&gt;(tcp_handle);
+                socket.close(); 
+                socket.abort(); 
             }
-            <span class="kw">let</span> <span class="ident">_packet_io_occurred</span> <span class="op">=</span> <span class="ident">poll_iface</span>(<span class="kw-2">&amp;</span><span class="ident">iface</span>, <span class="kw-2">&amp;mut</span> <span class="ident">sockets</span>, <span class="ident">startup_time</span>)<span class="question-mark">?</span>;
+            <span class="kw">let </span>_packet_io_occurred = poll_iface(<span class="kw-2">&amp;</span>iface, <span class="kw-2">&amp;mut </span>sockets, startup_time)<span class="question-mark">?</span>;
             
-            <span class="comment">// second, create an entirely new socket and connect it</span>
-            <span class="ident">local_port</span> <span class="op">=</span> <span class="ident">STARTING_FREE_PORT</span> <span class="op">+</span> (<span class="ident">rng</span>.<span class="ident">next_u32</span>() <span class="kw">as</span> <span class="ident">u16</span> <span class="op">%</span> <span class="ident">rng_upper_bound</span>);
-            <span class="ident">tcp_rx_buffer</span> <span class="op">=</span> <span class="ident">TcpSocketBuffer::new</span>(<span class="macro">vec!</span>[<span class="number">0</span>; <span class="number">4096</span>]);
-            <span class="ident">tcp_tx_buffer</span> <span class="op">=</span> <span class="ident">TcpSocketBuffer::new</span>(<span class="macro">vec!</span>[<span class="number">0</span>; <span class="number">4096</span>]);
-            <span class="ident">tcp_socket</span> <span class="op">=</span> <span class="ident">TcpSocket::new</span>(<span class="ident">tcp_rx_buffer</span>, <span class="ident">tcp_tx_buffer</span>);
-            <span class="ident">sockets</span> <span class="op">=</span> <span class="ident">SocketSet::new</span>(<span class="ident">Vec::with_capacity</span>(<span class="number">1</span>));
-            <span class="ident">tcp_handle</span> <span class="op">=</span> <span class="ident">sockets</span>.<span class="ident">add</span>(<span class="ident">tcp_socket</span>);
-            <span class="ident">connect</span>(<span class="ident">iface</span>, <span class="kw-2">&amp;mut</span> <span class="ident">sockets</span>, <span class="ident">tcp_handle</span>, <span class="ident">remote_endpoint</span>, <span class="ident">local_port</span>, <span class="ident">startup_time</span>)<span class="question-mark">?</span>;
+            <span class="comment">// second, create an entirely new socket and connect it
+            </span>local_port = STARTING_FREE_PORT + (rng.next_u32() <span class="kw">as </span>u16 % rng_upper_bound);
+            tcp_rx_buffer = TcpSocketBuffer::new(<span class="macro">vec!</span>[<span class="number">0</span>; <span class="number">4096</span>]);
+            tcp_tx_buffer = TcpSocketBuffer::new(<span class="macro">vec!</span>[<span class="number">0</span>; <span class="number">4096</span>]);
+            tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
+            sockets = SocketSet::new(Vec::with_capacity(<span class="number">1</span>));
+            tcp_handle = sockets.add(tcp_socket);
+            connect(iface, <span class="kw-2">&amp;mut </span>sockets, tcp_handle, remote_endpoint, local_port, startup_time)<span class="question-mark">?</span>;
         }
 
-        <span class="comment">// send the HTTP request and obtain a response</span>
-        <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">connected_tcp_socket</span> <span class="op">=</span> <span class="ident">ConnectedTcpSocket::new</span>(<span class="kw-2">&amp;</span><span class="ident">iface</span>, <span class="kw-2">&amp;mut</span> <span class="ident">sockets</span>, <span class="ident">tcp_handle</span>)<span class="question-mark">?</span>;
-            <span class="ident">send_request</span>(<span class="ident">http_request</span>, <span class="kw-2">&amp;mut</span> <span class="ident">connected_tcp_socket</span>, <span class="prelude-val">Some</span>(<span class="ident">HTTP_REQUEST_TIMEOUT_MILLIS</span>))<span class="question-mark">?</span>
-        };
+        <span class="comment">// send the HTTP request and obtain a response
+        </span><span class="kw">let </span>response = {
+            <span class="kw">let </span><span class="kw-2">mut </span>connected_tcp_socket = ConnectedTcpSocket::new(<span class="kw-2">&amp;</span>iface, <span class="kw-2">&amp;mut </span>sockets, tcp_handle)<span class="question-mark">?</span>;
+            send_request(http_request, <span class="kw-2">&amp;mut </span>connected_tcp_socket, <span class="prelude-val">Some</span>(HTTP_REQUEST_TIMEOUT_MILLIS))<span class="question-mark">?
+        </span>};
 
-        <span class="kw">if</span> <span class="ident">response</span>.<span class="ident">status_code</span> <span class="op">!</span><span class="op">=</span> <span class="number">200</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;ota_update_client: failed to download {:?}, Error {}: {}&quot;</span>, <span class="ident">path</span>, <span class="ident">response</span>.<span class="ident">status_code</span>, <span class="ident">response</span>.<span class="ident">reason</span>);
+        <span class="kw">if </span>response.status_code != <span class="number">200 </span>{
+            <span class="macro">error!</span>(<span class="string">&quot;ota_update_client: failed to download {:?}, Error {}: {}&quot;</span>, path, response.status_code, response.reason);
             <span class="kw">break</span>;
         }
 
-        <span class="ident">downloaded_files</span>.<span class="ident">push</span>(<span class="ident">DownloadedFile</span> {
-            <span class="ident">name</span>: <span class="ident">path</span>.<span class="ident">into</span>(),
-            <span class="ident">content</span>: <span class="ident">response</span>,
+        downloaded_files.push(DownloadedFile {
+            name: path.into(),
+            content: response,
         });
     }
 
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">_loop_ctr</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">issued_close</span> <span class="op">=</span> <span class="bool-val">false</span>;
-    <span class="kw">let</span> <span class="ident">timeout_millis</span> <span class="op">=</span> <span class="number">3000</span>; <span class="comment">// 3 second timeout</span>
-    <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="macro">hpet_ticks!</span>();
-    <span class="kw">loop</span> {
-        <span class="ident">_loop_ctr</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>_loop_ctr = <span class="number">0</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>issued_close = <span class="bool-val">false</span>;
+    <span class="kw">let </span>timeout_millis = <span class="number">3000</span>; <span class="comment">// 3 second timeout
+    </span><span class="kw">let </span>start = <span class="macro">hpet_ticks!</span>();
+    <span class="kw">loop </span>{
+        _loop_ctr += <span class="number">1</span>;
 
-        <span class="kw">let</span> <span class="ident">_packet_io_occurred</span> <span class="op">=</span> <span class="ident">poll_iface</span>(<span class="kw-2">&amp;</span><span class="ident">iface</span>, <span class="kw-2">&amp;mut</span> <span class="ident">sockets</span>, <span class="ident">startup_time</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>_packet_io_occurred = poll_iface(<span class="kw-2">&amp;</span>iface, <span class="kw-2">&amp;mut </span>sockets, startup_time)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">socket</span> <span class="op">=</span> <span class="ident">sockets</span>.<span class="ident">get</span>::<span class="op">&lt;</span><span class="ident">TcpSocket</span><span class="op">&gt;</span>(<span class="ident">tcp_handle</span>);
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">issued_close</span> {
-            <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: socket state is {:?}&quot;</span>, <span class="ident">socket</span>.<span class="ident">state</span>());
+        <span class="kw">let </span><span class="kw-2">mut </span>socket = sockets.get::&lt;TcpSocket&gt;(tcp_handle);
+        <span class="kw">if </span>!issued_close {
+            <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: socket state is {:?}&quot;</span>, socket.state());
 
             <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: closing socket...&quot;</span>);
-            <span class="ident">socket</span>.<span class="ident">close</span>();
-            <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: socket state (after close) is now {:?}&quot;</span>, <span class="ident">socket</span>.<span class="ident">state</span>());
-            <span class="ident">issued_close</span> <span class="op">=</span> <span class="bool-val">true</span>;
+            socket.close();
+            <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: socket state (after close) is now {:?}&quot;</span>, socket.state());
+            issued_close = <span class="bool-val">true</span>;
         }
 
-        <span class="kw">if</span> <span class="ident">socket</span>.<span class="ident">state</span>() <span class="op">==</span> <span class="ident">TcpState::Closed</span> {
+        <span class="kw">if </span>socket.state() == TcpState::Closed {
             <span class="kw">break</span>;
         }
 
-        <span class="kw">if</span> <span class="ident">_loop_ctr</span> <span class="op">%</span> <span class="number">50000</span> <span class="op">==</span> <span class="number">0</span> {
-            <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: socket state (looping) is now {:?}&quot;</span>, <span class="ident">socket</span>.<span class="ident">state</span>());
+        <span class="kw">if </span>_loop_ctr % <span class="number">50000 </span>== <span class="number">0 </span>{
+            <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: socket state (looping) is now {:?}&quot;</span>, socket.state());
         }
 
-        <span class="comment">// check to make sure we haven&#39;t timed out</span>
-        <span class="kw">if</span> <span class="ident">millis_since</span>(<span class="ident">start</span>)<span class="question-mark">?</span> <span class="op">&gt;</span> <span class="ident">timeout_millis</span> {
+        <span class="comment">// check to make sure we haven&#39;t timed out
+        </span><span class="kw">if </span>millis_since(start)<span class="question-mark">? </span>&gt; timeout_millis {
             <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: timed out waiting to close socket, closing it manually with an abort.&quot;</span>);
-            <span class="ident">socket</span>.<span class="ident">abort</span>();
-            <span class="comment">// Don&#39;t break out of the loop here!  we need to let this socket actually send the close msg</span>
-            <span class="comment">// to the remote endpoint, which requires another call to poll_iface (which will happen at the top of the loop).</span>
-            <span class="comment">// Then, the socket will be in the Closed state, and that conditional above will break out of the loop. </span>
-        }
+            socket.abort();
+            <span class="comment">// Don&#39;t break out of the loop here!  we need to let this socket actually send the close msg
+            // to the remote endpoint, which requires another call to poll_iface (which will happen at the top of the loop).
+            // Then, the socket will be in the Closed state, and that conditional above will break out of the loop. 
+        </span>}
     }
 
-    <span class="kw">if</span> <span class="ident">downloaded_files</span>.<span class="ident">len</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">absolute_paths</span>.<span class="ident">len</span>() {
-        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;failed to download all specified files&quot;</span>);
+    <span class="kw">if </span>downloaded_files.len() != absolute_paths.len() {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;failed to download all specified files&quot;</span>);
     }
 
-    <span class="prelude-val">Ok</span>(<span class="ident">downloaded_files</span>)
+    <span class="prelude-val">Ok</span>(downloaded_files)
 }
 
 
-<span class="comment">// /// A convenience function that checks whether a socket is connected, </span>
-<span class="comment">// /// which is currently true when both `may_send()` and `may_recv()` are true.</span>
-<span class="comment">// fn is_connected(sockets: &amp;mut SocketSet, tcp_handle: SocketHandle) -&gt; bool {</span>
-<span class="comment">//     let socket = sockets.get::&lt;TcpSocket&gt;(tcp_handle);</span>
-<span class="comment">//     socket.may_send() &amp;&amp; socket.may_recv()</span>
-<span class="comment">// }</span>
+<span class="comment">// /// A convenience function that checks whether a socket is connected, 
+// /// which is currently true when both `may_send()` and `may_recv()` are true.
+// fn is_connected(sockets: &amp;mut SocketSet, tcp_handle: SocketHandle) -&gt; bool {
+//     let socket = sockets.get::&lt;TcpSocket&gt;(tcp_handle);
+//     socket.may_send() &amp;&amp; socket.may_recv()
+// }
 
 
-<span class="doccomment">/// Returns true if the SHA3 512-bit hash of the given `content` matches the given `hash` string.</span>
-<span class="doccomment">/// The `hash` string must be 64 hexadecimal characters, otherwise `false` will be returned. </span>
-<span class="kw">fn</span> <span class="ident">verify_hash</span>(<span class="ident">content</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">hash</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">bool</span> {
-    <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">Sha3_512::digest</span>(<span class="ident">content</span>);
-    <span class="ident">hash</span> <span class="op">==</span> <span class="macro">format!</span>(<span class="string">&quot;{:x}&quot;</span>, <span class="ident">result</span>)
+</span><span class="doccomment">/// Returns true if the SHA3 512-bit hash of the given `content` matches the given `hash` string.
+/// The `hash` string must be 64 hexadecimal characters, otherwise `false` will be returned. 
+</span><span class="kw">fn </span>verify_hash(content: <span class="kw-2">&amp;</span>[u8], hash: <span class="kw-2">&amp;</span>str) -&gt; bool {
+    <span class="kw">let </span>result = Sha3_512::digest(content);
+    hash == <span class="macro">format!</span>(<span class="string">&quot;{:x}&quot;</span>, result)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ota_update_client" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ota_update_client" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

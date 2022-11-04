@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/wait_queue/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../wait_queue/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../wait_queue/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../wait_queue/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/wait_queue/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../wait_queue/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -235,236 +229,235 @@
 <span id="229">229</span>
 <span id="230">230</span>
 <span id="231">231</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
+</pre><pre class="rust"><code><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">scheduler</span>;
-
-
-<span class="kw">use</span> <span class="ident">alloc::collections::VecDeque</span>;
-<span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
-<span class="kw">use</span> <span class="ident">task</span>::{<span class="ident">TaskRef</span>, <span class="ident">RunState</span>};
+</span><span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>task;
+<span class="kw">extern crate </span>scheduler;
 
 
-<span class="doccomment">/// An object that holds a blocked `Task` </span>
-<span class="doccomment">/// that will be automatically unblocked upon drop.  </span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WaitGuard</span> {
-    <span class="ident">task</span>: <span class="ident">TaskRef</span>,
+<span class="kw">use </span>alloc::collections::VecDeque;
+<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>task::{TaskRef, RunState};
+
+
+<span class="doccomment">/// An object that holds a blocked `Task` 
+/// that will be automatically unblocked upon drop.  
+</span><span class="kw">pub struct </span>WaitGuard {
+    task: TaskRef,
 }
-<span class="kw">impl</span> <span class="ident">WaitGuard</span> {
-    <span class="doccomment">/// Blocks the given `Task` and returns a new `WaitGuard` object</span>
-    <span class="doccomment">/// that will automatically unblock that Task when it is dropped. </span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Returns an error if the task cannot be blocked. See [`Task::block`] for</span>
-    <span class="doccomment">///  more details.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">task</span>: <span class="ident">TaskRef</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">WaitGuard</span>, <span class="ident">RunState</span><span class="op">&gt;</span> {
-        <span class="ident">task</span>.<span class="ident">block</span>()<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="ident">WaitGuard</span> {
-            <span class="ident">task</span>,
+<span class="kw">impl </span>WaitGuard {
+    <span class="doccomment">/// Blocks the given `Task` and returns a new `WaitGuard` object
+    /// that will automatically unblock that Task when it is dropped. 
+    ///
+    /// Returns an error if the task cannot be blocked. See [`Task::block`] for
+    ///  more details.
+    </span><span class="kw">pub fn </span>new(task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;WaitGuard, RunState&gt; {
+        task.block()<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(WaitGuard {
+            task,
         })
     }
 
-    <span class="doccomment">/// Blocks the task guarded by this waitguard,</span>
-    <span class="doccomment">/// which is useful to re-block a task after it spuriously woke up. </span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Returns an error if the task cannot be blocked. See [`Task::block`] for</span>
-    <span class="doccomment">///  more details.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">block_again</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">RunState</span>, <span class="ident">RunState</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">task</span>.<span class="ident">block</span>()
+    <span class="doccomment">/// Blocks the task guarded by this waitguard,
+    /// which is useful to re-block a task after it spuriously woke up. 
+    ///
+    /// Returns an error if the task cannot be blocked. See [`Task::block`] for
+    ///  more details.
+    </span><span class="kw">pub fn </span>block_again(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;RunState, RunState&gt; {
+        <span class="self">self</span>.task.block()
     }
 
-    <span class="doccomment">/// Returns a reference to the `Task` being blocked in this `WaitGuard`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">task</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">TaskRef</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">task</span>
-    }
-}
-<span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">WaitGuard</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">task</span>.<span class="ident">unblock</span>().<span class="ident">unwrap</span>();
+    <span class="doccomment">/// Returns a reference to the `Task` being blocked in this `WaitGuard`.
+    </span><span class="kw">pub fn </span>task(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>TaskRef {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.task
     }
 }
-
-
-<span class="doccomment">/// Errors that may occur while waiting on a waitqueue/condition/event.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">WaitError</span> {
-    <span class="ident">NoCurrentTask</span>,
-    <span class="ident">Interrupted</span>,
-    <span class="ident">Timeout</span>,
-    <span class="ident">SpuriousWakeup</span>,
-    <span class="ident">CantBlockCurrentTask</span>,
+<span class="kw">impl </span>Drop <span class="kw">for </span>WaitGuard {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.task.unblock().unwrap();
+    }
 }
 
-<span class="doccomment">/// A queue in which multiple `Task`s can wait for other `Task`s to notify them.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This can be shared across multiple `Task`s by wrapping it in an `Arc`. </span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WaitQueue</span>(<span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">TaskRef</span><span class="op">&gt;</span><span class="op">&gt;</span>);
 
-<span class="comment">// ******************************************************************</span>
-<span class="comment">// ************ IMPORTANT IMPLEMENTATION NOTE ***********************</span>
-<span class="comment">// All modification of task runstates must be performed atomically </span>
-<span class="comment">// with respect to adding or removing those tasks to/from the waitqueue itself.</span>
-<span class="comment">// Otherwise, there could be interleavings that result in tasks not being notified properly,</span>
-<span class="comment">// or not actually being put to sleep when being placed on the waitqueue, </span>
-<span class="comment">// or the task being switched away from after setting itself to blocked (when waiting) </span>
-<span class="comment">// but before it can release its lock on the waitqueue.</span>
-<span class="comment">//    (Because once a task is blocked, it can never run again and thus </span>
-<span class="comment">//     has no chance to release its waitqueue lock, causing deadlock).</span>
-<span class="comment">// Thus, we disable preemption (well, currently we disable interrupts) </span>
-<span class="comment">// AND hold the waitqueue lock while changing task runstate, </span>
-<span class="comment">// which ensures that once the task is blocked it will always release its waitqueue lock.</span>
-<span class="comment">// ******************************************************************</span>
+<span class="doccomment">/// Errors that may occur while waiting on a waitqueue/condition/event.
+</span><span class="attr">#[derive(Debug, PartialEq)]
+</span><span class="kw">pub enum </span>WaitError {
+    NoCurrentTask,
+    Interrupted,
+    Timeout,
+    SpuriousWakeup,
+    CantBlockCurrentTask,
+}
 
-<span class="kw">impl</span> <span class="ident">WaitQueue</span> {
-    <span class="doccomment">/// Create a new empty WaitQueue.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">WaitQueue</span> {
-        <span class="ident">WaitQueue::with_capacity</span>(<span class="number">4</span>)
+<span class="doccomment">/// A queue in which multiple `Task`s can wait for other `Task`s to notify them.
+/// 
+/// This can be shared across multiple `Task`s by wrapping it in an `Arc`. 
+</span><span class="kw">pub struct </span>WaitQueue(MutexIrqSafe&lt;VecDeque&lt;TaskRef&gt;&gt;);
+
+<span class="comment">// ******************************************************************
+// ************ IMPORTANT IMPLEMENTATION NOTE ***********************
+// All modification of task runstates must be performed atomically 
+// with respect to adding or removing those tasks to/from the waitqueue itself.
+// Otherwise, there could be interleavings that result in tasks not being notified properly,
+// or not actually being put to sleep when being placed on the waitqueue, 
+// or the task being switched away from after setting itself to blocked (when waiting) 
+// but before it can release its lock on the waitqueue.
+//    (Because once a task is blocked, it can never run again and thus 
+//     has no chance to release its waitqueue lock, causing deadlock).
+// Thus, we disable preemption (well, currently we disable interrupts) 
+// AND hold the waitqueue lock while changing task runstate, 
+// which ensures that once the task is blocked it will always release its waitqueue lock.
+// ******************************************************************
+
+</span><span class="kw">impl </span>WaitQueue {
+    <span class="doccomment">/// Create a new empty WaitQueue.
+    </span><span class="kw">pub fn </span>new() -&gt; WaitQueue {
+        WaitQueue::with_capacity(<span class="number">4</span>)
     }
 
-    <span class="doccomment">/// Create a new empty WaitQueue.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_capacity</span>(<span class="ident">initial_capacity</span>: <span class="ident">usize</span>) -&gt; <span class="ident">WaitQueue</span> {
-        <span class="ident">WaitQueue</span>(<span class="ident">MutexIrqSafe::new</span>(<span class="ident">VecDeque::with_capacity</span>(<span class="ident">initial_capacity</span>)))
+    <span class="doccomment">/// Create a new empty WaitQueue.
+    </span><span class="kw">pub fn </span>with_capacity(initial_capacity: usize) -&gt; WaitQueue {
+        WaitQueue(MutexIrqSafe::new(VecDeque::with_capacity(initial_capacity)))
     }
 
-    <span class="doccomment">/// Puts the current `Task` to sleep where it blocks on this `WaitQueue`</span>
-    <span class="doccomment">/// until it is notified by another `Task`. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// If the `Task` wakes up spuriously (it is still on the waitqueue),</span>
-    <span class="doccomment">/// it will be automatically put back to sleep until it is properly woken up. </span>
-    <span class="doccomment">/// Therefore, there is no need for the caller to check for spurious wakeups.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// This function blocks until the `Task` is woken up through the notify mechanism.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">wait</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">WaitError</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">wait_until</span>(<span class="kw-2">&amp;</span><span class="op">|</span><span class="comment">/* _ */</span><span class="op">|</span> <span class="prelude-val">Some</span>(()))
+    <span class="doccomment">/// Puts the current `Task` to sleep where it blocks on this `WaitQueue`
+    /// until it is notified by another `Task`. 
+    /// 
+    /// If the `Task` wakes up spuriously (it is still on the waitqueue),
+    /// it will be automatically put back to sleep until it is properly woken up. 
+    /// Therefore, there is no need for the caller to check for spurious wakeups.
+    /// 
+    /// This function blocks until the `Task` is woken up through the notify mechanism.
+    </span><span class="kw">pub fn </span>wait(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), WaitError&gt; {
+        <span class="self">self</span>.wait_until(<span class="kw-2">&amp;</span>|<span class="comment">/* _ */</span>| <span class="prelude-val">Some</span>(()))
     }
 
-    <span class="doccomment">/// Similar to [`wait`](#method.wait), but this function blocks until the given</span>
-    <span class="doccomment">/// `condition` closure returns `Some(value)`, and then returns that `value` inside `Ok()`.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// The `condition` will be executed atomically with respect to the wait queue,</span>
-    <span class="doccomment">/// which avoids the problem of a waiting task missing a &quot;notify&quot; from another task</span>
-    <span class="doccomment">/// due to interleaving of instructions that may occur if the `condition` is checked </span>
-    <span class="doccomment">/// when the wait queue lock is not held. </span>
-    <span class="doccomment">/// </span>
-    <span class="comment">// /// The `condition` closure is invoked with one argument, an immutable reference to the waitqueue, </span>
-    <span class="comment">// /// to allow the closure to examine the condition of the waitqueue if necessary. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">wait_until</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">condition</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Fn</span>(<span class="comment">/* &amp;VecDeque&lt;TaskRef&gt; */</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">WaitError</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">curr_task</span> <span class="op">=</span> <span class="ident">task::get_my_current_task</span>().<span class="ident">ok_or</span>(<span class="ident">WaitError::NoCurrentTask</span>)<span class="question-mark">?</span>;
+    <span class="doccomment">/// Similar to [`wait`](#method.wait), but this function blocks until the given
+    /// `condition` closure returns `Some(value)`, and then returns that `value` inside `Ok()`.
+    /// 
+    /// The `condition` will be executed atomically with respect to the wait queue,
+    /// which avoids the problem of a waiting task missing a &quot;notify&quot; from another task
+    /// due to interleaving of instructions that may occur if the `condition` is checked 
+    /// when the wait queue lock is not held. 
+    /// 
+    </span><span class="comment">// /// The `condition` closure is invoked with one argument, an immutable reference to the waitqueue, 
+    // /// to allow the closure to examine the condition of the waitqueue if necessary. 
+    </span><span class="kw">pub fn </span>wait_until&lt;R&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, condition: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Fn(<span class="comment">/* &amp;VecDeque&lt;TaskRef&gt; */</span>) -&gt; <span class="prelude-ty">Option</span>&lt;R&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;R, WaitError&gt; {
+        <span class="kw">let </span>curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)<span class="question-mark">?</span>;
 
-        <span class="comment">// Do the following atomically:</span>
-        <span class="comment">// (1) Obtain the waitqueue lock</span>
-        <span class="comment">// (2) Add the current task to the waitqueue</span>
-        <span class="comment">// (3) Set the current task&#39;s runstate to `Blocked`</span>
-        <span class="comment">// (4) Release the lock on the waitqueue.</span>
-        <span class="kw">loop</span> {
+        <span class="comment">// Do the following atomically:
+        // (1) Obtain the waitqueue lock
+        // (2) Add the current task to the waitqueue
+        // (3) Set the current task&#39;s runstate to `Blocked`
+        // (4) Release the lock on the waitqueue.
+        </span><span class="kw">loop </span>{
             {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wq_locked</span> <span class="op">=</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">lock</span>();
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">ret</span>) <span class="op">=</span> <span class="ident">condition</span>(<span class="comment">/* &amp;wq_locked */</span>) {
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">ret</span>);
+                <span class="kw">let </span><span class="kw-2">mut </span>wq_locked = <span class="self">self</span>.<span class="number">0</span>.lock();
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(ret) = condition(<span class="comment">/* &amp;wq_locked */</span>) {
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(ret);
                 }
-                <span class="comment">// This is only necessary because we&#39;re using a non-Set waitqueue collection that allows duplicates</span>
-                <span class="kw">if</span> <span class="op">!</span><span class="ident">wq_locked</span>.<span class="ident">contains</span>(<span class="ident">curr_task</span>) {
-                    <span class="ident">wq_locked</span>.<span class="ident">push_back</span>(<span class="ident">curr_task</span>.<span class="ident">clone</span>());
-                } <span class="kw">else</span> {
-                    <span class="macro">warn!</span>(<span class="string">&quot;WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}&quot;</span>, <span class="ident">curr_task</span>);
+                <span class="comment">// This is only necessary because we&#39;re using a non-Set waitqueue collection that allows duplicates
+                </span><span class="kw">if </span>!wq_locked.contains(curr_task) {
+                    wq_locked.push_back(curr_task.clone());
+                } <span class="kw">else </span>{
+                    <span class="macro">warn!</span>(<span class="string">&quot;WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}&quot;</span>, curr_task);
                 }
-                <span class="comment">// trace!(&quot;WaitQueue::wait_until():  putting task to sleep: {:?}\n    --&gt; WQ: {:?}&quot;, curr_task, &amp;*wq_locked);</span>
-                <span class="ident">curr_task</span>.<span class="ident">block</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">WaitError::CantBlockCurrentTask</span>)<span class="question-mark">?</span>;
+                <span class="comment">// trace!(&quot;WaitQueue::wait_until():  putting task to sleep: {:?}\n    --&gt; WQ: {:?}&quot;, curr_task, &amp;*wq_locked);
+                </span>curr_task.block().map_err(|<span class="kw">_</span>| WaitError::CantBlockCurrentTask)<span class="question-mark">?</span>;
             }
-            <span class="ident">scheduler::schedule</span>();
+            scheduler::schedule();
 
-            <span class="comment">// Here, we have been woken up, so loop back around and check the condition again</span>
-            <span class="comment">// trace!(&quot;WaitQueue::wait_until():  woke up!&quot;);</span>
-        }
+            <span class="comment">// Here, we have been woken up, so loop back around and check the condition again
+            // trace!(&quot;WaitQueue::wait_until():  woke up!&quot;);
+        </span>}
     }
 
-    <span class="doccomment">/// Similar to [`wait_until`](#method.wait_until), but this function accepts a `condition` closure</span>
-    <span class="doccomment">/// that can mutate its environment (a `FnMut`).</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">wait_until_mut</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">condition</span>: <span class="kw-2">&amp;mut</span> <span class="ident">dyn</span> <span class="ident">FnMut</span>(<span class="comment">/* &amp;VecDeque&lt;TaskRef&gt; */</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">R</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">WaitError</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">curr_task</span> <span class="op">=</span> <span class="ident">task::get_my_current_task</span>().<span class="ident">ok_or</span>(<span class="ident">WaitError::NoCurrentTask</span>)<span class="question-mark">?</span>;
+    <span class="doccomment">/// Similar to [`wait_until`](#method.wait_until), but this function accepts a `condition` closure
+    /// that can mutate its environment (a `FnMut`).
+    </span><span class="kw">pub fn </span>wait_until_mut&lt;R&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, condition: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FnMut(<span class="comment">/* &amp;VecDeque&lt;TaskRef&gt; */</span>) -&gt; <span class="prelude-ty">Option</span>&lt;R&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;R, WaitError&gt; {
+        <span class="kw">let </span>curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)<span class="question-mark">?</span>;
 
-        <span class="comment">// Do the following atomically:</span>
-        <span class="comment">// (1) Obtain the waitqueue lock</span>
-        <span class="comment">// (2) Add the current task to the waitqueue</span>
-        <span class="comment">// (3) Set the current task&#39;s runstate to `Blocked`</span>
-        <span class="comment">// (4) Release the lock on the waitqueue.</span>
-        <span class="kw">loop</span> {
+        <span class="comment">// Do the following atomically:
+        // (1) Obtain the waitqueue lock
+        // (2) Add the current task to the waitqueue
+        // (3) Set the current task&#39;s runstate to `Blocked`
+        // (4) Release the lock on the waitqueue.
+        </span><span class="kw">loop </span>{
             {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wq_locked</span> <span class="op">=</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">lock</span>();
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">ret</span>) <span class="op">=</span> <span class="ident">condition</span>(<span class="comment">/* &amp;wq_locked */</span>) {
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">ret</span>);
+                <span class="kw">let </span><span class="kw-2">mut </span>wq_locked = <span class="self">self</span>.<span class="number">0</span>.lock();
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(ret) = condition(<span class="comment">/* &amp;wq_locked */</span>) {
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(ret);
                 }
-                <span class="comment">// This is only necessary because we&#39;re using a non-Set waitqueue collection that allows duplicates</span>
-                <span class="kw">if</span> <span class="op">!</span><span class="ident">wq_locked</span>.<span class="ident">contains</span>(<span class="ident">curr_task</span>) {
-                    <span class="ident">wq_locked</span>.<span class="ident">push_back</span>(<span class="ident">curr_task</span>.<span class="ident">clone</span>());
-                } <span class="kw">else</span> {
-                    <span class="macro">warn!</span>(<span class="string">&quot;WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}&quot;</span>, <span class="ident">curr_task</span>);
+                <span class="comment">// This is only necessary because we&#39;re using a non-Set waitqueue collection that allows duplicates
+                </span><span class="kw">if </span>!wq_locked.contains(curr_task) {
+                    wq_locked.push_back(curr_task.clone());
+                } <span class="kw">else </span>{
+                    <span class="macro">warn!</span>(<span class="string">&quot;WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}&quot;</span>, curr_task);
                 }
-                <span class="comment">// trace!(&quot;WaitQueue::wait_until():  putting task to sleep: {:?}\n    --&gt; WQ: {:?}&quot;, curr_task, &amp;*wq_locked);</span>
-                <span class="ident">curr_task</span>.<span class="ident">block</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">WaitError::CantBlockCurrentTask</span>)<span class="question-mark">?</span>;
+                <span class="comment">// trace!(&quot;WaitQueue::wait_until():  putting task to sleep: {:?}\n    --&gt; WQ: {:?}&quot;, curr_task, &amp;*wq_locked);
+                </span>curr_task.block().map_err(|<span class="kw">_</span>| WaitError::CantBlockCurrentTask)<span class="question-mark">?</span>;
             }
-            <span class="ident">scheduler::schedule</span>();
+            scheduler::schedule();
 
-            <span class="comment">// Here, we have been woken up, so loop back around and check the condition again</span>
-            <span class="comment">// trace!(&quot;WaitQueue::wait_until():  woke up!&quot;);</span>
-        }
+            <span class="comment">// Here, we have been woken up, so loop back around and check the condition again
+            // trace!(&quot;WaitQueue::wait_until():  woke up!&quot;);
+        </span>}
     }
 
-    <span class="doccomment">/// Wake up one random `Task` that is waiting on this queue.</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// * returns `true` if a `Task` was successfully woken up,</span>
-    <span class="doccomment">/// * returns `false` if there were no `Task`s waiting.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">notify_one</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">notify</span>(<span class="prelude-val">None</span>)
+    <span class="doccomment">/// Wake up one random `Task` that is waiting on this queue.
+    /// # Return
+    /// * returns `true` if a `Task` was successfully woken up,
+    /// * returns `false` if there were no `Task`s waiting.
+    </span><span class="kw">pub fn </span>notify_one(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.notify(<span class="prelude-val">None</span>)
     }
 
-    <span class="doccomment">/// Wake up a specific `Task` that is waiting on this queue.</span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// * returns `true` if the given `Task` was waiting and was woken up,</span>
-    <span class="doccomment">/// * returns `false` if there was no such `Task` waiting.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">notify_specific</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">task_to_wakeup</span>: <span class="kw-2">&amp;</span><span class="ident">TaskRef</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">notify</span>(<span class="prelude-val">Some</span>(<span class="ident">task_to_wakeup</span>))
+    <span class="doccomment">/// Wake up a specific `Task` that is waiting on this queue.
+    /// # Return
+    /// * returns `true` if the given `Task` was waiting and was woken up,
+    /// * returns `false` if there was no such `Task` waiting.
+    </span><span class="kw">pub fn </span>notify_specific(<span class="kw-2">&amp;</span><span class="self">self</span>, task_to_wakeup: <span class="kw-2">&amp;</span>TaskRef) -&gt; bool {
+        <span class="self">self</span>.notify(<span class="prelude-val">Some</span>(task_to_wakeup))
     }
     
-    <span class="doccomment">/// The internal routine for notifying / waking up tasks that are blocking on the waitqueue. </span>
-    <span class="doccomment">/// If specified, the given `task_to_wakeup` will be notified, </span>
-    <span class="doccomment">/// otherwise the first task on the waitqueue will be notified.</span>
-    <span class="kw">fn</span> <span class="ident">notify</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">task_to_wakeup</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">TaskRef</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
-        <span class="comment">// trace!(&quot;  notify [top]: task_to_wakeup: {:?}&quot;, task_to_wakeup);</span>
+    <span class="doccomment">/// The internal routine for notifying / waking up tasks that are blocking on the waitqueue. 
+    /// If specified, the given `task_to_wakeup` will be notified, 
+    /// otherwise the first task on the waitqueue will be notified.
+    </span><span class="kw">fn </span>notify(<span class="kw-2">&amp;</span><span class="self">self</span>, task_to_wakeup: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>TaskRef&gt;) -&gt; bool {
+        <span class="comment">// trace!(&quot;  notify [top]: task_to_wakeup: {:?}&quot;, task_to_wakeup);
 
-        <span class="comment">// Do the following atomically:</span>
-        <span class="comment">// (1) Obtain the waitqueue lock</span>
-        <span class="comment">// (2) Choose a task and remove it from the waitqueue</span>
-        <span class="comment">// (3) Set that task&#39;s runstate to `Runnable`</span>
-        <span class="comment">// (4) Release the lock on the waitqueue.</span>
+        // Do the following atomically:
+        // (1) Obtain the waitqueue lock
+        // (2) Choose a task and remove it from the waitqueue
+        // (3) Set that task&#39;s runstate to `Runnable`
+        // (4) Release the lock on the waitqueue.
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wq_locked</span> <span class="op">=</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">lock</span>();
+        </span><span class="kw">let </span><span class="kw-2">mut </span>wq_locked = <span class="self">self</span>.<span class="number">0</span>.lock();
         
-        <span class="kw">loop</span> {
-            <span class="kw">let</span> <span class="ident">tref</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">ttw</span>) <span class="op">=</span> <span class="ident">task_to_wakeup</span> {
-                <span class="comment">// find a specific task to wake up</span>
-                <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident">wq_locked</span>.<span class="ident">iter</span>().<span class="ident">position</span>(<span class="op">|</span><span class="ident">t</span><span class="op">|</span> <span class="ident">t</span> <span class="op">==</span> <span class="ident">ttw</span>);
-                <span class="ident">index</span>.<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="ident">wq_locked</span>.<span class="ident">remove</span>(<span class="ident">i</span>))
-            } <span class="kw">else</span> {
-                <span class="comment">// just wake up the first task</span>
-                <span class="ident">wq_locked</span>.<span class="ident">pop_front</span>()
+        <span class="kw">loop </span>{
+            <span class="kw">let </span>tref = <span class="kw">if let </span><span class="prelude-val">Some</span>(ttw) = task_to_wakeup {
+                <span class="comment">// find a specific task to wake up
+                </span><span class="kw">let </span>index = wq_locked.iter().position(|t| t == ttw);
+                index.and_then(|i| wq_locked.remove(i))
+            } <span class="kw">else </span>{
+                <span class="comment">// just wake up the first task
+                </span>wq_locked.pop_front()
             };
 
-            <span class="comment">// trace!(&quot;  notify: chose task to wakeup: {:?}&quot;, tref);</span>
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">t</span>) <span class="op">=</span> <span class="ident">tref</span> {
-                <span class="comment">// trace!(&quot;WaitQueue::notify():  unblocked task on waitqueue\n    --&gt; WQ: {:?}&quot;, &amp;*wq_locked);</span>
-                <span class="kw">if</span> <span class="ident">t</span>.<span class="ident">unblock</span>().<span class="ident">is_ok</span>() {
-                    <span class="kw">return</span> <span class="bool-val">true</span>;
+            <span class="comment">// trace!(&quot;  notify: chose task to wakeup: {:?}&quot;, tref);
+            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(t) = tref {
+                <span class="comment">// trace!(&quot;WaitQueue::notify():  unblocked task on waitqueue\n    --&gt; WQ: {:?}&quot;, &amp;*wq_locked);
+                </span><span class="kw">if </span>t.unblock().is_ok() {
+                    <span class="kw">return </span><span class="bool-val">true</span>;
                 }
-            } <span class="kw">else</span> {
-                <span class="comment">// trace!(&quot;WaitQueue::notify():  did nothing&quot;);</span>
-                <span class="kw">return</span> <span class="bool-val">false</span>;
+            } <span class="kw">else </span>{
+                <span class="comment">// trace!(&quot;WaitQueue::notify():  did nothing&quot;);
+                </span><span class="kw">return </span><span class="bool-val">false</span>;
             }
         }
     }
 }</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="wait_queue" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="wait_queue" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

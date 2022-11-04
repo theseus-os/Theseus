@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/window_manager/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../window_manager/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../window_manager/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../window_manager/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/window_manager/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../window_manager/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -826,400 +820,400 @@
 <span id="820">820</span>
 <span id="821">821</span>
 <span id="822">822</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This crate acts as a manager of a list of windows. It defines a `WindowManager` structure and an instance of it. </span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! A window manager holds a set of `WindowInner` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! A window manager owns a bottom framebuffer and a top framebuffer. The bottom is the background of the desktop and the top framebuffer contains a floating window border and a mouse arrow. </span>
-<span class="doccomment">//! A window manager also contains a final framebuffer which is mapped to the screen. In refreshing an area, the manager will render all the framebuffers to the final one in order: bottom -&gt; hide list -&gt; showlist -&gt; active -&gt; top.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The window manager provides methods to update within some bounding boxes rather than the whole screen for better performance.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate acts as a manager of a list of windows. It defines a `WindowManager` structure and an instance of it. 
+//!
+//! A window manager holds a set of `WindowInner` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.
+//!
+//! A window manager owns a bottom framebuffer and a top framebuffer. The bottom is the background of the desktop and the top framebuffer contains a floating window border and a mouse arrow. 
+//! A window manager also contains a final framebuffer which is mapped to the screen. In refreshing an area, the manager will render all the framebuffers to the final one in order: bottom -&gt; hide list -&gt; showlist -&gt; active -&gt; top.
+//!
+//! The window manager provides methods to update within some bounding boxes rather than the whole screen for better performance.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mpmc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">event_types</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">compositor</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">framebuffer</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">framebuffer_compositor</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">framebuffer_drawer</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">keycodes_ascii</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mod_mgmt</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mouse_data</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">path</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">scheduler</span>; 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spawn</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">window_inner</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">shapes</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">color</span>;
+</span><span class="kw">extern crate </span>spin;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>mpmc;
+<span class="kw">extern crate </span>event_types;
+<span class="kw">extern crate </span>compositor;
+<span class="kw">extern crate </span>framebuffer;
+<span class="kw">extern crate </span>framebuffer_compositor;
+<span class="kw">extern crate </span>framebuffer_drawer;
+<span class="kw">extern crate </span>keycodes_ascii;
+<span class="kw">extern crate </span>mod_mgmt;
+<span class="kw">extern crate </span>mouse_data;
+<span class="kw">extern crate </span>path;
+<span class="kw">extern crate </span>scheduler; 
+<span class="kw">extern crate </span>spawn;
+<span class="kw">extern crate </span>window_inner;
+<span class="kw">extern crate </span>shapes;
+<span class="kw">extern crate </span>color;
 
-<span class="kw">use</span> <span class="ident">alloc::collections::VecDeque</span>;
-<span class="kw">use</span> <span class="ident">alloc::string::ToString</span>;
-<span class="kw">use</span> <span class="ident">alloc::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Weak</span>};
-<span class="kw">use</span> <span class="ident">alloc::vec</span>::{<span class="ident">Vec</span>};
-<span class="kw">use</span> <span class="ident">compositor</span>::{<span class="ident">Compositor</span>, <span class="ident">FramebufferUpdates</span>, <span class="ident">CompositableRegion</span>};
+<span class="kw">use </span>alloc::collections::VecDeque;
+<span class="kw">use </span>alloc::string::ToString;
+<span class="kw">use </span>alloc::sync::{Arc, Weak};
+<span class="kw">use </span>alloc::vec::{Vec};
+<span class="kw">use </span>compositor::{Compositor, FramebufferUpdates, CompositableRegion};
 
-<span class="kw">use</span> <span class="ident">mpmc::Queue</span>;
-<span class="kw">use</span> <span class="ident">event_types</span>::{<span class="ident">Event</span>, <span class="ident">MousePositionEvent</span>};
-<span class="kw">use</span> <span class="ident">framebuffer</span>::{<span class="ident">Framebuffer</span>, <span class="ident">AlphaPixel</span>};
-<span class="kw">use</span> <span class="ident">color</span>::{<span class="ident">Color</span>};
-<span class="kw">use</span> <span class="ident">shapes</span>::{<span class="ident">Coord</span>, <span class="ident">Rectangle</span>};
-<span class="kw">use</span> <span class="ident">framebuffer_compositor</span>::{<span class="ident">FRAME_COMPOSITOR</span>};
-<span class="kw">use</span> <span class="ident">keycodes_ascii</span>::{<span class="ident">KeyAction</span>, <span class="ident">KeyEvent</span>, <span class="ident">Keycode</span>};
-<span class="kw">use</span> <span class="ident">mouse_data::MouseEvent</span>;
-<span class="kw">use</span> <span class="ident">path::Path</span>;
-<span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">Mutex</span>, <span class="ident">Once</span>};
-<span class="kw">use</span> <span class="ident">window_inner</span>::{<span class="ident">WindowInner</span>, <span class="ident">WindowMovingStatus</span>};
+<span class="kw">use </span>mpmc::Queue;
+<span class="kw">use </span>event_types::{Event, MousePositionEvent};
+<span class="kw">use </span>framebuffer::{Framebuffer, AlphaPixel};
+<span class="kw">use </span>color::{Color};
+<span class="kw">use </span>shapes::{Coord, Rectangle};
+<span class="kw">use </span>framebuffer_compositor::{FRAME_COMPOSITOR};
+<span class="kw">use </span>keycodes_ascii::{KeyAction, KeyEvent, Keycode};
+<span class="kw">use </span>mouse_data::MouseEvent;
+<span class="kw">use </span>path::Path;
+<span class="kw">use </span>spin::{Mutex, Once};
+<span class="kw">use </span>window_inner::{WindowInner, WindowMovingStatus};
 
-<span class="doccomment">/// The instance of the default window manager</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">WINDOW_MANAGER</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowManager</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+<span class="doccomment">/// The instance of the default window manager
+</span><span class="kw">pub static </span>WINDOW_MANAGER: Once&lt;Mutex&lt;WindowManager&gt;&gt; = Once::new();
 
-<span class="doccomment">/// The width and height size of mouse in number of pixels.</span>
-<span class="kw">const</span> <span class="ident">MOUSE_POINTER_SIZE_Y</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">18</span>;
-<span class="kw">const</span> <span class="ident">MOUSE_POINTER_SIZE_X</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">11</span>;
-<span class="doccomment">/// The mouse pointer image defined as a 2-D pixel array.</span>
-<span class="kw">static</span> <span class="ident">MOUSE_POINTER_IMAGE</span>: [[<span class="ident">Color</span>; <span class="ident">MOUSE_POINTER_SIZE_Y</span>]; <span class="ident">MOUSE_POINTER_SIZE_X</span>] <span class="op">=</span> {
-    <span class="kw">const</span> <span class="ident">T</span>: <span class="ident">Color</span> <span class="op">=</span> <span class="ident">color::TRANSPARENT</span>;
-    <span class="kw">const</span> <span class="ident">C</span>: <span class="ident">Color</span> <span class="op">=</span> <span class="ident">color::BLACK</span>; <span class="comment">// Cursor</span>
-    <span class="kw">const</span> <span class="ident">B</span>: <span class="ident">Color</span> <span class="op">=</span> <span class="ident">color::WHITE</span>; <span class="comment">// Border</span>
-    [
-        [<span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">T</span>, <span class="ident">T</span>],
-        [<span class="ident">T</span>, <span class="ident">B</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">B</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>],
-        [<span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">B</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">B</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>],
-        [<span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">B</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">B</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>],
-        [<span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">B</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>],
-        [<span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">B</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">T</span>],
-        [<span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">B</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">B</span>],
-        [<span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">B</span>, <span class="ident">C</span>, <span class="ident">C</span>, <span class="ident">B</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">C</span>, <span class="ident">B</span>, <span class="ident">T</span>],
-        [<span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">B</span>, <span class="ident">C</span>, <span class="ident">B</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">T</span>],
-        [<span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">B</span>, <span class="ident">B</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>],
-        [<span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">B</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>, <span class="ident">T</span>],
+<span class="doccomment">/// The width and height size of mouse in number of pixels.
+</span><span class="kw">const </span>MOUSE_POINTER_SIZE_Y: usize = <span class="number">18</span>;
+<span class="kw">const </span>MOUSE_POINTER_SIZE_X: usize = <span class="number">11</span>;
+<span class="doccomment">/// The mouse pointer image defined as a 2-D pixel array.
+</span><span class="kw">static </span>MOUSE_POINTER_IMAGE: [[Color; MOUSE_POINTER_SIZE_Y]; MOUSE_POINTER_SIZE_X] = {
+    <span class="kw">const </span>T: Color = color::TRANSPARENT;
+    <span class="kw">const </span>C: Color = color::BLACK; <span class="comment">// Cursor
+    </span><span class="kw">const </span>B: Color = color::WHITE; <span class="comment">// Border
+    </span>[
+        [B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, T, T],
+        [T, B, C, C, C, C, C, C, C, C, C, C, C, C, B, T, T, T],
+        [T, T, B, C, C, C, C, C, C, C, C, C, C, B, T, T, T, T],
+        [T, T, T, B, C, C, C, C, C, C, C, C, B, T, T, T, T, T],
+        [T, T, T, T, B, C, C, C, C, C, C, C, C, B, B, T, T, T],
+        [T, T, T, T, T, B, C, C, C, C, C, C, C, C, C, B, B, T],
+        [T, T, T, T, T, T, B, C, C, C, C, B, B, C, C, C, C, B],
+        [T, T, T, T, T, T, T, B, C, C, B, T, T, B, B, C, B, T],
+        [T, T, T, T, T, T, T, T, B, C, B, T, T, T, T, B, B, T],
+        [T, T, T, T, T, T, T, T, T, B, B, T, T, T, T, T, T, T],
+        [T, T, T, T, T, T, T, T, T, T, B, T, T, T, T, T, T, T],
     ]
 };
 
-<span class="comment">// the border indicating new window position and size</span>
-<span class="kw">const</span> <span class="ident">WINDOW_BORDER_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">3</span>;
-<span class="comment">// border&#39;s inner color</span>
-<span class="kw">const</span> <span class="ident">WINDOW_BORDER_COLOR_INNER</span>: <span class="ident">Color</span> <span class="op">=</span> <span class="ident">Color::new</span>(<span class="number">0x00CA6F1E</span>);
+<span class="comment">// the border indicating new window position and size
+</span><span class="kw">const </span>WINDOW_BORDER_SIZE: usize = <span class="number">3</span>;
+<span class="comment">// border&#39;s inner color
+</span><span class="kw">const </span>WINDOW_BORDER_COLOR_INNER: Color = Color::new(<span class="number">0x00CA6F1E</span>);
 
-<span class="doccomment">/// Window manager structure which maintains a list of windows and a mouse.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WindowManager</span> {
-    <span class="doccomment">/// those window currently not shown on screen</span>
-    <span class="ident">hide_list</span>: <span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">Weak</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// those window shown on screen that may overlapping each other</span>
-    <span class="ident">show_list</span>: <span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">Weak</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// the only active window, receiving all keyboard events (except for those remained for WM)</span>
-    <span class="ident">active</span>: <span class="ident">Weak</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="comment">// this one is not in show_list</span>
-    <span class="doccomment">/// current mouse position</span>
-    <span class="ident">mouse</span>: <span class="ident">Coord</span>,
-    <span class="doccomment">/// If a window is being repositioned (e.g., by dragging it), this is the position of that window&#39;s border</span>
-    <span class="ident">repositioned_border</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Rectangle</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The bottom framebuffer typically contains the background/wallpaper image, </span>
-    <span class="doccomment">/// which is displayed by default when no other windows exist on top of it.</span>
-    <span class="ident">bottom_fb</span>: <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">AlphaPixel</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The top framebuffer is used for overlaying visual elements atop the rest of the windows, </span>
-    <span class="doccomment">/// e.g., the mouse pointer, the border of a window being dragged/moved, etc. </span>
-    <span class="ident">top_fb</span>: <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">AlphaPixel</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The final framebuffer which is mapped to the screen (the actual display device).</span>
-    <span class="kw">pub</span> <span class="ident">final_fb</span>: <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">AlphaPixel</span><span class="op">&gt;</span>,
+<span class="doccomment">/// Window manager structure which maintains a list of windows and a mouse.
+</span><span class="kw">pub struct </span>WindowManager {
+    <span class="doccomment">/// those window currently not shown on screen
+    </span>hide_list: VecDeque&lt;Weak&lt;Mutex&lt;WindowInner&gt;&gt;&gt;,
+    <span class="doccomment">/// those window shown on screen that may overlapping each other
+    </span>show_list: VecDeque&lt;Weak&lt;Mutex&lt;WindowInner&gt;&gt;&gt;,
+    <span class="doccomment">/// the only active window, receiving all keyboard events (except for those remained for WM)
+    </span>active: Weak&lt;Mutex&lt;WindowInner&gt;&gt;, <span class="comment">// this one is not in show_list
+    </span><span class="doccomment">/// current mouse position
+    </span>mouse: Coord,
+    <span class="doccomment">/// If a window is being repositioned (e.g., by dragging it), this is the position of that window&#39;s border
+    </span>repositioned_border: <span class="prelude-ty">Option</span>&lt;Rectangle&gt;,
+    <span class="doccomment">/// The bottom framebuffer typically contains the background/wallpaper image, 
+    /// which is displayed by default when no other windows exist on top of it.
+    </span>bottom_fb: Framebuffer&lt;AlphaPixel&gt;,
+    <span class="doccomment">/// The top framebuffer is used for overlaying visual elements atop the rest of the windows, 
+    /// e.g., the mouse pointer, the border of a window being dragged/moved, etc. 
+    </span>top_fb: Framebuffer&lt;AlphaPixel&gt;,
+    <span class="doccomment">/// The final framebuffer which is mapped to the screen (the actual display device).
+    </span><span class="kw">pub </span>final_fb: Framebuffer&lt;AlphaPixel&gt;,
 }
 
-<span class="kw">impl</span> <span class="ident">WindowManager</span> {
-    <span class="doccomment">/// Sets one window as active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window&#39;s area.</span>
-    <span class="doccomment">/// Returns whether this window is the first active window in the manager.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// TODO FIXME: (kevinaboos) remove this dumb notion of &quot;first active&quot;. This is a bad hack. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_active</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">inner_ref</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">refresh</span>: <span class="ident">bool</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// if it is currently actived, just return</span>
-        <span class="kw">let</span> <span class="ident">first_active</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">active</span>.<span class="ident">upgrade</span>() {
-            <span class="prelude-val">Some</span>(<span class="ident">current_active</span>) =&gt; {
-                <span class="kw">if</span> <span class="ident">Arc::ptr_eq</span>(<span class="kw-2">&amp;</span>(<span class="ident">current_active</span>), <span class="ident">inner_ref</span>) {
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>); <span class="comment">// do nothing</span>
-                } <span class="kw">else</span> {
-                    <span class="comment">// save this to show_list</span>
-                    <span class="self">self</span>.<span class="ident">show_list</span>.<span class="ident">push_front</span>(<span class="self">self</span>.<span class="ident">active</span>.<span class="ident">clone</span>());
+<span class="kw">impl </span>WindowManager {
+    <span class="doccomment">/// Sets one window as active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window&#39;s area.
+    /// Returns whether this window is the first active window in the manager.
+    /// 
+    /// TODO FIXME: (kevinaboos) remove this dumb notion of &quot;first active&quot;. This is a bad hack. 
+    </span><span class="kw">pub fn </span>set_active(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        inner_ref: <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;WindowInner&gt;&gt;,
+        refresh: bool,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;bool, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// if it is currently actived, just return
+        </span><span class="kw">let </span>first_active = <span class="kw">match </span><span class="self">self</span>.active.upgrade() {
+            <span class="prelude-val">Some</span>(current_active) =&gt; {
+                <span class="kw">if </span>Arc::ptr_eq(<span class="kw-2">&amp;</span>(current_active), inner_ref) {
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="bool-val">true</span>); <span class="comment">// do nothing
+                </span>} <span class="kw">else </span>{
+                    <span class="comment">// save this to show_list
+                    </span><span class="self">self</span>.show_list.push_front(<span class="self">self</span>.active.clone());
                 }
-                <span class="bool-val">false</span>
-            }
-            <span class="prelude-val">None</span> =&gt; <span class="bool-val">true</span>,
+                <span class="bool-val">false
+            </span>}
+            <span class="prelude-val">None </span>=&gt; <span class="bool-val">true</span>,
         };
         
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">is_window_in_show_list</span>(<span class="kw-2">&amp;</span><span class="ident">inner_ref</span>) {
-            <span class="comment">// remove item in current list</span>
-            <span class="prelude-val">Some</span>(<span class="ident">i</span>) =&gt; {
-                <span class="self">self</span>.<span class="ident">show_list</span>.<span class="ident">remove</span>(<span class="ident">i</span>);
+        <span class="kw">match </span><span class="self">self</span>.is_window_in_show_list(<span class="kw-2">&amp;</span>inner_ref) {
+            <span class="comment">// remove item in current list
+            </span><span class="prelude-val">Some</span>(i) =&gt; {
+                <span class="self">self</span>.show_list.remove(i);
             }
-            <span class="prelude-val">None</span> =&gt; {}
+            <span class="prelude-val">None </span>=&gt; {}
         }
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">is_window_in_hide_list</span>(<span class="kw-2">&amp;</span><span class="ident">inner_ref</span>) {
-            <span class="comment">// remove item in current list</span>
-            <span class="prelude-val">Some</span>(<span class="ident">i</span>) =&gt; {
-                <span class="self">self</span>.<span class="ident">hide_list</span>.<span class="ident">remove</span>(<span class="ident">i</span>);
+        <span class="kw">match </span><span class="self">self</span>.is_window_in_hide_list(<span class="kw-2">&amp;</span>inner_ref) {
+            <span class="comment">// remove item in current list
+            </span><span class="prelude-val">Some</span>(i) =&gt; {
+                <span class="self">self</span>.hide_list.remove(i);
             }
-            <span class="prelude-val">None</span> =&gt; {}
+            <span class="prelude-val">None </span>=&gt; {}
         }
-        <span class="self">self</span>.<span class="ident">active</span> <span class="op">=</span> <span class="ident">Arc::downgrade</span>(<span class="ident">inner_ref</span>);
-        <span class="kw">let</span> <span class="ident">area</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">window</span> <span class="op">=</span> <span class="ident">inner_ref</span>.<span class="ident">lock</span>();
-            <span class="kw">let</span> <span class="ident">top_left</span> <span class="op">=</span> <span class="ident">window</span>.<span class="ident">get_position</span>();
-            <span class="kw">let</span> (<span class="ident">width</span>, <span class="ident">height</span>) <span class="op">=</span> <span class="ident">window</span>.<span class="ident">get_size</span>();          
-            <span class="ident">Rectangle</span> {
-                <span class="ident">top_left</span>: <span class="ident">top_left</span>,
-                <span class="ident">bottom_right</span>: <span class="ident">top_left</span> <span class="op">+</span> (<span class="ident">width</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">height</span> <span class="kw">as</span> <span class="ident">isize</span>)
+        <span class="self">self</span>.active = Arc::downgrade(inner_ref);
+        <span class="kw">let </span>area = {
+            <span class="kw">let </span>window = inner_ref.lock();
+            <span class="kw">let </span>top_left = window.get_position();
+            <span class="kw">let </span>(width, height) = window.get_size();          
+            Rectangle {
+                top_left: top_left,
+                bottom_right: top_left + (width <span class="kw">as </span>isize, height <span class="kw">as </span>isize)
             }
         };
-        <span class="kw">if</span> <span class="ident">refresh</span> {
-            <span class="self">self</span>.<span class="ident">refresh_bottom_windows</span>(<span class="prelude-val">Some</span>(<span class="ident">area</span>), <span class="bool-val">true</span>)<span class="question-mark">?</span>;
+        <span class="kw">if </span>refresh {
+            <span class="self">self</span>.refresh_bottom_windows(<span class="prelude-val">Some</span>(area), <span class="bool-val">true</span>)<span class="question-mark">?</span>;
         }
-        <span class="prelude-val">Ok</span>(<span class="ident">first_active</span>)
+        <span class="prelude-val">Ok</span>(first_active)
     }
 
-    <span class="doccomment">/// Returns the index of a window if it is in the show list</span>
-    <span class="kw">fn</span> <span class="ident">is_window_in_show_list</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">window</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">i</span> <span class="op">=</span> <span class="number">0_usize</span>;
-        <span class="kw">for</span> <span class="ident">item</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">show_list</span>.<span class="ident">iter</span>() {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">item_ptr</span>) <span class="op">=</span> <span class="ident">item</span>.<span class="ident">upgrade</span>() {
-                <span class="kw">if</span> <span class="ident">Arc::ptr_eq</span>(<span class="kw-2">&amp;</span>(<span class="ident">item_ptr</span>), <span class="ident">window</span>) {
-                    <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">i</span>);
+    <span class="doccomment">/// Returns the index of a window if it is in the show list
+    </span><span class="kw">fn </span>is_window_in_show_list(<span class="kw-2">&amp;mut </span><span class="self">self</span>, window: <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;WindowInner&gt;&gt;) -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>i = <span class="number">0_usize</span>;
+        <span class="kw">for </span>item <span class="kw">in </span><span class="self">self</span>.show_list.iter() {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(item_ptr) = item.upgrade() {
+                <span class="kw">if </span>Arc::ptr_eq(<span class="kw-2">&amp;</span>(item_ptr), window) {
+                    <span class="kw">return </span><span class="prelude-val">Some</span>(i);
                 }
             }
-            <span class="ident">i</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+            i += <span class="number">1</span>;
         }
-        <span class="prelude-val">None</span>
-    }
+        <span class="prelude-val">None
+    </span>}
 
-    <span class="doccomment">/// Returns the index of a window if it is in the hide list</span>
-    <span class="kw">fn</span> <span class="ident">is_window_in_hide_list</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">window</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">i</span> <span class="op">=</span> <span class="number">0_usize</span>;
-        <span class="kw">for</span> <span class="ident">item</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">hide_list</span>.<span class="ident">iter</span>() {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">item_ptr</span>) <span class="op">=</span> <span class="ident">item</span>.<span class="ident">upgrade</span>() {
-                <span class="kw">if</span> <span class="ident">Arc::ptr_eq</span>(<span class="kw-2">&amp;</span>(<span class="ident">item_ptr</span>), <span class="ident">window</span>) {
-                    <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">i</span>);
+    <span class="doccomment">/// Returns the index of a window if it is in the hide list
+    </span><span class="kw">fn </span>is_window_in_hide_list(<span class="kw-2">&amp;mut </span><span class="self">self</span>, window: <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;WindowInner&gt;&gt;) -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>i = <span class="number">0_usize</span>;
+        <span class="kw">for </span>item <span class="kw">in </span><span class="self">self</span>.hide_list.iter() {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(item_ptr) = item.upgrade() {
+                <span class="kw">if </span>Arc::ptr_eq(<span class="kw-2">&amp;</span>(item_ptr), window) {
+                    <span class="kw">return </span><span class="prelude-val">Some</span>(i);
                 }
             }
-            <span class="ident">i</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+            i += <span class="number">1</span>;
         }
-        <span class="prelude-val">None</span>
-    }
+        <span class="prelude-val">None
+    </span>}
 
-    <span class="doccomment">/// delete a window and refresh its region</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">delete_window</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">inner_ref</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> (<span class="ident">top_left</span>, <span class="ident">bottom_right</span>) <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">inner_ref</span>.<span class="ident">lock</span>();
-            <span class="kw">let</span> <span class="ident">top_left</span> <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">get_position</span>();
-            <span class="kw">let</span> (<span class="ident">width</span>, <span class="ident">height</span>) <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">get_size</span>();
-            <span class="kw">let</span> <span class="ident">bottom_right</span> <span class="op">=</span> <span class="ident">top_left</span> <span class="op">+</span> (<span class="ident">width</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">height</span> <span class="kw">as</span> <span class="ident">isize</span>);
-            (<span class="ident">top_left</span>, <span class="ident">bottom_right</span>)
+    <span class="doccomment">/// delete a window and refresh its region
+    </span><span class="kw">pub fn </span>delete_window(<span class="kw-2">&amp;mut </span><span class="self">self</span>, inner_ref: <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;WindowInner&gt;&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>(top_left, bottom_right) = {
+            <span class="kw">let </span>inner = inner_ref.lock();
+            <span class="kw">let </span>top_left = inner.get_position();
+            <span class="kw">let </span>(width, height) = inner.get_size();
+            <span class="kw">let </span>bottom_right = top_left + (width <span class="kw">as </span>isize, height <span class="kw">as </span>isize);
+            (top_left, bottom_right)
         };
-        <span class="kw">let</span> <span class="ident">area</span> <span class="op">=</span> <span class="prelude-val">Some</span>(
-            <span class="ident">Rectangle</span> {
-                <span class="ident">top_left</span>: <span class="ident">top_left</span>,
-                <span class="ident">bottom_right</span>: <span class="ident">bottom_right</span>
+        <span class="kw">let </span>area = <span class="prelude-val">Some</span>(
+            Rectangle {
+                top_left: top_left,
+                bottom_right: bottom_right
             }
         );
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">current_active</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">active</span>.<span class="ident">upgrade</span>() {
-            <span class="kw">if</span> <span class="ident">Arc::ptr_eq</span>(<span class="kw-2">&amp;</span><span class="ident">current_active</span>, <span class="ident">inner_ref</span>) {
-                <span class="self">self</span>.<span class="ident">refresh_bottom_windows</span>(<span class="ident">area</span>, <span class="bool-val">false</span>)<span class="question-mark">?</span>;
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">window</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">show_list</span>.<span class="ident">remove</span>(<span class="number">0</span>) {
-                    <span class="self">self</span>.<span class="ident">active</span> <span class="op">=</span> <span class="ident">window</span>;
-                } <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">window</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">hide_list</span>.<span class="ident">remove</span>(<span class="number">0</span>) {
-                    <span class="self">self</span>.<span class="ident">active</span> <span class="op">=</span> <span class="ident">window</span>;
-                } <span class="kw">else</span> {
-                    <span class="self">self</span>.<span class="ident">active</span> <span class="op">=</span> <span class="ident">Weak::new</span>(); <span class="comment">// delete reference</span>
-                }
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(current_active) = <span class="self">self</span>.active.upgrade() {
+            <span class="kw">if </span>Arc::ptr_eq(<span class="kw-2">&amp;</span>current_active, inner_ref) {
+                <span class="self">self</span>.refresh_bottom_windows(area, <span class="bool-val">false</span>)<span class="question-mark">?</span>;
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(window) = <span class="self">self</span>.show_list.remove(<span class="number">0</span>) {
+                    <span class="self">self</span>.active = window;
+                } <span class="kw">else if let </span><span class="prelude-val">Some</span>(window) = <span class="self">self</span>.hide_list.remove(<span class="number">0</span>) {
+                    <span class="self">self</span>.active = window;
+                } <span class="kw">else </span>{
+                    <span class="self">self</span>.active = Weak::new(); <span class="comment">// delete reference
+                </span>}
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(());
             }
         }
         
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">index</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">is_window_in_show_list</span>(<span class="ident">inner_ref</span>) {
-            <span class="self">self</span>.<span class="ident">show_list</span>.<span class="ident">remove</span>(<span class="ident">index</span>);
-            <span class="self">self</span>.<span class="ident">refresh_windows</span>(<span class="ident">area</span>)<span class="question-mark">?</span>;
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(())        
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(index) = <span class="self">self</span>.is_window_in_show_list(inner_ref) {
+            <span class="self">self</span>.show_list.remove(index);
+            <span class="self">self</span>.refresh_windows(area)<span class="question-mark">?</span>;
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(())        
         }
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">index</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">is_window_in_hide_list</span>(<span class="ident">inner_ref</span>) {
-            <span class="self">self</span>.<span class="ident">hide_list</span>.<span class="ident">remove</span>(<span class="ident">index</span>);
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(())        
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(index) = <span class="self">self</span>.is_window_in_hide_list(inner_ref) {
+            <span class="self">self</span>.hide_list.remove(index);
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(())        
         }
         <span class="prelude-val">Err</span>(<span class="string">&quot;cannot find this window&quot;</span>)
     }
 
-    <span class="doccomment">/// Refresh the region in `bounding_box`. Only render the bottom final framebuffer and windows. Ignore the active window if `active` is false.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">refresh_bottom_windows</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">CompositableRegion</span> <span class="op">+</span> <span class="ident">Clone</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>, 
-        <span class="ident">bounding_box</span>: <span class="kw">impl</span> <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">B</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span>,
-        <span class="ident">active</span>: <span class="ident">bool</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// bottom framebuffer</span>
-        <span class="kw">let</span> <span class="ident">bottom_fb_area</span> <span class="op">=</span> <span class="ident">FramebufferUpdates</span> {
-            <span class="ident">src_framebuffer</span>: <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">bottom_fb</span>,
-            <span class="ident">coordinate_in_dest_framebuffer</span>: <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>),
+    <span class="doccomment">/// Refresh the region in `bounding_box`. Only render the bottom final framebuffer and windows. Ignore the active window if `active` is false.
+    </span><span class="kw">pub fn </span>refresh_bottom_windows&lt;B: CompositableRegion + Clone&gt;(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>, 
+        bounding_box: <span class="kw">impl </span>IntoIterator&lt;Item = B&gt; + Clone,
+        active: bool,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// bottom framebuffer
+        </span><span class="kw">let </span>bottom_fb_area = FramebufferUpdates {
+            src_framebuffer: <span class="kw-2">&amp;</span><span class="self">self</span>.bottom_fb,
+            coordinate_in_dest_framebuffer: Coord::new(<span class="number">0</span>, <span class="number">0</span>),
         };
 
-        <span class="comment">// list of windows to be updated</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">window_ref_list</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-        <span class="kw">for</span> <span class="ident">window</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">hide_list</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">window_ref</span>) <span class="op">=</span> <span class="ident">window</span>.<span class="ident">upgrade</span>() {
-                <span class="ident">window_ref_list</span>.<span class="ident">push</span>(<span class="ident">window_ref</span>);
+        <span class="comment">// list of windows to be updated
+        </span><span class="kw">let </span><span class="kw-2">mut </span>window_ref_list = Vec::new();
+        <span class="kw">for </span>window <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.hide_list {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(window_ref) = window.upgrade() {
+                window_ref_list.push(window_ref);
             }
         }
-        <span class="kw">for</span> <span class="ident">window</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">show_list</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">window_ref</span>) <span class="op">=</span> <span class="ident">window</span>.<span class="ident">upgrade</span>() {
-                <span class="ident">window_ref_list</span>.<span class="ident">push</span>(<span class="ident">window_ref</span>);
+        <span class="kw">for </span>window <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.show_list {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(window_ref) = window.upgrade() {
+                window_ref_list.push(window_ref);
             }
         }
-        <span class="kw">if</span> <span class="ident">active</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">window_ref</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">active</span>.<span class="ident">upgrade</span>() {
-                <span class="ident">window_ref_list</span>.<span class="ident">push</span>(<span class="ident">window_ref</span>)
+        <span class="kw">if </span>active {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(window_ref) = <span class="self">self</span>.active.upgrade() {
+                window_ref_list.push(window_ref)
             }
         }
 
-        <span class="comment">// lock windows</span>
-        <span class="kw">let</span> <span class="ident">locked_window_list</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">window_ref_list</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">lock</span>()).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+        <span class="comment">// lock windows
+        </span><span class="kw">let </span>locked_window_list = <span class="kw-2">&amp;</span>window_ref_list.iter().map(|x| x.lock()).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-        <span class="comment">// create updated framebuffer info objects</span>
-        <span class="kw">let</span> <span class="ident">window_bufferlist</span> <span class="op">=</span> <span class="ident">locked_window_list</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">window</span><span class="op">|</span> {
-            <span class="ident">FramebufferUpdates</span> {
-                <span class="ident">src_framebuffer</span>: <span class="ident">window</span>.<span class="ident">framebuffer</span>(),
-                <span class="ident">coordinate_in_dest_framebuffer</span>: <span class="ident">window</span>.<span class="ident">get_position</span>(),
+        <span class="comment">// create updated framebuffer info objects
+        </span><span class="kw">let </span>window_bufferlist = locked_window_list.iter().map(|window| {
+            FramebufferUpdates {
+                src_framebuffer: window.framebuffer(),
+                coordinate_in_dest_framebuffer: window.get_position(),
             }
         });
         
-        <span class="kw">let</span> <span class="ident">buffer_iter</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">bottom_fb_area</span>).<span class="ident">into_iter</span>().<span class="ident">chain</span>(<span class="ident">window_bufferlist</span>);
-        <span class="ident">FRAME_COMPOSITOR</span>.<span class="ident">lock</span>().<span class="ident">composite</span>(<span class="ident">buffer_iter</span>, <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">final_fb</span>, <span class="ident">bounding_box</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>buffer_iter = <span class="prelude-val">Some</span>(bottom_fb_area).into_iter().chain(window_bufferlist);
+        FRAME_COMPOSITOR.lock().composite(buffer_iter, <span class="kw-2">&amp;mut </span><span class="self">self</span>.final_fb, bounding_box)<span class="question-mark">?</span>;
         
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Refresh the region of `bounding_box` in the top framebuffer</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">refresh_top</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">CompositableRegion</span> <span class="op">+</span> <span class="ident">Clone</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>, 
-        <span class="ident">bounding_box</span>: <span class="kw">impl</span> <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">B</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span>
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">top_buffer</span> <span class="op">=</span> <span class="ident">FramebufferUpdates</span> {
-            <span class="ident">src_framebuffer</span>: <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">top_fb</span>,
-            <span class="ident">coordinate_in_dest_framebuffer</span>: <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>),
+    <span class="doccomment">/// Refresh the region of `bounding_box` in the top framebuffer
+    </span><span class="kw">pub fn </span>refresh_top&lt;B: CompositableRegion + Clone&gt;(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>, 
+        bounding_box: <span class="kw">impl </span>IntoIterator&lt;Item = B&gt; + Clone
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>top_buffer = FramebufferUpdates {
+            src_framebuffer: <span class="kw-2">&amp;</span><span class="self">self</span>.top_fb,
+            coordinate_in_dest_framebuffer: Coord::new(<span class="number">0</span>, <span class="number">0</span>),
         }; 
 
-        <span class="ident">FRAME_COMPOSITOR</span>.<span class="ident">lock</span>().<span class="ident">composite</span>(<span class="prelude-val">Some</span>(<span class="ident">top_buffer</span>), <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">final_fb</span>, <span class="ident">bounding_box</span>)
+        FRAME_COMPOSITOR.lock().composite(<span class="prelude-val">Some</span>(top_buffer), <span class="kw-2">&amp;mut </span><span class="self">self</span>.final_fb, bounding_box)
     }
 
-    <span class="doccomment">/// Refresh the part in `bounding_box` of every window. `bounding_box` is a region relative to the top-left of the screen. Refresh the whole screen if the bounding box is None.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">refresh_windows</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">CompositableRegion</span> <span class="op">+</span> <span class="ident">Clone</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>, 
-        <span class="ident">bounding_box</span>: <span class="kw">impl</span> <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">B</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// reference of windows</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">window_ref_list</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-        <span class="kw">for</span> <span class="ident">window</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">hide_list</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">window_ref</span>) <span class="op">=</span> <span class="ident">window</span>.<span class="ident">upgrade</span>() {
-                <span class="ident">window_ref_list</span>.<span class="ident">push</span>(<span class="ident">window_ref</span>);
+    <span class="doccomment">/// Refresh the part in `bounding_box` of every window. `bounding_box` is a region relative to the top-left of the screen. Refresh the whole screen if the bounding box is None.
+    </span><span class="kw">pub fn </span>refresh_windows&lt;B: CompositableRegion + Clone&gt;(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>, 
+        bounding_box: <span class="kw">impl </span>IntoIterator&lt;Item = B&gt; + Clone,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// reference of windows
+        </span><span class="kw">let </span><span class="kw-2">mut </span>window_ref_list = Vec::new();
+        <span class="kw">for </span>window <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.hide_list {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(window_ref) = window.upgrade() {
+                window_ref_list.push(window_ref);
             }
         }
-        <span class="kw">for</span> <span class="ident">window</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">show_list</span> {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">window_ref</span>) <span class="op">=</span> <span class="ident">window</span>.<span class="ident">upgrade</span>() {
-                <span class="ident">window_ref_list</span>.<span class="ident">push</span>(<span class="ident">window_ref</span>);
+        <span class="kw">for </span>window <span class="kw">in </span><span class="kw-2">&amp;</span><span class="self">self</span>.show_list {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(window_ref) = window.upgrade() {
+                window_ref_list.push(window_ref);
             }
         }
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">window_ref</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">active</span>.<span class="ident">upgrade</span>() {
-            <span class="ident">window_ref_list</span>.<span class="ident">push</span>(<span class="ident">window_ref</span>)
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(window_ref) = <span class="self">self</span>.active.upgrade() {
+            window_ref_list.push(window_ref)
         }
 
-        <span class="comment">// lock windows</span>
-        <span class="kw">let</span> <span class="ident">locked_window_list</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">window_ref_list</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">lock</span>()).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
-        <span class="comment">// create updated framebuffer info objects</span>
-        <span class="kw">let</span> <span class="ident">bufferlist</span> <span class="op">=</span> <span class="ident">locked_window_list</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">window</span><span class="op">|</span> {
-            <span class="ident">FramebufferUpdates</span> {
-                <span class="ident">src_framebuffer</span>: <span class="ident">window</span>.<span class="ident">framebuffer</span>(),
-                <span class="ident">coordinate_in_dest_framebuffer</span>: <span class="ident">window</span>.<span class="ident">get_position</span>(),
+        <span class="comment">// lock windows
+        </span><span class="kw">let </span>locked_window_list = <span class="kw-2">&amp;</span>window_ref_list.iter().map(|x| x.lock()).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+        <span class="comment">// create updated framebuffer info objects
+        </span><span class="kw">let </span>bufferlist = locked_window_list.iter().map(|window| {
+            FramebufferUpdates {
+                src_framebuffer: window.framebuffer(),
+                coordinate_in_dest_framebuffer: window.get_position(),
             }
         });
 
-        <span class="ident">FRAME_COMPOSITOR</span>.<span class="ident">lock</span>().<span class="ident">composite</span>(<span class="ident">bufferlist</span>, <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">final_fb</span>, <span class="ident">bounding_box</span>)
+        FRAME_COMPOSITOR.lock().composite(bufferlist, <span class="kw-2">&amp;mut </span><span class="self">self</span>.final_fb, bounding_box)
     }
 
 
-    <span class="doccomment">/// Refresh the part in `bounding_box` of the active window. `bounding_box` is a region relative to the top-left of the screen. Refresh the whole screen if the bounding box is None.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">refresh_active_window</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">bounding_box</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Rectangle</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">window_ref</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">active</span>.<span class="ident">upgrade</span>() {
-            <span class="kw">let</span> <span class="ident">window</span> <span class="op">=</span> <span class="ident">window_ref</span>.<span class="ident">lock</span>();
-            <span class="kw">let</span> <span class="ident">buffer_update</span> <span class="op">=</span> <span class="ident">FramebufferUpdates</span> {
-                <span class="ident">src_framebuffer</span>: <span class="ident">window</span>.<span class="ident">framebuffer</span>(),
-                <span class="ident">coordinate_in_dest_framebuffer</span>: <span class="ident">window</span>.<span class="ident">get_position</span>(),
+    <span class="doccomment">/// Refresh the part in `bounding_box` of the active window. `bounding_box` is a region relative to the top-left of the screen. Refresh the whole screen if the bounding box is None.
+    </span><span class="kw">pub fn </span>refresh_active_window(<span class="kw-2">&amp;mut </span><span class="self">self</span>, bounding_box: <span class="prelude-ty">Option</span>&lt;Rectangle&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(window_ref) = <span class="self">self</span>.active.upgrade() {
+            <span class="kw">let </span>window = window_ref.lock();
+            <span class="kw">let </span>buffer_update = FramebufferUpdates {
+                src_framebuffer: window.framebuffer(),
+                coordinate_in_dest_framebuffer: window.get_position(),
             };
-            <span class="ident">FRAME_COMPOSITOR</span>.<span class="ident">lock</span>().<span class="ident">composite</span>(<span class="prelude-val">Some</span>(<span class="ident">buffer_update</span>), <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">final_fb</span>, <span class="ident">bounding_box</span>)
-        } <span class="kw">else</span> {
+            FRAME_COMPOSITOR.lock().composite(<span class="prelude-val">Some</span>(buffer_update), <span class="kw-2">&amp;mut </span><span class="self">self</span>.final_fb, bounding_box)
+        } <span class="kw">else </span>{
             <span class="prelude-val">Ok</span>(())
         } 
     }
     
-    <span class="doccomment">/// Passes the given keyboard event to the currently active window.</span>
-    <span class="kw">fn</span> <span class="ident">pass_keyboard_event_to_window</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key_event</span>: <span class="ident">KeyEvent</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">active_window</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">active</span>.<span class="ident">upgrade</span>().<span class="ident">ok_or</span>(<span class="string">&quot;no window was set as active to receive a keyboard event&quot;</span>)<span class="question-mark">?</span>;
-        <span class="ident">active_window</span>.<span class="ident">lock</span>().<span class="ident">send_event</span>(<span class="ident">Event::new_keyboard_event</span>(<span class="ident">key_event</span>))
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;Failed to enqueue the keyboard event; window event queue was full.&quot;</span>)<span class="question-mark">?</span>;
+    <span class="doccomment">/// Passes the given keyboard event to the currently active window.
+    </span><span class="kw">fn </span>pass_keyboard_event_to_window(<span class="kw-2">&amp;</span><span class="self">self</span>, key_event: KeyEvent) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>active_window = <span class="self">self</span>.active.upgrade().ok_or(<span class="string">&quot;no window was set as active to receive a keyboard event&quot;</span>)<span class="question-mark">?</span>;
+        active_window.lock().send_event(Event::new_keyboard_event(key_event))
+            .map_err(|_e| <span class="string">&quot;Failed to enqueue the keyboard event; window event queue was full.&quot;</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Passes the given mouse event to the window that the mouse is currently over. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// If the mouse is not over any window, an error is returned; </span>
-    <span class="doccomment">/// however, this error is quite common and expected when the mouse is not positioned within a window,</span>
-    <span class="doccomment">/// and is not a true failure. </span>
-    <span class="kw">fn</span> <span class="ident">pass_mouse_event_to_window</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mouse_event</span>: <span class="ident">MouseEvent</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">coordinate</span> <span class="op">=</span> { <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mouse</span> };
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">event</span>: <span class="ident">MousePositionEvent</span> <span class="op">=</span> <span class="ident">MousePositionEvent</span> {
-            <span class="ident">coordinate</span>: <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>),
-            <span class="ident">gcoordinate</span>: <span class="ident">coordinate</span>.<span class="ident">clone</span>(),
-            <span class="ident">scrolling_up</span>: <span class="ident">mouse_event</span>.<span class="ident">mousemove</span>.<span class="ident">scrolling_up</span>,
-            <span class="ident">scrolling_down</span>: <span class="ident">mouse_event</span>.<span class="ident">mousemove</span>.<span class="ident">scrolling_down</span>,
-            <span class="ident">left_button_hold</span>: <span class="ident">mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">left_button_hold</span>,
-            <span class="ident">right_button_hold</span>: <span class="ident">mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">right_button_hold</span>,
-            <span class="ident">fourth_button_hold</span>: <span class="ident">mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">fourth_button_hold</span>,
-            <span class="ident">fifth_button_hold</span>: <span class="ident">mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">fifth_button_hold</span>,
+    <span class="doccomment">/// Passes the given mouse event to the window that the mouse is currently over. 
+    /// 
+    /// If the mouse is not over any window, an error is returned; 
+    /// however, this error is quite common and expected when the mouse is not positioned within a window,
+    /// and is not a true failure. 
+    </span><span class="kw">fn </span>pass_mouse_event_to_window(<span class="kw-2">&amp;</span><span class="self">self</span>, mouse_event: MouseEvent) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>coordinate = { <span class="kw-2">&amp;</span><span class="self">self</span>.mouse };
+        <span class="kw">let </span><span class="kw-2">mut </span>event: MousePositionEvent = MousePositionEvent {
+            coordinate: Coord::new(<span class="number">0</span>, <span class="number">0</span>),
+            gcoordinate: coordinate.clone(),
+            scrolling_up: mouse_event.mousemove.scrolling_up,
+            scrolling_down: mouse_event.mousemove.scrolling_down,
+            left_button_hold: mouse_event.buttonact.left_button_hold,
+            right_button_hold: mouse_event.buttonact.right_button_hold,
+            fourth_button_hold: mouse_event.buttonact.fourth_button_hold,
+            fifth_button_hold: mouse_event.buttonact.fifth_button_hold,
         };
 
-        <span class="comment">// TODO: FIXME:  improve this logic to just send the mouse event to the top-most window in the entire WM list,</span>
-        <span class="comment">//               not just necessarily the active one. (For example, scroll wheel events can be sent to non-active windows).</span>
+        <span class="comment">// TODO: FIXME:  improve this logic to just send the mouse event to the top-most window in the entire WM list,
+        //               not just necessarily the active one. (For example, scroll wheel events can be sent to non-active windows).
 
 
-        <span class="comment">// first check the active one</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">current_active</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">active</span>.<span class="ident">upgrade</span>() {
-            <span class="kw">let</span> <span class="ident">current_active_win</span> <span class="op">=</span> <span class="ident">current_active</span>.<span class="ident">lock</span>();
-            <span class="kw">let</span> <span class="ident">current_coordinate</span> <span class="op">=</span> <span class="ident">current_active_win</span>.<span class="ident">get_position</span>();
-            <span class="kw">if</span> <span class="ident">current_active_win</span>.<span class="ident">contains</span>(<span class="kw-2">*</span><span class="ident">coordinate</span> <span class="op">-</span> <span class="ident">current_coordinate</span>) <span class="op">|</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">current_active_win</span>.<span class="ident">moving</span> {
-                <span class="ident">WindowMovingStatus::Moving</span>(<span class="kw">_</span>) =&gt; <span class="bool-val">true</span>,
-                <span class="kw">_</span> =&gt; <span class="bool-val">false</span>,
+        // first check the active one
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(current_active) = <span class="self">self</span>.active.upgrade() {
+            <span class="kw">let </span>current_active_win = current_active.lock();
+            <span class="kw">let </span>current_coordinate = current_active_win.get_position();
+            <span class="kw">if </span>current_active_win.contains(<span class="kw-2">*</span>coordinate - current_coordinate) || <span class="kw">match </span>current_active_win.moving {
+                WindowMovingStatus::Moving(<span class="kw">_</span>) =&gt; <span class="bool-val">true</span>,
+                <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
             }{
-                <span class="ident">event</span>.<span class="ident">coordinate</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">coordinate</span> <span class="op">-</span> <span class="ident">current_coordinate</span>;
-                <span class="comment">// debug!(&quot;pass to active: {}, {}&quot;, event.x, event.y);</span>
-                <span class="ident">current_active_win</span>.<span class="ident">send_event</span>(<span class="ident">Event::MousePositionEvent</span>(<span class="ident">event</span>))
-                    .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;Failed to enqueue the mouse event; window event queue was full.&quot;</span>)<span class="question-mark">?</span>;
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+                event.coordinate = <span class="kw-2">*</span>coordinate - current_coordinate;
+                <span class="comment">// debug!(&quot;pass to active: {}, {}&quot;, event.x, event.y);
+                </span>current_active_win.send_event(Event::MousePositionEvent(event))
+                    .map_err(|_e| <span class="string">&quot;Failed to enqueue the mouse event; window event queue was full.&quot;</span>)<span class="question-mark">?</span>;
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(());
             }
         }
 
-        <span class="comment">// TODO FIXME: (kevinaboos): the logic below here is actually incorrect -- it could send mouse events to an invisible window below others.</span>
+        <span class="comment">// TODO FIXME: (kevinaboos): the logic below here is actually incorrect -- it could send mouse events to an invisible window below others.
 
-        <span class="comment">// then check show_list</span>
-        <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="self">self</span>.<span class="ident">show_list</span>.<span class="ident">len</span>() {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">now_inner_mutex</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">show_list</span>[<span class="ident">i</span>].<span class="ident">upgrade</span>() {
-                <span class="kw">let</span> <span class="ident">now_inner</span> <span class="op">=</span> <span class="ident">now_inner_mutex</span>.<span class="ident">lock</span>();
-                <span class="kw">let</span> <span class="ident">current_coordinate</span> <span class="op">=</span> <span class="ident">now_inner</span>.<span class="ident">get_position</span>();
-                <span class="kw">if</span> <span class="ident">now_inner</span>.<span class="ident">contains</span>(<span class="kw-2">*</span><span class="ident">coordinate</span> <span class="op">-</span> <span class="ident">current_coordinate</span>) {
-                    <span class="ident">event</span>.<span class="ident">coordinate</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">coordinate</span> <span class="op">-</span> <span class="ident">current_coordinate</span>;
-                    <span class="ident">now_inner</span>.<span class="ident">send_event</span>(<span class="ident">Event::MousePositionEvent</span>(<span class="ident">event</span>))
-                        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;Failed to enqueue the mouse event; window event queue was full.&quot;</span>)<span class="question-mark">?</span>;
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+        // then check show_list
+        </span><span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..<span class="self">self</span>.show_list.len() {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(now_inner_mutex) = <span class="self">self</span>.show_list[i].upgrade() {
+                <span class="kw">let </span>now_inner = now_inner_mutex.lock();
+                <span class="kw">let </span>current_coordinate = now_inner.get_position();
+                <span class="kw">if </span>now_inner.contains(<span class="kw-2">*</span>coordinate - current_coordinate) {
+                    event.coordinate = <span class="kw-2">*</span>coordinate - current_coordinate;
+                    now_inner.send_event(Event::MousePositionEvent(event))
+                        .map_err(|_e| <span class="string">&quot;Failed to enqueue the mouse event; window event queue was full.&quot;</span>)<span class="question-mark">?</span>;
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(());
                 }
             }
         }
@@ -1227,427 +1221,426 @@
         <span class="prelude-val">Err</span>(<span class="string">&quot;the mouse position does not fall within the bounds of any window&quot;</span>)
     }
 
-    <span class="doccomment">/// Refresh the floating border, which is used to show the outline of a window while it is being moved. </span>
-    <span class="doccomment">/// `show` indicates whether to show the border or not.</span>
-    <span class="doccomment">/// `new_border` defines the rectangular outline of the border.</span>
-    <span class="kw">fn</span> <span class="ident">refresh_floating_border</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">show</span>: <span class="ident">bool</span>,
-        <span class="ident">new_border</span>: <span class="ident">Rectangle</span>,
-    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// first clear old border if exists</span>
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">repositioned_border</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">border</span>) =&gt; {
-                <span class="kw">let</span> <span class="ident">pixels</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">draw_floating_border</span>(<span class="kw-2">&amp;</span><span class="ident">border</span>, <span class="ident">color::TRANSPARENT</span>);
-                <span class="self">self</span>.<span class="ident">refresh_bottom_windows</span>(<span class="ident">pixels</span>.<span class="ident">into_iter</span>(), <span class="bool-val">true</span>)<span class="question-mark">?</span>;
+    <span class="doccomment">/// Refresh the floating border, which is used to show the outline of a window while it is being moved. 
+    /// `show` indicates whether to show the border or not.
+    /// `new_border` defines the rectangular outline of the border.
+    </span><span class="kw">fn </span>refresh_floating_border(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        show: bool,
+        new_border: Rectangle,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// first clear old border if exists
+        </span><span class="kw">match </span><span class="self">self</span>.repositioned_border {
+            <span class="prelude-val">Some</span>(border) =&gt; {
+                <span class="kw">let </span>pixels = <span class="self">self</span>.draw_floating_border(<span class="kw-2">&amp;</span>border, color::TRANSPARENT);
+                <span class="self">self</span>.refresh_bottom_windows(pixels.into_iter(), <span class="bool-val">true</span>)<span class="question-mark">?</span>;
             },
-            <span class="prelude-val">None</span> =&gt;{}
+            <span class="prelude-val">None </span>=&gt;{}
         }
 
-        <span class="comment">// then draw current border</span>
-        <span class="kw">if</span> <span class="ident">show</span> {
-            <span class="kw">let</span> <span class="ident">pixels</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">draw_floating_border</span>(<span class="kw-2">&amp;</span><span class="ident">new_border</span>, <span class="ident">WINDOW_BORDER_COLOR_INNER</span>);
-            <span class="self">self</span>.<span class="ident">refresh_top</span>(<span class="ident">pixels</span>.<span class="ident">into_iter</span>())<span class="question-mark">?</span>;
-            <span class="self">self</span>.<span class="ident">repositioned_border</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">new_border</span>);
-        } <span class="kw">else</span> {
-            <span class="self">self</span>.<span class="ident">repositioned_border</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+        <span class="comment">// then draw current border
+        </span><span class="kw">if </span>show {
+            <span class="kw">let </span>pixels = <span class="self">self</span>.draw_floating_border(<span class="kw-2">&amp;</span>new_border, WINDOW_BORDER_COLOR_INNER);
+            <span class="self">self</span>.refresh_top(pixels.into_iter())<span class="question-mark">?</span>;
+            <span class="self">self</span>.repositioned_border = <span class="prelude-val">Some</span>(new_border);
+        } <span class="kw">else </span>{
+            <span class="self">self</span>.repositioned_border = <span class="prelude-val">None</span>;
         }
 
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// draw the floating border with `pixel`. Return the list of coordinates of pixels that were updated.</span>
-    <span class="doccomment">/// `border` indicates the position of the border as a rectangle.</span>
-    <span class="doccomment">/// `color` is the color of the floating border.</span>
-    <span class="kw">fn</span> <span class="ident">draw_floating_border</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">border</span>: <span class="kw-2">&amp;</span><span class="ident">Rectangle</span>, <span class="ident">color</span>: <span class="ident">Color</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Coord</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">coordinates</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-        <span class="kw">let</span> <span class="ident">pixel</span> <span class="op">=</span> <span class="ident">color</span>.<span class="ident">into</span>();
-        <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..(<span class="ident">WINDOW_BORDER_SIZE</span>) <span class="kw">as</span> <span class="ident">isize</span> {
-            <span class="kw">let</span> <span class="ident">width</span> <span class="op">=</span> (<span class="ident">border</span>.<span class="ident">bottom_right</span>.<span class="ident">x</span> <span class="op">-</span> <span class="ident">border</span>.<span class="ident">top_left</span>.<span class="ident">x</span>) <span class="op">-</span> <span class="number">2</span> <span class="op">*</span> <span class="ident">i</span>;
-            <span class="kw">let</span> <span class="ident">height</span> <span class="op">=</span> (<span class="ident">border</span>.<span class="ident">bottom_right</span>.<span class="ident">y</span> <span class="op">-</span> <span class="ident">border</span>.<span class="ident">top_left</span>.<span class="ident">y</span>) <span class="op">-</span> <span class="number">2</span> <span class="op">*</span> <span class="ident">i</span>;
-            <span class="kw">let</span> <span class="ident">coordinate</span> <span class="op">=</span> <span class="ident">border</span>.<span class="ident">top_left</span> <span class="op">+</span> (<span class="ident">i</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">i</span> <span class="kw">as</span> <span class="ident">isize</span>);
-            <span class="kw">if</span> <span class="ident">width</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">height</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">0</span> {
+    <span class="doccomment">/// draw the floating border with `pixel`. Return the list of coordinates of pixels that were updated.
+    /// `border` indicates the position of the border as a rectangle.
+    /// `color` is the color of the floating border.
+    </span><span class="kw">fn </span>draw_floating_border(<span class="kw-2">&amp;mut </span><span class="self">self</span>, border: <span class="kw-2">&amp;</span>Rectangle, color: Color) -&gt; Vec&lt;Coord&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>coordinates = Vec::new();
+        <span class="kw">let </span>pixel = color.into();
+        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..(WINDOW_BORDER_SIZE) <span class="kw">as </span>isize {
+            <span class="kw">let </span>width = (border.bottom_right.x - border.top_left.x) - <span class="number">2 </span>* i;
+            <span class="kw">let </span>height = (border.bottom_right.y - border.top_left.y) - <span class="number">2 </span>* i;
+            <span class="kw">let </span>coordinate = border.top_left + (i <span class="kw">as </span>isize, i <span class="kw">as </span>isize);
+            <span class="kw">if </span>width &lt;= <span class="number">0 </span>|| height &lt;= <span class="number">0 </span>{
                 <span class="kw">break</span>;
             }
-            <span class="ident">framebuffer_drawer::draw_rectangle</span>(
-                <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">top_fb</span>, 
-                <span class="ident">coordinate</span>, 
-                <span class="ident">width</span> <span class="kw">as</span> <span class="ident">usize</span>, 
-                <span class="ident">height</span> <span class="kw">as</span> <span class="ident">usize</span>, 
-                <span class="ident">pixel</span>
+            framebuffer_drawer::draw_rectangle(
+                <span class="kw-2">&amp;mut </span><span class="self">self</span>.top_fb, 
+                coordinate, 
+                width <span class="kw">as </span>usize, 
+                height <span class="kw">as </span>usize, 
+                pixel
             );
 
-            <span class="kw">for</span> <span class="ident">m</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">width</span> {
-                <span class="ident">coordinates</span>.<span class="ident">push</span>(<span class="ident">coordinate</span> <span class="op">+</span> (<span class="ident">m</span>, <span class="number">0</span>));
-                <span class="ident">coordinates</span>.<span class="ident">push</span>(<span class="ident">coordinate</span> <span class="op">+</span> (<span class="ident">m</span>, <span class="ident">height</span>));
+            <span class="kw">for </span>m <span class="kw">in </span><span class="number">0</span>..width {
+                coordinates.push(coordinate + (m, <span class="number">0</span>));
+                coordinates.push(coordinate + (m, height));
             }            
             
-            <span class="kw">for</span> <span class="ident">m</span> <span class="kw">in</span> <span class="number">1</span>..<span class="ident">height</span> <span class="op">-</span> <span class="number">1</span> {
-                <span class="ident">coordinates</span>.<span class="ident">push</span>(<span class="ident">coordinate</span> <span class="op">+</span> (<span class="number">0</span>, <span class="ident">m</span>));
-                <span class="ident">coordinates</span>.<span class="ident">push</span>(<span class="ident">coordinate</span> <span class="op">+</span> (<span class="ident">width</span>, <span class="ident">m</span>));
+            <span class="kw">for </span>m <span class="kw">in </span><span class="number">1</span>..height - <span class="number">1 </span>{
+                coordinates.push(coordinate + (<span class="number">0</span>, m));
+                coordinates.push(coordinate + (width, m));
             }            
         }
 
-        <span class="ident">coordinates</span>
+        coordinates
     }
 
-    <span class="doccomment">/// take active window&#39;s base position and current mouse, move the window with delta</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">move_active_window</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">current_active</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">active</span>.<span class="ident">upgrade</span>() {
-            <span class="kw">let</span> <span class="ident">border</span> <span class="op">=</span> <span class="ident">Rectangle</span> { 
-                <span class="ident">top_left</span>: <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>), 
-                <span class="ident">bottom_right</span>: <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>) 
+    <span class="doccomment">/// take active window&#39;s base position and current mouse, move the window with delta
+    </span><span class="kw">pub fn </span>move_active_window(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(current_active) = <span class="self">self</span>.active.upgrade() {
+            <span class="kw">let </span>border = Rectangle { 
+                top_left: Coord::new(<span class="number">0</span>, <span class="number">0</span>), 
+                bottom_right: Coord::new(<span class="number">0</span>, <span class="number">0</span>) 
             };
-            <span class="self">self</span>.<span class="ident">refresh_floating_border</span>(<span class="bool-val">false</span>, <span class="ident">border</span>)<span class="question-mark">?</span>;
+            <span class="self">self</span>.refresh_floating_border(<span class="bool-val">false</span>, border)<span class="question-mark">?</span>;
 
-            <span class="kw">let</span> (<span class="ident">old_top_left</span>, <span class="ident">old_bottom_right</span>, <span class="ident">new_top_left</span>, <span class="ident">new_bottom_right</span>) <span class="op">=</span> {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">current_active_win</span> <span class="op">=</span> <span class="ident">current_active</span>.<span class="ident">lock</span>();
-                <span class="kw">let</span> (<span class="ident">current_x</span>, <span class="ident">current_y</span>) <span class="op">=</span> {
-                    <span class="kw">let</span> <span class="ident">m</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mouse</span>;
-                    (<span class="ident">m</span>.<span class="ident">x</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">m</span>.<span class="ident">y</span> <span class="kw">as</span> <span class="ident">isize</span>)
+            <span class="kw">let </span>(old_top_left, old_bottom_right, new_top_left, new_bottom_right) = {
+                <span class="kw">let </span><span class="kw-2">mut </span>current_active_win = current_active.lock();
+                <span class="kw">let </span>(current_x, current_y) = {
+                    <span class="kw">let </span>m = <span class="kw-2">&amp;</span><span class="self">self</span>.mouse;
+                    (m.x <span class="kw">as </span>isize, m.y <span class="kw">as </span>isize)
                 };
-                <span class="kw">match</span> <span class="ident">current_active_win</span>.<span class="ident">moving</span> {
-                    <span class="ident">WindowMovingStatus::Moving</span>(<span class="ident">base</span>) =&gt; {
-                        <span class="kw">let</span> <span class="ident">old_top_left</span> <span class="op">=</span> <span class="ident">current_active_win</span>.<span class="ident">get_position</span>();
-                        <span class="kw">let</span> <span class="ident">new_top_left</span> <span class="op">=</span> <span class="ident">old_top_left</span> <span class="op">+</span> ((<span class="ident">current_x</span> <span class="op">-</span> <span class="ident">base</span>.<span class="ident">x</span>), (<span class="ident">current_y</span> <span class="op">-</span> <span class="ident">base</span>.<span class="ident">y</span>));
-                        <span class="kw">let</span> (<span class="ident">width</span>, <span class="ident">height</span>) <span class="op">=</span> <span class="ident">current_active_win</span>.<span class="ident">get_size</span>();
-                        <span class="kw">let</span> <span class="ident">old_bottom_right</span> <span class="op">=</span> <span class="ident">old_top_left</span> <span class="op">+</span> (<span class="ident">width</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">height</span> <span class="kw">as</span> <span class="ident">isize</span>);
-                        <span class="kw">let</span> <span class="ident">new_bottom_right</span> <span class="op">=</span> <span class="ident">new_top_left</span> <span class="op">+</span> (<span class="ident">width</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">height</span> <span class="kw">as</span> <span class="ident">isize</span>);
-                        <span class="ident">current_active_win</span>.<span class="ident">set_position</span>(<span class="ident">new_top_left</span>);
-                        (<span class="ident">old_top_left</span>, <span class="ident">old_bottom_right</span>, <span class="ident">new_top_left</span>, <span class="ident">new_bottom_right</span>)        
+                <span class="kw">match </span>current_active_win.moving {
+                    WindowMovingStatus::Moving(base) =&gt; {
+                        <span class="kw">let </span>old_top_left = current_active_win.get_position();
+                        <span class="kw">let </span>new_top_left = old_top_left + ((current_x - base.x), (current_y - base.y));
+                        <span class="kw">let </span>(width, height) = current_active_win.get_size();
+                        <span class="kw">let </span>old_bottom_right = old_top_left + (width <span class="kw">as </span>isize, height <span class="kw">as </span>isize);
+                        <span class="kw">let </span>new_bottom_right = new_top_left + (width <span class="kw">as </span>isize, height <span class="kw">as </span>isize);
+                        current_active_win.set_position(new_top_left);
+                        (old_top_left, old_bottom_right, new_top_left, new_bottom_right)        
                     },
-                    <span class="ident">WindowMovingStatus::Stationary</span> =&gt; {
-                        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;The window is not moving&quot;</span>);
+                    WindowMovingStatus::Stationary =&gt; {
+                        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;The window is not moving&quot;</span>);
                     }
                 }
             };
-            <span class="self">self</span>.<span class="ident">refresh_bottom_windows</span>(<span class="prelude-val">Some</span>(<span class="ident">Rectangle</span>{<span class="ident">top_left</span>: <span class="ident">old_top_left</span>, <span class="ident">bottom_right</span>: <span class="ident">old_bottom_right</span>}), <span class="bool-val">false</span>)<span class="question-mark">?</span>;
+            <span class="self">self</span>.refresh_bottom_windows(<span class="prelude-val">Some</span>(Rectangle{top_left: old_top_left, bottom_right: old_bottom_right}), <span class="bool-val">false</span>)<span class="question-mark">?</span>;
 
-            <span class="self">self</span>.<span class="ident">refresh_active_window</span>(<span class="prelude-val">Some</span>(<span class="ident">Rectangle</span>{<span class="ident">top_left</span>: <span class="ident">new_top_left</span>, <span class="ident">bottom_right</span>: <span class="ident">new_bottom_right</span>}))<span class="question-mark">?</span>;
-            <span class="self">self</span>.<span class="ident">refresh_mouse</span>()<span class="question-mark">?</span>;
-        } <span class="kw">else</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;cannot find active window to move&quot;</span>);
+            <span class="self">self</span>.refresh_active_window(<span class="prelude-val">Some</span>(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}))<span class="question-mark">?</span>;
+            <span class="self">self</span>.refresh_mouse()<span class="question-mark">?</span>;
+        } <span class="kw">else </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;cannot find active window to move&quot;</span>);
         }
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Refresh the mouse display</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">refresh_mouse</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">bounding_box</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Rectangle</span> {
-            <span class="ident">top_left</span>: <span class="self">self</span>.<span class="ident">mouse</span>,
-            <span class="ident">bottom_right</span>: <span class="self">self</span>.<span class="ident">mouse</span> <span class="op">+</span> (<span class="ident">MOUSE_POINTER_SIZE_X</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">MOUSE_POINTER_SIZE_Y</span> <span class="kw">as</span> <span class="ident">isize</span>)
+    <span class="doccomment">/// Refresh the mouse display
+    </span><span class="kw">pub fn </span>refresh_mouse(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>bounding_box = <span class="prelude-val">Some</span>(Rectangle {
+            top_left: <span class="self">self</span>.mouse,
+            bottom_right: <span class="self">self</span>.mouse + (MOUSE_POINTER_SIZE_X <span class="kw">as </span>isize, MOUSE_POINTER_SIZE_Y <span class="kw">as </span>isize)
         });
         
-        <span class="self">self</span>.<span class="ident">refresh_top</span>(<span class="ident">bounding_box</span>.<span class="ident">into_iter</span>())
+        <span class="self">self</span>.refresh_top(bounding_box.into_iter())
     }
 
-    <span class="doccomment">/// Move mouse. `relative` indicates the new position relative to current position.</span>
-    <span class="kw">fn</span> <span class="ident">move_mouse</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">relative</span>: <span class="ident">Coord</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">old</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">mouse</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new</span> <span class="op">=</span> <span class="ident">old</span> <span class="op">+</span> <span class="ident">relative</span>;
+    <span class="doccomment">/// Move mouse. `relative` indicates the new position relative to current position.
+    </span><span class="kw">fn </span>move_mouse(<span class="kw-2">&amp;mut </span><span class="self">self</span>, relative: Coord) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>old = <span class="self">self</span>.mouse;
+        <span class="kw">let </span><span class="kw-2">mut </span>new = old + relative;
         
-        <span class="kw">let</span> (<span class="ident">screen_width</span>, <span class="ident">screen_height</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_screen_size</span>();
-        <span class="kw">if</span> <span class="ident">new</span>.<span class="ident">x</span> <span class="op">&lt;</span> <span class="number">0</span> {
-            <span class="ident">new</span>.<span class="ident">x</span> <span class="op">=</span> <span class="number">0</span>;
+        <span class="kw">let </span>(screen_width, screen_height) = <span class="self">self</span>.get_screen_size();
+        <span class="kw">if </span>new.x &lt; <span class="number">0 </span>{
+            new.x = <span class="number">0</span>;
         }
-        <span class="kw">if</span> <span class="ident">new</span>.<span class="ident">y</span> <span class="op">&lt;</span> <span class="number">0</span> {
-            <span class="ident">new</span>.<span class="ident">y</span> <span class="op">=</span> <span class="number">0</span>;
+        <span class="kw">if </span>new.y &lt; <span class="number">0 </span>{
+            new.y = <span class="number">0</span>;
         }
 
-        <span class="comment">// keep mouse pointer border in the screen when it is at the right or bottom side.</span>
-        <span class="kw">const</span> <span class="ident">MOUSE_POINTER_BORDER</span>: <span class="ident">isize</span> <span class="op">=</span> <span class="number">3</span>;
-        <span class="ident">new</span>.<span class="ident">x</span> <span class="op">=</span> <span class="ident">core::cmp::min</span>(<span class="ident">new</span>.<span class="ident">x</span>, <span class="ident">screen_width</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">-</span> <span class="ident">MOUSE_POINTER_BORDER</span>);
-        <span class="ident">new</span>.<span class="ident">y</span> <span class="op">=</span> <span class="ident">core::cmp::min</span>(<span class="ident">new</span>.<span class="ident">y</span>, <span class="ident">screen_height</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">-</span> <span class="ident">MOUSE_POINTER_BORDER</span>);
+        <span class="comment">// keep mouse pointer border in the screen when it is at the right or bottom side.
+        </span><span class="kw">const </span>MOUSE_POINTER_BORDER: isize = <span class="number">3</span>;
+        new.x = core::cmp::min(new.x, screen_width <span class="kw">as </span>isize - MOUSE_POINTER_BORDER);
+        new.y = core::cmp::min(new.y, screen_height <span class="kw">as </span>isize - MOUSE_POINTER_BORDER);
             
-        <span class="self">self</span>.<span class="ident">move_mouse_to</span>(<span class="ident">new</span>)
+        <span class="self">self</span>.move_mouse_to(new)
     }
     
-    <span class="comment">// Move mouse to absolute position `new`</span>
-    <span class="kw">fn</span> <span class="ident">move_mouse_to</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">new</span>: <span class="ident">Coord</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// clear old mouse</span>
-        <span class="kw">for</span> <span class="ident">y</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">mouse</span>.<span class="ident">y</span>..<span class="self">self</span>.<span class="ident">mouse</span>.<span class="ident">y</span> <span class="op">+</span> <span class="ident">MOUSE_POINTER_SIZE_Y</span> <span class="kw">as</span> <span class="ident">isize</span> {
-            <span class="kw">for</span> <span class="ident">x</span> <span class="kw">in</span>
-                <span class="self">self</span>.<span class="ident">mouse</span>.<span class="ident">x</span>..<span class="self">self</span>.<span class="ident">mouse</span>.<span class="ident">x</span> <span class="op">+</span> <span class="ident">MOUSE_POINTER_SIZE_X</span> <span class="kw">as</span> <span class="ident">isize</span> {
-                <span class="kw">let</span> <span class="ident">coordinate</span> <span class="op">=</span> <span class="ident">Coord::new</span>(<span class="ident">x</span>, <span class="ident">y</span>);
-                <span class="self">self</span>.<span class="ident">top_fb</span>.<span class="ident">overwrite_pixel</span>(<span class="ident">coordinate</span>, <span class="ident">color::TRANSPARENT</span>.<span class="ident">into</span>());
+    <span class="comment">// Move mouse to absolute position `new`
+    </span><span class="kw">fn </span>move_mouse_to(<span class="kw-2">&amp;mut </span><span class="self">self</span>, new: Coord) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// clear old mouse
+        </span><span class="kw">for </span>y <span class="kw">in </span><span class="self">self</span>.mouse.y..<span class="self">self</span>.mouse.y + MOUSE_POINTER_SIZE_Y <span class="kw">as </span>isize {
+            <span class="kw">for </span>x <span class="kw">in
+                </span><span class="self">self</span>.mouse.x..<span class="self">self</span>.mouse.x + MOUSE_POINTER_SIZE_X <span class="kw">as </span>isize {
+                <span class="kw">let </span>coordinate = Coord::new(x, y);
+                <span class="self">self</span>.top_fb.overwrite_pixel(coordinate, color::TRANSPARENT.into());
             }
         }
-        <span class="kw">let</span> <span class="ident">bounding_box</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Rectangle</span> {
-            <span class="ident">top_left</span>: <span class="self">self</span>.<span class="ident">mouse</span>,
-            <span class="ident">bottom_right</span>: <span class="self">self</span>.<span class="ident">mouse</span> <span class="op">+</span> (<span class="ident">MOUSE_POINTER_SIZE_X</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">MOUSE_POINTER_SIZE_Y</span> <span class="kw">as</span> <span class="ident">isize</span>)
+        <span class="kw">let </span>bounding_box = <span class="prelude-val">Some</span>(Rectangle {
+            top_left: <span class="self">self</span>.mouse,
+            bottom_right: <span class="self">self</span>.mouse + (MOUSE_POINTER_SIZE_X <span class="kw">as </span>isize, MOUSE_POINTER_SIZE_Y <span class="kw">as </span>isize)
         });
-        <span class="self">self</span>.<span class="ident">refresh_bottom_windows</span>(<span class="ident">bounding_box</span>.<span class="ident">into_iter</span>(), <span class="bool-val">true</span>)<span class="question-mark">?</span>;
+        <span class="self">self</span>.refresh_bottom_windows(bounding_box.into_iter(), <span class="bool-val">true</span>)<span class="question-mark">?</span>;
 
-        <span class="comment">// draw new mouse</span>
-        <span class="self">self</span>.<span class="ident">mouse</span> <span class="op">=</span> <span class="ident">new</span>;
-        <span class="kw">for</span> <span class="ident">y</span> <span class="kw">in</span> <span class="ident">new</span>.<span class="ident">y</span>..<span class="ident">new</span>.<span class="ident">y</span> <span class="op">+</span> <span class="ident">MOUSE_POINTER_SIZE_Y</span> <span class="kw">as</span> <span class="ident">isize</span> {
-            <span class="kw">for</span> <span class="ident">x</span> <span class="kw">in</span> <span class="ident">new</span>.<span class="ident">x</span>..<span class="ident">new</span>.<span class="ident">x</span> <span class="op">+</span> <span class="ident">MOUSE_POINTER_SIZE_X</span> <span class="kw">as</span> <span class="ident">isize</span> {
-                <span class="kw">let</span> <span class="ident">coordinate</span> <span class="op">=</span> <span class="ident">Coord::new</span>(<span class="ident">x</span>, <span class="ident">y</span>);
-                <span class="kw">let</span> <span class="ident">pixel</span> <span class="op">=</span> <span class="ident">MOUSE_POINTER_IMAGE</span>[(<span class="ident">x</span> <span class="op">-</span> <span class="ident">new</span>.<span class="ident">x</span>) <span class="kw">as</span> <span class="ident">usize</span>][(<span class="ident">y</span> <span class="op">-</span> <span class="ident">new</span>.<span class="ident">y</span>) <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">into</span>();
-                <span class="self">self</span>.<span class="ident">top_fb</span>.<span class="ident">overwrite_pixel</span>(<span class="ident">coordinate</span>, <span class="ident">pixel</span>);
+        <span class="comment">// draw new mouse
+        </span><span class="self">self</span>.mouse = new;
+        <span class="kw">for </span>y <span class="kw">in </span>new.y..new.y + MOUSE_POINTER_SIZE_Y <span class="kw">as </span>isize {
+            <span class="kw">for </span>x <span class="kw">in </span>new.x..new.x + MOUSE_POINTER_SIZE_X <span class="kw">as </span>isize {
+                <span class="kw">let </span>coordinate = Coord::new(x, y);
+                <span class="kw">let </span>pixel = MOUSE_POINTER_IMAGE[(x - new.x) <span class="kw">as </span>usize][(y - new.y) <span class="kw">as </span>usize].into();
+                <span class="self">self</span>.top_fb.overwrite_pixel(coordinate, pixel);
             }
         }
-        <span class="self">self</span>.<span class="ident">refresh_mouse</span>()<span class="question-mark">?</span>;
+        <span class="self">self</span>.refresh_mouse()<span class="question-mark">?</span>;
 
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Move the floating border when a window is moving.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">move_floating_border</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> (<span class="ident">new_x</span>, <span class="ident">new_y</span>) <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">m</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mouse</span>;
-            (<span class="ident">m</span>.<span class="ident">x</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">m</span>.<span class="ident">y</span> <span class="kw">as</span> <span class="ident">isize</span>)
+    <span class="doccomment">/// Move the floating border when a window is moving.
+    </span><span class="kw">pub fn </span>move_floating_border(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>(new_x, new_y) = {
+            <span class="kw">let </span>m = <span class="kw-2">&amp;</span><span class="self">self</span>.mouse;
+            (m.x <span class="kw">as </span>isize, m.y <span class="kw">as </span>isize)
         };
         
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">current_active</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">active</span>.<span class="ident">upgrade</span>() {
-            <span class="kw">let</span> (<span class="ident">is_draw</span>, <span class="ident">border_start</span>, <span class="ident">border_end</span>) <span class="op">=</span> {
-                <span class="kw">let</span> <span class="ident">current_active_win</span> <span class="op">=</span> <span class="ident">current_active</span>.<span class="ident">lock</span>();
-                <span class="kw">match</span> <span class="ident">current_active_win</span>.<span class="ident">moving</span> {
-                    <span class="ident">WindowMovingStatus::Moving</span>(<span class="ident">base</span>) =&gt; {
-                        <span class="comment">// move this window</span>
-                        <span class="comment">// for better performance, while moving window, only border is shown for indication</span>
-                        <span class="kw">let</span> <span class="ident">coordinate</span> <span class="op">=</span> <span class="ident">current_active_win</span>.<span class="ident">get_position</span>();
-                        <span class="comment">// let (current_x, current_y) = (coordinate.x, coordinate.y);</span>
-                        <span class="kw">let</span> (<span class="ident">width</span>, <span class="ident">height</span>) <span class="op">=</span> <span class="ident">current_active_win</span>.<span class="ident">get_size</span>();
-                        <span class="kw">let</span> <span class="ident">border_start</span> <span class="op">=</span> <span class="ident">coordinate</span> <span class="op">+</span> (<span class="ident">new_x</span> <span class="op">-</span> <span class="ident">base</span>.<span class="ident">x</span>, <span class="ident">new_y</span> <span class="op">-</span> <span class="ident">base</span>.<span class="ident">y</span>);
-                        <span class="kw">let</span> <span class="ident">border_end</span> <span class="op">=</span> <span class="ident">border_start</span> <span class="op">+</span> (<span class="ident">width</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">height</span> <span class="kw">as</span> <span class="ident">isize</span>);
-                        (<span class="bool-val">true</span>, <span class="ident">border_start</span>, <span class="ident">border_end</span>)
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(current_active) = <span class="self">self</span>.active.upgrade() {
+            <span class="kw">let </span>(is_draw, border_start, border_end) = {
+                <span class="kw">let </span>current_active_win = current_active.lock();
+                <span class="kw">match </span>current_active_win.moving {
+                    WindowMovingStatus::Moving(base) =&gt; {
+                        <span class="comment">// move this window
+                        // for better performance, while moving window, only border is shown for indication
+                        </span><span class="kw">let </span>coordinate = current_active_win.get_position();
+                        <span class="comment">// let (current_x, current_y) = (coordinate.x, coordinate.y);
+                        </span><span class="kw">let </span>(width, height) = current_active_win.get_size();
+                        <span class="kw">let </span>border_start = coordinate + (new_x - base.x, new_y - base.y);
+                        <span class="kw">let </span>border_end = border_start + (width <span class="kw">as </span>isize, height <span class="kw">as </span>isize);
+                        (<span class="bool-val">true</span>, border_start, border_end)
                     }
-                    <span class="ident">WindowMovingStatus::Stationary</span> =&gt; (<span class="bool-val">false</span>, <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>), <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>)),
+                    WindowMovingStatus::Stationary =&gt; (<span class="bool-val">false</span>, Coord::new(<span class="number">0</span>, <span class="number">0</span>), Coord::new(<span class="number">0</span>, <span class="number">0</span>)),
                 }
             };
-            <span class="kw">let</span> <span class="ident">border</span> <span class="op">=</span> <span class="ident">Rectangle</span> {
-                <span class="ident">top_left</span>: <span class="ident">border_start</span>,
-                <span class="ident">bottom_right</span>: <span class="ident">border_end</span>,
+            <span class="kw">let </span>border = Rectangle {
+                top_left: border_start,
+                bottom_right: border_end,
             };
-            <span class="self">self</span>.<span class="ident">refresh_floating_border</span>(<span class="ident">is_draw</span>, <span class="ident">border</span>)<span class="question-mark">?</span>;
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">border</span> <span class="op">=</span> <span class="ident">Rectangle</span> {
-                <span class="ident">top_left</span>: <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>),
-                <span class="ident">bottom_right</span>: <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>),
+            <span class="self">self</span>.refresh_floating_border(is_draw, border)<span class="question-mark">?</span>;
+        } <span class="kw">else </span>{
+            <span class="kw">let </span>border = Rectangle {
+                top_left: Coord::new(<span class="number">0</span>, <span class="number">0</span>),
+                bottom_right: Coord::new(<span class="number">0</span>, <span class="number">0</span>),
             };
-            <span class="self">self</span>.<span class="ident">refresh_floating_border</span>(<span class="bool-val">false</span>, <span class="ident">border</span>)<span class="question-mark">?</span>;
+            <span class="self">self</span>.refresh_floating_border(<span class="bool-val">false</span>, border)<span class="question-mark">?</span>;
         }
 
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Returns true if the given `window` is the currently active window.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_active</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">window</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">active</span>.<span class="ident">upgrade</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">active</span><span class="op">|</span> <span class="ident">Arc::ptr_eq</span>(<span class="kw-2">&amp;</span><span class="ident">active</span>, <span class="ident">window</span>))
-            .<span class="ident">unwrap_or</span>(<span class="bool-val">false</span>)
+    <span class="doccomment">/// Returns true if the given `window` is the currently active window.
+    </span><span class="kw">pub fn </span>is_active(<span class="kw-2">&amp;</span><span class="self">self</span>, window: <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;WindowInner&gt;&gt;) -&gt; bool {
+        <span class="self">self</span>.active.upgrade()
+            .map(|active| Arc::ptr_eq(<span class="kw-2">&amp;</span>active, window))
+            .unwrap_or(<span class="bool-val">false</span>)
     }
 
-    <span class="doccomment">/// Returns the `(width, height)` in pixels of the screen itself (the final framebuffer).</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_screen_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (<span class="ident">usize</span>, <span class="ident">usize</span>) {
-        <span class="self">self</span>.<span class="ident">final_fb</span>.<span class="ident">get_size</span>()
+    <span class="doccomment">/// Returns the `(width, height)` in pixels of the screen itself (the final framebuffer).
+    </span><span class="kw">pub fn </span>get_screen_size(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (usize, usize) {
+        <span class="self">self</span>.final_fb.get_size()
     }
 }
 
-<span class="doccomment">/// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>, <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">final_fb</span>: <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">AlphaPixel</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">framebuffer::init</span>()<span class="question-mark">?</span>;
-    <span class="kw">let</span> (<span class="ident">width</span>, <span class="ident">height</span>) <span class="op">=</span> <span class="ident">final_fb</span>.<span class="ident">get_size</span>();
+<span class="doccomment">/// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.
+</span><span class="kw">pub fn </span>init() -&gt; <span class="prelude-ty">Result</span>&lt;(Queue&lt;Event&gt;, Queue&lt;Event&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>final_fb: Framebuffer&lt;AlphaPixel&gt; = framebuffer::init()<span class="question-mark">?</span>;
+    <span class="kw">let </span>(width, height) = final_fb.get_size();
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bottom_fb</span> <span class="op">=</span> <span class="ident">Framebuffer::new</span>(<span class="ident">width</span>, <span class="ident">height</span>, <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">top_fb</span> <span class="op">=</span> <span class="ident">Framebuffer::new</span>(<span class="ident">width</span>, <span class="ident">height</span>, <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> (<span class="ident">screen_width</span>, <span class="ident">screen_height</span>) <span class="op">=</span> <span class="ident">bottom_fb</span>.<span class="ident">get_size</span>();
-    <span class="ident">bottom_fb</span>.<span class="ident">fill</span>(<span class="ident">color::LIGHT_GRAY</span>.<span class="ident">into</span>());
-    <span class="ident">top_fb</span>.<span class="ident">fill</span>(<span class="ident">color::TRANSPARENT</span>.<span class="ident">into</span>()); 
+    <span class="kw">let </span><span class="kw-2">mut </span>bottom_fb = Framebuffer::new(width, height, <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>top_fb = Framebuffer::new(width, height, <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>(screen_width, screen_height) = bottom_fb.get_size();
+    bottom_fb.fill(color::LIGHT_GRAY.into());
+    top_fb.fill(color::TRANSPARENT.into()); 
 
-    <span class="comment">// Initial position for the mouse</span>
-    <span class="kw">let</span> <span class="ident">mouse</span> <span class="op">=</span> <span class="ident">Coord</span> {
-        <span class="ident">x</span>: <span class="ident">screen_width</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">/</span> <span class="number">2</span>,
-        <span class="ident">y</span>: <span class="ident">screen_height</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">/</span> <span class="number">2</span>,
+    <span class="comment">// Initial position for the mouse
+    </span><span class="kw">let </span>mouse = Coord {
+        x: screen_width <span class="kw">as </span>isize / <span class="number">2</span>,
+        y: screen_height <span class="kw">as </span>isize / <span class="number">2</span>,
     }; 
 
-    <span class="comment">// Initialize static window manager</span>
-    <span class="kw">let</span> <span class="ident">window_manager</span> <span class="op">=</span> <span class="ident">WindowManager</span> {
-        <span class="ident">hide_list</span>: <span class="ident">VecDeque::new</span>(),
-        <span class="ident">show_list</span>: <span class="ident">VecDeque::new</span>(),
-        <span class="ident">active</span>: <span class="ident">Weak::new</span>(),
-        <span class="ident">mouse</span>,
-        <span class="ident">repositioned_border</span>: <span class="prelude-val">None</span>,
-        <span class="ident">bottom_fb</span>,
-        <span class="ident">top_fb</span>,
-        <span class="ident">final_fb</span>,
+    <span class="comment">// Initialize static window manager
+    </span><span class="kw">let </span>window_manager = WindowManager {
+        hide_list: VecDeque::new(),
+        show_list: VecDeque::new(),
+        active: Weak::new(),
+        mouse,
+        repositioned_border: <span class="prelude-val">None</span>,
+        bottom_fb,
+        top_fb,
+        final_fb,
     };
-    <span class="ident">WINDOW_MANAGER</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">Mutex::new</span>(<span class="ident">window_manager</span>));
+    WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
 
-    <span class="comment">// keyinput queue initialization</span>
-    <span class="kw">let</span> <span class="ident">key_consumer</span>: <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Queue::with_capacity</span>(<span class="number">100</span>);
-    <span class="kw">let</span> <span class="ident">key_producer</span> <span class="op">=</span> <span class="ident">key_consumer</span>.<span class="ident">clone</span>();
+    <span class="comment">// keyinput queue initialization
+    </span><span class="kw">let </span>key_consumer: Queue&lt;Event&gt; = Queue::with_capacity(<span class="number">100</span>);
+    <span class="kw">let </span>key_producer = key_consumer.clone();
 
-    <span class="comment">// mouse input queue initialization</span>
-    <span class="kw">let</span> <span class="ident">mouse_consumer</span>: <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Queue::with_capacity</span>(<span class="number">100</span>);
-    <span class="kw">let</span> <span class="ident">mouse_producer</span> <span class="op">=</span> <span class="ident">mouse_consumer</span>.<span class="ident">clone</span>();
+    <span class="comment">// mouse input queue initialization
+    </span><span class="kw">let </span>mouse_consumer: Queue&lt;Event&gt; = Queue::with_capacity(<span class="number">100</span>);
+    <span class="kw">let </span>mouse_producer = mouse_consumer.clone();
 
-    <span class="ident">spawn::new_task_builder</span>(<span class="ident">window_manager_loop</span>, (<span class="ident">key_consumer</span>, <span class="ident">mouse_consumer</span>))
-        .<span class="ident">name</span>(<span class="string">&quot;window_manager_loop&quot;</span>.<span class="ident">to_string</span>())
-        .<span class="ident">spawn</span>()<span class="question-mark">?</span>;
+    spawn::new_task_builder(window_manager_loop, (key_consumer, mouse_consumer))
+        .name(<span class="string">&quot;window_manager_loop&quot;</span>.to_string())
+        .spawn()<span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>((<span class="ident">key_producer</span>, <span class="ident">mouse_producer</span>))
+    <span class="prelude-val">Ok</span>((key_producer, mouse_producer))
 }
 
-<span class="doccomment">/// handles all keyboard and mouse movement in this window manager</span>
-<span class="kw">fn</span> <span class="ident">window_manager_loop</span>(
-    (<span class="ident">key_consumer</span>, <span class="ident">mouse_consumer</span>): (<span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>, <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>),
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">loop</span> {
-        <span class="kw">let</span> <span class="ident">event_opt</span> <span class="op">=</span> <span class="ident">key_consumer</span>.<span class="ident">pop</span>()
-            .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span><span class="ident">mouse_consumer</span>.<span class="ident">pop</span>())
-            .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span>{
-                <span class="ident">scheduler::schedule</span>();
-                <span class="prelude-val">None</span>
-            });
+<span class="doccomment">/// handles all keyboard and mouse movement in this window manager
+</span><span class="kw">fn </span>window_manager_loop(
+    (key_consumer, mouse_consumer): (Queue&lt;Event&gt;, Queue&lt;Event&gt;),
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">loop </span>{
+        <span class="kw">let </span>event_opt = key_consumer.pop()
+            .or_else(||mouse_consumer.pop())
+            .or_else(||{
+                scheduler::schedule();
+                <span class="prelude-val">None
+            </span>});
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">event</span>) <span class="op">=</span> <span class="ident">event_opt</span> {
-            <span class="comment">// Currently, the window manager only cares about keyboard or mouse events</span>
-            <span class="kw">match</span> <span class="ident">event</span> {
-                <span class="ident">Event::KeyboardEvent</span>(<span class="kw-2">ref</span> <span class="ident">input_event</span>) =&gt; {
-                    <span class="kw">let</span> <span class="ident">key_input</span> <span class="op">=</span> <span class="ident">input_event</span>.<span class="ident">key_event</span>;
-                    <span class="ident">keyboard_handle_application</span>(<span class="ident">key_input</span>)<span class="question-mark">?</span>;
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(event) = event_opt {
+            <span class="comment">// Currently, the window manager only cares about keyboard or mouse events
+            </span><span class="kw">match </span>event {
+                Event::KeyboardEvent(<span class="kw-2">ref </span>input_event) =&gt; {
+                    <span class="kw">let </span>key_input = input_event.key_event;
+                    keyboard_handle_application(key_input)<span class="question-mark">?</span>;
                 }
-                <span class="ident">Event::MouseMovementEvent</span>(<span class="kw-2">ref</span> <span class="ident">mouse_event</span>) =&gt; {
-                    <span class="comment">// mouse::mouse_to_print(&amp;mouse_event);</span>
-                    <span class="kw">let</span> <span class="ident">mouse_displacement</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">mouse_event</span>.<span class="ident">displacement</span>;
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span> <span class="op">=</span> (<span class="ident">mouse_displacement</span>.<span class="ident">x</span> <span class="kw">as</span> <span class="ident">i8</span>) <span class="kw">as</span> <span class="ident">isize</span>;
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">y</span> <span class="op">=</span> (<span class="ident">mouse_displacement</span>.<span class="ident">y</span> <span class="kw">as</span> <span class="ident">i8</span>) <span class="kw">as</span> <span class="ident">isize</span>;
-                    <span class="comment">// need to combine mouse events if there pending a lot</span>
+                Event::MouseMovementEvent(<span class="kw-2">ref </span>mouse_event) =&gt; {
+                    <span class="comment">// mouse::mouse_to_print(&amp;mouse_event);
+                    </span><span class="kw">let </span>mouse_displacement = <span class="kw-2">&amp;</span>mouse_event.displacement;
+                    <span class="kw">let </span><span class="kw-2">mut </span>x = (mouse_displacement.x <span class="kw">as </span>i8) <span class="kw">as </span>isize;
+                    <span class="kw">let </span><span class="kw-2">mut </span>y = (mouse_displacement.y <span class="kw">as </span>i8) <span class="kw">as </span>isize;
+                    <span class="comment">// need to combine mouse events if there pending a lot
 
-                    <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">next_event</span>) <span class="op">=</span> <span class="ident">mouse_consumer</span>.<span class="ident">pop</span>() {
-                        <span class="kw">match</span> <span class="ident">next_event</span> {
-                            <span class="ident">Event::MouseMovementEvent</span>(<span class="kw-2">ref</span> <span class="ident">next_mouse_event</span>) =&gt; {
-                                <span class="kw">if</span> <span class="ident">next_mouse_event</span>.<span class="ident">mousemove</span>.<span class="ident">scrolling_up</span>
-                                    <span class="op">==</span> <span class="ident">mouse_event</span>.<span class="ident">mousemove</span>.<span class="ident">scrolling_up</span>
-                                    <span class="op">&amp;&amp;</span> <span class="ident">next_mouse_event</span>.<span class="ident">mousemove</span>.<span class="ident">scrolling_down</span>
-                                        <span class="op">==</span> <span class="ident">mouse_event</span>.<span class="ident">mousemove</span>.<span class="ident">scrolling_down</span>
-                                    <span class="op">&amp;&amp;</span> <span class="ident">next_mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">left_button_hold</span>
-                                        <span class="op">==</span> <span class="ident">mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">left_button_hold</span>
-                                    <span class="op">&amp;&amp;</span> <span class="ident">next_mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">right_button_hold</span>
-                                        <span class="op">==</span> <span class="ident">mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">right_button_hold</span>
-                                    <span class="op">&amp;&amp;</span> <span class="ident">next_mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">fourth_button_hold</span>
-                                        <span class="op">==</span> <span class="ident">mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">fourth_button_hold</span>
-                                    <span class="op">&amp;&amp;</span> <span class="ident">next_mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">fifth_button_hold</span>
-                                        <span class="op">==</span> <span class="ident">mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">fifth_button_hold</span>
+                    </span><span class="kw">while let </span><span class="prelude-val">Some</span>(next_event) = mouse_consumer.pop() {
+                        <span class="kw">match </span>next_event {
+                            Event::MouseMovementEvent(<span class="kw-2">ref </span>next_mouse_event) =&gt; {
+                                <span class="kw">if </span>next_mouse_event.mousemove.scrolling_up
+                                    == mouse_event.mousemove.scrolling_up
+                                    &amp;&amp; next_mouse_event.mousemove.scrolling_down
+                                        == mouse_event.mousemove.scrolling_down
+                                    &amp;&amp; next_mouse_event.buttonact.left_button_hold
+                                        == mouse_event.buttonact.left_button_hold
+                                    &amp;&amp; next_mouse_event.buttonact.right_button_hold
+                                        == mouse_event.buttonact.right_button_hold
+                                    &amp;&amp; next_mouse_event.buttonact.fourth_button_hold
+                                        == mouse_event.buttonact.fourth_button_hold
+                                    &amp;&amp; next_mouse_event.buttonact.fifth_button_hold
+                                        == mouse_event.buttonact.fifth_button_hold
                                 {
-                                    <span class="ident">x</span> <span class="op">+</span><span class="op">=</span> (<span class="ident">next_mouse_event</span>.<span class="ident">displacement</span>.<span class="ident">x</span> <span class="kw">as</span> <span class="ident">i8</span>) <span class="kw">as</span> <span class="ident">isize</span>;
-                                    <span class="ident">y</span> <span class="op">+</span><span class="op">=</span> (<span class="ident">next_mouse_event</span>.<span class="ident">displacement</span>.<span class="ident">y</span> <span class="kw">as</span> <span class="ident">i8</span>) <span class="kw">as</span> <span class="ident">isize</span>;
+                                    x += (next_mouse_event.displacement.x <span class="kw">as </span>i8) <span class="kw">as </span>isize;
+                                    y += (next_mouse_event.displacement.y <span class="kw">as </span>i8) <span class="kw">as </span>isize;
                                 }
                             }
-                            <span class="kw">_</span> =&gt; {
+                            <span class="kw">_ </span>=&gt; {
                                 <span class="kw">break</span>;
                             }
                         }
-                        <span class="comment">// next_event.mark_completed();</span>
-                    }
-                    <span class="kw">if</span> <span class="ident">x</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">y</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wm</span> <span class="op">=</span> <span class="ident">WINDOW_MANAGER</span>
-                            .<span class="ident">get</span>()
-                            .<span class="ident">ok_or</span>(<span class="string">&quot;The static window manager was not yet initialized&quot;</span>)<span class="question-mark">?</span>
-                            .<span class="ident">lock</span>();
-                        <span class="ident">wm</span>.<span class="ident">move_mouse</span>(
-                            <span class="ident">Coord::new</span>(<span class="ident">x</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="op">-</span>(<span class="ident">y</span> <span class="kw">as</span> <span class="ident">isize</span>))
+                        <span class="comment">// next_event.mark_completed();
+                    </span>}
+                    <span class="kw">if </span>x != <span class="number">0 </span>|| y != <span class="number">0 </span>{
+                        <span class="kw">let </span><span class="kw-2">mut </span>wm = WINDOW_MANAGER
+                            .get()
+                            .ok_or(<span class="string">&quot;The static window manager was not yet initialized&quot;</span>)<span class="question-mark">?
+                            </span>.lock();
+                        wm.move_mouse(
+                            Coord::new(x <span class="kw">as </span>isize, -(y <span class="kw">as </span>isize))
                         )<span class="question-mark">?</span>;
                     }
-                    <span class="ident">cursor_handle_application</span>(<span class="kw-2">*</span><span class="ident">mouse_event</span>)<span class="question-mark">?</span>; <span class="comment">// tell the event to application, or moving window</span>
-                }
-                <span class="ident">_other</span> =&gt; {
-                    <span class="macro">trace!</span>(<span class="string">&quot;WINDOW_MANAGER: ignoring unexpected event: {:?}&quot;</span>, <span class="ident">_other</span>);
+                    cursor_handle_application(<span class="kw-2">*</span>mouse_event)<span class="question-mark">?</span>; <span class="comment">// tell the event to application, or moving window
+                </span>}
+                _other =&gt; {
+                    <span class="macro">trace!</span>(<span class="string">&quot;WINDOW_MANAGER: ignoring unexpected event: {:?}&quot;</span>, _other);
                 }
             }
         }
     }
 }
 
-<span class="doccomment">/// handle keyboard event, push it to the active window if one exists</span>
-<span class="kw">fn</span> <span class="ident">keyboard_handle_application</span>(<span class="ident">key_input</span>: <span class="ident">KeyEvent</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">win_mgr</span> <span class="op">=</span> <span class="ident">WINDOW_MANAGER</span>.<span class="ident">get</span>().<span class="ident">ok_or</span>(<span class="string">&quot;The window manager was not yet initialized&quot;</span>)<span class="question-mark">?</span>;
+<span class="doccomment">/// handle keyboard event, push it to the active window if one exists
+</span><span class="kw">fn </span>keyboard_handle_application(key_input: KeyEvent) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>win_mgr = WINDOW_MANAGER.get().ok_or(<span class="string">&quot;The window manager was not yet initialized&quot;</span>)<span class="question-mark">?</span>;
     
-    <span class="comment">// First, we handle keyboard shortcuts understood by the window manager.</span>
+    <span class="comment">// First, we handle keyboard shortcuts understood by the window manager.
     
-    <span class="comment">// &quot;Super + Arrow&quot; will resize and move windows to the specified half of the screen (left, right, top, or bottom)</span>
-    <span class="kw">if</span> <span class="ident">key_input</span>.<span class="ident">modifiers</span>.<span class="ident">is_super_key</span>() <span class="op">&amp;&amp;</span> <span class="ident">key_input</span>.<span class="ident">action</span> <span class="op">==</span> <span class="ident">KeyAction::Pressed</span> {
-        <span class="kw">let</span> <span class="ident">screen_dimensions</span> <span class="op">=</span> <span class="ident">win_mgr</span>.<span class="ident">lock</span>().<span class="ident">get_screen_size</span>();
-        <span class="kw">let</span> (<span class="ident">width</span>, <span class="ident">height</span>) <span class="op">=</span> (<span class="ident">screen_dimensions</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">screen_dimensions</span>.<span class="number">1</span> <span class="kw">as</span> <span class="ident">isize</span>);
-        <span class="kw">let</span> <span class="ident">new_position</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Rectangle</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">key_input</span>.<span class="ident">keycode</span> {
-            <span class="ident">Keycode::Left</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Rectangle</span> {
-                <span class="ident">top_left</span>:     <span class="ident">Coord</span> { <span class="ident">x</span>: <span class="number">0</span>, <span class="ident">y</span>: <span class="number">0</span> },
-                <span class="ident">bottom_right</span>: <span class="ident">Coord</span> { <span class="ident">x</span>: <span class="ident">width</span> <span class="op">/</span> <span class="number">2</span>, <span class="ident">y</span>: <span class="ident">height</span> },
+    // &quot;Super + Arrow&quot; will resize and move windows to the specified half of the screen (left, right, top, or bottom)
+    </span><span class="kw">if </span>key_input.modifiers.is_super_key() &amp;&amp; key_input.action == KeyAction::Pressed {
+        <span class="kw">let </span>screen_dimensions = win_mgr.lock().get_screen_size();
+        <span class="kw">let </span>(width, height) = (screen_dimensions.<span class="number">0 </span><span class="kw">as </span>isize, screen_dimensions.<span class="number">1 </span><span class="kw">as </span>isize);
+        <span class="kw">let </span>new_position: <span class="prelude-ty">Option</span>&lt;Rectangle&gt; = <span class="kw">match </span>key_input.keycode {
+            Keycode::Left =&gt; <span class="prelude-val">Some</span>(Rectangle {
+                top_left:     Coord { x: <span class="number">0</span>, y: <span class="number">0 </span>},
+                bottom_right: Coord { x: width / <span class="number">2</span>, y: height },
             }),
-            <span class="ident">Keycode::Right</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Rectangle</span> {
-                <span class="ident">top_left</span>:     <span class="ident">Coord</span> { <span class="ident">x</span>: <span class="ident">width</span> <span class="op">/</span> <span class="number">2</span>, <span class="ident">y</span>: <span class="number">0</span> },
-                <span class="ident">bottom_right</span>: <span class="ident">Coord</span> { <span class="ident">x</span>: <span class="ident">width</span>, <span class="ident">y</span>: <span class="ident">height</span> },
+            Keycode::Right =&gt; <span class="prelude-val">Some</span>(Rectangle {
+                top_left:     Coord { x: width / <span class="number">2</span>, y: <span class="number">0 </span>},
+                bottom_right: Coord { x: width, y: height },
             }),
-            <span class="ident">Keycode::Up</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Rectangle</span> {
-                <span class="ident">top_left</span>:     <span class="ident">Coord</span> { <span class="ident">x</span>: <span class="number">0</span>, <span class="ident">y</span>: <span class="number">0</span> },
-                <span class="ident">bottom_right</span>: <span class="ident">Coord</span> { <span class="ident">x</span>: <span class="ident">width</span>, <span class="ident">y</span>: <span class="ident">height</span> <span class="op">/</span> <span class="number">2</span> },
+            Keycode::Up =&gt; <span class="prelude-val">Some</span>(Rectangle {
+                top_left:     Coord { x: <span class="number">0</span>, y: <span class="number">0 </span>},
+                bottom_right: Coord { x: width, y: height / <span class="number">2 </span>},
             }),
-            <span class="ident">Keycode::Down</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Rectangle</span> {
-                <span class="ident">top_left</span>:     <span class="ident">Coord</span> { <span class="ident">x</span>: <span class="number">0</span>, <span class="ident">y</span>: <span class="ident">height</span> <span class="op">/</span> <span class="number">2</span> },
-                <span class="ident">bottom_right</span>: <span class="ident">Coord</span> { <span class="ident">x</span>: <span class="ident">width</span>, <span class="ident">y</span>: <span class="ident">height</span> },
+            Keycode::Down =&gt; <span class="prelude-val">Some</span>(Rectangle {
+                top_left:     Coord { x: <span class="number">0</span>, y: height / <span class="number">2 </span>},
+                bottom_right: Coord { x: width, y: height },
             }),
-            <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
         };
         
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">position</span>) <span class="op">=</span> <span class="ident">new_position</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">wm</span> <span class="op">=</span> <span class="ident">win_mgr</span>.<span class="ident">lock</span>();
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">active_window</span>) <span class="op">=</span> <span class="ident">wm</span>.<span class="ident">active</span>.<span class="ident">upgrade</span>() {
-                <span class="macro">debug!</span>(<span class="string">&quot;window_manager: resizing active window to {:?}&quot;</span>, <span class="ident">new_position</span>);
-                <span class="ident">active_window</span>.<span class="ident">lock</span>().<span class="ident">resize</span>(<span class="ident">position</span>)<span class="question-mark">?</span>;
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(position) = new_position {
+            <span class="kw">let </span><span class="kw-2">mut </span>wm = win_mgr.lock();
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(active_window) = wm.active.upgrade() {
+                <span class="macro">debug!</span>(<span class="string">&quot;window_manager: resizing active window to {:?}&quot;</span>, new_position);
+                active_window.lock().resize(position)<span class="question-mark">?</span>;
 
-                <span class="comment">// force refresh the entire screen for now</span>
-                <span class="comment">// TODO: perform a proper screen refresh here: only refresh the area that contained the active_window&#39;s old bounds.</span>
-                <span class="ident">wm</span>.<span class="ident">refresh_bottom_windows</span>(<span class="prelude-ty">Option</span>::<span class="op">&lt;</span><span class="ident">Rectangle</span><span class="op">&gt;</span><span class="ident">::None</span>, <span class="bool-val">true</span>)<span class="question-mark">?</span>;
+                <span class="comment">// force refresh the entire screen for now
+                // TODO: perform a proper screen refresh here: only refresh the area that contained the active_window&#39;s old bounds.
+                </span>wm.refresh_bottom_windows(<span class="prelude-ty">Option</span>::&lt;Rectangle&gt;::None, <span class="bool-val">true</span>)<span class="question-mark">?</span>;
             }
         }
 
-        <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+        <span class="kw">return </span><span class="prelude-val">Ok</span>(());
     }
 
-    <span class="comment">// Spawn a new terminal via Ctrl+Alt+T</span>
-    <span class="kw">if</span> <span class="ident">key_input</span>.<span class="ident">modifiers</span>.<span class="ident">is_control</span>()
-        <span class="op">&amp;&amp;</span> <span class="ident">key_input</span>.<span class="ident">modifiers</span>.<span class="ident">is_alt</span>()
-        <span class="op">&amp;&amp;</span> <span class="ident">key_input</span>.<span class="ident">keycode</span> <span class="op">==</span> <span class="ident">Keycode::T</span>
-        <span class="op">&amp;&amp;</span> <span class="ident">key_input</span>.<span class="ident">action</span> <span class="op">==</span> <span class="ident">KeyAction::Pressed</span>
+    <span class="comment">// Spawn a new terminal via Ctrl+Alt+T
+    </span><span class="kw">if </span>key_input.modifiers.is_control()
+        &amp;&amp; key_input.modifiers.is_alt()
+        &amp;&amp; key_input.keycode == Keycode::T
+        &amp;&amp; key_input.action == KeyAction::Pressed
     {
-        <span class="comment">// Because this task (the window manager loop) runs in a kernel-only namespace,</span>
-        <span class="comment">// we have to create a new application namespace in order to be able to actually spawn a shell.</span>
+        <span class="comment">// Because this task (the window manager loop) runs in a kernel-only namespace,
+        // we have to create a new application namespace in order to be able to actually spawn a shell.
 
-        <span class="kw">let</span> <span class="ident">new_app_namespace</span> <span class="op">=</span> <span class="ident">mod_mgmt::create_application_namespace</span>(<span class="prelude-val">None</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">shell_objfile</span> <span class="op">=</span> <span class="ident">new_app_namespace</span>.<span class="ident">dir</span>().<span class="ident">get_file_starting_with</span>(<span class="string">&quot;shell-&quot;</span>)
-            .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find shell application file to run upon Ctrl+Alt+T&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">path</span> <span class="op">=</span> <span class="ident">Path::new</span>(<span class="ident">shell_objfile</span>.<span class="ident">lock</span>().<span class="ident">get_absolute_path</span>());
-        <span class="ident">spawn::new_application_task_builder</span>(<span class="ident">path</span>, <span class="prelude-val">Some</span>(<span class="ident">new_app_namespace</span>))<span class="question-mark">?</span>
-            .<span class="ident">name</span>(<span class="macro">format!</span>(<span class="string">&quot;shell&quot;</span>))
-            .<span class="ident">spawn</span>()<span class="question-mark">?</span>;
+        </span><span class="kw">let </span>new_app_namespace = mod_mgmt::create_application_namespace(<span class="prelude-val">None</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>shell_objfile = new_app_namespace.dir().get_file_starting_with(<span class="string">&quot;shell-&quot;</span>)
+            .ok_or(<span class="string">&quot;Couldn&#39;t find shell application file to run upon Ctrl+Alt+T&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>path = Path::new(shell_objfile.lock().get_absolute_path());
+        spawn::new_application_task_builder(path, <span class="prelude-val">Some</span>(new_app_namespace))<span class="question-mark">?
+            </span>.name(<span class="macro">format!</span>(<span class="string">&quot;shell&quot;</span>))
+            .spawn()<span class="question-mark">?</span>;
 
         <span class="macro">debug!</span>(<span class="string">&quot;window_manager: spawned new shell app in new app namespace.&quot;</span>);
-        <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+        <span class="kw">return </span><span class="prelude-val">Ok</span>(());
     }
 
-    <span class="comment">// Any keyboard event unhandled above should be passed to the active window.</span>
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">win_mgr</span>.<span class="ident">lock</span>().<span class="ident">pass_keyboard_event_to_window</span>(<span class="ident">key_input</span>) {
-        <span class="macro">warn!</span>(<span class="string">&quot;window_manager: failed to pass keyboard event to active window. Error: {:?}&quot;</span>, <span class="ident">_e</span>);
-        <span class="comment">// If no window is currently active, then something might be potentially wrong, </span>
-        <span class="comment">// but we can likely recover in the future when another window becomes active.</span>
-        <span class="comment">// Thus, we don&#39;t need to return a hard error here. </span>
-    }
+    <span class="comment">// Any keyboard event unhandled above should be passed to the active window.
+    </span><span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = win_mgr.lock().pass_keyboard_event_to_window(key_input) {
+        <span class="macro">warn!</span>(<span class="string">&quot;window_manager: failed to pass keyboard event to active window. Error: {:?}&quot;</span>, _e);
+        <span class="comment">// If no window is currently active, then something might be potentially wrong, 
+        // but we can likely recover in the future when another window becomes active.
+        // Thus, we don&#39;t need to return a hard error here. 
+    </span>}
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="doccomment">/// handle mouse event, push it to related window or anyone asked for it</span>
-<span class="kw">fn</span> <span class="ident">cursor_handle_application</span>(<span class="ident">mouse_event</span>: <span class="ident">MouseEvent</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">wm</span> <span class="op">=</span> <span class="ident">WINDOW_MANAGER</span>.<span class="ident">get</span>().<span class="ident">ok_or</span>(<span class="string">&quot;The static window manager was not yet initialized&quot;</span>)<span class="question-mark">?</span>.<span class="ident">lock</span>();
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span> <span class="ident">wm</span>.<span class="ident">pass_mouse_event_to_window</span>(<span class="ident">mouse_event</span>) {
-        <span class="comment">// the mouse event should be passed to the window that satisfies:</span>
-        <span class="comment">// 1. the mouse position is currently in the window area</span>
-        <span class="comment">// 2. the window is the top one (active window or show_list windows) under the mouse pointer</span>
-        <span class="comment">// if no window is found in this position, that is system background area. Add logic to handle those events later</span>
-    }
+<span class="doccomment">/// handle mouse event, push it to related window or anyone asked for it
+</span><span class="kw">fn </span>cursor_handle_application(mouse_event: MouseEvent) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>wm = WINDOW_MANAGER.get().ok_or(<span class="string">&quot;The static window manager was not yet initialized&quot;</span>)<span class="question-mark">?</span>.lock();
+    <span class="kw">if let </span><span class="prelude-val">Err</span>(<span class="kw">_</span>) = wm.pass_mouse_event_to_window(mouse_event) {
+        <span class="comment">// the mouse event should be passed to the window that satisfies:
+        // 1. the mouse position is currently in the window area
+        // 2. the window is the top one (active window or show_list windows) under the mouse pointer
+        // if no window is found in this position, that is system background area. Add logic to handle those events later
+    </span>}
     <span class="prelude-val">Ok</span>(())
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="window_manager" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="window_manager" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

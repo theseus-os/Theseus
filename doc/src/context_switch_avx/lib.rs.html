@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/context_switch_avx/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../context_switch_avx/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../context_switch_avx/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../context_switch_avx/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/context_switch_avx/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../context_switch_avx/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -152,81 +146,81 @@
 <span id="146">146</span>
 <span id="147">147</span>
 <span id="148">148</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This crate contains structures and routines for context switching </span>
-<span class="doccomment">//! when AVX extensions are enabled. </span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate contains structures and routines for context switching 
+//! when AVX extensions are enabled. 
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">naked_functions</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(naked_functions)]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">zerocopy</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">context_switch_regular</span>;
+</span><span class="kw">extern crate </span>zerocopy;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>context_switch_regular;
 
-<span class="kw">use</span> <span class="ident">context_switch_regular::ContextRegular</span>;
-<span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
+<span class="kw">use </span>context_switch_regular::ContextRegular;
+<span class="kw">use </span>zerocopy::FromBytes;
 
 
-<span class="doccomment">/// The registers saved before a context switch and restored after a context switch</span>
-<span class="doccomment">/// for AVX-enabled Tasks.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Note: the order of the registers here MUST MATCH the order of </span>
-<span class="doccomment">/// registers popped in the [`restore_registers_avx!`] macro. </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ContextAVX</span> {
-    <span class="ident">ymm15</span>: [<span class="ident">u128</span>; <span class="number">2</span>],
-    <span class="ident">ymm14</span>: [<span class="ident">u128</span>; <span class="number">2</span>],   
-    <span class="ident">ymm13</span>: [<span class="ident">u128</span>; <span class="number">2</span>],   
-    <span class="ident">ymm12</span>: [<span class="ident">u128</span>; <span class="number">2</span>],   
-    <span class="ident">ymm11</span>: [<span class="ident">u128</span>; <span class="number">2</span>],   
-    <span class="ident">ymm10</span>: [<span class="ident">u128</span>; <span class="number">2</span>],   
-    <span class="ident">ymm9</span>:  [<span class="ident">u128</span>; <span class="number">2</span>],   
-    <span class="ident">ymm8</span>:  [<span class="ident">u128</span>; <span class="number">2</span>],   
-    <span class="ident">ymm7</span>:  [<span class="ident">u128</span>; <span class="number">2</span>],   
-    <span class="ident">ymm6</span>:  [<span class="ident">u128</span>; <span class="number">2</span>],   
-    <span class="ident">ymm5</span>:  [<span class="ident">u128</span>; <span class="number">2</span>],   
-    <span class="ident">ymm4</span>:  [<span class="ident">u128</span>; <span class="number">2</span>],   
-    <span class="ident">ymm3</span>:  [<span class="ident">u128</span>; <span class="number">2</span>],   
-    <span class="ident">ymm2</span>:  [<span class="ident">u128</span>; <span class="number">2</span>],   
-    <span class="ident">ymm1</span>:  [<span class="ident">u128</span>; <span class="number">2</span>],   
-    <span class="ident">ymm0</span>:  [<span class="ident">u128</span>; <span class="number">2</span>], 
-    <span class="ident">regular</span>: <span class="ident">ContextRegular</span>,
+<span class="doccomment">/// The registers saved before a context switch and restored after a context switch
+/// for AVX-enabled Tasks.
+///
+/// Note: the order of the registers here MUST MATCH the order of 
+/// registers popped in the [`restore_registers_avx!`] macro. 
+</span><span class="attr">#[derive(FromBytes)]
+#[repr(C, packed)]
+</span><span class="kw">pub struct </span>ContextAVX {
+    ymm15: [u128; <span class="number">2</span>],
+    ymm14: [u128; <span class="number">2</span>],   
+    ymm13: [u128; <span class="number">2</span>],   
+    ymm12: [u128; <span class="number">2</span>],   
+    ymm11: [u128; <span class="number">2</span>],   
+    ymm10: [u128; <span class="number">2</span>],   
+    ymm9:  [u128; <span class="number">2</span>],   
+    ymm8:  [u128; <span class="number">2</span>],   
+    ymm7:  [u128; <span class="number">2</span>],   
+    ymm6:  [u128; <span class="number">2</span>],   
+    ymm5:  [u128; <span class="number">2</span>],   
+    ymm4:  [u128; <span class="number">2</span>],   
+    ymm3:  [u128; <span class="number">2</span>],   
+    ymm2:  [u128; <span class="number">2</span>],   
+    ymm1:  [u128; <span class="number">2</span>],   
+    ymm0:  [u128; <span class="number">2</span>], 
+    regular: ContextRegular,
 }
 
-<span class="kw">impl</span> <span class="ident">ContextAVX</span> {
-    <span class="doccomment">/// Creates a new ContextAVX struct that will cause the</span>
-    <span class="doccomment">/// AVX-enabled Task containing it to begin its execution at the given `rip`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">rip</span>: <span class="ident">usize</span>) -&gt; <span class="ident">ContextAVX</span> {
-        <span class="ident">ContextAVX</span> {
-            <span class="ident">ymm15</span>: [<span class="number">0</span>, <span class="number">0</span>],
-            <span class="ident">ymm14</span>: [<span class="number">0</span>, <span class="number">0</span>],   
-            <span class="ident">ymm13</span>: [<span class="number">0</span>, <span class="number">0</span>],   
-            <span class="ident">ymm12</span>: [<span class="number">0</span>, <span class="number">0</span>],   
-            <span class="ident">ymm11</span>: [<span class="number">0</span>, <span class="number">0</span>],   
-            <span class="ident">ymm10</span>: [<span class="number">0</span>, <span class="number">0</span>],   
-            <span class="ident">ymm9</span>:  [<span class="number">0</span>, <span class="number">0</span>],   
-            <span class="ident">ymm8</span>:  [<span class="number">0</span>, <span class="number">0</span>],   
-            <span class="ident">ymm7</span>:  [<span class="number">0</span>, <span class="number">0</span>],   
-            <span class="ident">ymm6</span>:  [<span class="number">0</span>, <span class="number">0</span>],   
-            <span class="ident">ymm5</span>:  [<span class="number">0</span>, <span class="number">0</span>],   
-            <span class="ident">ymm4</span>:  [<span class="number">0</span>, <span class="number">0</span>],   
-            <span class="ident">ymm3</span>:  [<span class="number">0</span>, <span class="number">0</span>],   
-            <span class="ident">ymm2</span>:  [<span class="number">0</span>, <span class="number">0</span>],   
-            <span class="ident">ymm1</span>:  [<span class="number">0</span>, <span class="number">0</span>],   
-            <span class="ident">ymm0</span>:  [<span class="number">0</span>, <span class="number">0</span>],   
-            <span class="ident">regular</span>: <span class="ident">ContextRegular::new</span>(<span class="ident">rip</span>),
+<span class="kw">impl </span>ContextAVX {
+    <span class="doccomment">/// Creates a new ContextAVX struct that will cause the
+    /// AVX-enabled Task containing it to begin its execution at the given `rip`.
+    </span><span class="kw">pub fn </span>new(rip: usize) -&gt; ContextAVX {
+        ContextAVX {
+            ymm15: [<span class="number">0</span>, <span class="number">0</span>],
+            ymm14: [<span class="number">0</span>, <span class="number">0</span>],   
+            ymm13: [<span class="number">0</span>, <span class="number">0</span>],   
+            ymm12: [<span class="number">0</span>, <span class="number">0</span>],   
+            ymm11: [<span class="number">0</span>, <span class="number">0</span>],   
+            ymm10: [<span class="number">0</span>, <span class="number">0</span>],   
+            ymm9:  [<span class="number">0</span>, <span class="number">0</span>],   
+            ymm8:  [<span class="number">0</span>, <span class="number">0</span>],   
+            ymm7:  [<span class="number">0</span>, <span class="number">0</span>],   
+            ymm6:  [<span class="number">0</span>, <span class="number">0</span>],   
+            ymm5:  [<span class="number">0</span>, <span class="number">0</span>],   
+            ymm4:  [<span class="number">0</span>, <span class="number">0</span>],   
+            ymm3:  [<span class="number">0</span>, <span class="number">0</span>],   
+            ymm2:  [<span class="number">0</span>, <span class="number">0</span>],   
+            ymm1:  [<span class="number">0</span>, <span class="number">0</span>],   
+            ymm0:  [<span class="number">0</span>, <span class="number">0</span>],   
+            regular: ContextRegular::new(rip),
         }
     }
 }
 
 
-<span class="doccomment">/// An assembly block for saving AVX registers</span>
-<span class="doccomment">/// by pushing them onto the stack.</span>
-<span class="attribute">#[<span class="ident">macro_export</span>]</span>
-<span class="macro">macro_rules!</span> <span class="ident">save_registers_avx</span> {
+<span class="doccomment">/// An assembly block for saving AVX registers
+/// by pushing them onto the stack.
+</span><span class="attr">#[macro_export]
+</span><span class="macro">macro_rules! </span>save_registers_avx {
     () =&gt; (
-        <span class="comment">// Save all of the ymm registers (for AVX).</span>
-        <span class="comment">// Each register is 32 bytes (256 bits), and there are 16 of them.</span>
-        <span class="string">r#&quot;
+        <span class="comment">// Save all of the ymm registers (for AVX).
+        // Each register is 32 bytes (256 bits), and there are 16 of them.
+        </span><span class="string">r#&quot;
             lea rsp, [rsp - 32*16]
             vmovups [rsp + 32*0],  ymm0   # push ymm0
             vmovups [rsp + 32*1],  ymm1   # push ymm1
@@ -244,18 +238,18 @@
             vmovups [rsp + 32*13], ymm13  # push ymm13
             vmovups [rsp + 32*14], ymm14  # push ymm14
             vmovups [rsp + 32*15], ymm15  # push ymm15
-        &quot;#</span>
-    );
+        &quot;#
+    </span>);
 }
 
 
-<span class="doccomment">/// An assembly block for restoring AVX registers</span>
-<span class="doccomment">/// by popping them off of the stack.</span>
-<span class="attribute">#[<span class="ident">macro_export</span>]</span>
-<span class="macro">macro_rules!</span> <span class="ident">restore_registers_avx</span> {
+<span class="doccomment">/// An assembly block for restoring AVX registers
+/// by popping them off of the stack.
+</span><span class="attr">#[macro_export]
+</span><span class="macro">macro_rules! </span>restore_registers_avx {
     () =&gt; (
-        <span class="comment">// restore all of the ymm registers</span>
-        <span class="string">r#&quot;
+        <span class="comment">// restore all of the ymm registers
+        </span><span class="string">r#&quot;
             vmovups ymm15, [rsp + 32*15]   # pop ymm15
             vmovups ymm14, [rsp + 32*14]   # pop ymm14
             vmovups ymm13, [rsp + 32*13]   # pop ymm13
@@ -273,33 +267,32 @@
             vmovups ymm1,  [rsp + 32*1]    # pop ymm1
             vmovups ymm0,  [rsp + 32*0]    # pop ymm0
             lea rsp, [rsp + 32*16]
-        &quot;#</span>
-    );
+        &quot;#
+    </span>);
 }
 
 
-<span class="doccomment">/// Switches context from an AVX Task to another AVX Task.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * First argument  (in `RDI`): mutable pointer to the previous task&#39;s stack pointer</span>
-<span class="doccomment">/// * Second argument (in `RSI`): the value of the next task&#39;s stack pointer</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Safety</span>
-<span class="doccomment">/// This function is unsafe because it changes the content on both task&#39;s stacks. </span>
-<span class="attribute">#[<span class="ident">naked</span>]</span>
-<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">context_switch_avx</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
-    <span class="comment">// Since this is a naked function that expects its arguments in two registers,</span>
-    <span class="comment">// you CANNOT place any log statements or other instructions here</span>
-    <span class="comment">// before, in between, or after anything below.</span>
-    <span class="macro">core::arch::asm!</span>(
+<span class="doccomment">/// Switches context from an AVX Task to another AVX Task.
+/// 
+/// # Arguments
+/// * First argument  (in `RDI`): mutable pointer to the previous task&#39;s stack pointer
+/// * Second argument (in `RSI`): the value of the next task&#39;s stack pointer
+/// 
+/// # Safety
+/// This function is unsafe because it changes the content on both task&#39;s stacks. 
+</span><span class="attr">#[naked]
+</span><span class="kw">pub unsafe extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>context_switch_avx(_prev_stack_pointer: <span class="kw-2">*mut </span>usize, _next_stack_pointer_value: usize) {
+    <span class="comment">// Since this is a naked function that expects its arguments in two registers,
+    // you CANNOT place any log statements or other instructions here
+    // before, in between, or after anything below.
+    </span><span class="macro">core::arch::asm!</span>(
         <span class="macro">save_registers_regular!</span>(),
         <span class="macro">save_registers_avx!</span>(),
         <span class="macro">switch_stacks!</span>(),
         <span class="macro">restore_registers_avx!</span>(),
         <span class="macro">restore_registers_regular!</span>(),
-        <span class="ident">options</span>(<span class="ident">noreturn</span>)
+        options(noreturn)
     );
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="context_switch_avx" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="context_switch_avx" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

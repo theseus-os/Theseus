@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/acpi/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../acpi/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../acpi/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../acpi/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/acpi/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../acpi/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -139,134 +133,134 @@
 <span id="133">133</span>
 <span id="134">134</span>
 <span id="135">135</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Code to parse the ACPI tables, based off of Redox. </span>
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Code to parse the ACPI tables, based off of Redox. 
+</span><span class="attr">#![no_std]
 
-<span class="attribute">#![<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span> <span class="comment">//  to suppress warnings for unused functions/methods</span>
+#![allow(dead_code)] </span><span class="comment">//  to suppress warnings for unused functions/methods
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">hpet</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">acpi_table</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">acpi_table_handler</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">rsdp</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">rsdt</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fadt</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">madt</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">dmar</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">iommu</span>;
-
-
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PageTable</span>, <span class="ident">PhysicalAddress</span>};
-<span class="kw">use</span> <span class="ident">rsdp::Rsdp</span>;
-<span class="kw">use</span> <span class="ident">acpi_table::AcpiTables</span>;
-<span class="kw">use</span> <span class="ident">acpi_table_handler::acpi_table_handler</span>;
+</span><span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>hpet;
+<span class="kw">extern crate </span>acpi_table;
+<span class="kw">extern crate </span>acpi_table_handler;
+<span class="kw">extern crate </span>rsdp;
+<span class="kw">extern crate </span>rsdt;
+<span class="kw">extern crate </span>fadt;
+<span class="kw">extern crate </span>madt;
+<span class="kw">extern crate </span>dmar;
+<span class="kw">extern crate </span>iommu;
 
 
-<span class="doccomment">/// The singleton instance of the `AcpiTables` struct,</span>
-<span class="doccomment">/// which contains the MappedPages and location of all discovered ACPI tables.</span>
-<span class="kw">static</span> <span class="ident">ACPI_TABLES</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">AcpiTables</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">AcpiTables::empty</span>());
+<span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>memory::{PageTable, PhysicalAddress};
+<span class="kw">use </span>rsdp::Rsdp;
+<span class="kw">use </span>acpi_table::AcpiTables;
+<span class="kw">use </span>acpi_table_handler::acpi_table_handler;
 
-<span class="doccomment">/// Returns a reference to the singleton instance of all ACPI tables </span>
-<span class="doccomment">/// that have been discovered, mapped, and parsed so far.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_acpi_tables</span>() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">AcpiTables</span><span class="op">&gt;</span> {
-    <span class="kw-2">&amp;</span><span class="ident">ACPI_TABLES</span>
+
+<span class="doccomment">/// The singleton instance of the `AcpiTables` struct,
+/// which contains the MappedPages and location of all discovered ACPI tables.
+</span><span class="kw">static </span>ACPI_TABLES: Mutex&lt;AcpiTables&gt; = Mutex::new(AcpiTables::empty());
+
+<span class="doccomment">/// Returns a reference to the singleton instance of all ACPI tables 
+/// that have been discovered, mapped, and parsed so far.
+</span><span class="kw">pub fn </span>get_acpi_tables() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Mutex&lt;AcpiTables&gt; {
+    <span class="kw-2">&amp;</span>ACPI_TABLES
 }
 
-<span class="doccomment">/// Parses the system&#39;s ACPI tables </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">page_table</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PageTable</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="comment">// The first step is to search for the RSDP (Root System Descriptor Pointer),</span>
-    <span class="comment">// which contains the physical address of the RSDT/XSDG (Root/Extended System Descriptor Table).</span>
-    <span class="kw">let</span> <span class="ident">rsdp</span> <span class="op">=</span> <span class="ident">Rsdp::get_rsdp</span>(<span class="ident">page_table</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">rsdt_phys_addr</span> <span class="op">=</span> <span class="ident">rsdp</span>.<span class="ident">sdt_address</span>();
-    <span class="macro">debug!</span>(<span class="string">&quot;RXSDT is located in Frame {:#X}&quot;</span>, <span class="ident">rsdt_phys_addr</span>);
+<span class="doccomment">/// Parses the system&#39;s ACPI tables 
+</span><span class="kw">pub fn </span>init(page_table: <span class="kw-2">&amp;mut </span>PageTable) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="comment">// The first step is to search for the RSDP (Root System Descriptor Pointer),
+    // which contains the physical address of the RSDT/XSDG (Root/Extended System Descriptor Table).
+    </span><span class="kw">let </span>rsdp = Rsdp::get_rsdp(page_table)<span class="question-mark">?</span>;
+    <span class="kw">let </span>rsdt_phys_addr = rsdp.sdt_address();
+    <span class="macro">debug!</span>(<span class="string">&quot;RXSDT is located in Frame {:#X}&quot;</span>, rsdt_phys_addr);
 
-    <span class="comment">// Now, we get the actual RSDT/XSDT</span>
-    {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">acpi_tables</span> <span class="op">=</span> <span class="ident">ACPI_TABLES</span>.<span class="ident">lock</span>();
-        <span class="kw">let</span> (<span class="ident">sdt_signature</span>, <span class="ident">sdt_total_length</span>) <span class="op">=</span> <span class="ident">acpi_tables</span>.<span class="ident">map_new_table</span>(<span class="ident">rsdt_phys_addr</span>, <span class="ident">page_table</span>)<span class="question-mark">?</span>;
-        <span class="ident">acpi_table_handler</span>(<span class="kw-2">&amp;mut</span> <span class="ident">acpi_tables</span>, <span class="ident">sdt_signature</span>, <span class="ident">sdt_total_length</span>, <span class="ident">rsdt_phys_addr</span>)<span class="question-mark">?</span>;
+    <span class="comment">// Now, we get the actual RSDT/XSDT
+    </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>acpi_tables = ACPI_TABLES.lock();
+        <span class="kw">let </span>(sdt_signature, sdt_total_length) = acpi_tables.map_new_table(rsdt_phys_addr, page_table)<span class="question-mark">?</span>;
+        acpi_table_handler(<span class="kw-2">&amp;mut </span>acpi_tables, sdt_signature, sdt_total_length, rsdt_phys_addr)<span class="question-mark">?</span>;
     }
-    <span class="kw">let</span> <span class="ident">sdt_addresses</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">PhysicalAddress</span><span class="op">&gt;</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="ident">acpi_tables</span> <span class="op">=</span> <span class="ident">ACPI_TABLES</span>.<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="ident">rxsdt</span> <span class="op">=</span> <span class="ident">rsdt::RsdtXsdt::get</span>(<span class="kw-2">&amp;</span><span class="ident">acpi_tables</span>).<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t get RSDT or XSDT from ACPI tables&quot;</span>)<span class="question-mark">?</span>;
-        <span class="ident">rxsdt</span>.<span class="ident">addresses</span>().<span class="ident">collect</span>()
+    <span class="kw">let </span>sdt_addresses: Vec&lt;PhysicalAddress&gt; = {
+        <span class="kw">let </span>acpi_tables = ACPI_TABLES.lock();
+        <span class="kw">let </span>rxsdt = rsdt::RsdtXsdt::get(<span class="kw-2">&amp;</span>acpi_tables).ok_or(<span class="string">&quot;couldn&#39;t get RSDT or XSDT from ACPI tables&quot;</span>)<span class="question-mark">?</span>;
+        rxsdt.addresses().collect()
     };
 
-    <span class="comment">// The RSDT/XSDT tells us where all of the rest of the ACPI tables exist.</span>
-    {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">acpi_tables</span> <span class="op">=</span> <span class="ident">ACPI_TABLES</span>.<span class="ident">lock</span>();
-        <span class="kw">for</span> <span class="ident">sdt_paddr</span> <span class="kw">in</span> <span class="ident">sdt_addresses</span> {
-            <span class="comment">// debug!(&quot;RXSDT entry: {:#X}&quot;, sdt_paddr);</span>
-            <span class="kw">let</span> (<span class="ident">sdt_signature</span>, <span class="ident">sdt_total_length</span>) <span class="op">=</span> <span class="ident">acpi_tables</span>.<span class="ident">map_new_table</span>(<span class="ident">sdt_paddr</span>, <span class="ident">page_table</span>)<span class="question-mark">?</span>;
-            <span class="ident">acpi_table_handler</span>(<span class="kw-2">&amp;mut</span> <span class="ident">acpi_tables</span>, <span class="ident">sdt_signature</span>, <span class="ident">sdt_total_length</span>, <span class="ident">sdt_paddr</span>)<span class="question-mark">?</span>;
+    <span class="comment">// The RSDT/XSDT tells us where all of the rest of the ACPI tables exist.
+    </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>acpi_tables = ACPI_TABLES.lock();
+        <span class="kw">for </span>sdt_paddr <span class="kw">in </span>sdt_addresses {
+            <span class="comment">// debug!(&quot;RXSDT entry: {:#X}&quot;, sdt_paddr);
+            </span><span class="kw">let </span>(sdt_signature, sdt_total_length) = acpi_tables.map_new_table(sdt_paddr, page_table)<span class="question-mark">?</span>;
+            acpi_table_handler(<span class="kw-2">&amp;mut </span>acpi_tables, sdt_signature, sdt_total_length, sdt_paddr)<span class="question-mark">?</span>;
         }
     }
 
-    <span class="comment">// FADT is mandatory, and contains the address of the DSDT</span>
-    {
-        <span class="kw">let</span> <span class="ident">acpi_tables</span> <span class="op">=</span> <span class="ident">ACPI_TABLES</span>.<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="ident">_fadt</span> <span class="op">=</span> <span class="ident">fadt::Fadt::get</span>(<span class="kw-2">&amp;</span><span class="ident">acpi_tables</span>).<span class="ident">ok_or</span>(<span class="string">&quot;The required FADT APIC table wasn&#39;t found (signature &#39;FACP&#39;)&quot;</span>)<span class="question-mark">?</span>;
-        <span class="comment">// here: do something with the DSDT here, when needed.</span>
-        <span class="comment">// debug!(&quot;DSDT physical address: {:#X}&quot;, fadt.dsdt);</span>
-    }
+    <span class="comment">// FADT is mandatory, and contains the address of the DSDT
+    </span>{
+        <span class="kw">let </span>acpi_tables = ACPI_TABLES.lock();
+        <span class="kw">let </span>_fadt = fadt::Fadt::get(<span class="kw-2">&amp;</span>acpi_tables).ok_or(<span class="string">&quot;The required FADT APIC table wasn&#39;t found (signature &#39;FACP&#39;)&quot;</span>)<span class="question-mark">?</span>;
+        <span class="comment">// here: do something with the DSDT here, when needed.
+        // debug!(&quot;DSDT physical address: {:#X}&quot;, fadt.dsdt);
+    </span>}
     
-    <span class="comment">// HPET is optional, but usually present.</span>
-    {
-        <span class="kw">let</span> <span class="ident">acpi_tables</span> <span class="op">=</span> <span class="ident">ACPI_TABLES</span>.<span class="ident">lock</span>();
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">hpet_table</span>) <span class="op">=</span> <span class="ident">hpet::HpetAcpiTable::get</span>(<span class="kw-2">&amp;</span><span class="ident">acpi_tables</span>) {
-            <span class="ident">hpet_table</span>.<span class="ident">init_hpet</span>(<span class="ident">page_table</span>)<span class="question-mark">?</span>;
-        } <span class="kw">else</span> {
+    <span class="comment">// HPET is optional, but usually present.
+    </span>{
+        <span class="kw">let </span>acpi_tables = ACPI_TABLES.lock();
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(hpet_table) = hpet::HpetAcpiTable::get(<span class="kw-2">&amp;</span>acpi_tables) {
+            hpet_table.init_hpet(page_table)<span class="question-mark">?</span>;
+        } <span class="kw">else </span>{
             <span class="macro">warn!</span>(<span class="string">&quot;This machine has no HPET.&quot;</span>);
         }
     };
     
-    <span class="comment">// MADT is mandatory</span>
-    {
-        <span class="kw">let</span> <span class="ident">acpi_tables</span> <span class="op">=</span> <span class="ident">ACPI_TABLES</span>.<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="ident">madt</span> <span class="op">=</span> <span class="ident">madt::Madt::get</span>(<span class="kw-2">&amp;</span><span class="ident">acpi_tables</span>).<span class="ident">ok_or</span>(<span class="string">&quot;The required MADT ACPI table wasn&#39;t found (signature &#39;APIC&#39;)&quot;</span>)<span class="question-mark">?</span>;
-        <span class="ident">madt</span>.<span class="ident">bsp_init</span>(<span class="ident">page_table</span>)<span class="question-mark">?</span>;
+    <span class="comment">// MADT is mandatory
+    </span>{
+        <span class="kw">let </span>acpi_tables = ACPI_TABLES.lock();
+        <span class="kw">let </span>madt = madt::Madt::get(<span class="kw-2">&amp;</span>acpi_tables).ok_or(<span class="string">&quot;The required MADT ACPI table wasn&#39;t found (signature &#39;APIC&#39;)&quot;</span>)<span class="question-mark">?</span>;
+        madt.bsp_init(page_table)<span class="question-mark">?</span>;
     }
 
-    <span class="comment">// If we have a DMAR table, use it to obtain IOMMU info. </span>
-    {
-        <span class="kw">let</span> <span class="ident">acpi_tables</span> <span class="op">=</span> <span class="ident">ACPI_TABLES</span>.<span class="ident">lock</span>();
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">dmar_table</span>) <span class="op">=</span> <span class="ident">dmar::Dmar::get</span>(<span class="kw-2">&amp;</span><span class="ident">acpi_tables</span>) {
+    <span class="comment">// If we have a DMAR table, use it to obtain IOMMU info. 
+    </span>{
+        <span class="kw">let </span>acpi_tables = ACPI_TABLES.lock();
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(dmar_table) = dmar::Dmar::get(<span class="kw-2">&amp;</span>acpi_tables) {
             <span class="macro">debug!</span>(<span class="string">&quot;This machine has a DMAR table: flags: {:#b}, host_address_width: {} bits&quot;</span>, 
-                <span class="ident">dmar_table</span>.<span class="ident">flags</span>(), <span class="ident">dmar_table</span>.<span class="ident">host_address_width</span>()
+                dmar_table.flags(), dmar_table.host_address_width()
             );
 
-            <span class="kw">for</span> <span class="ident">table</span> <span class="kw">in</span> <span class="ident">dmar_table</span>.<span class="ident">iter</span>() {
-                <span class="kw">match</span> <span class="ident">table</span> {
-                    <span class="ident">dmar::DmarEntry::Drhd</span>(<span class="ident">drhd</span>) =&gt; {
+            <span class="kw">for </span>table <span class="kw">in </span>dmar_table.iter() {
+                <span class="kw">match </span>table {
+                    dmar::DmarEntry::Drhd(drhd) =&gt; {
                         <span class="macro">debug!</span>(<span class="string">&quot;Found DRHD table: INCLUDE_PCI_ALL: {:?}, segment_number: {:#X}, register_base_address: {:#X}&quot;</span>, 
-                            <span class="ident">drhd</span>.<span class="ident">include_pci_all</span>(), <span class="ident">drhd</span>.<span class="ident">segment_number</span>(), <span class="ident">drhd</span>.<span class="ident">register_base_address</span>(),
+                            drhd.include_pci_all(), drhd.segment_number(), drhd.register_base_address(),
                         );
-                        <span class="kw">if</span> <span class="op">!</span><span class="ident">drhd</span>.<span class="ident">include_pci_all</span>() {
+                        <span class="kw">if </span>!drhd.include_pci_all() {
                             <span class="macro">info!</span>(<span class="string">&quot;No IOMMU support when INCLUDE_PCI_ALL not set in DRHD&quot;</span>);
-                        } <span class="kw">else</span> {
-                            <span class="kw">let</span> <span class="ident">register_base_address</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(<span class="ident">drhd</span>.<span class="ident">register_base_address</span>() <span class="kw">as</span> <span class="ident">usize</span>)
-                                .<span class="ident">ok_or</span>(<span class="string">&quot;IOMMU register_base_address was invalid&quot;</span>)<span class="question-mark">?</span>;
-                            <span class="ident">iommu::init</span>(
-                                <span class="ident">dmar_table</span>.<span class="ident">host_address_width</span>(),
-                                <span class="ident">drhd</span>.<span class="ident">segment_number</span>(), 
-                                <span class="ident">register_base_address</span>,
-                                <span class="ident">page_table</span>
+                        } <span class="kw">else </span>{
+                            <span class="kw">let </span>register_base_address = PhysicalAddress::new(drhd.register_base_address() <span class="kw">as </span>usize)
+                                .ok_or(<span class="string">&quot;IOMMU register_base_address was invalid&quot;</span>)<span class="question-mark">?</span>;
+                            iommu::init(
+                                dmar_table.host_address_width(),
+                                drhd.segment_number(), 
+                                register_base_address,
+                                page_table
                             )<span class="question-mark">?</span>;
                         }
                         <span class="macro">debug!</span>(<span class="string">&quot;DRHD table has Device Scope entries:&quot;</span>);
-                        <span class="kw">for</span> (<span class="ident">_idx</span>, <span class="ident">dev_scope</span>) <span class="kw">in</span> <span class="ident">drhd</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
+                        <span class="kw">for </span>(_idx, dev_scope) <span class="kw">in </span>drhd.iter().enumerate() {
                             <span class="macro">debug!</span>(<span class="string">&quot;    Device Scope [{}]: type: {}, enumeration_id: {}, start_bus_number: {}&quot;</span>, 
-                                <span class="ident">_idx</span>, <span class="ident">dev_scope</span>.<span class="ident">device_type</span>(), <span class="ident">dev_scope</span>.<span class="ident">enumeration_id</span>(), <span class="ident">dev_scope</span>.<span class="ident">start_bus_number</span>(),
+                                _idx, dev_scope.device_type(), dev_scope.enumeration_id(), dev_scope.start_bus_number(),
                             );
-                            <span class="macro">debug!</span>(<span class="string">&quot;                  path: {:?}&quot;</span>, <span class="ident">dev_scope</span>.<span class="ident">path</span>());
+                            <span class="macro">debug!</span>(<span class="string">&quot;                  path: {:?}&quot;</span>, dev_scope.path());
                         }
                     }
-                    <span class="kw">_</span> =&gt; { }
+                    <span class="kw">_ </span>=&gt; { }
                 }
             }
         }
@@ -275,5 +269,4 @@
     <span class="prelude-val">Ok</span>(())
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="acpi" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="acpi" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

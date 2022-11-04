@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/device_manager/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../device_manager/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../device_manager/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../device_manager/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/device_manager/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../device_manager/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -305,217 +299,217 @@
 <span id="299">299</span>
 <span id="300">300</span>
 <span id="301">301</span>
-</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">trait_alias</span>)]</span>
+</pre><pre class="rust"><code><span class="attr">#![no_std]
+#![feature(trait_alias)]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">event_types</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">e1000</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">apic</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">acpi</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">serial_port</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">console</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">logger</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">keyboard</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pci</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mouse</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">storage_manager</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">network_manager</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">ethernet_smoltcp_device</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mpmc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">ixgbe</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fatfs</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">io</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">core2</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">derive_more</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mlx5</span>;
+#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>event_types;
+<span class="kw">extern crate </span>e1000;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>apic;
+<span class="kw">extern crate </span>acpi;
+<span class="kw">extern crate </span>serial_port;
+<span class="kw">extern crate </span>console;
+<span class="kw">extern crate </span>logger;
+<span class="kw">extern crate </span>keyboard;
+<span class="kw">extern crate </span>pci;
+<span class="kw">extern crate </span>mouse;
+<span class="kw">extern crate </span>storage_manager;
+<span class="kw">extern crate </span>network_manager;
+<span class="kw">extern crate </span>ethernet_smoltcp_device;
+<span class="kw">extern crate </span>mpmc;
+<span class="kw">extern crate </span>ixgbe;
+<span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>fatfs;
+<span class="kw">extern crate </span>io;
+<span class="kw">extern crate </span>core2;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>derive_more;
+<span class="kw">extern crate </span>mlx5;
 
-<span class="kw">use</span> <span class="ident">core::convert::TryFrom</span>;
-<span class="kw">use</span> <span class="ident">mpmc::Queue</span>;
-<span class="kw">use</span> <span class="ident">event_types::Event</span>;
-<span class="kw">use</span> <span class="ident">memory::MemoryManagementInfo</span>;
-<span class="kw">use</span> <span class="ident">ethernet_smoltcp_device::EthernetNetworkInterface</span>;
-<span class="kw">use</span> <span class="ident">network_manager::add_to_network_interfaces</span>;
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">io</span>::{<span class="ident">ByteReaderWriterWrapper</span>, <span class="ident">LockableIo</span>, <span class="ident">ReaderWriter</span>};
-<span class="kw">use</span> <span class="ident">serial_port</span>::{<span class="ident">SerialPortAddress</span>, <span class="ident">take_serial_port_basic</span>};
-<span class="kw">use</span> <span class="ident">storage_manager::StorageDevice</span>;
+<span class="kw">use </span>core::convert::TryFrom;
+<span class="kw">use </span>mpmc::Queue;
+<span class="kw">use </span>event_types::Event;
+<span class="kw">use </span>memory::MemoryManagementInfo;
+<span class="kw">use </span>ethernet_smoltcp_device::EthernetNetworkInterface;
+<span class="kw">use </span>network_manager::add_to_network_interfaces;
+<span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>io::{ByteReaderWriterWrapper, LockableIo, ReaderWriter};
+<span class="kw">use </span>serial_port::{SerialPortAddress, take_serial_port_basic};
+<span class="kw">use </span>storage_manager::StorageDevice;
 
-<span class="doccomment">/// A randomly chosen IP address that must be outside of the DHCP range.</span>
-<span class="doccomment">/// TODO: use DHCP to acquire an IP address.</span>
-<span class="kw">const</span> <span class="ident">DEFAULT_LOCAL_IP</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;10.0.2.15/24&quot;</span>; <span class="comment">// the default QEMU user-slirp network gives IP addresses of &quot;10.0.2.*&quot;</span>
+<span class="doccomment">/// A randomly chosen IP address that must be outside of the DHCP range.
+/// TODO: use DHCP to acquire an IP address.
+</span><span class="kw">const </span>DEFAULT_LOCAL_IP: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;10.0.2.15/24&quot;</span>; <span class="comment">// the default QEMU user-slirp network gives IP addresses of &quot;10.0.2.*&quot;
 
-<span class="doccomment">/// Standard home router address.</span>
-<span class="doccomment">/// TODO: use DHCP to acquire gateway IP</span>
-<span class="kw">const</span> <span class="ident">DEFAULT_GATEWAY_IP</span>: [<span class="ident">u8</span>; <span class="number">4</span>] <span class="op">=</span> [<span class="number">10</span>, <span class="number">0</span>, <span class="number">2</span>, <span class="number">2</span>]; <span class="comment">// the default QEMU user-slirp networking gateway IP</span>
+</span><span class="doccomment">/// Standard home router address.
+/// TODO: use DHCP to acquire gateway IP
+</span><span class="kw">const </span>DEFAULT_GATEWAY_IP: [u8; <span class="number">4</span>] = [<span class="number">10</span>, <span class="number">0</span>, <span class="number">2</span>, <span class="number">2</span>]; <span class="comment">// the default QEMU user-slirp networking gateway IP
 
-<span class="doccomment">/// Performs early-stage initialization for simple devices needed during early boot.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This includes:</span>
-<span class="doccomment">/// * local APICs ([`apic`]),</span>
-<span class="doccomment">/// * [`acpi`] tables for system configuration info, including the IOAPIC.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">early_init</span>(<span class="ident">kernel_mmi</span>: <span class="kw-2">&amp;mut</span> <span class="ident">MemoryManagementInfo</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="comment">// First, initialize the local APIC hardware such that we can populate</span>
-    <span class="comment">// and initialize each LocalAPIC discovered in the ACPI table initialization routine below.</span>
-    <span class="ident">apic::init</span>();
+</span><span class="doccomment">/// Performs early-stage initialization for simple devices needed during early boot.
+///
+/// This includes:
+/// * local APICs ([`apic`]),
+/// * [`acpi`] tables for system configuration info, including the IOAPIC.
+</span><span class="kw">pub fn </span>early_init(kernel_mmi: <span class="kw-2">&amp;mut </span>MemoryManagementInfo) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="comment">// First, initialize the local APIC hardware such that we can populate
+    // and initialize each LocalAPIC discovered in the ACPI table initialization routine below.
+    </span>apic::init();
     
-    <span class="comment">// Then, parse the ACPI tables to acquire system configuration info.</span>
-    <span class="ident">acpi::init</span>(<span class="kw-2">&amp;mut</span> <span class="ident">kernel_mmi</span>.<span class="ident">page_table</span>)<span class="question-mark">?</span>;
+    <span class="comment">// Then, parse the ACPI tables to acquire system configuration info.
+    </span>acpi::init(<span class="kw-2">&amp;mut </span>kernel_mmi.page_table)<span class="question-mark">?</span>;
 
     <span class="prelude-val">Ok</span>(())
 }
 
 
-<span class="doccomment">/// Initializes all other devices not initialized during [`early_init()`]. </span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Devices include:</span>
-<span class="doccomment">/// * At least one [`serial_port`] (e.g., `COM1`) with full interrupt support,</span>
-<span class="doccomment">/// * The fully-featured system [`logger`],</span>
-<span class="doccomment">/// * PS2 [`keyboard`] and [`mouse`],</span>
-<span class="doccomment">/// * All other devices discovered on the [`pci`] bus.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">key_producer</span>: <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>, <span class="ident">mouse_producer</span>: <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>  {
+<span class="doccomment">/// Initializes all other devices not initialized during [`early_init()`]. 
+///
+/// Devices include:
+/// * At least one [`serial_port`] (e.g., `COM1`) with full interrupt support,
+/// * The fully-featured system [`logger`],
+/// * PS2 [`keyboard`] and [`mouse`],
+/// * All other devices discovered on the [`pci`] bus.
+</span><span class="kw">pub fn </span>init(key_producer: Queue&lt;Event&gt;, mouse_producer: Queue&lt;Event&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;  {
 
-    <span class="kw">let</span> <span class="ident">serial_ports</span> <span class="op">=</span> <span class="ident">logger::take_early_log_writers</span>();
-    <span class="kw">let</span> <span class="ident">logger_writers</span> <span class="op">=</span> <span class="ident">IntoIterator::into_iter</span>(<span class="ident">serial_ports</span>)
-        .<span class="ident">flatten</span>()
-        .<span class="ident">flat_map</span>(<span class="op">|</span><span class="ident">sp</span><span class="op">|</span> <span class="ident">SerialPortAddress::try_from</span>(<span class="ident">sp</span>.<span class="ident">base_port_address</span>())
-            .<span class="ident">ok</span>()
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">sp_addr</span><span class="op">|</span> <span class="ident">serial_port::init_serial_port</span>(<span class="ident">sp_addr</span>, <span class="ident">sp</span>))
-        ).<span class="ident">map</span>(<span class="op">|</span><span class="ident">arc_ref</span><span class="op">|</span> <span class="ident">arc_ref</span>.<span class="ident">clone</span>());
+    <span class="kw">let </span>serial_ports = logger::take_early_log_writers();
+    <span class="kw">let </span>logger_writers = IntoIterator::into_iter(serial_ports)
+        .flatten()
+        .flat_map(|sp| SerialPortAddress::try_from(sp.base_port_address())
+            .ok()
+            .map(|sp_addr| serial_port::init_serial_port(sp_addr, sp))
+        ).map(|arc_ref| arc_ref.clone());
 
-    <span class="ident">logger::init</span>(<span class="prelude-val">None</span>, <span class="ident">logger_writers</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;BUG: logger::init() failed&quot;</span>)<span class="question-mark">?</span>;
+    logger::init(<span class="prelude-val">None</span>, logger_writers).map_err(|_e| <span class="string">&quot;BUG: logger::init() failed&quot;</span>)<span class="question-mark">?</span>;
     <span class="macro">info!</span>(<span class="string">&quot;Initialized full logger.&quot;</span>);
 
-    <span class="comment">// Ensure that both COM1 and COM2 are initialized, for logging and/or headless operation.</span>
-    <span class="comment">// If a serial port was used for logging (as configured in [`logger::early_init()`]),</span>
-    <span class="comment">// ignore its inputs for purposes of starting new console instances.</span>
-    <span class="kw">let</span> <span class="ident">init_serial_port</span> <span class="op">=</span> <span class="op">|</span><span class="ident">spa</span>: <span class="ident">SerialPortAddress</span><span class="op">|</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">sp</span>) <span class="op">=</span> <span class="ident">take_serial_port_basic</span>(<span class="ident">spa</span>) {
-            <span class="ident">serial_port::init_serial_port</span>(<span class="ident">spa</span>, <span class="ident">sp</span>);
-        } <span class="kw">else</span> {
-            <span class="ident">console::ignore_serial_port_input</span>(<span class="ident">spa</span> <span class="kw">as</span> <span class="ident">u16</span>);
-            <span class="macro">info!</span>(<span class="string">&quot;Ignoring input on {:?} because it is being used for logging.&quot;</span>, <span class="ident">spa</span>);
+    <span class="comment">// Ensure that both COM1 and COM2 are initialized, for logging and/or headless operation.
+    // If a serial port was used for logging (as configured in [`logger::early_init()`]),
+    // ignore its inputs for purposes of starting new console instances.
+    </span><span class="kw">let </span>init_serial_port = |spa: SerialPortAddress| {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(sp) = take_serial_port_basic(spa) {
+            serial_port::init_serial_port(spa, sp);
+        } <span class="kw">else </span>{
+            console::ignore_serial_port_input(spa <span class="kw">as </span>u16);
+            <span class="macro">info!</span>(<span class="string">&quot;Ignoring input on {:?} because it is being used for logging.&quot;</span>, spa);
         }
     };
-    <span class="ident">init_serial_port</span>(<span class="ident">SerialPortAddress::COM1</span>);
-    <span class="ident">init_serial_port</span>(<span class="ident">SerialPortAddress::COM2</span>);
+    init_serial_port(SerialPortAddress::COM1);
+    init_serial_port(SerialPortAddress::COM2);
 
-    <span class="ident">keyboard::init</span>(<span class="ident">key_producer</span>)<span class="question-mark">?</span>;
-    <span class="ident">mouse::init</span>(<span class="ident">mouse_producer</span>)<span class="question-mark">?</span>;
+    keyboard::init(key_producer)<span class="question-mark">?</span>;
+    mouse::init(mouse_producer)<span class="question-mark">?</span>;
 
-    <span class="comment">// Initialize/scan the PCI bus to discover PCI devices</span>
-    <span class="kw">for</span> <span class="ident">dev</span> <span class="kw">in</span> <span class="ident">pci::pci_device_iter</span>() {
-        <span class="macro">debug!</span>(<span class="string">&quot;Found pci device: {:X?}&quot;</span>, <span class="ident">dev</span>);
+    <span class="comment">// Initialize/scan the PCI bus to discover PCI devices
+    </span><span class="kw">for </span>dev <span class="kw">in </span>pci::pci_device_iter() {
+        <span class="macro">debug!</span>(<span class="string">&quot;Found pci device: {:X?}&quot;</span>, dev);
     } 
 
-    <span class="comment">// store all the initialized ixgbe NICs here to be added to the network interface list</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ixgbe_devs</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
+    <span class="comment">// store all the initialized ixgbe NICs here to be added to the network interface list
+    </span><span class="kw">let </span><span class="kw-2">mut </span>ixgbe_devs = Vec::new();
 
-    <span class="comment">// Iterate over all PCI devices and initialize the drivers for the devices we support.</span>
+    <span class="comment">// Iterate over all PCI devices and initialize the drivers for the devices we support.
 
-    <span class="kw">for</span> <span class="ident">dev</span> <span class="kw">in</span> <span class="ident">pci::pci_device_iter</span>() {
-        <span class="comment">// Currently we skip Bridge devices, since we have no use for them yet. </span>
-        <span class="kw">if</span> <span class="ident">dev</span>.<span class="ident">class</span> <span class="op">==</span> <span class="number">0x06</span> {
+    </span><span class="kw">for </span>dev <span class="kw">in </span>pci::pci_device_iter() {
+        <span class="comment">// Currently we skip Bridge devices, since we have no use for them yet. 
+        </span><span class="kw">if </span>dev.class == <span class="number">0x06 </span>{
             <span class="kw">continue</span>;
         }
 
-        <span class="comment">// If this is a storage device, initialize it as such.</span>
-        <span class="kw">match</span> <span class="ident">storage_manager::init_device</span>(<span class="ident">dev</span>) {
-            <span class="comment">// Successfully initialized this storage device.</span>
-            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">_storage_controller</span>)) =&gt; <span class="kw">continue</span>,
+        <span class="comment">// If this is a storage device, initialize it as such.
+        </span><span class="kw">match </span>storage_manager::init_device(dev) {
+            <span class="comment">// Successfully initialized this storage device.
+            </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(_storage_controller)) =&gt; <span class="kw">continue</span>,
 
-            <span class="comment">// Not a storage device, so fall through and let another handler deal with it.</span>
-            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; { }
+            <span class="comment">// Not a storage device, so fall through and let another handler deal with it.
+            </span><span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>) =&gt; { }
             
-            <span class="comment">// Error initializing this device, so skip it.</span>
-            <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
-                <span class="macro">error!</span>(<span class="string">&quot;Failed to initialize storage device, it will be unavailable.\n{:?}\nError: {}&quot;</span>, <span class="ident">dev</span>, <span class="ident">e</span>);
+            <span class="comment">// Error initializing this device, so skip it.
+            </span><span class="prelude-val">Err</span>(e) =&gt; {
+                <span class="macro">error!</span>(<span class="string">&quot;Failed to initialize storage device, it will be unavailable.\n{:?}\nError: {}&quot;</span>, dev, e);
                 <span class="kw">continue</span>;
             }
         }
 
-        <span class="comment">// If this is a network device, initialize it as such.</span>
-        <span class="comment">// Look for networking controllers, specifically ethernet cards</span>
-        <span class="kw">if</span> <span class="ident">dev</span>.<span class="ident">class</span> <span class="op">==</span> <span class="number">0x02</span> <span class="op">&amp;&amp;</span> <span class="ident">dev</span>.<span class="ident">subclass</span> <span class="op">==</span> <span class="number">0x00</span> {
-            <span class="kw">if</span> <span class="ident">dev</span>.<span class="ident">vendor_id</span> <span class="op">==</span> <span class="ident">e1000::INTEL_VEND</span> <span class="op">&amp;&amp;</span> <span class="ident">dev</span>.<span class="ident">device_id</span> <span class="op">==</span> <span class="ident">e1000::E1000_DEV</span> {
-                <span class="macro">info!</span>(<span class="string">&quot;e1000 PCI device found at: {:?}&quot;</span>, <span class="ident">dev</span>.<span class="ident">location</span>);
-                <span class="kw">let</span> <span class="ident">e1000_nic_ref</span> <span class="op">=</span> <span class="ident">e1000::E1000Nic::init</span>(<span class="ident">dev</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">e1000_interface</span> <span class="op">=</span> <span class="ident">EthernetNetworkInterface::new_ipv4_interface</span>(<span class="ident">e1000_nic_ref</span>, <span class="ident">DEFAULT_LOCAL_IP</span>, <span class="kw-2">&amp;</span><span class="ident">DEFAULT_GATEWAY_IP</span>)<span class="question-mark">?</span>;
-                <span class="ident">add_to_network_interfaces</span>(<span class="ident">e1000_interface</span>);
+        <span class="comment">// If this is a network device, initialize it as such.
+        // Look for networking controllers, specifically ethernet cards
+        </span><span class="kw">if </span>dev.class == <span class="number">0x02 </span>&amp;&amp; dev.subclass == <span class="number">0x00 </span>{
+            <span class="kw">if </span>dev.vendor_id == e1000::INTEL_VEND &amp;&amp; dev.device_id == e1000::E1000_DEV {
+                <span class="macro">info!</span>(<span class="string">&quot;e1000 PCI device found at: {:?}&quot;</span>, dev.location);
+                <span class="kw">let </span>e1000_nic_ref = e1000::E1000Nic::init(dev)<span class="question-mark">?</span>;
+                <span class="kw">let </span>e1000_interface = EthernetNetworkInterface::new_ipv4_interface(e1000_nic_ref, DEFAULT_LOCAL_IP, <span class="kw-2">&amp;</span>DEFAULT_GATEWAY_IP)<span class="question-mark">?</span>;
+                add_to_network_interfaces(e1000_interface);
                 <span class="kw">continue</span>;
             }
-            <span class="kw">if</span> <span class="ident">dev</span>.<span class="ident">vendor_id</span> <span class="op">==</span> <span class="ident">ixgbe::INTEL_VEND</span> <span class="op">&amp;&amp;</span> <span class="ident">dev</span>.<span class="ident">device_id</span> <span class="op">==</span> <span class="ident">ixgbe::INTEL_82599</span> {
-                <span class="macro">info!</span>(<span class="string">&quot;ixgbe PCI device found at: {:?}&quot;</span>, <span class="ident">dev</span>.<span class="ident">location</span>);
+            <span class="kw">if </span>dev.vendor_id == ixgbe::INTEL_VEND &amp;&amp; dev.device_id == ixgbe::INTEL_82599 {
+                <span class="macro">info!</span>(<span class="string">&quot;ixgbe PCI device found at: {:?}&quot;</span>, dev.location);
                 
-                <span class="comment">// Initialization parameters of the NIC.</span>
-                <span class="comment">// These can be changed according to the requirements specified in the ixgbe init function.</span>
-                <span class="kw">const</span> <span class="ident">VIRT_ENABLED</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
-                <span class="kw">const</span> <span class="ident">RSS_ENABLED</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">false</span>;
-                <span class="kw">const</span> <span class="ident">RX_DESCS</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">8</span>;
-                <span class="kw">const</span> <span class="ident">TX_DESCS</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">8</span>;
+                <span class="comment">// Initialization parameters of the NIC.
+                // These can be changed according to the requirements specified in the ixgbe init function.
+                </span><span class="kw">const </span>VIRT_ENABLED: bool = <span class="bool-val">true</span>;
+                <span class="kw">const </span>RSS_ENABLED: bool = <span class="bool-val">false</span>;
+                <span class="kw">const </span>RX_DESCS: u16 = <span class="number">8</span>;
+                <span class="kw">const </span>TX_DESCS: u16 = <span class="number">8</span>;
                 
-                <span class="kw">let</span> <span class="ident">ixgbe_nic</span> <span class="op">=</span> <span class="ident">ixgbe::IxgbeNic::init</span>(
-                    <span class="ident">dev</span>, 
-                    <span class="ident">dev</span>.<span class="ident">location</span>,
-                    <span class="ident">VIRT_ENABLED</span>, 
+                <span class="kw">let </span>ixgbe_nic = ixgbe::IxgbeNic::init(
+                    dev, 
+                    dev.location,
+                    VIRT_ENABLED, 
                     <span class="prelude-val">None</span>, 
-                    <span class="ident">RSS_ENABLED</span>, 
-                    <span class="ident">ixgbe::RxBufferSizeKiB::Buffer2KiB</span>,
-                    <span class="ident">RX_DESCS</span>,
-                    <span class="ident">TX_DESCS</span>
+                    RSS_ENABLED, 
+                    ixgbe::RxBufferSizeKiB::Buffer2KiB,
+                    RX_DESCS,
+                    TX_DESCS
                 )<span class="question-mark">?</span>;
 
-                <span class="ident">ixgbe_devs</span>.<span class="ident">push</span>(<span class="ident">ixgbe_nic</span>);
+                ixgbe_devs.push(ixgbe_nic);
                 <span class="kw">continue</span>;
             }
-            <span class="kw">if</span> <span class="ident">dev</span>.<span class="ident">vendor_id</span> <span class="op">==</span> <span class="ident">mlx5::MLX_VEND</span> <span class="op">&amp;&amp;</span> (<span class="ident">dev</span>.<span class="ident">device_id</span> <span class="op">==</span> <span class="ident">mlx5::CONNECTX5_DEV</span> <span class="op">|</span><span class="op">|</span> <span class="ident">dev</span>.<span class="ident">device_id</span> <span class="op">==</span> <span class="ident">mlx5::CONNECTX5_EX_DEV</span>) {
-                <span class="macro">info!</span>(<span class="string">&quot;mlx5 PCI device found at: {:?}&quot;</span>, <span class="ident">dev</span>.<span class="ident">location</span>);
-                <span class="kw">const</span> <span class="ident">RX_DESCS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">512</span>;
-                <span class="kw">const</span> <span class="ident">TX_DESCS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">8192</span>;
-                <span class="kw">const</span> <span class="ident">MAX_MTU</span>:  <span class="ident">u16</span> <span class="op">=</span> <span class="number">9000</span>;
+            <span class="kw">if </span>dev.vendor_id == mlx5::MLX_VEND &amp;&amp; (dev.device_id == mlx5::CONNECTX5_DEV || dev.device_id == mlx5::CONNECTX5_EX_DEV) {
+                <span class="macro">info!</span>(<span class="string">&quot;mlx5 PCI device found at: {:?}&quot;</span>, dev.location);
+                <span class="kw">const </span>RX_DESCS: usize = <span class="number">512</span>;
+                <span class="kw">const </span>TX_DESCS: usize = <span class="number">8192</span>;
+                <span class="kw">const </span>MAX_MTU:  u16 = <span class="number">9000</span>;
 
-                <span class="ident">mlx5::ConnectX5Nic::init</span>(<span class="ident">dev</span>, <span class="ident">TX_DESCS</span>, <span class="ident">RX_DESCS</span>, <span class="ident">MAX_MTU</span>)<span class="question-mark">?</span>;
+                mlx5::ConnectX5Nic::init(dev, TX_DESCS, RX_DESCS, MAX_MTU)<span class="question-mark">?</span>;
                 <span class="kw">continue</span>;
             }
 
-            <span class="comment">// here: check for and initialize other ethernet cards</span>
-        }
+            <span class="comment">// here: check for and initialize other ethernet cards
+        </span>}
 
-        <span class="macro">warn!</span>(<span class="string">&quot;Ignoring PCI device with no handler. {:X?}&quot;</span>, <span class="ident">dev</span>);
+        <span class="macro">warn!</span>(<span class="string">&quot;Ignoring PCI device with no handler. {:X?}&quot;</span>, dev);
     }
 
-    <span class="comment">// Once all the NICs have been initialized, we can store them and add them to the list of network interfaces.</span>
-    <span class="kw">let</span> <span class="ident">ixgbe_nics</span> <span class="op">=</span> <span class="ident">ixgbe::IXGBE_NICS</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">ixgbe_devs</span>);
-    <span class="kw">for</span> <span class="ident">ixgbe_nic_ref</span> <span class="kw">in</span> <span class="ident">ixgbe_nics</span>.<span class="ident">iter</span>() {
-        <span class="kw">let</span> <span class="ident">ixgbe_interface</span> <span class="op">=</span> <span class="ident">EthernetNetworkInterface::new_ipv4_interface</span>(
-            <span class="ident">ixgbe_nic_ref</span>, 
-            <span class="ident">DEFAULT_LOCAL_IP</span>, 
-            <span class="kw-2">&amp;</span><span class="ident">DEFAULT_GATEWAY_IP</span>
+    <span class="comment">// Once all the NICs have been initialized, we can store them and add them to the list of network interfaces.
+    </span><span class="kw">let </span>ixgbe_nics = ixgbe::IXGBE_NICS.call_once(|| ixgbe_devs);
+    <span class="kw">for </span>ixgbe_nic_ref <span class="kw">in </span>ixgbe_nics.iter() {
+        <span class="kw">let </span>ixgbe_interface = EthernetNetworkInterface::new_ipv4_interface(
+            ixgbe_nic_ref, 
+            DEFAULT_LOCAL_IP, 
+            <span class="kw-2">&amp;</span>DEFAULT_GATEWAY_IP
         )<span class="question-mark">?</span>;
-        <span class="ident">add_to_network_interfaces</span>(<span class="ident">ixgbe_interface</span>);
+        add_to_network_interfaces(ixgbe_interface);
     }
 
-    <span class="comment">// Convenience notification for developers to inform them of no networking devices</span>
-    <span class="kw">if</span> <span class="ident">network_manager::NETWORK_INTERFACES</span>.<span class="ident">lock</span>().<span class="ident">is_empty</span>() {
+    <span class="comment">// Convenience notification for developers to inform them of no networking devices
+    </span><span class="kw">if </span>network_manager::NETWORK_INTERFACES.lock().is_empty() {
         <span class="macro">warn!</span>(<span class="string">&quot;Note: no network devices found on this system.&quot;</span>);
     }
 
-    <span class="comment">// Discover filesystems from each storage device on the storage controllers initialized above</span>
-    <span class="comment">// and mount each filesystem to the root directory by default.</span>
-    <span class="kw">if</span> <span class="bool-val">false</span> {
-        <span class="kw">for</span> <span class="ident">storage_device</span> <span class="kw">in</span> <span class="ident">storage_manager::storage_devices</span>() {
-            <span class="kw">let</span> <span class="ident">disk</span> <span class="op">=</span> <span class="ident">FatFsAdapter</span>(
-                <span class="ident">ReaderWriter::new</span>(
-                    <span class="ident">ByteReaderWriterWrapper::from</span>(
-                        <span class="ident">LockableIo</span>::<span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">StorageDevice</span> <span class="op">+</span> <span class="ident">Send</span>, <span class="ident">spin::Mutex</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span>, <span class="kw">_</span><span class="op">&gt;</span><span class="ident">::from</span>(<span class="ident">storage_device</span>)
+    <span class="comment">// Discover filesystems from each storage device on the storage controllers initialized above
+    // and mount each filesystem to the root directory by default.
+    </span><span class="kw">if </span><span class="bool-val">false </span>{
+        <span class="kw">for </span>storage_device <span class="kw">in </span>storage_manager::storage_devices() {
+            <span class="kw">let </span>disk = FatFsAdapter(
+                ReaderWriter::new(
+                    ByteReaderWriterWrapper::from(
+                        LockableIo::&lt;<span class="kw">dyn </span>StorageDevice + Send, spin::Mutex&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;::from(storage_device)
                     )
                 ),
             );
 
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">filesystem</span>) <span class="op">=</span> <span class="ident">fatfs::FileSystem::new</span>(<span class="ident">disk</span>, <span class="ident">fatfs::FsOptions::new</span>()) {
+            <span class="kw">if let </span><span class="prelude-val">Ok</span>(filesystem) = fatfs::FileSystem::new(disk, fatfs::FsOptions::new()) {
                 <span class="macro">debug!</span>(<span class="string">&quot;FATFS data:
                     fat_type: {:?},
                     volume_id: {:X?},
@@ -523,18 +517,18 @@
                     cluster_size: {:?},
                     status_flags: {:?},
                     stats: {:?}&quot;</span>,
-                    <span class="ident">filesystem</span>.<span class="ident">fat_type</span>(),
-                    <span class="ident">filesystem</span>.<span class="ident">volume_id</span>(),
-                    <span class="ident">filesystem</span>.<span class="ident">volume_label</span>(),
-                    <span class="ident">filesystem</span>.<span class="ident">cluster_size</span>(),
-                    <span class="ident">filesystem</span>.<span class="ident">read_status_flags</span>(),
-                    <span class="ident">filesystem</span>.<span class="ident">stats</span>(),
+                    filesystem.fat_type(),
+                    filesystem.volume_id(),
+                    filesystem.volume_label(),
+                    filesystem.cluster_size(),
+                    filesystem.read_status_flags(),
+                    filesystem.stats(),
                 );
 
-                <span class="kw">let</span> <span class="ident">root</span> <span class="op">=</span> <span class="ident">filesystem</span>.<span class="ident">root_dir</span>();
+                <span class="kw">let </span>root = filesystem.root_dir();
                 <span class="macro">debug!</span>(<span class="string">&quot;Root directory contents:&quot;</span>);
-                <span class="kw">for</span> <span class="ident">f</span> <span class="kw">in</span> <span class="ident">root</span>.<span class="ident">iter</span>() {
-                    <span class="macro">debug!</span>(<span class="string">&quot;\t {:X?}&quot;</span>, <span class="ident">f</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">entry</span><span class="op">|</span> (<span class="ident">entry</span>.<span class="ident">file_name</span>(), <span class="ident">entry</span>.<span class="ident">attributes</span>(), <span class="ident">entry</span>.<span class="ident">len</span>())));
+                <span class="kw">for </span>f <span class="kw">in </span>root.iter() {
+                    <span class="macro">debug!</span>(<span class="string">&quot;\t {:X?}&quot;</span>, f.map(|entry| (entry.file_name(), entry.attributes(), entry.len())));
                 }
             }
         }
@@ -543,69 +537,68 @@
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="comment">// TODO: move the following `FatFsAdapter` stuff into a separate crate. </span>
+<span class="comment">// TODO: move the following `FatFsAdapter` stuff into a separate crate. 
 
-<span class="doccomment">/// An adapter (wrapper type) that implements traits required by the [`fatfs`] crate</span>
-<span class="doccomment">/// for any I/O device that wants to be usable by [`fatfs`].</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// To meet [`fatfs`]&#39;s requirements, the underlying I/O stream must be able to </span>
-<span class="doccomment">/// read, write, and seek while tracking its current offset. </span>
-<span class="doccomment">/// We use traits from the [`core2`] crate to meet these requirements, </span>
-<span class="doccomment">/// thus, the given `IO` parameter must implement those [`core2`] traits.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// For example, this allows one to access a FAT filesystem </span>
-<span class="doccomment">/// by reading from or writing to a storage device.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FatFsAdapter</span><span class="op">&lt;</span><span class="ident">IO</span><span class="op">&gt;</span>(<span class="ident">IO</span>);
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">IO</span><span class="op">&gt;</span> <span class="ident">FatFsAdapter</span><span class="op">&lt;</span><span class="ident">IO</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">io</span>: <span class="ident">IO</span>) -&gt; <span class="ident">FatFsAdapter</span><span class="op">&lt;</span><span class="ident">IO</span><span class="op">&gt;</span> { <span class="ident">FatFsAdapter</span>(<span class="ident">io</span>) }
+</span><span class="doccomment">/// An adapter (wrapper type) that implements traits required by the [`fatfs`] crate
+/// for any I/O device that wants to be usable by [`fatfs`].
+///
+/// To meet [`fatfs`]&#39;s requirements, the underlying I/O stream must be able to 
+/// read, write, and seek while tracking its current offset. 
+/// We use traits from the [`core2`] crate to meet these requirements, 
+/// thus, the given `IO` parameter must implement those [`core2`] traits.
+///
+/// For example, this allows one to access a FAT filesystem 
+/// by reading from or writing to a storage device.
+</span><span class="kw">pub struct </span>FatFsAdapter&lt;IO&gt;(IO);
+<span class="kw">impl</span>&lt;IO&gt; FatFsAdapter&lt;IO&gt; {
+    <span class="kw">pub fn </span>new(io: IO) -&gt; FatFsAdapter&lt;IO&gt; { FatFsAdapter(io) }
 }
-<span class="doccomment">/// This tells the `fatfs` crate that our read/write/seek functions</span>
-<span class="doccomment">/// may return errors of the type [`FatFsIoErrorAdapter`],</span>
-<span class="doccomment">/// which is a simple wrapper around [`core2::io::Error`].</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">IO</span><span class="op">&gt;</span> <span class="ident">fatfs::IoBase</span> <span class="kw">for</span> <span class="ident">FatFsAdapter</span><span class="op">&lt;</span><span class="ident">IO</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="ident">FatFsIoErrorAdapter</span>;
+<span class="doccomment">/// This tells the `fatfs` crate that our read/write/seek functions
+/// may return errors of the type [`FatFsIoErrorAdapter`],
+/// which is a simple wrapper around [`core2::io::Error`].
+</span><span class="kw">impl</span>&lt;IO&gt; fatfs::IoBase <span class="kw">for </span>FatFsAdapter&lt;IO&gt; {
+    <span class="kw">type </span>Error = FatFsIoErrorAdapter;
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">IO</span><span class="op">&gt;</span> <span class="ident">fatfs::Read</span> <span class="kw">for</span> <span class="ident">FatFsAdapter</span><span class="op">&lt;</span><span class="ident">IO</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">IO</span>: <span class="ident">core2::io::Read</span> {
-    <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">read</span>(<span class="ident">buf</span>).<span class="ident">map_err</span>(<span class="ident">Into::into</span>)
+<span class="kw">impl</span>&lt;IO&gt; fatfs::Read <span class="kw">for </span>FatFsAdapter&lt;IO&gt; <span class="kw">where </span>IO: core2::io::Read {
+    <span class="kw">fn </span>read(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buf: <span class="kw-2">&amp;mut </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;usize, <span class="self">Self</span>::Error&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.read(buf).map_err(Into::into)
     }
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">IO</span><span class="op">&gt;</span> <span class="ident">fatfs::Write</span> <span class="kw">for</span> <span class="ident">FatFsAdapter</span><span class="op">&lt;</span><span class="ident">IO</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">IO</span>: <span class="ident">core2::io::Write</span> {
-    <span class="kw">fn</span> <span class="ident">write</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">write</span>(<span class="ident">buf</span>).<span class="ident">map_err</span>(<span class="ident">Into::into</span>)
+<span class="kw">impl</span>&lt;IO&gt; fatfs::Write <span class="kw">for </span>FatFsAdapter&lt;IO&gt; <span class="kw">where </span>IO: core2::io::Write {
+    <span class="kw">fn </span>write(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buf: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;usize, <span class="self">Self</span>::Error&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.write(buf).map_err(Into::into)
     }
-    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">flush</span>().<span class="ident">map_err</span>(<span class="ident">Into::into</span>)
+    <span class="kw">fn </span>flush(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.flush().map_err(Into::into)
     }
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">IO</span><span class="op">&gt;</span> <span class="ident">fatfs::Seek</span> <span class="kw">for</span> <span class="ident">FatFsAdapter</span><span class="op">&lt;</span><span class="ident">IO</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">IO</span>: <span class="ident">core2::io::Seek</span> {
-    <span class="kw">fn</span> <span class="ident">seek</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">pos</span>: <span class="ident">fatfs::SeekFrom</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">core2_pos</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">pos</span> {
-            <span class="ident">fatfs::SeekFrom::Start</span>(<span class="ident">s</span>)   =&gt; <span class="ident">core2::io::SeekFrom::Start</span>(<span class="ident">s</span>),
-            <span class="ident">fatfs::SeekFrom::Current</span>(<span class="ident">c</span>) =&gt; <span class="ident">core2::io::SeekFrom::Current</span>(<span class="ident">c</span>),
-            <span class="ident">fatfs::SeekFrom::End</span>(<span class="ident">e</span>)     =&gt; <span class="ident">core2::io::SeekFrom::End</span>(<span class="ident">e</span>),
+<span class="kw">impl</span>&lt;IO&gt; fatfs::Seek <span class="kw">for </span>FatFsAdapter&lt;IO&gt; <span class="kw">where </span>IO: core2::io::Seek {
+    <span class="kw">fn </span>seek(<span class="kw-2">&amp;mut </span><span class="self">self</span>, pos: fatfs::SeekFrom) -&gt; <span class="prelude-ty">Result</span>&lt;u64, <span class="self">Self</span>::Error&gt; {
+        <span class="kw">let </span>core2_pos = <span class="kw">match </span>pos {
+            fatfs::SeekFrom::Start(s)   =&gt; core2::io::SeekFrom::Start(s),
+            fatfs::SeekFrom::Current(c) =&gt; core2::io::SeekFrom::Current(c),
+            fatfs::SeekFrom::End(e)     =&gt; core2::io::SeekFrom::End(e),
         };
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">seek</span>(<span class="ident">core2_pos</span>).<span class="ident">map_err</span>(<span class="ident">Into::into</span>)
+        <span class="self">self</span>.<span class="number">0</span>.seek(core2_pos).map_err(Into::into)
     }
 }
 
-<span class="doccomment">/// This struct exists to enable us to implement the [`fatfs::IoError`] trait</span>
-<span class="doccomment">/// for the [`core2::io::Error`] trait.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This is required because Rust prevents implementing foreign traits for foreign types.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">From</span>, <span class="ident">Into</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FatFsIoErrorAdapter</span>(<span class="ident">core2::io::Error</span>);
-<span class="kw">impl</span> <span class="ident">fatfs::IoError</span> <span class="kw">for</span> <span class="ident">FatFsIoErrorAdapter</span> {
-    <span class="kw">fn</span> <span class="ident">is_interrupted</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">kind</span>() <span class="op">==</span> <span class="ident">core2::io::ErrorKind::Interrupted</span>
+<span class="doccomment">/// This struct exists to enable us to implement the [`fatfs::IoError`] trait
+/// for the [`core2::io::Error`] trait.
+/// 
+/// This is required because Rust prevents implementing foreign traits for foreign types.
+</span><span class="attr">#[derive(Debug, From, Into)]
+</span><span class="kw">pub struct </span>FatFsIoErrorAdapter(core2::io::Error);
+<span class="kw">impl </span>fatfs::IoError <span class="kw">for </span>FatFsIoErrorAdapter {
+    <span class="kw">fn </span>is_interrupted(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.<span class="number">0</span>.kind() == core2::io::ErrorKind::Interrupted
     }
-    <span class="kw">fn</span> <span class="ident">new_unexpected_eof_error</span>() -&gt; <span class="self">Self</span> {
-        <span class="ident">FatFsIoErrorAdapter</span>(<span class="ident">core2::io::ErrorKind::UnexpectedEof</span>.<span class="ident">into</span>())
+    <span class="kw">fn </span>new_unexpected_eof_error() -&gt; <span class="self">Self </span>{
+        FatFsIoErrorAdapter(core2::io::ErrorKind::UnexpectedEof.into())
     }
-    <span class="kw">fn</span> <span class="ident">new_write_zero_error</span>() -&gt; <span class="self">Self</span> {
-        <span class="ident">FatFsIoErrorAdapter</span>(<span class="ident">core2::io::ErrorKind::WriteZero</span>.<span class="ident">into</span>())
+    <span class="kw">fn </span>new_write_zero_error() -&gt; <span class="self">Self </span>{
+        FatFsIoErrorAdapter(core2::io::ErrorKind::WriteZero.into())
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="device_manager" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="device_manager" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

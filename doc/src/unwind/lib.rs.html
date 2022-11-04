@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/unwind/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../unwind/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../unwind/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../unwind/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/unwind/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../unwind/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -960,500 +954,500 @@
 <span id="954">954</span>
 <span id="955">955</span>
 <span id="956">956</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Support for unwinding the call stack and cleaning up stack frames.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Uses DWARF debugging information (`.eh_frame` and `.gcc_except_table` sections) from object files.</span>
-<span class="doccomment">//! It can also be used to generate stack traces (backtrace) using only that debug information</span>
-<span class="doccomment">//! without using frame pointer registers.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! The general flow of the unwinding procedure is as follows:</span>
-<span class="doccomment">//! * A panic occurs, which jumps to the panic entry point. </span>
-<span class="doccomment">//! * The panic entry point invokes the panic_wrapper, which handles said panic </span>
-<span class="doccomment">//!   by invoking `start_unwinding()` in this crate with the reason for the panic.</span>
-<span class="doccomment">//! * `start_unwinding()` generates an iterator over all stack frames in the call stack</span>
-<span class="doccomment">//!   (the knowledge for which comes from parsing the .eh_frame section).</span>
-<span class="doccomment">//! * `start_unwinding()` creates an unwinding context, which contains the stack frame iterator, </span>
-<span class="doccomment">//!   the reason for the panic, and a reference to the current task being unwound.</span>
-<span class="doccomment">//!   It then skips the first several stack frames, which correspond to the panic and unwind handlers themselves.</span>
-<span class="doccomment">//!   Note that we cannot unwind those frames because they contain resources that we are currently using for unwinding purposes.</span>
-<span class="doccomment">//! * At any point hereafter, the unwinding context must be manually cleaned up.</span>
-<span class="doccomment">//! * `start_unwinding()` calls `continue_unwinding()`, which contains the bulk of the unwinding logic.</span>
-<span class="doccomment">//! * `continue_unwinding()` iterates to the &quot;next&quot; stack frame (the previous frame in the call stack),</span>
-<span class="doccomment">//!   and invokes its cleanup routine (landing pad) if it has one. </span>
-<span class="doccomment">//! * Once the cleanup routine is complete, it jumps to `_Unwind_Resume` automatically. </span>
-<span class="doccomment">//!   This cannot be changed and is an artifact of how unwinding routines are generated by the compiler.</span>
-<span class="doccomment">//! * `_Unwind_Resume` is defined alongside the panic entry pointer, and is nothing more</span>
-<span class="doccomment">//!   than a simple wrapper that invokes `continue_unwinding()` here. </span>
-<span class="doccomment">//! * `continue_unwinding()` continues iterating up the call stack. </span>
-<span class="doccomment">//!   Once it reaches the end of the call stack (or an error occurs),</span>
-<span class="doccomment">//!   we invoke a finalizer routine called `cleanup_unwinding_context()`. </span>
-<span class="doccomment">//! * In `cleanup_unwinding_context()`, the unwinding context pointer is recovered and all unwinding resources are freed.</span>
-<span class="doccomment">//!   Finally, the task is marked as killed so it can no longer be scheduled in. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! The flow of some functions was inspired by gcc&#39;s `libunwind`</span>
-<span class="doccomment">//! and from `gimli/unwind-rs/src/glue.rs`.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Support for unwinding the call stack and cleaning up stack frames.
+//! 
+//! Uses DWARF debugging information (`.eh_frame` and `.gcc_except_table` sections) from object files.
+//! It can also be used to generate stack traces (backtrace) using only that debug information
+//! without using frame pointer registers.
+//! 
+//! The general flow of the unwinding procedure is as follows:
+//! * A panic occurs, which jumps to the panic entry point. 
+//! * The panic entry point invokes the panic_wrapper, which handles said panic 
+//!   by invoking `start_unwinding()` in this crate with the reason for the panic.
+//! * `start_unwinding()` generates an iterator over all stack frames in the call stack
+//!   (the knowledge for which comes from parsing the .eh_frame section).
+//! * `start_unwinding()` creates an unwinding context, which contains the stack frame iterator, 
+//!   the reason for the panic, and a reference to the current task being unwound.
+//!   It then skips the first several stack frames, which correspond to the panic and unwind handlers themselves.
+//!   Note that we cannot unwind those frames because they contain resources that we are currently using for unwinding purposes.
+//! * At any point hereafter, the unwinding context must be manually cleaned up.
+//! * `start_unwinding()` calls `continue_unwinding()`, which contains the bulk of the unwinding logic.
+//! * `continue_unwinding()` iterates to the &quot;next&quot; stack frame (the previous frame in the call stack),
+//!   and invokes its cleanup routine (landing pad) if it has one. 
+//! * Once the cleanup routine is complete, it jumps to `_Unwind_Resume` automatically. 
+//!   This cannot be changed and is an artifact of how unwinding routines are generated by the compiler.
+//! * `_Unwind_Resume` is defined alongside the panic entry pointer, and is nothing more
+//!   than a simple wrapper that invokes `continue_unwinding()` here. 
+//! * `continue_unwinding()` continues iterating up the call stack. 
+//!   Once it reaches the end of the call stack (or an error occurs),
+//!   we invoke a finalizer routine called `cleanup_unwinding_context()`. 
+//! * In `cleanup_unwinding_context()`, the unwinding context pointer is recovered and all unwinding resources are freed.
+//!   Finally, the task is marked as killed so it can no longer be scheduled in. 
+//! 
+//! 
+//! The flow of some functions was inspired by gcc&#39;s `libunwind`
+//! and from `gimli/unwind-rs/src/glue.rs`.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">panic_info_message</span>)]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">naked_functions</span>)]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">trait_alias</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(panic_info_message)]
+#![feature(naked_functions)]
+#![feature(trait_alias)]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mod_mgmt</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">gimli</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fallible_iterator</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">interrupts</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">external_unwind_info</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>mod_mgmt;
+<span class="kw">extern crate </span>task;
+<span class="kw">extern crate </span>gimli;
+<span class="kw">extern crate </span>fallible_iterator;
+<span class="kw">extern crate </span>interrupts;
+<span class="kw">extern crate </span>external_unwind_info;
 
-<span class="kw">mod</span> <span class="ident">registers</span>;
-<span class="kw">mod</span> <span class="ident">lsda</span>;
+<span class="kw">mod </span>registers;
+<span class="kw">mod </span>lsda;
 
-<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">arch::asm</span>, <span class="ident">fmt</span>};
-<span class="kw">use</span> <span class="ident">alloc</span>::{
-    <span class="ident">sync::Arc</span>,
-    <span class="ident">boxed::Box</span>,
+<span class="kw">use </span>core::{arch::asm, fmt};
+<span class="kw">use </span>alloc::{
+    sync::Arc,
+    boxed::Box,
 };
-<span class="kw">use</span> <span class="ident">external_unwind_info::ExternalUnwindInfo</span>;
-<span class="kw">use</span> <span class="ident">gimli</span>::{
-    <span class="ident">UnwindSection</span>, 
-    <span class="ident">UnwindTableRow</span>, 
-    <span class="ident">EhFrame</span>, 
-    <span class="ident">BaseAddresses</span>, 
-    <span class="ident">UninitializedUnwindContext</span>, 
-    <span class="ident">FrameDescriptionEntry</span>,
-    <span class="ident">Pointer</span>,
-    <span class="ident">EndianSlice</span>,
-    <span class="ident">NativeEndian</span>,
-    <span class="ident">CfaRule</span>,
-    <span class="ident">RegisterRule</span>,
-    <span class="ident">X86_64</span>
+<span class="kw">use </span>external_unwind_info::ExternalUnwindInfo;
+<span class="kw">use </span>gimli::{
+    UnwindSection, 
+    UnwindTableRow, 
+    EhFrame, 
+    BaseAddresses, 
+    UninitializedUnwindContext, 
+    FrameDescriptionEntry,
+    Pointer,
+    EndianSlice,
+    NativeEndian,
+    CfaRule,
+    RegisterRule,
+    X86_64
 };
-<span class="kw">use</span> <span class="ident">registers</span>::{<span class="ident">Registers</span>, <span class="ident">LandingRegisters</span>, <span class="ident">SavedRegs</span>};
-<span class="kw">use</span> <span class="ident">fallible_iterator::FallibleIterator</span>;
-<span class="kw">use</span> <span class="ident">mod_mgmt</span>::{
-    <span class="ident">CrateNamespace</span>,
-    <span class="ident">SectionType</span>,
-    <span class="ident">StrongCrateRef</span>,
-    <span class="ident">StrongSectionRef</span>,
+<span class="kw">use </span>registers::{Registers, LandingRegisters, SavedRegs};
+<span class="kw">use </span>fallible_iterator::FallibleIterator;
+<span class="kw">use </span>mod_mgmt::{
+    CrateNamespace,
+    SectionType,
+    StrongCrateRef,
+    StrongSectionRef,
 };
-<span class="kw">use</span> <span class="ident">memory::VirtualAddress</span>;
-<span class="kw">use</span> <span class="ident">task</span>::{<span class="ident">TaskRef</span>, <span class="ident">KillReason</span>};
+<span class="kw">use </span>memory::VirtualAddress;
+<span class="kw">use </span>task::{TaskRef, KillReason};
 
 
-<span class="doccomment">/// This is the context/state that is used during unwinding and passed around</span>
-<span class="doccomment">/// to the callback functions in the various unwinding stages, such as in `_Unwind_Resume()`. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Because those callbacks follow an extern &quot;C&quot; ABI, this structure is passed as a pointer </span>
-<span class="doccomment">/// rather than directly by value or by reference.</span>
-<span class="doccomment">/// Thus, it must be manually freed when unwinding is finished (or if it fails in the middle)</span>
-<span class="doccomment">/// in order to avoid leaking memory, e.g., not dropping reference counts. </span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">UnwindingContext</span> {
-    <span class="doccomment">/// The iterator over the current call stack, in which the &quot;next&quot; item in the iterator</span>
-    <span class="doccomment">/// is the previous frame in the call stack (the caller frame).</span>
-    <span class="ident">stack_frame_iter</span>: <span class="ident">StackFrameIter</span>,
-    <span class="doccomment">/// The reason why we&#39;re performing unwinding, which should be set in the panic entry point handler.</span>
-    <span class="ident">cause</span>: <span class="ident">KillReason</span>,
-    <span class="doccomment">/// A reference to the current task that is being unwound.</span>
-    <span class="ident">current_task</span>: <span class="ident">TaskRef</span>,
+<span class="doccomment">/// This is the context/state that is used during unwinding and passed around
+/// to the callback functions in the various unwinding stages, such as in `_Unwind_Resume()`. 
+/// 
+/// Because those callbacks follow an extern &quot;C&quot; ABI, this structure is passed as a pointer 
+/// rather than directly by value or by reference.
+/// Thus, it must be manually freed when unwinding is finished (or if it fails in the middle)
+/// in order to avoid leaking memory, e.g., not dropping reference counts. 
+</span><span class="kw">pub struct </span>UnwindingContext {
+    <span class="doccomment">/// The iterator over the current call stack, in which the &quot;next&quot; item in the iterator
+    /// is the previous frame in the call stack (the caller frame).
+    </span>stack_frame_iter: StackFrameIter,
+    <span class="doccomment">/// The reason why we&#39;re performing unwinding, which should be set in the panic entry point handler.
+    </span>cause: KillReason,
+    <span class="doccomment">/// A reference to the current task that is being unwound.
+    </span>current_task: TaskRef,
 }
-<span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span>(<span class="ident">StackFrameIter</span>, <span class="ident">KillReason</span>, <span class="ident">TaskRef</span>)<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">UnwindingContext</span> {
-    <span class="kw">fn</span> <span class="ident">into</span>(<span class="self">self</span>) -&gt; (<span class="ident">StackFrameIter</span>, <span class="ident">KillReason</span>, <span class="ident">TaskRef</span>) {
-        (<span class="self">self</span>.<span class="ident">stack_frame_iter</span>, <span class="self">self</span>.<span class="ident">cause</span>, <span class="self">self</span>.<span class="ident">current_task</span>)
+<span class="kw">impl </span>Into&lt;(StackFrameIter, KillReason, TaskRef)&gt; <span class="kw">for </span>UnwindingContext {
+    <span class="kw">fn </span>into(<span class="self">self</span>) -&gt; (StackFrameIter, KillReason, TaskRef) {
+        (<span class="self">self</span>.stack_frame_iter, <span class="self">self</span>.cause, <span class="self">self</span>.current_task)
     }
 }
 
 
 
-<span class="doccomment">/// A single frame in the stack, which contains</span>
-<span class="doccomment">/// unwinding-related information for a single function call&#39;s stack frame.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// See each method for documentation about the members of this struct.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">StackFrame</span> {
-    <span class="ident">personality</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
-    <span class="ident">lsda</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
-    <span class="ident">initial_address</span>: <span class="ident">u64</span>,
-    <span class="ident">call_site_address</span>: <span class="ident">u64</span>,
+<span class="doccomment">/// A single frame in the stack, which contains
+/// unwinding-related information for a single function call&#39;s stack frame.
+/// 
+/// See each method for documentation about the members of this struct.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>StackFrame {
+    personality: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+    lsda: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+    initial_address: u64,
+    call_site_address: u64,
 }
 
-<span class="kw">impl</span> <span class="ident">StackFrame</span> {
-    <span class="doccomment">/// The address of the personality function that corresponds</span>
-    <span class="doccomment">/// to this stack frame&#39;s unwinding routine, if needed for this stack frame.</span>
-    <span class="doccomment">/// In Rust, this is always the same function, the one defined as the `eh_personality`</span>
-    <span class="doccomment">/// language item, something required by the compiler.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Note that in Theseus we do not use a personality function,</span>
-    <span class="doccomment">/// as we use a custom unwinding flow that bypasses invoking the personality function.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">personality</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">personality</span>
+<span class="kw">impl </span>StackFrame {
+    <span class="doccomment">/// The address of the personality function that corresponds
+    /// to this stack frame&#39;s unwinding routine, if needed for this stack frame.
+    /// In Rust, this is always the same function, the one defined as the `eh_personality`
+    /// language item, something required by the compiler.
+    /// 
+    /// Note that in Theseus we do not use a personality function,
+    /// as we use a custom unwinding flow that bypasses invoking the personality function.
+    </span><span class="kw">pub fn </span>personality(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;u64&gt; {
+        <span class="self">self</span>.personality
     }
 
-    <span class="doccomment">/// The address of the Language-Specific Data Area (LSDA)</span>
-    <span class="doccomment">/// that is needed to discover the unwinding cleanup routines (landing pads)</span>
-    <span class="doccomment">/// for this stack frame. </span>
-    <span class="doccomment">/// Typically, this points to an area within a `.gcc_except_table` section,</span>
-    <span class="doccomment">/// which then needs to be parsed.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lsda</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">lsda</span>
+    <span class="doccomment">/// The address of the Language-Specific Data Area (LSDA)
+    /// that is needed to discover the unwinding cleanup routines (landing pads)
+    /// for this stack frame. 
+    /// Typically, this points to an area within a `.gcc_except_table` section,
+    /// which then needs to be parsed.
+    </span><span class="kw">pub fn </span>lsda(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;u64&gt; {
+        <span class="self">self</span>.lsda
     }
 
-    <span class="doccomment">/// The *call site* of this stack frame, i.e.,</span>
-    <span class="doccomment">/// the address of the instruction that called the next function in the call stack.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">call_site_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span> {
-        <span class="self">self</span>.<span class="ident">call_site_address</span>
+    <span class="doccomment">/// The *call site* of this stack frame, i.e.,
+    /// the address of the instruction that called the next function in the call stack.
+    </span><span class="kw">pub fn </span>call_site_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64 {
+        <span class="self">self</span>.call_site_address
     }
 
-    <span class="doccomment">/// The address (starting instruction pointer) of the function</span>
-    <span class="doccomment">/// corresponding to this stack frame. </span>
-    <span class="doccomment">/// This points to the top (entry point) of that function.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">initial_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span> {
-        <span class="self">self</span>.<span class="ident">initial_address</span>
-    }
-}
-
-
-<span class="doccomment">/// An iterator over the stack frames on the current task&#39;s call stack,</span>
-<span class="doccomment">/// which works in reverse calling order from the current function</span>
-<span class="doccomment">/// up the call stack to the very first function on the stack,</span>
-<span class="doccomment">/// at which point it will return `None`. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This is a lazy iterator: the previous frame in the call stack</span>
-<span class="doccomment">/// is only calculated upon invocation of the `next()` method. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This can be used with the `FallibleIterator` trait.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">StackFrameIter</span> {
-    <span class="doccomment">/// The namespace (set of crates/sections) that is used to resolve symbols</span>
-    <span class="doccomment">/// and section addresses when iterating over stack frames. </span>
-    <span class="ident">namespace</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The values of the registers that exited during the stack frame</span>
-    <span class="doccomment">/// that is currently being iterated over. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// These register values will change on each invocation of `next()`</span>
-    <span class="doccomment">/// as different stack frames are successively iterated over.</span>
-    <span class="ident">registers</span>: <span class="ident">Registers</span>,
-    <span class="doccomment">/// Unwinding state related to the previous frame in the call stack:</span>
-    <span class="doccomment">/// a reference to its row/entry in the unwinding table,</span>
-    <span class="doccomment">/// and the Canonical Frame Address (CFA value) that is used to determine the next frame.</span>
-    <span class="ident">state</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">UnwindRowReference</span>, <span class="ident">u64</span>)<span class="op">&gt;</span>,
-    <span class="doccomment">/// An extra offset that is used to adjust the calculation of the CFA in certain circumstances, </span>
-    <span class="doccomment">/// primarily when unwinding through an exception/interrupt handler stack frame `B` </span>
-    <span class="doccomment">/// to a frame `A` that caused the exception, even though frame `A` did not &quot;call&quot; frame `B`.</span>
-    <span class="doccomment">/// This will have a different value based on what the CPU did, e.g., pushed error codes onto the stack. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// If `Some`, the latest stack frame produced by this iterator was an exception handler stack frame.</span>
-    <span class="ident">cfa_adjustment</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// This is set to true when the previous stack frame was an exception/interrupt handler,</span>
-    <span class="doccomment">/// which is useful in the case of taking into account the CPU pushing an `InterruptStackFrame` onto the stack.</span>
-    <span class="doccomment">/// The DWARF debugging/unwinding info cannot account for this because an interrupt or exception happening </span>
-    <span class="doccomment">/// is not the same as a regular function &quot;call&quot; happening.</span>
-    <span class="ident">last_frame_was_exception_handler</span>: <span class="ident">bool</span>,
-}
-
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">StackFrameIter</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="comment">// write!(f, &quot;StackFrameIter {{\nRegisters: {:?},\nstate: {:#X?}\n}}&quot;, self.registers, self.state)</span>
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;StackFrameIter {{\nRegisters: {:?}\n}}&quot;</span>, <span class="self">self</span>.<span class="ident">registers</span>)
+    <span class="doccomment">/// The address (starting instruction pointer) of the function
+    /// corresponding to this stack frame. 
+    /// This points to the top (entry point) of that function.
+    </span><span class="kw">pub fn </span>initial_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64 {
+        <span class="self">self</span>.initial_address
     }
 }
 
-<span class="kw">impl</span> <span class="ident">StackFrameIter</span> {
-    <span class="doccomment">/// Create a new iterator over stack frames that starts from the current frame</span>
-    <span class="doccomment">/// and uses the given `Registers` values as a starting point. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Note: ideally, this shouldn&#39;t be public since it needs to be invoked with the correct initial register values.</span>
-    <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">namespace</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>, <span class="ident">registers</span>: <span class="ident">Registers</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">StackFrameIter</span> {
-            <span class="ident">namespace</span>,
-            <span class="ident">registers</span>,
-            <span class="ident">state</span>: <span class="prelude-val">None</span>,
-            <span class="ident">cfa_adjustment</span>: <span class="prelude-val">None</span>,
-            <span class="ident">last_frame_was_exception_handler</span>: <span class="bool-val">false</span>,
+
+<span class="doccomment">/// An iterator over the stack frames on the current task&#39;s call stack,
+/// which works in reverse calling order from the current function
+/// up the call stack to the very first function on the stack,
+/// at which point it will return `None`. 
+/// 
+/// This is a lazy iterator: the previous frame in the call stack
+/// is only calculated upon invocation of the `next()` method. 
+/// 
+/// This can be used with the `FallibleIterator` trait.
+</span><span class="kw">pub struct </span>StackFrameIter {
+    <span class="doccomment">/// The namespace (set of crates/sections) that is used to resolve symbols
+    /// and section addresses when iterating over stack frames. 
+    </span>namespace: Arc&lt;CrateNamespace&gt;,
+    <span class="doccomment">/// The values of the registers that exited during the stack frame
+    /// that is currently being iterated over. 
+    /// 
+    /// These register values will change on each invocation of `next()`
+    /// as different stack frames are successively iterated over.
+    </span>registers: Registers,
+    <span class="doccomment">/// Unwinding state related to the previous frame in the call stack:
+    /// a reference to its row/entry in the unwinding table,
+    /// and the Canonical Frame Address (CFA value) that is used to determine the next frame.
+    </span>state: <span class="prelude-ty">Option</span>&lt;(UnwindRowReference, u64)&gt;,
+    <span class="doccomment">/// An extra offset that is used to adjust the calculation of the CFA in certain circumstances, 
+    /// primarily when unwinding through an exception/interrupt handler stack frame `B` 
+    /// to a frame `A` that caused the exception, even though frame `A` did not &quot;call&quot; frame `B`.
+    /// This will have a different value based on what the CPU did, e.g., pushed error codes onto the stack. 
+    /// 
+    /// If `Some`, the latest stack frame produced by this iterator was an exception handler stack frame.
+    </span>cfa_adjustment: <span class="prelude-ty">Option</span>&lt;i64&gt;,
+    <span class="doccomment">/// This is set to true when the previous stack frame was an exception/interrupt handler,
+    /// which is useful in the case of taking into account the CPU pushing an `InterruptStackFrame` onto the stack.
+    /// The DWARF debugging/unwinding info cannot account for this because an interrupt or exception happening 
+    /// is not the same as a regular function &quot;call&quot; happening.
+    </span>last_frame_was_exception_handler: bool,
+}
+
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>StackFrameIter {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        <span class="comment">// write!(f, &quot;StackFrameIter {{\nRegisters: {:?},\nstate: {:#X?}\n}}&quot;, self.registers, self.state)
+        </span><span class="macro">write!</span>(f, <span class="string">&quot;StackFrameIter {{\nRegisters: {:?}\n}}&quot;</span>, <span class="self">self</span>.registers)
+    }
+}
+
+<span class="kw">impl </span>StackFrameIter {
+    <span class="doccomment">/// Create a new iterator over stack frames that starts from the current frame
+    /// and uses the given `Registers` values as a starting point. 
+    /// 
+    /// Note: ideally, this shouldn&#39;t be public since it needs to be invoked with the correct initial register values.
+    </span><span class="attr">#[doc(hidden)]
+    </span><span class="kw">pub fn </span>new(namespace: Arc&lt;CrateNamespace&gt;, registers: Registers) -&gt; <span class="self">Self </span>{
+        StackFrameIter {
+            namespace,
+            registers,
+            state: <span class="prelude-val">None</span>,
+            cfa_adjustment: <span class="prelude-val">None</span>,
+            last_frame_was_exception_handler: <span class="bool-val">false</span>,
         }
     }
 
-    <span class="doccomment">/// Returns the array of register values as they existed during the stack frame</span>
-    <span class="doccomment">/// that is currently being iterated over. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// After the [`next()`](#method.next.html) is invoked to iterate to a given stack frame,</span>
-    <span class="doccomment">/// this function will return the register values for that frame that was just iterated to. </span>
-    <span class="doccomment">/// Successive calls to this function will keep returning the same register values </span>
-    <span class="doccomment">/// until the `next()` method is invoked again. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// This is necessary in order to restore the proper register values </span>
-    <span class="doccomment">/// before jumping to the **landing pad** (a cleanup function or exception/panic catcher)</span>
-    <span class="doccomment">/// such that the landing pad function will actually execute properly with the right context.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">registers</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Registers</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registers</span>
+    <span class="doccomment">/// Returns the array of register values as they existed during the stack frame
+    /// that is currently being iterated over. 
+    /// 
+    /// After the [`next()`](#method.next.html) is invoked to iterate to a given stack frame,
+    /// this function will return the register values for that frame that was just iterated to. 
+    /// Successive calls to this function will keep returning the same register values 
+    /// until the `next()` method is invoked again. 
+    /// 
+    /// This is necessary in order to restore the proper register values 
+    /// before jumping to the **landing pad** (a cleanup function or exception/panic catcher)
+    /// such that the landing pad function will actually execute properly with the right context.
+    </span><span class="kw">pub fn </span>registers(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Registers {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.registers
     }
 
-    <span class="doccomment">/// Returns a reference to the underlying `CrateNamespace`</span>
-    <span class="doccomment">/// that is used for symbol resolution while iterating over these stack frames.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">namespace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">namespace</span>
+    <span class="doccomment">/// Returns a reference to the underlying `CrateNamespace`
+    /// that is used for symbol resolution while iterating over these stack frames.
+    </span><span class="kw">pub fn </span>namespace(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Arc&lt;CrateNamespace&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.namespace
     }
 }
 
-<span class="comment">// Here we implement the main logic for traversing up the call stack.</span>
-<span class="kw">impl</span> <span class="ident">FallibleIterator</span> <span class="kw">for</span> <span class="ident">StackFrameIter</span> {
-    <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">StackFrame</span>;
-    <span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>;
+<span class="comment">// Here we implement the main logic for traversing up the call stack.
+</span><span class="kw">impl </span>FallibleIterator <span class="kw">for </span>StackFrameIter {
+    <span class="kw">type </span>Item = StackFrame;
+    <span class="kw">type </span>Error = <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str;
 
-    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span>, <span class="ident"><span class="self">Self</span>::Error</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">registers</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">registers</span>;
-        <span class="kw">let</span> <span class="ident">prev_cfa_adjustment</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cfa_adjustment</span>;
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt;, <span class="self">Self</span>::Error&gt; {
+        <span class="kw">let </span>registers = <span class="kw-2">&amp;mut </span><span class="self">self</span>.registers;
+        <span class="kw">let </span>prev_cfa_adjustment = <span class="self">self</span>.cfa_adjustment;
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">unwind_row_ref</span>, <span class="ident">cfa</span>)) <span class="op">=</span> <span class="self">self</span>.<span class="ident">state</span>.<span class="ident">take</span>() {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">newregs</span> <span class="op">=</span> <span class="ident">registers</span>.<span class="ident">clone</span>();
-            <span class="ident">newregs</span>[<span class="ident">X86_64::RA</span>] <span class="op">=</span> <span class="prelude-val">None</span>;
+        <span class="kw">if let </span><span class="prelude-val">Some</span>((unwind_row_ref, cfa)) = <span class="self">self</span>.state.take() {
+            <span class="kw">let </span><span class="kw-2">mut </span>newregs = registers.clone();
+            newregs[X86_64::RA] = <span class="prelude-val">None</span>;
 
-            <span class="comment">// For x86_64, the stack pointer is defined to be the previously-calculated CFA.</span>
-            <span class="ident">newregs</span>[<span class="ident">X86_64::RSP</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">cfa</span>);
-            <span class="comment">// If this frame is an exception/interrupt handler, we need to adjust RSP and the return address RA accordingly.</span>
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">extra_offset</span>) <span class="op">=</span> <span class="ident">prev_cfa_adjustment</span> {
-                <span class="ident">newregs</span>[<span class="ident">X86_64::RSP</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">cfa</span>.<span class="ident">wrapping_add</span>(<span class="ident">extra_offset</span> <span class="kw">as</span> <span class="ident">u64</span>));
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-                <span class="macro">trace!</span>(<span class="string">&quot;adjusting RSP to {:X?}&quot;</span>, <span class="ident">newregs</span>[<span class="ident">X86_64::RSP</span>]);
+            <span class="comment">// For x86_64, the stack pointer is defined to be the previously-calculated CFA.
+            </span>newregs[X86_64::RSP] = <span class="prelude-val">Some</span>(cfa);
+            <span class="comment">// If this frame is an exception/interrupt handler, we need to adjust RSP and the return address RA accordingly.
+            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(extra_offset) = prev_cfa_adjustment {
+                newregs[X86_64::RSP] = <span class="prelude-val">Some</span>(cfa.wrapping_add(extra_offset <span class="kw">as </span>u64));
+                <span class="attr">#[cfg(not(downtime_eval))]
+                </span><span class="macro">trace!</span>(<span class="string">&quot;adjusting RSP to {:X?}&quot;</span>, newregs[X86_64::RSP]);
             } 
 
-            <span class="ident">unwind_row_ref</span>.<span class="ident">with_unwind_info</span>(<span class="op">|</span><span class="ident">_fde</span>, <span class="ident">row</span><span class="op">|</span> {
-                <span class="comment">// There is some strange behavior when moving up the call stack </span>
-                <span class="comment">// from an exception handler function&#39;s frame `B` to a frame `A` that resulted in the exception,</span>
-                <span class="comment">// since frame `A` did not call frame `B` directly, </span>
-                <span class="comment">// and since the CPU may have pushed an error code onto the stack,</span>
-                <span class="comment">// which messes up the DWARF info that calculates register values properly. </span>
-                <span class="comment">//</span>
-                <span class="comment">// In this case, the `cfa` value must be modified to account for that error code </span>
-                <span class="comment">// being pushed onto the stack by adding `8` (the error code&#39;s size in bytes) to the `cfa` value.</span>
-                <span class="comment">//</span>
-                <span class="comment">// Also, the return address (RA) must be calculated differently, not using the below register rules.</span>
-                <span class="kw">for</span> <span class="kw-2">&amp;</span>(<span class="ident">reg_num</span>, <span class="kw-2">ref</span> <span class="ident">rule</span>) <span class="kw">in</span> <span class="ident">row</span>.<span class="ident">registers</span>() {
-                    <span class="comment">// debug!(&quot;Looking at register rule:  {:?} {:?}&quot;, reg_num, rule);</span>
-                    <span class="comment">// The stack pointer (RSP) is given by the CFA calculated during the previous iteration;</span>
-                    <span class="comment">// there should *not* be a register rule defining the value of the RSP directly.</span>
-                    <span class="kw">if</span> <span class="ident">reg_num</span> <span class="op">==</span> <span class="ident">X86_64::RSP</span> {
-                        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-                        <span class="macro">warn!</span>(<span class="string">&quot;Ignoring unwind row&#39;s register rule for RSP {:?}, which is invalid on x86_64 because RSP is always set to the CFA value.&quot;</span>, <span class="ident">rule</span>);
+            unwind_row_ref.with_unwind_info(|_fde, row| {
+                <span class="comment">// There is some strange behavior when moving up the call stack 
+                // from an exception handler function&#39;s frame `B` to a frame `A` that resulted in the exception,
+                // since frame `A` did not call frame `B` directly, 
+                // and since the CPU may have pushed an error code onto the stack,
+                // which messes up the DWARF info that calculates register values properly. 
+                //
+                // In this case, the `cfa` value must be modified to account for that error code 
+                // being pushed onto the stack by adding `8` (the error code&#39;s size in bytes) to the `cfa` value.
+                //
+                // Also, the return address (RA) must be calculated differently, not using the below register rules.
+                </span><span class="kw">for </span><span class="kw-2">&amp;</span>(reg_num, <span class="kw-2">ref </span>rule) <span class="kw">in </span>row.registers() {
+                    <span class="comment">// debug!(&quot;Looking at register rule:  {:?} {:?}&quot;, reg_num, rule);
+                    // The stack pointer (RSP) is given by the CFA calculated during the previous iteration;
+                    // there should *not* be a register rule defining the value of the RSP directly.
+                    </span><span class="kw">if </span>reg_num == X86_64::RSP {
+                        <span class="attr">#[cfg(not(downtime_eval))]
+                        </span><span class="macro">warn!</span>(<span class="string">&quot;Ignoring unwind row&#39;s register rule for RSP {:?}, which is invalid on x86_64 because RSP is always set to the CFA value.&quot;</span>, rule);
                         <span class="kw">continue</span>;
                     }
 
-                    <span class="comment">// If this stack frame is an exception handler, the return address wouldn&#39;t have been pushed onto the stack as with normal call instructions.</span>
-                    <span class="comment">// Instead, it would&#39;ve been pushed onto the stack by the CPU as part of the InterruptStackFrame, so we have to look for it there.</span>
-                    <span class="comment">//</span>
-                    <span class="comment">// We know that the stack currently looks like this:</span>
-                    <span class="comment">// |-- address --|------------  Item on the stack -------------|</span>
-                    <span class="comment">// |  &lt;lower&gt;    |  ...                                        |</span>
-                    <span class="comment">// | CFA         |  error code                                 |</span>
-                    <span class="comment">// | CFA + 0x08  |  Exception stack frame: instruction pointer |</span>
-                    <span class="comment">// | CFA + 0x10  |                         code segment        |</span>
-                    <span class="comment">// | CFA + 0x18  |                         cpu flags           |</span>
-                    <span class="comment">// | CFA + 0x20  |                         stack pointer       |</span>
-                    <span class="comment">// | CFA + 0x28  |                         stack segment       |</span>
-                    <span class="comment">// |  &lt;higher&gt;   |  ...                                        |</span>
-                    <span class="comment">// |-------------|---------------------------------------------|</span>
-                    <span class="comment">//</span>
-                    <span class="comment">// Thus, we want to skip the error code so we can get the instruction pointer, </span>
-                    <span class="comment">// i.e., the value at CFA + 0x08.</span>
-                    <span class="kw">if</span> <span class="ident">reg_num</span> <span class="op">==</span> <span class="ident">X86_64::RA</span> {
-                        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw">_</span>) <span class="op">=</span> <span class="ident">prev_cfa_adjustment</span> {
-                            <span class="kw">let</span> <span class="ident">size_of_error_code</span> <span class="op">=</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>();
-                            <span class="comment">// TODO FIXME: only skip the error code if the prev_cfa_adjustment included it</span>
-                            <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">*</span>(<span class="ident">cfa</span>.<span class="ident">wrapping_add</span>(<span class="ident">size_of_error_code</span> <span class="kw">as</span> <span class="ident">u64</span>) <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">u64</span>) };
-                            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-                            <span class="macro">trace!</span>(<span class="string">&quot;Using return address from CPU-pushed exception stack frame. Value: {:#X}&quot;</span>, <span class="ident">value</span>);
-                            <span class="ident">newregs</span>[<span class="ident">X86_64::RA</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">value</span>);
+                    <span class="comment">// If this stack frame is an exception handler, the return address wouldn&#39;t have been pushed onto the stack as with normal call instructions.
+                    // Instead, it would&#39;ve been pushed onto the stack by the CPU as part of the InterruptStackFrame, so we have to look for it there.
+                    //
+                    // We know that the stack currently looks like this:
+                    // |-- address --|------------  Item on the stack -------------|
+                    // |  &lt;lower&gt;    |  ...                                        |
+                    // | CFA         |  error code                                 |
+                    // | CFA + 0x08  |  Exception stack frame: instruction pointer |
+                    // | CFA + 0x10  |                         code segment        |
+                    // | CFA + 0x18  |                         cpu flags           |
+                    // | CFA + 0x20  |                         stack pointer       |
+                    // | CFA + 0x28  |                         stack segment       |
+                    // |  &lt;higher&gt;   |  ...                                        |
+                    // |-------------|---------------------------------------------|
+                    //
+                    // Thus, we want to skip the error code so we can get the instruction pointer, 
+                    // i.e., the value at CFA + 0x08.
+                    </span><span class="kw">if </span>reg_num == X86_64::RA {
+                        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw">_</span>) = prev_cfa_adjustment {
+                            <span class="kw">let </span>size_of_error_code = core::mem::size_of::&lt;usize&gt;();
+                            <span class="comment">// TODO FIXME: only skip the error code if the prev_cfa_adjustment included it
+                            </span><span class="kw">let </span>value = <span class="kw">unsafe </span>{ <span class="kw-2">*</span>(cfa.wrapping_add(size_of_error_code <span class="kw">as </span>u64) <span class="kw">as </span><span class="kw-2">*const </span>u64) };
+                            <span class="attr">#[cfg(not(downtime_eval))]
+                            </span><span class="macro">trace!</span>(<span class="string">&quot;Using return address from CPU-pushed exception stack frame. Value: {:#X}&quot;</span>, value);
+                            newregs[X86_64::RA] = <span class="prelude-val">Some</span>(value);
                             <span class="kw">continue</span>;
                         }
                     }
 
-                    <span class="ident">newregs</span>[<span class="ident">reg_num</span>] <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">*</span><span class="ident">rule</span> {
-                        <span class="ident">RegisterRule::Undefined</span> =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;StackFrameIter: encountered an unsupported RegisterRule::Undefined&quot;</span>), <span class="comment">// registers[reg_num],</span>
-                        <span class="ident">RegisterRule::SameValue</span> =&gt; <span class="ident">registers</span>[<span class="ident">reg_num</span>],
-                        <span class="ident">RegisterRule::Register</span>(<span class="ident">other_reg_num</span>) =&gt; <span class="ident">registers</span>[<span class="ident">other_reg_num</span>],
-                        <span class="comment">// This is the most common register rule (in fact, the only one we&#39;ve seen),</span>
-                        <span class="comment">// so we may have to adapt the logic herein for use in other rules. </span>
-                        <span class="ident">RegisterRule::Offset</span>(<span class="ident">offset</span>) =&gt; {
-                            <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">*</span>(<span class="ident">cfa</span>.<span class="ident">wrapping_add</span>(<span class="ident">offset</span> <span class="kw">as</span> <span class="ident">u64</span>) <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">u64</span>) };
-                            <span class="comment">// trace!(&quot;     cfa: {:#X}, addr: {:#X}, value: {:#X}&quot;, cfa, cfa.wrapping_add(offset as u64), value);</span>
-                            <span class="prelude-val">Some</span>(<span class="ident">value</span>)
+                    newregs[reg_num] = <span class="kw">match </span><span class="kw-2">*</span>rule {
+                        RegisterRule::Undefined =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;StackFrameIter: encountered an unsupported RegisterRule::Undefined&quot;</span>), <span class="comment">// registers[reg_num],
+                        </span>RegisterRule::SameValue =&gt; registers[reg_num],
+                        RegisterRule::Register(other_reg_num) =&gt; registers[other_reg_num],
+                        <span class="comment">// This is the most common register rule (in fact, the only one we&#39;ve seen),
+                        // so we may have to adapt the logic herein for use in other rules. 
+                        </span>RegisterRule::Offset(offset) =&gt; {
+                            <span class="kw">let </span>value = <span class="kw">unsafe </span>{ <span class="kw-2">*</span>(cfa.wrapping_add(offset <span class="kw">as </span>u64) <span class="kw">as </span><span class="kw-2">*const </span>u64) };
+                            <span class="comment">// trace!(&quot;     cfa: {:#X}, addr: {:#X}, value: {:#X}&quot;, cfa, cfa.wrapping_add(offset as u64), value);
+                            </span><span class="prelude-val">Some</span>(value)
                         }
-                        <span class="ident">RegisterRule::ValOffset</span>(<span class="ident">offset</span>) =&gt; <span class="prelude-val">Some</span>(<span class="ident">cfa</span>.<span class="ident">wrapping_add</span>(<span class="ident">offset</span> <span class="kw">as</span> <span class="ident">u64</span>)),
-                        <span class="ident">RegisterRule::Expression</span>(<span class="kw">_</span>) =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;StackFrameIter: encountered an unsupported RegisterRule::Expression&quot;</span>),
-                        <span class="ident">RegisterRule::ValExpression</span>(<span class="kw">_</span>) =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;StackFrameIter: encountered an unsupported RegisterRule::ValExpression&quot;</span>),
-                        <span class="ident">RegisterRule::Architectural</span> =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;StackFrameIter: encountered an unsupported RegisterRule::Architectural&quot;</span>),
+                        RegisterRule::ValOffset(offset) =&gt; <span class="prelude-val">Some</span>(cfa.wrapping_add(offset <span class="kw">as </span>u64)),
+                        RegisterRule::Expression(<span class="kw">_</span>) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;StackFrameIter: encountered an unsupported RegisterRule::Expression&quot;</span>),
+                        RegisterRule::ValExpression(<span class="kw">_</span>) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;StackFrameIter: encountered an unsupported RegisterRule::ValExpression&quot;</span>),
+                        RegisterRule::Architectural =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;StackFrameIter: encountered an unsupported RegisterRule::Architectural&quot;</span>),
                     };
                 }
                 <span class="prelude-val">Ok</span>(())
             })<span class="question-mark">?</span>;
 
-            <span class="kw-2">*</span><span class="ident">registers</span> <span class="op">=</span> <span class="ident">newregs</span>;
+            <span class="kw-2">*</span>registers = newregs;
         }
 
-        <span class="comment">// The return address (used to find the caller&#39;s stack frame) should be in the newly-calculated register set.</span>
-        <span class="comment">// If there isn&#39;t one, or if it&#39;s 0, then we have reached the beginning of the call stack, and are done iterating.</span>
-        <span class="kw">let</span> <span class="ident">return_address</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">registers</span>[<span class="ident">X86_64::RA</span>] {
-            <span class="prelude-val">Some</span>(<span class="number">0</span>) <span class="op">|</span> <span class="prelude-val">None</span> =&gt; <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>),
-            <span class="prelude-val">Some</span>(<span class="ident">ra</span>) =&gt; <span class="ident">ra</span>,
+        <span class="comment">// The return address (used to find the caller&#39;s stack frame) should be in the newly-calculated register set.
+        // If there isn&#39;t one, or if it&#39;s 0, then we have reached the beginning of the call stack, and are done iterating.
+        </span><span class="kw">let </span>return_address = <span class="kw">match </span>registers[X86_64::RA] {
+            <span class="prelude-val">Some</span>(<span class="number">0</span>) | <span class="prelude-val">None </span>=&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>),
+            <span class="prelude-val">Some</span>(ra) =&gt; ra,
         };
         
-        <span class="comment">// The return address (RA register) actually points to the *next* instruction (1 byte past the call instruction),</span>
-        <span class="comment">// because the processor has advanced it to continue executing after the function returns.</span>
-        <span class="comment">// As x86 has variable-length instructions, we don&#39;t know exactly where the previous instruction starts,</span>
-        <span class="comment">// but we know that subtracting `1` will give us an address *within* that previous instruction.</span>
-        <span class="kw">let</span> <span class="ident">caller</span> <span class="op">=</span> <span class="ident">return_address</span> <span class="op">-</span> <span class="number">1</span>;
-        <span class="comment">// TODO FIXME: only subtract 1 for non-&quot;fault&quot; exceptions, e.g., page faults should NOT subtract 1</span>
-        <span class="comment">// trace!(&quot;call_site_address: {:#X}&quot;, caller);</span>
-        <span class="kw">let</span> <span class="ident">caller_virt_addr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">caller</span> <span class="kw">as</span> <span class="ident">usize</span>)
-            .<span class="ident">ok_or</span>(<span class="string">&quot;caller wasn&#39;t a valid virtual address&quot;</span>)<span class="question-mark">?</span>;
+        <span class="comment">// The return address (RA register) actually points to the *next* instruction (1 byte past the call instruction),
+        // because the processor has advanced it to continue executing after the function returns.
+        // As x86 has variable-length instructions, we don&#39;t know exactly where the previous instruction starts,
+        // but we know that subtracting `1` will give us an address *within* that previous instruction.
+        </span><span class="kw">let </span>caller = return_address - <span class="number">1</span>;
+        <span class="comment">// TODO FIXME: only subtract 1 for non-&quot;fault&quot; exceptions, e.g., page faults should NOT subtract 1
+        // trace!(&quot;call_site_address: {:#X}&quot;, caller);
+        </span><span class="kw">let </span>caller_virt_addr = VirtualAddress::new(caller <span class="kw">as </span>usize)
+            .ok_or(<span class="string">&quot;caller wasn&#39;t a valid virtual address&quot;</span>)<span class="question-mark">?</span>;
 
-        <span class="comment">// Get unwind info for the call site (&quot;caller&quot;) address.</span>
-        <span class="kw">let</span> (<span class="ident">eh_frame_sec</span>, <span class="ident">base_addrs</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">namespace</span>
-            <span class="comment">// First: search the current namespace&#39;s crates to see if any of them contain the caller address.</span>
-            .<span class="ident">get_crate_containing_address</span>(<span class="ident">caller_virt_addr</span>, <span class="bool-val">false</span>)
-            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">crate_ref</span><span class="op">|</span> <span class="ident">get_eh_frame_info</span>(<span class="kw-2">&amp;</span><span class="ident">crate_ref</span>)
-                .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">eh_frame_sec</span>, <span class="ident">base_addrs</span>)<span class="op">|</span> 
-                    (<span class="ident">EhFrameReference::Section</span>(<span class="ident">eh_frame_sec</span>), <span class="ident">base_addrs</span>)
+        <span class="comment">// Get unwind info for the call site (&quot;caller&quot;) address.
+        </span><span class="kw">let </span>(eh_frame_sec, base_addrs) = <span class="self">self</span>.namespace
+            <span class="comment">// First: search the current namespace&#39;s crates to see if any of them contain the caller address.
+            </span>.get_crate_containing_address(caller_virt_addr, <span class="bool-val">false</span>)
+            .and_then(|crate_ref| get_eh_frame_info(<span class="kw-2">&amp;</span>crate_ref)
+                .map(|(eh_frame_sec, base_addrs)| 
+                    (EhFrameReference::Section(eh_frame_sec), base_addrs)
                 )
             )
-            <span class="comment">// Second: search externally-registered unwind info for the caller address.</span>
-            .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">external_unwind_info::get_unwind_info</span>(<span class="ident">caller_virt_addr</span>)
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">uw_info</span><span class="op">|</span> {
-                    <span class="kw">let</span> <span class="ident">base_addrs</span> <span class="op">=</span> <span class="ident">BaseAddresses::default</span>()
-                        .<span class="ident">set_eh_frame</span>(<span class="ident">uw_info</span>.<span class="ident">unwind_info</span>.<span class="ident">start</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>)
-                        .<span class="ident">set_text</span>(<span class="ident">uw_info</span>.<span class="ident">text_section</span>.<span class="ident">start</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
-                    (<span class="ident">EhFrameReference::External</span>(<span class="ident">uw_info</span>), <span class="ident">base_addrs</span>)
+            <span class="comment">// Second: search externally-registered unwind info for the caller address.
+            </span>.or_else(|| external_unwind_info::get_unwind_info(caller_virt_addr)
+                .map(|uw_info| {
+                    <span class="kw">let </span>base_addrs = BaseAddresses::default()
+                        .set_eh_frame(uw_info.unwind_info.start.value() <span class="kw">as </span>u64)
+                        .set_text(uw_info.text_section.start.value() <span class="kw">as </span>u64);
+                    (EhFrameReference::External(uw_info), base_addrs)
                 })
             )
-            <span class="comment">// Otherwise, the caller address isn&#39;t known to the system, so return an error.</span>
-            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-                <span class="macro">error!</span>(<span class="string">&quot;StackTraceIter::next(): couldn&#39;t get unwind info for call site address: {:#X}&quot;</span>, <span class="ident">caller</span>);
-                <span class="string">&quot;couldn&#39;t get unwind info for call site address&quot;</span>
-            })<span class="question-mark">?</span>;
+            <span class="comment">// Otherwise, the caller address isn&#39;t known to the system, so return an error.
+            </span>.ok_or_else(|| {
+                <span class="attr">#[cfg(not(downtime_eval))]
+                </span><span class="macro">error!</span>(<span class="string">&quot;StackTraceIter::next(): couldn&#39;t get unwind info for call site address: {:#X}&quot;</span>, caller);
+                <span class="string">&quot;couldn&#39;t get unwind info for call site address&quot;
+            </span>})<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cfa_adjustment</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">this_frame_is_exception_handler</span> <span class="op">=</span> <span class="bool-val">false</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>cfa_adjustment: <span class="prelude-ty">Option</span>&lt;i64&gt; = <span class="prelude-val">None</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>this_frame_is_exception_handler = <span class="bool-val">false</span>;
 
-        <span class="kw">let</span> <span class="ident">row_ref</span> <span class="op">=</span> <span class="ident">UnwindRowReference</span> { <span class="ident">caller</span>, <span class="ident">eh_frame_sec</span>, <span class="ident">base_addrs</span> };
-        <span class="kw">let</span> (<span class="ident">cfa</span>, <span class="ident">frame</span>) <span class="op">=</span> <span class="ident">row_ref</span>.<span class="ident">with_unwind_info</span>(<span class="op">|</span><span class="ident">fde</span>, <span class="ident">row</span><span class="op">|</span> {
-            <span class="comment">// trace!(&quot;ok: {:?} (0x{:x} - 0x{:x})&quot;, row.cfa(), row.start_address(), row.end_address());</span>
-            <span class="kw">let</span> <span class="ident">cfa</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">*</span><span class="ident">row</span>.<span class="ident">cfa</span>() {
-                <span class="ident">CfaRule::RegisterAndOffset</span>{<span class="ident">register</span>, <span class="ident">offset</span>} =&gt; {
-                    <span class="comment">// debug!(&quot;CfaRule:RegisterAndOffset: reg {:?}, offset: {:#X}&quot;, register, offset);</span>
-                    <span class="kw">let</span> <span class="ident">reg_value</span> <span class="op">=</span> <span class="ident">registers</span>[<span class="ident">register</span>].<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-                        <span class="macro">error!</span>(<span class="string">&quot;CFA rule specified register {:?} with offset {:#X}, but register {:?}({}) had no value!&quot;</span>, <span class="ident">register</span>, <span class="ident">offset</span>, <span class="ident">register</span>, <span class="ident">register</span>.<span class="number">0</span>);
-                        <span class="string">&quot;CFA rule specified register with offset, but that register had no value.&quot;</span>
-                    })<span class="question-mark">?</span>;
-                    <span class="ident">reg_value</span>.<span class="ident">wrapping_add</span>(<span class="ident">offset</span> <span class="kw">as</span> <span class="ident">u64</span>)
+        <span class="kw">let </span>row_ref = UnwindRowReference { caller, eh_frame_sec, base_addrs };
+        <span class="kw">let </span>(cfa, frame) = row_ref.with_unwind_info(|fde, row| {
+            <span class="comment">// trace!(&quot;ok: {:?} (0x{:x} - 0x{:x})&quot;, row.cfa(), row.start_address(), row.end_address());
+            </span><span class="kw">let </span>cfa = <span class="kw">match </span><span class="kw-2">*</span>row.cfa() {
+                CfaRule::RegisterAndOffset{register, offset} =&gt; {
+                    <span class="comment">// debug!(&quot;CfaRule:RegisterAndOffset: reg {:?}, offset: {:#X}&quot;, register, offset);
+                    </span><span class="kw">let </span>reg_value = registers[register].ok_or_else(|| {
+                        <span class="attr">#[cfg(not(downtime_eval))]
+                        </span><span class="macro">error!</span>(<span class="string">&quot;CFA rule specified register {:?} with offset {:#X}, but register {:?}({}) had no value!&quot;</span>, register, offset, register, register.<span class="number">0</span>);
+                        <span class="string">&quot;CFA rule specified register with offset, but that register had no value.&quot;
+                    </span>})<span class="question-mark">?</span>;
+                    reg_value.wrapping_add(offset <span class="kw">as </span>u64)
                 }
-                <span class="ident">CfaRule::Expression</span>(<span class="ident">_expr</span>) =&gt; {
-                    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-                    <span class="macro">error!</span>(<span class="string">&quot;CFA rules based on Expressions are not yet supported. Expression: {:?}&quot;</span>, <span class="ident">_expr</span>);
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;CFA rules based on Expressions are not yet supported.&quot;</span>);
+                CfaRule::Expression(_expr) =&gt; {
+                    <span class="attr">#[cfg(not(downtime_eval))]
+                    </span><span class="macro">error!</span>(<span class="string">&quot;CFA rules based on Expressions are not yet supported. Expression: {:?}&quot;</span>, _expr);
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;CFA rules based on Expressions are not yet supported.&quot;</span>);
                 }
             };
             
-            <span class="comment">// trace!(&quot;initial_address: {:#X}&quot;, fde.initial_address());</span>
+            <span class="comment">// trace!(&quot;initial_address: {:#X}&quot;, fde.initial_address());
 
-            <span class="comment">// If the next stack frame is an exception handler, then the CPU pushed an `InterruptStackFrame`</span>
-            <span class="comment">// onto the stack, completely unbeknownst to the DWARF debug info. </span>
-            <span class="comment">// Thus, we need to adjust this next frame&#39;s stack pointer (i.e., `cfa` which becomes the stack pointer)</span>
-            <span class="comment">// to account for the change in stack contents. </span>
-            <span class="comment">// TODO FIXME: check for any type of exception/interrupt handler, and differentiate between error codes</span>
-            <span class="ident">cfa_adjustment</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">interrupts::is_exception_handler_with_error_code</span>(<span class="ident">fde</span>.<span class="ident">initial_address</span>()) {
-                <span class="kw">let</span> <span class="ident">size_of_error_code</span>: <span class="ident">i64</span> <span class="op">=</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>() <span class="kw">as</span> <span class="ident">i64</span>;
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-                <span class="macro">trace!</span>(<span class="string">&quot;StackFrameIter: next stack frame has a CPU-pushed error code on the stack, adjusting CFA to {:#X}&quot;</span>, <span class="ident">cfa</span>);
+            // If the next stack frame is an exception handler, then the CPU pushed an `InterruptStackFrame`
+            // onto the stack, completely unbeknownst to the DWARF debug info. 
+            // Thus, we need to adjust this next frame&#39;s stack pointer (i.e., `cfa` which becomes the stack pointer)
+            // to account for the change in stack contents. 
+            // TODO FIXME: check for any type of exception/interrupt handler, and differentiate between error codes
+            </span>cfa_adjustment = <span class="kw">if </span>interrupts::is_exception_handler_with_error_code(fde.initial_address()) {
+                <span class="kw">let </span>size_of_error_code: i64 = core::mem::size_of::&lt;usize&gt;() <span class="kw">as </span>i64;
+                <span class="attr">#[cfg(not(downtime_eval))]
+                </span><span class="macro">trace!</span>(<span class="string">&quot;StackFrameIter: next stack frame has a CPU-pushed error code on the stack, adjusting CFA to {:#X}&quot;</span>, cfa);
 
-                <span class="comment">// TODO: we need to set this to true for any exception/interrupt handler, not just those with error codes.</span>
-                <span class="comment">// If there is an error code pushed, then we need to account for that additionally beyond the exception stack frame being pushed.</span>
-                <span class="kw">let</span> <span class="ident">size_of_exception_stack_frame</span>: <span class="ident">i64</span> <span class="op">=</span> <span class="number">5</span> <span class="op">*</span> <span class="number">8</span>;
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-                <span class="macro">trace!</span>(<span class="string">&quot;StackFrameIter: next stack frame is an exception handler: adding {:#X} to cfa, new cfa: {:#X}&quot;</span>, <span class="ident">size_of_exception_stack_frame</span>, <span class="ident">cfa</span>);
+                <span class="comment">// TODO: we need to set this to true for any exception/interrupt handler, not just those with error codes.
+                // If there is an error code pushed, then we need to account for that additionally beyond the exception stack frame being pushed.
+                </span><span class="kw">let </span>size_of_exception_stack_frame: i64 = <span class="number">5 </span>* <span class="number">8</span>;
+                <span class="attr">#[cfg(not(downtime_eval))]
+                </span><span class="macro">trace!</span>(<span class="string">&quot;StackFrameIter: next stack frame is an exception handler: adding {:#X} to cfa, new cfa: {:#X}&quot;</span>, size_of_exception_stack_frame, cfa);
                 
-                <span class="ident">this_frame_is_exception_handler</span> <span class="op">=</span> <span class="bool-val">true</span>;
-                <span class="prelude-val">Some</span>(<span class="ident">size_of_error_code</span> <span class="op">+</span> <span class="ident">size_of_exception_stack_frame</span>)
-            } <span class="kw">else</span> {
-                <span class="prelude-val">None</span>
-            };
+                this_frame_is_exception_handler = <span class="bool-val">true</span>;
+                <span class="prelude-val">Some</span>(size_of_error_code + size_of_exception_stack_frame)
+            } <span class="kw">else </span>{
+                <span class="prelude-val">None
+            </span>};
 
-            <span class="comment">// trace!(&quot;cfa is {:#X}&quot;, cfa);</span>
+            <span class="comment">// trace!(&quot;cfa is {:#X}&quot;, cfa);
 
-            <span class="kw">let</span> <span class="ident">frame</span> <span class="op">=</span> <span class="ident">StackFrame</span> {
-                <span class="ident">personality</span>: <span class="prelude-val">None</span>, <span class="comment">// we don&#39;t use the personality function in Theseus</span>
-                <span class="ident">lsda</span>: <span class="ident">fde</span>.<span class="ident">lsda</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="kw">unsafe</span> { <span class="ident">deref_ptr</span>(<span class="ident">x</span>) }),
-                <span class="ident">initial_address</span>: <span class="ident">fde</span>.<span class="ident">initial_address</span>(),
-                <span class="ident">call_site_address</span>: <span class="ident">caller</span>,
+            </span><span class="kw">let </span>frame = StackFrame {
+                personality: <span class="prelude-val">None</span>, <span class="comment">// we don&#39;t use the personality function in Theseus
+                </span>lsda: fde.lsda().map(|x| <span class="kw">unsafe </span>{ deref_ptr(x) }),
+                initial_address: fde.initial_address(),
+                call_site_address: caller,
             };
-            <span class="prelude-val">Ok</span>((<span class="ident">cfa</span>, <span class="ident">frame</span>))
+            <span class="prelude-val">Ok</span>((cfa, frame))
         })<span class="question-mark">?</span>;
 
-        <span class="comment">// since we can&#39;t double-borrow `self` mutably in the above closure, we assign its state(s) here.</span>
-        <span class="self">self</span>.<span class="ident">cfa_adjustment</span> <span class="op">=</span> <span class="ident">cfa_adjustment</span>;
-        <span class="self">self</span>.<span class="ident">last_frame_was_exception_handler</span> <span class="op">=</span> <span class="ident">this_frame_is_exception_handler</span>;
-        <span class="self">self</span>.<span class="ident">state</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">row_ref</span>, <span class="ident">cfa</span>));
+        <span class="comment">// since we can&#39;t double-borrow `self` mutably in the above closure, we assign its state(s) here.
+        </span><span class="self">self</span>.cfa_adjustment = cfa_adjustment;
+        <span class="self">self</span>.last_frame_was_exception_handler = this_frame_is_exception_handler;
+        <span class="self">self</span>.state = <span class="prelude-val">Some</span>((row_ref, cfa));
 
-        <span class="comment">// return the stack frame that we just iterated to</span>
-        <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">frame</span>))
+        <span class="comment">// return the stack frame that we just iterated to
+        </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(frame))
     }
 }
 
 
-<span class="doccomment">/// Dereferences a `Pointer` type found in unwinding information,</span>
-<span class="doccomment">/// which is either direct (no dereference) or indirect. </span>
-<span class="doccomment">/// Doing so is unsafe because the value of the `Pointer` is not checked. </span>
-<span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">deref_ptr</span>(<span class="ident">ptr</span>: <span class="ident">Pointer</span>) -&gt; <span class="ident">u64</span> {
-    <span class="kw">match</span> <span class="ident">ptr</span> {
-        <span class="ident">Pointer::Direct</span>(<span class="ident">x</span>) =&gt; <span class="ident">x</span>,
-        <span class="ident">Pointer::Indirect</span>(<span class="ident">x</span>) =&gt; <span class="kw-2">*</span>(<span class="ident">x</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">u64</span>),
+<span class="doccomment">/// Dereferences a `Pointer` type found in unwinding information,
+/// which is either direct (no dereference) or indirect. 
+/// Doing so is unsafe because the value of the `Pointer` is not checked. 
+</span><span class="kw">unsafe fn </span>deref_ptr(ptr: Pointer) -&gt; u64 {
+    <span class="kw">match </span>ptr {
+        Pointer::Direct(x) =&gt; x,
+        Pointer::Indirect(x) =&gt; <span class="kw-2">*</span>(x <span class="kw">as </span><span class="kw-2">*const </span>u64),
     }
 }
 
 
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">FuncWithRegisters</span> <span class="op">=</span> <span class="ident">FnMut</span>(<span class="ident">Registers</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>;
-<span class="kw">type</span> <span class="ident">FuncWithRegistersRefMut</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">dyn</span> <span class="ident">FuncWithRegisters</span>;
+<span class="kw">pub trait </span>FuncWithRegisters = FnMut(Registers) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
+<span class="kw">type </span>FuncWithRegistersRefMut&lt;<span class="lifetime">&#39;a</span>&gt; = <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="kw">dyn </span>FuncWithRegisters;
 
 
-<span class="doccomment">/// This function saves the current CPU register values onto the stack (to preserve them)</span>
-<span class="doccomment">/// and then invokes the given closure with those registers as the argument.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// In general, this is useful for jumpstarting the unwinding procedure,</span>
-<span class="doccomment">/// since we have to start from the current call frame and work backwards up the call stack </span>
-<span class="doccomment">/// while applying the rules for register value changes in each call frame</span>
-<span class="doccomment">/// in order to arrive at the proper register values for a prior call frame.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">invoke_with_current_registers</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(<span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">F</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> 
-    <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">FuncWithRegisters</span> 
+<span class="doccomment">/// This function saves the current CPU register values onto the stack (to preserve them)
+/// and then invokes the given closure with those registers as the argument.
+/// 
+/// In general, this is useful for jumpstarting the unwinding procedure,
+/// since we have to start from the current call frame and work backwards up the call stack 
+/// while applying the rules for register value changes in each call frame
+/// in order to arrive at the proper register values for a prior call frame.
+</span><span class="kw">pub fn </span>invoke_with_current_registers&lt;F&gt;(f: <span class="kw-2">&amp;mut </span>F) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; 
+    <span class="kw">where </span>F: FuncWithRegisters 
 {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">f</span>: <span class="ident">FuncWithRegistersRefMut</span> <span class="op">=</span> <span class="ident">f</span>; <span class="comment">// cast to a &amp;mut trait object</span>
-    <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="kw">unsafe</span> { 
-        <span class="kw">let</span> <span class="ident">res_ptr</span> <span class="op">=</span> <span class="ident">unwind_trampoline</span>(<span class="kw-2">&amp;mut</span> <span class="ident">f</span>);
-        <span class="kw">let</span> <span class="ident">res_boxed</span> <span class="op">=</span> <span class="ident">Box::from_raw</span>(<span class="ident">res_ptr</span>);
-        <span class="kw-2">*</span><span class="ident">res_boxed</span>
+    <span class="kw">let </span><span class="kw-2">mut </span>f: FuncWithRegistersRefMut = f; <span class="comment">// cast to a &amp;mut trait object
+    </span><span class="kw">let </span>result = <span class="kw">unsafe </span>{ 
+        <span class="kw">let </span>res_ptr = unwind_trampoline(<span class="kw-2">&amp;mut </span>f);
+        <span class="kw">let </span>res_boxed = Box::from_raw(res_ptr);
+        <span class="kw-2">*</span>res_boxed
     };
-    <span class="kw">return</span> <span class="ident">result</span>;
-    <span class="comment">// this is the end of the code in this function, the following is just inner functions.</span>
+    <span class="kw">return </span>result;
+    <span class="comment">// this is the end of the code in this function, the following is just inner functions.
 
 
-    <span class="doccomment">/// This is an internal assembly function used by `invoke_with_current_registers()` </span>
-    <span class="doccomment">/// that saves the current register values by pushing them onto the stack</span>
-    <span class="doccomment">/// before invoking the function &quot;unwind_recorder&quot; with those register values as the only argument.</span>
-    <span class="doccomment">/// This is needed because the unwind info tables describe register values as operations (offsets/addends)</span>
-    <span class="doccomment">/// that are relative to the current register values, so we must have those current values as a starting point.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// The argument is a pointer to a function reference, so effectively a pointer to a pointer. </span>
-    <span class="attribute">#[<span class="ident">naked</span>]</span>
-    <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">unwind_trampoline</span>(<span class="ident">_func</span>: <span class="kw-2">*mut</span> <span class="ident">FuncWithRegistersRefMut</span>) -&gt; <span class="kw-2">*mut</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// This is a naked function, so you CANNOT place anything here before the asm block, not even log statements.</span>
-        <span class="comment">// This is because we rely on the value of registers to stay the same as whatever the caller set them to.</span>
-        <span class="comment">// DO NOT touch RDI register, which has the `_func` function; it needs to be passed into unwind_recorder.</span>
-        <span class="macro">asm!</span>(
-            <span class="comment">// copy the stack pointer to RSI</span>
-            <span class="string">&quot;
+    </span><span class="doccomment">/// This is an internal assembly function used by `invoke_with_current_registers()` 
+    /// that saves the current register values by pushing them onto the stack
+    /// before invoking the function &quot;unwind_recorder&quot; with those register values as the only argument.
+    /// This is needed because the unwind info tables describe register values as operations (offsets/addends)
+    /// that are relative to the current register values, so we must have those current values as a starting point.
+    /// 
+    /// The argument is a pointer to a function reference, so effectively a pointer to a pointer. 
+    </span><span class="attr">#[naked]
+    </span><span class="kw">unsafe extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>unwind_trampoline(_func: <span class="kw-2">*mut </span>FuncWithRegistersRefMut) -&gt; <span class="kw-2">*mut </span><span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// This is a naked function, so you CANNOT place anything here before the asm block, not even log statements.
+        // This is because we rely on the value of registers to stay the same as whatever the caller set them to.
+        // DO NOT touch RDI register, which has the `_func` function; it needs to be passed into unwind_recorder.
+        </span><span class="macro">asm!</span>(
+            <span class="comment">// copy the stack pointer to RSI
+            </span><span class="string">&quot;
             movq %rsp, %rsi
             pushq %rbp
             pushq %rbx
@@ -1462,16 +1456,16 @@
             pushq %r14
             pushq %r15
             &quot;</span>,
-            <span class="comment">// To invoke `unwind_recorder`, we need to put: </span>
-            <span class="comment">// (1) the func in RDI (it&#39;s already there, just don&#39;t overwrite it),</span>
-            <span class="comment">// (2) the stack in RSI,</span>
-            <span class="comment">// (3) a pointer to the saved registers in RDX.</span>
-            <span class="string">&quot;
+            <span class="comment">// To invoke `unwind_recorder`, we need to put: 
+            // (1) the func in RDI (it&#39;s already there, just don&#39;t overwrite it),
+            // (2) the stack in RSI,
+            // (3) a pointer to the saved registers in RDX.
+            </span><span class="string">&quot;
             movq %rsp, %rdx   # pointer to saved regs (on the stack)
             call unwind_recorder
             &quot;</span>,
-            <span class="comment">// Finally, restore saved registers</span>
-            <span class="string">&quot;
+            <span class="comment">// Finally, restore saved registers
+            </span><span class="string">&quot;
             popq %r15
             popq %r14
             popq %r13
@@ -1480,88 +1474,88 @@
             popq %rbp
             ret
             &quot;</span>,
-            <span class="ident">options</span>(<span class="ident">att_syntax</span>, <span class="ident">noreturn</span>)
+            options(att_syntax, noreturn)
         );
     }
 
 
-    <span class="doccomment">/// The calling convention dictates the following order of arguments: </span>
-    <span class="doccomment">/// * first arg in `RDI` register, the function (or closure) to invoke with the saved registers arg,</span>
-    <span class="doccomment">/// * second arg in `RSI` register, the stack pointer,</span>
-    <span class="doccomment">/// * third arg in `RDX` register, the saved register values used to recover execution context</span>
-    <span class="doccomment">///   after we change the register values during unwinding,</span>
-    <span class="attribute">#[<span class="ident">no_mangle</span>]</span>
-    <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">unwind_recorder</span>(
-        <span class="ident">func</span>: <span class="kw-2">*mut</span> <span class="ident">FuncWithRegistersRefMut</span>,
-        <span class="ident">stack</span>: <span class="ident">u64</span>,
-        <span class="ident">saved_regs</span>: <span class="kw-2">*mut</span> <span class="ident">SavedRegs</span>,
-    ) -&gt; <span class="kw-2">*mut</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">func</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">func</span>;
-        <span class="kw">let</span> <span class="ident">saved_regs</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">saved_regs</span>;
+    <span class="doccomment">/// The calling convention dictates the following order of arguments: 
+    /// * first arg in `RDI` register, the function (or closure) to invoke with the saved registers arg,
+    /// * second arg in `RSI` register, the stack pointer,
+    /// * third arg in `RDX` register, the saved register values used to recover execution context
+    ///   after we change the register values during unwinding,
+    </span><span class="attr">#[no_mangle]
+    </span><span class="kw">unsafe extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>unwind_recorder(
+        func: <span class="kw-2">*mut </span>FuncWithRegistersRefMut,
+        stack: u64,
+        saved_regs: <span class="kw-2">*mut </span>SavedRegs,
+    ) -&gt; <span class="kw-2">*mut </span><span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>func = <span class="kw-2">&amp;mut *</span>func;
+        <span class="kw">let </span>saved_regs = <span class="kw-2">&amp;*</span>saved_regs;
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">registers</span> <span class="op">=</span> <span class="ident">Registers::default</span>();
-        <span class="ident">registers</span>[<span class="ident">X86_64::RBX</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">saved_regs</span>.<span class="ident">rbx</span>);
-        <span class="ident">registers</span>[<span class="ident">X86_64::RBP</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">saved_regs</span>.<span class="ident">rbp</span>);
-        <span class="ident">registers</span>[<span class="ident">X86_64::RSP</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">stack</span> <span class="op">+</span> <span class="number">8</span>); <span class="comment">// the stack value passed in is one pointer width before the real RSP</span>
-        <span class="ident">registers</span>[<span class="ident">X86_64::R12</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">saved_regs</span>.<span class="ident">r12</span>);
-        <span class="ident">registers</span>[<span class="ident">X86_64::R13</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">saved_regs</span>.<span class="ident">r13</span>);
-        <span class="ident">registers</span>[<span class="ident">X86_64::R14</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">saved_regs</span>.<span class="ident">r14</span>);
-        <span class="ident">registers</span>[<span class="ident">X86_64::R15</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">saved_regs</span>.<span class="ident">r15</span>);
-        <span class="ident">registers</span>[<span class="ident">X86_64::RA</span>]  <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="kw-2">*</span>(<span class="ident">stack</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">u64</span>));
+        <span class="kw">let </span><span class="kw-2">mut </span>registers = Registers::default();
+        registers[X86_64::RBX] = <span class="prelude-val">Some</span>(saved_regs.rbx);
+        registers[X86_64::RBP] = <span class="prelude-val">Some</span>(saved_regs.rbp);
+        registers[X86_64::RSP] = <span class="prelude-val">Some</span>(stack + <span class="number">8</span>); <span class="comment">// the stack value passed in is one pointer width before the real RSP
+        </span>registers[X86_64::R12] = <span class="prelude-val">Some</span>(saved_regs.r12);
+        registers[X86_64::R13] = <span class="prelude-val">Some</span>(saved_regs.r13);
+        registers[X86_64::R14] = <span class="prelude-val">Some</span>(saved_regs.r14);
+        registers[X86_64::R15] = <span class="prelude-val">Some</span>(saved_regs.r15);
+        registers[X86_64::RA]  = <span class="prelude-val">Some</span>(<span class="kw-2">*</span>(stack <span class="kw">as </span><span class="kw-2">*const </span>u64));
 
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">func</span>(<span class="ident">registers</span>);
-        <span class="ident">Box::into_raw</span>(<span class="ident">Box::new</span>(<span class="ident">res</span>))
+        <span class="kw">let </span>res = func(registers);
+        Box::into_raw(Box::new(res))
     }
 }
 
 
-<span class="doccomment">/// **Landing** refers to the process of jumping to a handler for a stack frame,</span>
-<span class="doccomment">/// e.g., an unwinding cleanup function, or an exception &quot;catch&quot; block.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This function basically fills the actual CPU registers with the values in the given `LandingRegisters`</span>
-<span class="doccomment">/// and then jumps to the exception handler (landing pad) pointed to by the stack pointer (RSP) in those `LandingRegisters`.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This is similar in design to how the latter half of a context switch routine</span>
-<span class="doccomment">/// must restore the previously-saved registers for the next task.</span>
-<span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">land</span>(<span class="ident">regs</span>: <span class="kw-2">&amp;</span><span class="ident">Registers</span>, <span class="ident">landing_pad_address</span>: <span class="ident">u64</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">landing_regs</span> <span class="op">=</span> <span class="ident">LandingRegisters</span> {
-        <span class="ident">rax</span>: <span class="ident">regs</span>[<span class="ident">X86_64::RAX</span>].<span class="ident">unwrap_or</span>(<span class="number">0</span>),
-        <span class="ident">rbx</span>: <span class="ident">regs</span>[<span class="ident">X86_64::RBX</span>].<span class="ident">unwrap_or</span>(<span class="number">0</span>),
-        <span class="ident">rcx</span>: <span class="ident">regs</span>[<span class="ident">X86_64::RCX</span>].<span class="ident">unwrap_or</span>(<span class="number">0</span>),
-        <span class="ident">rdx</span>: <span class="ident">regs</span>[<span class="ident">X86_64::RDX</span>].<span class="ident">unwrap_or</span>(<span class="number">0</span>),
-        <span class="ident">rdi</span>: <span class="ident">regs</span>[<span class="ident">X86_64::RDI</span>].<span class="ident">unwrap_or</span>(<span class="number">0</span>),
-        <span class="ident">rsi</span>: <span class="ident">regs</span>[<span class="ident">X86_64::RSI</span>].<span class="ident">unwrap_or</span>(<span class="number">0</span>),
-        <span class="ident">rbp</span>: <span class="ident">regs</span>[<span class="ident">X86_64::RBP</span>].<span class="ident">unwrap_or</span>(<span class="number">0</span>),
-        <span class="ident">r8</span>:  <span class="ident">regs</span>[<span class="ident">X86_64::R8</span> ].<span class="ident">unwrap_or</span>(<span class="number">0</span>),
-        <span class="ident">r9</span>:  <span class="ident">regs</span>[<span class="ident">X86_64::R9</span> ].<span class="ident">unwrap_or</span>(<span class="number">0</span>),
-        <span class="ident">r10</span>: <span class="ident">regs</span>[<span class="ident">X86_64::R10</span>].<span class="ident">unwrap_or</span>(<span class="number">0</span>),
-        <span class="ident">r11</span>: <span class="ident">regs</span>[<span class="ident">X86_64::R11</span>].<span class="ident">unwrap_or</span>(<span class="number">0</span>),
-        <span class="ident">r12</span>: <span class="ident">regs</span>[<span class="ident">X86_64::R12</span>].<span class="ident">unwrap_or</span>(<span class="number">0</span>),
-        <span class="ident">r13</span>: <span class="ident">regs</span>[<span class="ident">X86_64::R13</span>].<span class="ident">unwrap_or</span>(<span class="number">0</span>),
-        <span class="ident">r14</span>: <span class="ident">regs</span>[<span class="ident">X86_64::R14</span>].<span class="ident">unwrap_or</span>(<span class="number">0</span>),
-        <span class="ident">r15</span>: <span class="ident">regs</span>[<span class="ident">X86_64::R15</span>].<span class="ident">unwrap_or</span>(<span class="number">0</span>),
-        <span class="ident">rsp</span>: <span class="ident">regs</span>[<span class="ident">X86_64::RSP</span>].<span class="ident">ok_or</span>(<span class="string">&quot;unwind::land(): RSP was None, \
-            it must be set so that the landing pad function can execute properly.&quot;</span>
-        )<span class="question-mark">?</span>,
+<span class="doccomment">/// **Landing** refers to the process of jumping to a handler for a stack frame,
+/// e.g., an unwinding cleanup function, or an exception &quot;catch&quot; block.
+/// 
+/// This function basically fills the actual CPU registers with the values in the given `LandingRegisters`
+/// and then jumps to the exception handler (landing pad) pointed to by the stack pointer (RSP) in those `LandingRegisters`.
+/// 
+/// This is similar in design to how the latter half of a context switch routine
+/// must restore the previously-saved registers for the next task.
+</span><span class="kw">unsafe fn </span>land(regs: <span class="kw-2">&amp;</span>Registers, landing_pad_address: u64) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>landing_regs = LandingRegisters {
+        rax: regs[X86_64::RAX].unwrap_or(<span class="number">0</span>),
+        rbx: regs[X86_64::RBX].unwrap_or(<span class="number">0</span>),
+        rcx: regs[X86_64::RCX].unwrap_or(<span class="number">0</span>),
+        rdx: regs[X86_64::RDX].unwrap_or(<span class="number">0</span>),
+        rdi: regs[X86_64::RDI].unwrap_or(<span class="number">0</span>),
+        rsi: regs[X86_64::RSI].unwrap_or(<span class="number">0</span>),
+        rbp: regs[X86_64::RBP].unwrap_or(<span class="number">0</span>),
+        r8:  regs[X86_64::R8 ].unwrap_or(<span class="number">0</span>),
+        r9:  regs[X86_64::R9 ].unwrap_or(<span class="number">0</span>),
+        r10: regs[X86_64::R10].unwrap_or(<span class="number">0</span>),
+        r11: regs[X86_64::R11].unwrap_or(<span class="number">0</span>),
+        r12: regs[X86_64::R12].unwrap_or(<span class="number">0</span>),
+        r13: regs[X86_64::R13].unwrap_or(<span class="number">0</span>),
+        r14: regs[X86_64::R14].unwrap_or(<span class="number">0</span>),
+        r15: regs[X86_64::R15].unwrap_or(<span class="number">0</span>),
+        rsp: regs[X86_64::RSP].ok_or(<span class="string">&quot;unwind::land(): RSP was None, \
+            it must be set so that the landing pad function can execute properly.&quot;
+        </span>)<span class="question-mark">?</span>,
     };
 
-    <span class="comment">// Now place the landing pad function&#39;s address at the &quot;bottom&quot; of the stack</span>
-    <span class="comment">// -- not really the bottom of the whole stack, just the last thing to be popped off after the landing_regs.</span>
-    <span class="ident">landing_regs</span>.<span class="ident">rsp</span> <span class="op">-</span><span class="op">=</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>() <span class="kw">as</span> <span class="ident">u64</span>;
-    <span class="kw-2">*</span>(<span class="ident">landing_regs</span>.<span class="ident">rsp</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">u64</span>) <span class="op">=</span> <span class="ident">landing_pad_address</span>;
-    <span class="comment">// trace!(&quot;unwind_lander regs: {:#X?}&quot;, landing_regs);</span>
-    <span class="ident">unwind_lander</span>(<span class="kw-2">&amp;</span><span class="ident">landing_regs</span>);
-    <span class="comment">// this is the end of the code in this function, the following is just inner functions.</span>
+    <span class="comment">// Now place the landing pad function&#39;s address at the &quot;bottom&quot; of the stack
+    // -- not really the bottom of the whole stack, just the last thing to be popped off after the landing_regs.
+    </span>landing_regs.rsp -= core::mem::size_of::&lt;u64&gt;() <span class="kw">as </span>u64;
+    <span class="kw-2">*</span>(landing_regs.rsp <span class="kw">as </span><span class="kw-2">*mut </span>u64) = landing_pad_address;
+    <span class="comment">// trace!(&quot;unwind_lander regs: {:#X?}&quot;, landing_regs);
+    </span>unwind_lander(<span class="kw-2">&amp;</span>landing_regs);
+    <span class="comment">// this is the end of the code in this function, the following is just inner functions.
 
 
-    <span class="doccomment">/// This function places the values of the given landing registers</span>
-    <span class="doccomment">/// into the actual CPU registers, and then jumps to the landing pad address</span>
-    <span class="doccomment">/// specified by the stack pointer in those registers. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// It is marked as divergent (returning `!`) because it doesn&#39;t return to the caller,</span>
-    <span class="doccomment">/// instead it returns (jumps to) that landing pad address.</span>
-    <span class="attribute">#[<span class="ident">naked</span>]</span>
-    <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">unwind_lander</span>(<span class="ident">_regs</span>: <span class="kw-2">*const</span> <span class="ident">LandingRegisters</span>) -&gt; <span class="op">!</span> {
+    </span><span class="doccomment">/// This function places the values of the given landing registers
+    /// into the actual CPU registers, and then jumps to the landing pad address
+    /// specified by the stack pointer in those registers. 
+    /// 
+    /// It is marked as divergent (returning `!`) because it doesn&#39;t return to the caller,
+    /// instead it returns (jumps to) that landing pad address.
+    </span><span class="attr">#[naked]
+    </span><span class="kw">unsafe extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>unwind_lander(_regs: <span class="kw-2">*const </span>LandingRegisters) -&gt; ! {
         <span class="macro">asm!</span>(<span class="string">&quot;
             movq %rdi, %rsp
             popq %rax
@@ -1582,340 +1576,339 @@
             movq 0(%rsp), %rsp
             ret  # jump to the actual landing pad function
             &quot;</span>,
-            <span class="ident">options</span>(<span class="ident">att_syntax</span>, <span class="ident">noreturn</span>)
+            options(att_syntax, noreturn)
         );
     }
 }
 
 
-<span class="kw">type</span> <span class="ident">NativeEndianSliceReader</span><span class="op">&lt;</span><span class="lifetime">&#39;i</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">EndianSlice</span><span class="op">&lt;</span><span class="lifetime">&#39;i</span>, <span class="ident">NativeEndian</span><span class="op">&gt;</span>;
+<span class="kw">type </span>NativeEndianSliceReader&lt;<span class="lifetime">&#39;i</span>&gt; = EndianSlice&lt;<span class="lifetime">&#39;i</span>, NativeEndian&gt;;
 
 
-<span class="doccomment">/// An abstraction of a reference to the contents of an `.eh_frame` section. </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">enum</span> <span class="ident">EhFrameReference</span> {
-    <span class="doccomment">/// A reference to a &quot;native&quot; (Theseus-owned) `.eh_frame` [`mod_mgmt::LoadedSection`].</span>
-    <span class="ident">Section</span>(<span class="ident">StrongSectionRef</span>),
-    <span class="doccomment">/// A reference to an externally-registered `.eh_frame` section&#39;s bounds in memory.</span>
-    <span class="ident">External</span>(<span class="ident">ExternalUnwindInfo</span>),
+<span class="doccomment">/// An abstraction of a reference to the contents of an `.eh_frame` section. 
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">enum </span>EhFrameReference {
+    <span class="doccomment">/// A reference to a &quot;native&quot; (Theseus-owned) `.eh_frame` [`mod_mgmt::LoadedSection`].
+    </span>Section(StrongSectionRef),
+    <span class="doccomment">/// A reference to an externally-registered `.eh_frame` section&#39;s bounds in memory.
+    </span>External(ExternalUnwindInfo),
 }
 
-<span class="doccomment">/// Due to lifetime and locking issues, we cannot store a direct reference to an unwind table row. </span>
-<span class="doccomment">/// Instead, here we store references to the objects needed to calculate/obtain an unwind table row.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">struct</span> <span class="ident">UnwindRowReference</span> {
-    <span class="ident">caller</span>: <span class="ident">u64</span>,
-    <span class="ident">eh_frame_sec</span>: <span class="ident">EhFrameReference</span>,
-    <span class="ident">base_addrs</span>: <span class="ident">BaseAddresses</span>,
+<span class="doccomment">/// Due to lifetime and locking issues, we cannot store a direct reference to an unwind table row. 
+/// Instead, here we store references to the objects needed to calculate/obtain an unwind table row.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">struct </span>UnwindRowReference {
+    caller: u64,
+    eh_frame_sec: EhFrameReference,
+    base_addrs: BaseAddresses,
 }
-<span class="kw">impl</span> <span class="ident">UnwindRowReference</span> {
-    <span class="doccomment">/// Accepts a closure/function that will be invoked with following unwinding information:</span>
-    <span class="doccomment">/// a frame description entry and an unwinding table row.</span>
-    <span class="kw">fn</span> <span class="ident">with_unwind_info</span><span class="op">&lt;</span><span class="ident">O</span>, <span class="ident">F</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">f</span>: <span class="ident">F</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">O</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>
-        <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="kw-2">&amp;</span><span class="ident">FrameDescriptionEntry</span><span class="op">&lt;</span><span class="ident">NativeEndianSliceReader</span>, <span class="ident">usize</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="ident">UnwindTableRow</span><span class="op">&lt;</span><span class="ident">NativeEndianSliceReader</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">O</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>
+<span class="kw">impl </span>UnwindRowReference {
+    <span class="doccomment">/// Accepts a closure/function that will be invoked with following unwinding information:
+    /// a frame description entry and an unwinding table row.
+    </span><span class="kw">fn </span>with_unwind_info&lt;O, F&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>f: F) -&gt; <span class="prelude-ty">Result</span>&lt;O, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
+        <span class="kw">where </span>F: FnMut(<span class="kw-2">&amp;</span>FrameDescriptionEntry&lt;NativeEndianSliceReader, usize&gt;, <span class="kw-2">&amp;</span>UnwindTableRow&lt;NativeEndianSliceReader&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;O, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
     {
-        <span class="comment">// an inner closure that invokes the passed-in closure `f`.</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">invoke_f_with_eh_frame_slice</span> <span class="op">=</span> <span class="op">|</span><span class="ident">eh_frame_slice</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]<span class="op">|</span> {
-            <span class="kw">let</span> <span class="ident">eh_frame</span> <span class="op">=</span> <span class="ident">EhFrame::new</span>(<span class="ident">eh_frame_slice</span>, <span class="ident">NativeEndian</span>);
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">unwind_ctx</span> <span class="op">=</span> <span class="ident">UninitializedUnwindContext::new</span>();
-            <span class="kw">let</span> <span class="ident">fde</span> <span class="op">=</span> <span class="ident">eh_frame</span>.<span class="ident">fde_for_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">base_addrs</span>, <span class="self">self</span>.<span class="ident">caller</span>, <span class="ident">EhFrame::cie_from_offset</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> {
-                <span class="macro">error!</span>(<span class="string">&quot;gimli error: {:?}&quot;</span>, <span class="ident">_e</span>);
-                <span class="string">&quot;gimli error while finding FDE for address&quot;</span>
-            })<span class="question-mark">?</span>;
-            <span class="kw">let</span> <span class="ident">unwind_table_row</span> <span class="op">=</span> <span class="ident">fde</span>.<span class="ident">unwind_info_for_address</span>(<span class="kw-2">&amp;</span><span class="ident">eh_frame</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">base_addrs</span>, <span class="kw-2">&amp;mut</span> <span class="ident">unwind_ctx</span>, <span class="self">self</span>.<span class="ident">caller</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> {
-                <span class="macro">error!</span>(<span class="string">&quot;gimli error: {:?}&quot;</span>, <span class="ident">_e</span>);
-                <span class="string">&quot;gimli error while finding unwind info for address&quot;</span>
-            })<span class="question-mark">?</span>;
+        <span class="comment">// an inner closure that invokes the passed-in closure `f`.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>invoke_f_with_eh_frame_slice = |eh_frame_slice: <span class="kw-2">&amp;</span>[u8]| {
+            <span class="kw">let </span>eh_frame = EhFrame::new(eh_frame_slice, NativeEndian);
+            <span class="kw">let </span><span class="kw-2">mut </span>unwind_ctx = UninitializedUnwindContext::new();
+            <span class="kw">let </span>fde = eh_frame.fde_for_address(<span class="kw-2">&amp;</span><span class="self">self</span>.base_addrs, <span class="self">self</span>.caller, EhFrame::cie_from_offset).map_err(|_e| {
+                <span class="macro">error!</span>(<span class="string">&quot;gimli error: {:?}&quot;</span>, _e);
+                <span class="string">&quot;gimli error while finding FDE for address&quot;
+            </span>})<span class="question-mark">?</span>;
+            <span class="kw">let </span>unwind_table_row = fde.unwind_info_for_address(<span class="kw-2">&amp;</span>eh_frame, <span class="kw-2">&amp;</span><span class="self">self</span>.base_addrs, <span class="kw-2">&amp;mut </span>unwind_ctx, <span class="self">self</span>.caller).map_err(|_e| {
+                <span class="macro">error!</span>(<span class="string">&quot;gimli error: {:?}&quot;</span>, _e);
+                <span class="string">&quot;gimli error while finding unwind info for address&quot;
+            </span>})<span class="question-mark">?</span>;
             
-            <span class="comment">// debug!(&quot;FDE: {:?} &quot;, fde);</span>
-            <span class="comment">// let mut instructions = fde.instructions(&amp;eh_frame, &amp;self.base_addrs);</span>
-            <span class="comment">// while let Some(instr) = instructions.next().map_err(|_e| {</span>
-            <span class="comment">//     error!(&quot;FDE instructions gimli error: {:?}&quot;, _e);</span>
-            <span class="comment">//     &quot;gimli error while iterating through eh_frame FDE instructions list&quot;</span>
-            <span class="comment">// })? {</span>
-            <span class="comment">//     debug!(&quot;    FDE instr: {:?}&quot;, instr);</span>
-            <span class="comment">// }</span>
+            <span class="comment">// debug!(&quot;FDE: {:?} &quot;, fde);
+            // let mut instructions = fde.instructions(&amp;eh_frame, &amp;self.base_addrs);
+            // while let Some(instr) = instructions.next().map_err(|_e| {
+            //     error!(&quot;FDE instructions gimli error: {:?}&quot;, _e);
+            //     &quot;gimli error while iterating through eh_frame FDE instructions list&quot;
+            // })? {
+            //     debug!(&quot;    FDE instr: {:?}&quot;, instr);
+            // }
 
-            <span class="ident">f</span>(<span class="kw-2">&amp;</span><span class="ident">fde</span>, <span class="kw-2">&amp;</span><span class="ident">unwind_table_row</span>)
+            </span>f(<span class="kw-2">&amp;</span>fde, <span class="kw-2">&amp;</span>unwind_table_row)
         };
 
-        <span class="comment">// The actual logic of this function that handles the `EhFrameReference` abstraction.</span>
-        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">eh_frame_sec</span> {
-            <span class="ident">EhFrameReference::Section</span>(<span class="ident">sec</span>) =&gt; {
-                <span class="kw">let</span> <span class="ident">sec_pages</span> <span class="op">=</span> <span class="ident">sec</span>.<span class="ident">mapped_pages</span>.<span class="ident">lock</span>();
-                <span class="kw">let</span> <span class="ident">eh_frame_slice</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">sec_pages</span>.<span class="ident">as_slice</span>(<span class="ident">sec</span>.<span class="ident">mapped_pages_offset</span>, <span class="ident">sec</span>.<span class="ident">size</span>())<span class="question-mark">?</span>;
-                <span class="ident">invoke_f_with_eh_frame_slice</span>(<span class="ident">eh_frame_slice</span>)
+        <span class="comment">// The actual logic of this function that handles the `EhFrameReference` abstraction.
+        </span><span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.eh_frame_sec {
+            EhFrameReference::Section(sec) =&gt; {
+                <span class="kw">let </span>sec_pages = sec.mapped_pages.lock();
+                <span class="kw">let </span>eh_frame_slice: <span class="kw-2">&amp;</span>[u8] = sec_pages.as_slice(sec.mapped_pages_offset, sec.size())<span class="question-mark">?</span>;
+                invoke_f_with_eh_frame_slice(eh_frame_slice)
             }
-            <span class="ident">EhFrameReference::External</span>(<span class="ident">uw_info</span>) =&gt; {
-                <span class="kw">let</span> <span class="ident">eh_frame_ptr</span> <span class="op">=</span> <span class="ident">uw_info</span>.<span class="ident">unwind_info</span>.<span class="ident">start</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">u8</span>;
-                <span class="kw">let</span> <span class="ident">eh_frame_size</span> <span class="op">=</span> <span class="ident">uw_info</span>.<span class="ident">unwind_info</span>.<span class="ident">end</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">uw_info</span>.<span class="ident">unwind_info</span>.<span class="ident">start</span>.<span class="ident">value</span>();
-                <span class="kw">let</span> <span class="ident">eh_frame_slice</span> <span class="op">=</span> <span class="kw">unsafe</span> {
-                    <span class="ident">core::slice::from_raw_parts</span>(<span class="ident">eh_frame_ptr</span>, <span class="ident">eh_frame_size</span>)
+            EhFrameReference::External(uw_info) =&gt; {
+                <span class="kw">let </span>eh_frame_ptr = uw_info.unwind_info.start.value() <span class="kw">as </span><span class="kw-2">*const </span>u8;
+                <span class="kw">let </span>eh_frame_size = uw_info.unwind_info.end.value() - uw_info.unwind_info.start.value();
+                <span class="kw">let </span>eh_frame_slice = <span class="kw">unsafe </span>{
+                    core::slice::from_raw_parts(eh_frame_ptr, eh_frame_size)
                 };
-                <span class="ident">invoke_f_with_eh_frame_slice</span>(<span class="ident">eh_frame_slice</span>)
+                invoke_f_with_eh_frame_slice(eh_frame_slice)
             }
         }
     }
 }
 
 
-<span class="doccomment">/// Returns a tuple of:</span>
-<span class="doccomment">/// 1. The `.eh_frame` section for the given `crate_ref`</span>
-<span class="doccomment">/// 2. The base addresses of that crate&#39;s main `.text` section and `.eh_frame` section.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Locking / Deadlock</span>
-<span class="doccomment">/// Obtains the lock on the given `crate_ref`.</span>
-<span class="kw">fn</span> <span class="ident">get_eh_frame_info</span>(<span class="ident">crate_ref</span>: <span class="kw-2">&amp;</span><span class="ident">StrongCrateRef</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">StrongSectionRef</span>, <span class="ident">BaseAddresses</span>)<span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">krate</span> <span class="op">=</span> <span class="ident">crate_ref</span>.<span class="ident">lock_as_ref</span>();
+<span class="doccomment">/// Returns a tuple of:
+/// 1. The `.eh_frame` section for the given `crate_ref`
+/// 2. The base addresses of that crate&#39;s main `.text` section and `.eh_frame` section.
+/// 
+/// # Locking / Deadlock
+/// Obtains the lock on the given `crate_ref`.
+</span><span class="kw">fn </span>get_eh_frame_info(crate_ref: <span class="kw-2">&amp;</span>StrongCrateRef) -&gt; <span class="prelude-ty">Option</span>&lt;(StrongSectionRef, BaseAddresses)&gt; {
+    <span class="kw">let </span>krate = crate_ref.lock_as_ref();
 
-    <span class="kw">let</span> <span class="ident">eh_frame_sec</span> <span class="op">=</span> <span class="ident">krate</span>.<span class="ident">sections</span>.<span class="ident">values</span>()
-        .<span class="ident">find</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">typ</span> <span class="op">==</span> <span class="ident">SectionType::EhFrame</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>eh_frame_sec = krate.sections.values()
+        .find(|s| s.typ == SectionType::EhFrame)<span class="question-mark">?</span>;
     
-    <span class="kw">let</span> <span class="ident">eh_frame_vaddr</span> <span class="op">=</span> <span class="ident">eh_frame_sec</span>.<span class="ident">start_address</span>().<span class="ident">value</span>();
-    <span class="kw">let</span> <span class="ident">text_pages_vaddr</span> <span class="op">=</span> <span class="ident">krate</span>.<span class="ident">text_pages</span>.<span class="ident">as_ref</span>()<span class="question-mark">?</span>.<span class="number">1</span>.<span class="ident">start</span>.<span class="ident">value</span>();
-    <span class="kw">let</span> <span class="ident">base_addrs</span> <span class="op">=</span> <span class="ident">BaseAddresses::default</span>()
-        .<span class="ident">set_eh_frame</span>(<span class="ident">eh_frame_vaddr</span> <span class="kw">as</span> <span class="ident">u64</span>)
-        .<span class="ident">set_text</span>(<span class="ident">text_pages_vaddr</span> <span class="kw">as</span> <span class="ident">u64</span>);
+    <span class="kw">let </span>eh_frame_vaddr = eh_frame_sec.start_address().value();
+    <span class="kw">let </span>text_pages_vaddr = krate.text_pages.as_ref()<span class="question-mark">?</span>.<span class="number">1</span>.start.value();
+    <span class="kw">let </span>base_addrs = BaseAddresses::default()
+        .set_eh_frame(eh_frame_vaddr <span class="kw">as </span>u64)
+        .set_text(text_pages_vaddr <span class="kw">as </span>u64);
 
-    <span class="prelude-val">Some</span>((<span class="ident">eh_frame_sec</span>.<span class="ident">clone</span>(), <span class="ident">base_addrs</span>))
+    <span class="prelude-val">Some</span>((eh_frame_sec.clone(), base_addrs))
 }
 
 
-<span class="doccomment">/// Starts the unwinding procedure for the current task </span>
-<span class="doccomment">/// by working backwards up the call stack starting from the current stack frame.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `reason`: the reason why the current task is being killed, e.g., due to a panic, exception, etc.</span>
-<span class="doccomment">/// * `stack_frames_to_skip`: the number of stack frames that can be skipped in order to avoid unwinding them.</span>
-<span class="doccomment">///   Those frames should have nothing that needs to be unwound, e.g., no landing pads that invoke drop handlers.</span>
-<span class="doccomment">///   For example, for a panic, the first `5` frames in the call stack can be ignored.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// ## Note: Skipping frames</span>
-<span class="doccomment">/// If you are unsure how many frames you could possibly skip, then it&#39;s always safe to pass `0`</span>
-<span class="doccomment">/// such that all function frames on the stack are unwound.</span>
-<span class="doccomment">/// </span>
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_unwinding</span>(<span class="ident">reason</span>: <span class="ident">KillReason</span>, <span class="ident">stack_frames_to_skip</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="comment">// Here we have to be careful to have no resources waiting to be dropped/freed/released on the stack. </span>
-    <span class="kw">let</span> <span class="ident">unwinding_context_ptr</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="ident">curr_task</span> <span class="op">=</span> <span class="ident">task::get_my_current_task</span>().<span class="ident">ok_or</span>(<span class="string">&quot;get_my_current_task() failed&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">namespace</span> <span class="op">=</span> <span class="ident">curr_task</span>.<span class="ident">get_namespace</span>();
+<span class="doccomment">/// Starts the unwinding procedure for the current task 
+/// by working backwards up the call stack starting from the current stack frame.
+/// 
+/// # Arguments
+/// * `reason`: the reason why the current task is being killed, e.g., due to a panic, exception, etc.
+/// * `stack_frames_to_skip`: the number of stack frames that can be skipped in order to avoid unwinding them.
+///   Those frames should have nothing that needs to be unwound, e.g., no landing pads that invoke drop handlers.
+///   For example, for a panic, the first `5` frames in the call stack can be ignored.
+/// 
+/// ## Note: Skipping frames
+/// If you are unsure how many frames you could possibly skip, then it&#39;s always safe to pass `0`
+/// such that all function frames on the stack are unwound.
+/// 
+</span><span class="attr">#[doc(hidden)]
+</span><span class="kw">pub fn </span>start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="comment">// Here we have to be careful to have no resources waiting to be dropped/freed/released on the stack. 
+    </span><span class="kw">let </span>unwinding_context_ptr = {
+        <span class="kw">let </span>curr_task = task::get_my_current_task().ok_or(<span class="string">&quot;get_my_current_task() failed&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>namespace = curr_task.get_namespace();
 
-        <span class="ident">Box::into_raw</span>(<span class="ident">Box::new</span>(
-            <span class="ident">UnwindingContext</span> {
-                <span class="ident">stack_frame_iter</span>: <span class="ident">StackFrameIter::new</span>(
-                    <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">namespace</span>),
-                    <span class="comment">// we will set the real register values later, in the `invoke_with_current_registers()` closure.</span>
-                    <span class="ident">Registers::default</span>()
+        Box::into_raw(Box::new(
+            UnwindingContext {
+                stack_frame_iter: StackFrameIter::new(
+                    Arc::clone(<span class="kw-2">&amp;</span>namespace),
+                    <span class="comment">// we will set the real register values later, in the `invoke_with_current_registers()` closure.
+                    </span>Registers::default()
                 ), 
-                <span class="ident">cause</span>: <span class="ident">reason</span>,
-                <span class="ident">current_task</span>: <span class="ident">curr_task</span>.<span class="ident">clone</span>(),
+                cause: reason,
+                current_task: curr_task.clone(),
             }
         ))
     };
 
-    <span class="comment">// IMPORTANT NOTE!!!!</span>
-    <span class="comment">// From this point on, if there is a failure, we need to free the unwinding context pointer to avoid leaking things.</span>
+    <span class="comment">// IMPORTANT NOTE!!!!
+    // From this point on, if there is a failure, we need to free the unwinding context pointer to avoid leaking things.
 
 
-    <span class="comment">// We pass a pointer to the unwinding context to this closure. </span>
-    <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">invoke_with_current_registers</span>(<span class="kw-2">&amp;mut</span> <span class="op">|</span><span class="ident">registers</span><span class="op">|</span> {
-        <span class="comment">// set the proper register values before start the actual unwinding procedure.</span>
-        {  
-            <span class="comment">// SAFE: we just created this pointer above</span>
-            <span class="kw">let</span> <span class="ident">unwinding_context</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">unwinding_context_ptr</span> };
-            <span class="ident">unwinding_context</span>.<span class="ident">stack_frame_iter</span>.<span class="ident">registers</span> <span class="op">=</span> <span class="ident">registers</span>;
+    // We pass a pointer to the unwinding context to this closure. 
+    </span><span class="kw">let </span>res = invoke_with_current_registers(<span class="kw-2">&amp;mut </span>|registers| {
+        <span class="comment">// set the proper register values before start the actual unwinding procedure.
+        </span>{  
+            <span class="comment">// SAFE: we just created this pointer above
+            </span><span class="kw">let </span>unwinding_context = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>unwinding_context_ptr };
+            unwinding_context.stack_frame_iter.registers = registers;
             
-            <span class="comment">// Skip the first several frames, e.g., to skip unwinding the panic entry point functions themselves.</span>
-            <span class="kw">for</span> <span class="ident">_i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">stack_frames_to_skip</span> {
-                <span class="ident">unwinding_context</span>.<span class="ident">stack_frame_iter</span>.<span class="ident">next</span>()
-                    .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> {
-                        <span class="macro">error!</span>(<span class="string">&quot;error skipping call stack frame {} in unwinder&quot;</span>, <span class="ident">_i</span>);
-                        <span class="string">&quot;error skipping call stack frame in unwinder&quot;</span>
-                    })<span class="question-mark">?</span>
-                    .<span class="ident">ok_or</span>(<span class="string">&quot;call stack frame did not exist (we were trying to skip it)&quot;</span>)<span class="question-mark">?</span>;
+            <span class="comment">// Skip the first several frames, e.g., to skip unwinding the panic entry point functions themselves.
+            </span><span class="kw">for </span>_i <span class="kw">in </span><span class="number">0</span>..stack_frames_to_skip {
+                unwinding_context.stack_frame_iter.next()
+                    .map_err(|_e| {
+                        <span class="macro">error!</span>(<span class="string">&quot;error skipping call stack frame {} in unwinder&quot;</span>, _i);
+                        <span class="string">&quot;error skipping call stack frame in unwinder&quot;
+                    </span>})<span class="question-mark">?
+                    </span>.ok_or(<span class="string">&quot;call stack frame did not exist (we were trying to skip it)&quot;</span>)<span class="question-mark">?</span>;
             }
         }
 
-        <span class="ident">continue_unwinding</span>(<span class="ident">unwinding_context_ptr</span>)
+        continue_unwinding(unwinding_context_ptr)
     });
 
-    <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">res</span> {
+    <span class="kw">match </span><span class="kw-2">&amp;</span>res {
         <span class="kw-2">&amp;</span><span class="prelude-val">Ok</span>(()) =&gt; {
             <span class="macro">debug!</span>(<span class="string">&quot;unwinding procedure has reached the end of the stack.&quot;</span>);
         }
-        <span class="kw-2">&amp;</span><span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
-            <span class="macro">error!</span>(<span class="string">&quot;BUG: unwinding the first stack frame returned unexpectedly. Error: {}&quot;</span>, <span class="ident">e</span>);
+        <span class="kw-2">&amp;</span><span class="prelude-val">Err</span>(e) =&gt; {
+            <span class="macro">error!</span>(<span class="string">&quot;BUG: unwinding the first stack frame returned unexpectedly. Error: {}&quot;</span>, e);
         }
     }
-    <span class="ident">cleanup_unwinding_context</span>(<span class="ident">unwinding_context_ptr</span>);
+    cleanup_unwinding_context(unwinding_context_ptr);
 }
 
 
-<span class="doccomment">/// Continues the unwinding process from the point it left off at, </span>
-<span class="doccomment">/// which is defined by the given unwinding context.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This returns an error upon failure, </span>
-<span class="doccomment">/// and an `Ok(())` when it reaches the end of the stack and there are no more frames to unwind.</span>
-<span class="doccomment">/// When either value is returned (upon a return of any kind),</span>
-<span class="doccomment">/// **the caller is responsible for cleaning up** the given `UnwindingContext`.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Upon successfully continuing to iterate up the call stack, this function will actually not return at all. </span>
-<span class="kw">fn</span> <span class="ident">continue_unwinding</span>(<span class="ident">unwinding_context_ptr</span>: <span class="kw-2">*mut</span> <span class="ident">UnwindingContext</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">stack_frame_iter</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;mut</span> (<span class="kw-2">*</span><span class="ident">unwinding_context_ptr</span>).<span class="ident">stack_frame_iter</span> };
+<span class="doccomment">/// Continues the unwinding process from the point it left off at, 
+/// which is defined by the given unwinding context.
+/// 
+/// This returns an error upon failure, 
+/// and an `Ok(())` when it reaches the end of the stack and there are no more frames to unwind.
+/// When either value is returned (upon a return of any kind),
+/// **the caller is responsible for cleaning up** the given `UnwindingContext`.
+/// 
+/// Upon successfully continuing to iterate up the call stack, this function will actually not return at all. 
+</span><span class="kw">fn </span>continue_unwinding(unwinding_context_ptr: <span class="kw-2">*mut </span>UnwindingContext) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>stack_frame_iter = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut </span>(<span class="kw-2">*</span>unwinding_context_ptr).stack_frame_iter };
     
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-    <span class="macro">trace!</span>(<span class="string">&quot;continue_unwinding(): stack_frame_iter: {:#X?}&quot;</span>, <span class="ident">stack_frame_iter</span>);
+    <span class="attr">#[cfg(not(downtime_eval))]
+    </span><span class="macro">trace!</span>(<span class="string">&quot;continue_unwinding(): stack_frame_iter: {:#X?}&quot;</span>, stack_frame_iter);
     
-    <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">regs</span>, <span class="ident">landing_pad_address</span>) <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">frame</span>) <span class="op">=</span> <span class="ident">stack_frame_iter</span>.<span class="ident">next</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
-        <span class="macro">error!</span>(<span class="string">&quot;continue_unwinding: error getting next stack frame in the call stack: {}&quot;</span>, <span class="ident">e</span>);
-        <span class="string">&quot;continue_unwinding: error getting next stack frame in the call stack&quot;</span>
-    })<span class="question-mark">?</span> {
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span> {
-            <span class="macro">info!</span>(<span class="string">&quot;Unwinding StackFrame: {:#X?}&quot;</span>, <span class="ident">frame</span>);
-            <span class="macro">info!</span>(<span class="string">&quot;  In func: {:?}&quot;</span>, <span class="ident">stack_frame_iter</span>.<span class="ident">namespace</span>().<span class="ident">get_section_containing_address</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">frame</span>.<span class="ident">initial_address</span>() <span class="kw">as</span> <span class="ident">usize</span>), <span class="bool-val">false</span>));
-            <span class="macro">info!</span>(<span class="string">&quot;  Regs: {:?}&quot;</span>, <span class="ident">stack_frame_iter</span>.<span class="ident">registers</span>());
+    <span class="kw">let </span>(<span class="kw-2">mut </span>regs, landing_pad_address) = <span class="kw">if let </span><span class="prelude-val">Some</span>(frame) = stack_frame_iter.next().map_err(|e| {
+        <span class="macro">error!</span>(<span class="string">&quot;continue_unwinding: error getting next stack frame in the call stack: {}&quot;</span>, e);
+        <span class="string">&quot;continue_unwinding: error getting next stack frame in the call stack&quot;
+    </span>})<span class="question-mark">? </span>{
+        <span class="attr">#[cfg(not(downtime_eval))] </span>{
+            <span class="macro">info!</span>(<span class="string">&quot;Unwinding StackFrame: {:#X?}&quot;</span>, frame);
+            <span class="macro">info!</span>(<span class="string">&quot;  In func: {:?}&quot;</span>, stack_frame_iter.namespace().get_section_containing_address(VirtualAddress::new_canonical(frame.initial_address() <span class="kw">as </span>usize), <span class="bool-val">false</span>));
+            <span class="macro">info!</span>(<span class="string">&quot;  Regs: {:?}&quot;</span>, stack_frame_iter.registers());
         }
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">lsda</span>) <span class="op">=</span> <span class="ident">frame</span>.<span class="ident">lsda</span>() {
-            <span class="kw">let</span> <span class="ident">lsda</span> <span class="op">=</span> <span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">lsda</span> <span class="kw">as</span> <span class="ident">usize</span>);
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">sec</span>, <span class="kw">_</span>)) <span class="op">=</span> <span class="ident">stack_frame_iter</span>.<span class="ident">namespace</span>().<span class="ident">get_section_containing_address</span>(<span class="ident">lsda</span>, <span class="bool-val">true</span>) {
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-                <span class="macro">info!</span>(<span class="string">&quot;  parsing LSDA section: {:?}&quot;</span>, <span class="ident">sec</span>);
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(lsda) = frame.lsda() {
+            <span class="kw">let </span>lsda = VirtualAddress::new_canonical(lsda <span class="kw">as </span>usize);
+            <span class="kw">if let </span><span class="prelude-val">Some</span>((sec, <span class="kw">_</span>)) = stack_frame_iter.namespace().get_section_containing_address(lsda, <span class="bool-val">true</span>) {
+                <span class="attr">#[cfg(not(downtime_eval))]
+                </span><span class="macro">info!</span>(<span class="string">&quot;  parsing LSDA section: {:?}&quot;</span>, sec);
                 
-                <span class="kw">let</span> <span class="ident">starting_offset</span> <span class="op">=</span> <span class="ident">sec</span>.<span class="ident">mapped_pages_offset</span> <span class="op">+</span> (<span class="ident">lsda</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">sec</span>.<span class="ident">address_range</span>.<span class="ident">start</span>.<span class="ident">value</span>());
-                <span class="kw">let</span> <span class="ident">length_til_end_of_mp</span> <span class="op">=</span> <span class="ident">sec</span>.<span class="ident">address_range</span>.<span class="ident">end</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">lsda</span>.<span class="ident">value</span>();
-                <span class="kw">let</span> <span class="ident">sec_mp</span> <span class="op">=</span> <span class="ident">sec</span>.<span class="ident">mapped_pages</span>.<span class="ident">lock</span>();
-                <span class="kw">let</span> <span class="ident">lsda_slice</span> <span class="op">=</span> <span class="ident">sec_mp</span>.<span class="ident">as_slice</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">starting_offset</span>, <span class="ident">length_til_end_of_mp</span>)
-                    .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;continue_unwinding(): couldn&#39;t get LSDA pointer as a slice&quot;</span>)<span class="question-mark">?</span>;
-                <span class="kw">let</span> <span class="ident">table</span> <span class="op">=</span> <span class="ident">lsda::GccExceptTableArea::new</span>(<span class="ident">lsda_slice</span>, <span class="ident">NativeEndian</span>, <span class="ident">frame</span>.<span class="ident">initial_address</span>());
+                <span class="kw">let </span>starting_offset = sec.mapped_pages_offset + (lsda.value() - sec.address_range.start.value());
+                <span class="kw">let </span>length_til_end_of_mp = sec.address_range.end.value() - lsda.value();
+                <span class="kw">let </span>sec_mp = sec.mapped_pages.lock();
+                <span class="kw">let </span>lsda_slice = sec_mp.as_slice::&lt;u8&gt;(starting_offset, length_til_end_of_mp)
+                    .map_err(|_e| <span class="string">&quot;continue_unwinding(): couldn&#39;t get LSDA pointer as a slice&quot;</span>)<span class="question-mark">?</span>;
+                <span class="kw">let </span>table = lsda::GccExceptTableArea::new(lsda_slice, NativeEndian, frame.initial_address());
 
-                <span class="comment">// {</span>
-                <span class="comment">//     let mut iter = table.call_site_table_entries().map_err(|_| &quot;BAD TABLE&quot;)?;</span>
-                <span class="comment">//     while let Some(entry) = iter.next().map_err(|_| &quot;BAD ITER&quot;)? {</span>
-                <span class="comment">//         debug!(&quot;    {:#X?}&quot;, entry);</span>
-                <span class="comment">//     }</span>
-                <span class="comment">// }</span>
+                <span class="comment">// {
+                //     let mut iter = table.call_site_table_entries().map_err(|_| &quot;BAD TABLE&quot;)?;
+                //     while let Some(entry) = iter.next().map_err(|_| &quot;BAD ITER&quot;)? {
+                //         debug!(&quot;    {:#X?}&quot;, entry);
+                //     }
+                // }
 
-                <span class="kw">let</span> <span class="ident">entry</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">table</span>.<span class="ident">call_site_table_entry_for_address</span>(<span class="ident">frame</span>.<span class="ident">call_site_address</span>()) {
-                    <span class="prelude-val">Ok</span>(<span class="ident">x</span>) =&gt; <span class="ident">x</span>,
-                    <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
-                        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-                        <span class="macro">error!</span>(<span class="string">&quot;continue_unwinding(): couldn&#39;t find a call site table entry for this stack frame&#39;s call site address {:#X}. Error: {}&quot;</span>, <span class="ident">frame</span>.<span class="ident">call_site_address</span>(), <span class="ident">e</span>);
+                </span><span class="kw">let </span>entry = <span class="kw">match </span>table.call_site_table_entry_for_address(frame.call_site_address()) {
+                    <span class="prelude-val">Ok</span>(x) =&gt; x,
+                    <span class="prelude-val">Err</span>(e) =&gt; {
+                        <span class="attr">#[cfg(not(downtime_eval))]
+                        </span><span class="macro">error!</span>(<span class="string">&quot;continue_unwinding(): couldn&#39;t find a call site table entry for this stack frame&#39;s call site address {:#X}. Error: {}&quot;</span>, frame.call_site_address(), e);
                         
-                        <span class="comment">// Now we don&#39;t have an exact match. We try to use the previous</span>
-                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">iter</span> <span class="op">=</span> <span class="ident">table</span>.<span class="ident">call_site_table_entries</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> {<span class="string">&quot;Couldn&#39;t find call_site_table_entries&quot;</span>})<span class="question-mark">?</span>;
+                        <span class="comment">// Now we don&#39;t have an exact match. We try to use the previous
+                        </span><span class="kw">let </span><span class="kw-2">mut </span>iter = table.call_site_table_entries().map_err(|_e| {<span class="string">&quot;Couldn&#39;t find call_site_table_entries&quot;</span>})<span class="question-mark">?</span>;
 
-                        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">closest_entry</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-                        <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">entry</span>) <span class="op">=</span> <span class="ident">iter</span>.<span class="ident">next</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> {<span class="string">&quot;Couldn&#39;t iterate through the entries&quot;</span>})<span class="question-mark">?</span> {
-                            <span class="kw">if</span> <span class="ident">entry</span>.<span class="ident">range_of_covered_addresses</span>().<span class="ident">start</span> <span class="op">&lt;</span> <span class="ident">frame</span>.<span class="ident">call_site_address</span>() {
-                                <span class="ident">closest_entry</span> <span class="op">=</span>  <span class="prelude-val">Some</span>(<span class="ident">entry</span>);
+                        <span class="kw">let </span><span class="kw-2">mut </span>closest_entry = <span class="prelude-val">None</span>;
+                        <span class="kw">while let </span><span class="prelude-val">Some</span>(entry) = iter.next().map_err(|_e| {<span class="string">&quot;Couldn&#39;t iterate through the entries&quot;</span>})<span class="question-mark">? </span>{
+                            <span class="kw">if </span>entry.range_of_covered_addresses().start &lt; frame.call_site_address() {
+                                closest_entry =  <span class="prelude-val">Some</span>(entry);
                             }
                         }
                         
-                        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span> (<span class="ident">closest_entry</span>) <span class="op">=</span> <span class="ident">closest_entry</span> {
-                            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-                            <span class="macro">debug!</span>(<span class="string">&quot;No unwind info for address. Using the closeset&quot;</span>);
-                            <span class="ident">closest_entry</span>
-                        } <span class="kw">else</span> {
-                            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;continue_unwinding(): couldn&#39;t find a call site table entry for this stack frame&#39;s call site address.&quot;</span>);
+                        <span class="kw">if let </span><span class="prelude-val">Some </span>(closest_entry) = closest_entry {
+                            <span class="attr">#[cfg(not(downtime_eval))]
+                            </span><span class="macro">debug!</span>(<span class="string">&quot;No unwind info for address. Using the closeset&quot;</span>);
+                            closest_entry
+                        } <span class="kw">else </span>{
+                            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;continue_unwinding(): couldn&#39;t find a call site table entry for this stack frame&#39;s call site address.&quot;</span>);
                         }
                     }
                 };
 
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-                <span class="macro">debug!</span>(<span class="string">&quot;Found call site entry for address {:#X}: {:#X?}&quot;</span>, <span class="ident">frame</span>.<span class="ident">call_site_address</span>(), <span class="ident">entry</span>);
-                (<span class="ident">stack_frame_iter</span>.<span class="ident">registers</span>().<span class="ident">clone</span>(), <span class="ident">entry</span>.<span class="ident">landing_pad_address</span>())
-            } <span class="kw">else</span> {
-                <span class="macro">error!</span>(<span class="string">&quot;  BUG: couldn&#39;t find LSDA section (.gcc_except_table) for LSDA address: {:#X}&quot;</span>, <span class="ident">lsda</span>);
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: couldn&#39;t find LSDA section (.gcc_except_table) for LSDA address specified in stack frame&quot;</span>);
+                <span class="attr">#[cfg(not(downtime_eval))]
+                </span><span class="macro">debug!</span>(<span class="string">&quot;Found call site entry for address {:#X}: {:#X?}&quot;</span>, frame.call_site_address(), entry);
+                (stack_frame_iter.registers().clone(), entry.landing_pad_address())
+            } <span class="kw">else </span>{
+                <span class="macro">error!</span>(<span class="string">&quot;  BUG: couldn&#39;t find LSDA section (.gcc_except_table) for LSDA address: {:#X}&quot;</span>, lsda);
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: couldn&#39;t find LSDA section (.gcc_except_table) for LSDA address specified in stack frame&quot;</span>);
             }
-        } <span class="kw">else</span> {
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-            <span class="macro">trace!</span>(<span class="string">&quot;continue_unwinding(): stack frame has no LSDA&quot;</span>);
-            <span class="kw">return</span> <span class="ident">continue_unwinding</span>(<span class="ident">unwinding_context_ptr</span>);
+        } <span class="kw">else </span>{
+            <span class="attr">#[cfg(not(downtime_eval))]
+            </span><span class="macro">trace!</span>(<span class="string">&quot;continue_unwinding(): stack frame has no LSDA&quot;</span>);
+            <span class="kw">return </span>continue_unwinding(unwinding_context_ptr);
         }
-    } <span class="kw">else</span> {
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-        <span class="macro">trace!</span>(<span class="string">&quot;continue_unwinding(): NO REMAINING STACK FRAMES&quot;</span>);
-        <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+    } <span class="kw">else </span>{
+        <span class="attr">#[cfg(not(downtime_eval))]
+        </span><span class="macro">trace!</span>(<span class="string">&quot;continue_unwinding(): NO REMAINING STACK FRAMES&quot;</span>);
+        <span class="kw">return </span><span class="prelude-val">Ok</span>(());
     };
 
-    <span class="comment">// Even if this frame has LSDA, it may still not have a landing pad function.</span>
-    <span class="kw">let</span> <span class="ident">landing_pad_address</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">landing_pad_address</span> {
-        <span class="prelude-val">Some</span>(<span class="ident">lpa</span>) =&gt; <span class="ident">lpa</span>,
-        <span class="kw">_</span> =&gt; {
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-            <span class="macro">warn!</span>(<span class="string">&quot;continue_unwinding(): stack frame has LSDA but no landing pad&quot;</span>);
-            <span class="kw">return</span> <span class="ident">continue_unwinding</span>(<span class="ident">unwinding_context_ptr</span>);
+    <span class="comment">// Even if this frame has LSDA, it may still not have a landing pad function.
+    </span><span class="kw">let </span>landing_pad_address = <span class="kw">match </span>landing_pad_address {
+        <span class="prelude-val">Some</span>(lpa) =&gt; lpa,
+        <span class="kw">_ </span>=&gt; {
+            <span class="attr">#[cfg(not(downtime_eval))]
+            </span><span class="macro">warn!</span>(<span class="string">&quot;continue_unwinding(): stack frame has LSDA but no landing pad&quot;</span>);
+            <span class="kw">return </span>continue_unwinding(unwinding_context_ptr);
         }
     };
 
-    <span class="comment">// Exception/interrupt handlers appear to have no real cleanup routines, despite having an LSDA entry. </span>
-    <span class="comment">// Thus, we skip unwinding an exception handler frame because its landing pad will point to an invalid instruction (usually `ud2`).</span>
-    <span class="kw">if</span> <span class="ident">stack_frame_iter</span>.<span class="ident">last_frame_was_exception_handler</span> {
-        <span class="kw">let</span> <span class="ident">landing_pad_value</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">*</span>(<span class="ident">landing_pad_address</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">u16</span>) };
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-        <span class="macro">warn!</span>(<span class="string">&quot;Skipping exception/interrupt handler&#39;s landing pad (cleanup function) at {:#X}, which points to {:#X} (UD2: {})&quot;</span>, 
-            <span class="ident">landing_pad_address</span>, <span class="ident">landing_pad_value</span>, <span class="ident">landing_pad_value</span> <span class="op">==</span> <span class="number">0x0B0F</span>,  <span class="comment">// the `ud2` instruction</span>
-        );
-        <span class="kw">return</span> <span class="ident">continue_unwinding</span>(<span class="ident">unwinding_context_ptr</span>);
+    <span class="comment">// Exception/interrupt handlers appear to have no real cleanup routines, despite having an LSDA entry. 
+    // Thus, we skip unwinding an exception handler frame because its landing pad will point to an invalid instruction (usually `ud2`).
+    </span><span class="kw">if </span>stack_frame_iter.last_frame_was_exception_handler {
+        <span class="kw">let </span>landing_pad_value: u16 = <span class="kw">unsafe </span>{ <span class="kw-2">*</span>(landing_pad_address <span class="kw">as </span><span class="kw-2">*const </span>u16) };
+        <span class="attr">#[cfg(not(downtime_eval))]
+        </span><span class="macro">warn!</span>(<span class="string">&quot;Skipping exception/interrupt handler&#39;s landing pad (cleanup function) at {:#X}, which points to {:#X} (UD2: {})&quot;</span>, 
+            landing_pad_address, landing_pad_value, landing_pad_value == <span class="number">0x0B0F</span>,  <span class="comment">// the `ud2` instruction
+        </span>);
+        <span class="kw">return </span>continue_unwinding(unwinding_context_ptr);
     }
 
-    <span class="comment">// Jump to the actual landing pad function, or rather, a function that will jump there after setting up register values properly.</span>
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-    <span class="macro">debug!</span>(<span class="string">&quot;Jumping to landing pad (cleanup function) at {:#X}&quot;</span>, <span class="ident">landing_pad_address</span>);
-    <span class="comment">// Once the unwinding cleanup function is done, it will call _Unwind_Resume (technically, it jumps to it),</span>
-    <span class="comment">// and pass the value in the landing registers&#39; RAX register as the argument to _Unwind_Resume. </span>
-    <span class="comment">// So, whatever we put into RAX in the landing regs will be placed into the first arg (RDI) in _Unwind_Resume.</span>
-    <span class="comment">// This is arch-specific; for x86_64 the transfer is from RAX -&gt; RDI, for ARM/AARCH64, the transfer is from R0 -&gt; R1 or X0 -&gt; X1.</span>
-    <span class="comment">// See this for more mappings: &lt;https://github.com/rust-lang/rust/blob/master/src/libpanic_unwind/gcc.rs#L102&gt;</span>
-    <span class="ident">regs</span>[<span class="ident">gimli::X86_64::RAX</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">unwinding_context_ptr</span> <span class="kw">as</span> <span class="ident">u64</span>);
-    <span class="kw">unsafe</span> {
-        <span class="ident">land</span>(<span class="kw-2">&amp;</span><span class="ident">regs</span>, <span class="ident">landing_pad_address</span>)<span class="question-mark">?</span>;
+    <span class="comment">// Jump to the actual landing pad function, or rather, a function that will jump there after setting up register values properly.
+    </span><span class="attr">#[cfg(not(downtime_eval))]
+    </span><span class="macro">debug!</span>(<span class="string">&quot;Jumping to landing pad (cleanup function) at {:#X}&quot;</span>, landing_pad_address);
+    <span class="comment">// Once the unwinding cleanup function is done, it will call _Unwind_Resume (technically, it jumps to it),
+    // and pass the value in the landing registers&#39; RAX register as the argument to _Unwind_Resume. 
+    // So, whatever we put into RAX in the landing regs will be placed into the first arg (RDI) in _Unwind_Resume.
+    // This is arch-specific; for x86_64 the transfer is from RAX -&gt; RDI, for ARM/AARCH64, the transfer is from R0 -&gt; R1 or X0 -&gt; X1.
+    // See this for more mappings: &lt;https://github.com/rust-lang/rust/blob/master/src/libpanic_unwind/gcc.rs#L102&gt;
+    </span>regs[gimli::X86_64::RAX] = <span class="prelude-val">Some</span>(unwinding_context_ptr <span class="kw">as </span>u64);
+    <span class="kw">unsafe </span>{
+        land(<span class="kw-2">&amp;</span>regs, landing_pad_address)<span class="question-mark">?</span>;
     }
     <span class="macro">error!</span>(<span class="string">&quot;BUG: call to unwind::land() returned, which should never happen!&quot;</span>);
     <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: call to unwind::land() returned, which should never happen!&quot;</span>)
 }
 
 
-<span class="doccomment">/// This function is invoked after each unwinding cleanup routine has finished.</span>
-<span class="doccomment">/// Thus, this is a middle point in the unwinding execution flow; </span>
-<span class="doccomment">/// here we need to continue (*resume*) the unwinding procedure </span>
-<span class="doccomment">/// by basically figuring out where we just came from and picking up where we left off. </span>
-<span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unwind_resume</span>(<span class="ident">unwinding_context_ptr</span>: <span class="ident">usize</span>) -&gt; <span class="op">!</span> {
-    <span class="comment">// trace!(&quot;unwind_resume(): unwinding_context_ptr value: {:#X}&quot;, unwinding_context_ptr);</span>
-    <span class="kw">let</span> <span class="ident">unwinding_context_ptr</span> <span class="op">=</span> <span class="ident">unwinding_context_ptr</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">UnwindingContext</span>;
+<span class="doccomment">/// This function is invoked after each unwinding cleanup routine has finished.
+/// Thus, this is a middle point in the unwinding execution flow; 
+/// here we need to continue (*resume*) the unwinding procedure 
+/// by basically figuring out where we just came from and picking up where we left off. 
+</span><span class="attr">#[doc(hidden)]
+</span><span class="kw">pub fn </span>unwind_resume(unwinding_context_ptr: usize) -&gt; ! {
+    <span class="comment">// trace!(&quot;unwind_resume(): unwinding_context_ptr value: {:#X}&quot;, unwinding_context_ptr);
+    </span><span class="kw">let </span>unwinding_context_ptr = unwinding_context_ptr <span class="kw">as </span><span class="kw-2">*mut </span>UnwindingContext;
 
-    <span class="kw">match</span> <span class="ident">continue_unwinding</span>(<span class="ident">unwinding_context_ptr</span>) {
+    <span class="kw">match </span>continue_unwinding(unwinding_context_ptr) {
         <span class="prelude-val">Ok</span>(()) =&gt; {
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-            <span class="macro">debug!</span>(<span class="string">&quot;unwind_resume(): continue_unwinding() returned Ok(), meaning it&#39;s at the end of the call stack.&quot;</span>);
+            <span class="attr">#[cfg(not(downtime_eval))]
+            </span><span class="macro">debug!</span>(<span class="string">&quot;unwind_resume(): continue_unwinding() returned Ok(), meaning it&#39;s at the end of the call stack.&quot;</span>);
         }
-        <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
-            <span class="macro">error!</span>(<span class="string">&quot;BUG: in unwind_resume(): continue_unwinding() returned an error: {}&quot;</span>, <span class="ident">e</span>);
+        <span class="prelude-val">Err</span>(e) =&gt; {
+            <span class="macro">error!</span>(<span class="string">&quot;BUG: in unwind_resume(): continue_unwinding() returned an error: {}&quot;</span>, e);
         }
     }
-    <span class="comment">// here, cleanup the unwinding state and kill the task</span>
-    <span class="ident">cleanup_unwinding_context</span>(<span class="ident">unwinding_context_ptr</span>);
+    <span class="comment">// here, cleanup the unwinding state and kill the task
+    </span>cleanup_unwinding_context(unwinding_context_ptr);
 }
 
 
-<span class="doccomment">/// This function should be invoked when the unwinding procedure is finished, or cannot be continued any further.</span>
-<span class="doccomment">/// It cleans up the `UnwindingContext` object pointed to by the given pointer and marks the current task as killed.</span>
-<span class="kw">fn</span> <span class="ident">cleanup_unwinding_context</span>(<span class="ident">unwinding_context_ptr</span>: <span class="kw-2">*mut</span> <span class="ident">UnwindingContext</span>) -&gt; <span class="op">!</span> {
-    <span class="comment">// Recover ownership of the unwinding context from its pointer</span>
-    <span class="kw">let</span> <span class="ident">unwinding_context_boxed</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Box::from_raw</span>(<span class="ident">unwinding_context_ptr</span>) };
-    <span class="kw">let</span> <span class="ident">unwinding_context</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">unwinding_context_boxed</span>;
-    <span class="kw">let</span> (<span class="ident">stack_frame_iter</span>, <span class="ident">cause</span>, <span class="ident">current_task</span>) <span class="op">=</span> <span class="ident">unwinding_context</span>.<span class="ident">into</span>();
-    <span class="ident">drop</span>(<span class="ident">stack_frame_iter</span>);
+<span class="doccomment">/// This function should be invoked when the unwinding procedure is finished, or cannot be continued any further.
+/// It cleans up the `UnwindingContext` object pointed to by the given pointer and marks the current task as killed.
+</span><span class="kw">fn </span>cleanup_unwinding_context(unwinding_context_ptr: <span class="kw-2">*mut </span>UnwindingContext) -&gt; ! {
+    <span class="comment">// Recover ownership of the unwinding context from its pointer
+    </span><span class="kw">let </span>unwinding_context_boxed = <span class="kw">unsafe </span>{ Box::from_raw(unwinding_context_ptr) };
+    <span class="kw">let </span>unwinding_context = <span class="kw-2">*</span>unwinding_context_boxed;
+    <span class="kw">let </span>(stack_frame_iter, cause, current_task) = unwinding_context.into();
+    drop(stack_frame_iter);
 
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-    <span class="macro">warn!</span>(<span class="string">&quot;cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}&quot;</span>, <span class="ident">current_task</span>);
+    <span class="attr">#[cfg(not(downtime_eval))]
+    </span><span class="macro">warn!</span>(<span class="string">&quot;cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}&quot;</span>, current_task);
     
-    (<span class="ident">current_task</span>.<span class="ident">failure_cleanup_function</span>)(<span class="ident">current_task</span>, <span class="ident">cause</span>)
+    (current_task.failure_cleanup_function)(current_task, cause)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="unwind" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="unwind" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

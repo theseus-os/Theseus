@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/libterm/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../libterm/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../libterm/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../libterm/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/libterm/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../libterm/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -665,667 +659,666 @@
 <span id="659">659</span>
 <span id="660">660</span>
 <span id="661">661</span>
-</pre><pre class="rust"><code><span class="doccomment">//! A basic terminal emulator library.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The terminal has several main responsibilities: </span>
-<span class="doccomment">//! * Managing the scrollback buffer, a string of characters that should be printed to the screen.</span>
-<span class="doccomment">//! * Determining which parts of that buffer should be displayed and using the window manager to do so.</span>
-<span class="doccomment">//! * Handling the command line user input.</span>
-<span class="doccomment">//! * Displaying the cursor at the right position</span>
-<span class="doccomment">//! * Handling events delivered from the window manager.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! A basic terminal emulator library.
+//!
+//! The terminal has several main responsibilities: 
+//! * Managing the scrollback buffer, a string of characters that should be printed to the screen.
+//! * Determining which parts of that buffer should be displayed and using the window manager to do so.
+//! * Handling the command line user input.
+//! * Displaying the cursor at the right position
+//! * Handling events delivered from the window manager.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">dfqueue</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">environment</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">print</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">event_types</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">displayable</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">font</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">framebuffer</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">framebuffer_drawer</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">framebuffer_printer</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">tsc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">window_manager</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">window</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">text_display</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">shapes</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">color</span>;
+#[macro_use] </span><span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>dfqueue;
+<span class="kw">extern crate </span>environment;
+<span class="kw">extern crate </span>print;
+<span class="kw">extern crate </span>event_types;
+<span class="kw">extern crate </span>displayable;
+<span class="kw">extern crate </span>font;
+<span class="kw">extern crate </span>framebuffer;
+<span class="kw">extern crate </span>framebuffer_drawer;
+<span class="kw">extern crate </span>framebuffer_printer;
+<span class="kw">extern crate </span>tsc;
+<span class="kw">extern crate </span>window_manager;
+<span class="kw">extern crate </span>window;
+<span class="kw">extern crate </span>text_display;
+<span class="kw">extern crate </span>shapes;
+<span class="kw">extern crate </span>color;
 
-<span class="kw">use</span> <span class="ident">core::ops::DerefMut</span>;
-<span class="kw">use</span> <span class="ident">alloc::string</span>::{<span class="ident">String</span>, <span class="ident">ToString</span>};
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">cursor</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">text_display::TextDisplay</span>;
-<span class="kw">use</span> <span class="ident">displayable::Displayable</span>;
-<span class="kw">use</span> <span class="ident">event_types::Event</span>;
-<span class="kw">use</span> <span class="ident">font</span>::{<span class="ident">CHARACTER_HEIGHT</span>, <span class="ident">CHARACTER_WIDTH</span>};
-<span class="kw">use</span> <span class="ident">framebuffer</span>::{<span class="ident">Framebuffer</span>, <span class="ident">Pixel</span>};
-<span class="kw">use</span> <span class="ident">color</span>::{<span class="ident">Color</span>};
-<span class="kw">use</span> <span class="ident">shapes</span>::{<span class="ident">Coord</span>, <span class="ident">Rectangle</span>};
-<span class="kw">use</span> <span class="ident">tsc</span>::{<span class="ident">tsc_ticks</span>, <span class="ident">TscTicks</span>};
-<span class="kw">use</span> <span class="ident">window::Window</span>;
+<span class="kw">use </span>core::ops::DerefMut;
+<span class="kw">use </span>alloc::string::{String, ToString};
+<span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>cursor::<span class="kw-2">*</span>;
+<span class="kw">use </span>text_display::TextDisplay;
+<span class="kw">use </span>displayable::Displayable;
+<span class="kw">use </span>event_types::Event;
+<span class="kw">use </span>font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
+<span class="kw">use </span>framebuffer::{Framebuffer, Pixel};
+<span class="kw">use </span>color::{Color};
+<span class="kw">use </span>shapes::{Coord, Rectangle};
+<span class="kw">use </span>tsc::{tsc_ticks, TscTicks};
+<span class="kw">use </span>window::Window;
 
-<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">cursor</span>;
+<span class="kw">pub mod </span>cursor;
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FONT_FOREGROUND_COLOR</span>: <span class="ident">Color</span> <span class="op">=</span> <span class="ident">color::LIGHT_GREEN</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">FONT_BACKGROUND_COLOR</span>: <span class="ident">Color</span> <span class="op">=</span> <span class="ident">color::BLACK</span>;
-<span class="kw">const</span> <span class="ident">DEFAULT_CURSOR_FREQ</span>: <span class="ident">u128</span> <span class="op">=</span> <span class="number">400000000</span>;
+<span class="kw">pub const </span>FONT_FOREGROUND_COLOR: Color = color::LIGHT_GREEN;
+<span class="kw">pub const </span>FONT_BACKGROUND_COLOR: Color = color::BLACK;
+<span class="kw">const </span>DEFAULT_CURSOR_FREQ: u128 = <span class="number">400000000</span>;
 
-<span class="doccomment">/// Error type for tracking different scroll errors that a terminal</span>
-<span class="doccomment">/// application could encounter.</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">ScrollError</span> {
-    <span class="doccomment">/// Occurs when a index-calculation returns an index that is outside of the </span>
-    <span class="doccomment">/// bounds of the scroll buffer</span>
-    <span class="ident">OffEndBound</span>
+<span class="doccomment">/// Error type for tracking different scroll errors that a terminal
+/// application could encounter.
+</span><span class="kw">pub enum </span>ScrollError {
+    <span class="doccomment">/// Occurs when a index-calculation returns an index that is outside of the 
+    /// bounds of the scroll buffer
+    </span>OffEndBound
 }
 
-<span class="doccomment">/// An instance of a graphical terminal emulator.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Terminal</span> {
-    <span class="doccomment">/// The terminal&#39;s own window.</span>
-    <span class="kw">pub</span> <span class="ident">window</span>: <span class="ident">Window</span>,
-    <span class="doccomment">/// The terminal&#39;s scrollback buffer which stores a string to be displayed by the text display</span>
-    <span class="ident">scrollback_buffer</span>: <span class="ident">String</span>,
-    <span class="doccomment">/// Indicates whether the text display is displaying the last part of the scrollback buffer slice</span>
-    <span class="ident">is_scroll_end</span>: <span class="ident">bool</span>,
-    <span class="doccomment">/// The starting index of the scrollback buffer string slice that is currently being displayed on the text display</span>
-    <span class="ident">scroll_start_idx</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// The text displayable which the terminal prints to.</span>
-    <span class="ident">text_display</span>: <span class="ident">TextDisplay</span>,
-    <span class="doccomment">/// The cursor of the terminal.</span>
-    <span class="kw">pub</span> <span class="ident">cursor</span>: <span class="ident">Cursor</span>,
+<span class="doccomment">/// An instance of a graphical terminal emulator.
+</span><span class="kw">pub struct </span>Terminal {
+    <span class="doccomment">/// The terminal&#39;s own window.
+    </span><span class="kw">pub </span>window: Window,
+    <span class="doccomment">/// The terminal&#39;s scrollback buffer which stores a string to be displayed by the text display
+    </span>scrollback_buffer: String,
+    <span class="doccomment">/// Indicates whether the text display is displaying the last part of the scrollback buffer slice
+    </span>is_scroll_end: bool,
+    <span class="doccomment">/// The starting index of the scrollback buffer string slice that is currently being displayed on the text display
+    </span>scroll_start_idx: usize,
+    <span class="doccomment">/// The text displayable which the terminal prints to.
+    </span>text_display: TextDisplay,
+    <span class="doccomment">/// The cursor of the terminal.
+    </span><span class="kw">pub </span>cursor: Cursor,
 }
 
-<span class="doccomment">/// Private methods of `Terminal`.</span>
-<span class="kw">impl</span> <span class="ident">Terminal</span> {
-    <span class="doccomment">/// Gets the width and height of the text displayable in number of characters.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_text_dimensions</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (<span class="ident">usize</span>, <span class="ident">usize</span>) {
-        <span class="self">self</span>.<span class="ident">text_display</span>.<span class="ident">get_dimensions</span>()
+<span class="doccomment">/// Private methods of `Terminal`.
+</span><span class="kw">impl </span>Terminal {
+    <span class="doccomment">/// Gets the width and height of the text displayable in number of characters.
+    </span><span class="kw">pub fn </span>get_text_dimensions(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (usize, usize) {
+        <span class="self">self</span>.text_display.get_dimensions()
     }
 
-    <span class="doccomment">/// This function takes in the end index of some index in the scrollback buffer and calculates the starting index of the</span>
-    <span class="doccomment">/// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of </span>
-    <span class="doccomment">/// text display. </span>
-    <span class="doccomment">/// If the text display&#39;s first line will display a continuation of a syntactical line in the scrollback buffer, this function </span>
-    <span class="doccomment">/// calculates the starting index so that when displayed on the text display, it preserves that line so that it looks the same</span>
-    <span class="doccomment">/// as if the whole physical line is displayed on the buffer</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Return: starting index of the string and the cursor position(with respect to position on the screen, not in the scrollback buffer) in that order</span>
-    <span class="kw">fn</span> <span class="ident">calc_start_idx</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">end_idx</span>: <span class="ident">usize</span>) -&gt; (<span class="ident">usize</span>, <span class="ident">usize</span>) {
-        <span class="kw">let</span> (<span class="ident">buffer_width</span>, <span class="ident">buffer_height</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_text_dimensions</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">start_idx</span> <span class="op">=</span> <span class="ident">end_idx</span>;
-        <span class="kw">let</span> <span class="ident">result</span>;
-        <span class="comment">// Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)</span>
-        <span class="kw">if</span> <span class="ident">end_idx</span> <span class="op">&gt;</span> <span class="ident">buffer_width</span> <span class="op">*</span> <span class="ident">buffer_height</span> {
-            <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">get</span>(<span class="ident">end_idx</span> <span class="op">-</span> <span class="ident">buffer_width</span> <span class="op">*</span> <span class="ident">buffer_height</span>..<span class="ident">end_idx</span>);
-        } <span class="kw">else</span> {
-            <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">get</span>(<span class="number">0</span>..<span class="ident">end_idx</span>);
+    <span class="doccomment">/// This function takes in the end index of some index in the scrollback buffer and calculates the starting index of the
+    /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
+    /// text display. 
+    /// If the text display&#39;s first line will display a continuation of a syntactical line in the scrollback buffer, this function 
+    /// calculates the starting index so that when displayed on the text display, it preserves that line so that it looks the same
+    /// as if the whole physical line is displayed on the buffer
+    /// 
+    /// Return: starting index of the string and the cursor position(with respect to position on the screen, not in the scrollback buffer) in that order
+    </span><span class="kw">fn </span>calc_start_idx(<span class="kw-2">&amp;</span><span class="self">self</span>, end_idx: usize) -&gt; (usize, usize) {
+        <span class="kw">let </span>(buffer_width, buffer_height) = <span class="self">self</span>.get_text_dimensions();
+        <span class="kw">let </span><span class="kw-2">mut </span>start_idx = end_idx;
+        <span class="kw">let </span>result;
+        <span class="comment">// Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
+        </span><span class="kw">if </span>end_idx &gt; buffer_width * buffer_height {
+            result = <span class="self">self</span>.scrollback_buffer.get(end_idx - buffer_width * buffer_height..end_idx);
+        } <span class="kw">else </span>{
+            result = <span class="self">self</span>.scrollback_buffer.get(<span class="number">0</span>..end_idx);
         }
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">slice</span>) <span class="op">=</span> <span class="ident">result</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">total_lines</span> <span class="op">=</span> <span class="number">0</span>;
-            <span class="comment">// Obtains a vector of indices of newlines in the slice in the REVERSE order that they occur</span>
-            <span class="kw">let</span> <span class="ident">new_line_indices</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">usize</span>, <span class="kw-2">&amp;</span><span class="ident">str</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">slice</span>.<span class="ident">rmatch_indices</span>(<span class="string">&#39;\n&#39;</span>).<span class="ident">collect</span>();
-            <span class="comment">// if there are no new lines in the slice</span>
-            <span class="kw">if</span> <span class="ident">new_line_indices</span>.<span class="ident">is_empty</span>() {
-                <span class="kw">if</span> <span class="ident">buffer_height</span> <span class="op">*</span> <span class="ident">buffer_width</span> <span class="op">&gt;</span> <span class="ident">end_idx</span> {
-                    <span class="kw">return</span> (<span class="number">0</span>, <span class="ident">end_idx</span>);
-                } <span class="kw">else</span> {
-                    <span class="ident">start_idx</span> <span class="op">-</span><span class="op">=</span> <span class="ident">buffer_height</span> <span class="op">*</span> <span class="ident">buffer_width</span>; <span class="comment">// text with no newlines will fill the entire buffer</span>
-                    <span class="kw">return</span> (<span class="ident">start_idx</span>, <span class="ident">buffer_height</span> <span class="op">*</span> <span class="ident">buffer_width</span> <span class="op">-</span><span class="number">1</span>);
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(slice) = result {
+            <span class="kw">let </span><span class="kw-2">mut </span>total_lines = <span class="number">0</span>;
+            <span class="comment">// Obtains a vector of indices of newlines in the slice in the REVERSE order that they occur
+            </span><span class="kw">let </span>new_line_indices: Vec&lt;(usize, <span class="kw-2">&amp;</span>str)&gt; = slice.rmatch_indices(<span class="string">&#39;\n&#39;</span>).collect();
+            <span class="comment">// if there are no new lines in the slice
+            </span><span class="kw">if </span>new_line_indices.is_empty() {
+                <span class="kw">if </span>buffer_height * buffer_width &gt; end_idx {
+                    <span class="kw">return </span>(<span class="number">0</span>, end_idx);
+                } <span class="kw">else </span>{
+                    start_idx -= buffer_height * buffer_width; <span class="comment">// text with no newlines will fill the entire buffer
+                    </span><span class="kw">return </span>(start_idx, buffer_height * buffer_width -<span class="number">1</span>);
                 }
             }
 
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">last_line_chars</span> <span class="op">=</span> <span class="number">0</span>;
-            <span class="comment">// Case where the last newline does not occur at the end of the slice</span>
-            <span class="kw">if</span> <span class="ident">new_line_indices</span>[<span class="number">0</span>].<span class="number">0</span> <span class="op">!</span><span class="op">=</span> <span class="ident">slice</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="number">1</span> {
-                <span class="ident">start_idx</span> <span class="op">-</span><span class="op">=</span> <span class="ident">slice</span>.<span class="ident">len</span>() <span class="op">-</span><span class="number">1</span> <span class="op">-</span> <span class="ident">new_line_indices</span>[<span class="number">0</span>].<span class="number">0</span>;
-                <span class="ident">total_lines</span> <span class="op">+</span><span class="op">=</span> (<span class="ident">slice</span>.<span class="ident">len</span>()<span class="op">-</span><span class="number">1</span> <span class="op">-</span> <span class="ident">new_line_indices</span>[<span class="number">0</span>].<span class="number">0</span>)<span class="op">/</span><span class="ident">buffer_width</span> <span class="op">+</span> <span class="number">1</span>;
-                <span class="ident">last_line_chars</span> <span class="op">=</span> (<span class="ident">slice</span>.<span class="ident">len</span>() <span class="op">-</span><span class="number">1</span> <span class="op">-</span> <span class="ident">new_line_indices</span>[<span class="number">0</span>].<span class="number">0</span>) <span class="op">%</span> <span class="ident">buffer_width</span>; <span class="comment">// fix: account for more than one line</span>
-            }
-            <span class="kw">else</span> {
-                <span class="ident">start_idx</span> <span class="op">-</span><span class="op">=</span> <span class="number">1</span>;
-                <span class="ident">total_lines</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+            <span class="kw">let </span><span class="kw-2">mut </span>last_line_chars = <span class="number">0</span>;
+            <span class="comment">// Case where the last newline does not occur at the end of the slice
+            </span><span class="kw">if </span>new_line_indices[<span class="number">0</span>].<span class="number">0 </span>!= slice.len() - <span class="number">1 </span>{
+                start_idx -= slice.len() -<span class="number">1 </span>- new_line_indices[<span class="number">0</span>].<span class="number">0</span>;
+                total_lines += (slice.len()-<span class="number">1 </span>- new_line_indices[<span class="number">0</span>].<span class="number">0</span>)/buffer_width + <span class="number">1</span>;
+                last_line_chars = (slice.len() -<span class="number">1 </span>- new_line_indices[<span class="number">0</span>].<span class="number">0</span>) % buffer_width; <span class="comment">// fix: account for more than one line
+            </span>}
+            <span class="kw">else </span>{
+                start_idx -= <span class="number">1</span>;
+                total_lines += <span class="number">1</span>;
             }
 
-            <span class="comment">// covers everything *up to* the characters between the beginning of the slice and the first new line character</span>
-            <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">new_line_indices</span>.<span class="ident">len</span>()<span class="op">-</span><span class="number">1</span> {
-                <span class="kw">if</span> <span class="ident">total_lines</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">buffer_height</span> {
+            <span class="comment">// covers everything *up to* the characters between the beginning of the slice and the first new line character
+            </span><span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..new_line_indices.len()-<span class="number">1 </span>{
+                <span class="kw">if </span>total_lines &gt;= buffer_height {
                     <span class="kw">break</span>;
                 }
-                <span class="kw">let</span> <span class="ident">num_chars</span> <span class="op">=</span> <span class="ident">new_line_indices</span>[<span class="ident">i</span>].<span class="number">0</span> <span class="op">-</span> <span class="ident">new_line_indices</span>[<span class="ident">i</span><span class="op">+</span><span class="number">1</span>].<span class="number">0</span>;
-                <span class="kw">let</span> <span class="ident">num_lines</span> <span class="op">=</span> <span class="kw">if</span> (<span class="ident">num_chars</span><span class="op">-</span><span class="number">1</span>)<span class="op">%</span><span class="ident">buffer_width</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span> (<span class="ident">num_chars</span> <span class="op">-</span><span class="number">1</span>) <span class="op">==</span> <span class="number">0</span> {
-                                    (<span class="ident">num_chars</span><span class="op">-</span><span class="number">1</span>) <span class="op">/</span> <span class="ident">buffer_width</span> <span class="op">+</span> <span class="number">1</span> 
-                                } <span class="kw">else</span> {
-                                    (<span class="ident">num_chars</span><span class="op">-</span><span class="number">1</span>)<span class="op">/</span><span class="ident">buffer_width</span>}; <span class="comment">// using (num_chars -1) because that&#39;s the number of characters that actually show up on the screen</span>
-                <span class="kw">if</span> <span class="ident">num_chars</span> <span class="op">&gt;</span> <span class="ident">start_idx</span> { <span class="comment">// prevents subtraction overflow</span>
-                    <span class="kw">return</span> (<span class="number">0</span>, <span class="ident">total_lines</span> <span class="op">*</span> <span class="ident">buffer_width</span> <span class="op">+</span> <span class="ident">last_line_chars</span>);
+                <span class="kw">let </span>num_chars = new_line_indices[i].<span class="number">0 </span>- new_line_indices[i+<span class="number">1</span>].<span class="number">0</span>;
+                <span class="kw">let </span>num_lines = <span class="kw">if </span>(num_chars-<span class="number">1</span>)%buffer_width != <span class="number">0 </span>|| (num_chars -<span class="number">1</span>) == <span class="number">0 </span>{
+                                    (num_chars-<span class="number">1</span>) / buffer_width + <span class="number">1 
+                                </span>} <span class="kw">else </span>{
+                                    (num_chars-<span class="number">1</span>)/buffer_width}; <span class="comment">// using (num_chars -1) because that&#39;s the number of characters that actually show up on the screen
+                </span><span class="kw">if </span>num_chars &gt; start_idx { <span class="comment">// prevents subtraction overflow
+                    </span><span class="kw">return </span>(<span class="number">0</span>, total_lines * buffer_width + last_line_chars);
                 }  
-                <span class="ident">start_idx</span> <span class="op">-</span><span class="op">=</span> <span class="ident">num_chars</span>;
-                <span class="ident">total_lines</span> <span class="op">+</span><span class="op">=</span> <span class="ident">num_lines</span>;
+                start_idx -= num_chars;
+                total_lines += num_lines;
             }
 
-            <span class="comment">// tracks the characters between the beginning of the slice and the first new line character</span>
-            <span class="kw">let</span> <span class="ident">first_chars</span> <span class="op">=</span> <span class="ident">new_line_indices</span>[<span class="ident">new_line_indices</span>.<span class="ident">len</span>() <span class="op">-</span><span class="number">1</span>].<span class="number">0</span>;
-            <span class="kw">let</span> <span class="ident">first_chars_lines</span> <span class="op">=</span> <span class="ident">first_chars</span><span class="op">/</span><span class="ident">buffer_width</span> <span class="op">+</span> <span class="number">1</span>;
+            <span class="comment">// tracks the characters between the beginning of the slice and the first new line character
+            </span><span class="kw">let </span>first_chars = new_line_indices[new_line_indices.len() -<span class="number">1</span>].<span class="number">0</span>;
+            <span class="kw">let </span>first_chars_lines = first_chars/buffer_width + <span class="number">1</span>;
 
-            <span class="comment">// covers the case where the text inside the new_lines_indices array overflow the text buffer </span>
-            <span class="kw">if</span> <span class="ident">total_lines</span> <span class="op">&gt;</span> <span class="ident">buffer_height</span> {
-                <span class="ident">start_idx</span> <span class="op">+</span><span class="op">=</span> (<span class="ident">total_lines</span> <span class="op">-</span> <span class="ident">buffer_height</span>) <span class="op">*</span> <span class="ident">buffer_width</span>; <span class="comment">// adds back the overcounted lines to the starting index</span>
-                <span class="ident">total_lines</span> <span class="op">=</span> <span class="ident">buffer_height</span>;
-            <span class="comment">// covers the case where the text between the last newline and the end of the slice overflow the text buffer</span>
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">first_chars_lines</span> <span class="op">+</span> <span class="ident">total_lines</span> <span class="op">&gt;</span> <span class="ident">buffer_height</span> {
-                <span class="kw">let</span> <span class="ident">diff</span> <span class="op">=</span> <span class="ident">buffer_height</span> <span class="op">-</span> <span class="ident">total_lines</span>;
-                <span class="ident">total_lines</span> <span class="op">+</span><span class="op">=</span> <span class="ident">diff</span>;
-                <span class="ident">start_idx</span> <span class="op">-</span><span class="op">=</span> <span class="ident">diff</span> <span class="op">*</span> <span class="ident">buffer_width</span>;
-            <span class="comment">// covers the case where the text between the last newline and the end of the slice exactly fits the text buffer</span>
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">first_chars_lines</span> <span class="op">+</span> <span class="ident">total_lines</span> <span class="op">==</span> <span class="ident">buffer_height</span> {
-                <span class="ident">total_lines</span> <span class="op">+</span><span class="op">=</span> <span class="ident">first_chars_lines</span>;
-                <span class="ident">start_idx</span> <span class="op">-</span><span class="op">=</span> <span class="ident">first_chars</span>;
-            <span class="comment">// covers the case where the slice fits within the text buffer (i.e. there is not enough output to fill the screen)</span>
-            } <span class="kw">else</span> {
-                <span class="kw">return</span> (<span class="number">0</span>, <span class="ident">total_lines</span> <span class="op">*</span> <span class="ident">buffer_width</span> <span class="op">+</span> <span class="ident">last_line_chars</span>); <span class="comment">// In  the case that an end index argument corresponded to a string slice that underfits the text display</span>
-            }
+            <span class="comment">// covers the case where the text inside the new_lines_indices array overflow the text buffer 
+            </span><span class="kw">if </span>total_lines &gt; buffer_height {
+                start_idx += (total_lines - buffer_height) * buffer_width; <span class="comment">// adds back the overcounted lines to the starting index
+                </span>total_lines = buffer_height;
+            <span class="comment">// covers the case where the text between the last newline and the end of the slice overflow the text buffer
+            </span>} <span class="kw">else if </span>first_chars_lines + total_lines &gt; buffer_height {
+                <span class="kw">let </span>diff = buffer_height - total_lines;
+                total_lines += diff;
+                start_idx -= diff * buffer_width;
+            <span class="comment">// covers the case where the text between the last newline and the end of the slice exactly fits the text buffer
+            </span>} <span class="kw">else if </span>first_chars_lines + total_lines == buffer_height {
+                total_lines += first_chars_lines;
+                start_idx -= first_chars;
+            <span class="comment">// covers the case where the slice fits within the text buffer (i.e. there is not enough output to fill the screen)
+            </span>} <span class="kw">else </span>{
+                <span class="kw">return </span>(<span class="number">0</span>, total_lines * buffer_width + last_line_chars); <span class="comment">// In  the case that an end index argument corresponded to a string slice that underfits the text display
+            </span>}
 
-            <span class="comment">// If the previous loop overcounted, this cuts off the excess string from string. Happens when there are many charcters between newlines at the beginning of the slice</span>
-            <span class="kw">return</span> (<span class="ident">start_idx</span>, (<span class="ident">total_lines</span> <span class="op">-</span> <span class="number">1</span>) <span class="op">*</span> <span class="ident">buffer_width</span> <span class="op">+</span> <span class="ident">last_line_chars</span>);
+            <span class="comment">// If the previous loop overcounted, this cuts off the excess string from string. Happens when there are many charcters between newlines at the beginning of the slice
+            </span><span class="kw">return </span>(start_idx, (total_lines - <span class="number">1</span>) * buffer_width + last_line_chars);
 
-        } <span class="kw">else</span> {
-            <span class="kw">return</span> (<span class="number">0</span>,<span class="number">0</span>); <span class="comment">/* WARNING: should change to Option&lt;&gt; rather than returning (0, 0) */</span>
-        }   
+        } <span class="kw">else </span>{
+            <span class="kw">return </span>(<span class="number">0</span>,<span class="number">0</span>); <span class="comment">/* WARNING: should change to Option&lt;&gt; rather than returning (0, 0) */
+        </span>}   
     }
 
-    <span class="doccomment">/// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the</span>
-    <span class="doccomment">/// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of </span>
-    <span class="doccomment">/// text display. </span>
-    <span class="kw">fn</span> <span class="ident">calc_end_idx</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start_idx</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">ScrollError</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> (<span class="ident">buffer_width</span>, <span class="ident">buffer_height</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_text_dimensions</span>();
-        <span class="kw">let</span> <span class="ident">scrollback_buffer_len</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">end_idx</span> <span class="op">=</span> <span class="ident">start_idx</span>;
-        <span class="kw">let</span> <span class="ident">result</span>;
-        <span class="comment">// Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)</span>
-        <span class="kw">if</span> <span class="ident">start_idx</span> <span class="op">+</span> <span class="ident">buffer_width</span> <span class="op">*</span> <span class="ident">buffer_height</span> <span class="op">&gt;</span> <span class="ident">scrollback_buffer_len</span> {
-            <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">get</span>(<span class="ident">start_idx</span>..<span class="ident">scrollback_buffer_len</span><span class="op">-</span><span class="number">1</span>);
-        } <span class="kw">else</span> {
-            <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">get</span>(<span class="ident">start_idx</span>..<span class="ident">start_idx</span> <span class="op">+</span> <span class="ident">buffer_width</span> <span class="op">*</span> <span class="ident">buffer_height</span>);
+    <span class="doccomment">/// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the
+    /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
+    /// text display. 
+    </span><span class="kw">fn </span>calc_end_idx(<span class="kw-2">&amp;</span><span class="self">self</span>, start_idx: usize) -&gt; <span class="prelude-ty">Result</span>&lt;usize, ScrollError&gt; {
+        <span class="kw">let </span>(buffer_width, buffer_height) = <span class="self">self</span>.get_text_dimensions();
+        <span class="kw">let </span>scrollback_buffer_len = <span class="self">self</span>.scrollback_buffer.len();
+        <span class="kw">let </span><span class="kw-2">mut </span>end_idx = start_idx;
+        <span class="kw">let </span>result;
+        <span class="comment">// Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
+        </span><span class="kw">if </span>start_idx + buffer_width * buffer_height &gt; scrollback_buffer_len {
+            result = <span class="self">self</span>.scrollback_buffer.get(start_idx..scrollback_buffer_len-<span class="number">1</span>);
+        } <span class="kw">else </span>{
+            result = <span class="self">self</span>.scrollback_buffer.get(start_idx..start_idx + buffer_width * buffer_height);
         }
 
-        <span class="comment">// calculate the starting index for the slice</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">slice</span>) <span class="op">=</span> <span class="ident">result</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">total_lines</span> <span class="op">=</span> <span class="number">0</span>;
-            <span class="comment">// Obtains a vector of the indices of the slice where newlines occur in ascending order</span>
-            <span class="kw">let</span> <span class="ident">new_line_indices</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">usize</span>, <span class="kw-2">&amp;</span><span class="ident">str</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">slice</span>.<span class="ident">match_indices</span>(<span class="string">&#39;\n&#39;</span>).<span class="ident">collect</span>();
-            <span class="comment">// if there are no new lines in the slice</span>
-            <span class="kw">if</span> <span class="ident">new_line_indices</span>.<span class="ident">len</span>() <span class="op">==</span> <span class="number">0</span> {
-                <span class="comment">// indicates that the text is just one continuous string with no newlines and will therefore fill the buffer completely</span>
-                <span class="ident">end_idx</span> <span class="op">+</span><span class="op">=</span> <span class="ident">buffer_height</span> <span class="op">*</span> <span class="ident">buffer_width</span>;
-                <span class="kw">if</span> <span class="ident">end_idx</span> <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>() <span class="op">-</span><span class="number">1</span> {
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">end_idx</span>); 
-                } <span class="kw">else</span> {
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">ScrollError::OffEndBound</span>);
+        <span class="comment">// calculate the starting index for the slice
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(slice) = result {
+            <span class="kw">let </span><span class="kw-2">mut </span>total_lines = <span class="number">0</span>;
+            <span class="comment">// Obtains a vector of the indices of the slice where newlines occur in ascending order
+            </span><span class="kw">let </span>new_line_indices: Vec&lt;(usize, <span class="kw-2">&amp;</span>str)&gt; = slice.match_indices(<span class="string">&#39;\n&#39;</span>).collect();
+            <span class="comment">// if there are no new lines in the slice
+            </span><span class="kw">if </span>new_line_indices.len() == <span class="number">0 </span>{
+                <span class="comment">// indicates that the text is just one continuous string with no newlines and will therefore fill the buffer completely
+                </span>end_idx += buffer_height * buffer_width;
+                <span class="kw">if </span>end_idx &lt;= <span class="self">self</span>.scrollback_buffer.len() -<span class="number">1 </span>{
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(end_idx); 
+                } <span class="kw">else </span>{
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(ScrollError::OffEndBound);
                 }
             }
 
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">counter</span> <span class="op">=</span> <span class="number">0</span>;
-            <span class="comment">// Covers the case where the start idx argument corresponds to a string that does not start on a newline </span>
-            <span class="kw">if</span> <span class="ident">new_line_indices</span>[<span class="number">0</span>].<span class="number">0</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-                <span class="ident">end_idx</span> <span class="op">+</span><span class="op">=</span> <span class="ident">new_line_indices</span>[<span class="number">0</span>].<span class="number">0</span>;
-                <span class="ident">total_lines</span> <span class="op">+</span><span class="op">=</span> <span class="ident">new_line_indices</span>[<span class="number">0</span>].<span class="number">0</span><span class="op">/</span><span class="ident">buffer_width</span> <span class="op">+</span> <span class="number">1</span>;
+            <span class="kw">let </span><span class="kw-2">mut </span>counter = <span class="number">0</span>;
+            <span class="comment">// Covers the case where the start idx argument corresponds to a string that does not start on a newline 
+            </span><span class="kw">if </span>new_line_indices[<span class="number">0</span>].<span class="number">0 </span>!= <span class="number">0 </span>{
+                end_idx += new_line_indices[<span class="number">0</span>].<span class="number">0</span>;
+                total_lines += new_line_indices[<span class="number">0</span>].<span class="number">0</span>/buffer_width + <span class="number">1</span>;
             }
-            <span class="comment">// the characters between the last newline and the end of the slice</span>
-            <span class="kw">let</span> <span class="ident">last_line_chars</span> <span class="op">=</span> <span class="ident">slice</span>.<span class="ident">len</span>() <span class="op">-</span><span class="number">1</span> <span class="op">-</span> <span class="ident">new_line_indices</span>[<span class="ident">new_line_indices</span>.<span class="ident">len</span>() <span class="op">-</span><span class="number">1</span>].<span class="number">0</span>;  
-            <span class="kw">let</span> <span class="ident">num_last_lines</span> <span class="op">=</span> <span class="ident">last_line_chars</span><span class="op">%</span><span class="ident">buffer_width</span> <span class="op">+</span> <span class="number">1</span>; <span class="comment">// +1 to account for the physical line that the last characters will take up</span>
+            <span class="comment">// the characters between the last newline and the end of the slice
+            </span><span class="kw">let </span>last_line_chars = slice.len() -<span class="number">1 </span>- new_line_indices[new_line_indices.len() -<span class="number">1</span>].<span class="number">0</span>;  
+            <span class="kw">let </span>num_last_lines = last_line_chars%buffer_width + <span class="number">1</span>; <span class="comment">// +1 to account for the physical line that the last characters will take up
 
-            <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">new_line_indices</span>.<span class="ident">len</span>()<span class="op">-</span><span class="number">1</span> {
-                <span class="kw">if</span> <span class="ident">total_lines</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">buffer_height</span> {
+            </span><span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..new_line_indices.len()-<span class="number">1 </span>{
+                <span class="kw">if </span>total_lines &gt;= buffer_height {
                     <span class="kw">break</span>;
                 }
-                <span class="kw">let</span> <span class="ident">num_chars</span> <span class="op">=</span> <span class="ident">new_line_indices</span>[<span class="ident">i</span><span class="op">+</span><span class="number">1</span>].<span class="number">0</span> <span class="op">-</span> <span class="ident">new_line_indices</span>[<span class="ident">i</span>].<span class="number">0</span>;
-                <span class="kw">let</span> <span class="ident">num_lines</span> <span class="op">=</span> <span class="ident">num_chars</span><span class="op">/</span><span class="ident">buffer_width</span> <span class="op">+</span> <span class="number">1</span>;
-                <span class="ident">end_idx</span> <span class="op">+</span><span class="op">=</span> <span class="ident">num_chars</span>;
-                <span class="ident">total_lines</span> <span class="op">+</span><span class="op">=</span> <span class="ident">num_lines</span>;
-                <span class="ident">counter</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                <span class="kw">let </span>num_chars = new_line_indices[i+<span class="number">1</span>].<span class="number">0 </span>- new_line_indices[i].<span class="number">0</span>;
+                <span class="kw">let </span>num_lines = num_chars/buffer_width + <span class="number">1</span>;
+                end_idx += num_chars;
+                total_lines += num_lines;
+                counter += <span class="number">1</span>;
             }
-            <span class="comment">// covers the case where the text inside the new_line_indices array overflows the text buffer capacity            </span>
-            <span class="kw">if</span> <span class="ident">total_lines</span> <span class="op">&gt;</span> <span class="ident">buffer_height</span> {
-                <span class="kw">let</span> <span class="ident">num_chars</span> <span class="op">=</span> <span class="ident">new_line_indices</span>[<span class="ident">counter</span>].<span class="number">0</span> <span class="op">-</span> <span class="ident">new_line_indices</span>[<span class="ident">counter</span> <span class="op">-</span><span class="number">1</span>].<span class="number">0</span>;
-                <span class="ident">end_idx</span> <span class="op">-</span><span class="op">=</span> <span class="ident">num_chars</span>;
-                <span class="ident">end_idx</span> <span class="op">+</span><span class="op">=</span> <span class="ident">buffer_width</span>;
-            <span class="comment">// covers the case where the characters between the last newline and the end of the slice overflow the text buffer capacity</span>
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">total_lines</span> <span class="op">+</span> <span class="ident">num_last_lines</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">total_lines</span> {
-                <span class="kw">let</span> <span class="ident">diff</span> <span class="op">=</span> <span class="ident">buffer_height</span> <span class="op">-</span> <span class="ident">total_lines</span>;
-                <span class="ident">end_idx</span> <span class="op">+</span><span class="op">=</span> <span class="ident">diff</span> <span class="op">*</span> <span class="ident">buffer_width</span>;
-            <span class="comment">// covers the case where the entire slice exactly fits or is smaller than the text buffer capacity</span>
-            } <span class="kw">else</span> {
-                <span class="ident">end_idx</span> <span class="op">+</span><span class="op">=</span> <span class="ident">last_line_chars</span>;
+            <span class="comment">// covers the case where the text inside the new_line_indices array overflows the text buffer capacity            
+            </span><span class="kw">if </span>total_lines &gt; buffer_height {
+                <span class="kw">let </span>num_chars = new_line_indices[counter].<span class="number">0 </span>- new_line_indices[counter -<span class="number">1</span>].<span class="number">0</span>;
+                end_idx -= num_chars;
+                end_idx += buffer_width;
+            <span class="comment">// covers the case where the characters between the last newline and the end of the slice overflow the text buffer capacity
+            </span>} <span class="kw">else if </span>total_lines + num_last_lines &gt;= total_lines {
+                <span class="kw">let </span>diff = buffer_height - total_lines;
+                end_idx += diff * buffer_width;
+            <span class="comment">// covers the case where the entire slice exactly fits or is smaller than the text buffer capacity
+            </span>} <span class="kw">else </span>{
+                end_idx += last_line_chars;
             }
 
-            <span class="kw">if</span> <span class="ident">end_idx</span> <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>() <span class="op">-</span><span class="number">1</span> {
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">end_idx</span>); 
-            } <span class="kw">else</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">ScrollError::OffEndBound</span>);
+            <span class="kw">if </span>end_idx &lt;= <span class="self">self</span>.scrollback_buffer.len() -<span class="number">1 </span>{
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(end_idx); 
+            } <span class="kw">else </span>{
+                <span class="kw">return </span><span class="prelude-val">Err</span>(ScrollError::OffEndBound);
             }
-        } <span class="kw">else</span> {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="number">1</span>) <span class="comment">/* WARNING: maybe should return Error? */</span>
-        }
+        } <span class="kw">else </span>{
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="self">self</span>.scrollback_buffer.len() - <span class="number">1</span>) <span class="comment">/* WARNING: maybe should return Error? */
+        </span>}
     }
 
-    <span class="doccomment">/// Scrolls the text display up one line</span>
-    <span class="kw">fn</span> <span class="ident">scroll_up_one_line</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="ident">buffer_width</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_text_dimensions</span>().<span class="number">0</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">start_idx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scroll_start_idx</span>;
-        <span class="comment">//indicates that the user has scrolled to the top of the page</span>
-        <span class="kw">if</span> <span class="ident">start_idx</span> <span class="op">&lt;</span> <span class="number">1</span> {
+    <span class="doccomment">/// Scrolls the text display up one line
+    </span><span class="kw">fn </span>scroll_up_one_line(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">let </span>buffer_width = <span class="self">self</span>.get_text_dimensions().<span class="number">0</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>start_idx = <span class="self">self</span>.scroll_start_idx;
+        <span class="comment">//indicates that the user has scrolled to the top of the page
+        </span><span class="kw">if </span>start_idx &lt; <span class="number">1 </span>{
             <span class="kw">return</span>; 
-        } <span class="kw">else</span> {
-            <span class="ident">start_idx</span> <span class="op">-</span><span class="op">=</span> <span class="number">1</span>;
+        } <span class="kw">else </span>{
+            start_idx -= <span class="number">1</span>;
         }
-        <span class="kw">let</span> <span class="ident">new_start_idx</span>;
-        <span class="kw">let</span> <span class="ident">result</span>;
-        <span class="kw">let</span> <span class="ident">slice_len</span>;
-        <span class="kw">if</span> <span class="ident">buffer_width</span> <span class="op">&lt;</span> <span class="ident">start_idx</span> {
-            <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">as_str</span>().<span class="ident">get</span>(<span class="ident">start_idx</span> <span class="op">-</span> <span class="ident">buffer_width</span> .. <span class="ident">start_idx</span>);
-            <span class="ident">slice_len</span> <span class="op">=</span> <span class="ident">buffer_width</span>;
-        } <span class="kw">else</span> {
-            <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">as_str</span>().<span class="ident">get</span>(<span class="number">0</span> .. <span class="ident">start_idx</span>);
-            <span class="ident">slice_len</span> <span class="op">=</span> <span class="ident">start_idx</span>;
+        <span class="kw">let </span>new_start_idx;
+        <span class="kw">let </span>result;
+        <span class="kw">let </span>slice_len;
+        <span class="kw">if </span>buffer_width &lt; start_idx {
+            result = <span class="self">self</span>.scrollback_buffer.as_str().get(start_idx - buffer_width .. start_idx);
+            slice_len = buffer_width;
+        } <span class="kw">else </span>{
+            result = <span class="self">self</span>.scrollback_buffer.as_str().get(<span class="number">0 </span>.. start_idx);
+            slice_len = start_idx;
         }
-        <span class="comment">// Searches this slice for a newline</span>
+        <span class="comment">// Searches this slice for a newline
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">slice</span>) <span class="op">=</span> <span class="ident">result</span> {
-            <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident">slice</span>.<span class="ident">rfind</span>(<span class="string">&#39;\n&#39;</span>);   
-            <span class="ident">new_start_idx</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">index</span> {
-                <span class="prelude-val">Some</span>(<span class="ident">index</span>) =&gt; { <span class="ident">start_idx</span> <span class="op">-</span> <span class="ident">slice_len</span> <span class="op">+</span> <span class="ident">index</span> }, <span class="comment">// Moves the starting index back to the position of the nearest newline back</span>
-                <span class="prelude-val">None</span> =&gt; { <span class="ident">start_idx</span> <span class="op">-</span> <span class="ident">slice_len</span>}, <span class="comment">// If no newline is found, moves the start index back by the buffer width value</span>
-            }; <span class="comment">// we&#39;re moving the cursor one position to the right relative to the end of the input string</span>
-        } <span class="kw">else</span> {
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(slice) = result {
+            <span class="kw">let </span>index = slice.rfind(<span class="string">&#39;\n&#39;</span>);   
+            new_start_idx = <span class="kw">match </span>index {
+                <span class="prelude-val">Some</span>(index) =&gt; { start_idx - slice_len + index }, <span class="comment">// Moves the starting index back to the position of the nearest newline back
+                </span><span class="prelude-val">None </span>=&gt; { start_idx - slice_len}, <span class="comment">// If no newline is found, moves the start index back by the buffer width value
+            </span>}; <span class="comment">// we&#39;re moving the cursor one position to the right relative to the end of the input string
+        </span>} <span class="kw">else </span>{
             <span class="kw">return</span>;
         }
-        <span class="self">self</span>.<span class="ident">scroll_start_idx</span> <span class="op">=</span> <span class="ident">new_start_idx</span>;
-        <span class="comment">// Recalculates the end index after the new starting index is found</span>
-        <span class="self">self</span>.<span class="ident">is_scroll_end</span> <span class="op">=</span> <span class="bool-val">false</span>;
+        <span class="self">self</span>.scroll_start_idx = new_start_idx;
+        <span class="comment">// Recalculates the end index after the new starting index is found
+        </span><span class="self">self</span>.is_scroll_end = <span class="bool-val">false</span>;
     }
 
-    <span class="doccomment">/// Scrolls the text display down one line</span>
-    <span class="kw">fn</span> <span class="ident">scroll_down_one_line</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="ident">buffer_width</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_text_dimensions</span>().<span class="number">0</span>;
-        <span class="kw">let</span> <span class="ident">prev_start_idx</span>;
-        <span class="comment">// Prevents the user from scrolling down if already at the bottom of the page</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_scroll_end</span> {
+    <span class="doccomment">/// Scrolls the text display down one line
+    </span><span class="kw">fn </span>scroll_down_one_line(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">let </span>buffer_width = <span class="self">self</span>.get_text_dimensions().<span class="number">0</span>;
+        <span class="kw">let </span>prev_start_idx;
+        <span class="comment">// Prevents the user from scrolling down if already at the bottom of the page
+        </span><span class="kw">if </span><span class="self">self</span>.is_scroll_end {
             <span class="kw">return</span>;
         } 
-        <span class="ident">prev_start_idx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scroll_start_idx</span>;
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">calc_end_idx</span>(<span class="ident">prev_start_idx</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">end_idx</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">result</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">end_idx</span>) =&gt; <span class="ident">end_idx</span>,
-            <span class="prelude-val">Err</span>(<span class="ident">ScrollError::OffEndBound</span>) =&gt; <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>() <span class="op">-</span><span class="number">1</span>,
+        prev_start_idx = <span class="self">self</span>.scroll_start_idx;
+        <span class="kw">let </span>result = <span class="self">self</span>.calc_end_idx(prev_start_idx);
+        <span class="kw">let </span><span class="kw-2">mut </span>end_idx = <span class="kw">match </span>result {
+            <span class="prelude-val">Ok</span>(end_idx) =&gt; end_idx,
+            <span class="prelude-val">Err</span>(ScrollError::OffEndBound) =&gt; <span class="self">self</span>.scrollback_buffer.len() -<span class="number">1</span>,
         };
 
-        <span class="comment">// If the newly calculated end index is the bottom of the scrollback buffer, recalculates the start index and returns</span>
-        <span class="kw">if</span> <span class="ident">end_idx</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>() <span class="op">-</span><span class="number">1</span> {
-            <span class="self">self</span>.<span class="ident">is_scroll_end</span> <span class="op">=</span> <span class="bool-val">true</span>;
-            <span class="kw">let</span> <span class="ident">new_start</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">calc_start_idx</span>(<span class="ident">end_idx</span>).<span class="number">0</span>;
-            <span class="self">self</span>.<span class="ident">scroll_start_idx</span> <span class="op">=</span> <span class="ident">new_start</span>;
+        <span class="comment">// If the newly calculated end index is the bottom of the scrollback buffer, recalculates the start index and returns
+        </span><span class="kw">if </span>end_idx == <span class="self">self</span>.scrollback_buffer.len() -<span class="number">1 </span>{
+            <span class="self">self</span>.is_scroll_end = <span class="bool-val">true</span>;
+            <span class="kw">let </span>new_start = <span class="self">self</span>.calc_start_idx(end_idx).<span class="number">0</span>;
+            <span class="self">self</span>.scroll_start_idx = new_start;
             <span class="kw">return</span>;
         }
-        <span class="ident">end_idx</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>; <span class="comment">// Advances to the next character for the calculation</span>
-        <span class="kw">let</span> <span class="ident">new_end_idx</span>;
+        end_idx += <span class="number">1</span>; <span class="comment">// Advances to the next character for the calculation
+        </span><span class="kw">let </span>new_end_idx;
         {
-            <span class="kw">let</span> <span class="ident">result</span>;
-            <span class="kw">let</span> <span class="ident">slice_len</span>; <span class="comment">// specifies the length of the grabbed slice</span>
-            <span class="comment">// Grabs a slice (the size of the buffer width at most) of the scrollback buffer that is directly below the current slice being displayed on the text display</span>
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="ident">end_idx</span> <span class="op">+</span> <span class="ident">buffer_width</span> {
-                <span class="ident">slice_len</span> <span class="op">=</span> <span class="ident">buffer_width</span>;
-                <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">as_str</span>().<span class="ident">get</span>(<span class="ident">end_idx</span> .. <span class="ident">end_idx</span> <span class="op">+</span> <span class="ident">buffer_width</span>);
-            } <span class="kw">else</span> {
-                <span class="ident">slice_len</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="ident">end_idx</span> <span class="op">-</span><span class="number">1</span>; 
-                <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">as_str</span>().<span class="ident">get</span>(<span class="ident">end_idx</span> .. <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>());
+            <span class="kw">let </span>result;
+            <span class="kw">let </span>slice_len; <span class="comment">// specifies the length of the grabbed slice
+            // Grabs a slice (the size of the buffer width at most) of the scrollback buffer that is directly below the current slice being displayed on the text display
+            </span><span class="kw">if </span><span class="self">self</span>.scrollback_buffer.len() &gt; end_idx + buffer_width {
+                slice_len = buffer_width;
+                result = <span class="self">self</span>.scrollback_buffer.as_str().get(end_idx .. end_idx + buffer_width);
+            } <span class="kw">else </span>{
+                slice_len = <span class="self">self</span>.scrollback_buffer.len() - end_idx -<span class="number">1</span>; 
+                result = <span class="self">self</span>.scrollback_buffer.as_str().get(end_idx .. <span class="self">self</span>.scrollback_buffer.len());
             }
-            <span class="comment">// Searches the grabbed slice for a newline</span>
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">slice</span>) <span class="op">=</span> <span class="ident">result</span> {
-                <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident">slice</span>.<span class="ident">find</span>(<span class="string">&#39;\n&#39;</span>);   
-                <span class="ident">new_end_idx</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">index</span> {
-                    <span class="prelude-val">Some</span>(<span class="ident">index</span>) =&gt; { <span class="ident">end_idx</span> <span class="op">+</span> <span class="ident">index</span> <span class="op">+</span> <span class="number">1</span>}, <span class="comment">// Moves end index forward to the next newline</span>
-                    <span class="prelude-val">None</span> =&gt; { <span class="ident">end_idx</span> <span class="op">+</span> <span class="ident">slice_len</span>}, <span class="comment">// If no newline is found, moves the end index forward by the buffer width value</span>
-                }; 
-            } <span class="kw">else</span> {
+            <span class="comment">// Searches the grabbed slice for a newline
+            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(slice) = result {
+                <span class="kw">let </span>index = slice.find(<span class="string">&#39;\n&#39;</span>);   
+                new_end_idx = <span class="kw">match </span>index {
+                    <span class="prelude-val">Some</span>(index) =&gt; { end_idx + index + <span class="number">1</span>}, <span class="comment">// Moves end index forward to the next newline
+                    </span><span class="prelude-val">None </span>=&gt; { end_idx + slice_len}, <span class="comment">// If no newline is found, moves the end index forward by the buffer width value
+                </span>}; 
+            } <span class="kw">else </span>{
                 <span class="kw">return</span>;
             }
         }
-        <span class="comment">// Recalculates new starting index</span>
-        <span class="kw">let</span> <span class="ident">start_idx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">calc_start_idx</span>(<span class="ident">new_end_idx</span>).<span class="number">0</span>;
-        <span class="self">self</span>.<span class="ident">scroll_start_idx</span> <span class="op">=</span> <span class="ident">start_idx</span>;
+        <span class="comment">// Recalculates new starting index
+        </span><span class="kw">let </span>start_idx = <span class="self">self</span>.calc_start_idx(new_end_idx).<span class="number">0</span>;
+        <span class="self">self</span>.scroll_start_idx = start_idx;
     }
 
-    <span class="doccomment">/// Shifts the text display up by making the previous first line the last line displayed on the text display</span>
-    <span class="kw">fn</span> <span class="ident">page_up</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="ident">new_end_idx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scroll_start_idx</span>;
-        <span class="kw">let</span> <span class="ident">new_start_idx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">calc_start_idx</span>(<span class="ident">new_end_idx</span>);
-        <span class="self">self</span>.<span class="ident">scroll_start_idx</span> <span class="op">=</span> <span class="ident">new_start_idx</span>.<span class="number">0</span>;
+    <span class="doccomment">/// Shifts the text display up by making the previous first line the last line displayed on the text display
+    </span><span class="kw">fn </span>page_up(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">let </span>new_end_idx = <span class="self">self</span>.scroll_start_idx;
+        <span class="kw">let </span>new_start_idx = <span class="self">self</span>.calc_start_idx(new_end_idx);
+        <span class="self">self</span>.scroll_start_idx = new_start_idx.<span class="number">0</span>;
     }
 
-    <span class="doccomment">/// Shifts the text display down by making the previous last line the first line displayed on the text display</span>
-    <span class="kw">fn</span> <span class="ident">page_down</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="ident">start_idx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scroll_start_idx</span>;
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">calc_end_idx</span>(<span class="ident">start_idx</span>);
-        <span class="kw">let</span> <span class="ident">new_start_idx</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">result</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">idx</span>) =&gt; <span class="ident">idx</span><span class="op">+</span> <span class="number">1</span>, 
-            <span class="prelude-val">Err</span>(<span class="ident">ScrollError::OffEndBound</span>) =&gt; {
-                <span class="kw">let</span> <span class="ident">scrollback_buffer_len</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>();
-                <span class="kw">let</span> <span class="ident">new_start_idx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">calc_start_idx</span>(<span class="ident">scrollback_buffer_len</span>).<span class="number">0</span>;
-                <span class="self">self</span>.<span class="ident">scroll_start_idx</span> <span class="op">=</span> <span class="ident">new_start_idx</span>;
-                <span class="self">self</span>.<span class="ident">is_scroll_end</span> <span class="op">=</span> <span class="bool-val">true</span>;
+    <span class="doccomment">/// Shifts the text display down by making the previous last line the first line displayed on the text display
+    </span><span class="kw">fn </span>page_down(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">let </span>start_idx = <span class="self">self</span>.scroll_start_idx;
+        <span class="kw">let </span>result = <span class="self">self</span>.calc_end_idx(start_idx);
+        <span class="kw">let </span>new_start_idx = <span class="kw">match </span>result {
+            <span class="prelude-val">Ok</span>(idx) =&gt; idx+ <span class="number">1</span>, 
+            <span class="prelude-val">Err</span>(ScrollError::OffEndBound) =&gt; {
+                <span class="kw">let </span>scrollback_buffer_len = <span class="self">self</span>.scrollback_buffer.len();
+                <span class="kw">let </span>new_start_idx = <span class="self">self</span>.calc_start_idx(scrollback_buffer_len).<span class="number">0</span>;
+                <span class="self">self</span>.scroll_start_idx = new_start_idx;
+                <span class="self">self</span>.is_scroll_end = <span class="bool-val">true</span>;
                 <span class="kw">return</span>;
             },
         };
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">calc_end_idx</span>(<span class="ident">new_start_idx</span>);
-        <span class="kw">let</span> <span class="ident">new_end_idx</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">result</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">end_idx</span>) =&gt; <span class="ident">end_idx</span>,
-            <span class="prelude-val">Err</span>(<span class="ident">ScrollError::OffEndBound</span>) =&gt; {
-                <span class="kw">let</span> <span class="ident">scrollback_buffer_len</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>();
-                <span class="kw">let</span> <span class="ident">new_start_idx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">calc_start_idx</span>(<span class="ident">scrollback_buffer_len</span>).<span class="number">0</span>;
-                <span class="self">self</span>.<span class="ident">scroll_start_idx</span> <span class="op">=</span> <span class="ident">new_start_idx</span>;
-                <span class="self">self</span>.<span class="ident">is_scroll_end</span> <span class="op">=</span> <span class="bool-val">true</span>;
+        <span class="kw">let </span>result = <span class="self">self</span>.calc_end_idx(new_start_idx);
+        <span class="kw">let </span>new_end_idx = <span class="kw">match </span>result {
+            <span class="prelude-val">Ok</span>(end_idx) =&gt; end_idx,
+            <span class="prelude-val">Err</span>(ScrollError::OffEndBound) =&gt; {
+                <span class="kw">let </span>scrollback_buffer_len = <span class="self">self</span>.scrollback_buffer.len();
+                <span class="kw">let </span>new_start_idx = <span class="self">self</span>.calc_start_idx(scrollback_buffer_len).<span class="number">0</span>;
+                <span class="self">self</span>.scroll_start_idx = new_start_idx;
+                <span class="self">self</span>.is_scroll_end = <span class="bool-val">true</span>;
                 <span class="kw">return</span>;
             },
         };
-        <span class="kw">if</span> <span class="ident">new_end_idx</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>() <span class="op">-</span><span class="number">1</span> {
-            <span class="comment">// if the user page downs near the bottom of the page so only gets a partial shift</span>
-            <span class="self">self</span>.<span class="ident">is_scroll_end</span> <span class="op">=</span> <span class="bool-val">true</span>;
+        <span class="kw">if </span>new_end_idx == <span class="self">self</span>.scrollback_buffer.len() -<span class="number">1 </span>{
+            <span class="comment">// if the user page downs near the bottom of the page so only gets a partial shift
+            </span><span class="self">self</span>.is_scroll_end = <span class="bool-val">true</span>;
             <span class="kw">return</span>;
         }
-        <span class="self">self</span>.<span class="ident">scroll_start_idx</span> <span class="op">=</span> <span class="ident">new_start_idx</span>;
+        <span class="self">self</span>.scroll_start_idx = new_start_idx;
     }
 
-    <span class="doccomment">/// Updates the text display by taking a string index and displaying as much as it starting from the passed string index (i.e. starts from the top of the display and goes down)</span>
-    <span class="kw">fn</span> <span class="ident">update_display_forwards</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">start_idx</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">scroll_start_idx</span> <span class="op">=</span> <span class="ident">start_idx</span>;
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">calc_end_idx</span>(<span class="ident">start_idx</span>);
-        <span class="kw">let</span> <span class="ident">end_idx</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">result</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">end_idx</span>) =&gt; <span class="ident">end_idx</span>,
-            <span class="prelude-val">Err</span>(<span class="ident">ScrollError::OffEndBound</span>) =&gt; {
-                <span class="kw">let</span> <span class="ident">new_end_idx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>() <span class="op">-</span><span class="number">1</span>;
-                <span class="kw">let</span> <span class="ident">new_start_idx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">calc_start_idx</span>(<span class="ident">new_end_idx</span>).<span class="number">0</span>;
-                <span class="self">self</span>.<span class="ident">scroll_start_idx</span> <span class="op">=</span> <span class="ident">new_start_idx</span>;
-                <span class="ident">new_end_idx</span>
+    <span class="doccomment">/// Updates the text display by taking a string index and displaying as much as it starting from the passed string index (i.e. starts from the top of the display and goes down)
+    </span><span class="kw">fn </span>update_display_forwards(<span class="kw-2">&amp;mut </span><span class="self">self</span>, start_idx: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.scroll_start_idx = start_idx;
+        <span class="kw">let </span>result = <span class="self">self</span>.calc_end_idx(start_idx);
+        <span class="kw">let </span>end_idx = <span class="kw">match </span>result {
+            <span class="prelude-val">Ok</span>(end_idx) =&gt; end_idx,
+            <span class="prelude-val">Err</span>(ScrollError::OffEndBound) =&gt; {
+                <span class="kw">let </span>new_end_idx = <span class="self">self</span>.scrollback_buffer.len() -<span class="number">1</span>;
+                <span class="kw">let </span>new_start_idx = <span class="self">self</span>.calc_start_idx(new_end_idx).<span class="number">0</span>;
+                <span class="self">self</span>.scroll_start_idx = new_start_idx;
+                new_end_idx
             },
         };
-        <span class="kw">let</span> <span class="ident">result</span>  <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">get</span>(<span class="ident">start_idx</span>..<span class="op">=</span><span class="ident">end_idx</span>); <span class="comment">// =end_idx includes the end index in the slice</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">slice</span>) <span class="op">=</span> <span class="ident">result</span> {
-            <span class="self">self</span>.<span class="ident">text_display</span>.<span class="ident">set_text</span>(<span class="kw-2">&amp;</span><span class="ident">slice</span>);
-            <span class="self">self</span>.<span class="ident">display_text</span>()<span class="question-mark">?</span>;
-        } <span class="kw">else</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;could not get slice of scrollback buffer string&quot;</span>);
+        <span class="kw">let </span>result  = <span class="self">self</span>.scrollback_buffer.get(start_idx..=end_idx); <span class="comment">// =end_idx includes the end index in the slice
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(slice) = result {
+            <span class="self">self</span>.text_display.set_text(<span class="kw-2">&amp;</span>slice);
+            <span class="self">self</span>.display_text()<span class="question-mark">?</span>;
+        } <span class="kw">else </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;could not get slice of scrollback buffer string&quot;</span>);
         }
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Display the text displayable in the window and render it to the screen</span>
-    <span class="kw">fn</span> <span class="ident">display_text</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>{
-        <span class="kw">let</span> <span class="ident">coord</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">window</span>.<span class="ident">area</span>().<span class="ident">top_left</span>;
-        <span class="kw">let</span> <span class="ident">area_to_render</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">text_display</span>.<span class="ident">display</span>(<span class="ident">coord</span>, <span class="self">self</span>.<span class="ident">window</span>.<span class="ident">framebuffer_mut</span>().<span class="ident">deref_mut</span>())<span class="question-mark">?</span>;
-        <span class="self">self</span>.<span class="ident">window</span>.<span class="ident">render</span>(<span class="prelude-val">Some</span>(<span class="ident">area_to_render</span>))
+    <span class="doccomment">/// Display the text displayable in the window and render it to the screen
+    </span><span class="kw">fn </span>display_text(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;{
+        <span class="kw">let </span>coord = <span class="self">self</span>.window.area().top_left;
+        <span class="kw">let </span>area_to_render = <span class="self">self</span>.text_display.display(coord, <span class="self">self</span>.window.framebuffer_mut().deref_mut())<span class="question-mark">?</span>;
+        <span class="self">self</span>.window.render(<span class="prelude-val">Some</span>(area_to_render))
     }
 
-    <span class="doccomment">/// Updates the text display by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)</span>
-    <span class="kw">fn</span> <span class="ident">update_display_backwards</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">end_idx</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> (<span class="ident">start_idx</span>, <span class="ident">_cursor_pos</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">calc_start_idx</span>(<span class="ident">end_idx</span>);
-        <span class="self">self</span>.<span class="ident">scroll_start_idx</span> <span class="op">=</span> <span class="ident">start_idx</span>;
+    <span class="doccomment">/// Updates the text display by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)
+    </span><span class="kw">fn </span>update_display_backwards(<span class="kw-2">&amp;mut </span><span class="self">self</span>, end_idx: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>(start_idx, _cursor_pos) = <span class="self">self</span>.calc_start_idx(end_idx);
+        <span class="self">self</span>.scroll_start_idx = start_idx;
 
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">get</span>(<span class="ident">start_idx</span>..<span class="ident">end_idx</span>);
+        <span class="kw">let </span>result = <span class="self">self</span>.scrollback_buffer.get(start_idx..end_idx);
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">slice</span>) <span class="op">=</span> <span class="ident">result</span> {
-            <span class="self">self</span>.<span class="ident">text_display</span>.<span class="ident">set_text</span>(<span class="ident">slice</span>);
-            <span class="self">self</span>.<span class="ident">display_text</span>()<span class="question-mark">?</span>;
-        } <span class="kw">else</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;could not get slice of scrollback buffer string&quot;</span>);
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(slice) = result {
+            <span class="self">self</span>.text_display.set_text(slice);
+            <span class="self">self</span>.display_text()<span class="question-mark">?</span>;
+        } <span class="kw">else </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;could not get slice of scrollback buffer string&quot;</span>);
         }
         <span class="prelude-val">Ok</span>(())
     }
 }
 
-<span class="doccomment">/// Public methods of `Terminal`.</span>
-<span class="kw">impl</span> <span class="ident">Terminal</span> {
-    <span class="doccomment">/// Creates a new terminal and adds it to the window manager `wm_mutex`</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Terminal</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">wm_ref</span> <span class="op">=</span> <span class="ident">window_manager::WINDOW_MANAGER</span>.<span class="ident">get</span>().<span class="ident">ok_or</span>(<span class="string">&quot;The window manager is not initialized&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">window_width</span>, <span class="ident">window_height</span>) <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">wm</span> <span class="op">=</span> <span class="ident">wm_ref</span>.<span class="ident">lock</span>();
-            <span class="ident">wm</span>.<span class="ident">get_screen_size</span>()
+<span class="doccomment">/// Public methods of `Terminal`.
+</span><span class="kw">impl </span>Terminal {
+    <span class="doccomment">/// Creates a new terminal and adds it to the window manager `wm_mutex`
+    </span><span class="kw">pub fn </span>new() -&gt; <span class="prelude-ty">Result</span>&lt;Terminal, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>wm_ref = window_manager::WINDOW_MANAGER.get().ok_or(<span class="string">&quot;The window manager is not initialized&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>(window_width, window_height) = {
+            <span class="kw">let </span>wm = wm_ref.lock();
+            wm.get_screen_size()
         };
 
-        <span class="kw">let</span> <span class="ident">window</span> <span class="op">=</span> <span class="ident">window::Window::new</span>(
-            <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>), 
-            <span class="ident">window_width</span>, 
-            <span class="ident">window_height</span>,
-            <span class="ident">FONT_BACKGROUND_COLOR</span>,
+        <span class="kw">let </span>window = window::Window::new(
+            Coord::new(<span class="number">0</span>, <span class="number">0</span>), 
+            window_width, 
+            window_height,
+            FONT_BACKGROUND_COLOR,
         )<span class="question-mark">?</span>;
         
-        <span class="kw">let</span> <span class="ident">area</span> <span class="op">=</span> <span class="ident">window</span>.<span class="ident">area</span>();
-        <span class="kw">let</span> <span class="ident">text_display</span> <span class="op">=</span> <span class="ident">TextDisplay::new</span>(<span class="ident">area</span>.<span class="ident">width</span>(), <span class="ident">area</span>.<span class="ident">height</span>(), <span class="ident">FONT_FOREGROUND_COLOR</span>, <span class="ident">FONT_BACKGROUND_COLOR</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>area = window.area();
+        <span class="kw">let </span>text_display = TextDisplay::new(area.width(), area.height(), FONT_FOREGROUND_COLOR, FONT_BACKGROUND_COLOR)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">terminal</span> <span class="op">=</span> <span class="ident">Terminal</span> {
-            <span class="ident">window</span>,
-            <span class="ident">scrollback_buffer</span>: <span class="ident">String::new</span>(),
-            <span class="ident">scroll_start_idx</span>: <span class="number">0</span>,
-            <span class="ident">is_scroll_end</span>: <span class="bool-val">true</span>,
-            <span class="ident">text_display</span>,
-            <span class="ident">cursor</span>: <span class="ident">Cursor::default</span>(),
+        <span class="kw">let </span><span class="kw-2">mut </span>terminal = Terminal {
+            window,
+            scrollback_buffer: String::new(),
+            scroll_start_idx: <span class="number">0</span>,
+            is_scroll_end: <span class="bool-val">true</span>,
+            text_display,
+            cursor: Cursor::default(),
         };
-        <span class="ident">terminal</span>.<span class="ident">display_text</span>()<span class="question-mark">?</span>;
+        terminal.display_text()<span class="question-mark">?</span>;
 
-        <span class="ident">terminal</span>.<span class="ident">print_to_terminal</span>(<span class="macro">format!</span>(<span class="string">&quot;Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n&quot;</span>));
-        <span class="prelude-val">Ok</span>(<span class="ident">terminal</span>)
+        terminal.print_to_terminal(<span class="macro">format!</span>(<span class="string">&quot;Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n&quot;</span>));
+        <span class="prelude-val">Ok</span>(terminal)
     }
 
-    <span class="doccomment">/// Adds a string to be printed to the terminal to the terminal scrollback buffer.</span>
-    <span class="doccomment">/// Note that one needs to call `refresh_display` to get things actually printed. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">print_to_terminal</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">s</span>: <span class="ident">String</span>) {
-        <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">push_str</span>(<span class="kw-2">&amp;</span><span class="ident">s</span>);
+    <span class="doccomment">/// Adds a string to be printed to the terminal to the terminal scrollback buffer.
+    /// Note that one needs to call `refresh_display` to get things actually printed. 
+    </span><span class="kw">pub fn </span>print_to_terminal(<span class="kw-2">&amp;mut </span><span class="self">self</span>, s: String) {
+        <span class="self">self</span>.scrollback_buffer.push_str(<span class="kw-2">&amp;</span>s);
     }
 
-    <span class="doccomment">/// Actually refresh the screen. Currently it&#39;s expensive.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">refresh_display</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">start_idx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scroll_start_idx</span>;
-        <span class="comment">// handling display refreshing errors here so that we don&#39;t clog the main loop of the terminal</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_scroll_end</span> {
-            <span class="kw">let</span> <span class="ident">buffer_len</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>();
-            <span class="self">self</span>.<span class="ident">update_display_backwards</span>(<span class="ident">buffer_len</span>)<span class="question-mark">?</span>;
-        } <span class="kw">else</span> {
-            <span class="self">self</span>.<span class="ident">update_display_forwards</span>(<span class="ident">start_idx</span>)<span class="question-mark">?</span>;
+    <span class="doccomment">/// Actually refresh the screen. Currently it&#39;s expensive.
+    </span><span class="kw">pub fn </span>refresh_display(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>start_idx = <span class="self">self</span>.scroll_start_idx;
+        <span class="comment">// handling display refreshing errors here so that we don&#39;t clog the main loop of the terminal
+        </span><span class="kw">if </span><span class="self">self</span>.is_scroll_end {
+            <span class="kw">let </span>buffer_len = <span class="self">self</span>.scrollback_buffer.len();
+            <span class="self">self</span>.update_display_backwards(buffer_len)<span class="question-mark">?</span>;
+        } <span class="kw">else </span>{
+            <span class="self">self</span>.update_display_forwards(start_idx)<span class="question-mark">?</span>;
         }
 
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Insert a character to the terminal.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// * `c`: the new character to insert.</span>
-    <span class="doccomment">/// * `offset_from_end`: the position to insert the character. It represents the distance relative to the end of the whole output in the terminal in number of characters.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Examples</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// * `terminal.insert_char(char, 0)` will append `char` to the end of existing text.</span>
-    <span class="doccomment">/// * `terminal.insert_char(char, 5)` will insert `char` right before the last 5 characters.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// After invoke this function, one must call `refresh_display` to get the updates actually showed on the screen.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">insert_char</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">c</span>: <span class="ident">char</span>, <span class="ident">offset_from_end</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">buflen</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>();
-        <span class="kw">if</span> <span class="ident">buflen</span> <span class="op">&lt;</span> <span class="ident">offset_from_end</span> { <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;offset_from_end is larger than length of scrollback buffer&quot;</span>); }
-        <span class="kw">let</span> <span class="ident">insert_idx</span> <span class="op">=</span> <span class="ident">buflen</span> <span class="op">-</span> <span class="ident">offset_from_end</span>;
-        <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">insert_str</span>(<span class="ident">insert_idx</span>, <span class="kw-2">&amp;</span><span class="ident">c</span>.<span class="ident">to_string</span>());
+    <span class="doccomment">/// Insert a character to the terminal.
+    ///
+    /// # Arguments
+    ///
+    /// * `c`: the new character to insert.
+    /// * `offset_from_end`: the position to insert the character. It represents the distance relative to the end of the whole output in the terminal in number of characters.
+    ///
+    /// # Examples
+    ///
+    /// * `terminal.insert_char(char, 0)` will append `char` to the end of existing text.
+    /// * `terminal.insert_char(char, 5)` will insert `char` right before the last 5 characters.
+    ///
+    /// After invoke this function, one must call `refresh_display` to get the updates actually showed on the screen.
+    </span><span class="kw">pub fn </span>insert_char(<span class="kw-2">&amp;mut </span><span class="self">self</span>, c: char, offset_from_end: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>buflen = <span class="self">self</span>.scrollback_buffer.len();
+        <span class="kw">if </span>buflen &lt; offset_from_end { <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;offset_from_end is larger than length of scrollback buffer&quot;</span>); }
+        <span class="kw">let </span>insert_idx = buflen - offset_from_end;
+        <span class="self">self</span>.scrollback_buffer.insert_str(insert_idx, <span class="kw-2">&amp;</span>c.to_string());
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Remove a character from the terminal.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `offset_from_end`: the position of the character to remove. It represents the distance relative to the end of the whole output in the terminal in number of characters. `offset_from_end == 0` is *invalid* here.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Examples</span>
-    <span class="doccomment">/// * `terminal.remove_char(1)` will remove the last character in the screen.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// After invoke this function, one must call `refresh_display` to get the updates actually showed on the screen.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">remove_char</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">offset_from_end</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">buflen</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>();
-        <span class="kw">if</span> <span class="ident">buflen</span> <span class="op">&lt;</span> <span class="ident">offset_from_end</span> { <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;offset_from_end is larger than length of scrollback buffer&quot;</span>); }
-        <span class="kw">if</span> <span class="ident">offset_from_end</span> <span class="op">==</span> <span class="number">0</span> { <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;cannot remove character at offset_from_end == 0&quot;</span>); }
-        <span class="kw">let</span> <span class="ident">remove_idx</span> <span class="op">=</span> <span class="ident">buflen</span> <span class="op">-</span> <span class="ident">offset_from_end</span>;
-        <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">remove</span>(<span class="ident">remove_idx</span>);
+    <span class="doccomment">/// Remove a character from the terminal.
+    ///
+    /// # Arguments
+    /// * `offset_from_end`: the position of the character to remove. It represents the distance relative to the end of the whole output in the terminal in number of characters. `offset_from_end == 0` is *invalid* here.
+    ///
+    /// # Examples
+    /// * `terminal.remove_char(1)` will remove the last character in the screen.
+    ///
+    /// After invoke this function, one must call `refresh_display` to get the updates actually showed on the screen.
+    </span><span class="kw">pub fn </span>remove_char(<span class="kw-2">&amp;mut </span><span class="self">self</span>, offset_from_end: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>buflen = <span class="self">self</span>.scrollback_buffer.len();
+        <span class="kw">if </span>buflen &lt; offset_from_end { <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;offset_from_end is larger than length of scrollback buffer&quot;</span>); }
+        <span class="kw">if </span>offset_from_end == <span class="number">0 </span>{ <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;cannot remove character at offset_from_end == 0&quot;</span>); }
+        <span class="kw">let </span>remove_idx = buflen - offset_from_end;
+        <span class="self">self</span>.scrollback_buffer.remove(remove_idx);
         <span class="prelude-val">Ok</span>(())
     }
     
-    <span class="doccomment">/// Scroll the screen to the very beginning.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">move_screen_to_begin</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// Home command only registers if the text display has the ability to scroll</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">scroll_start_idx</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="self">self</span>.<span class="ident">is_scroll_end</span> <span class="op">=</span> <span class="bool-val">false</span>;
-            <span class="self">self</span>.<span class="ident">scroll_start_idx</span> <span class="op">=</span> <span class="number">0</span>; <span class="comment">// takes us up to the start of the page</span>
-            <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">disable</span>();
-            <span class="self">self</span>.<span class="ident">display_cursor</span>()<span class="question-mark">?</span>;
+    <span class="doccomment">/// Scroll the screen to the very beginning.
+    </span><span class="kw">pub fn </span>move_screen_to_begin(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// Home command only registers if the text display has the ability to scroll
+        </span><span class="kw">if </span><span class="self">self</span>.scroll_start_idx != <span class="number">0 </span>{
+            <span class="self">self</span>.is_scroll_end = <span class="bool-val">false</span>;
+            <span class="self">self</span>.scroll_start_idx = <span class="number">0</span>; <span class="comment">// takes us up to the start of the page
+            </span><span class="self">self</span>.cursor.disable();
+            <span class="self">self</span>.display_cursor()<span class="question-mark">?</span>;
         }
         
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Scroll the screen to the very end.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">move_screen_to_end</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_scroll_end</span> {
-            <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">disable</span>();
-            <span class="self">self</span>.<span class="ident">display_cursor</span>()<span class="question-mark">?</span>;
-            <span class="self">self</span>.<span class="ident">is_scroll_end</span> <span class="op">=</span> <span class="bool-val">true</span>;
-            <span class="kw">let</span> <span class="ident">buffer_len</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">len</span>();
-            <span class="self">self</span>.<span class="ident">scroll_start_idx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">calc_start_idx</span>(<span class="ident">buffer_len</span>).<span class="number">0</span>;
-            <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">enable</span>();
+    <span class="doccomment">/// Scroll the screen to the very end.
+    </span><span class="kw">pub fn </span>move_screen_to_end(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">if </span>!<span class="self">self</span>.is_scroll_end {
+            <span class="self">self</span>.cursor.disable();
+            <span class="self">self</span>.display_cursor()<span class="question-mark">?</span>;
+            <span class="self">self</span>.is_scroll_end = <span class="bool-val">true</span>;
+            <span class="kw">let </span>buffer_len = <span class="self">self</span>.scrollback_buffer.len();
+            <span class="self">self</span>.scroll_start_idx = <span class="self">self</span>.calc_start_idx(buffer_len).<span class="number">0</span>;
+            <span class="self">self</span>.cursor.enable();
         }
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Scroll the screen a line up.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">move_screen_line_up</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">scroll_start_idx</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="self">self</span>.<span class="ident">scroll_up_one_line</span>();
-            <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">disable</span>();
-            <span class="self">self</span>.<span class="ident">display_cursor</span>()<span class="question-mark">?</span>;
+    <span class="doccomment">/// Scroll the screen a line up.
+    </span><span class="kw">pub fn </span>move_screen_line_up(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">if </span><span class="self">self</span>.scroll_start_idx != <span class="number">0 </span>{
+            <span class="self">self</span>.scroll_up_one_line();
+            <span class="self">self</span>.cursor.disable();
+            <span class="self">self</span>.display_cursor()<span class="question-mark">?</span>;
         }
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Scroll the screen a line down.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">move_screen_line_down</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_scroll_end</span> {
-            <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">disable</span>();
-            <span class="self">self</span>.<span class="ident">display_cursor</span>()<span class="question-mark">?</span>;
-            <span class="self">self</span>.<span class="ident">scroll_down_one_line</span>();
-            <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">enable</span>();
+    <span class="doccomment">/// Scroll the screen a line down.
+    </span><span class="kw">pub fn </span>move_screen_line_down(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">if </span>!<span class="self">self</span>.is_scroll_end {
+            <span class="self">self</span>.cursor.disable();
+            <span class="self">self</span>.display_cursor()<span class="question-mark">?</span>;
+            <span class="self">self</span>.scroll_down_one_line();
+            <span class="self">self</span>.cursor.enable();
         }
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Scroll the screen a page up.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">move_screen_page_up</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">scroll_start_idx</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">1</span> {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+    <span class="doccomment">/// Scroll the screen a page up.
+    </span><span class="kw">pub fn </span>move_screen_page_up(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">if </span><span class="self">self</span>.scroll_start_idx &lt;= <span class="number">1 </span>{
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(());
         }
-        <span class="self">self</span>.<span class="ident">page_up</span>();
-        <span class="self">self</span>.<span class="ident">is_scroll_end</span> <span class="op">=</span> <span class="bool-val">false</span>;
-        <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">disable</span>();
-        <span class="self">self</span>.<span class="ident">display_cursor</span>()
+        <span class="self">self</span>.page_up();
+        <span class="self">self</span>.is_scroll_end = <span class="bool-val">false</span>;
+        <span class="self">self</span>.cursor.disable();
+        <span class="self">self</span>.display_cursor()
     }
 
-    <span class="doccomment">/// Scroll the screen a page down.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">move_screen_page_down</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_scroll_end</span> {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+    <span class="doccomment">/// Scroll the screen a page down.
+    </span><span class="kw">pub fn </span>move_screen_page_down(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">if </span><span class="self">self</span>.is_scroll_end {
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(());
         }
-        <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">disable</span>();
-        <span class="self">self</span>.<span class="ident">display_cursor</span>()<span class="question-mark">?</span>;
-        <span class="self">self</span>.<span class="ident">page_down</span>();
-        <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">enable</span>();
+        <span class="self">self</span>.cursor.disable();
+        <span class="self">self</span>.display_cursor()<span class="question-mark">?</span>;
+        <span class="self">self</span>.page_down();
+        <span class="self">self</span>.cursor.enable();
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Clear the scrollback buffer and reset the scroll positions.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">scrollback_buffer</span>.<span class="ident">clear</span>();
-        <span class="self">self</span>.<span class="ident">scroll_start_idx</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="self">self</span>.<span class="ident">is_scroll_end</span> <span class="op">=</span> <span class="bool-val">true</span>;
+    <span class="doccomment">/// Clear the scrollback buffer and reset the scroll positions.
+    </span><span class="kw">pub fn </span>clear(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.scrollback_buffer.clear();
+        <span class="self">self</span>.scroll_start_idx = <span class="number">0</span>;
+        <span class="self">self</span>.is_scroll_end = <span class="bool-val">true</span>;
     }
 
-    <span class="doccomment">/// Gets an event from the window&#39;s event queue.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Returns `None` if no events have been sent to this window.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_event</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">window</span>.<span class="ident">handle_event</span>() {
-            <span class="prelude-val">Ok</span>(<span class="ident">event</span>) =&gt; <span class="ident">event</span>,
-            <span class="prelude-val">Err</span>(<span class="ident">_e</span>) =&gt; {
-                <span class="macro">error!</span>(<span class="string">&quot;Terminal::get_event(): error in the window&#39;s event handler: {:?}.&quot;</span>, <span class="ident">_e</span>);
-                <span class="prelude-val">Some</span>(<span class="ident">Event::ExitEvent</span>)
+    <span class="doccomment">/// Gets an event from the window&#39;s event queue.
+    /// 
+    /// Returns `None` if no events have been sent to this window.
+    </span><span class="kw">pub fn </span>get_event(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Event&gt; {
+        <span class="kw">match </span><span class="self">self</span>.window.handle_event() {
+            <span class="prelude-val">Ok</span>(event) =&gt; event,
+            <span class="prelude-val">Err</span>(_e) =&gt; {
+                <span class="macro">error!</span>(<span class="string">&quot;Terminal::get_event(): error in the window&#39;s event handler: {:?}.&quot;</span>, _e);
+                <span class="prelude-val">Some</span>(Event::ExitEvent)
             }
         }
     }
 
-    <span class="doccomment">/// Display the cursor of the terminal.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">display_cursor</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// get info about the text displayable</span>
-        <span class="kw">let</span> (<span class="ident">col_num</span>, <span class="ident">line_num</span>, <span class="ident">text_next_pos</span>) <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">text_next_pos</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">text_display</span>.<span class="ident">get_next_index</span>();
-            <span class="kw">let</span> (<span class="ident">col_num</span>, <span class="ident">line_num</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_text_dimensions</span>();
-            (<span class="ident">col_num</span>, <span class="ident">line_num</span>, <span class="ident">text_next_pos</span>)
+    <span class="doccomment">/// Display the cursor of the terminal.
+    </span><span class="kw">pub fn </span>display_cursor(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// get info about the text displayable
+        </span><span class="kw">let </span>(col_num, line_num, text_next_pos) = {
+            <span class="kw">let </span>text_next_pos = <span class="self">self</span>.text_display.get_next_index();
+            <span class="kw">let </span>(col_num, line_num) = <span class="self">self</span>.get_text_dimensions();
+            (col_num, line_num, text_next_pos)
         };
 
-        <span class="comment">// return if the cursor is not in the screen</span>
-        <span class="kw">if</span> <span class="ident">text_next_pos</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">col_num</span> <span class="op">*</span> <span class="ident">line_num</span> {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(())
+        <span class="comment">// return if the cursor is not in the screen
+        </span><span class="kw">if </span>text_next_pos &gt;= col_num * line_num {
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(())
         }
 
-        <span class="comment">// calculate the cursor position</span>
-        <span class="kw">let</span> <span class="ident">cursor_pos</span> <span class="op">=</span> <span class="ident">text_next_pos</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">offset_from_end</span>;
-        <span class="kw">let</span> <span class="ident">cursor_line</span> <span class="op">=</span> <span class="ident">cursor_pos</span> <span class="op">/</span> <span class="ident">col_num</span>;
-        <span class="kw">let</span> <span class="ident">cursor_col</span> <span class="op">=</span> <span class="ident">cursor_pos</span> <span class="op">%</span> <span class="ident">col_num</span>;
+        <span class="comment">// calculate the cursor position
+        </span><span class="kw">let </span>cursor_pos = text_next_pos - <span class="self">self</span>.cursor.offset_from_end;
+        <span class="kw">let </span>cursor_line = cursor_pos / col_num;
+        <span class="kw">let </span>cursor_col = cursor_pos % col_num;
 
-        <span class="comment">// Get the bounding box that contains the displayed cursor.</span>
-        <span class="kw">let</span> <span class="ident">bounding_box</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">coord</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">window</span>.<span class="ident">area</span>().<span class="ident">top_left</span>;
-            <span class="kw">let</span> <span class="ident">bounding_box</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">display</span>(
-                <span class="ident">coord</span>,
-                <span class="ident">cursor_col</span>,
-                <span class="ident">cursor_line</span>,
-                <span class="self">self</span>.<span class="ident">window</span>.<span class="ident">framebuffer_mut</span>().<span class="ident">deref_mut</span>(),
+        <span class="comment">// Get the bounding box that contains the displayed cursor.
+        </span><span class="kw">let </span>bounding_box = {
+            <span class="kw">let </span>coord = <span class="self">self</span>.window.area().top_left;
+            <span class="kw">let </span>bounding_box = <span class="self">self</span>.cursor.display(
+                coord,
+                cursor_col,
+                cursor_line,
+                <span class="self">self</span>.window.framebuffer_mut().deref_mut(),
             )<span class="question-mark">?</span>;
-            <span class="ident">bounding_box</span>
+            bounding_box
         };   
 
-        <span class="self">self</span>.<span class="ident">window</span>.<span class="ident">render</span>(<span class="prelude-val">Some</span>(<span class="ident">bounding_box</span>))
+        <span class="self">self</span>.window.render(<span class="prelude-val">Some</span>(bounding_box))
     }
 
-    <span class="doccomment">/// Gets the position of the cursor relative to the end of text in number of characters.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_cursor_offset_from_end</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">offset_from_end</span>
+    <span class="doccomment">/// Gets the position of the cursor relative to the end of text in number of characters.
+    </span><span class="kw">pub fn </span>get_cursor_offset_from_end(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.cursor.offset_from_end
     }
 
-    <span class="doccomment">/// Updates the position of a cursor.</span>
-    <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `offset_from_end`: the position of the cursor relative to the end of text in number of characters.</span>
-    <span class="doccomment">/// * `underlying_char`: the ASCII code of the underlying character when the cursor is unseen.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">update_cursor_pos</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">offset_from_end</span>: <span class="ident">usize</span>, <span class="ident">underlying_char</span>: <span class="ident">u8</span>) {
-        <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">offset_from_end</span> <span class="op">=</span> <span class="ident">offset_from_end</span>;
-        <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">underlying_char</span> <span class="op">=</span> <span class="ident">underlying_char</span>;
+    <span class="doccomment">/// Updates the position of a cursor.
+    /// # Arguments
+    /// * `offset_from_end`: the position of the cursor relative to the end of text in number of characters.
+    /// * `underlying_char`: the ASCII code of the underlying character when the cursor is unseen.
+    </span><span class="kw">pub fn </span>update_cursor_pos(<span class="kw-2">&amp;mut </span><span class="self">self</span>, offset_from_end: usize, underlying_char: u8) {
+        <span class="self">self</span>.cursor.offset_from_end = offset_from_end;
+        <span class="self">self</span>.cursor.underlying_char = underlying_char;
     }
 
-    <span class="doccomment">/// Resizes this terminal and its underlying text display and then refreshes the window.</span>
-    <span class="doccomment">/// This does not automatically redisplay the terminal cursor.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">resize</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">new_position</span>: <span class="ident">Rectangle</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">text_display</span>.<span class="ident">set_size</span>(<span class="ident">new_position</span>.<span class="ident">width</span>(), <span class="ident">new_position</span>.<span class="ident">height</span>());
-        <span class="self">self</span>.<span class="ident">text_display</span>.<span class="ident">reset_cache</span>();
-        <span class="self">self</span>.<span class="ident">refresh_display</span>()<span class="question-mark">?</span>;
+    <span class="doccomment">/// Resizes this terminal and its underlying text display and then refreshes the window.
+    /// This does not automatically redisplay the terminal cursor.
+    </span><span class="kw">pub fn </span>resize(<span class="kw-2">&amp;mut </span><span class="self">self</span>, new_position: Rectangle) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.text_display.set_size(new_position.width(), new_position.height());
+        <span class="self">self</span>.text_display.reset_cache();
+        <span class="self">self</span>.refresh_display()<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="libterm" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="libterm" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../port_io/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../port_io/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../port_io/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../port_io/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -151,153 +145,152 @@
 <span id="145">145</span>
 <span id="146">146</span>
 <span id="147">147</span>
-</pre><pre class="rust"><code><span class="doccomment">//! CPU-level input/output instructions, including `inb`, `outb`, etc., and</span>
-<span class="doccomment">//! a high level Rust wrapper.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! CPU-level input/output instructions, including `inb`, `outb`, etc., and
+//! a high level Rust wrapper.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">use</span> <span class="ident">core::marker::PhantomData</span>;
+</span><span class="kw">use </span>core::marker::PhantomData;
 
-<span class="comment">// These cfg statements should cause compiler errors on non-x86 platforms.</span>
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">target_arch</span><span class="op">=</span><span class="string">&quot;x86&quot;</span>, <span class="ident">target_arch</span><span class="op">=</span><span class="string">&quot;x86_64&quot;</span>))]</span>
-<span class="kw">mod</span> <span class="ident">x86</span>;
+<span class="comment">// These cfg statements should cause compiler errors on non-x86 platforms.
+</span><span class="attr">#[cfg(any(target_arch=<span class="string">&quot;x86&quot;</span>, target_arch=<span class="string">&quot;x86_64&quot;</span>))]
+</span><span class="kw">mod </span>x86;
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">any</span>(<span class="ident">target_arch</span><span class="op">=</span><span class="string">&quot;x86&quot;</span>, <span class="ident">target_arch</span><span class="op">=</span><span class="string">&quot;x86_64&quot;</span>))]</span>
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">x86</span>::{<span class="ident">inb</span>, <span class="ident">outb</span>, <span class="ident">inw</span>, <span class="ident">outw</span>, <span class="ident">inl</span>, <span class="ident">outl</span>};
+<span class="attr">#[cfg(any(target_arch=<span class="string">&quot;x86&quot;</span>, target_arch=<span class="string">&quot;x86_64&quot;</span>))]
+</span><span class="kw">pub use </span>x86::{inb, outb, inw, outw, inl, outl};
 
 
-<span class="doccomment">/// This trait is defined for any type which can be read from a port.</span>
-<span class="doccomment">/// x86 processors support Port IO for `u8`, `u16` and `u32`.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">PortIn</span> {
-    <span class="doccomment">/// Read a value from the specified port.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">port_in</span>(<span class="ident">port</span>: <span class="ident">u16</span>) -&gt; <span class="self">Self</span>;
+<span class="doccomment">/// This trait is defined for any type which can be read from a port.
+/// x86 processors support Port IO for `u8`, `u16` and `u32`.
+</span><span class="kw">pub trait </span>PortIn {
+    <span class="doccomment">/// Read a value from the specified port.
+    </span><span class="kw">unsafe fn </span>port_in(port: u16) -&gt; <span class="self">Self</span>;
 }
 
-<span class="doccomment">/// This trait is defined for any type which can be read from a port.</span>
-<span class="doccomment">/// x86 processors support Port IO for `u8`, `u16` and `u32`.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">PortOut</span> {
-    <span class="doccomment">/// Write a value to the specified port.</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">port_out</span>(<span class="ident">port</span>: <span class="ident">u16</span>, <span class="ident">value</span>: <span class="self">Self</span>);
+<span class="doccomment">/// This trait is defined for any type which can be read from a port.
+/// x86 processors support Port IO for `u8`, `u16` and `u32`.
+</span><span class="kw">pub trait </span>PortOut {
+    <span class="doccomment">/// Write a value to the specified port.
+    </span><span class="kw">unsafe fn </span>port_out(port: u16, value: <span class="self">Self</span>);
 }
 
-<span class="kw">impl</span> <span class="ident">PortOut</span> <span class="kw">for</span> <span class="ident">u8</span> {
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">port_out</span>(<span class="ident">port</span>: <span class="ident">u16</span>, <span class="ident">value</span>: <span class="self">Self</span>) {
-        <span class="ident">outb</span>(<span class="ident">value</span>, <span class="ident">port</span>);
+<span class="kw">impl </span>PortOut <span class="kw">for </span>u8 {
+    <span class="kw">unsafe fn </span>port_out(port: u16, value: <span class="self">Self</span>) {
+        outb(value, port);
     }
 }
-<span class="kw">impl</span> <span class="ident">PortOut</span> <span class="kw">for</span> <span class="ident">u16</span> {
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">port_out</span>(<span class="ident">port</span>: <span class="ident">u16</span>, <span class="ident">value</span>: <span class="self">Self</span>) {
-        <span class="ident">outw</span>(<span class="ident">value</span>, <span class="ident">port</span>);
+<span class="kw">impl </span>PortOut <span class="kw">for </span>u16 {
+    <span class="kw">unsafe fn </span>port_out(port: u16, value: <span class="self">Self</span>) {
+        outw(value, port);
     }
 }
-<span class="kw">impl</span> <span class="ident">PortOut</span> <span class="kw">for</span> <span class="ident">u32</span> {
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">port_out</span>(<span class="ident">port</span>: <span class="ident">u16</span>, <span class="ident">value</span>: <span class="self">Self</span>) {
-        <span class="ident">outl</span>(<span class="ident">value</span>, <span class="ident">port</span>);
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">PortIn</span> <span class="kw">for</span> <span class="ident">u8</span> {
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">port_in</span>(<span class="ident">port</span>: <span class="ident">u16</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">inb</span>(<span class="ident">port</span>)
-    }
-}
-<span class="kw">impl</span> <span class="ident">PortIn</span> <span class="kw">for</span> <span class="ident">u16</span> {
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">port_in</span>(<span class="ident">port</span>: <span class="ident">u16</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">inw</span>(<span class="ident">port</span>)
-    }
-}
-<span class="kw">impl</span> <span class="ident">PortIn</span> <span class="kw">for</span> <span class="ident">u32</span> {
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">port_in</span>(<span class="ident">port</span>: <span class="ident">u16</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident">inl</span>(<span class="ident">port</span>)
+<span class="kw">impl </span>PortOut <span class="kw">for </span>u32 {
+    <span class="kw">unsafe fn </span>port_out(port: u16, value: <span class="self">Self</span>) {
+        outl(value, port);
     }
 }
 
-
-
-<span class="doccomment">/// A readable and writable I/O port over an arbitrary type supporting the `InOut` interface,</span>
-<span class="doccomment">/// which is only `u8`, `u16`, or `u32`.</span>
-<span class="comment">// /// which only includes types that losslessly convert into a `u8`, `u16`, and `u32`.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Port</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">PortIn</span> <span class="op">+</span> <span class="ident">PortOut</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Port address (in the I/O space), which is always 16 bits.</span>
-    <span class="ident">port</span>: <span class="ident">u16</span>,
-    <span class="ident">_phantom</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+<span class="kw">impl </span>PortIn <span class="kw">for </span>u8 {
+    <span class="kw">unsafe fn </span>port_in(port: u16) -&gt; <span class="self">Self </span>{
+        inb(port)
+    }
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">PortIn</span> <span class="op">+</span> <span class="ident">PortOut</span><span class="op">&gt;</span> <span class="ident">Port</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Create a new I/O port.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">port</span>: <span class="ident">u16</span>) -&gt; <span class="ident">Port</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">Port</span> { <span class="ident">port</span>: <span class="ident">port</span>, <span class="ident">_phantom</span>: <span class="ident">PhantomData</span> }
+<span class="kw">impl </span>PortIn <span class="kw">for </span>u16 {
+    <span class="kw">unsafe fn </span>port_in(port: u16) -&gt; <span class="self">Self </span>{
+        inw(port)
     }
-
-    <span class="doccomment">/// Returns the address of this port.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">port_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u16</span> { 
-        <span class="self">self</span>.<span class="ident">port</span>
-    }
-
-    <span class="doccomment">/// Read data of size `T` from the port.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">T</span> {
-        <span class="kw">unsafe</span> { <span class="ident">T::port_in</span>(<span class="self">self</span>.<span class="ident">port</span>) }
-    }
-
-    <span class="doccomment">/// Write data of size `T` to the port.</span>
-    <span class="doccomment">/// This is unsafe because writing to an arbitrary port may cause problems.</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">value</span>: <span class="ident">T</span>) {
-        <span class="ident">T::port_out</span>(<span class="self">self</span>.<span class="ident">port</span>, <span class="ident">value</span>);
+}
+<span class="kw">impl </span>PortIn <span class="kw">for </span>u32 {
+    <span class="kw">unsafe fn </span>port_in(port: u16) -&gt; <span class="self">Self </span>{
+        inl(port)
     }
 }
 
 
-<span class="doccomment">/// A read-only I/O port over an arbitrary type supporting the `InOut` interface,</span>
-<span class="doccomment">/// which is only `u8`, `u16`, and `u32`.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PortReadOnly</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">PortIn</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Port address (in the I/O space), which is always 16 bits.</span>
-    <span class="ident">port</span>: <span class="ident">u16</span>,
-    <span class="ident">_phantom</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+
+<span class="doccomment">/// A readable and writable I/O port over an arbitrary type supporting the `InOut` interface,
+/// which is only `u8`, `u16`, or `u32`.
+</span><span class="comment">// /// which only includes types that losslessly convert into a `u8`, `u16`, and `u32`.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>Port&lt;T: PortIn + PortOut&gt; {
+    <span class="doccomment">/// Port address (in the I/O space), which is always 16 bits.
+    </span>port: u16,
+    _phantom: PhantomData&lt;T&gt;,
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">PortIn</span><span class="op">&gt;</span> <span class="ident">PortReadOnly</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Create a new read-only I/O port.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">port</span>: <span class="ident">u16</span>) -&gt; <span class="ident">PortReadOnly</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">PortReadOnly</span> { <span class="ident">port</span>: <span class="ident">port</span>, <span class="ident">_phantom</span>: <span class="ident">PhantomData</span> }
+<span class="kw">impl</span>&lt;T: PortIn + PortOut&gt; Port&lt;T&gt; {
+    <span class="doccomment">/// Create a new I/O port.
+    </span><span class="kw">pub const fn </span>new(port: u16) -&gt; Port&lt;T&gt; {
+        Port { port: port, _phantom: PhantomData }
     }
 
-    <span class="doccomment">/// Returns the address of this port.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">port_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u16</span> { 
-        <span class="self">self</span>.<span class="ident">port</span>
+    <span class="doccomment">/// Returns the address of this port.
+    </span><span class="kw">pub const fn </span>port_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u16 { 
+        <span class="self">self</span>.port
     }
 
-    <span class="doccomment">/// Read data of size `T` from the port.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">T</span> {
-        <span class="kw">unsafe</span> { <span class="ident">T::port_in</span>(<span class="self">self</span>.<span class="ident">port</span>) }
+    <span class="doccomment">/// Read data of size `T` from the port.
+    </span><span class="kw">pub fn </span>read(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; T {
+        <span class="kw">unsafe </span>{ T::port_in(<span class="self">self</span>.port) }
+    }
+
+    <span class="doccomment">/// Write data of size `T` to the port.
+    /// This is unsafe because writing to an arbitrary port may cause problems.
+    </span><span class="kw">pub unsafe fn </span>write(<span class="kw-2">&amp;</span><span class="self">self</span>, value: T) {
+        T::port_out(<span class="self">self</span>.port, value);
     }
 }
 
 
-<span class="doccomment">/// A write-only I/O port over an arbitrary type supporting the `InOut` interface,</span>
-<span class="doccomment">/// which is only `u8`, `u16`, and `u32`.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PortWriteOnly</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">PortOut</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Port address (in the I/O space), which is always 16 bits.</span>
-    <span class="ident">port</span>: <span class="ident">u16</span>,
-    <span class="ident">_phantom</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A read-only I/O port over an arbitrary type supporting the `InOut` interface,
+/// which is only `u8`, `u16`, and `u32`.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>PortReadOnly&lt;T: PortIn&gt; {
+    <span class="doccomment">/// Port address (in the I/O space), which is always 16 bits.
+    </span>port: u16,
+    _phantom: PhantomData&lt;T&gt;,
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">PortOut</span><span class="op">&gt;</span> <span class="ident">PortWriteOnly</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Create a new read-only I/O port.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">port</span>: <span class="ident">u16</span>) -&gt; <span class="ident">PortWriteOnly</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">PortWriteOnly</span> { <span class="ident">port</span>: <span class="ident">port</span>, <span class="ident">_phantom</span>: <span class="ident">PhantomData</span> }
+<span class="kw">impl</span>&lt;T: PortIn&gt; PortReadOnly&lt;T&gt; {
+    <span class="doccomment">/// Create a new read-only I/O port.
+    </span><span class="kw">pub const fn </span>new(port: u16) -&gt; PortReadOnly&lt;T&gt; {
+        PortReadOnly { port: port, _phantom: PhantomData }
     }
 
-    <span class="doccomment">/// Returns the address of this port.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">port_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u16</span> { 
-        <span class="self">self</span>.<span class="ident">port</span>
+    <span class="doccomment">/// Returns the address of this port.
+    </span><span class="kw">pub const fn </span>port_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u16 { 
+        <span class="self">self</span>.port
     }
 
-    <span class="doccomment">/// Write data of size `T` to the port.</span>
-    <span class="doccomment">/// This is unsafe because writing to an arbitrary port may cause problems.</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">value</span>: <span class="ident">T</span>) {
-        <span class="ident">T::port_out</span>(<span class="self">self</span>.<span class="ident">port</span>, <span class="ident">value</span>);
+    <span class="doccomment">/// Read data of size `T` from the port.
+    </span><span class="kw">pub fn </span>read(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; T {
+        <span class="kw">unsafe </span>{ T::port_in(<span class="self">self</span>.port) }
+    }
+}
+
+
+<span class="doccomment">/// A write-only I/O port over an arbitrary type supporting the `InOut` interface,
+/// which is only `u8`, `u16`, and `u32`.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>PortWriteOnly&lt;T: PortOut&gt; {
+    <span class="doccomment">/// Port address (in the I/O space), which is always 16 bits.
+    </span>port: u16,
+    _phantom: PhantomData&lt;T&gt;,
+}
+<span class="kw">impl</span>&lt;T: PortOut&gt; PortWriteOnly&lt;T&gt; {
+    <span class="doccomment">/// Create a new read-only I/O port.
+    </span><span class="kw">pub const fn </span>new(port: u16) -&gt; PortWriteOnly&lt;T&gt; {
+        PortWriteOnly { port: port, _phantom: PhantomData }
+    }
+
+    <span class="doccomment">/// Returns the address of this port.
+    </span><span class="kw">pub const fn </span>port_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u16 { 
+        <span class="self">self</span>.port
+    }
+
+    <span class="doccomment">/// Write data of size `T` to the port.
+    /// This is unsafe because writing to an arbitrary port may cause problems.
+    </span><span class="kw">pub unsafe fn </span>write(<span class="kw-2">&amp;</span><span class="self">self</span>, value: T) {
+        T::port_out(<span class="self">self</span>.port, value);
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="port_io" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="port_io" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

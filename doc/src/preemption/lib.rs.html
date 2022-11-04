@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/preemption/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../preemption/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../preemption/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../preemption/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/preemption/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../preemption/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -142,144 +136,143 @@
 <span id="136">136</span>
 <span id="137">137</span>
 <span id="138">138</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Manages preemption on a per-CPU core basis.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Supports enabling and disabling preemption for the purpose of </span>
-<span class="doccomment">//! safe task state management, e.g., through preemption-safe locks.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Manages preemption on a per-CPU core basis.
+//! 
+//! Supports enabling and disabling preemption for the purpose of 
+//! safe task state management, e.g., through preemption-safe locks.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">negative_impls</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(negative_impls)]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
+</span><span class="kw">extern crate </span>alloc;
 
-<span class="kw">use</span> <span class="ident">core::sync::atomic</span>::{<span class="ident">AtomicU8</span>, <span class="ident">Ordering</span>};
+<span class="kw">use </span>core::sync::atomic::{AtomicU8, Ordering};
 
-<span class="doccomment">/// Theseus uses a `u8` to hold each CPU core&#39;s ID (apic ID),</span>
-<span class="doccomment">/// so the maximum number of cores it supports is `u8::MAX` (256).</span>
-<span class="kw">const</span> <span class="ident">MAX_CPU_CORES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">u8::MAX</span> <span class="kw">as</span> <span class="ident">usize</span>;
+<span class="doccomment">/// Theseus uses a `u8` to hold each CPU core&#39;s ID (apic ID),
+/// so the maximum number of cores it supports is `u8::MAX` (256).
+</span><span class="kw">const </span>MAX_CPU_CORES: usize = u8::MAX <span class="kw">as </span>usize;
 
-<span class="kw">const</span> <span class="ident">ATOMIC_U8_ZERO</span>: <span class="ident">AtomicU8</span> <span class="op">=</span> <span class="ident">AtomicU8::new</span>(<span class="number">0</span>);
+<span class="kw">const </span>ATOMIC_U8_ZERO: AtomicU8 = AtomicU8::new(<span class="number">0</span>);
 
-<span class="doccomment">/// The per-core preemption count, indexed by a CPU core&#39;s APIC ID.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// If a CPU&#39;s count is `0`, preemption is enabled.</span>
-<span class="doccomment">/// If a CPU&#39;s count is greater than `0`, preemption is disabled.</span>
-<span class="kw">static</span> <span class="ident">PREEMPTION_COUNT</span>: [<span class="ident">AtomicU8</span>; <span class="ident">MAX_CPU_CORES</span>] <span class="op">=</span> [<span class="ident">ATOMIC_U8_ZERO</span>; <span class="ident">MAX_CPU_CORES</span>];
+<span class="doccomment">/// The per-core preemption count, indexed by a CPU core&#39;s APIC ID.
+/// 
+/// If a CPU&#39;s count is `0`, preemption is enabled.
+/// If a CPU&#39;s count is greater than `0`, preemption is disabled.
+</span><span class="kw">static </span>PREEMPTION_COUNT: [AtomicU8; MAX_CPU_CORES] = [ATOMIC_U8_ZERO; MAX_CPU_CORES];
 
 
-<span class="doccomment">/// Prevents preemption (preemptive task switching) from occurring</span>
-<span class="doccomment">/// until the returned guard object is dropped.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">hold_preemption</span>() -&gt; <span class="ident">PreemptionGuard</span> {
-    <span class="kw">let</span> <span class="ident">apic_id</span> <span class="op">=</span> <span class="ident">apic::get_my_apic_id</span>();
-    <span class="kw">let</span> <span class="ident">prev_val</span> <span class="op">=</span> <span class="ident">PREEMPTION_COUNT</span>[<span class="ident">apic_id</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::Relaxed</span>);
-    <span class="comment">// If the previous counter value was 0, that indicates we are transitioning</span>
-    <span class="comment">// from preemption being enabled to disabled on this CPU.</span>
-    <span class="kw">let</span> <span class="ident">preemption_was_enabled</span> <span class="op">=</span> <span class="ident">prev_val</span> <span class="op">==</span> <span class="number">0</span>;
-    <span class="comment">// Create a guard here immediately after incrementing the counter,</span>
-    <span class="comment">// in order to guarantee that a failure below will drop it and decrement the counter.</span>
-    <span class="kw">let</span> <span class="ident">guard</span> <span class="op">=</span> <span class="ident">PreemptionGuard</span> {
-        <span class="ident">apic_id</span>,
-        <span class="ident">preemption_was_enabled</span>,
+<span class="doccomment">/// Prevents preemption (preemptive task switching) from occurring
+/// until the returned guard object is dropped.
+</span><span class="kw">pub fn </span>hold_preemption() -&gt; PreemptionGuard {
+    <span class="kw">let </span>apic_id = apic::get_my_apic_id();
+    <span class="kw">let </span>prev_val = PREEMPTION_COUNT[apic_id <span class="kw">as </span>usize].fetch_add(<span class="number">1</span>, Ordering::Relaxed);
+    <span class="comment">// If the previous counter value was 0, that indicates we are transitioning
+    // from preemption being enabled to disabled on this CPU.
+    </span><span class="kw">let </span>preemption_was_enabled = prev_val == <span class="number">0</span>;
+    <span class="comment">// Create a guard here immediately after incrementing the counter,
+    // in order to guarantee that a failure below will drop it and decrement the counter.
+    </span><span class="kw">let </span>guard = PreemptionGuard {
+        apic_id,
+        preemption_was_enabled,
     };
 
-    <span class="kw">if</span> <span class="ident">preemption_was_enabled</span> {
-        <span class="comment">// log::trace!(&quot; CPU {}:   disabling preemption&quot;, apic_id);</span>
+    <span class="kw">if </span>preemption_was_enabled {
+        <span class="comment">// log::trace!(&quot; CPU {}:   disabling preemption&quot;, apic_id);
         
-        <span class="comment">// When transitioning from preemption being enabled to disabled,</span>
-        <span class="comment">// we must disable the local APIC timer used for preemptive task switching.</span>
-        <span class="ident">apic::get_my_apic</span>()
-            .<span class="ident">expect</span>(<span class="string">&quot;BUG: hold_preemption() couldn&#39;t get local APIC&quot;</span>)
-            .<span class="ident">write</span>()
-            .<span class="ident">enable_lvt_timer</span>(<span class="bool-val">false</span>);
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">prev_val</span> <span class="op">==</span> <span class="ident">u8::MAX</span> {
-        <span class="comment">// Overflow occurred and the counter value wrapped around, which is a bug.</span>
-        <span class="macro">panic!</span>(<span class="string">&quot;BUG: Overflow occurred in the preemption counter for CPU {}&quot;</span>, <span class="ident">apic_id</span>);
+        // When transitioning from preemption being enabled to disabled,
+        // we must disable the local APIC timer used for preemptive task switching.
+        </span>apic::get_my_apic()
+            .expect(<span class="string">&quot;BUG: hold_preemption() couldn&#39;t get local APIC&quot;</span>)
+            .write()
+            .enable_lvt_timer(<span class="bool-val">false</span>);
+    } <span class="kw">else if </span>prev_val == u8::MAX {
+        <span class="comment">// Overflow occurred and the counter value wrapped around, which is a bug.
+        </span><span class="macro">panic!</span>(<span class="string">&quot;BUG: Overflow occurred in the preemption counter for CPU {}&quot;</span>, apic_id);
     }
 
-    <span class="ident">guard</span>
+    guard
 }
 
 
-<span class="doccomment">/// A guard type that ensures preemption is disabled as long as it is held.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Call [`hold_preemption()`] to obtain a `PreemptionGuard`.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Preemption *may* be re-enabled when this guard is dropped,</span>
-<span class="doccomment">/// but not necessarily so, because other previous functions </span>
-<span class="doccomment">/// in the call stack may have already acquired a `PreemptionGuard`.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This type does not implement `Send` because it is invalid</span>
-<span class="doccomment">/// to move it across a &quot;thread&quot; boundary (into a different task).</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PreemptionGuard</span> {
-    <span class="doccomment">/// The APIC ID of the CPU on which preemption was held.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// This is just used for strict sanity checks to ensure that</span>
-    <span class="doccomment">/// a guard isn&#39;t created on one CPU and then dropped on a different CPU.</span>
-    <span class="ident">apic_id</span>: <span class="ident">u8</span>,
-    <span class="doccomment">/// Whether preemption was enabled when this guard was created.</span>
-    <span class="ident">preemption_was_enabled</span>: <span class="ident">bool</span>,
+<span class="doccomment">/// A guard type that ensures preemption is disabled as long as it is held.
+/// 
+/// Call [`hold_preemption()`] to obtain a `PreemptionGuard`.
+/// 
+/// Preemption *may* be re-enabled when this guard is dropped,
+/// but not necessarily so, because other previous functions 
+/// in the call stack may have already acquired a `PreemptionGuard`.
+/// 
+/// This type does not implement `Send` because it is invalid
+/// to move it across a &quot;thread&quot; boundary (into a different task).
+</span><span class="kw">pub struct </span>PreemptionGuard {
+    <span class="doccomment">/// The APIC ID of the CPU on which preemption was held.
+    /// 
+    /// This is just used for strict sanity checks to ensure that
+    /// a guard isn&#39;t created on one CPU and then dropped on a different CPU.
+    </span>apic_id: u8,
+    <span class="doccomment">/// Whether preemption was enabled when this guard was created.
+    </span>preemption_was_enabled: bool,
 }
 
-<span class="comment">// TODO FIXME: currently we transfer a `PreemptionGuard` between tasks</span>
-<span class="comment">//             during a task switch (right before and right after the context switch).</span>
-<span class="comment">//             Thus, this type needs to impl `Send`, even though it doesn&#39;t make sense</span>
-<span class="comment">//             to move it across a thread boundary in the general case.</span>
-<span class="comment">// // Similar guard types in Rust `std` are not `Send`.</span>
-<span class="comment">// impl !Send for PreemptionGuard { }</span>
+<span class="comment">// TODO FIXME: currently we transfer a `PreemptionGuard` between tasks
+//             during a task switch (right before and right after the context switch).
+//             Thus, this type needs to impl `Send`, even though it doesn&#39;t make sense
+//             to move it across a thread boundary in the general case.
+// // Similar guard types in Rust `std` are not `Send`.
+// impl !Send for PreemptionGuard { }
 
-<span class="kw">impl</span> <span class="ident">PreemptionGuard</span> {
-    <span class="doccomment">/// Returns whether preemption was originally enabled when this guard was created.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// * `true`: indicates that the caller function/task holding this guard</span>
-    <span class="doccomment">///    was the one that caused the transition from preemption</span>
-    <span class="doccomment">///    being enabled on this CPU to being disabled.</span>
-    <span class="doccomment">/// * `false`: indicates that preemption was already disabled</span>
-    <span class="doccomment">///    and that no transition occurred when the caller function/task</span>
-    <span class="doccomment">///    obtained this guard.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">preemption_was_enabled</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">preemption_was_enabled</span>
+</span><span class="kw">impl </span>PreemptionGuard {
+    <span class="doccomment">/// Returns whether preemption was originally enabled when this guard was created.
+    /// 
+    /// # Return
+    /// * `true`: indicates that the caller function/task holding this guard
+    ///    was the one that caused the transition from preemption
+    ///    being enabled on this CPU to being disabled.
+    /// * `false`: indicates that preemption was already disabled
+    ///    and that no transition occurred when the caller function/task
+    ///    obtained this guard.
+    </span><span class="kw">pub fn </span>preemption_was_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.preemption_was_enabled
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">PreemptionGuard</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="ident">apic_id</span> <span class="op">=</span> <span class="ident">apic::get_my_apic_id</span>();
+<span class="kw">impl </span>Drop <span class="kw">for </span>PreemptionGuard {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">let </span>apic_id = apic::get_my_apic_id();
         <span class="macro">assert!</span>(
-            <span class="self">self</span>.<span class="ident">apic_id</span> <span class="op">==</span> <span class="ident">apic_id</span>,
+            <span class="self">self</span>.apic_id == apic_id,
             <span class="string">&quot;PreemptionGuard::drop(): BUG: APIC IDs did not match! \
-            This indicates an unexpected task migration across CPUs.&quot;</span>
-        );
+            This indicates an unexpected task migration across CPUs.&quot;
+        </span>);
 
-        <span class="kw">let</span> <span class="ident">prev_val</span> <span class="op">=</span> <span class="ident">PREEMPTION_COUNT</span>[<span class="ident">apic_id</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">fetch_sub</span>(<span class="number">1</span>, <span class="ident">Ordering::Relaxed</span>);
-        <span class="kw">if</span> <span class="ident">prev_val</span> <span class="op">==</span> <span class="number">1</span> {
-            <span class="comment">// log::trace!(&quot;CPU {}: re-enabling preemption&quot;, apic_id);</span>
+        <span class="kw">let </span>prev_val = PREEMPTION_COUNT[apic_id <span class="kw">as </span>usize].fetch_sub(<span class="number">1</span>, Ordering::Relaxed);
+        <span class="kw">if </span>prev_val == <span class="number">1 </span>{
+            <span class="comment">// log::trace!(&quot;CPU {}: re-enabling preemption&quot;, apic_id);
 
-            <span class="comment">// If the previous counter value was 1, that means the current value is 1,</span>
-            <span class="comment">// which indicates we are transitioning from preemption disabled to enabled on this CPU.</span>
-            <span class="comment">// Thus, we re-enable the local APIC timer used for preemptive task switching.</span>
-            <span class="ident">apic::get_my_apic</span>()
-                .<span class="ident">expect</span>(<span class="string">&quot;BUG: PreemptionGuard::drop() couldn&#39;t get local APIC&quot;</span>)
-                .<span class="ident">write</span>()
-                .<span class="ident">enable_lvt_timer</span>(<span class="bool-val">true</span>);
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">prev_val</span> <span class="op">==</span> <span class="number">0</span> {
-            <span class="comment">// Underflow occurred and the counter value wrapped around, which is a bug.</span>
-            <span class="macro">panic!</span>(<span class="string">&quot;BUG: Underflow occurred in the preemption counter for CPU {}&quot;</span>, <span class="ident">apic_id</span>);
+            // If the previous counter value was 1, that means the current value is 1,
+            // which indicates we are transitioning from preemption disabled to enabled on this CPU.
+            // Thus, we re-enable the local APIC timer used for preemptive task switching.
+            </span>apic::get_my_apic()
+                .expect(<span class="string">&quot;BUG: PreemptionGuard::drop() couldn&#39;t get local APIC&quot;</span>)
+                .write()
+                .enable_lvt_timer(<span class="bool-val">true</span>);
+        } <span class="kw">else if </span>prev_val == <span class="number">0 </span>{
+            <span class="comment">// Underflow occurred and the counter value wrapped around, which is a bug.
+            </span><span class="macro">panic!</span>(<span class="string">&quot;BUG: Underflow occurred in the preemption counter for CPU {}&quot;</span>, apic_id);
         }
     }
 }
 
 
-<span class="doccomment">/// Returns `true` if preemption is currently enabled on this CPU.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Note that this value can&#39;t be used as a lock indicator or property,</span>
-<span class="doccomment">/// as it is just a snapshot that offers no guarantee that preemption</span>
-<span class="doccomment">/// will continue to be enabled or disabled immediately after returning.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">preemption_enabled</span>() -&gt; <span class="ident">bool</span> {
-    <span class="kw">let</span> <span class="ident">apic_id</span> <span class="op">=</span> <span class="ident">apic::get_my_apic_id</span>();
-    <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">PREEMPTION_COUNT</span>[<span class="ident">apic_id</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>);
-    <span class="ident">val</span> <span class="op">==</span> <span class="number">0</span>
-}
+<span class="doccomment">/// Returns `true` if preemption is currently enabled on this CPU.
+/// 
+/// Note that this value can&#39;t be used as a lock indicator or property,
+/// as it is just a snapshot that offers no guarantee that preemption
+/// will continue to be enabled or disabled immediately after returning.
+</span><span class="kw">pub fn </span>preemption_enabled() -&gt; bool {
+    <span class="kw">let </span>apic_id = apic::get_my_apic_id();
+    <span class="kw">let </span>val = PREEMPTION_COUNT[apic_id <span class="kw">as </span>usize].load(Ordering::Relaxed);
+    val == <span class="number">0
+</span>}
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="preemption" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="preemption" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

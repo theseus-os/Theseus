@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mouse/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../mouse/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../mouse/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../mouse/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mouse/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../mouse/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -170,119 +164,119 @@
 <span id="164">164</span>
 <span id="165">165</span>
 <span id="166">166</span>
-</pre><pre class="rust"><code><span class="doccomment">//! A basic driver for a mouse connected to the legacy PS2 port.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! A basic driver for a mouse connected to the legacy PS2 port.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">abi_x86_interrupt</span>)]</span>
+</span><span class="attr">#![no_std]
+#![feature(abi_x86_interrupt)]
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
+#[macro_use] </span><span class="kw">extern crate </span>log;
 
-<span class="kw">use</span> <span class="ident">spin::Once</span>;
-<span class="kw">use</span> <span class="ident">mpmc::Queue</span>;
-<span class="kw">use</span> <span class="ident">event_types::Event</span>;
-<span class="kw">use</span> <span class="ident">x86_64::structures::idt::InterruptStackFrame</span>;
-<span class="kw">use</span> <span class="ident">mouse_data</span>::{<span class="ident">ButtonAction</span>, <span class="ident">Displacement</span>, <span class="ident">MouseEvent</span>, <span class="ident">MouseMovement</span>};
-<span class="kw">use</span> <span class="ident">ps2</span>::{<span class="ident">check_mouse_id</span>, <span class="ident">init_ps2_port2</span>, <span class="ident">set_mouse_id</span>, <span class="ident">test_ps2_port2</span>};
+<span class="kw">use </span>spin::Once;
+<span class="kw">use </span>mpmc::Queue;
+<span class="kw">use </span>event_types::Event;
+<span class="kw">use </span>x86_64::structures::idt::InterruptStackFrame;
+<span class="kw">use </span>mouse_data::{ButtonAction, Displacement, MouseEvent, MouseMovement};
+<span class="kw">use </span>ps2::{check_mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2};
 
-<span class="doccomment">/// The first PS2 port for the mouse is connected directly to IRQ 0xC.</span>
-<span class="doccomment">/// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.</span>
-<span class="kw">const</span> <span class="ident">PS2_MOUSE_IRQ</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">interrupts::IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0xC</span>;
+<span class="doccomment">/// The first PS2 port for the mouse is connected directly to IRQ 0xC.
+/// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.
+</span><span class="kw">const </span>PS2_MOUSE_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + <span class="number">0xC</span>;
 
-<span class="kw">static</span> <span class="kw-2">mut</span> <span class="ident">MOUSE_MOVE</span>: <span class="ident">MouseMovement</span> <span class="op">=</span> <span class="ident">MouseMovement::default</span>();
-<span class="kw">static</span> <span class="kw-2">mut</span> <span class="ident">BUTTON_ACT</span>: <span class="ident">ButtonAction</span> <span class="op">=</span> <span class="ident">ButtonAction::default</span>();
-<span class="kw">static</span> <span class="kw-2">mut</span> <span class="ident">DISPLACEMENT</span>: <span class="ident">Displacement</span> <span class="op">=</span> <span class="ident">Displacement::default</span>();
+<span class="kw">static </span><span class="kw-2">mut </span>MOUSE_MOVE: MouseMovement = MouseMovement::default();
+<span class="kw">static </span><span class="kw-2">mut </span>BUTTON_ACT: ButtonAction = ButtonAction::default();
+<span class="kw">static </span><span class="kw-2">mut </span>DISPLACEMENT: Displacement = Displacement::default();
 
-<span class="kw">static</span> <span class="ident">MOUSE_PRODUCER</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+<span class="kw">static </span>MOUSE_PRODUCER: Once&lt;Queue&lt;Event&gt;&gt; = Once::new();
 
-<span class="doccomment">/// Initialize the PS2 mouse driver and register its interrupt handler.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// ## Arguments</span>
-<span class="doccomment">/// * `mouse_queue_producer`: the queue onto which the mouse interrupt handler</span>
-<span class="doccomment">///    will push new mouse events when a mouse action occurs.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">mouse_queue_producer</span>: <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="comment">// Init the second ps2 port, which is used for the mouse.</span>
-    <span class="ident">init_ps2_port2</span>();
-    <span class="comment">// Test the second port.</span>
-    <span class="comment">// TODO: return an error if this test fails.</span>
-    <span class="ident">test_ps2_port2</span>();
+<span class="doccomment">/// Initialize the PS2 mouse driver and register its interrupt handler.
+/// 
+/// ## Arguments
+/// * `mouse_queue_producer`: the queue onto which the mouse interrupt handler
+///    will push new mouse events when a mouse action occurs.
+</span><span class="kw">pub fn </span>init(mouse_queue_producer: Queue&lt;Event&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="comment">// Init the second ps2 port, which is used for the mouse.
+    </span>init_ps2_port2();
+    <span class="comment">// Test the second port.
+    // TODO: return an error if this test fails.
+    </span>test_ps2_port2();
 
-    <span class="comment">// Set Mouse ID to 4, and read it back to check that it worked.</span>
-    <span class="kw">let</span> <span class="ident">_e</span> <span class="op">=</span> <span class="ident">set_mouse_id</span>(<span class="number">4</span>);
-    <span class="kw">match</span> <span class="ident">check_mouse_id</span>() {
-        <span class="prelude-val">Ok</span>(<span class="ident">id</span>) =&gt; <span class="macro">info!</span>(<span class="string">&quot;the initial mouse ID is: {}&quot;</span>, <span class="ident">id</span>),
-        <span class="prelude-val">Err</span>(<span class="ident">_e</span>) =&gt; {
-            <span class="macro">error!</span>(<span class="string">&quot;Failed to read the initial PS2 mouse ID, error: {:?}&quot;</span>, <span class="ident">_e</span>);
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Failed to read the initial PS2 mouse ID&quot;</span>);
+    <span class="comment">// Set Mouse ID to 4, and read it back to check that it worked.
+    </span><span class="kw">let </span>_e = set_mouse_id(<span class="number">4</span>);
+    <span class="kw">match </span>check_mouse_id() {
+        <span class="prelude-val">Ok</span>(id) =&gt; <span class="macro">info!</span>(<span class="string">&quot;the initial mouse ID is: {}&quot;</span>, id),
+        <span class="prelude-val">Err</span>(_e) =&gt; {
+            <span class="macro">error!</span>(<span class="string">&quot;Failed to read the initial PS2 mouse ID, error: {:?}&quot;</span>, _e);
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Failed to read the initial PS2 mouse ID&quot;</span>);
         }
     }
 
-    <span class="comment">// Register the interrupt handler</span>
-    <span class="ident">interrupts::register_interrupt</span>(<span class="ident">PS2_MOUSE_IRQ</span>, <span class="ident">ps2_mouse_handler</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {
+    <span class="comment">// Register the interrupt handler
+    </span>interrupts::register_interrupt(PS2_MOUSE_IRQ, ps2_mouse_handler).map_err(|e| {
         <span class="macro">error!</span>(<span class="string">&quot;PS2 mouse IRQ {:#X} was already in use by handler {:#X}! Sharing IRQs is currently unsupported.&quot;</span>, 
-            <span class="ident">PS2_MOUSE_IRQ</span>, <span class="ident">e</span>,
+            PS2_MOUSE_IRQ, e,
         );
-        <span class="string">&quot;PS2 mouse IRQ was already in use! Sharing IRQs is currently unsupported.&quot;</span>
-    })<span class="question-mark">?</span>;
+        <span class="string">&quot;PS2 mouse IRQ was already in use! Sharing IRQs is currently unsupported.&quot;
+    </span>})<span class="question-mark">?</span>;
 
-    <span class="comment">// Final step: set the producer end of the mouse event queue.</span>
-    <span class="ident">MOUSE_PRODUCER</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">mouse_queue_producer</span>);
+    <span class="comment">// Final step: set the producer end of the mouse event queue.
+    </span>MOUSE_PRODUCER.call_once(|| mouse_queue_producer);
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="doccomment">/// Print details of the given mouse event.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// TODO: this is silly, just impl `fmt::Debug` for `MouseEvent`</span>
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="kw">fn</span> <span class="ident">mouse_to_print</span>(<span class="ident">mouse_event</span>: <span class="kw-2">&amp;</span><span class="ident">MouseEvent</span>) {
-    <span class="kw">let</span> <span class="ident">mouse_movement</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">mouse_event</span>.<span class="ident">mousemove</span>;
-    <span class="kw">let</span> <span class="ident">mouse_buttons</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">mouse_event</span>.<span class="ident">buttonact</span>;
-    <span class="kw">let</span> <span class="ident">mouse_displacement</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">mouse_event</span>.<span class="ident">displacement</span>;
-    <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">mouse_displacement</span>.<span class="ident">x</span> <span class="kw">as</span> <span class="ident">i8</span>;
-    <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">mouse_displacement</span>.<span class="ident">y</span> <span class="kw">as</span> <span class="ident">i8</span>;
+<span class="doccomment">/// Print details of the given mouse event.
+/// 
+/// TODO: this is silly, just impl `fmt::Debug` for `MouseEvent`
+</span><span class="attr">#[allow(dead_code)]
+</span><span class="kw">fn </span>mouse_to_print(mouse_event: <span class="kw-2">&amp;</span>MouseEvent) {
+    <span class="kw">let </span>mouse_movement = <span class="kw-2">&amp;</span>mouse_event.mousemove;
+    <span class="kw">let </span>mouse_buttons = <span class="kw-2">&amp;</span>mouse_event.buttonact;
+    <span class="kw">let </span>mouse_displacement = <span class="kw-2">&amp;</span>mouse_event.displacement;
+    <span class="kw">let </span>x = mouse_displacement.x <span class="kw">as </span>i8;
+    <span class="kw">let </span>y = mouse_displacement.y <span class="kw">as </span>i8;
 
     {
-        <span class="comment">// print direction</span>
-        <span class="kw">if</span> <span class="ident">mouse_movement</span>.<span class="ident">right</span> {
-            <span class="kw">if</span> <span class="ident">mouse_movement</span>.<span class="ident">up</span> {
-                <span class="macro">info!</span>(<span class="string">&quot;right: {},up: {},\n&quot;</span>, <span class="ident">x</span>, <span class="ident">y</span>);
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">mouse_movement</span>.<span class="ident">down</span> {
-                <span class="macro">info!</span>(<span class="string">&quot;right: {},down: {},\n&quot;</span>, <span class="ident">x</span>, <span class="ident">y</span>);
-            } <span class="kw">else</span> {
-                <span class="macro">info!</span>(<span class="string">&quot;right: {}\n&quot;</span>, <span class="ident">x</span>);
+        <span class="comment">// print direction
+        </span><span class="kw">if </span>mouse_movement.right {
+            <span class="kw">if </span>mouse_movement.up {
+                <span class="macro">info!</span>(<span class="string">&quot;right: {},up: {},\n&quot;</span>, x, y);
+            } <span class="kw">else if </span>mouse_movement.down {
+                <span class="macro">info!</span>(<span class="string">&quot;right: {},down: {},\n&quot;</span>, x, y);
+            } <span class="kw">else </span>{
+                <span class="macro">info!</span>(<span class="string">&quot;right: {}\n&quot;</span>, x);
             }
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">mouse_movement</span>.<span class="ident">left</span> {
-            <span class="kw">if</span> <span class="ident">mouse_movement</span>.<span class="ident">up</span> {
-                <span class="macro">info!</span>(<span class="string">&quot;left: {},up : {},\n&quot;</span>, <span class="ident">x</span>, <span class="ident">y</span>);
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">mouse_movement</span>.<span class="ident">down</span> {
-                <span class="macro">info!</span>(<span class="string">&quot;left: {},down: {},\n&quot;</span>, <span class="ident">x</span>, <span class="ident">y</span>);
-            } <span class="kw">else</span> {
-                <span class="macro">info!</span>(<span class="string">&quot;left: {}\n&quot;</span>, <span class="ident">x</span>);
+        } <span class="kw">else if </span>mouse_movement.left {
+            <span class="kw">if </span>mouse_movement.up {
+                <span class="macro">info!</span>(<span class="string">&quot;left: {},up : {},\n&quot;</span>, x, y);
+            } <span class="kw">else if </span>mouse_movement.down {
+                <span class="macro">info!</span>(<span class="string">&quot;left: {},down: {},\n&quot;</span>, x, y);
+            } <span class="kw">else </span>{
+                <span class="macro">info!</span>(<span class="string">&quot;left: {}\n&quot;</span>, x);
             }
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">mouse_movement</span>.<span class="ident">up</span> {
-            <span class="macro">info!</span>(<span class="string">&quot;up: {},\n&quot;</span>, <span class="ident">y</span>);
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">mouse_movement</span>.<span class="ident">down</span> {
-            <span class="macro">info!</span>(<span class="string">&quot;down: {},\n&quot;</span>, <span class="ident">y</span>);
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">mouse_movement</span>.<span class="ident">scrolling_up</span> {
+        } <span class="kw">else if </span>mouse_movement.up {
+            <span class="macro">info!</span>(<span class="string">&quot;up: {},\n&quot;</span>, y);
+        } <span class="kw">else if </span>mouse_movement.down {
+            <span class="macro">info!</span>(<span class="string">&quot;down: {},\n&quot;</span>, y);
+        } <span class="kw">else if </span>mouse_movement.scrolling_up {
             <span class="macro">info!</span>(<span class="string">&quot;scrollingup, \n&quot;</span>);
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">mouse_movement</span>.<span class="ident">scrolling_down</span> {
+        } <span class="kw">else if </span>mouse_movement.scrolling_down {
             <span class="macro">info!</span>(<span class="string">&quot;scrollingdown,\n&quot;</span>);
         }
     }
-    <span class="comment">// print buttons</span>
-    {
-        <span class="kw">if</span> <span class="ident">mouse_buttons</span>.<span class="ident">left_button_hold</span> {
+    <span class="comment">// print buttons
+    </span>{
+        <span class="kw">if </span>mouse_buttons.left_button_hold {
             <span class="macro">info!</span>(<span class="string">&quot;left_button_hold&quot;</span>);
         }
 
-        <span class="kw">if</span> <span class="ident">mouse_buttons</span>.<span class="ident">right_button_hold</span> {
+        <span class="kw">if </span>mouse_buttons.right_button_hold {
             <span class="macro">info!</span>(<span class="string">&quot;right_button_hold&quot;</span>);
         }
 
-        <span class="kw">if</span> <span class="ident">mouse_buttons</span>.<span class="ident">fifth_button_hold</span> {
+        <span class="kw">if </span>mouse_buttons.fifth_button_hold {
             <span class="macro">info!</span>(<span class="string">&quot;right_button_hold&quot;</span>);
         }
 
-        <span class="kw">if</span> <span class="ident">mouse_buttons</span>.<span class="ident">fourth_button_hold</span> {
+        <span class="kw">if </span>mouse_buttons.fourth_button_hold {
             <span class="macro">info!</span>(<span class="string">&quot;fourth_button_hold&quot;</span>);
         }
     }
@@ -290,52 +284,51 @@
 
 
 
-<span class="doccomment">/// The interrupt handler for a ps2-connected mouse, registered at IRQ 0x2C.</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">ps2_mouse_handler</span>(<span class="ident">_stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+<span class="doccomment">/// The interrupt handler for a ps2-connected mouse, registered at IRQ 0x2C.
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
 
-    <span class="kw">let</span> <span class="ident">indicator</span> <span class="op">=</span> <span class="ident">ps2::ps2_status_register</span>();
+    <span class="kw">let </span>indicator = ps2::ps2_status_register();
 
-    <span class="comment">// whether there is any data on the port 0x60</span>
-    <span class="kw">if</span> <span class="ident">indicator</span> <span class="op">&amp;</span> <span class="number">0x01</span> <span class="op">==</span> <span class="number">0x01</span> {
-        <span class="comment">//whether the data is coming from the mouse</span>
-        <span class="kw">if</span> <span class="ident">indicator</span> <span class="op">&amp;</span> <span class="number">0x20</span> <span class="op">==</span> <span class="number">0x20</span> {
-            <span class="kw">let</span> <span class="ident">readdata</span> <span class="op">=</span> <span class="ident">ps2::handle_mouse_packet</span>();
-            <span class="kw">if</span> (<span class="ident">readdata</span> <span class="op">&amp;</span> <span class="number">0x80</span> <span class="op">==</span> <span class="number">0x80</span>) <span class="op">|</span><span class="op">|</span> (<span class="ident">readdata</span> <span class="op">&amp;</span> <span class="number">0x40</span> <span class="op">==</span> <span class="number">0x40</span>) {
+    <span class="comment">// whether there is any data on the port 0x60
+    </span><span class="kw">if </span>indicator &amp; <span class="number">0x01 </span>== <span class="number">0x01 </span>{
+        <span class="comment">//whether the data is coming from the mouse
+        </span><span class="kw">if </span>indicator &amp; <span class="number">0x20 </span>== <span class="number">0x20 </span>{
+            <span class="kw">let </span>readdata = ps2::handle_mouse_packet();
+            <span class="kw">if </span>(readdata &amp; <span class="number">0x80 </span>== <span class="number">0x80</span>) || (readdata &amp; <span class="number">0x40 </span>== <span class="number">0x40</span>) {
                 <span class="macro">error!</span>(<span class="string">&quot;The overflow bits in the mouse data packet&#39;s first byte are set! Discarding the whole packet.&quot;</span>);
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">readdata</span> <span class="op">&amp;</span> <span class="number">0x08</span> <span class="op">==</span> <span class="number">0</span> {
+            } <span class="kw">else if </span>readdata &amp; <span class="number">0x08 </span>== <span class="number">0 </span>{
                 <span class="macro">error!</span>(<span class="string">&quot;Third bit should in the mouse data packet&#39;s first byte should be always be 1. Discarding the whole packet since the bit is 0 now.&quot;</span>);
-            } <span class="kw">else</span> {
-                <span class="kw">let</span> <span class="ident">_mouse_event</span> <span class="op">=</span> <span class="ident">handle_mouse_input</span>(<span class="ident">readdata</span>);
-                <span class="comment">// mouse_to_print(&amp;_mouse_event);</span>
-            }
+            } <span class="kw">else </span>{
+                <span class="kw">let </span>_mouse_event = handle_mouse_input(readdata);
+                <span class="comment">// mouse_to_print(&amp;_mouse_event);
+            </span>}
         }
     }
 
-    <span class="ident">interrupts::eoi</span>(<span class="prelude-val">Some</span>(<span class="ident">PS2_MOUSE_IRQ</span>));
+    interrupts::eoi(<span class="prelude-val">Some</span>(PS2_MOUSE_IRQ));
 }
 
 
-<span class="doccomment">/// return a Mouse Event according to the data</span>
-<span class="kw">fn</span> <span class="ident">handle_mouse_input</span>(<span class="ident">readdata</span>: <span class="ident">u32</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">action</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;mut</span> <span class="ident">BUTTON_ACT</span> };
-    <span class="kw">let</span> <span class="ident">mmove</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;mut</span> <span class="ident">MOUSE_MOVE</span> };
-    <span class="kw">let</span> <span class="ident">dis</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;mut</span> <span class="ident">DISPLACEMENT</span> };
+<span class="doccomment">/// return a Mouse Event according to the data
+</span><span class="kw">fn </span>handle_mouse_input(readdata: u32) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>action = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut </span>BUTTON_ACT };
+    <span class="kw">let </span>mmove = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut </span>MOUSE_MOVE };
+    <span class="kw">let </span>dis = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut </span>DISPLACEMENT };
 
-    <span class="ident">mmove</span>.<span class="ident">read_from_data</span>(<span class="ident">readdata</span>);
-    <span class="ident">action</span>.<span class="ident">read_from_data</span>(<span class="ident">readdata</span>);
-    <span class="ident">dis</span>.<span class="ident">read_from_data</span>(<span class="ident">readdata</span>);
+    mmove.read_from_data(readdata);
+    action.read_from_data(readdata);
+    dis.read_from_data(readdata);
 
-    <span class="kw">let</span> <span class="ident">mouse_event</span> <span class="op">=</span> <span class="ident">MouseEvent::new</span>(<span class="kw-2">*</span><span class="ident">action</span>, <span class="kw-2">*</span><span class="ident">mmove</span>, <span class="kw-2">*</span><span class="ident">dis</span>);
-    <span class="comment">// mouse_to_print(&amp;mouse_event);  // use this to debug</span>
-    <span class="kw">let</span> <span class="ident">event</span> <span class="op">=</span> <span class="ident">Event::MouseMovementEvent</span>(<span class="ident">mouse_event</span>);
+    <span class="kw">let </span>mouse_event = MouseEvent::new(<span class="kw-2">*</span>action, <span class="kw-2">*</span>mmove, <span class="kw-2">*</span>dis);
+    <span class="comment">// mouse_to_print(&amp;mouse_event);  // use this to debug
+    </span><span class="kw">let </span>event = Event::MouseMovementEvent(mouse_event);
 
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">producer</span>) <span class="op">=</span> <span class="ident">MOUSE_PRODUCER</span>.<span class="ident">get</span>() {
-        <span class="ident">producer</span>.<span class="ident">push</span>(<span class="ident">event</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;Fail to enqueue the mouse event&quot;</span>)
-    } <span class="kw">else</span> {
-        <span class="macro">warn!</span>(<span class="string">&quot;handle_mouse_input(): MOUSE_PRODUCER wasn&#39;t yet initialized, dropping mouse event {:?}.&quot;</span>, <span class="ident">event</span>);
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(producer) = MOUSE_PRODUCER.get() {
+        producer.push(event).map_err(|_e| <span class="string">&quot;Fail to enqueue the mouse event&quot;</span>)
+    } <span class="kw">else </span>{
+        <span class="macro">warn!</span>(<span class="string">&quot;handle_mouse_input(): MOUSE_PRODUCER wasn&#39;t yet initialized, dropping mouse event {:?}.&quot;</span>, event);
         <span class="prelude-val">Err</span>(<span class="string">&quot;mouse event queue not ready&quot;</span>)
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mouse" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mouse" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

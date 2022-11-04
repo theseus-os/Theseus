@@ -1,3 +1,3 @@
-(function() {var implementors = {};
-implementors["wasi_interpreter"] = [{"text":"impl Externals for <a class=\"struct\" href=\"wasi_interpreter/struct.HostExternals.html\" title=\"struct wasi_interpreter::HostExternals\">HostExternals</a>","synthetic":false,"types":["wasi_interpreter::HostExternals"]}];
-if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
+(function() {var implementors = {
+"wasi_interpreter":[["impl Externals for <a class=\"struct\" href=\"wasi_interpreter/struct.HostExternals.html\" title=\"struct wasi_interpreter::HostExternals\">HostExternals</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

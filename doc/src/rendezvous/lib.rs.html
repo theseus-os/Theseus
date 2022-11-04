@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/rendezvous/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../rendezvous/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../rendezvous/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../rendezvous/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/rendezvous/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../rendezvous/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -511,343 +505,343 @@
 <span id="505">505</span>
 <span id="506">506</span>
 <span id="507">507</span>
-</pre><pre class="rust"><code><span class="doccomment">//! A rendezvous-based channel for synchronous Inter-Task Communication (ITC).</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! This crate offers a rendezvous channel, in which two tasks can exchange messages</span>
-<span class="doccomment">//! without an intermediary buffer. </span>
-<span class="doccomment">//! The sender and receiver tasks must rendezvous together to exchange data,</span>
-<span class="doccomment">//! so at least one of them must block. </span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! Only `Send` types can be sent or received through the channel.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! This is not a zero-copy channel; </span>
-<span class="doccomment">//! To avoid copying large messages, use a reference (layer of indirection) like `Box`.</span>
-<span class="doccomment">//! </span>
-<span class="doccomment">//! TODO: add support for a queue of pending senders and receivers </span>
-<span class="doccomment">//!       so that we can enable MPMC (multi-producer multi-consumer) behavior</span>
-<span class="doccomment">//!       that allows senders and receivers to be cloned. </span>
-<span class="doccomment">//!       Note that currently only a single receiver and single sender is supported.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! A rendezvous-based channel for synchronous Inter-Task Communication (ITC).
+//! 
+//! This crate offers a rendezvous channel, in which two tasks can exchange messages
+//! without an intermediary buffer. 
+//! The sender and receiver tasks must rendezvous together to exchange data,
+//! so at least one of them must block. 
+//! 
+//! Only `Send` types can be sent or received through the channel.
+//! 
+//! This is not a zero-copy channel; 
+//! To avoid copying large messages, use a reference (layer of indirection) like `Box`.
+//! 
+//! TODO: add support for a queue of pending senders and receivers 
+//!       so that we can enable MPMC (multi-producer multi-consumer) behavior
+//!       that allows senders and receivers to be cloned. 
+//!       Note that currently only a single receiver and single sender is supported.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">trace_channel</span>)]</span> 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">debugit</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">wait_queue</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">scheduler</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="attr">#[cfg(trace_channel)] 
+#[macro_use] </span><span class="kw">extern crate </span>debugit;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>wait_queue;
+<span class="kw">extern crate </span>task;
+<span class="kw">extern crate </span>scheduler;
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">downtime_eval</span>)]</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">hpet</span>;
+<span class="attr">#[cfg(downtime_eval)]
+</span><span class="kw">extern crate </span>hpet;
 
-<span class="kw">use</span> <span class="ident">core::fmt</span>;
-<span class="kw">use</span> <span class="ident">alloc::sync::Arc</span>;
-<span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">wait_queue</span>::{<span class="ident">WaitQueue</span>, <span class="ident">WaitGuard</span>, <span class="ident">WaitError</span>};
-
-
-<span class="doccomment">/// A wrapper type for an `ExchangeSlot` that is used for sending only.</span>
-<span class="kw">struct</span> <span class="ident">SenderSlot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">ExchangeState</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>);
-<span class="doccomment">/// A wrapper type for an `ExchangeSlot` that is used for receiving only.</span>
-<span class="kw">struct</span> <span class="ident">ReceiverSlot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">ExchangeState</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>);
+<span class="kw">use </span>core::fmt;
+<span class="kw">use </span>alloc::sync::Arc;
+<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>wait_queue::{WaitQueue, WaitGuard, WaitError};
 
 
-<span class="doccomment">/// An `ExchangeSlot` consists of two references to a shared state</span>
-<span class="doccomment">/// that is used to exchange a message. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// There is a &quot;sender&quot; reference and a &quot;receiver&quot; reference, </span>
-<span class="doccomment">/// which are wrapped in their respective types: `SenderSlot` and `ReceiverSlot`.</span>
-<span class="kw">struct</span> <span class="ident">ExchangeSlot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="ident">sender</span>:   <span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SenderSlot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="ident">receiver</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ReceiverSlot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A wrapper type for an `ExchangeSlot` that is used for sending only.
+</span><span class="kw">struct </span>SenderSlot&lt;T&gt;(Arc&lt;MutexIrqSafe&lt;ExchangeState&lt;T&gt;&gt;&gt;);
+<span class="doccomment">/// A wrapper type for an `ExchangeSlot` that is used for receiving only.
+</span><span class="kw">struct </span>ReceiverSlot&lt;T&gt;(Arc&lt;MutexIrqSafe&lt;ExchangeState&lt;T&gt;&gt;&gt;);
+
+
+<span class="doccomment">/// An `ExchangeSlot` consists of two references to a shared state
+/// that is used to exchange a message. 
+/// 
+/// There is a &quot;sender&quot; reference and a &quot;receiver&quot; reference, 
+/// which are wrapped in their respective types: `SenderSlot` and `ReceiverSlot`.
+</span><span class="kw">struct </span>ExchangeSlot&lt;T&gt; {
+    sender:   Mutex&lt;<span class="prelude-ty">Option</span>&lt;SenderSlot&lt;T&gt;&gt;&gt;,
+    receiver: Mutex&lt;<span class="prelude-ty">Option</span>&lt;ReceiverSlot&lt;T&gt;&gt;&gt;,
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">ExchangeSlot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">ExchangeSlot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">MutexIrqSafe::new</span>(<span class="ident">ExchangeState::Init</span>));
-        <span class="ident">ExchangeSlot</span> {
-            <span class="ident">sender</span>: <span class="ident">Mutex::new</span>(<span class="prelude-val">Some</span>(<span class="ident">SenderSlot</span>(<span class="ident">inner</span>.<span class="ident">clone</span>()))),
-            <span class="ident">receiver</span>: <span class="ident">Mutex::new</span>(<span class="prelude-val">Some</span>(<span class="ident">ReceiverSlot</span>(<span class="ident">inner</span>))),
+<span class="kw">impl</span>&lt;T&gt; ExchangeSlot&lt;T&gt; {
+    <span class="kw">fn </span>new() -&gt; ExchangeSlot&lt;T&gt; {
+        <span class="kw">let </span>inner = Arc::new(MutexIrqSafe::new(ExchangeState::Init));
+        ExchangeSlot {
+            sender: Mutex::new(<span class="prelude-val">Some</span>(SenderSlot(inner.clone()))),
+            receiver: Mutex::new(<span class="prelude-val">Some</span>(ReceiverSlot(inner))),
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">take_sender_slot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SenderSlot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">sender</span>.<span class="ident">lock</span>().<span class="ident">take</span>()
+    <span class="kw">fn </span>take_sender_slot(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;SenderSlot&lt;T&gt;&gt; {
+        <span class="self">self</span>.sender.lock().take()
     }
 
-    <span class="kw">fn</span> <span class="ident">take_receiver_slot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ReceiverSlot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">receiver</span>.<span class="ident">lock</span>().<span class="ident">take</span>()
+    <span class="kw">fn </span>take_receiver_slot(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ReceiverSlot&lt;T&gt;&gt; {
+        <span class="self">self</span>.receiver.lock().take()
     }
 
-    <span class="kw">fn</span> <span class="ident">replace_sender_slot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">s</span>: <span class="ident">SenderSlot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="ident">_old</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sender</span>.<span class="ident">lock</span>().<span class="ident">replace</span>(<span class="ident">s</span>);
-        <span class="kw">if</span> <span class="ident">_old</span>.<span class="ident">is_some</span>() {
+    <span class="kw">fn </span>replace_sender_slot(<span class="kw-2">&amp;</span><span class="self">self</span>, s: SenderSlot&lt;T&gt;) {
+        <span class="kw">let </span>_old = <span class="self">self</span>.sender.lock().replace(s);
+        <span class="kw">if </span>_old.is_some() {
             <span class="macro">error!</span>(<span class="string">&quot;BUG: REPLACE SENDER SLOT WAS SOME ALREADY&quot;</span>);
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">replace_receiver_slot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">r</span>: <span class="ident">ReceiverSlot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="ident">_old</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">receiver</span>.<span class="ident">lock</span>().<span class="ident">replace</span>(<span class="ident">r</span>);
-        <span class="kw">if</span> <span class="ident">_old</span>.<span class="ident">is_some</span>() {
+    <span class="kw">fn </span>replace_receiver_slot(<span class="kw-2">&amp;</span><span class="self">self</span>, r: ReceiverSlot&lt;T&gt;) {
+        <span class="kw">let </span>_old = <span class="self">self</span>.receiver.lock().replace(r);
+        <span class="kw">if </span>_old.is_some() {
             <span class="macro">error!</span>(<span class="string">&quot;BUG: REPLACE RECEIVER SLOT WAS SOME ALREADY&quot;</span>);
         }
     }
 }
 
 
-<span class="doccomment">/// The possible states of an exchange slot in a rendezvous channel.</span>
-<span class="doccomment">/// TODO: we should improve this state machine using session types </span>
-<span class="doccomment">///       to check for valid state transitions at compile time.</span>
-<span class="kw">enum</span> <span class="ident">ExchangeState</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Initial state: we&#39;re waiting for either a sender or a receiver.</span>
-    <span class="ident">Init</span>,
-    <span class="doccomment">/// A sender has arrived before a receiver. </span>
-    <span class="doccomment">/// The `WaitGuard` contains the blocked sender task,</span>
-    <span class="doccomment">/// and the `T` is the message that will be exchanged.</span>
-    <span class="ident">WaitingForReceiver</span>(<span class="ident">WaitGuard</span>, <span class="ident">T</span>),
-    <span class="doccomment">/// A receiver has arrived before a sender.</span>
-    <span class="doccomment">/// The `WaitGuard` contains the blocked receiver task.</span>
-    <span class="ident">WaitingForSender</span>(<span class="ident">WaitGuard</span>),
-    <span class="doccomment">/// Sender and Receiver have rendezvoused, and the receiver finished first.</span>
-    <span class="doccomment">/// Thus, it is the sender&#39;s responsibility to reset to the initial state.</span>
-    <span class="ident">ReceiverFinishedFirst</span>,
-    <span class="doccomment">/// Sender and Receiver have rendezvoused, and the sender finished first.</span>
-    <span class="doccomment">/// Thus, the message `T` is enclosed here for the receiver to take, </span>
-    <span class="doccomment">/// and it is the receivers&#39;s responsibility to reset to the initial state.</span>
-    <span class="ident">SenderFinishedFirst</span>(<span class="ident">T</span>),
+<span class="doccomment">/// The possible states of an exchange slot in a rendezvous channel.
+/// TODO: we should improve this state machine using session types 
+///       to check for valid state transitions at compile time.
+</span><span class="kw">enum </span>ExchangeState&lt;T&gt; {
+    <span class="doccomment">/// Initial state: we&#39;re waiting for either a sender or a receiver.
+    </span>Init,
+    <span class="doccomment">/// A sender has arrived before a receiver. 
+    /// The `WaitGuard` contains the blocked sender task,
+    /// and the `T` is the message that will be exchanged.
+    </span>WaitingForReceiver(WaitGuard, T),
+    <span class="doccomment">/// A receiver has arrived before a sender.
+    /// The `WaitGuard` contains the blocked receiver task.
+    </span>WaitingForSender(WaitGuard),
+    <span class="doccomment">/// Sender and Receiver have rendezvoused, and the receiver finished first.
+    /// Thus, it is the sender&#39;s responsibility to reset to the initial state.
+    </span>ReceiverFinishedFirst,
+    <span class="doccomment">/// Sender and Receiver have rendezvoused, and the sender finished first.
+    /// Thus, the message `T` is enclosed here for the receiver to take, 
+    /// and it is the receivers&#39;s responsibility to reset to the initial state.
+    </span>SenderFinishedFirst(T),
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">ExchangeState</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;ExchangeState::{}&quot;</span>, <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">ExchangeState::Init</span>                     =&gt; <span class="string">&quot;Init&quot;</span>,
-            <span class="ident">ExchangeState::WaitingForReceiver</span>(..)   =&gt; <span class="string">&quot;WaitingForReceiver&quot;</span>,
-            <span class="ident">ExchangeState::WaitingForSender</span>(..)     =&gt; <span class="string">&quot;WaitingForSender&quot;</span>,
-            <span class="ident">ExchangeState::ReceiverFinishedFirst</span>    =&gt; <span class="string">&quot;ReceiverFinishedFirst&quot;</span>,
-            <span class="ident">ExchangeState::SenderFinishedFirst</span>(..)  =&gt; <span class="string">&quot;SenderFinishedFirst&quot;</span>,
+<span class="kw">impl</span>&lt;T&gt; fmt::Debug <span class="kw">for </span>ExchangeState&lt;T&gt; {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;ExchangeState::{}&quot;</span>, <span class="kw">match </span><span class="self">self </span>{
+            ExchangeState::Init                     =&gt; <span class="string">&quot;Init&quot;</span>,
+            ExchangeState::WaitingForReceiver(..)   =&gt; <span class="string">&quot;WaitingForReceiver&quot;</span>,
+            ExchangeState::WaitingForSender(..)     =&gt; <span class="string">&quot;WaitingForSender&quot;</span>,
+            ExchangeState::ReceiverFinishedFirst    =&gt; <span class="string">&quot;ReceiverFinishedFirst&quot;</span>,
+            ExchangeState::SenderFinishedFirst(..)  =&gt; <span class="string">&quot;SenderFinishedFirst&quot;</span>,
         })
     }
 }
 
-<span class="comment">// enum RendezvousState&lt;T&gt; {</span>
-<span class="comment">//     /// Initial state: we&#39;re waiting for either a sender or a receiver.</span>
-<span class="comment">//     Init,</span>
-<span class="comment">//     /// A task is blocked and waiting to rendezvous; the blocked task is held in the `WaitGuard`.</span>
-<span class="comment">//     /// The `Option&lt;T&gt;` is for exchanging the message, and indicates whether the blocked task is a sender or receiver.</span>
-<span class="comment">//     /// * If `None`, then the receiver is blocked, waiting on a sender to put its message into `Some(T)`.</span>
-<span class="comment">//     /// * If `Some`, then the sender is blocked, waiting on a receiver to take the message out of `Option&lt;T&gt;`.</span>
-<span class="comment">//     Waiting(WaitGuard, Option&lt;T&gt;),</span>
-<span class="comment">// }</span>
+<span class="comment">// enum RendezvousState&lt;T&gt; {
+//     /// Initial state: we&#39;re waiting for either a sender or a receiver.
+//     Init,
+//     /// A task is blocked and waiting to rendezvous; the blocked task is held in the `WaitGuard`.
+//     /// The `Option&lt;T&gt;` is for exchanging the message, and indicates whether the blocked task is a sender or receiver.
+//     /// * If `None`, then the receiver is blocked, waiting on a sender to put its message into `Some(T)`.
+//     /// * If `Some`, then the sender is blocked, waiting on a receiver to take the message out of `Option&lt;T&gt;`.
+//     Waiting(WaitGuard, Option&lt;T&gt;),
+// }
 
 
-<span class="doccomment">/// Create a new channel that requires a sender a receiver to rendezvous</span>
-<span class="doccomment">/// in order to exchange a message. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Returns a tuple of `(Sender, Receiver)`.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_channel</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span>() -&gt; (<span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) {
-    <span class="kw">let</span> <span class="ident">channel</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">Channel</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">slot</span>: <span class="ident">ExchangeSlot::new</span>(),
-        <span class="ident">waiting_senders</span>: <span class="ident">WaitQueue::new</span>(),
-        <span class="ident">waiting_receivers</span>: <span class="ident">WaitQueue::new</span>(),
+</span><span class="doccomment">/// Create a new channel that requires a sender a receiver to rendezvous
+/// in order to exchange a message. 
+/// 
+/// Returns a tuple of `(Sender, Receiver)`.
+</span><span class="kw">pub fn </span>new_channel&lt;T: Send&gt;() -&gt; (Sender&lt;T&gt;, Receiver&lt;T&gt;) {
+    <span class="kw">let </span>channel = Arc::new(Channel::&lt;T&gt; {
+        slot: ExchangeSlot::new(),
+        waiting_senders: WaitQueue::new(),
+        waiting_receivers: WaitQueue::new(),
     });
     (
-        <span class="ident">Sender</span>   { <span class="ident">channel</span>: <span class="ident">channel</span>.<span class="ident">clone</span>() },
-        <span class="ident">Receiver</span> { <span class="ident">channel</span>: <span class="ident">channel</span> }
+        Sender   { channel: channel.clone() },
+        Receiver { channel: channel }
     )
 }
 
 
 
-<span class="doccomment">/// The inner channel for synchronous rendezvous-based communication</span>
-<span class="doccomment">/// between `Sender`s and `Receiver`s. </span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This struct contains one or more exchange slot(s) (`ExchangeSlot`) as well as</span>
-<span class="doccomment">/// queues for tasks that waiting to send or receive messages via those exchange slots. </span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Sender-side and Receiver-side references to an exchange slot can be obtained in both </span>
-<span class="doccomment">/// a blocking and non-blocking fashion, </span>
-<span class="doccomment">/// which supports both synchronous (rendezvous-based) and asynchronous channels.</span>
-<span class="kw">struct</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// In a zero-capacity synchronous channel, there is only a single slot,</span>
-    <span class="doccomment">/// but senders and receivers perform a blocking wait on it until the slot becomes available.</span>
-    <span class="doccomment">/// In contrast, a synchronous channel with a capacity of 1 would return a &quot;channel full&quot; error</span>
-    <span class="doccomment">/// if the slot was taken, instead of blocking. </span>
-    <span class="ident">slot</span>: <span class="ident">ExchangeSlot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
-    <span class="ident">waiting_senders</span>: <span class="ident">WaitQueue</span>,
-    <span class="ident">waiting_receivers</span>: <span class="ident">WaitQueue</span>,
+<span class="doccomment">/// The inner channel for synchronous rendezvous-based communication
+/// between `Sender`s and `Receiver`s. 
+///
+/// This struct contains one or more exchange slot(s) (`ExchangeSlot`) as well as
+/// queues for tasks that waiting to send or receive messages via those exchange slots. 
+///
+/// Sender-side and Receiver-side references to an exchange slot can be obtained in both 
+/// a blocking and non-blocking fashion, 
+/// which supports both synchronous (rendezvous-based) and asynchronous channels.
+</span><span class="kw">struct </span>Channel&lt;T: Send&gt; {
+    <span class="doccomment">/// In a zero-capacity synchronous channel, there is only a single slot,
+    /// but senders and receivers perform a blocking wait on it until the slot becomes available.
+    /// In contrast, a synchronous channel with a capacity of 1 would return a &quot;channel full&quot; error
+    /// if the slot was taken, instead of blocking. 
+    </span>slot: ExchangeSlot&lt;T&gt;,
+    waiting_senders: WaitQueue,
+    waiting_receivers: WaitQueue,
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Obtain a sender slot, blocking until one is available.</span>
-    <span class="kw">fn</span> <span class="ident">take_sender_slot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">SenderSlot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">WaitError</span><span class="op">&gt;</span> {
-        <span class="comment">// Fast path: the uncontended case.</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">s</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">try_take_sender_slot</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">s</span>);
+<span class="kw">impl</span>&lt;T: Send&gt; Channel&lt;T&gt; {
+    <span class="doccomment">/// Obtain a sender slot, blocking until one is available.
+    </span><span class="kw">fn </span>take_sender_slot(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;SenderSlot&lt;T&gt;, WaitError&gt; {
+        <span class="comment">// Fast path: the uncontended case.
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(s) = <span class="self">self</span>.try_take_sender_slot() {
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(s);
         }
-        <span class="comment">// Slow path: add ourselves to the waitqueue</span>
-        <span class="comment">// trace!(&quot;waiting to acquire sender slot...&quot;);</span>
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">waiting_senders</span>.<span class="ident">wait_until</span>(<span class="kw-2">&amp;</span><span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">try_take_sender_slot</span>());
-        <span class="comment">// trace!(&quot;... acquired sender slot!&quot;);</span>
-        <span class="ident">res</span>
+        <span class="comment">// Slow path: add ourselves to the waitqueue
+        // trace!(&quot;waiting to acquire sender slot...&quot;);
+        </span><span class="kw">let </span>res = <span class="self">self</span>.waiting_senders.wait_until(<span class="kw-2">&amp;</span>|| <span class="self">self</span>.try_take_sender_slot());
+        <span class="comment">// trace!(&quot;... acquired sender slot!&quot;);
+        </span>res
     }
     
-    <span class="doccomment">/// Obtain a receiver slot, blocking until one is available.</span>
-    <span class="kw">fn</span> <span class="ident">take_receiver_slot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ReceiverSlot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">WaitError</span><span class="op">&gt;</span> {
-        <span class="comment">// Fast path: the uncontended case.</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">s</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">try_take_receiver_slot</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">s</span>);
+    <span class="doccomment">/// Obtain a receiver slot, blocking until one is available.
+    </span><span class="kw">fn </span>take_receiver_slot(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;ReceiverSlot&lt;T&gt;, WaitError&gt; {
+        <span class="comment">// Fast path: the uncontended case.
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(s) = <span class="self">self</span>.try_take_receiver_slot() {
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(s);
         }
-        <span class="comment">// Slow path: add ourselves to the waitqueue</span>
-        <span class="comment">// trace!(&quot;waiting to acquire receiver slot...&quot;);</span>
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">waiting_receivers</span>.<span class="ident">wait_until</span>(<span class="kw-2">&amp;</span><span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">try_take_receiver_slot</span>());
-        <span class="comment">// trace!(&quot;... acquired receiver slot!&quot;);</span>
-        <span class="ident">res</span>
+        <span class="comment">// Slow path: add ourselves to the waitqueue
+        // trace!(&quot;waiting to acquire receiver slot...&quot;);
+        </span><span class="kw">let </span>res = <span class="self">self</span>.waiting_receivers.wait_until(<span class="kw-2">&amp;</span>|| <span class="self">self</span>.try_take_receiver_slot());
+        <span class="comment">// trace!(&quot;... acquired receiver slot!&quot;);
+        </span>res
     }
 
-    <span class="doccomment">/// Try to obtain a sender slot in a non-blocking fashion,</span>
-    <span class="doccomment">/// returning `None` if a slot is not immediately available.</span>
-    <span class="kw">fn</span> <span class="ident">try_take_sender_slot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SenderSlot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">slot</span>.<span class="ident">take_sender_slot</span>()
+    <span class="doccomment">/// Try to obtain a sender slot in a non-blocking fashion,
+    /// returning `None` if a slot is not immediately available.
+    </span><span class="kw">fn </span>try_take_sender_slot(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;SenderSlot&lt;T&gt;&gt; {
+        <span class="self">self</span>.slot.take_sender_slot()
     }
 
-    <span class="doccomment">/// Try to obtain a receiver slot in a non-blocking fashion,</span>
-    <span class="doccomment">/// returning `None` if a slot is not immediately available.</span>
-    <span class="kw">fn</span> <span class="ident">try_take_receiver_slot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ReceiverSlot</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">slot</span>.<span class="ident">take_receiver_slot</span>()
+    <span class="doccomment">/// Try to obtain a receiver slot in a non-blocking fashion,
+    /// returning `None` if a slot is not immediately available.
+    </span><span class="kw">fn </span>try_take_receiver_slot(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ReceiverSlot&lt;T&gt;&gt; {
+        <span class="self">self</span>.slot.take_receiver_slot()
     }
 }
 
 
-<span class="doccomment">/// The sender (transmit) side of a channel.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> {
-    <span class="ident">channel</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// The sender (transmit) side of a channel.
+</span><span class="attr">#[derive(Clone)]
+</span><span class="kw">pub struct </span>Sender&lt;T: Send&gt; {
+    channel: Arc&lt;Channel&lt;T&gt;&gt;,
 }
-<span class="kw">impl</span> <span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Send a message, blocking until a receiver is ready.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Returns `Ok(())` if the message was sent and received successfully,</span>
-    <span class="doccomment">/// otherwise returns an error. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">msg</span>: <span class="ident">T</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">trace_channel</span>)]</span>
-        <span class="macro">trace!</span>(<span class="string">&quot;rendezvous: sending msg: {:?}&quot;</span>, <span class="macro">debugit!</span>(<span class="ident">msg</span>));
+<span class="kw">impl </span>&lt;T: Send&gt; Sender&lt;T&gt; {
+    <span class="doccomment">/// Send a message, blocking until a receiver is ready.
+    /// 
+    /// Returns `Ok(())` if the message was sent and received successfully,
+    /// otherwise returns an error. 
+    </span><span class="kw">pub fn </span>send(<span class="kw-2">&amp;</span><span class="self">self</span>, msg: T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="attr">#[cfg(trace_channel)]
+        </span><span class="macro">trace!</span>(<span class="string">&quot;rendezvous: sending msg: {:?}&quot;</span>, <span class="macro">debugit!</span>(msg));
 
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">downtime_eval</span>)]</span>
-        <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">hpet::get_hpet</span>().<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">get_counter</span>();
-        <span class="comment">// debug!(&quot;Value {} {}&quot;, value, value % 1024);</span>
+        <span class="attr">#[cfg(downtime_eval)]
+        </span><span class="kw">let </span>value = hpet::get_hpet().as_ref().unwrap().get_counter();
+        <span class="comment">// debug!(&quot;Value {} {}&quot;, value, value % 1024);
 
-        <span class="kw">let</span> <span class="ident">curr_task</span> <span class="op">=</span> <span class="ident">task::get_my_current_task</span>().<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t get current task&quot;</span>)<span class="question-mark">?</span>;
+        </span><span class="kw">let </span>curr_task = task::get_my_current_task().ok_or(<span class="string">&quot;couldn&#39;t get current task&quot;</span>)<span class="question-mark">?</span>;
 
-        <span class="comment">// Fault mimicing a memory write. Function could panic when getting task</span>
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">downtime_eval</span>)]</span>
-        {
-            <span class="kw">if</span> (<span class="ident">value</span> <span class="op">%</span> <span class="number">4096</span>) <span class="op">==</span> <span class="number">0</span>  <span class="op">&amp;&amp;</span> <span class="ident">curr_task</span>.<span class="ident">is_restartable</span>() {
-                <span class="comment">// debug!(&quot;Fake error {}&quot;, value);</span>
-                <span class="kw">unsafe</span> { <span class="kw-2">*</span>(<span class="number">0x5050DEADBEEF</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">usize</span>) <span class="op">=</span> <span class="number">0x5555_5555_5555</span>; }
+        <span class="comment">// Fault mimicing a memory write. Function could panic when getting task
+        </span><span class="attr">#[cfg(downtime_eval)]
+        </span>{
+            <span class="kw">if </span>(value % <span class="number">4096</span>) == <span class="number">0  </span>&amp;&amp; curr_task.is_restartable() {
+                <span class="comment">// debug!(&quot;Fake error {}&quot;, value);
+                </span><span class="kw">unsafe </span>{ <span class="kw-2">*</span>(<span class="number">0x5050DEADBEEF </span><span class="kw">as </span><span class="kw-2">*mut </span>usize) = <span class="number">0x5555_5555_5555</span>; }
             }
         }
 
 
-        <span class="comment">// obtain a sender-side exchange slot, blocking if necessary</span>
-        <span class="kw">let</span> <span class="ident">sender_slot</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">take_sender_slot</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;failed to take_sender_slot&quot;</span>)<span class="question-mark">?</span>;
+        <span class="comment">// obtain a sender-side exchange slot, blocking if necessary
+        </span><span class="kw">let </span>sender_slot = <span class="self">self</span>.channel.take_sender_slot().map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to take_sender_slot&quot;</span>)<span class="question-mark">?</span>;
 
-        <span class="comment">// Here, either the sender (this task) arrived first and needs to wait for a receiver,</span>
-        <span class="comment">// or a receiver has already arrived and is waiting for a sender. </span>
-        <span class="kw">let</span> <span class="ident">retval</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">sender_slot</span>.<span class="number">0</span>.<span class="ident">lock</span>();
-            <span class="comment">// Temporarily take ownership of the channel&#39;s waiting state so we can modify it;</span>
-            <span class="comment">// the match statement below will advance the waiting state to the proper next state.</span>
-            <span class="kw">let</span> <span class="ident">current_state</span> <span class="op">=</span> <span class="ident">core::mem::replace</span>(<span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">exchange_state</span>, <span class="ident">ExchangeState::Init</span>);
-            <span class="kw">match</span> <span class="ident">current_state</span> {
-                <span class="ident">ExchangeState::Init</span> =&gt; {
-                    <span class="comment">// Hold interrupts to avoid blocking &amp; descheduling this task until we release the slot lock,</span>
-                    <span class="comment">// which is currently done automatically because the slot uses a MutexIrqSafe.</span>
-                    <span class="kw-2">*</span><span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">ExchangeState::WaitingForReceiver</span>(<span class="ident">WaitGuard::new</span>(<span class="ident">curr_task</span>.<span class="ident">clone</span>()).<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;failed to create wait guard&quot;</span>)<span class="question-mark">?</span>, <span class="ident">msg</span>);
-                    <span class="prelude-val">None</span>
+        <span class="comment">// Here, either the sender (this task) arrived first and needs to wait for a receiver,
+        // or a receiver has already arrived and is waiting for a sender. 
+        </span><span class="kw">let </span>retval = {
+            <span class="kw">let </span><span class="kw-2">mut </span>exchange_state = sender_slot.<span class="number">0</span>.lock();
+            <span class="comment">// Temporarily take ownership of the channel&#39;s waiting state so we can modify it;
+            // the match statement below will advance the waiting state to the proper next state.
+            </span><span class="kw">let </span>current_state = core::mem::replace(<span class="kw-2">&amp;mut *</span>exchange_state, ExchangeState::Init);
+            <span class="kw">match </span>current_state {
+                ExchangeState::Init =&gt; {
+                    <span class="comment">// Hold interrupts to avoid blocking &amp; descheduling this task until we release the slot lock,
+                    // which is currently done automatically because the slot uses a MutexIrqSafe.
+                    </span><span class="kw-2">*</span>exchange_state = ExchangeState::WaitingForReceiver(WaitGuard::new(curr_task.clone()).map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to create wait guard&quot;</span>)<span class="question-mark">?</span>, msg);
+                    <span class="prelude-val">None
+                </span>}
+                ExchangeState::WaitingForSender(receiver_to_notify) =&gt; {
+                    <span class="comment">// The message has been sent successfully. 
+                    </span><span class="kw-2">*</span>exchange_state = ExchangeState::SenderFinishedFirst(msg);
+                    <span class="comment">// Notify the receiver task (outside of this match statement),
+                    // but DO NOT restore the sender slot to the channel yet; 
+                    // that will be done once the receiver is also finished with the slot (in SenderFinishedFirst).
+                    </span><span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(receiver_to_notify))
                 }
-                <span class="ident">ExchangeState::WaitingForSender</span>(<span class="ident">receiver_to_notify</span>) =&gt; {
-                    <span class="comment">// The message has been sent successfully. </span>
-                    <span class="kw-2">*</span><span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">ExchangeState::SenderFinishedFirst</span>(<span class="ident">msg</span>);
-                    <span class="comment">// Notify the receiver task (outside of this match statement),</span>
-                    <span class="comment">// but DO NOT restore the sender slot to the channel yet; </span>
-                    <span class="comment">// that will be done once the receiver is also finished with the slot (in SenderFinishedFirst).</span>
-                    <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(<span class="ident">receiver_to_notify</span>))
-                }
-                <span class="ident">state</span> =&gt; {
-                    <span class="macro">error!</span>(<span class="string">&quot;BUG: Sender (at beginning) in invalid state {:?}&quot;</span>, <span class="ident">state</span>);
-                    <span class="kw-2">*</span><span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">state</span>;
+                state =&gt; {
+                    <span class="macro">error!</span>(<span class="string">&quot;BUG: Sender (at beginning) in invalid state {:?}&quot;</span>, state);
+                    <span class="kw-2">*</span>exchange_state = state;
                     <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(<span class="string">&quot;BUG: Sender (at beginning) in invalid state&quot;</span>))
                 }
             }
-            <span class="comment">// here, the sender slot lock is dropped</span>
-        };
-        <span class="comment">// In the above block, we handled advancing the state of the exchange slot. </span>
-        <span class="comment">// Now we need to handle other stuff (like notifying waiters) without holding the sender_slot lock.</span>
-        <span class="kw">match</span> <span class="ident">retval</span> {
-            <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(<span class="ident">receiver_to_notify</span>)) =&gt; {
-                <span class="ident">drop</span>(<span class="ident">receiver_to_notify</span>);
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+            <span class="comment">// here, the sender slot lock is dropped
+        </span>};
+        <span class="comment">// In the above block, we handled advancing the state of the exchange slot. 
+        // Now we need to handle other stuff (like notifying waiters) without holding the sender_slot lock.
+        </span><span class="kw">match </span>retval {
+            <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(receiver_to_notify)) =&gt; {
+                drop(receiver_to_notify);
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(());
             }
-            <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(<span class="ident">e</span>)) =&gt; {
-                <span class="comment">// Restore the sender slot and notify waiting senders.</span>
-                <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">slot</span>.<span class="ident">replace_sender_slot</span>(<span class="ident">sender_slot</span>);
-                <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">waiting_senders</span>.<span class="ident">notify_one</span>();
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
+            <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(e)) =&gt; {
+                <span class="comment">// Restore the sender slot and notify waiting senders.
+                </span><span class="self">self</span>.channel.slot.replace_sender_slot(sender_slot);
+                <span class="self">self</span>.channel.waiting_senders.notify_one();
+                <span class="kw">return </span><span class="prelude-val">Err</span>(e);
             }
-            <span class="prelude-val">None</span> =&gt; {
-                <span class="ident">scheduler::schedule</span>();
+            <span class="prelude-val">None </span>=&gt; {
+                scheduler::schedule();
             }
         }
 
-        <span class="comment">// Here, the sender (this task) is waiting for a receiver</span>
-        <span class="kw">loop</span> {
+        <span class="comment">// Here, the sender (this task) is waiting for a receiver
+        </span><span class="kw">loop </span>{
             {
-                <span class="kw">let</span> <span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">sender_slot</span>.<span class="number">0</span>.<span class="ident">lock</span>();
-                <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">exchange_state</span> {
-                    <span class="ident">ExchangeState::WaitingForReceiver</span>(<span class="ident">blocked_sender</span>, ..) =&gt; {
-                        <span class="kw">if</span> <span class="ident">blocked_sender</span>.<span class="ident">task</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">curr_task</span> {
-                            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: CURR TASK WAS DIFFERENT THAN BLOCKED SENDER&quot;</span>);
+                <span class="kw">let </span>exchange_state = sender_slot.<span class="number">0</span>.lock();
+                <span class="kw">match </span><span class="kw-2">&amp;*</span>exchange_state {
+                    ExchangeState::WaitingForReceiver(blocked_sender, ..) =&gt; {
+                        <span class="kw">if </span>blocked_sender.task() != curr_task {
+                            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: CURR TASK WAS DIFFERENT THAN BLOCKED SENDER&quot;</span>);
                         }
-                        <span class="ident">blocked_sender</span>.<span class="ident">block_again</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;failed to block sender&quot;</span>)<span class="question-mark">?</span>;
+                        blocked_sender.block_again().map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to block sender&quot;</span>)<span class="question-mark">?</span>;
                     }
-                    <span class="kw">_</span> =&gt; <span class="kw">break</span>,
+                    <span class="kw">_ </span>=&gt; <span class="kw">break</span>,
                 }
             }
-            <span class="ident">scheduler::schedule</span>();
+            scheduler::schedule();
         }
 
-        <span class="comment">// Here, we are at the rendezvous point</span>
-        <span class="kw">let</span> <span class="ident">retval</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">sender_slot</span>.<span class="number">0</span>.<span class="ident">lock</span>();
-            <span class="comment">// Temporarily take ownership of the channel&#39;s waiting state so we can modify it;</span>
-            <span class="comment">// the match statement below will advance the waiting state to the proper next state.</span>
-            <span class="kw">let</span> <span class="ident">current_state</span> <span class="op">=</span> <span class="ident">core::mem::replace</span>(<span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">exchange_state</span>, <span class="ident">ExchangeState::Init</span>);
-            <span class="kw">match</span> <span class="ident">current_state</span> {
-                <span class="ident">ExchangeState::ReceiverFinishedFirst</span> =&gt; {
-                    <span class="comment">// Ready to transfer another message.</span>
-                    <span class="kw-2">*</span><span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">ExchangeState::Init</span>; 
+        <span class="comment">// Here, we are at the rendezvous point
+        </span><span class="kw">let </span>retval = {
+            <span class="kw">let </span><span class="kw-2">mut </span>exchange_state = sender_slot.<span class="number">0</span>.lock();
+            <span class="comment">// Temporarily take ownership of the channel&#39;s waiting state so we can modify it;
+            // the match statement below will advance the waiting state to the proper next state.
+            </span><span class="kw">let </span>current_state = core::mem::replace(<span class="kw-2">&amp;mut *</span>exchange_state, ExchangeState::Init);
+            <span class="kw">match </span>current_state {
+                ExchangeState::ReceiverFinishedFirst =&gt; {
+                    <span class="comment">// Ready to transfer another message.
+                    </span><span class="kw-2">*</span>exchange_state = ExchangeState::Init; 
                     <span class="prelude-val">Ok</span>(())
                 }
-                <span class="ident">state</span> =&gt; {
-                    <span class="macro">error!</span>(<span class="string">&quot;BUG: Sender (while waiting) in invalid state {:?}&quot;</span>, <span class="ident">state</span>);
-                    <span class="kw-2">*</span><span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">state</span>;
+                state =&gt; {
+                    <span class="macro">error!</span>(<span class="string">&quot;BUG: Sender (while waiting) in invalid state {:?}&quot;</span>, state);
+                    <span class="kw-2">*</span>exchange_state = state;
                     <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: Sender (while waiting) in invalid state&quot;</span>)
                 }
             }
         };
-        <span class="kw">if</span> <span class="ident">retval</span>.<span class="ident">is_ok</span>() {
-            <span class="comment">// Restore the receiver slot now that the receiver is finished, and notify waiting receivers.</span>
-            <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">slot</span>.<span class="ident">replace_receiver_slot</span>(<span class="ident">ReceiverSlot</span>(<span class="ident">sender_slot</span>.<span class="number">0</span>.<span class="ident">clone</span>()));
-            <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">waiting_receivers</span>.<span class="ident">notify_one</span>();
+        <span class="kw">if </span>retval.is_ok() {
+            <span class="comment">// Restore the receiver slot now that the receiver is finished, and notify waiting receivers.
+            </span><span class="self">self</span>.channel.slot.replace_receiver_slot(ReceiverSlot(sender_slot.<span class="number">0</span>.clone()));
+            <span class="self">self</span>.channel.waiting_receivers.notify_one();
         }
 
-        <span class="comment">// Restore the sender slot and notify waiting senders.</span>
-        <span class="comment">// trace!(&quot;sender done, restoring slot&quot;);</span>
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">slot</span>.<span class="ident">replace_sender_slot</span>(<span class="ident">sender_slot</span>);
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">waiting_senders</span>.<span class="ident">notify_one</span>();
-        <span class="comment">// trace!(&quot;sender done, returning from send().&quot;);</span>
-        <span class="ident">retval</span>
+        <span class="comment">// Restore the sender slot and notify waiting senders.
+        // trace!(&quot;sender done, restoring slot&quot;);
+        </span><span class="self">self</span>.channel.slot.replace_sender_slot(sender_slot);
+        <span class="self">self</span>.channel.waiting_senders.notify_one();
+        <span class="comment">// trace!(&quot;sender done, returning from send().&quot;);
+        </span>retval
         
         <span class="comment">/*
         loop {
@@ -869,155 +863,154 @@
             };
             let old_state = core::mem::replace(&amp;mut wait_entry, new_state);
         }
-        */</span>
-    }
+        */
+    </span>}
 
-    <span class="doccomment">/// Tries to send the message, only succeeding if a receiver is ready and waiting. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// If a receiver was not ready, it returns the `msg` back to the caller without blocking. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Note that if the non-blocking `try_send` and `try_receive` functions are only ever used,</span>
-    <span class="doccomment">/// then the message will never be delivered because the sender and receiver cannot possibly rendezvous. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_send</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_msg</span>: <span class="ident">T</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Tries to send the message, only succeeding if a receiver is ready and waiting. 
+    /// 
+    /// If a receiver was not ready, it returns the `msg` back to the caller without blocking. 
+    /// 
+    /// Note that if the non-blocking `try_send` and `try_receive` functions are only ever used,
+    /// then the message will never be delivered because the sender and receiver cannot possibly rendezvous. 
+    </span><span class="kw">pub fn </span>try_send(<span class="kw-2">&amp;</span><span class="self">self</span>, _msg: T) -&gt; <span class="prelude-ty">Result</span>&lt;(), T&gt; {
         <span class="macro">unimplemented!</span>()
     }
 }
 
-<span class="doccomment">/// The receiver side of a channel.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> {
-    <span class="ident">channel</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="doccomment">/// The receiver side of a channel.
+</span><span class="attr">#[derive(Clone)]
+</span><span class="kw">pub struct </span>Receiver&lt;T: Send&gt; {
+    channel: Arc&lt;Channel&lt;T&gt;&gt;,
 }
-<span class="kw">impl</span> <span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Receive a message, blocking until a sender is ready. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Returns the message if it was received properly,</span>
-    <span class="doccomment">/// otherwise returns an error.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">receive</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// trace!(&quot;rendezvous: receive() entry&quot;);</span>
-        <span class="kw">let</span> <span class="ident">curr_task</span> <span class="op">=</span> <span class="ident">task::get_my_current_task</span>().<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t get current task&quot;</span>)<span class="question-mark">?</span>;
+<span class="kw">impl </span>&lt;T: Send&gt; Receiver&lt;T&gt; {
+    <span class="doccomment">/// Receive a message, blocking until a sender is ready. 
+    /// 
+    /// Returns the message if it was received properly,
+    /// otherwise returns an error.
+    </span><span class="kw">pub fn </span>receive(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;T, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// trace!(&quot;rendezvous: receive() entry&quot;);
+        </span><span class="kw">let </span>curr_task = task::get_my_current_task().ok_or(<span class="string">&quot;couldn&#39;t get current task&quot;</span>)<span class="question-mark">?</span>;
         
-        <span class="comment">// obtain a receiver-side exchange slot, blocking if necessary</span>
-        <span class="kw">let</span> <span class="ident">receiver_slot</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">take_receiver_slot</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;failed to take_receiver_slot&quot;</span>)<span class="question-mark">?</span>;
+        <span class="comment">// obtain a receiver-side exchange slot, blocking if necessary
+        </span><span class="kw">let </span>receiver_slot = <span class="self">self</span>.channel.take_receiver_slot().map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to take_receiver_slot&quot;</span>)<span class="question-mark">?</span>;
 
-        <span class="comment">// Here, either the receiver (this task) arrived first and needs to wait for a sender,</span>
-        <span class="comment">// or a sender has already arrived and is waiting for a receiver. </span>
-        <span class="kw">let</span> <span class="ident">retval</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">receiver_slot</span>.<span class="number">0</span>.<span class="ident">lock</span>();
-            <span class="comment">// Temporarily take ownership of the channel&#39;s waiting state so we can modify it;</span>
-            <span class="comment">// the match statement below will advance the waiting state to the proper next state.</span>
-            <span class="kw">let</span> <span class="ident">current_state</span> <span class="op">=</span> <span class="ident">core::mem::replace</span>(<span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">exchange_state</span>, <span class="ident">ExchangeState::Init</span>);
-            <span class="kw">match</span> <span class="ident">current_state</span> {
-                <span class="ident">ExchangeState::Init</span> =&gt; {
-                    <span class="comment">// Hold interrupts to avoid blocking &amp; descheduling this task until we release the slot lock,</span>
-                    <span class="comment">// which is currently done automatically because the slot uses a MutexIrqSafe.</span>
-                    <span class="kw-2">*</span><span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">ExchangeState::WaitingForSender</span>(<span class="ident">WaitGuard::new</span>(<span class="ident">curr_task</span>.<span class="ident">clone</span>()).<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;failed to create wait guard&quot;</span>)<span class="question-mark">?</span>);
-                    <span class="prelude-val">None</span>
+        <span class="comment">// Here, either the receiver (this task) arrived first and needs to wait for a sender,
+        // or a sender has already arrived and is waiting for a receiver. 
+        </span><span class="kw">let </span>retval = {
+            <span class="kw">let </span><span class="kw-2">mut </span>exchange_state = receiver_slot.<span class="number">0</span>.lock();
+            <span class="comment">// Temporarily take ownership of the channel&#39;s waiting state so we can modify it;
+            // the match statement below will advance the waiting state to the proper next state.
+            </span><span class="kw">let </span>current_state = core::mem::replace(<span class="kw-2">&amp;mut *</span>exchange_state, ExchangeState::Init);
+            <span class="kw">match </span>current_state {
+                ExchangeState::Init =&gt; {
+                    <span class="comment">// Hold interrupts to avoid blocking &amp; descheduling this task until we release the slot lock,
+                    // which is currently done automatically because the slot uses a MutexIrqSafe.
+                    </span><span class="kw-2">*</span>exchange_state = ExchangeState::WaitingForSender(WaitGuard::new(curr_task.clone()).map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to create wait guard&quot;</span>)<span class="question-mark">?</span>);
+                    <span class="prelude-val">None
+                </span>}
+                ExchangeState::WaitingForReceiver(sender_to_notify, msg) =&gt; {
+                    <span class="comment">// The message has been received successfully! 
+                    </span><span class="kw-2">*</span>exchange_state = ExchangeState::ReceiverFinishedFirst;
+                    <span class="comment">// Notify the sender task (outside of this match statement), 
+                    // but DO NOT restore the receiver slot to the channel yet; 
+                    // that will be done once the sender is also finished with the slot (in ReceiverFinishedFirst).
+                    </span><span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>((sender_to_notify, msg)))
                 }
-                <span class="ident">ExchangeState::WaitingForReceiver</span>(<span class="ident">sender_to_notify</span>, <span class="ident">msg</span>) =&gt; {
-                    <span class="comment">// The message has been received successfully! </span>
-                    <span class="kw-2">*</span><span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">ExchangeState::ReceiverFinishedFirst</span>;
-                    <span class="comment">// Notify the sender task (outside of this match statement), </span>
-                    <span class="comment">// but DO NOT restore the receiver slot to the channel yet; </span>
-                    <span class="comment">// that will be done once the sender is also finished with the slot (in ReceiverFinishedFirst).</span>
-                    <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>((<span class="ident">sender_to_notify</span>, <span class="ident">msg</span>)))
-                }
-                <span class="ident">state</span> =&gt; {
-                    <span class="macro">error!</span>(<span class="string">&quot;BUG: Receiver (at beginning) in invalid state {:?}&quot;</span>, <span class="ident">state</span>);
-                    <span class="kw-2">*</span><span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">state</span>;
+                state =&gt; {
+                    <span class="macro">error!</span>(<span class="string">&quot;BUG: Receiver (at beginning) in invalid state {:?}&quot;</span>, state);
+                    <span class="kw-2">*</span>exchange_state = state;
                     <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(<span class="string">&quot;BUG: Receiver (at beginning) in invalid state&quot;</span>))
                 }
             }
-            <span class="comment">// here, the receiver slot lock is dropped</span>
-        };
-        <span class="comment">// In the above block, we handled advancing the state of the exchange slot. </span>
-        <span class="comment">// Now we need to handle other stuff (like notifying waiters) without holding the receiver_slot lock.</span>
-        <span class="kw">match</span> <span class="ident">retval</span> {
-            <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>((<span class="ident">sender_to_notify</span>, <span class="ident">msg</span>))) =&gt; {
-                <span class="ident">drop</span>(<span class="ident">sender_to_notify</span>);
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">trace_channel</span>)]</span>
-                <span class="macro">trace!</span>(<span class="string">&quot;rendezvous: received msg: {:?}&quot;</span>, <span class="macro">debugit!</span>(<span class="ident">msg</span>));
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">msg</span>);
+            <span class="comment">// here, the receiver slot lock is dropped
+        </span>};
+        <span class="comment">// In the above block, we handled advancing the state of the exchange slot. 
+        // Now we need to handle other stuff (like notifying waiters) without holding the receiver_slot lock.
+        </span><span class="kw">match </span>retval {
+            <span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>((sender_to_notify, msg))) =&gt; {
+                drop(sender_to_notify);
+                <span class="attr">#[cfg(trace_channel)]
+                </span><span class="macro">trace!</span>(<span class="string">&quot;rendezvous: received msg: {:?}&quot;</span>, <span class="macro">debugit!</span>(msg));
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(msg);
             }
-            <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(<span class="ident">e</span>)) =&gt; {
-                <span class="comment">// Restore the receiver slot and notify waiting receivers.</span>
-                <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">slot</span>.<span class="ident">replace_receiver_slot</span>(<span class="ident">receiver_slot</span>);
-                <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">waiting_receivers</span>.<span class="ident">notify_one</span>();
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
+            <span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(e)) =&gt; {
+                <span class="comment">// Restore the receiver slot and notify waiting receivers.
+                </span><span class="self">self</span>.channel.slot.replace_receiver_slot(receiver_slot);
+                <span class="self">self</span>.channel.waiting_receivers.notify_one();
+                <span class="kw">return </span><span class="prelude-val">Err</span>(e);
             }
-            <span class="prelude-val">None</span> =&gt; {
-                <span class="ident">scheduler::schedule</span>();
+            <span class="prelude-val">None </span>=&gt; {
+                scheduler::schedule();
             }
         }
 
-        <span class="comment">// Here, the receiver (this task) is waiting for a sender</span>
-        <span class="kw">loop</span> {
+        <span class="comment">// Here, the receiver (this task) is waiting for a sender
+        </span><span class="kw">loop </span>{
             {
-                <span class="kw">let</span> <span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">receiver_slot</span>.<span class="number">0</span>.<span class="ident">lock</span>();
-                <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">exchange_state</span> {
-                    <span class="ident">ExchangeState::WaitingForSender</span>(<span class="ident">blocked_receiver</span>) =&gt; {
+                <span class="kw">let </span>exchange_state = receiver_slot.<span class="number">0</span>.lock();
+                <span class="kw">match </span><span class="kw-2">&amp;*</span>exchange_state {
+                    ExchangeState::WaitingForSender(blocked_receiver) =&gt; {
                         <span class="macro">warn!</span>(<span class="string">&quot;spurious wakeup while receiver is WaitingForSender... re-blocking task.&quot;</span>);
-                        <span class="kw">if</span> <span class="ident">blocked_receiver</span>.<span class="ident">task</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">curr_task</span> {
-                            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: CURR TASK WAS DIFFERENT THAN BLOCKED RECEIVER&quot;</span>);
+                        <span class="kw">if </span>blocked_receiver.task() != curr_task {
+                            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: CURR TASK WAS DIFFERENT THAN BLOCKED RECEIVER&quot;</span>);
                         }
-                        <span class="ident">blocked_receiver</span>.<span class="ident">block_again</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;failed to block receiver&quot;</span>)<span class="question-mark">?</span>;
+                        blocked_receiver.block_again().map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to block receiver&quot;</span>)<span class="question-mark">?</span>;
                     }
-                    <span class="kw">_</span> =&gt; <span class="kw">break</span>,
+                    <span class="kw">_ </span>=&gt; <span class="kw">break</span>,
                 }
             }
-            <span class="ident">scheduler::schedule</span>();
+            scheduler::schedule();
         }
 
 
-        <span class="comment">// Here, we are at the rendezvous point</span>
-        <span class="kw">let</span> <span class="ident">retval</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">receiver_slot</span>.<span class="number">0</span>.<span class="ident">lock</span>();
-            <span class="comment">// Temporarily take ownership of the channel&#39;s waiting state so we can modify it;</span>
-            <span class="comment">// the match statement below will advance the waiting state to the proper next state.</span>
-            <span class="kw">let</span> <span class="ident">current_state</span> <span class="op">=</span> <span class="ident">core::mem::replace</span>(<span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">exchange_state</span>, <span class="ident">ExchangeState::Init</span>);
-            <span class="kw">match</span> <span class="ident">current_state</span> {
-                <span class="ident">ExchangeState::SenderFinishedFirst</span>(<span class="ident">msg</span>) =&gt; {
-                    <span class="comment">// Ready to transfer another message.</span>
-                    <span class="kw-2">*</span><span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">ExchangeState::Init</span>; 
-                    <span class="prelude-val">Ok</span>(<span class="ident">msg</span>)
+        <span class="comment">// Here, we are at the rendezvous point
+        </span><span class="kw">let </span>retval = {
+            <span class="kw">let </span><span class="kw-2">mut </span>exchange_state = receiver_slot.<span class="number">0</span>.lock();
+            <span class="comment">// Temporarily take ownership of the channel&#39;s waiting state so we can modify it;
+            // the match statement below will advance the waiting state to the proper next state.
+            </span><span class="kw">let </span>current_state = core::mem::replace(<span class="kw-2">&amp;mut *</span>exchange_state, ExchangeState::Init);
+            <span class="kw">match </span>current_state {
+                ExchangeState::SenderFinishedFirst(msg) =&gt; {
+                    <span class="comment">// Ready to transfer another message.
+                    </span><span class="kw-2">*</span>exchange_state = ExchangeState::Init; 
+                    <span class="prelude-val">Ok</span>(msg)
                 }
-                <span class="ident">state</span> =&gt; {
-                    <span class="macro">error!</span>(<span class="string">&quot;BUG: Receiver (at end) in invalid state {:?}&quot;</span>, <span class="ident">state</span>);
-                    <span class="kw-2">*</span><span class="ident">exchange_state</span> <span class="op">=</span> <span class="ident">state</span>;
+                state =&gt; {
+                    <span class="macro">error!</span>(<span class="string">&quot;BUG: Receiver (at end) in invalid state {:?}&quot;</span>, state);
+                    <span class="kw-2">*</span>exchange_state = state;
                     <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: Receiver (at end) in invalid state&quot;</span>)
                 }
             }
         };
-        <span class="kw">if</span> <span class="ident">retval</span>.<span class="ident">is_ok</span>() {
-            <span class="comment">// Restore the sender slot now that the sender is finished, and notify waiting senders.</span>
-            <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">slot</span>.<span class="ident">replace_sender_slot</span>(<span class="ident">SenderSlot</span>(<span class="ident">receiver_slot</span>.<span class="number">0</span>.<span class="ident">clone</span>()));
-            <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">waiting_senders</span>.<span class="ident">notify_one</span>();
+        <span class="kw">if </span>retval.is_ok() {
+            <span class="comment">// Restore the sender slot now that the sender is finished, and notify waiting senders.
+            </span><span class="self">self</span>.channel.slot.replace_sender_slot(SenderSlot(receiver_slot.<span class="number">0</span>.clone()));
+            <span class="self">self</span>.channel.waiting_senders.notify_one();
         }
 
-        <span class="comment">// Restore the receiver slot and notify waiting receivers.</span>
-        <span class="comment">// trace!(&quot;receiver done, restoring slot&quot;);</span>
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">slot</span>.<span class="ident">replace_receiver_slot</span>(<span class="ident">receiver_slot</span>);
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">waiting_receivers</span>.<span class="ident">notify_one</span>();
-        <span class="comment">// trace!(&quot;rendezvous: receiver done, returning from receive().&quot;);</span>
+        <span class="comment">// Restore the receiver slot and notify waiting receivers.
+        // trace!(&quot;receiver done, restoring slot&quot;);
+        </span><span class="self">self</span>.channel.slot.replace_receiver_slot(receiver_slot);
+        <span class="self">self</span>.channel.waiting_receivers.notify_one();
+        <span class="comment">// trace!(&quot;rendezvous: receiver done, returning from receive().&quot;);
 
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">trace_channel</span>)]</span>
-        <span class="macro">trace!</span>(<span class="string">&quot;rendezvous: received msg: {:?}&quot;</span>, <span class="macro">debugit!</span>(<span class="ident">retval</span>));
-        <span class="ident">retval</span>
+        </span><span class="attr">#[cfg(trace_channel)]
+        </span><span class="macro">trace!</span>(<span class="string">&quot;rendezvous: received msg: {:?}&quot;</span>, <span class="macro">debugit!</span>(retval));
+        retval
     }
 
-    <span class="doccomment">/// Tries to receive a message, only succeeding if a sender is ready and waiting. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// If the sender was not ready, it returns an error without blocking. </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Note that if the non-blocking `try_send` and `try_receive` functions are only ever used,</span>
-    <span class="doccomment">/// then the message will never be delivered because the sender and receiver cannot possibly rendezvous. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_receive</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Tries to receive a message, only succeeding if a sender is ready and waiting. 
+    /// 
+    /// If the sender was not ready, it returns an error without blocking. 
+    /// 
+    /// Note that if the non-blocking `try_send` and `try_receive` functions are only ever used,
+    /// then the message will never be delivered because the sender and receiver cannot possibly rendezvous. 
+    </span><span class="kw">pub fn </span>try_receive(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;T, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="macro">unimplemented!</span>()
     }
 }
 
 
-<span class="comment">// TODO: implement drop for sender and receiver in order to notify the other side of a disconnect</span>
-</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="rendezvous" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+<span class="comment">// TODO: implement drop for sender and receiver in order to notify the other side of a disconnect
+</span></code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="rendezvous" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

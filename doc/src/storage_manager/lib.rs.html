@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/storage_manager/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../storage_manager/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../storage_manager/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../storage_manager/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/storage_manager/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../storage_manager/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -74,76 +68,75 @@
 <span id="68">68</span>
 <span id="69">69</span>
 <span id="70">70</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Manages and handles initialization of all storage devices</span>
-<span class="doccomment">//! and storage controllers in the system.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Manages and handles initialization of all storage devices
+//! and storage controllers in the system.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pci</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">ata</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">storage_device</span>;
+</span><span class="kw">extern crate </span>alloc;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+<span class="kw">extern crate </span>spin;
+<span class="kw">extern crate </span>pci;
+<span class="kw">extern crate </span>ata;
+<span class="kw">extern crate </span>storage_device;
 
-<span class="kw">use</span> <span class="ident">alloc</span>::{
-    <span class="ident">vec::Vec</span>,
-    <span class="ident">sync::Arc</span>,
+<span class="kw">use </span>alloc::{
+    vec::Vec,
+    sync::Arc,
 };
-<span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">pci::PciDevice</span>;
-<span class="kw">use</span> <span class="ident">storage_device::StorageControllerRef</span>;
+<span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>pci::PciDevice;
+<span class="kw">use </span>storage_device::StorageControllerRef;
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">storage_device</span>::<span class="kw-2">*</span>;
+<span class="kw">pub use </span>storage_device::<span class="kw-2">*</span>;
 
-<span class="doccomment">/// A list of all of the available and initialized storage controllers that exist on this system.</span>
-<span class="kw">static</span> <span class="ident">STORAGE_CONTROLLERS</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">StorageControllerRef</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">Vec::new</span>());
+<span class="doccomment">/// A list of all of the available and initialized storage controllers that exist on this system.
+</span><span class="kw">static </span>STORAGE_CONTROLLERS: Mutex&lt;Vec&lt;StorageControllerRef&gt;&gt; = Mutex::new(Vec::new());
 
-<span class="doccomment">/// Returns an iterator over all initialized storage controllers on this system.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This function requires allocation, as it currently clones the list of storage controllers,\</span>
-<span class="doccomment">/// effectively a `Vec&lt;Arc&lt;StorageController&gt;&gt;`.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">storage_controllers</span>() -&gt; <span class="kw">impl</span> <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">StorageControllerRef</span><span class="op">&gt;</span> {
-    <span class="ident">STORAGE_CONTROLLERS</span>.<span class="ident">lock</span>().<span class="ident">clone</span>().<span class="ident">into_iter</span>()
+<span class="doccomment">/// Returns an iterator over all initialized storage controllers on this system.
+/// 
+/// This function requires allocation, as it currently clones the list of storage controllers,\
+/// effectively a `Vec&lt;Arc&lt;StorageController&gt;&gt;`.
+</span><span class="kw">pub fn </span>storage_controllers() -&gt; <span class="kw">impl </span>Iterator&lt;Item = StorageControllerRef&gt; {
+    STORAGE_CONTROLLERS.lock().clone().into_iter()
 }
 
-<span class="doccomment">/// Returns an iterator over all storage devices attached to the storage controllers on this system.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This function requires allocation, as it currently clones the list of storage devices (lazily)</span>
-<span class="doccomment">/// within each storage controller, effectively a `Vec&lt;Arc&lt;Vec&lt;Arc&lt;StorageDevice&gt;&gt;&gt;&gt;`.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">storage_devices</span>() -&gt; <span class="kw">impl</span> <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">StorageDeviceRef</span><span class="op">&gt;</span> {
-    <span class="ident">storage_controllers</span>()
-        .<span class="ident">flat_map</span>(<span class="op">|</span><span class="ident">c</span><span class="op">|</span> <span class="ident">c</span>.<span class="ident">lock</span>()
-            .<span class="ident">devices</span>()
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">StorageDeviceRef</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-            .<span class="ident">into_iter</span>()
+<span class="doccomment">/// Returns an iterator over all storage devices attached to the storage controllers on this system.
+///
+/// This function requires allocation, as it currently clones the list of storage devices (lazily)
+/// within each storage controller, effectively a `Vec&lt;Arc&lt;Vec&lt;Arc&lt;StorageDevice&gt;&gt;&gt;&gt;`.
+</span><span class="kw">pub fn </span>storage_devices() -&gt; <span class="kw">impl </span>Iterator&lt;Item = StorageDeviceRef&gt; {
+    storage_controllers()
+        .flat_map(|c| c.lock()
+            .devices()
+            .collect::&lt;Vec&lt;StorageDeviceRef&gt;&gt;()
+            .into_iter()
     )
 }
 
 
-<span class="doccomment">/// Attempts to handle the initialization of the given `PciDevice`,</span>
-<span class="doccomment">/// if it is a recognized storage device.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Return</span>
-<span class="doccomment">/// * `Ok(Some(StorageControllerRef))` if successful, containing the newly-initialized storage controller.</span>
-<span class="doccomment">/// * `Ok(None)` if the given `PciDevice` isn&#39;t a supported storage device,</span>
-<span class="doccomment">/// * An error if it fails to initialize a supported storage device.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_device</span>(<span class="ident">pci_device</span>: <span class="kw-2">&amp;</span><span class="ident">PciDevice</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">StorageControllerRef</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="comment">// We currently only support IDE controllers for ATA drives (aka PATA).</span>
-    <span class="kw">let</span> <span class="ident">storage_controller</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">pci_device</span>.<span class="ident">class</span> <span class="op">==</span> <span class="number">0x01</span> <span class="op">&amp;&amp;</span> <span class="ident">pci_device</span>.<span class="ident">subclass</span> <span class="op">==</span> <span class="number">0x01</span> {
-        <span class="macro">info!</span>(<span class="string">&quot;IDE controller PCI device found at: {:?}&quot;</span>, <span class="ident">pci_device</span>.<span class="ident">location</span>);
-        <span class="kw">let</span> <span class="ident">ide_controller</span> <span class="op">=</span> <span class="ident">ata::IdeController::new</span>(<span class="ident">pci_device</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">storage_controller_ref</span>: <span class="ident">StorageControllerRef</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">ide_controller</span>));
-        <span class="ident">STORAGE_CONTROLLERS</span>.<span class="ident">lock</span>().<span class="ident">push</span>(<span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">storage_controller_ref</span>));
-        <span class="prelude-val">Some</span>(<span class="ident">storage_controller_ref</span>)
+<span class="doccomment">/// Attempts to handle the initialization of the given `PciDevice`,
+/// if it is a recognized storage device.
+/// 
+/// # Return
+/// * `Ok(Some(StorageControllerRef))` if successful, containing the newly-initialized storage controller.
+/// * `Ok(None)` if the given `PciDevice` isn&#39;t a supported storage device,
+/// * An error if it fails to initialize a supported storage device.
+</span><span class="kw">pub fn </span>init_device(pci_device: <span class="kw-2">&amp;</span>PciDevice) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;StorageControllerRef&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="comment">// We currently only support IDE controllers for ATA drives (aka PATA).
+    </span><span class="kw">let </span>storage_controller = <span class="kw">if </span>pci_device.class == <span class="number">0x01 </span>&amp;&amp; pci_device.subclass == <span class="number">0x01 </span>{
+        <span class="macro">info!</span>(<span class="string">&quot;IDE controller PCI device found at: {:?}&quot;</span>, pci_device.location);
+        <span class="kw">let </span>ide_controller = ata::IdeController::new(pci_device)<span class="question-mark">?</span>;
+        <span class="kw">let </span>storage_controller_ref: StorageControllerRef = Arc::new(Mutex::new(ide_controller));
+        STORAGE_CONTROLLERS.lock().push(Arc::clone(<span class="kw-2">&amp;</span>storage_controller_ref));
+        <span class="prelude-val">Some</span>(storage_controller_ref)
     } 
-    <span class="comment">// Here: in the future, handle other supported storage devices</span>
-    <span class="kw">else</span> {
-        <span class="prelude-val">None</span>
-    };
+    <span class="comment">// Here: in the future, handle other supported storage devices
+    </span><span class="kw">else </span>{
+        <span class="prelude-val">None
+    </span>};
     
-    <span class="prelude-val">Ok</span>(<span class="ident">storage_controller</span>)
+    <span class="prelude-val">Ok</span>(storage_controller)
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="storage_manager" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="storage_manager" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

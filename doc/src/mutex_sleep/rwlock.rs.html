@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mutex_sleep/src/rwlock.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>rwlock.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../mutex_sleep/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../mutex_sleep/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../mutex_sleep/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mutex_sleep/src/rwlock.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>rwlock.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../mutex_sleep/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -328,330 +322,329 @@
 <span id="322">322</span>
 <span id="323">323</span>
 <span id="324">324</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">core::fmt</span>;
-<span class="kw">use</span> <span class="ident">core::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
-<span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">RwLock</span>, <span class="ident">RwLockReadGuard</span>, <span class="ident">RwLockWriteGuard</span>};
-<span class="kw">use</span> <span class="ident">wait_queue::WaitQueue</span>;
-<span class="kw">use</span> <span class="ident">lockable</span>::{<span class="ident">Lockable</span>, <span class="ident">LockableSized</span>};
+</pre><pre class="rust"><code><span class="kw">use </span>core::fmt;
+<span class="kw">use </span>core::ops::{Deref, DerefMut};
+<span class="kw">use </span>spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+<span class="kw">use </span>wait_queue::WaitQueue;
+<span class="kw">use </span>lockable::{Lockable, LockableSized};
 
-<span class="doccomment">/// A multi-reader, single-writer mutual exclusion wrapper that puts a `Task` to sleep</span>
-<span class="doccomment">/// while waiting for the lock to become available. </span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// The behavior of this read-write lock is defined by the underlying [`spin::RwLock`];</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// A sleeping `Task` has a &quot;blocked&quot; runstate, meaning that it will not be scheduled in. </span>
-<span class="doccomment">/// Once the lock becomes available, `Task`s that are sleeping while waiting for the lock</span>
-<span class="doccomment">/// will be notified (woken up) so they can attempt to acquire the lock again.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RwLockSleep</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> {
-    <span class="ident">queue</span>: <span class="ident">WaitQueue</span>,
-    <span class="ident">rwlock</span>: <span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+<span class="doccomment">/// A multi-reader, single-writer mutual exclusion wrapper that puts a `Task` to sleep
+/// while waiting for the lock to become available. 
+/// 
+/// The behavior of this read-write lock is defined by the underlying [`spin::RwLock`];
+/// 
+/// A sleeping `Task` has a &quot;blocked&quot; runstate, meaning that it will not be scheduled in. 
+/// Once the lock becomes available, `Task`s that are sleeping while waiting for the lock
+/// will be notified (woken up) so they can attempt to acquire the lock again.
+</span><span class="kw">pub struct </span>RwLockSleep&lt;T: <span class="question-mark">?</span>Sized&gt; {
+    queue: WaitQueue,
+    rwlock: RwLock&lt;T&gt;,
 }
 
-<span class="doccomment">/// A guard that allows the locked data to be immutably accessed,</span>
-<span class="doccomment">/// during which mutual exclusion is guaranteed.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// When the guard falls out of scope, the lock will be automatically released,</span>
-<span class="doccomment">/// which then notifies any `Task`s waiting on the lock.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RwLockSleepReadGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="ident">guard</span>: <span class="ident">RwLockReadGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>,
-    <span class="ident">queue</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">WaitQueue</span>,
+<span class="doccomment">/// A guard that allows the locked data to be immutably accessed,
+/// during which mutual exclusion is guaranteed.
+///
+/// When the guard falls out of scope, the lock will be automatically released,
+/// which then notifies any `Task`s waiting on the lock.
+</span><span class="kw">pub struct </span>RwLockSleepReadGuard&lt;<span class="lifetime">&#39;a</span>, T: <span class="question-mark">?</span>Sized + <span class="lifetime">&#39;a</span>&gt; {
+    guard: RwLockReadGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;,
+    queue: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>WaitQueue,
 }
 
-<span class="doccomment">/// A guard that allows the locked data to be mutably accessed,</span>
-<span class="doccomment">/// during which mutual exclusion is guaranteed.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// When the guard falls out of scope, the lock will be automatically released,</span>
-<span class="doccomment">/// which then notifies any `Task`s waiting on the lock.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RwLockSleepWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="ident">guard</span>: <span class="ident">RwLockWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>,
-    <span class="ident">queue</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">WaitQueue</span>,
+<span class="doccomment">/// A guard that allows the locked data to be mutably accessed,
+/// during which mutual exclusion is guaranteed.
+///
+/// When the guard falls out of scope, the lock will be automatically released,
+/// which then notifies any `Task`s waiting on the lock.
+</span><span class="kw">pub struct </span>RwLockSleepWriteGuard&lt;<span class="lifetime">&#39;a</span>, T: <span class="question-mark">?</span>Sized + <span class="lifetime">&#39;a</span>&gt; {
+    guard: RwLockWriteGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;,
+    queue: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>WaitQueue,
 }
 
-<span class="comment">// Same unsafe impls as `std::sync::RwLock`</span>
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Send</span> <span class="kw">for</span> <span class="ident">RwLockSleep</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {}
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">RwLockSleep</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {}
+<span class="comment">// Same unsafe impls as `std::sync::RwLock`
+</span><span class="kw">unsafe impl</span>&lt;T: <span class="question-mark">?</span>Sized + Send&gt; Send <span class="kw">for </span>RwLockSleep&lt;T&gt; {}
+<span class="kw">unsafe impl</span>&lt;T: <span class="question-mark">?</span>Sized + Send + Sync&gt; Sync <span class="kw">for </span>RwLockSleep&lt;T&gt; {}
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">RwLockSleep</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Creates a new lock wrapping the supplied data.</span>
-    <span class="doccomment">///</span>
-    <span class="comment">// NOTE: const fn is currently disabled because the inner WaitQueue</span>
-    <span class="comment">// is a VecDeque, which isn&#39;t statically initializable. </span>
-    <span class="comment">// When we switch to a different type, we can offer this as a const fn again.</span>
-    <span class="comment">// pub const fn new (data: T) -&gt; RwLockSleep&lt;T&gt; {</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">data</span>: <span class="ident">T</span>) -&gt; <span class="ident">RwLockSleep</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">RwLockSleep</span> {
-            <span class="ident">rwlock</span>: <span class="ident">RwLock::new</span>(<span class="ident">data</span>),
-            <span class="ident">queue</span>: <span class="ident">WaitQueue::new</span>(),
+<span class="kw">impl</span>&lt;T&gt; RwLockSleep&lt;T&gt; {
+    <span class="doccomment">/// Creates a new lock wrapping the supplied data.
+    ///
+    </span><span class="comment">// NOTE: const fn is currently disabled because the inner WaitQueue
+    // is a VecDeque, which isn&#39;t statically initializable. 
+    // When we switch to a different type, we can offer this as a const fn again.
+    // pub const fn new (data: T) -&gt; RwLockSleep&lt;T&gt; {
+    </span><span class="kw">pub fn </span>new(data: T) -&gt; RwLockSleep&lt;T&gt; {
+        RwLockSleep {
+            rwlock: RwLock::new(data),
+            queue: WaitQueue::new(),
         }
     }
 
-    <span class="doccomment">/// Consumes this `RwLockSleep`, returning the underlying data.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_inner</span>(<span class="self">self</span>) -&gt; <span class="ident">T</span> {
-        <span class="self">self</span>.<span class="ident">rwlock</span>.<span class="ident">into_inner</span>()
+    <span class="doccomment">/// Consumes this `RwLockSleep`, returning the underlying data.
+    </span><span class="kw">pub fn </span>into_inner(<span class="self">self</span>) -&gt; T {
+        <span class="self">self</span>.rwlock.into_inner()
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">RwLockSleep</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Returns `true` if the lock is currently held.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This function provides no synchronization guarantees and so its result should be considered &#39;out of date&#39;</span>
-    <span class="doccomment">/// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_locked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">rwlock</span>.<span class="ident">is_locked</span>()
+<span class="kw">impl</span>&lt;T: <span class="question-mark">?</span>Sized&gt; RwLockSleep&lt;T&gt; {
+    <span class="doccomment">/// Returns `true` if the lock is currently held.
+    ///
+    /// # Safety
+    ///
+    /// This function provides no synchronization guarantees and so its result should be considered &#39;out of date&#39;
+    /// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.
+    </span><span class="attr">#[inline(always)]
+    </span><span class="kw">pub fn </span>is_locked(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.rwlock.is_locked()
     }
 
-    <span class="doccomment">/// Locks this `RwLockSleep` with shared read (immutable) access.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// If a writer has already acquired this lock, this function will put the current `Task`</span>
-    <span class="doccomment">/// to sleep until the writer `Task` releases the lock, at which point this `Task` </span>
-    <span class="doccomment">/// will be woken up and attempt to acquire the read-only lock again.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// There may be other readers currently inside the lock when this function returns.</span>
-    <span class="doccomment">/// This does not provide any guarantees with respect to the ordering </span>
-    <span class="doccomment">/// of whether contentious readers or writers will acquire the lock first.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Returns an RAII guard which will release this task&#39;s shared access upon being dropped.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// ```</span>
-    <span class="doccomment">/// let mylock = RwLockSleep::new(0);</span>
-    <span class="doccomment">/// {</span>
-    <span class="doccomment">///     let mut data = mylock.read();</span>
-    <span class="doccomment">///     // The lock is now locked and the data can be read</span>
-    <span class="doccomment">///     println!(&quot;{}&quot;, *data);</span>
-    <span class="doccomment">///     // The lock is dropped and interrupts are restored to their prior state</span>
-    <span class="doccomment">/// }</span>
-    <span class="doccomment">/// ```</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">RwLockSleepReadGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// Fast path: check for the uncontended case.</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">guard</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">try_read</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">guard</span>);
+    <span class="doccomment">/// Locks this `RwLockSleep` with shared read (immutable) access.
+    /// 
+    /// If a writer has already acquired this lock, this function will put the current `Task`
+    /// to sleep until the writer `Task` releases the lock, at which point this `Task` 
+    /// will be woken up and attempt to acquire the read-only lock again.
+    ///
+    /// There may be other readers currently inside the lock when this function returns.
+    /// This does not provide any guarantees with respect to the ordering 
+    /// of whether contentious readers or writers will acquire the lock first.
+    ///
+    /// Returns an RAII guard which will release this task&#39;s shared access upon being dropped.
+    ///
+    /// ```
+    /// let mylock = RwLockSleep::new(0);
+    /// {
+    ///     let mut data = mylock.read();
+    ///     // The lock is now locked and the data can be read
+    ///     println!(&quot;{}&quot;, *data);
+    ///     // The lock is dropped and interrupts are restored to their prior state
+    /// }
+    /// ```
+    </span><span class="kw">pub fn </span>read&lt;<span class="lifetime">&#39;a</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;RwLockSleepReadGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// Fast path: check for the uncontended case.
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(guard) = <span class="self">self</span>.try_read() {
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(guard);
         }
-        <span class="comment">// Slow path if already locked elsewhere: wait until we obtain the lock.</span>
-        <span class="self">self</span>.<span class="ident">queue</span>
-            .<span class="ident">wait_until</span>(<span class="kw-2">&amp;</span><span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">try_read</span>())
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;failed to add current task to waitqueue&quot;</span>)
+        <span class="comment">// Slow path if already locked elsewhere: wait until we obtain the lock.
+        </span><span class="self">self</span>.queue
+            .wait_until(<span class="kw-2">&amp;</span>|| <span class="self">self</span>.try_read())
+            .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to add current task to waitqueue&quot;</span>)
     }
 
-    <span class="doccomment">/// Attempt to acquire this lock with shared read (immutable) access.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This function is the same as [`RwLockSleep::read`] but will never block,</span>
-    <span class="doccomment">/// returning immediately regardless of whether the lock has been acquired.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// ```</span>
-    <span class="doccomment">/// let mylock = RwLockSleep::new(0);</span>
-    <span class="doccomment">/// {</span>
-    <span class="doccomment">///     match mylock.try_read() {</span>
-    <span class="doccomment">///         Some(data) =&gt; {</span>
-    <span class="doccomment">///             // The lock is now locked and the data can be read</span>
-    <span class="doccomment">///             println!(&quot;{}&quot;, *data);</span>
-    <span class="doccomment">///             // The lock is dropped</span>
-    <span class="doccomment">///         },</span>
-    <span class="doccomment">///         None =&gt; (), // failed, another task holds the writer lock</span>
-    <span class="doccomment">///     };</span>
-    <span class="doccomment">/// }</span>
-    <span class="doccomment">/// ```</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_read</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RwLockSleepReadGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">rwlock</span>.<span class="ident">try_read</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">spinlock_guard</span><span class="op">|</span> 
-            <span class="ident">RwLockSleepReadGuard</span> {
-                <span class="ident">guard</span>: <span class="ident">spinlock_guard</span>,
-                <span class="ident">queue</span>: <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">queue</span>
+    <span class="doccomment">/// Attempt to acquire this lock with shared read (immutable) access.
+    ///
+    /// This function is the same as [`RwLockSleep::read`] but will never block,
+    /// returning immediately regardless of whether the lock has been acquired.
+    ///
+    /// ```
+    /// let mylock = RwLockSleep::new(0);
+    /// {
+    ///     match mylock.try_read() {
+    ///         Some(data) =&gt; {
+    ///             // The lock is now locked and the data can be read
+    ///             println!(&quot;{}&quot;, *data);
+    ///             // The lock is dropped
+    ///         },
+    ///         None =&gt; (), // failed, another task holds the writer lock
+    ///     };
+    /// }
+    /// ```
+    </span><span class="kw">pub fn </span>try_read(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;RwLockSleepReadGuard&lt;T&gt;&gt; {
+        <span class="self">self</span>.rwlock.try_read().map(|spinlock_guard| 
+            RwLockSleepReadGuard {
+                guard: spinlock_guard,
+                queue: <span class="kw-2">&amp;</span><span class="self">self</span>.queue
             }
         )
     }
 
-    <span class="doccomment">/// Return the number of readers that currently hold the lock (including upgradable readers).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This function provides no synchronization guarantees and so its result should be considered &#39;out of date&#39;</span>
-    <span class="doccomment">/// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reader_count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">rwlock</span>.<span class="ident">reader_count</span>()
+    <span class="doccomment">/// Return the number of readers that currently hold the lock (including upgradable readers).
+    ///
+    /// # Safety
+    ///
+    /// This function provides no synchronization guarantees and so its result should be considered &#39;out of date&#39;
+    /// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.
+    </span><span class="kw">pub fn </span>reader_count(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.rwlock.reader_count()
     }
 
-    <span class="doccomment">/// Return the number of writers that currently hold the lock.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Because [`RwLockSleep`] guarantees exclusive mutable access, this function may only return either `0` or `1`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This function provides no synchronization guarantees and so its result should be considered &#39;out of date&#39;</span>
-    <span class="doccomment">/// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">writer_count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">rwlock</span>.<span class="ident">writer_count</span>()
+    <span class="doccomment">/// Return the number of writers that currently hold the lock.
+    ///
+    /// Because [`RwLockSleep`] guarantees exclusive mutable access, this function may only return either `0` or `1`.
+    ///
+    /// # Safety
+    ///
+    /// This function provides no synchronization guarantees and so its result should be considered &#39;out of date&#39;
+    /// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.
+    </span><span class="kw">pub fn </span>writer_count(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.rwlock.writer_count()
     }
 
-    <span class="doccomment">/// Force decrement the reader count.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This is *extremely* unsafe if there are outstanding `RwLockSleepReadGuard`s</span>
-    <span class="doccomment">/// live, or if called more times than `read` has been called, but can be</span>
-    <span class="doccomment">/// useful in FFI contexts where the caller doesn&#39;t know how to deal with</span>
-    <span class="doccomment">/// RAII.</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">force_read_decrement</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">rwlock</span>.<span class="ident">force_read_decrement</span>();
+    <span class="doccomment">/// Force decrement the reader count.
+    ///
+    /// This is *extremely* unsafe if there are outstanding `RwLockSleepReadGuard`s
+    /// live, or if called more times than `read` has been called, but can be
+    /// useful in FFI contexts where the caller doesn&#39;t know how to deal with
+    /// RAII.
+    </span><span class="kw">pub unsafe fn </span>force_read_decrement(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.rwlock.force_read_decrement();
     }
 
-    <span class="doccomment">/// Force unlock exclusive write access.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This is *extremely* unsafe if there are outstanding `RwLockSleepWriteGuard`s</span>
-    <span class="doccomment">/// live, or if called when there are current readers, but can be useful in</span>
-    <span class="doccomment">/// FFI contexts where the caller doesn&#39;t know how to deal with RAII.</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">force_write_unlock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">rwlock</span>.<span class="ident">force_write_unlock</span>();
+    <span class="doccomment">/// Force unlock exclusive write access.
+    ///
+    /// This is *extremely* unsafe if there are outstanding `RwLockSleepWriteGuard`s
+    /// live, or if called when there are current readers, but can be useful in
+    /// FFI contexts where the caller doesn&#39;t know how to deal with RAII.
+    </span><span class="kw">pub unsafe fn </span>force_write_unlock(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.rwlock.force_write_unlock();
     }
 
-    <span class="doccomment">/// Locks this `RwLockSleep` with exclusive write (mutable) access.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// If another writer or reader has already acquired this lock, this function will</span>
-    <span class="doccomment">/// put the current `Task` to sleep until all other readers and the other writer `Task`</span>
-    <span class="doccomment">/// release their locks, at which point this `Task` will be woken up and</span>
-    <span class="doccomment">/// attempt to acquire the write lock again.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This does not provide any guarantees with respect to the ordering </span>
-    <span class="doccomment">/// of whether contentious readers or writers will acquire the lock first.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Returns an RAII guard which will release this task&#39;s exclusive access upon being dropped.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// ```</span>
-    <span class="doccomment">/// let mylock = RwLockSleep::new(0);</span>
-    <span class="doccomment">/// {</span>
-    <span class="doccomment">///     let mut data = mylock.write();</span>
-    <span class="doccomment">///     // The lock is now locked and the data can be written</span>
-    <span class="doccomment">///     *data += 1;</span>
-    <span class="doccomment">///     // The lock is dropped</span>
-    <span class="doccomment">/// }</span>
-    <span class="doccomment">/// ```</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">RwLockSleepWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="comment">// Fast path: check for the uncontended case.</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">guard</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">try_write</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">guard</span>);
+    <span class="doccomment">/// Locks this `RwLockSleep` with exclusive write (mutable) access.
+    /// 
+    /// If another writer or reader has already acquired this lock, this function will
+    /// put the current `Task` to sleep until all other readers and the other writer `Task`
+    /// release their locks, at which point this `Task` will be woken up and
+    /// attempt to acquire the write lock again.
+    ///
+    /// This does not provide any guarantees with respect to the ordering 
+    /// of whether contentious readers or writers will acquire the lock first.
+    ///
+    /// Returns an RAII guard which will release this task&#39;s exclusive access upon being dropped.
+    ///
+    /// ```
+    /// let mylock = RwLockSleep::new(0);
+    /// {
+    ///     let mut data = mylock.write();
+    ///     // The lock is now locked and the data can be written
+    ///     *data += 1;
+    ///     // The lock is dropped
+    /// }
+    /// ```
+    </span><span class="kw">pub fn </span>write&lt;<span class="lifetime">&#39;a</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;RwLockSleepWriteGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// Fast path: check for the uncontended case.
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(guard) = <span class="self">self</span>.try_write() {
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(guard);
         }
-        <span class="comment">// Slow path if already locked elsewhere: wait until we obtain the write lock.</span>
-        <span class="self">self</span>.<span class="ident">queue</span>
-            .<span class="ident">wait_until</span>(<span class="kw-2">&amp;</span><span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">try_write</span>())
-            .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;failed to add current task to waitqueue&quot;</span>)
+        <span class="comment">// Slow path if already locked elsewhere: wait until we obtain the write lock.
+        </span><span class="self">self</span>.queue
+            .wait_until(<span class="kw-2">&amp;</span>|| <span class="self">self</span>.try_write())
+            .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to add current task to waitqueue&quot;</span>)
     }
 
-    <span class="doccomment">/// Attempt to acquire this lock with exclusive write (mutable) access.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This function is the same as [`RwLockSleep::write`] but will never block,</span>
-    <span class="doccomment">/// returning immediately regardless of whether the lock has been acquired.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// ```</span>
-    <span class="doccomment">/// let mylock = RwLockSleep::new(0);</span>
-    <span class="doccomment">/// {</span>
-    <span class="doccomment">///     match mylock.try_write() {</span>
-    <span class="doccomment">///         Some(mut data) =&gt; {</span>
-    <span class="doccomment">///             // The lock is now locked and the data can be written</span>
-    <span class="doccomment">///             *data += 1;</span>
-    <span class="doccomment">///             // The lock is implicitly dropped</span>
-    <span class="doccomment">///         },</span>
-    <span class="doccomment">///         None =&gt; (), // failed, another task holds the writer lock</span>
-    <span class="doccomment">///     };</span>
-    <span class="doccomment">/// }</span>
-    <span class="doccomment">/// ```</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_write</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RwLockSleepWriteGuard</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">rwlock</span>.<span class="ident">try_write</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">spinlock_guard</span><span class="op">|</span>
-            <span class="ident">RwLockSleepWriteGuard</span> {
-                <span class="ident">guard</span>: <span class="ident">spinlock_guard</span>,
-                <span class="ident">queue</span>: <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">queue</span>,
+    <span class="doccomment">/// Attempt to acquire this lock with exclusive write (mutable) access.
+    ///
+    /// This function is the same as [`RwLockSleep::write`] but will never block,
+    /// returning immediately regardless of whether the lock has been acquired.
+    ///
+    /// ```
+    /// let mylock = RwLockSleep::new(0);
+    /// {
+    ///     match mylock.try_write() {
+    ///         Some(mut data) =&gt; {
+    ///             // The lock is now locked and the data can be written
+    ///             *data += 1;
+    ///             // The lock is implicitly dropped
+    ///         },
+    ///         None =&gt; (), // failed, another task holds the writer lock
+    ///     };
+    /// }
+    /// ```
+    </span><span class="kw">pub fn </span>try_write(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;RwLockSleepWriteGuard&lt;T&gt;&gt; {
+        <span class="self">self</span>.rwlock.try_write().map(|spinlock_guard|
+            RwLockSleepWriteGuard {
+                guard: spinlock_guard,
+                queue: <span class="kw-2">&amp;</span><span class="self">self</span>.queue,
             }
         )
     }
 
-    <span class="doccomment">/// Returns a mutable reference to the underlying data.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Since this call borrows the [`RwLockSleep`] mutably, and a mutable reference is guaranteed to be exclusive in Rust,</span>
-    <span class="doccomment">/// no actual locking needs to take place -- the mutable borrow statically guarantees no locks exist. As such,</span>
-    <span class="doccomment">/// this is a &#39;zero-cost&#39; operation.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Example</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// ```</span>
-    <span class="doccomment">/// let mut lock = RwLockSleep::new(0);</span>
-    <span class="doccomment">/// *lock.get_mut() = 10;</span>
-    <span class="doccomment">/// assert_eq!(*lock.lock(), 10);</span>
-    <span class="doccomment">/// ```</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">T</span> {
-        <span class="self">self</span>.<span class="ident">rwlock</span>.<span class="ident">get_mut</span>()
+    <span class="doccomment">/// Returns a mutable reference to the underlying data.
+    ///
+    /// Since this call borrows the [`RwLockSleep`] mutably, and a mutable reference is guaranteed to be exclusive in Rust,
+    /// no actual locking needs to take place -- the mutable borrow statically guarantees no locks exist. As such,
+    /// this is a &#39;zero-cost&#39; operation.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let mut lock = RwLockSleep::new(0);
+    /// *lock.get_mut() = 10;
+    /// assert_eq!(*lock.lock(), 10);
+    /// ```
+    </span><span class="kw">pub fn </span>get_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>T {
+        <span class="self">self</span>.rwlock.get_mut()
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">fmt::Debug</span><span class="op">&gt;</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">RwLockSleep</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">rwlock</span>.<span class="ident">try_read</span>() {
-            <span class="prelude-val">Some</span>(<span class="ident">guard</span>) =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;RwLockSleep {{ data: {:?} }}&quot;</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">guard</span>),
-            <span class="prelude-val">None</span> =&gt; <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;RwLockSleep {{ &lt;locked&gt; }}&quot;</span>),
+<span class="kw">impl</span>&lt;T: <span class="question-mark">?</span>Sized + fmt::Debug&gt; fmt::Debug <span class="kw">for </span>RwLockSleep&lt;T&gt; {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
+        <span class="kw">match </span><span class="self">self</span>.rwlock.try_read() {
+            <span class="prelude-val">Some</span>(guard) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;RwLockSleep {{ data: {:?} }}&quot;</span>, <span class="kw-2">&amp;*</span>guard),
+            <span class="prelude-val">None </span>=&gt; <span class="macro">write!</span>(f, <span class="string">&quot;RwLockSleep {{ &lt;locked&gt; }}&quot;</span>),
         }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span> <span class="op">+</span> <span class="ident">Default</span><span class="op">&gt;</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">RwLockSleep</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="ident">RwLockSleep</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="ident">RwLockSleep::new</span>(<span class="ident">Default::default</span>())
+<span class="kw">impl</span>&lt;T: <span class="question-mark">?</span>Sized + Default&gt; Default <span class="kw">for </span>RwLockSleep&lt;T&gt; {
+    <span class="kw">fn </span>default() -&gt; RwLockSleep&lt;T&gt; {
+        RwLockSleep::new(Default::default())
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;rwlock</span>, <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">RwLockSleepReadGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;rwlock</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;rwlock</span>, T: <span class="question-mark">?</span>Sized&gt; Deref <span class="kw">for </span>RwLockSleepReadGuard&lt;<span class="lifetime">&#39;rwlock</span>, T&gt; {
+    <span class="kw">type </span>Target = T;
 
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">T</span> { 
-       <span class="op">&amp;</span> <span class="kw-2">*</span>(<span class="self">self</span>.<span class="ident">guard</span>) 
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>T { 
+       &amp; <span class="kw-2">*</span>(<span class="self">self</span>.guard) 
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;rwlock</span>, <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">RwLockSleepWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;rwlock</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;rwlock</span>, T: <span class="question-mark">?</span>Sized&gt; Deref <span class="kw">for </span>RwLockSleepWriteGuard&lt;<span class="lifetime">&#39;rwlock</span>, T&gt; {
+    <span class="kw">type </span>Target = T;
 
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">T</span> { 
-        <span class="op">&amp;</span> <span class="kw-2">*</span>(<span class="self">self</span>.<span class="ident">guard</span>)
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>T { 
+        &amp; <span class="kw-2">*</span>(<span class="self">self</span>.guard)
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;rwlock</span>, <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">DerefMut</span> <span class="kw">for</span> <span class="ident">RwLockSleepWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;rwlock</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">deref_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">T</span> { 
-        <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span>(<span class="self">self</span>.<span class="ident">guard</span>)
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;rwlock</span>, T: <span class="question-mark">?</span>Sized&gt; DerefMut <span class="kw">for </span>RwLockSleepWriteGuard&lt;<span class="lifetime">&#39;rwlock</span>, T&gt; {
+    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>T { 
+        <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.guard)
     }
 }
 
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;rwlock</span>, <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">RwLockSleepReadGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;rwlock</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="comment">// Notify a task on the waitqueue that the lock is released,</span>
-        <span class="comment">// which occurs automatically when the inner `guard` is dropped after this method executes.</span>
-        <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">notify_one</span>();
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;rwlock</span>, T: <span class="question-mark">?</span>Sized&gt; Drop <span class="kw">for </span>RwLockSleepReadGuard&lt;<span class="lifetime">&#39;rwlock</span>, T&gt; {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="comment">// Notify a task on the waitqueue that the lock is released,
+        // which occurs automatically when the inner `guard` is dropped after this method executes.
+        </span><span class="self">self</span>.queue.notify_one();
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;rwlock</span>, <span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">RwLockSleepWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;rwlock</span>, <span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="comment">// Notify a task on the waitqueue that the lock is released,</span>
-        <span class="comment">// which occurs automatically when the inner `guard` is dropped after this method executes.</span>
-        <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">notify_one</span>();
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;rwlock</span>, T: <span class="question-mark">?</span>Sized&gt; Drop <span class="kw">for </span>RwLockSleepWriteGuard&lt;<span class="lifetime">&#39;rwlock</span>, T&gt; {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="comment">// Notify a task on the waitqueue that the lock is released,
+        // which occurs automatically when the inner `guard` is dropped after this method executes.
+        </span><span class="self">self</span>.queue.notify_one();
     }
 }
 
-<span class="doccomment">/// Implement `Lockable` for [`RwLockSleep`].</span>
-<span class="doccomment">/// Because [`RwLockSleep::read()`] and [`RwLockSleep::write()`] return `Result`s and may fail,</span>
-<span class="doccomment">/// the [`Lockable::lock()`] and `lock_mut()` functions internally `unwrap` those `Result`s.</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Lockable</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">RwLockSleep</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">T</span>: <span class="lifetime">&#39;t</span> <span class="op">+</span> <span class="question-mark">?</span><span class="ident">Sized</span> {
-    <span class="kw">type</span> <span class="ident">Guard</span> <span class="op">=</span> <span class="ident">RwLockSleepReadGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span>;
-    <span class="kw">type</span> <span class="ident">GuardMut</span> <span class="op">=</span> <span class="ident">RwLockSleepWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span>;
+<span class="doccomment">/// Implement `Lockable` for [`RwLockSleep`].
+/// Because [`RwLockSleep::read()`] and [`RwLockSleep::write()`] return `Result`s and may fail,
+/// the [`Lockable::lock()`] and `lock_mut()` functions internally `unwrap` those `Result`s.
+</span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;t</span>, T&gt; Lockable&lt;<span class="lifetime">&#39;t</span>, T&gt; <span class="kw">for </span>RwLockSleep&lt;T&gt; <span class="kw">where </span>T: <span class="lifetime">&#39;t </span>+ <span class="question-mark">?</span>Sized {
+    <span class="kw">type </span>Guard = RwLockSleepReadGuard&lt;<span class="lifetime">&#39;t</span>, T&gt;;
+    <span class="kw">type </span>GuardMut = RwLockSleepWriteGuard&lt;<span class="lifetime">&#39;t</span>, T&gt;;
 
-    <span class="kw">fn</span> <span class="ident">lock</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::Guard</span> { <span class="self">self</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>() }
-    <span class="kw">fn</span> <span class="ident">try_lock</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Guard</span><span class="op">&gt;</span> { <span class="self">self</span>.<span class="ident">try_read</span>() }
-    <span class="kw">fn</span> <span class="ident">lock_mut</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::GuardMut</span> { <span class="self">self</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>() }
-    <span class="kw">fn</span> <span class="ident">try_lock_mut</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::GuardMut</span><span class="op">&gt;</span> { <span class="self">self</span>.<span class="ident">try_write</span>() }
-    <span class="kw">fn</span> <span class="ident">is_locked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> { <span class="self">self</span>.<span class="ident">is_locked</span>() }
-    <span class="kw">fn</span> <span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="kw-2">mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">T</span> { <span class="self">self</span>.<span class="ident">get_mut</span>() }
+    <span class="kw">fn </span>lock(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span><span class="self">self</span>) -&gt; <span class="self">Self</span>::Guard { <span class="self">self</span>.read().unwrap() }
+    <span class="kw">fn </span>try_lock(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Guard&gt; { <span class="self">self</span>.try_read() }
+    <span class="kw">fn </span>lock_mut(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span><span class="self">self</span>) -&gt; <span class="self">Self</span>::GuardMut { <span class="self">self</span>.write().unwrap() }
+    <span class="kw">fn </span>try_lock_mut(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::GuardMut&gt; { <span class="self">self</span>.try_write() }
+    <span class="kw">fn </span>is_locked(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool { <span class="self">self</span>.is_locked() }
+    <span class="kw">fn </span>get_mut(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span><span class="kw-2">mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>T { <span class="self">self</span>.get_mut() }
 }
-<span class="doccomment">/// Implement `LockableSized` for [`RwLockSleep`].</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="ident">LockableSized</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">RwLockSleep</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">T</span>: <span class="lifetime">&#39;t</span> <span class="op">+</span> <span class="ident">Sized</span> {
-    <span class="kw">fn</span> <span class="ident">into_inner</span>(<span class="self">self</span>) -&gt; <span class="ident">T</span> { <span class="self">self</span>.<span class="ident">into_inner</span>() }
+<span class="doccomment">/// Implement `LockableSized` for [`RwLockSleep`].
+</span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;t</span>, T&gt; LockableSized&lt;<span class="lifetime">&#39;t</span>, T&gt; <span class="kw">for </span>RwLockSleep&lt;T&gt; <span class="kw">where </span>T: <span class="lifetime">&#39;t </span>+ Sized {
+    <span class="kw">fn </span>into_inner(<span class="self">self</span>) -&gt; T { <span class="self">self</span>.into_inner() }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mutex_sleep" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mutex_sleep" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

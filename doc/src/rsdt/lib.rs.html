@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/acpi/rsdt/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../rsdt/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../rsdt/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../rsdt/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/acpi/rsdt/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../rsdt/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -115,117 +109,116 @@
 <span id="109">109</span>
 <span id="110">110</span>
 <span id="111">111</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Definitions for the ACPI RSDT and XSDT system tables.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! RSDT is the Root System Descriptor Table, whereas</span>
-<span class="doccomment">//! XSDT is the Extended System Descriptor Table. </span>
-<span class="doccomment">//! They are identical except that the XSDT uses 64-bit physical addresses</span>
-<span class="doccomment">//! to point to other ACPI SDTs, while the RSDT uses 32-bit physical addresses.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! # Note about alignment</span>
-<span class="doccomment">//! Technically the RSDT contains a list of 32-bit addresses (`u32`) and the XSDT has 64-bit addresses (`u64`),</span>
-<span class="doccomment">//! but the ACPI tables often aren&#39;t aligned to 4-byte and 8-byte addresses. </span>
-<span class="doccomment">//! This lack of alignment causes problems with Rust&#39;s slice type, which requires proper alignment.</span>
-<span class="doccomment">//! Thus, we store them as slices of individual bytes (`u8`) and calculate the physical addresses</span>
-<span class="doccomment">//! on demand when requested in the `RsdtXsdt::addresses()` iterator function.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Definitions for the ACPI RSDT and XSDT system tables.
+//!
+//! RSDT is the Root System Descriptor Table, whereas
+//! XSDT is the Extended System Descriptor Table. 
+//! They are identical except that the XSDT uses 64-bit physical addresses
+//! to point to other ACPI SDTs, while the RSDT uses 32-bit physical addresses.
+//!
+//! # Note about alignment
+//! Technically the RSDT contains a list of 32-bit addresses (`u32`) and the XSDT has 64-bit addresses (`u64`),
+//! but the ACPI tables often aren&#39;t aligned to 4-byte and 8-byte addresses. 
+//! This lack of alignment causes problems with Rust&#39;s slice type, which requires proper alignment.
+//! Thus, we store them as slices of individual bytes (`u8`) and calculate the physical addresses
+//! on demand when requested in the `RsdtXsdt::addresses()` iterator function.
 
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</span><span class="attr">#![no_std]
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">sdt</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">acpi_table</span>;
+</span><span class="kw">extern crate </span>memory;
+<span class="kw">extern crate </span>sdt;
+<span class="kw">extern crate </span>acpi_table;
 
-<span class="kw">use</span> <span class="ident">core::mem::size_of</span>;
-<span class="kw">use</span> <span class="ident">memory::PhysicalAddress</span>;
-<span class="kw">use</span> <span class="ident">sdt</span>::{<span class="ident">Sdt</span>, <span class="ident">SDT_SIZE_IN_BYTES</span>};
-<span class="kw">use</span> <span class="ident">acpi_table</span>::{<span class="ident">AcpiSignature</span>, <span class="ident">AcpiTables</span>};
-
-
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RSDT_SIGNATURE</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>; <span class="number">4</span>] <span class="op">=</span> <span class="string">b&quot;RSDT&quot;</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">XSDT_SIGNATURE</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>; <span class="number">4</span>] <span class="op">=</span> <span class="string">b&quot;XSDT&quot;</span>;
+<span class="kw">use </span>core::mem::size_of;
+<span class="kw">use </span>memory::PhysicalAddress;
+<span class="kw">use </span>sdt::{Sdt, SDT_SIZE_IN_BYTES};
+<span class="kw">use </span>acpi_table::{AcpiSignature, AcpiTables};
 
 
-<span class="doccomment">/// The handler for parsing RSDT/XSDT tables and adding them to the ACPI tables list.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle</span>(
-    <span class="ident">acpi_tables</span>: <span class="kw-2">&amp;mut</span> <span class="ident">AcpiTables</span>,
-    <span class="ident">signature</span>: <span class="ident">AcpiSignature</span>,
-    <span class="ident">length</span>: <span class="ident">usize</span>,
-    <span class="ident">phys_addr</span>: <span class="ident">PhysicalAddress</span>
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="comment">// See the crate-level docs for an explanation of why this is always `u8`.</span>
-    <span class="kw">let</span> <span class="ident">slice_element_size</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">signature</span> {
-        <span class="ident">RSDT_SIGNATURE</span> =&gt; <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(),
-        <span class="ident">XSDT_SIGNATURE</span> =&gt; <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(),
-        <span class="kw">_</span> =&gt; <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;unexpected ACPI table signature (not RSDT or XSDT)&quot;</span>),
+<span class="kw">pub const </span>RSDT_SIGNATURE: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8; <span class="number">4</span>] = <span class="string">b&quot;RSDT&quot;</span>;
+<span class="kw">pub const </span>XSDT_SIGNATURE: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8; <span class="number">4</span>] = <span class="string">b&quot;XSDT&quot;</span>;
+
+
+<span class="doccomment">/// The handler for parsing RSDT/XSDT tables and adding them to the ACPI tables list.
+</span><span class="kw">pub fn </span>handle(
+    acpi_tables: <span class="kw-2">&amp;mut </span>AcpiTables,
+    signature: AcpiSignature,
+    length: usize,
+    phys_addr: PhysicalAddress
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="comment">// See the crate-level docs for an explanation of why this is always `u8`.
+    </span><span class="kw">let </span>slice_element_size = <span class="kw">match </span><span class="kw-2">&amp;</span>signature {
+        RSDT_SIGNATURE =&gt; size_of::&lt;u8&gt;(),
+        XSDT_SIGNATURE =&gt; size_of::&lt;u8&gt;(),
+        <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;unexpected ACPI table signature (not RSDT or XSDT)&quot;</span>),
     };
 
-    <span class="kw">let</span> <span class="ident">slice_paddr</span> <span class="op">=</span> <span class="ident">phys_addr</span> <span class="op">+</span> <span class="ident">SDT_SIZE_IN_BYTES</span>; <span class="comment">// the array of addresses starts right after the SDT header.</span>
-    <span class="kw">let</span> <span class="ident">num_addrs</span> <span class="op">=</span> (<span class="ident">length</span> <span class="op">-</span> <span class="ident">SDT_SIZE_IN_BYTES</span>) <span class="op">/</span> <span class="ident">slice_element_size</span>;
-    <span class="ident">acpi_tables</span>.<span class="ident">add_table_location</span>(<span class="ident">signature</span>, <span class="ident">phys_addr</span>, <span class="prelude-val">Some</span>((<span class="ident">slice_paddr</span>, <span class="ident">num_addrs</span>)))
+    <span class="kw">let </span>slice_paddr = phys_addr + SDT_SIZE_IN_BYTES; <span class="comment">// the array of addresses starts right after the SDT header.
+    </span><span class="kw">let </span>num_addrs = (length - SDT_SIZE_IN_BYTES) / slice_element_size;
+    acpi_tables.add_table_location(signature, phys_addr, <span class="prelude-val">Some</span>((slice_paddr, num_addrs)))
 }
 
 
-<span class="doccomment">/// The Root/Extended System Descriptor Table, RSDT or XSDT. </span>
-<span class="doccomment">/// This table primarily contains an array of physical addresses</span>
-<span class="doccomment">/// where other ACPI SDTs can be found.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Use the `addresses()` method to obtain an [`Iterator`] over those physical addresses.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RsdtXsdt</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span>(<span class="ident">RsdtOrXsdt</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span>);
-<span class="kw">enum</span> <span class="ident">RsdtOrXsdt</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// RSDT, which contains 32-bit addresses.</span>
-    <span class="ident">Regular</span>(<span class="ident">Rsdt</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span>),
-    <span class="doccomment">/// XSDT, which contains 64-bit addresses.</span>
-    <span class="ident">Extended</span>(<span class="ident">Xsdt</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span>),
+<span class="doccomment">/// The Root/Extended System Descriptor Table, RSDT or XSDT. 
+/// This table primarily contains an array of physical addresses
+/// where other ACPI SDTs can be found.
+///
+/// Use the `addresses()` method to obtain an [`Iterator`] over those physical addresses.
+</span><span class="kw">pub struct </span>RsdtXsdt&lt;<span class="lifetime">&#39;t</span>&gt;(RsdtOrXsdt&lt;<span class="lifetime">&#39;t</span>&gt;);
+<span class="kw">enum </span>RsdtOrXsdt&lt;<span class="lifetime">&#39;t</span>&gt; {
+    <span class="doccomment">/// RSDT, which contains 32-bit addresses.
+    </span>Regular(Rsdt&lt;<span class="lifetime">&#39;t</span>&gt;),
+    <span class="doccomment">/// XSDT, which contains 64-bit addresses.
+    </span>Extended(Xsdt&lt;<span class="lifetime">&#39;t</span>&gt;),
 }
 
-<span class="kw">type</span> <span class="ident">Rsdt</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> <span class="op">=</span> (<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">Sdt</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> [<span class="ident">u8</span>]);
-<span class="kw">type</span> <span class="ident">Xsdt</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> <span class="op">=</span> (<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">Sdt</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> [<span class="ident">u8</span>]);
+<span class="kw">type </span>Rsdt&lt;<span class="lifetime">&#39;t</span>&gt; = (<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>Sdt, <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>[u8]);
+<span class="kw">type </span>Xsdt&lt;<span class="lifetime">&#39;t</span>&gt; = (<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>Sdt, <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>[u8]);
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> <span class="ident">RsdtXsdt</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> {
-    <span class="doccomment">/// Finds the RSDT or XSDT in the given `AcpiTables` and returns a reference to it.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="ident">acpi_tables</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">AcpiTables</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RsdtXsdt</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Ok</span>(<span class="ident">sdt</span>), <span class="prelude-val">Ok</span>(<span class="ident">addrs</span>)) <span class="op">=</span> (<span class="ident">acpi_tables</span>.<span class="ident">table</span>::<span class="op">&lt;</span><span class="ident">Sdt</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">RSDT_SIGNATURE</span>), <span class="ident">acpi_tables</span>.<span class="ident">table_slice</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">RSDT_SIGNATURE</span>)) {
-            <span class="prelude-val">Some</span>(<span class="ident">RsdtXsdt</span>(<span class="ident">RsdtOrXsdt::Regular</span>((<span class="ident">sdt</span>, <span class="ident">addrs</span>))))
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;t</span>&gt; RsdtXsdt&lt;<span class="lifetime">&#39;t</span>&gt; {
+    <span class="doccomment">/// Finds the RSDT or XSDT in the given `AcpiTables` and returns a reference to it.
+    </span><span class="kw">pub fn </span>get(acpi_tables: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>AcpiTables) -&gt; <span class="prelude-ty">Option</span>&lt;RsdtXsdt&lt;<span class="lifetime">&#39;t</span>&gt;&gt; {
+        <span class="kw">if let </span>(<span class="prelude-val">Ok</span>(sdt), <span class="prelude-val">Ok</span>(addrs)) = (acpi_tables.table::&lt;Sdt&gt;(<span class="kw-2">&amp;</span>RSDT_SIGNATURE), acpi_tables.table_slice::&lt;u8&gt;(<span class="kw-2">&amp;</span>RSDT_SIGNATURE)) {
+            <span class="prelude-val">Some</span>(RsdtXsdt(RsdtOrXsdt::Regular((sdt, addrs))))
         }
-        <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> (<span class="prelude-val">Ok</span>(<span class="ident">sdt</span>), <span class="prelude-val">Ok</span>(<span class="ident">addrs</span>)) <span class="op">=</span> (<span class="ident">acpi_tables</span>.<span class="ident">table</span>::<span class="op">&lt;</span><span class="ident">Sdt</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">XSDT_SIGNATURE</span>), <span class="ident">acpi_tables</span>.<span class="ident">table_slice</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">XSDT_SIGNATURE</span>)) {
-            <span class="prelude-val">Some</span>(<span class="ident">RsdtXsdt</span>(<span class="ident">RsdtOrXsdt::Extended</span>((<span class="ident">sdt</span>, <span class="ident">addrs</span>))))
+        <span class="kw">else if let </span>(<span class="prelude-val">Ok</span>(sdt), <span class="prelude-val">Ok</span>(addrs)) = (acpi_tables.table::&lt;Sdt&gt;(<span class="kw-2">&amp;</span>XSDT_SIGNATURE), acpi_tables.table_slice::&lt;u8&gt;(<span class="kw-2">&amp;</span>XSDT_SIGNATURE)) {
+            <span class="prelude-val">Some</span>(RsdtXsdt(RsdtOrXsdt::Extended((sdt, addrs))))
         } 
-        <span class="kw">else</span> {
-            <span class="prelude-val">None</span>
+        <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
+    }
+
+    <span class="doccomment">/// Returns a reference to the SDT header of this RSDT or XSDT.
+    </span><span class="kw">pub fn </span>sdt(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Sdt {
+        <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0 </span>{
+            RsdtOrXsdt::Regular(<span class="kw-2">ref </span>r)  =&gt; r.<span class="number">0</span>,
+            RsdtOrXsdt::Extended(<span class="kw-2">ref </span>x) =&gt; x.<span class="number">0</span>,
         }
     }
 
-    <span class="doccomment">/// Returns a reference to the SDT header of this RSDT or XSDT.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sdt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Sdt</span> {
-        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span> {
-            <span class="ident">RsdtOrXsdt::Regular</span>(<span class="kw-2">ref</span> <span class="ident">r</span>)  =&gt; <span class="ident">r</span>.<span class="number">0</span>,
-            <span class="ident">RsdtOrXsdt::Extended</span>(<span class="kw-2">ref</span> <span class="ident">x</span>) =&gt; <span class="ident">x</span>.<span class="number">0</span>,
-        }
-    }
-
-    <span class="doccomment">/// Returns an [`Iterator`] over the `PhysicalAddress`es of the SDT entries</span>
-    <span class="doccomment">/// included in this RSDT or XSDT.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">addresses</span><span class="op">&lt;</span><span class="lifetime">&#39;r</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;r</span> <span class="self">self</span>) -&gt; <span class="kw">impl</span> <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">PhysicalAddress</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;r</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rsdt_iter</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">xsdt_iter</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span> {
-            <span class="ident">RsdtOrXsdt::Regular</span>(<span class="kw-2">ref</span> <span class="ident">rsdt</span>)  =&gt; <span class="ident">rsdt_iter</span> <span class="op">=</span> <span class="prelude-val">Some</span>(
-                <span class="ident">rsdt</span>.<span class="number">1</span>.<span class="ident">chunks_exact</span>(<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>()).<span class="ident">map</span>(<span class="op">|</span><span class="ident">bytes</span><span class="op">|</span> {
-                    <span class="kw">let</span> <span class="ident">arr</span> <span class="op">=</span> [<span class="ident">bytes</span>[<span class="number">0</span>], <span class="ident">bytes</span>[<span class="number">1</span>], <span class="ident">bytes</span>[<span class="number">2</span>], <span class="ident">bytes</span>[<span class="number">3</span>]];
-                    <span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">u32::from_le_bytes</span>(<span class="ident">arr</span>) <span class="kw">as</span> <span class="ident">usize</span>)
+    <span class="doccomment">/// Returns an [`Iterator`] over the `PhysicalAddress`es of the SDT entries
+    /// included in this RSDT or XSDT.
+    </span><span class="kw">pub fn </span>addresses&lt;<span class="lifetime">&#39;r</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;r </span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = PhysicalAddress&gt; + <span class="lifetime">&#39;r </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>rsdt_iter = <span class="prelude-val">None</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>xsdt_iter = <span class="prelude-val">None</span>;
+        <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0 </span>{
+            RsdtOrXsdt::Regular(<span class="kw-2">ref </span>rsdt)  =&gt; rsdt_iter = <span class="prelude-val">Some</span>(
+                rsdt.<span class="number">1</span>.chunks_exact(size_of::&lt;u32&gt;()).map(|bytes| {
+                    <span class="kw">let </span>arr = [bytes[<span class="number">0</span>], bytes[<span class="number">1</span>], bytes[<span class="number">2</span>], bytes[<span class="number">3</span>]];
+                    PhysicalAddress::new_canonical(u32::from_le_bytes(arr) <span class="kw">as </span>usize)
                 })
             ),
-            <span class="ident">RsdtOrXsdt::Extended</span>(<span class="kw-2">ref</span> <span class="ident">xsdt</span>) =&gt; <span class="ident">xsdt_iter</span> <span class="op">=</span> <span class="prelude-val">Some</span>(
-                <span class="ident">xsdt</span>.<span class="number">1</span>.<span class="ident">chunks_exact</span>(<span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>()).<span class="ident">map</span>(<span class="op">|</span><span class="ident">bytes</span><span class="op">|</span> {
-                    <span class="kw">let</span> <span class="ident">arr</span> <span class="op">=</span> [<span class="ident">bytes</span>[<span class="number">0</span>], <span class="ident">bytes</span>[<span class="number">1</span>], <span class="ident">bytes</span>[<span class="number">2</span>], <span class="ident">bytes</span>[<span class="number">3</span>], <span class="ident">bytes</span>[<span class="number">4</span>], <span class="ident">bytes</span>[<span class="number">5</span>], <span class="ident">bytes</span>[<span class="number">6</span>], <span class="ident">bytes</span>[<span class="number">7</span>]];
-                    <span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">usize::from_le_bytes</span>(<span class="ident">arr</span>))
+            RsdtOrXsdt::Extended(<span class="kw-2">ref </span>xsdt) =&gt; xsdt_iter = <span class="prelude-val">Some</span>(
+                xsdt.<span class="number">1</span>.chunks_exact(size_of::&lt;u64&gt;()).map(|bytes| {
+                    <span class="kw">let </span>arr = [bytes[<span class="number">0</span>], bytes[<span class="number">1</span>], bytes[<span class="number">2</span>], bytes[<span class="number">3</span>], bytes[<span class="number">4</span>], bytes[<span class="number">5</span>], bytes[<span class="number">6</span>], bytes[<span class="number">7</span>]];
+                    PhysicalAddress::new_canonical(usize::from_le_bytes(arr))
                 })
             ),
         }
 
-        <span class="ident">rsdt_iter</span>.<span class="ident">into_iter</span>().<span class="ident">flatten</span>().<span class="ident">chain</span>(<span class="ident">xsdt_iter</span>.<span class="ident">into_iter</span>().<span class="ident">flatten</span>())
+        rsdt_iter.into_iter().flatten().chain(xsdt_iter.into_iter().flatten())
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="rsdt" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="rsdt" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

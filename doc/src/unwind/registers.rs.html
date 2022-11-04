@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/unwind/src/registers.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>registers.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../unwind/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../unwind/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../unwind/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/unwind/src/registers.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>registers.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../unwind/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -118,120 +112,119 @@
 <span id="112">112</span>
 <span id="113">113</span>
 <span id="114">114</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Struct definitions for various sets of register values that are useful in unwinding.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Struct definitions for various sets of register values that are useful in unwinding.
 
-<span class="kw">use</span> <span class="ident">gimli</span>::{<span class="self">self</span>, <span class="ident">X86_64</span>};
-<span class="kw">use</span> <span class="ident">core::fmt</span>::{<span class="ident">Debug</span>, <span class="ident">Formatter</span>, <span class="prelude-ty">Result</span> <span class="kw">as</span> <span class="ident">FmtResult</span>};
-<span class="kw">use</span> <span class="ident">core::ops</span>::{<span class="ident">Index</span>, <span class="ident">IndexMut</span>};
+</span><span class="kw">use </span>gimli::{<span class="self">self</span>, X86_64};
+<span class="kw">use </span>core::fmt::{Debug, Formatter, <span class="prelude-ty">Result </span><span class="kw">as </span>FmtResult};
+<span class="kw">use </span>core::ops::{Index, IndexMut};
 
-<span class="doccomment">/// The set of register values that existed during a single point in time,</span>
-<span class="doccomment">/// i.e., at one point in a given stack frame.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// These are used for iterating through frames in a call stack</span>
-<span class="doccomment">/// and calculating the caller frame&#39;s register values.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// The register values herein can be indexed by using DWARF-specific register IDs,</span>
-<span class="doccomment">/// which are constant values that are defined in the ELF x86_86 ABI.</span>
-<span class="doccomment">/// [Here is a brief link](https://docs.rs/gimli/0.19.0/gimli/struct.X86_64.html)</span>
-<span class="doccomment">/// that defines these constants in a practical, useful manner.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Important Note</span>
-<span class="doccomment">/// The number of registers defined here must be one greater than </span>
-<span class="doccomment">/// the number of registers defined in the `LandingRegisters` struct,</span>
-<span class="doccomment">/// because this one includes the return address too.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// Currently, this structure has room for `17` optional registers.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Registers</span> {
-    <span class="ident">registers</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>; <span class="number">17</span>],
+<span class="doccomment">/// The set of register values that existed during a single point in time,
+/// i.e., at one point in a given stack frame.
+/// 
+/// These are used for iterating through frames in a call stack
+/// and calculating the caller frame&#39;s register values.
+/// 
+/// The register values herein can be indexed by using DWARF-specific register IDs,
+/// which are constant values that are defined in the ELF x86_86 ABI.
+/// [Here is a brief link](https://docs.rs/gimli/0.19.0/gimli/struct.X86_64.html)
+/// that defines these constants in a practical, useful manner.
+/// 
+/// # Important Note
+/// The number of registers defined here must be one greater than 
+/// the number of registers defined in the `LandingRegisters` struct,
+/// because this one includes the return address too.
+/// 
+/// Currently, this structure has room for `17` optional registers.
+</span><span class="attr">#[derive(Default, Clone, PartialEq, Eq)]
+</span><span class="kw">pub struct </span>Registers {
+    registers: [<span class="prelude-ty">Option</span>&lt;u64&gt;; <span class="number">17</span>],
 }
 
-<span class="kw">impl</span> <span class="ident">Registers</span> {
-    <span class="doccomment">/// Returns the value of the stack pointer register.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">stack_pointer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
-        <span class="self">self</span>[<span class="ident">X86_64::RSP</span>]
+<span class="kw">impl </span>Registers {
+    <span class="doccomment">/// Returns the value of the stack pointer register.
+    </span><span class="kw">pub fn </span>stack_pointer(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;u64&gt; {
+        <span class="self">self</span>[X86_64::RSP]
     }
 
-    <span class="doccomment">/// Returns the value of the return address for this register set.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">return_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
-        <span class="self">self</span>[<span class="ident">X86_64::RA</span>]
+    <span class="doccomment">/// Returns the value of the return address for this register set.
+    </span><span class="kw">pub fn </span>return_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;u64&gt; {
+        <span class="self">self</span>[X86_64::RA]
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">Registers</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">fmt</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Formatter</span>) -&gt; <span class="ident">FmtResult</span> {
-        <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">reg</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">registers</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
-            <span class="kw">match</span> <span class="kw-2">*</span><span class="ident">reg</span> {
-                <span class="prelude-val">None</span> =&gt; { } <span class="comment">// write!(fmt, &quot;[{}]: None, &quot;, i)?,</span>
-                <span class="prelude-val">Some</span>(<span class="ident">r</span>) =&gt; <span class="macro">write!</span>(<span class="ident">fmt</span>, <span class="string">&quot;[{}]: {:#X}, &quot;</span>, <span class="ident">i</span>, <span class="ident">r</span>)<span class="question-mark">?</span>,
+<span class="kw">impl </span>Debug <span class="kw">for </span>Registers {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, fmt: <span class="kw-2">&amp;mut </span>Formatter) -&gt; FmtResult {
+        <span class="kw">for </span>(i, reg) <span class="kw">in </span><span class="self">self</span>.registers.iter().enumerate() {
+            <span class="kw">match </span><span class="kw-2">*</span>reg {
+                <span class="prelude-val">None </span>=&gt; { } <span class="comment">// write!(fmt, &quot;[{}]: None, &quot;, i)?,
+                </span><span class="prelude-val">Some</span>(r) =&gt; <span class="macro">write!</span>(fmt, <span class="string">&quot;[{}]: {:#X}, &quot;</span>, i, r)<span class="question-mark">?</span>,
             }
         }
         <span class="prelude-val">Ok</span>(())
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Index</span><span class="op">&lt;</span><span class="ident">gimli::Register</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Registers</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>;
+<span class="kw">impl </span>Index&lt;gimli::Register&gt; <span class="kw">for </span>Registers {
+    <span class="kw">type </span>Output = <span class="prelude-ty">Option</span>&lt;u64&gt;;
 
-    <span class="kw">fn</span> <span class="ident">index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">reg</span>: <span class="ident">gimli::Register</span>) -&gt; <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">registers</span>[<span class="ident">reg</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">usize</span>]
+    <span class="kw">fn </span>index(<span class="kw-2">&amp;</span><span class="self">self</span>, reg: gimli::Register) -&gt; <span class="kw-2">&amp;</span><span class="prelude-ty">Option</span>&lt;u64&gt; {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.registers[reg.<span class="number">0 </span><span class="kw">as </span>usize]
     }
 }
 
-<span class="kw">impl</span> <span class="ident">IndexMut</span><span class="op">&lt;</span><span class="ident">gimli::Register</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Registers</span> {
-    <span class="kw">fn</span> <span class="ident">index_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">reg</span>: <span class="ident">gimli::Register</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">registers</span>[<span class="ident">reg</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">usize</span>]
+<span class="kw">impl </span>IndexMut&lt;gimli::Register&gt; <span class="kw">for </span>Registers {
+    <span class="kw">fn </span>index_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>, reg: gimli::Register) -&gt; <span class="kw-2">&amp;mut </span><span class="prelude-ty">Option</span>&lt;u64&gt; {
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>.registers[reg.<span class="number">0 </span><span class="kw">as </span>usize]
     }
 }
 
 
-<span class="doccomment">/// Contains the register values that will be restored to the actual CPU registers</span>
-<span class="doccomment">/// right before jumping to a landing pad function.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// # Important Note</span>
-<span class="doccomment">/// This should be kept in sync with the number of elements </span>
-<span class="doccomment">/// in the `Registers` struct; this must have one less element.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LandingRegisters</span> {
-    <span class="kw">pub</span> <span class="ident">rax</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">rbx</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">rcx</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">rdx</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">rdi</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">rsi</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">rbp</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">r8</span>:  <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">r9</span>:  <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">r10</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">r11</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">r12</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">r13</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">r14</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">r15</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">rsp</span>: <span class="ident">u64</span>,
-    <span class="comment">// Not sure if we need to include other registers here, like rflags or segment registers. </span>
-    <span class="comment">// We probably do for SIMD at least.</span>
-}
+<span class="doccomment">/// Contains the register values that will be restored to the actual CPU registers
+/// right before jumping to a landing pad function.
+/// 
+/// # Important Note
+/// This should be kept in sync with the number of elements 
+/// in the `Registers` struct; this must have one less element.
+</span><span class="attr">#[derive(Debug)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>LandingRegisters {
+    <span class="kw">pub </span>rax: u64,
+    <span class="kw">pub </span>rbx: u64,
+    <span class="kw">pub </span>rcx: u64,
+    <span class="kw">pub </span>rdx: u64,
+    <span class="kw">pub </span>rdi: u64,
+    <span class="kw">pub </span>rsi: u64,
+    <span class="kw">pub </span>rbp: u64,
+    <span class="kw">pub </span>r8:  u64,
+    <span class="kw">pub </span>r9:  u64,
+    <span class="kw">pub </span>r10: u64,
+    <span class="kw">pub </span>r11: u64,
+    <span class="kw">pub </span>r12: u64,
+    <span class="kw">pub </span>r13: u64,
+    <span class="kw">pub </span>r14: u64,
+    <span class="kw">pub </span>r15: u64,
+    <span class="kw">pub </span>rsp: u64,
+    <span class="comment">// Not sure if we need to include other registers here, like rflags or segment registers. 
+    // We probably do for SIMD at least.
+</span>}
 
 
-<span class="doccomment">/// Contains the registers that are callee-saved.</span>
-<span class="doccomment">/// This is intended to be used at the beginning of stack unwinding for two purposes:</span>
-<span class="doccomment">/// 1. The unwinding tables need an initial value for these registers in order to </span>
-<span class="doccomment">///    calculate the register values for the previous stack frame based on register transformation rules,</span>
-<span class="doccomment">/// 2. To know which register values to restore after unwinding is complete.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// This is currently x86_64-specific.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SavedRegs</span> {
-    <span class="kw">pub</span> <span class="ident">r15</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">r14</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">r13</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">r12</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">rbx</span>: <span class="ident">u64</span>,
-    <span class="kw">pub</span> <span class="ident">rbp</span>: <span class="ident">u64</span>,
+<span class="doccomment">/// Contains the registers that are callee-saved.
+/// This is intended to be used at the beginning of stack unwinding for two purposes:
+/// 1. The unwinding tables need an initial value for these registers in order to 
+///    calculate the register values for the previous stack frame based on register transformation rules,
+/// 2. To know which register values to restore after unwinding is complete.
+/// 
+/// This is currently x86_64-specific.
+</span><span class="attr">#[derive(Debug)]
+#[repr(C)]
+</span><span class="kw">pub struct </span>SavedRegs {
+    <span class="kw">pub </span>r15: u64,
+    <span class="kw">pub </span>r14: u64,
+    <span class="kw">pub </span>r13: u64,
+    <span class="kw">pub </span>r12: u64,
+    <span class="kw">pub </span>rbx: u64,
+    <span class="kw">pub </span>rbp: u64,
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="unwind" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="unwind" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

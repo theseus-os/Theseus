@@ -1,10 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/wasi_interpreter/src/wasi_syscalls.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>wasi_syscalls.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../wasi_interpreter/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../wasi_interpreter/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../wasi_interpreter/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1">
-                                <a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div>
-                        </div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/wasi_interpreter/src/wasi_syscalls.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>wasi_syscalls.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><div class="width-limiter"><nav class="sub"><a class="sub-logo-container" href="../../wasi_interpreter/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -697,699 +691,698 @@
 <span id="691">691</span>
 <span id="692">692</span>
 <span id="693">693</span>
-</pre><pre class="rust"><code><span class="doccomment">//! WASI system call implementations.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! This module implements system calls required by WASI. These system calls interact with wasmi</span>
-<span class="doccomment">//! memory and Theseus I/O (standard I/O, file system, arguments, environment variables, etc.).</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Documentation on system call behavior:</span>
-<span class="doccomment">//! &lt;https://docs.rs/wasi/0.10.2+wasi-snapshot-preview1/wasi/index.html&gt;</span>
-<span class="doccomment">//! &lt;https://github.com/WebAssembly/wasi-libc/blob/ad5133410f66b93a2381db5b542aad5e0964db96/libc-bottom-half/headers/public/wasi/api.h&gt;</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! The WASI crate documentation is useful for understanding WASI crate types and for a high-level</span>
-<span class="doccomment">//! understanding of WASI standards. The wasi-lib.c API header is far more useful, however, for</span>
-<span class="doccomment">//! understanding implementation details such as exact arguments passed into WASI system calls.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! Inspiration for some implementations is borrowed from tomaka/redshirt:</span>
-<span class="doccomment">//! &lt;https://github.com/tomaka/redshirt/blob/4df506f68821353a7fd67bb94c4223df6b683e1b/kernel/core/src/extrinsics/wasi.rs&gt;</span>
-<span class="doccomment">//!</span>
+</pre><pre class="rust"><code><span class="doccomment">//! WASI system call implementations.
+//!
+//! This module implements system calls required by WASI. These system calls interact with wasmi
+//! memory and Theseus I/O (standard I/O, file system, arguments, environment variables, etc.).
+//!
+//! Documentation on system call behavior:
+//! &lt;https://docs.rs/wasi/0.10.2+wasi-snapshot-preview1/wasi/index.html&gt;
+//! &lt;https://github.com/WebAssembly/wasi-libc/blob/ad5133410f66b93a2381db5b542aad5e0964db96/libc-bottom-half/headers/public/wasi/api.h&gt;
+//!
+//! The WASI crate documentation is useful for understanding WASI crate types and for a high-level
+//! understanding of WASI standards. The wasi-lib.c API header is far more useful, however, for
+//! understanding implementation details such as exact arguments passed into WASI system calls.
+//!
+//! Inspiration for some implementations is borrowed from tomaka/redshirt:
+//! &lt;https://github.com/tomaka/redshirt/blob/4df506f68821353a7fd67bb94c4223df6b683e1b/kernel/core/src/extrinsics/wasi.rs&gt;
+//!
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::posix_file_system</span>::{<span class="ident">PosixNode</span>, <span class="ident">PosixNodeOrStdio</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::wasi_definitions::SystemCall</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::HostExternals</span>;
-<span class="kw">use</span> <span class="ident">alloc::string::String</span>;
-<span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">core::convert::TryFrom</span> <span class="kw">as</span> <span class="kw">_</span>;
-<span class="kw">use</span> <span class="ident">fs_node</span>::{<span class="ident">DirRef</span>, <span class="ident">FileOrDir</span>};
-<span class="kw">use</span> <span class="ident">wasmi</span>::{<span class="ident">MemoryRef</span>, <span class="ident">RuntimeArgs</span>, <span class="ident">RuntimeValue</span>, <span class="ident">Trap</span>};
+</span><span class="kw">use </span><span class="kw">crate</span>::posix_file_system::{PosixNode, PosixNodeOrStdio};
+<span class="kw">use </span><span class="kw">crate</span>::wasi_definitions::SystemCall;
+<span class="kw">use </span><span class="kw">crate</span>::HostExternals;
+<span class="kw">use </span>alloc::string::String;
+<span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>core::convert::TryFrom <span class="kw">as _</span>;
+<span class="kw">use </span>fs_node::{DirRef, FileOrDir};
+<span class="kw">use </span>wasmi::{MemoryRef, RuntimeArgs, RuntimeValue, Trap};
 
-<span class="doccomment">/// Helper function to support retrieving args/env sizes.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `list`: string vector of which size is being retrieved (args or env).</span>
-<span class="doccomment">/// * `argc_out`: pointer to store length of list.</span>
-<span class="doccomment">/// * `argv_buf_size_out`: pointer to store total length of data in list. This includes null</span>
-<span class="doccomment">/// terminating bytes used by strings.</span>
-<span class="doccomment">/// * `memory`: wasmi memory buffer.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Return</span>
-<span class="doccomment">/// A WASI errno.</span>
-<span class="kw">fn</span> <span class="ident">args_or_env_sizes_get</span>(
-    <span class="ident">list</span>: <span class="kw-2">&amp;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="ident">argc_out</span>: <span class="ident">u32</span>,
-    <span class="ident">argv_buf_size_out</span>: <span class="ident">u32</span>,
-    <span class="ident">memory</span>: <span class="kw-2">&amp;</span><span class="ident">MemoryRef</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RuntimeValue</span><span class="op">&gt;</span>, <span class="ident">Trap</span><span class="op">&gt;</span> {
-    <span class="comment">// Compute length of list.</span>
-    <span class="kw">let</span> <span class="ident">argc</span>: <span class="ident">wasi::Size</span> <span class="op">=</span> <span class="ident">list</span>.<span class="ident">len</span>();
-    <span class="comment">// Compute length of data within list.</span>
-    <span class="kw">let</span> <span class="ident">argv_buf_size</span>: <span class="ident">wasi::Size</span> <span class="op">=</span> <span class="ident">list</span>
-        .<span class="ident">iter</span>()
-        .<span class="ident">fold</span>(<span class="number">0</span>, <span class="op">|</span><span class="ident">s</span>, <span class="ident">a</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">saturating_add</span>(<span class="ident">a</span>.<span class="ident">len</span>()).<span class="ident">saturating_add</span>(<span class="number">1</span>));
+<span class="doccomment">/// Helper function to support retrieving args/env sizes.
+///
+/// # Arguments
+/// * `list`: string vector of which size is being retrieved (args or env).
+/// * `argc_out`: pointer to store length of list.
+/// * `argv_buf_size_out`: pointer to store total length of data in list. This includes null
+/// terminating bytes used by strings.
+/// * `memory`: wasmi memory buffer.
+///
+/// # Return
+/// A WASI errno.
+</span><span class="kw">fn </span>args_or_env_sizes_get(
+    list: <span class="kw-2">&amp;</span>Vec&lt;String&gt;,
+    argc_out: u32,
+    argv_buf_size_out: u32,
+    memory: <span class="kw-2">&amp;</span>MemoryRef,
+) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;RuntimeValue&gt;, Trap&gt; {
+    <span class="comment">// Compute length of list.
+    </span><span class="kw">let </span>argc: wasi::Size = list.len();
+    <span class="comment">// Compute length of data within list.
+    </span><span class="kw">let </span>argv_buf_size: wasi::Size = list
+        .iter()
+        .fold(<span class="number">0</span>, |s, a| s.saturating_add(a.len()).saturating_add(<span class="number">1</span>));
 
-    <span class="comment">// Write lengths to memory</span>
-    <span class="ident">memory</span>.<span class="ident">set</span>(<span class="ident">argc_out</span>, <span class="kw-2">&amp;</span><span class="ident">argc</span>.<span class="ident">to_le_bytes</span>()).<span class="ident">unwrap</span>();
-    <span class="ident">memory</span>
-        .<span class="ident">set</span>(<span class="ident">argv_buf_size_out</span>, <span class="kw-2">&amp;</span><span class="ident">argv_buf_size</span>.<span class="ident">to_le_bytes</span>())
-        .<span class="ident">unwrap</span>();
+    <span class="comment">// Write lengths to memory
+    </span>memory.set(argc_out, <span class="kw-2">&amp;</span>argc.to_le_bytes()).unwrap();
+    memory
+        .set(argv_buf_size_out, <span class="kw-2">&amp;</span>argv_buf_size.to_le_bytes())
+        .unwrap();
 
-    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_SUCCESS</span>))));
+    <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
 }
 
-<span class="doccomment">/// Helper function to support retrieving args/env data.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `list`: string vector of which data is being retrieved (args or env).</span>
-<span class="doccomment">/// * `argv_pointers`: buffer to store pointers to each element in list.</span>
-<span class="doccomment">/// * `argv_data`: buffer to store data in list. This includes null terminating bytes for each</span>
-<span class="doccomment">/// element in list.</span>
-<span class="doccomment">/// * `memory`: wasmi memory buffer.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Return</span>
-<span class="doccomment">/// A WASI errno.</span>
-<span class="kw">fn</span> <span class="ident">args_or_env_get</span>(
-    <span class="ident">list</span>: <span class="kw-2">&amp;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-    <span class="ident">argv_pointers</span>: <span class="ident">u32</span>,
-    <span class="ident">argv_data</span>: <span class="ident">u32</span>,
-    <span class="ident">memory</span>: <span class="kw-2">&amp;</span><span class="ident">MemoryRef</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RuntimeValue</span><span class="op">&gt;</span>, <span class="ident">Trap</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">argv_pointers_pos</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">0</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">argv_data_pos</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="number">0</span>;
+<span class="doccomment">/// Helper function to support retrieving args/env data.
+///
+/// # Arguments
+/// * `list`: string vector of which data is being retrieved (args or env).
+/// * `argv_pointers`: buffer to store pointers to each element in list.
+/// * `argv_data`: buffer to store data in list. This includes null terminating bytes for each
+/// element in list.
+/// * `memory`: wasmi memory buffer.
+///
+/// # Return
+/// A WASI errno.
+</span><span class="kw">fn </span>args_or_env_get(
+    list: <span class="kw-2">&amp;</span>Vec&lt;String&gt;,
+    argv_pointers: u32,
+    argv_data: u32,
+    memory: <span class="kw-2">&amp;</span>MemoryRef,
+) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;RuntimeValue&gt;, Trap&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>argv_pointers_pos: u32 = <span class="number">0</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>argv_data_pos: u32 = <span class="number">0</span>;
 
-    <span class="kw">for</span> <span class="ident">arg</span> <span class="kw">in</span> <span class="ident">list</span>.<span class="ident">iter</span>() {
-        <span class="kw">let</span> <span class="ident">arg</span> <span class="op">=</span> <span class="ident">arg</span>.<span class="ident">as_bytes</span>();
+    <span class="kw">for </span>arg <span class="kw">in </span>list.iter() {
+        <span class="kw">let </span>arg = arg.as_bytes();
 
-        <span class="comment">// Write pointer to current arg to argv_pointers buffer.</span>
-        <span class="ident">memory</span>
-            .<span class="ident">set</span>(
-                <span class="ident">argv_pointers</span>.<span class="ident">checked_add</span>(<span class="ident">argv_pointers_pos</span>).<span class="ident">unwrap</span>(),
-                <span class="kw-2">&amp;</span>(<span class="ident">argv_data</span>.<span class="ident">checked_add</span>(<span class="ident">argv_data_pos</span>).<span class="ident">unwrap</span>()).<span class="ident">to_le_bytes</span>(),
+        <span class="comment">// Write pointer to current arg to argv_pointers buffer.
+        </span>memory
+            .set(
+                argv_pointers.checked_add(argv_pointers_pos).unwrap(),
+                <span class="kw-2">&amp;</span>(argv_data.checked_add(argv_data_pos).unwrap()).to_le_bytes(),
             )
-            .<span class="ident">unwrap</span>();
-        <span class="ident">argv_pointers_pos</span> <span class="op">=</span> <span class="ident">argv_pointers_pos</span>.<span class="ident">checked_add</span>(<span class="number">4</span>).<span class="ident">unwrap</span>();
+            .unwrap();
+        argv_pointers_pos = argv_pointers_pos.checked_add(<span class="number">4</span>).unwrap();
 
-        <span class="comment">// Write content of current arg to argv_data buffer.</span>
-        <span class="ident">memory</span>
-            .<span class="ident">set</span>(<span class="ident">argv_data</span>.<span class="ident">checked_add</span>(<span class="ident">argv_data_pos</span>).<span class="ident">unwrap</span>(), <span class="kw-2">&amp;</span><span class="ident">arg</span>)
-            .<span class="ident">unwrap</span>();
-        <span class="ident">argv_data_pos</span> <span class="op">=</span> <span class="ident">argv_data_pos</span>
-            .<span class="ident">checked_add</span>(<span class="ident">u32::try_from</span>(<span class="ident">arg</span>.<span class="ident">len</span>()).<span class="ident">unwrap</span>())
-            .<span class="ident">unwrap</span>();
+        <span class="comment">// Write content of current arg to argv_data buffer.
+        </span>memory
+            .set(argv_data.checked_add(argv_data_pos).unwrap(), <span class="kw-2">&amp;</span>arg)
+            .unwrap();
+        argv_data_pos = argv_data_pos
+            .checked_add(u32::try_from(arg.len()).unwrap())
+            .unwrap();
 
-        <span class="comment">// Write null terminating byte to argv_data buffer.</span>
-        <span class="ident">memory</span>
-            .<span class="ident">set</span>(<span class="ident">argv_data</span>.<span class="ident">checked_add</span>(<span class="ident">argv_data_pos</span>).<span class="ident">unwrap</span>(), <span class="kw-2">&amp;</span>[<span class="number">0</span>])
-            .<span class="ident">unwrap</span>();
-        <span class="ident">argv_data_pos</span> <span class="op">=</span> <span class="ident">argv_data_pos</span>.<span class="ident">checked_add</span>(<span class="number">1</span>).<span class="ident">unwrap</span>();
+        <span class="comment">// Write null terminating byte to argv_data buffer.
+        </span>memory
+            .set(argv_data.checked_add(argv_data_pos).unwrap(), <span class="kw-2">&amp;</span>[<span class="number">0</span>])
+            .unwrap();
+        argv_data_pos = argv_data_pos.checked_add(<span class="number">1</span>).unwrap();
     }
 
-    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_SUCCESS</span>))));
+    <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
 }
 
-<span class="doccomment">/// Executes specified system calls by interacting with wasmi memory and Theseus I/O.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `system_call`: SystemCall enum specifying which system call to execute.</span>
-<span class="doccomment">/// * `h_ext`: object containing wasmi memory and Theseus I/O.</span>
-<span class="doccomment">/// * `wasmi_args`: system call arguments.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Return</span>
-<span class="doccomment">/// Returns result of wasmi RuntimeValue on success or wasmi Trap on error used by wasmi to</span>
-<span class="doccomment">/// continue binary execution.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">execute_system_call</span>(
-    <span class="ident">system_call</span>: <span class="ident">SystemCall</span>,
-    <span class="ident">h_ext</span>: <span class="kw-2">&amp;mut</span> <span class="ident">HostExternals</span>,
-    <span class="ident">wasmi_args</span>: <span class="ident">RuntimeArgs</span>,
-) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RuntimeValue</span><span class="op">&gt;</span>, <span class="ident">Trap</span><span class="op">&gt;</span> {
-    <span class="comment">// Handles to wasmi memory and Theseus I/O.</span>
-    <span class="kw">let</span> <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">memory</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">h_ext</span>.<span class="ident">memory</span> {
-        <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">mem</span>) =&gt; <span class="ident">mem</span>,
-        <span class="prelude-val">None</span> =&gt; {
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_NOMEM</span>))));
+<span class="doccomment">/// Executes specified system calls by interacting with wasmi memory and Theseus I/O.
+///
+/// # Arguments
+/// * `system_call`: SystemCall enum specifying which system call to execute.
+/// * `h_ext`: object containing wasmi memory and Theseus I/O.
+/// * `wasmi_args`: system call arguments.
+///
+/// # Return
+/// Returns result of wasmi RuntimeValue on success or wasmi Trap on error used by wasmi to
+/// continue binary execution.
+</span><span class="kw">pub fn </span>execute_system_call(
+    system_call: SystemCall,
+    h_ext: <span class="kw-2">&amp;mut </span>HostExternals,
+    wasmi_args: RuntimeArgs,
+) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;RuntimeValue&gt;, Trap&gt; {
+    <span class="comment">// Handles to wasmi memory and Theseus I/O.
+    </span><span class="kw">let </span><span class="kw-2">ref mut </span>memory = <span class="kw">match </span>h_ext.memory {
+        <span class="prelude-val">Some</span>(<span class="kw-2">ref mut </span>mem) =&gt; mem,
+        <span class="prelude-val">None </span>=&gt; {
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_NOMEM))));
         }
     };
-    <span class="kw">let</span> <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">fd_table</span> <span class="op">=</span> <span class="ident">h_ext</span>.<span class="ident">fd_table</span>;
-    <span class="kw">let</span> <span class="kw-2">ref</span> <span class="ident">theseus_env_vars</span> <span class="op">=</span> <span class="ident">h_ext</span>.<span class="ident">theseus_env_vars</span>;
-    <span class="kw">let</span> <span class="kw-2">ref</span> <span class="ident">theseus_args</span> <span class="op">=</span> <span class="ident">h_ext</span>.<span class="ident">theseus_args</span>;
+    <span class="kw">let </span><span class="kw-2">ref mut </span>fd_table = h_ext.fd_table;
+    <span class="kw">let </span><span class="kw-2">ref </span>theseus_env_vars = h_ext.theseus_env_vars;
+    <span class="kw">let </span><span class="kw-2">ref </span>theseus_args = h_ext.theseus_args;
 
-    <span class="kw">match</span> <span class="ident">system_call</span> {
-        <span class="comment">// Terminate process with given exit code.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Arguments</span>
-        <span class="comment">// * `exit_code`: the exit code being returned by the process.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Return</span>
-        <span class="comment">// None.</span>
-        <span class="ident">SystemCall::ProcExit</span> =&gt; {
-            <span class="kw">let</span> <span class="ident">exit_code</span>: <span class="ident">wasi::Exitcode</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">0</span>)<span class="question-mark">?</span>;
-            <span class="ident">h_ext</span>.<span class="ident">exit_code</span> <span class="op">=</span> <span class="ident">exit_code</span>;
+    <span class="kw">match </span>system_call {
+        <span class="comment">// Terminate process with given exit code.
+        //
+        // # Arguments
+        // * `exit_code`: the exit code being returned by the process.
+        //
+        // # Return
+        // None.
+        </span>SystemCall::ProcExit =&gt; {
+            <span class="kw">let </span>exit_code: wasi::Exitcode = wasmi_args.nth_checked(<span class="number">0</span>)<span class="question-mark">?</span>;
+            h_ext.exit_code = exit_code;
             <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
         }
 
-        <span class="comment">// Close a file descriptor. This is similar to close in POSIX.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Arguments</span>
-        <span class="comment">// * `fd`: the file descriptor number to close.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Return</span>
-        <span class="comment">// A WASI errno.</span>
-        <span class="ident">SystemCall::FdClose</span> =&gt; {
-            <span class="kw">let</span> <span class="ident">fd</span>: <span class="ident">wasi::Fd</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-            <span class="kw">match</span> <span class="ident">fd_table</span>.<span class="ident">close_fd</span>(<span class="ident">fd</span>) {
-                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_SUCCESS</span>)))),
-                <span class="prelude-val">Err</span>(<span class="ident">wasi_error</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi_error</span>)))),
+        <span class="comment">// Close a file descriptor. This is similar to close in POSIX.
+        //
+        // # Arguments
+        // * `fd`: the file descriptor number to close.
+        //
+        // # Return
+        // A WASI errno.
+        </span>SystemCall::FdClose =&gt; {
+            <span class="kw">let </span>fd: wasi::Fd = wasmi_args.nth_checked(<span class="number">0</span>).unwrap();
+            <span class="kw">match </span>fd_table.close_fd(fd) {
+                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS)))),
+                <span class="prelude-val">Err</span>(wasi_error) =&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi_error)))),
             }
         }
 
-        <span class="comment">// Write to a file descriptor. This is similar to writev in POSIX.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Arguments</span>
-        <span class="comment">// * `fd`: the file descriptor number to write to.</span>
-        <span class="comment">// * `iovs`: pointer to list of scatter/gather vectors from which to retrieve data. each</span>
-        <span class="comment">// element in list consists of a 32 bit pointer to a data vector and a 32 bit length</span>
-        <span class="comment">// associated with that data vector (8 bytes).</span>
-        <span class="comment">// * `iovs_len`: the length of the array pointed to by `iovs`.</span>
-        <span class="comment">// * `ret_ptr`: pointer to write number of bytes written to.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Return</span>
-        <span class="comment">// A WASI errno.</span>
-        <span class="ident">SystemCall::FdWrite</span> =&gt; {
-            <span class="comment">// Fetch file to write to.</span>
-            <span class="kw">let</span> <span class="ident">posix_node_or_stdio</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PosixNodeOrStdio</span> <span class="op">=</span> {
-                <span class="kw">let</span> <span class="ident">fd</span>: <span class="ident">wasi::Fd</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-                <span class="kw">match</span> <span class="ident">fd_table</span>.<span class="ident">get_posix_node_or_stdio</span>(<span class="ident">fd</span>) {
-                    <span class="prelude-val">Some</span>(<span class="ident">pn</span>) =&gt; <span class="ident">pn</span>,
-                    <span class="prelude-val">None</span> =&gt; {
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_BADF</span>))));
+        <span class="comment">// Write to a file descriptor. This is similar to writev in POSIX.
+        //
+        // # Arguments
+        // * `fd`: the file descriptor number to write to.
+        // * `iovs`: pointer to list of scatter/gather vectors from which to retrieve data. each
+        // element in list consists of a 32 bit pointer to a data vector and a 32 bit length
+        // associated with that data vector (8 bytes).
+        // * `iovs_len`: the length of the array pointed to by `iovs`.
+        // * `ret_ptr`: pointer to write number of bytes written to.
+        //
+        // # Return
+        // A WASI errno.
+        </span>SystemCall::FdWrite =&gt; {
+            <span class="comment">// Fetch file to write to.
+            </span><span class="kw">let </span>posix_node_or_stdio: <span class="kw-2">&amp;mut </span>PosixNodeOrStdio = {
+                <span class="kw">let </span>fd: wasi::Fd = wasmi_args.nth_checked(<span class="number">0</span>).unwrap();
+                <span class="kw">match </span>fd_table.get_posix_node_or_stdio(fd) {
+                    <span class="prelude-val">Some</span>(pn) =&gt; pn,
+                    <span class="prelude-val">None </span>=&gt; {
+                        <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_BADF))));
                     }
                 }
             };
 
-            <span class="kw">let</span> <span class="ident">iovs</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">1</span>).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">iovs_len</span>: <span class="ident">wasi::Size</span> <span class="op">=</span> {
-                <span class="kw">let</span> <span class="ident">len</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">2</span>).<span class="ident">unwrap</span>();
-                <span class="ident">wasi::Size::try_from</span>(<span class="ident">len</span>).<span class="ident">unwrap</span>()
+            <span class="kw">let </span>iovs: u32 = wasmi_args.nth_checked(<span class="number">1</span>).unwrap();
+            <span class="kw">let </span>iovs_len: wasi::Size = {
+                <span class="kw">let </span>len: u32 = wasmi_args.nth_checked(<span class="number">2</span>).unwrap();
+                wasi::Size::try_from(len).unwrap()
             };
 
-            <span class="comment">// convert iovs into vector of (ptr,len) pairs.</span>
-            <span class="kw">let</span> <span class="ident">data_pointers</span> <span class="op">=</span> <span class="ident">memory</span>.<span class="ident">get</span>(<span class="ident">iovs</span>, <span class="number">4</span> <span class="op">*</span> <span class="ident">iovs_len</span> <span class="op">*</span> <span class="number">2</span>);
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data_out</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">iovs_len</span> <span class="op">*</span> <span class="number">2</span>);
+            <span class="comment">// convert iovs into vector of (ptr,len) pairs.
+            </span><span class="kw">let </span>data_pointers = memory.get(iovs, <span class="number">4 </span>* iovs_len * <span class="number">2</span>);
+            <span class="kw">let </span><span class="kw-2">mut </span>data_out = Vec::with_capacity(iovs_len * <span class="number">2</span>);
 
-            <span class="kw">for</span> <span class="ident">elt</span> <span class="kw">in</span> <span class="ident">data_pointers</span>.<span class="ident">unwrap</span>().<span class="ident">chunks</span>(<span class="number">4</span>) {
-                <span class="ident">data_out</span>.<span class="ident">push</span>(<span class="ident">u32::from_le_bytes</span>(<span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">4</span>]<span class="op">&gt;</span><span class="ident">::try_from</span>(<span class="ident">elt</span>).<span class="ident">unwrap</span>()));
+            <span class="kw">for </span>elt <span class="kw">in </span>data_pointers.unwrap().chunks(<span class="number">4</span>) {
+                data_out.push(u32::from_le_bytes(&lt;[u8; <span class="number">4</span>]&gt;::try_from(elt).unwrap()));
             }
 
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">total_written</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
+            <span class="kw">let </span><span class="kw-2">mut </span>total_written: usize = <span class="number">0</span>;
 
-            <span class="kw">for</span> <span class="ident">ptr_and_len</span> <span class="kw">in</span> <span class="ident">data_out</span>.<span class="ident">chunks</span>(<span class="number">2</span>) {
-                <span class="kw">let</span> <span class="ident">ptr</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">ptr_and_len</span>[<span class="number">0</span>];
-                <span class="kw">let</span> <span class="ident">len</span>: <span class="ident">wasi::Size</span> <span class="op">=</span> <span class="ident">wasi::Size::try_from</span>(<span class="ident">ptr_and_len</span>[<span class="number">1</span>]).<span class="ident">unwrap</span>();
+            <span class="kw">for </span>ptr_and_len <span class="kw">in </span>data_out.chunks(<span class="number">2</span>) {
+                <span class="kw">let </span>ptr: u32 = ptr_and_len[<span class="number">0</span>];
+                <span class="kw">let </span>len: wasi::Size = wasi::Size::try_from(ptr_and_len[<span class="number">1</span>]).unwrap();
 
-                <span class="comment">// retrieve data to write.</span>
-                <span class="kw">let</span> <span class="ident">char_arr</span> <span class="op">=</span> <span class="ident">memory</span>.<span class="ident">get</span>(<span class="ident">ptr</span>, <span class="ident">len</span>).<span class="ident">unwrap</span>();
+                <span class="comment">// retrieve data to write.
+                </span><span class="kw">let </span>char_arr = memory.get(ptr, len).unwrap();
 
-                <span class="kw">let</span> <span class="ident">bytes_written</span>: <span class="ident">wasi::Size</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">posix_node_or_stdio</span>.<span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="ident">char_arr</span>) {
-                    <span class="prelude-val">Ok</span>(<span class="ident">bytes_written</span>) =&gt; <span class="ident">bytes_written</span>,
-                    <span class="prelude-val">Err</span>(<span class="ident">wasi_errno</span>) =&gt; {
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi_errno</span>))));
+                <span class="kw">let </span>bytes_written: wasi::Size = <span class="kw">match </span>posix_node_or_stdio.write(<span class="kw-2">&amp;</span>char_arr) {
+                    <span class="prelude-val">Ok</span>(bytes_written) =&gt; bytes_written,
+                    <span class="prelude-val">Err</span>(wasi_errno) =&gt; {
+                        <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi_errno))));
                     }
                 };
-                <span class="ident">total_written</span> <span class="op">=</span> <span class="ident">total_written</span>.<span class="ident">checked_add</span>(<span class="ident">bytes_written</span>).<span class="ident">unwrap</span>();
+                total_written = total_written.checked_add(bytes_written).unwrap();
             }
 
-            <span class="comment">// write bytes written to return pointer.</span>
-            <span class="kw">let</span> <span class="ident">ret_ptr</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">3</span>).<span class="ident">unwrap</span>();
-            <span class="ident">memory</span>.<span class="ident">set</span>(<span class="ident">ret_ptr</span>, <span class="kw-2">&amp;</span><span class="ident">total_written</span>.<span class="ident">to_le_bytes</span>()).<span class="ident">unwrap</span>();
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_SUCCESS</span>))));
+            <span class="comment">// write bytes written to return pointer.
+            </span><span class="kw">let </span>ret_ptr: u32 = wasmi_args.nth_checked(<span class="number">3</span>).unwrap();
+            memory.set(ret_ptr, <span class="kw-2">&amp;</span>total_written.to_le_bytes()).unwrap();
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
         }
 
-        <span class="comment">// Move the offset of a file descriptor. This is similar to lseek in POSIX.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Arguments</span>
-        <span class="comment">// * `fd`: the file descriptor number to seek.</span>
-        <span class="comment">// * `offset`: the number of bytes to move.</span>
-        <span class="comment">// * `whence`: the base from which the offset is relative.</span>
-        <span class="comment">// * `ret_ptr`: pointer to write new offset to.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Return</span>
-        <span class="comment">// A WASI errno.</span>
-        <span class="ident">SystemCall::FdSeek</span> =&gt; {
-            <span class="comment">// fetch file to seek.</span>
-            <span class="kw">let</span> <span class="ident">posix_node_or_stdio</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PosixNodeOrStdio</span> <span class="op">=</span> {
-                <span class="kw">let</span> <span class="ident">fd</span>: <span class="ident">wasi::Fd</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-                <span class="kw">match</span> <span class="ident">fd_table</span>.<span class="ident">get_posix_node_or_stdio</span>(<span class="ident">fd</span>) {
-                    <span class="prelude-val">Some</span>(<span class="ident">pn</span>) =&gt; <span class="ident">pn</span>,
-                    <span class="prelude-val">None</span> =&gt; {
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_BADF</span>))));
+        <span class="comment">// Move the offset of a file descriptor. This is similar to lseek in POSIX.
+        //
+        // # Arguments
+        // * `fd`: the file descriptor number to seek.
+        // * `offset`: the number of bytes to move.
+        // * `whence`: the base from which the offset is relative.
+        // * `ret_ptr`: pointer to write new offset to.
+        //
+        // # Return
+        // A WASI errno.
+        </span>SystemCall::FdSeek =&gt; {
+            <span class="comment">// fetch file to seek.
+            </span><span class="kw">let </span>posix_node_or_stdio: <span class="kw-2">&amp;mut </span>PosixNodeOrStdio = {
+                <span class="kw">let </span>fd: wasi::Fd = wasmi_args.nth_checked(<span class="number">0</span>).unwrap();
+                <span class="kw">match </span>fd_table.get_posix_node_or_stdio(fd) {
+                    <span class="prelude-val">Some</span>(pn) =&gt; pn,
+                    <span class="prelude-val">None </span>=&gt; {
+                        <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_BADF))));
                     }
                 }
             };
 
-            <span class="kw">let</span> <span class="ident">offset</span>: <span class="ident">wasi::Filedelta</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">1</span>).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">whence</span>: <span class="ident">wasi::Whence</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">2</span>).<span class="ident">unwrap</span>();
+            <span class="kw">let </span>offset: wasi::Filedelta = wasmi_args.nth_checked(<span class="number">1</span>).unwrap();
+            <span class="kw">let </span>whence: wasi::Whence = wasmi_args.nth_checked(<span class="number">2</span>).unwrap();
 
-            <span class="comment">// move offset.</span>
-            <span class="kw">let</span> <span class="ident">new_offset</span>: <span class="ident">wasi::Filesize</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">posix_node_or_stdio</span>.<span class="ident">seek</span>(<span class="ident">offset</span>, <span class="ident">whence</span>) {
-                <span class="prelude-val">Ok</span>(<span class="ident">new_offset</span>) =&gt; <span class="ident">wasi::Filesize::try_from</span>(<span class="ident">new_offset</span>).<span class="ident">unwrap</span>(),
-                <span class="prelude-val">Err</span>(<span class="ident">wasi_errno</span>) =&gt; {
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi_errno</span>))));
+            <span class="comment">// move offset.
+            </span><span class="kw">let </span>new_offset: wasi::Filesize = <span class="kw">match </span>posix_node_or_stdio.seek(offset, whence) {
+                <span class="prelude-val">Ok</span>(new_offset) =&gt; wasi::Filesize::try_from(new_offset).unwrap(),
+                <span class="prelude-val">Err</span>(wasi_errno) =&gt; {
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi_errno))));
                 }
             };
 
-            <span class="comment">// write new offset to return pointer.</span>
-            <span class="kw">let</span> <span class="ident">ret_ptr</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">3</span>).<span class="ident">unwrap</span>();
-            <span class="ident">memory</span>.<span class="ident">set</span>(<span class="ident">ret_ptr</span>, <span class="kw-2">&amp;</span><span class="ident">new_offset</span>.<span class="ident">to_le_bytes</span>()).<span class="ident">unwrap</span>();
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_SUCCESS</span>))));
+            <span class="comment">// write new offset to return pointer.
+            </span><span class="kw">let </span>ret_ptr: u32 = wasmi_args.nth_checked(<span class="number">3</span>).unwrap();
+            memory.set(ret_ptr, <span class="kw-2">&amp;</span>new_offset.to_le_bytes()).unwrap();
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
         }
 
-        <span class="comment">// Read from a file descriptor. This is similar to readv in POSIX.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Arguments</span>
-        <span class="comment">// * `fd`: the file descriptor number to read from.</span>
-        <span class="comment">// * `iovs`: pointer to list of scatter/gather vectors to which to store data. each element</span>
-        <span class="comment">// in list consists of a 32 bit pointer to a data vector and a 32 bit length associated with</span>
-        <span class="comment">// that data vector (8 bytes).</span>
-        <span class="comment">// * `iovs_len`: the length of the array pointed to by `iovs`.</span>
-        <span class="comment">// * `ret_ptr`: pointer to write number of bytes read from.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Return</span>
-        <span class="comment">// A WASI errno.</span>
-        <span class="ident">SystemCall::FdRead</span> =&gt; {
-            <span class="comment">// fetch file to read from.</span>
-            <span class="kw">let</span> <span class="ident">posix_node_or_stdio</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PosixNodeOrStdio</span> <span class="op">=</span> {
-                <span class="kw">let</span> <span class="ident">fd</span>: <span class="ident">wasi::Fd</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-                <span class="kw">match</span> <span class="ident">fd_table</span>.<span class="ident">get_posix_node_or_stdio</span>(<span class="ident">fd</span>) {
-                    <span class="prelude-val">Some</span>(<span class="ident">pn</span>) =&gt; <span class="ident">pn</span>,
-                    <span class="prelude-val">None</span> =&gt; {
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_BADF</span>))));
+        <span class="comment">// Read from a file descriptor. This is similar to readv in POSIX.
+        //
+        // # Arguments
+        // * `fd`: the file descriptor number to read from.
+        // * `iovs`: pointer to list of scatter/gather vectors to which to store data. each element
+        // in list consists of a 32 bit pointer to a data vector and a 32 bit length associated with
+        // that data vector (8 bytes).
+        // * `iovs_len`: the length of the array pointed to by `iovs`.
+        // * `ret_ptr`: pointer to write number of bytes read from.
+        //
+        // # Return
+        // A WASI errno.
+        </span>SystemCall::FdRead =&gt; {
+            <span class="comment">// fetch file to read from.
+            </span><span class="kw">let </span>posix_node_or_stdio: <span class="kw-2">&amp;mut </span>PosixNodeOrStdio = {
+                <span class="kw">let </span>fd: wasi::Fd = wasmi_args.nth_checked(<span class="number">0</span>).unwrap();
+                <span class="kw">match </span>fd_table.get_posix_node_or_stdio(fd) {
+                    <span class="prelude-val">Some</span>(pn) =&gt; pn,
+                    <span class="prelude-val">None </span>=&gt; {
+                        <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_BADF))));
                     }
                 }
             };
 
-            <span class="kw">let</span> <span class="ident">iovs</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">1</span>).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">iovs_len</span>: <span class="ident">wasi::Size</span> <span class="op">=</span> {
-                <span class="kw">let</span> <span class="ident">len</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">2</span>).<span class="ident">unwrap</span>();
-                <span class="ident">wasi::Size::try_from</span>(<span class="ident">len</span>).<span class="ident">unwrap</span>()
+            <span class="kw">let </span>iovs: u32 = wasmi_args.nth_checked(<span class="number">1</span>).unwrap();
+            <span class="kw">let </span>iovs_len: wasi::Size = {
+                <span class="kw">let </span>len: u32 = wasmi_args.nth_checked(<span class="number">2</span>).unwrap();
+                wasi::Size::try_from(len).unwrap()
             };
 
-            <span class="comment">// convert iovs into vector of (ptr,len) pairs.</span>
-            <span class="kw">let</span> <span class="ident">input_pointers</span> <span class="op">=</span> <span class="ident">memory</span>.<span class="ident">get</span>(<span class="ident">iovs</span>, <span class="number">4</span> <span class="op">*</span> <span class="ident">iovs_len</span> <span class="op">*</span> <span class="number">2</span>);
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data_in</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">iovs_len</span> <span class="op">*</span> <span class="number">2</span>);
+            <span class="comment">// convert iovs into vector of (ptr,len) pairs.
+            </span><span class="kw">let </span>input_pointers = memory.get(iovs, <span class="number">4 </span>* iovs_len * <span class="number">2</span>);
+            <span class="kw">let </span><span class="kw-2">mut </span>data_in = Vec::with_capacity(iovs_len * <span class="number">2</span>);
 
-            <span class="kw">for</span> <span class="ident">elt</span> <span class="kw">in</span> <span class="ident">input_pointers</span>.<span class="ident">unwrap</span>().<span class="ident">chunks</span>(<span class="number">4</span>) {
-                <span class="ident">data_in</span>.<span class="ident">push</span>(<span class="ident">u32::from_le_bytes</span>(<span class="op">&lt;</span>[<span class="ident">u8</span>; <span class="number">4</span>]<span class="op">&gt;</span><span class="ident">::try_from</span>(<span class="ident">elt</span>).<span class="ident">unwrap</span>()));
+            <span class="kw">for </span>elt <span class="kw">in </span>input_pointers.unwrap().chunks(<span class="number">4</span>) {
+                data_in.push(u32::from_le_bytes(&lt;[u8; <span class="number">4</span>]&gt;::try_from(elt).unwrap()));
             }
 
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">total_read</span>: <span class="ident">wasi::Size</span> <span class="op">=</span> <span class="number">0</span>;
+            <span class="kw">let </span><span class="kw-2">mut </span>total_read: wasi::Size = <span class="number">0</span>;
 
-            <span class="kw">for</span> <span class="ident">ptr_and_len</span> <span class="kw">in</span> <span class="ident">data_in</span>.<span class="ident">chunks</span>(<span class="number">2</span>) {
-                <span class="kw">let</span> <span class="ident">ptr</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">ptr_and_len</span>[<span class="number">0</span>];
-                <span class="kw">let</span> <span class="ident">len</span>: <span class="ident">wasi::Size</span> <span class="op">=</span> <span class="ident">wasi::Size::try_from</span>(<span class="ident">ptr_and_len</span>[<span class="number">1</span>]).<span class="ident">unwrap</span>();
+            <span class="kw">for </span>ptr_and_len <span class="kw">in </span>data_in.chunks(<span class="number">2</span>) {
+                <span class="kw">let </span>ptr: u32 = ptr_and_len[<span class="number">0</span>];
+                <span class="kw">let </span>len: wasi::Size = wasi::Size::try_from(ptr_and_len[<span class="number">1</span>]).unwrap();
 
-                <span class="kw">let</span> <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">read_buf</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="number">0</span>; <span class="ident">len</span>];
+                <span class="kw">let </span><span class="kw-2">ref mut </span>read_buf = <span class="macro">vec!</span>[<span class="number">0</span>; len];
 
-                <span class="comment">// retrieve data to read.</span>
-                <span class="kw">let</span> <span class="ident">bytes_read</span>: <span class="ident">wasi::Size</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">posix_node_or_stdio</span>.<span class="ident">read</span>(<span class="ident">read_buf</span>) {
-                    <span class="prelude-val">Ok</span>(<span class="ident">bytes_written</span>) =&gt; <span class="ident">bytes_written</span>,
-                    <span class="prelude-val">Err</span>(<span class="ident">wasi_errno</span>) =&gt; {
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi_errno</span>))));
+                <span class="comment">// retrieve data to read.
+                </span><span class="kw">let </span>bytes_read: wasi::Size = <span class="kw">match </span>posix_node_or_stdio.read(read_buf) {
+                    <span class="prelude-val">Ok</span>(bytes_written) =&gt; bytes_written,
+                    <span class="prelude-val">Err</span>(wasi_errno) =&gt; {
+                        <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi_errno))));
                     }
                 };
 
-                <span class="ident">memory</span>.<span class="ident">set</span>(<span class="ident">ptr</span>, <span class="kw-2">&amp;</span><span class="ident">read_buf</span>[<span class="number">0</span>..<span class="ident">bytes_read</span>]).<span class="ident">unwrap</span>();
-                <span class="ident">total_read</span> <span class="op">=</span> <span class="ident">total_read</span>.<span class="ident">checked_add</span>(<span class="ident">bytes_read</span>).<span class="ident">unwrap</span>();
+                memory.set(ptr, <span class="kw-2">&amp;</span>read_buf[<span class="number">0</span>..bytes_read]).unwrap();
+                total_read = total_read.checked_add(bytes_read).unwrap();
             }
 
-            <span class="comment">// write bytes read to return pointer.</span>
-            <span class="kw">let</span> <span class="ident">ret_ptr</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">3</span>).<span class="ident">unwrap</span>();
-            <span class="ident">memory</span>.<span class="ident">set</span>(<span class="ident">ret_ptr</span>, <span class="kw-2">&amp;</span><span class="ident">total_read</span>.<span class="ident">to_le_bytes</span>()).<span class="ident">unwrap</span>();
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_SUCCESS</span>))));
+            <span class="comment">// write bytes read to return pointer.
+            </span><span class="kw">let </span>ret_ptr: u32 = wasmi_args.nth_checked(<span class="number">3</span>).unwrap();
+            memory.set(ret_ptr, <span class="kw-2">&amp;</span>total_read.to_le_bytes()).unwrap();
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
         }
 
-        <span class="comment">// Get the attributes of a file descriptor.</span>
-        <span class="comment">// This returns similar flags to fsync(fd, F_GETFL) in POSIX.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Arguments</span>
-        <span class="comment">// * `fd`: the file descriptor number to get attributes of.</span>
-        <span class="comment">// * `stat_buf`: the buffer to store file descriptor&#39;s attributes.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Return</span>
-        <span class="comment">// A WASI errno.</span>
-        <span class="ident">SystemCall::FdFdstatGet</span> =&gt; {
-            <span class="comment">// fetch file system node to retrieve attributes from.</span>
-            <span class="kw">let</span> <span class="ident">posix_node</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PosixNode</span> <span class="op">=</span> {
-                <span class="kw">let</span> <span class="ident">fd</span>: <span class="ident">wasi::Fd</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-                <span class="kw">match</span> <span class="ident">fd_table</span>.<span class="ident">get_posix_node</span>(<span class="ident">fd</span>) {
-                    <span class="prelude-val">Some</span>(<span class="ident">pn</span>) =&gt; <span class="ident">pn</span>,
-                    <span class="prelude-val">None</span> =&gt; {
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_BADF</span>))));
+        <span class="comment">// Get the attributes of a file descriptor.
+        // This returns similar flags to fsync(fd, F_GETFL) in POSIX.
+        //
+        // # Arguments
+        // * `fd`: the file descriptor number to get attributes of.
+        // * `stat_buf`: the buffer to store file descriptor&#39;s attributes.
+        //
+        // # Return
+        // A WASI errno.
+        </span>SystemCall::FdFdstatGet =&gt; {
+            <span class="comment">// fetch file system node to retrieve attributes from.
+            </span><span class="kw">let </span>posix_node: <span class="kw-2">&amp;mut </span>PosixNode = {
+                <span class="kw">let </span>fd: wasi::Fd = wasmi_args.nth_checked(<span class="number">0</span>).unwrap();
+                <span class="kw">match </span>fd_table.get_posix_node(fd) {
+                    <span class="prelude-val">Some</span>(pn) =&gt; pn,
+                    <span class="prelude-val">None </span>=&gt; {
+                        <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_BADF))));
                     }
                 }
             };
 
-            <span class="comment">// fetch attributes.</span>
-            <span class="kw">let</span> <span class="ident">stat</span>: <span class="ident">wasi::Fdstat</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">posix_node</span>.<span class="ident">theseus_file_or_dir</span> {
-                <span class="ident">FileOrDir::Dir</span> { .. } =&gt; <span class="ident">wasi::Fdstat</span> {
-                    <span class="ident">fs_filetype</span>: <span class="ident">wasi::FILETYPE_DIRECTORY</span>,
-                    <span class="ident">fs_flags</span>: <span class="ident">posix_node</span>.<span class="ident">fs_flags</span>(),
-                    <span class="ident">fs_rights_base</span>: <span class="ident">posix_node</span>.<span class="ident">fs_rights_base</span>(),
-                    <span class="ident">fs_rights_inheriting</span>: <span class="ident">posix_node</span>.<span class="ident">fs_rights_inheriting</span>(),
+            <span class="comment">// fetch attributes.
+            </span><span class="kw">let </span>stat: wasi::Fdstat = <span class="kw">match </span>posix_node.theseus_file_or_dir {
+                FileOrDir::Dir { .. } =&gt; wasi::Fdstat {
+                    fs_filetype: wasi::FILETYPE_DIRECTORY,
+                    fs_flags: posix_node.fs_flags(),
+                    fs_rights_base: posix_node.fs_rights_base(),
+                    fs_rights_inheriting: posix_node.fs_rights_inheriting(),
                 },
-                <span class="ident">FileOrDir::File</span> { .. } =&gt; <span class="ident">wasi::Fdstat</span> {
-                    <span class="ident">fs_filetype</span>: <span class="ident">wasi::FILETYPE_REGULAR_FILE</span>,
-                    <span class="ident">fs_flags</span>: <span class="ident">posix_node</span>.<span class="ident">fs_flags</span>(),
-                    <span class="ident">fs_rights_base</span>: <span class="ident">posix_node</span>.<span class="ident">fs_rights_base</span>(),
-                    <span class="ident">fs_rights_inheriting</span>: <span class="ident">posix_node</span>.<span class="ident">fs_rights_inheriting</span>(),
+                FileOrDir::File { .. } =&gt; wasi::Fdstat {
+                    fs_filetype: wasi::FILETYPE_REGULAR_FILE,
+                    fs_flags: posix_node.fs_flags(),
+                    fs_rights_base: posix_node.fs_rights_base(),
+                    fs_rights_inheriting: posix_node.fs_rights_inheriting(),
                 },
             };
 
-            <span class="kw">let</span> <span class="ident">stat_buf</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">1</span>).<span class="ident">unwrap</span>();
+            <span class="kw">let </span>stat_buf: u32 = wasmi_args.nth_checked(<span class="number">1</span>).unwrap();
 
-            <span class="comment">// write attributes to stat_buf.</span>
-            <span class="ident">memory</span>.<span class="ident">set</span>(<span class="ident">stat_buf</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>; <span class="number">24</span>]).<span class="ident">unwrap</span>();
-            <span class="ident">memory</span>.<span class="ident">set</span>(<span class="ident">stat_buf</span>, <span class="kw-2">&amp;</span>[<span class="ident">stat</span>.<span class="ident">fs_filetype</span>]).<span class="ident">unwrap</span>();
-            <span class="ident">memory</span>
-                .<span class="ident">set</span>(
-                    <span class="ident">stat_buf</span>.<span class="ident">checked_add</span>(<span class="number">2</span>).<span class="ident">unwrap</span>(),
-                    <span class="kw-2">&amp;</span><span class="ident">stat</span>.<span class="ident">fs_flags</span>.<span class="ident">to_le_bytes</span>(),
+            <span class="comment">// write attributes to stat_buf.
+            </span>memory.set(stat_buf, <span class="kw-2">&amp;</span>[<span class="number">0</span>; <span class="number">24</span>]).unwrap();
+            memory.set(stat_buf, <span class="kw-2">&amp;</span>[stat.fs_filetype]).unwrap();
+            memory
+                .set(
+                    stat_buf.checked_add(<span class="number">2</span>).unwrap(),
+                    <span class="kw-2">&amp;</span>stat.fs_flags.to_le_bytes(),
                 )
-                .<span class="ident">unwrap</span>();
-            <span class="ident">memory</span>
-                .<span class="ident">set</span>(
-                    <span class="ident">stat_buf</span>.<span class="ident">checked_add</span>(<span class="number">8</span>).<span class="ident">unwrap</span>(),
-                    <span class="kw-2">&amp;</span><span class="ident">stat</span>.<span class="ident">fs_rights_base</span>.<span class="ident">to_le_bytes</span>(),
+                .unwrap();
+            memory
+                .set(
+                    stat_buf.checked_add(<span class="number">8</span>).unwrap(),
+                    <span class="kw-2">&amp;</span>stat.fs_rights_base.to_le_bytes(),
                 )
-                .<span class="ident">unwrap</span>();
-            <span class="ident">memory</span>
-                .<span class="ident">set</span>(
-                    <span class="ident">stat_buf</span>.<span class="ident">checked_add</span>(<span class="number">16</span>).<span class="ident">unwrap</span>(),
-                    <span class="kw-2">&amp;</span><span class="ident">stat</span>.<span class="ident">fs_rights_inheriting</span>.<span class="ident">to_le_bytes</span>(),
+                .unwrap();
+            memory
+                .set(
+                    stat_buf.checked_add(<span class="number">16</span>).unwrap(),
+                    <span class="kw-2">&amp;</span>stat.fs_rights_inheriting.to_le_bytes(),
                 )
-                .<span class="ident">unwrap</span>();
+                .unwrap();
 
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_SUCCESS</span>))));
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
         }
 
-        <span class="comment">// Return environment variable data sizes.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Arguments</span>
-        <span class="comment">// * `envc_ptr`: the buffer to store the number of environment variables.</span>
-        <span class="comment">// * `envv_buf_size_ptr`: the buffer to store the total length of environment variables.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Return</span>
-        <span class="comment">// A WASI errno.</span>
-        <span class="ident">SystemCall::EnvironSizesGet</span> =&gt; {
-            <span class="kw">let</span> <span class="ident">envc_ptr</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">envv_buf_size_ptr</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">1</span>).<span class="ident">unwrap</span>();
-            <span class="ident">args_or_env_sizes_get</span>(<span class="ident">theseus_env_vars</span>, <span class="ident">envc_ptr</span>, <span class="ident">envv_buf_size_ptr</span>, <span class="ident">memory</span>)
+        <span class="comment">// Return environment variable data sizes.
+        //
+        // # Arguments
+        // * `envc_ptr`: the buffer to store the number of environment variables.
+        // * `envv_buf_size_ptr`: the buffer to store the total length of environment variables.
+        //
+        // # Return
+        // A WASI errno.
+        </span>SystemCall::EnvironSizesGet =&gt; {
+            <span class="kw">let </span>envc_ptr: u32 = wasmi_args.nth_checked(<span class="number">0</span>).unwrap();
+            <span class="kw">let </span>envv_buf_size_ptr: u32 = wasmi_args.nth_checked(<span class="number">1</span>).unwrap();
+            args_or_env_sizes_get(theseus_env_vars, envc_ptr, envv_buf_size_ptr, memory)
         }
 
-        <span class="comment">// Return environment variable data.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Arguments</span>
-        <span class="comment">// * `envv_pointers`: the buffer to store pointers to each environment variable.</span>
-        <span class="comment">// * `envv_data`: the buffer to store environment variables.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Return</span>
-        <span class="comment">// A WASI errno.</span>
-        <span class="ident">SystemCall::EnvironGet</span> =&gt; {
-            <span class="kw">let</span> <span class="ident">envv_pointers</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">envv_data</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">1</span>).<span class="ident">unwrap</span>();
-            <span class="ident">args_or_env_get</span>(<span class="ident">theseus_env_vars</span>, <span class="ident">envv_pointers</span>, <span class="ident">envv_data</span>, <span class="ident">memory</span>)
+        <span class="comment">// Return environment variable data.
+        //
+        // # Arguments
+        // * `envv_pointers`: the buffer to store pointers to each environment variable.
+        // * `envv_data`: the buffer to store environment variables.
+        //
+        // # Return
+        // A WASI errno.
+        </span>SystemCall::EnvironGet =&gt; {
+            <span class="kw">let </span>envv_pointers: u32 = wasmi_args.nth_checked(<span class="number">0</span>).unwrap();
+            <span class="kw">let </span>envv_data: u32 = wasmi_args.nth_checked(<span class="number">1</span>).unwrap();
+            args_or_env_get(theseus_env_vars, envv_pointers, envv_data, memory)
         }
 
-        <span class="comment">// Return a description of the given preopened file descriptor.</span>
-        <span class="comment">//</span>
-        <span class="comment">// The preopened descriptor consists of a wasi::Preopentype and the length of the underlying</span>
-        <span class="comment">// file name (the relative file path).</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Arguments</span>
-        <span class="comment">// * `fd`: the file descriptor number to get preopened description of.</span>
-        <span class="comment">// * `ret_ptr`: the pointer to write preopened file descriptor.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Return</span>
-        <span class="comment">// A WASI errno.</span>
-        <span class="ident">SystemCall::FdPrestatGet</span> =&gt; {
-            <span class="comment">// fetch file to retrieve attributes from.</span>
-            <span class="kw">let</span> <span class="ident">posix_node</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PosixNode</span> <span class="op">=</span> {
-                <span class="kw">let</span> <span class="ident">fd</span>: <span class="ident">wasi::Fd</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-                <span class="kw">match</span> <span class="ident">fd_table</span>.<span class="ident">get_posix_node</span>(<span class="ident">fd</span>) {
-                    <span class="prelude-val">Some</span>(<span class="ident">pn</span>) =&gt; <span class="ident">pn</span>,
-                    <span class="prelude-val">None</span> =&gt; {
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_BADF</span>))));
+        <span class="comment">// Return a description of the given preopened file descriptor.
+        //
+        // The preopened descriptor consists of a wasi::Preopentype and the length of the underlying
+        // file name (the relative file path).
+        //
+        // # Arguments
+        // * `fd`: the file descriptor number to get preopened description of.
+        // * `ret_ptr`: the pointer to write preopened file descriptor.
+        //
+        // # Return
+        // A WASI errno.
+        </span>SystemCall::FdPrestatGet =&gt; {
+            <span class="comment">// fetch file to retrieve attributes from.
+            </span><span class="kw">let </span>posix_node: <span class="kw-2">&amp;mut </span>PosixNode = {
+                <span class="kw">let </span>fd: wasi::Fd = wasmi_args.nth_checked(<span class="number">0</span>).unwrap();
+                <span class="kw">match </span>fd_table.get_posix_node(fd) {
+                    <span class="prelude-val">Some</span>(pn) =&gt; pn,
+                    <span class="prelude-val">None </span>=&gt; {
+                        <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_BADF))));
                     }
                 }
             };
 
-            <span class="comment">// get directory name (relative path).</span>
-            <span class="kw">let</span> <span class="ident">pr_name_len</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">posix_node</span>.<span class="ident">theseus_file_or_dir</span> {
-                <span class="ident">FileOrDir::File</span> { .. } =&gt; {
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_NOTDIR</span>))));
+            <span class="comment">// get directory name (relative path).
+            </span><span class="kw">let </span>pr_name_len: u32 = <span class="kw">match </span>posix_node.theseus_file_or_dir {
+                FileOrDir::File { .. } =&gt; {
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_NOTDIR))));
                 }
-                <span class="ident">FileOrDir::Dir</span> { .. } =&gt; {
-                    <span class="ident">u32::try_from</span>(<span class="ident">posix_node</span>.<span class="ident">get_relative_path</span>().<span class="ident">chars</span>().<span class="ident">count</span>()).<span class="ident">unwrap</span>()
+                FileOrDir::Dir { .. } =&gt; {
+                    u32::try_from(posix_node.get_relative_path().chars().count()).unwrap()
                 }
             };
 
-            <span class="kw">let</span> <span class="ident">ret_ptr</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">1</span>).<span class="ident">unwrap</span>();
+            <span class="kw">let </span>ret_ptr: u32 = wasmi_args.nth_checked(<span class="number">1</span>).unwrap();
 
-            <span class="comment">// write preopened file descriptor to ret_ptr.</span>
-            <span class="comment">// wasi::PREOPENTYPE_DIR is of type u8 but memory is aligned in sets of 4 bytes.</span>
-            <span class="ident">memory</span>.<span class="ident">set</span>(<span class="ident">ret_ptr</span>, <span class="kw-2">&amp;</span>[<span class="number">0</span>; <span class="number">8</span>]).<span class="ident">unwrap</span>();
-            <span class="ident">memory</span>.<span class="ident">set</span>(<span class="ident">ret_ptr</span>, <span class="kw-2">&amp;</span>[<span class="ident">wasi::PREOPENTYPE_DIR</span>]).<span class="ident">unwrap</span>();
-            <span class="ident">memory</span>
-                .<span class="ident">set</span>(<span class="ident">ret_ptr</span>.<span class="ident">checked_add</span>(<span class="number">4</span>).<span class="ident">unwrap</span>(), <span class="kw-2">&amp;</span><span class="ident">pr_name_len</span>.<span class="ident">to_le_bytes</span>())
-                .<span class="ident">unwrap</span>();
+            <span class="comment">// write preopened file descriptor to ret_ptr.
+            // wasi::PREOPENTYPE_DIR is of type u8 but memory is aligned in sets of 4 bytes.
+            </span>memory.set(ret_ptr, <span class="kw-2">&amp;</span>[<span class="number">0</span>; <span class="number">8</span>]).unwrap();
+            memory.set(ret_ptr, <span class="kw-2">&amp;</span>[wasi::PREOPENTYPE_DIR]).unwrap();
+            memory
+                .set(ret_ptr.checked_add(<span class="number">4</span>).unwrap(), <span class="kw-2">&amp;</span>pr_name_len.to_le_bytes())
+                .unwrap();
 
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_SUCCESS</span>))));
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
         }
 
-        <span class="comment">// Return the directory name of the given preopened file descriptor.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Arguments</span>
-        <span class="comment">// * `fd`: the file descriptor number to get name of.</span>
-        <span class="comment">// * `path`: the buffer into which to write the preopened directory name.</span>
-        <span class="comment">// * `path_len`: the length of the preopened directory name.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Return</span>
-        <span class="comment">// A WASI errno.</span>
-        <span class="ident">SystemCall::FdPrestatDirName</span> =&gt; {
-            <span class="comment">// fetch file to retrieve name of.</span>
-            <span class="kw">let</span> <span class="ident">posix_node</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PosixNode</span> <span class="op">=</span> {
-                <span class="kw">let</span> <span class="ident">fd</span>: <span class="ident">wasi::Fd</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-                <span class="kw">match</span> <span class="ident">fd_table</span>.<span class="ident">get_posix_node</span>(<span class="ident">fd</span>) {
-                    <span class="prelude-val">Some</span>(<span class="ident">pn</span>) =&gt; <span class="ident">pn</span>,
-                    <span class="prelude-val">None</span> =&gt; {
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_BADF</span>))));
+        <span class="comment">// Return the directory name of the given preopened file descriptor.
+        //
+        // # Arguments
+        // * `fd`: the file descriptor number to get name of.
+        // * `path`: the buffer into which to write the preopened directory name.
+        // * `path_len`: the length of the preopened directory name.
+        //
+        // # Return
+        // A WASI errno.
+        </span>SystemCall::FdPrestatDirName =&gt; {
+            <span class="comment">// fetch file to retrieve name of.
+            </span><span class="kw">let </span>posix_node: <span class="kw-2">&amp;mut </span>PosixNode = {
+                <span class="kw">let </span>fd: wasi::Fd = wasmi_args.nth_checked(<span class="number">0</span>).unwrap();
+                <span class="kw">match </span>fd_table.get_posix_node(fd) {
+                    <span class="prelude-val">Some</span>(pn) =&gt; pn,
+                    <span class="prelude-val">None </span>=&gt; {
+                        <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_BADF))));
                     }
                 }
             };
 
-            <span class="comment">// get directory name (relative path).</span>
-            <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">posix_node</span>.<span class="ident">theseus_file_or_dir</span> {
-                <span class="ident">FileOrDir::File</span> { .. } =&gt; {
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_NOTDIR</span>))));
+            <span class="comment">// get directory name (relative path).
+            </span><span class="kw">let </span>name = <span class="kw">match </span>posix_node.theseus_file_or_dir {
+                FileOrDir::File { .. } =&gt; {
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_NOTDIR))));
                 }
-                <span class="ident">FileOrDir::Dir</span> { .. } =&gt; <span class="ident">posix_node</span>.<span class="ident">get_relative_path</span>(),
+                FileOrDir::Dir { .. } =&gt; posix_node.get_relative_path(),
             };
 
-            <span class="kw">let</span> <span class="ident">path</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">1</span>).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">path_out_len</span>: <span class="ident">wasi::Size</span> <span class="op">=</span> {
-                <span class="kw">let</span> <span class="ident">len</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">2</span>).<span class="ident">unwrap</span>();
-                <span class="ident">wasi::Size::try_from</span>(<span class="ident">len</span>).<span class="ident">unwrap</span>()
+            <span class="kw">let </span>path: u32 = wasmi_args.nth_checked(<span class="number">1</span>).unwrap();
+            <span class="kw">let </span>path_out_len: wasi::Size = {
+                <span class="kw">let </span>len: u32 = wasmi_args.nth_checked(<span class="number">2</span>).unwrap();
+                wasi::Size::try_from(len).unwrap()
             };
 
-            <span class="comment">// write directory name to path.</span>
-            <span class="ident">memory</span>.<span class="ident">set</span>(<span class="ident">path</span>, <span class="kw-2">&amp;</span><span class="ident">name</span>.<span class="ident">as_bytes</span>()[..<span class="ident">path_out_len</span>]).<span class="ident">unwrap</span>();
+            <span class="comment">// write directory name to path.
+            </span>memory.set(path, <span class="kw-2">&amp;</span>name.as_bytes()[..path_out_len]).unwrap();
 
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_SUCCESS</span>))));
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
         }
 
-        <span class="comment">// Open file or directory. This is similar to openat in POSIX.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Arguments</span>
-        <span class="comment">// * `fd`: the file descriptor number to open from.</span>
-        <span class="comment">// * `dirflags`: flags determining the method of how the path is resolved.</span>
-        <span class="comment">// * `path`: the relative path of the file or directory to open, relative to fd directory.</span>
-        <span class="comment">// * `path_len`: length of path buffer containing path to open.</span>
-        <span class="comment">// * `open_flags`: the method by which to open the file. this includes modes such as</span>
-        <span class="comment">// whether to create a file if it doesn&#39;t exist, truncate existing files, etc.</span>
-        <span class="comment">// * `fs_rights_base`: rights applying to the file being opened. this includes rights such</span>
-        <span class="comment">// as whether reading, writing, setting flags, etc. are permitted.</span>
-        <span class="comment">// * `fs_rights_inheriting`: rights inherited by files opened by the resulting opened file.</span>
-        <span class="comment">// * `fs_flags`: file descriptor flags. this includes modes such as append mode when</span>
-        <span class="comment">// writign to files.</span>
-        <span class="comment">// * `ret_ptr`: the pointer to write the file descriptor of the opened file or directory.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Return</span>
-        <span class="comment">// A WASI errno.</span>
-        <span class="ident">SystemCall::PathOpen</span> =&gt; {
-            <span class="comment">// fetch file system node to open from.</span>
-            <span class="kw">let</span> <span class="ident">posix_node</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PosixNode</span> <span class="op">=</span> {
-                <span class="kw">let</span> <span class="ident">fd</span>: <span class="ident">wasi::Fd</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-                <span class="kw">match</span> <span class="ident">fd_table</span>.<span class="ident">get_posix_node</span>(<span class="ident">fd</span>) {
-                    <span class="prelude-val">Some</span>(<span class="ident">pn</span>) =&gt; <span class="ident">pn</span>,
-                    <span class="prelude-val">None</span> =&gt; {
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_BADF</span>))));
+        <span class="comment">// Open file or directory. This is similar to openat in POSIX.
+        //
+        // # Arguments
+        // * `fd`: the file descriptor number to open from.
+        // * `dirflags`: flags determining the method of how the path is resolved.
+        // * `path`: the relative path of the file or directory to open, relative to fd directory.
+        // * `path_len`: length of path buffer containing path to open.
+        // * `open_flags`: the method by which to open the file. this includes modes such as
+        // whether to create a file if it doesn&#39;t exist, truncate existing files, etc.
+        // * `fs_rights_base`: rights applying to the file being opened. this includes rights such
+        // as whether reading, writing, setting flags, etc. are permitted.
+        // * `fs_rights_inheriting`: rights inherited by files opened by the resulting opened file.
+        // * `fs_flags`: file descriptor flags. this includes modes such as append mode when
+        // writign to files.
+        // * `ret_ptr`: the pointer to write the file descriptor of the opened file or directory.
+        //
+        // # Return
+        // A WASI errno.
+        </span>SystemCall::PathOpen =&gt; {
+            <span class="comment">// fetch file system node to open from.
+            </span><span class="kw">let </span>posix_node: <span class="kw-2">&amp;mut </span>PosixNode = {
+                <span class="kw">let </span>fd: wasi::Fd = wasmi_args.nth_checked(<span class="number">0</span>).unwrap();
+                <span class="kw">match </span>fd_table.get_posix_node(fd) {
+                    <span class="prelude-val">Some</span>(pn) =&gt; pn,
+                    <span class="prelude-val">None </span>=&gt; {
+                        <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_BADF))));
                     }
                 }
             };
 
-            <span class="comment">// verify that file descriptor has rights to open path from.</span>
-            <span class="kw">if</span> <span class="ident">posix_node</span>.<span class="ident">fs_rights_base</span>() <span class="op">&amp;</span> <span class="ident">wasi::RIGHTS_PATH_OPEN</span> <span class="op">==</span> <span class="number">0</span> {
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_ACCES</span>))));
+            <span class="comment">// verify that file descriptor has rights to open path from.
+            </span><span class="kw">if </span>posix_node.fs_rights_base() &amp; wasi::RIGHTS_PATH_OPEN == <span class="number">0 </span>{
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_ACCES))));
             }
 
-            <span class="comment">// fetch underlying directory.</span>
-            <span class="kw">let</span> <span class="ident">parent_dir</span>: <span class="ident">DirRef</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">posix_node</span>.<span class="ident">theseus_file_or_dir</span>.<span class="ident">clone</span>() {
-                <span class="ident">FileOrDir::File</span> { .. } =&gt; {
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_NOTDIR</span>))));
+            <span class="comment">// fetch underlying directory.
+            </span><span class="kw">let </span>parent_dir: DirRef = <span class="kw">match </span>posix_node.theseus_file_or_dir.clone() {
+                FileOrDir::File { .. } =&gt; {
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_NOTDIR))));
                 }
-                <span class="ident">FileOrDir::Dir</span>(<span class="ident">dir_ref</span>) =&gt; <span class="ident">dir_ref</span>.<span class="ident">clone</span>(),
+                FileOrDir::Dir(dir_ref) =&gt; dir_ref.clone(),
             };
 
-            <span class="kw">let</span> <span class="ident">lookup_flags</span>: <span class="ident">wasi::Lookupflags</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">1</span>).<span class="ident">unwrap</span>();
+            <span class="kw">let </span>lookup_flags: wasi::Lookupflags = wasmi_args.nth_checked(<span class="number">1</span>).unwrap();
 
-            <span class="comment">// access path to open.</span>
-            <span class="kw">let</span> <span class="ident">path</span> <span class="op">=</span> {
-                <span class="kw">let</span> <span class="ident">path</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">2</span>).<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">path_len</span>: <span class="ident">wasi::Size</span> <span class="op">=</span> {
-                    <span class="kw">let</span> <span class="ident">len</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">3</span>).<span class="ident">unwrap</span>();
-                    <span class="ident">wasi::Size::try_from</span>(<span class="ident">len</span>).<span class="ident">unwrap</span>()
+            <span class="comment">// access path to open.
+            </span><span class="kw">let </span>path = {
+                <span class="kw">let </span>path: u32 = wasmi_args.nth_checked(<span class="number">2</span>).unwrap();
+                <span class="kw">let </span>path_len: wasi::Size = {
+                    <span class="kw">let </span>len: u32 = wasmi_args.nth_checked(<span class="number">3</span>).unwrap();
+                    wasi::Size::try_from(len).unwrap()
                 };
-                <span class="kw">let</span> <span class="ident">path_utf8</span> <span class="op">=</span> <span class="ident">memory</span>.<span class="ident">get</span>(<span class="ident">path</span>, <span class="ident">path_len</span>).<span class="ident">unwrap</span>();
-                <span class="ident">String::from_utf8</span>(<span class="ident">path_utf8</span>).<span class="ident">unwrap</span>()
+                <span class="kw">let </span>path_utf8 = memory.get(path, path_len).unwrap();
+                String::from_utf8(path_utf8).unwrap()
             };
 
-            <span class="kw">let</span> <span class="ident">maximum_rights</span>: <span class="ident">wasi::Rights</span> <span class="op">=</span> <span class="ident">posix_node</span>.<span class="ident">fs_rights_inheriting</span>();
+            <span class="kw">let </span>maximum_rights: wasi::Rights = posix_node.fs_rights_inheriting();
 
-            <span class="kw">let</span> <span class="ident">open_flags</span>: <span class="ident">wasi::Oflags</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">4</span>).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fs_rights_base</span>: <span class="ident">wasi::Rights</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">5</span>).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">fs_rights_inheriting</span>: <span class="ident">wasi::Rights</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">6</span>).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">fs_flags</span>: <span class="ident">wasi::Fdflags</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">7</span>).<span class="ident">unwrap</span>();
+            <span class="kw">let </span>open_flags: wasi::Oflags = wasmi_args.nth_checked(<span class="number">4</span>).unwrap();
+            <span class="kw">let </span><span class="kw-2">mut </span>fs_rights_base: wasi::Rights = wasmi_args.nth_checked(<span class="number">5</span>).unwrap();
+            <span class="kw">let </span><span class="kw-2">mut </span>fs_rights_inheriting: wasi::Rights = wasmi_args.nth_checked(<span class="number">6</span>).unwrap();
+            <span class="kw">let </span>fs_flags: wasi::Fdflags = wasmi_args.nth_checked(<span class="number">7</span>).unwrap();
 
-            <span class="comment">// set rights from parent file descriptor&#39;s inheriting rights.</span>
-            <span class="ident">fs_rights_base</span> <span class="op">&amp;=</span> <span class="ident">maximum_rights</span>;
-            <span class="ident">fs_rights_inheriting</span> <span class="op">&amp;=</span> <span class="ident">maximum_rights</span>;
+            <span class="comment">// set rights from parent file descriptor&#39;s inheriting rights.
+            </span>fs_rights_base &amp;= maximum_rights;
+            fs_rights_inheriting &amp;= maximum_rights;
 
-            <span class="comment">// open path from file descriptor.</span>
-            <span class="kw">let</span> <span class="ident">opened_fd</span>: <span class="ident">wasi::Fd</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">fd_table</span>.<span class="ident">open_path</span>(
-                <span class="kw-2">&amp;</span><span class="ident">path</span>,
-                <span class="ident">parent_dir</span>,
-                <span class="ident">lookup_flags</span>,
-                <span class="ident">open_flags</span>,
-                <span class="ident">fs_rights_base</span>,
-                <span class="ident">fs_rights_inheriting</span>,
-                <span class="ident">fs_flags</span>,
+            <span class="comment">// open path from file descriptor.
+            </span><span class="kw">let </span>opened_fd: wasi::Fd = <span class="kw">match </span>fd_table.open_path(
+                <span class="kw-2">&amp;</span>path,
+                parent_dir,
+                lookup_flags,
+                open_flags,
+                fs_rights_base,
+                fs_rights_inheriting,
+                fs_flags,
             ) {
-                <span class="prelude-val">Ok</span>(<span class="ident">fd</span>) =&gt; <span class="ident">fd</span>,
-                <span class="prelude-val">Err</span>(<span class="ident">wasi_error</span>) =&gt; {
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi_error</span>))));
+                <span class="prelude-val">Ok</span>(fd) =&gt; fd,
+                <span class="prelude-val">Err</span>(wasi_error) =&gt; {
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi_error))));
                 }
             };
 
-            <span class="comment">// write opened file descriptor to return pointer.</span>
-            <span class="kw">let</span> <span class="ident">opened_fd_ptr</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">8</span>).<span class="ident">unwrap</span>();
-            <span class="ident">memory</span>.<span class="ident">set</span>(<span class="ident">opened_fd_ptr</span>, <span class="kw-2">&amp;</span><span class="ident">opened_fd</span>.<span class="ident">to_le_bytes</span>()).<span class="ident">unwrap</span>();
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_SUCCESS</span>))));
+            <span class="comment">// write opened file descriptor to return pointer.
+            </span><span class="kw">let </span>opened_fd_ptr: u32 = wasmi_args.nth_checked(<span class="number">8</span>).unwrap();
+            memory.set(opened_fd_ptr, <span class="kw-2">&amp;</span>opened_fd.to_le_bytes()).unwrap();
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
         }
 
-        <span class="comment">// Adjust the flags associated with a file descriptor.</span>
-        <span class="comment">// This is similar to fcntl(fd, F_SETFL, flags) in POSIX.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Arguments</span>
-        <span class="comment">// * `fd`: the file descriptor being modified.</span>
-        <span class="comment">// * `flags`: the desired values of the file descriptor flags.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Return</span>
-        <span class="comment">// A WASI errno.</span>
-        <span class="ident">SystemCall::FdFdstatSetFlags</span> =&gt; {
-            <span class="comment">// fetch file system node to modify flags.</span>
-            <span class="kw">let</span> <span class="ident">posix_node</span>: <span class="kw-2">&amp;mut</span> <span class="ident">PosixNode</span> <span class="op">=</span> {
-                <span class="kw">let</span> <span class="ident">fd</span>: <span class="ident">wasi::Fd</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-                <span class="kw">match</span> <span class="ident">fd_table</span>.<span class="ident">get_posix_node</span>(<span class="ident">fd</span>) {
-                    <span class="prelude-val">Some</span>(<span class="ident">pn</span>) =&gt; <span class="ident">pn</span>,
-                    <span class="prelude-val">None</span> =&gt; {
-                        <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_BADF</span>))));
+        <span class="comment">// Adjust the flags associated with a file descriptor.
+        // This is similar to fcntl(fd, F_SETFL, flags) in POSIX.
+        //
+        // # Arguments
+        // * `fd`: the file descriptor being modified.
+        // * `flags`: the desired values of the file descriptor flags.
+        //
+        // # Return
+        // A WASI errno.
+        </span>SystemCall::FdFdstatSetFlags =&gt; {
+            <span class="comment">// fetch file system node to modify flags.
+            </span><span class="kw">let </span>posix_node: <span class="kw-2">&amp;mut </span>PosixNode = {
+                <span class="kw">let </span>fd: wasi::Fd = wasmi_args.nth_checked(<span class="number">0</span>).unwrap();
+                <span class="kw">match </span>fd_table.get_posix_node(fd) {
+                    <span class="prelude-val">Some</span>(pn) =&gt; pn,
+                    <span class="prelude-val">None </span>=&gt; {
+                        <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_BADF))));
                     }
                 }
             };
 
-            <span class="comment">// set flags of file.</span>
-            <span class="kw">let</span> <span class="ident">flags</span>: <span class="ident">wasi::Fdflags</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">1</span>).<span class="ident">unwrap</span>();
-            <span class="kw">match</span> <span class="ident">posix_node</span>.<span class="ident">set_fs_flags</span>(<span class="ident">flags</span>) {
+            <span class="comment">// set flags of file.
+            </span><span class="kw">let </span>flags: wasi::Fdflags = wasmi_args.nth_checked(<span class="number">1</span>).unwrap();
+            <span class="kw">match </span>posix_node.set_fs_flags(flags) {
                 <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
-                <span class="prelude-val">Err</span>(<span class="ident">wasi_error</span>) =&gt; {
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi_error</span>))));
+                <span class="prelude-val">Err</span>(wasi_error) =&gt; {
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi_error))));
                 }
             };
 
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_SUCCESS</span>))));
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
         }
 
-        <span class="comment">// Return argument data sizes.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Arguments</span>
-        <span class="comment">// * `argc_ptr`: the buffer to store the number of arguments.</span>
-        <span class="comment">// * `argv_buf_size_ptr`: the buffer to store the total length of arguments data.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Return</span>
-        <span class="comment">// A WASI errno.</span>
-        <span class="ident">SystemCall::ArgsSizesGet</span> =&gt; {
-            <span class="kw">let</span> <span class="ident">argc_ptr</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">argv_buf_size_ptr</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">1</span>).<span class="ident">unwrap</span>();
-            <span class="ident">args_or_env_sizes_get</span>(<span class="ident">theseus_args</span>, <span class="ident">argc_ptr</span>, <span class="ident">argv_buf_size_ptr</span>, <span class="ident">memory</span>)
+        <span class="comment">// Return argument data sizes.
+        //
+        // # Arguments
+        // * `argc_ptr`: the buffer to store the number of arguments.
+        // * `argv_buf_size_ptr`: the buffer to store the total length of arguments data.
+        //
+        // # Return
+        // A WASI errno.
+        </span>SystemCall::ArgsSizesGet =&gt; {
+            <span class="kw">let </span>argc_ptr: u32 = wasmi_args.nth_checked(<span class="number">0</span>).unwrap();
+            <span class="kw">let </span>argv_buf_size_ptr: u32 = wasmi_args.nth_checked(<span class="number">1</span>).unwrap();
+            args_or_env_sizes_get(theseus_args, argc_ptr, argv_buf_size_ptr, memory)
         }
 
-        <span class="comment">// Return arguments.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Arguments</span>
-        <span class="comment">// * `argv_pointers`: the buffer to store pointers to each argument.</span>
-        <span class="comment">// * `argv_data`: the buffer to store arguments data.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Return</span>
-        <span class="comment">// A WASI errno.</span>
-        <span class="ident">SystemCall::ArgsGet</span> =&gt; {
-            <span class="kw">let</span> <span class="ident">argv_pointers</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">argv_data</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">1</span>).<span class="ident">unwrap</span>();
-            <span class="ident">args_or_env_get</span>(<span class="ident">theseus_args</span>, <span class="ident">argv_pointers</span>, <span class="ident">argv_data</span>, <span class="ident">memory</span>)
+        <span class="comment">// Return arguments.
+        //
+        // # Arguments
+        // * `argv_pointers`: the buffer to store pointers to each argument.
+        // * `argv_data`: the buffer to store arguments data.
+        //
+        // # Return
+        // A WASI errno.
+        </span>SystemCall::ArgsGet =&gt; {
+            <span class="kw">let </span>argv_pointers: u32 = wasmi_args.nth_checked(<span class="number">0</span>).unwrap();
+            <span class="kw">let </span>argv_data: u32 = wasmi_args.nth_checked(<span class="number">1</span>).unwrap();
+            args_or_env_get(theseus_args, argv_pointers, argv_data, memory)
         }
 
-        <span class="comment">// Return time value of a clock. This is similar to clock_gettime in POSIX.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Arguments</span>
-        <span class="comment">// * `clock_id`: The clock for which to return the time.</span>
-        <span class="comment">// * `precision`: The maximum lag (exclusive) that the returned time value may have, compared to its</span>
-        <span class="comment">// actual value.</span>
-        <span class="comment">// * `ret_ptr`: The buffer in which to store the time.</span>
-        <span class="comment">//</span>
-        <span class="comment">// # Return</span>
-        <span class="comment">// A WASI errno.</span>
-        <span class="ident">SystemCall::ClockTimeGet</span> =&gt; {
-            <span class="kw">let</span> <span class="ident">clock_id</span>: <span class="ident">wasi::Clockid</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">0</span>).<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">_precision</span>: <span class="ident">wasi::Timestamp</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">1</span>).<span class="ident">unwrap</span>();
+        <span class="comment">// Return time value of a clock. This is similar to clock_gettime in POSIX.
+        //
+        // # Arguments
+        // * `clock_id`: The clock for which to return the time.
+        // * `precision`: The maximum lag (exclusive) that the returned time value may have, compared to its
+        // actual value.
+        // * `ret_ptr`: The buffer in which to store the time.
+        //
+        // # Return
+        // A WASI errno.
+        </span>SystemCall::ClockTimeGet =&gt; {
+            <span class="kw">let </span>clock_id: wasi::Clockid = wasmi_args.nth_checked(<span class="number">0</span>).unwrap();
+            <span class="kw">let </span>_precision: wasi::Timestamp = wasmi_args.nth_checked(<span class="number">1</span>).unwrap();
 
-            <span class="comment">// TODO: use rtc value converted to unix timestamp.</span>
-            <span class="kw">let</span> <span class="ident">unix_timestamp</span> <span class="op">=</span> <span class="number">0</span>;
+            <span class="comment">// TODO: use rtc value converted to unix timestamp.
+            </span><span class="kw">let </span>unix_timestamp = <span class="number">0</span>;
 
-            <span class="comment">// fetch time.</span>
-            <span class="kw">let</span> <span class="ident">timestamp</span>: <span class="ident">wasi::Timestamp</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">clock_id</span> {
-                <span class="ident">wasi::CLOCKID_MONOTONIC</span> =&gt; <span class="macro">unimplemented!</span>(),
-                <span class="ident">wasi::CLOCKID_PROCESS_CPUTIME_ID</span> =&gt; <span class="macro">unimplemented!</span>(),
-                <span class="ident">wasi::CLOCKID_REALTIME</span> =&gt; <span class="ident">unix_timestamp</span>,
-                <span class="ident">wasi::CLOCKID_THREAD_CPUTIME_ID</span> =&gt; <span class="macro">unimplemented!</span>(),
-                <span class="kw">_</span> =&gt; {
-                    <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_NOTSUP</span>))));
+            <span class="comment">// fetch time.
+            </span><span class="kw">let </span>timestamp: wasi::Timestamp = <span class="kw">match </span>clock_id {
+                wasi::CLOCKID_MONOTONIC =&gt; <span class="macro">unimplemented!</span>(),
+                wasi::CLOCKID_PROCESS_CPUTIME_ID =&gt; <span class="macro">unimplemented!</span>(),
+                wasi::CLOCKID_REALTIME =&gt; unix_timestamp,
+                wasi::CLOCKID_THREAD_CPUTIME_ID =&gt; <span class="macro">unimplemented!</span>(),
+                <span class="kw">_ </span>=&gt; {
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_NOTSUP))));
                 }
             };
 
-            <span class="comment">// write time to return pointer.</span>
-            <span class="kw">let</span> <span class="ident">ret_ptr</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">wasmi_args</span>.<span class="ident">nth_checked</span>(<span class="number">2</span>).<span class="ident">unwrap</span>();
-            <span class="ident">memory</span>.<span class="ident">set</span>(<span class="ident">ret_ptr</span>, <span class="kw-2">&amp;</span><span class="ident">timestamp</span>.<span class="ident">to_le_bytes</span>()).<span class="ident">unwrap</span>();
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="ident">RuntimeValue::I32</span>(<span class="ident">From::from</span>(<span class="ident">wasi::ERRNO_SUCCESS</span>))));
+            <span class="comment">// write time to return pointer.
+            </span><span class="kw">let </span>ret_ptr: u32 = wasmi_args.nth_checked(<span class="number">2</span>).unwrap();
+            memory.set(ret_ptr, <span class="kw-2">&amp;</span>timestamp.to_le_bytes()).unwrap();
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
         }
     }
 }
 </code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="wasi_interpreter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f8588549c 2022-07-18)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="wasi_interpreter" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>
