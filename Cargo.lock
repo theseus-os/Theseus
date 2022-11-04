@@ -541,6 +541,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cpu_local"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "memory",
+ "spin 0.9.0",
+]
+
+[[package]]
 name = "cranelift-entity"
 version = "0.77.0"
 dependencies = [
