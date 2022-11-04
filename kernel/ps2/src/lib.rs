@@ -17,48 +17,93 @@ static PS2_DATA_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
 static PS2_COMMAND_AND_STATUS_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x64));
 
 // https://wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Commands
+// quite a few of these are commented out because they're either unused, deprecated or non-standard.
 /// Command types which can be sent to the PS/2 Controller
+/// 
+/// Naming perspective: Output means "out of the device into the host".
+/// e.g. [WriteByteToPort2InputBuffer] means "write byte out of the host into port 2"
 enum HostToControllerCommand {
     /// returns [ControllerConfigurationByte]
     ReadFromInternalRAMByte0 = 0x20,
-    // ReadFromInternalRAMByteN = 0x21, //0x21-0x3F; N is the command byte & 0x1F; return Unknown/non-standard
+    
+    // return is non-standard
+    // /// 0x21-0x3F; N is the command byte & 0x1F
+    // ReadFromInternalRAMByteN = 0x21,
+
     /// sets [ControllerConfigurationByte]
     WriteToInternalRAMByte0 = 0x60,
-    // WriteToInternalRAMByteN = 0x61, //0x61-0x7F; N is the command byte & 0x1F
+
+    // usage is non-standard
+    // /// 0x61-0x7F; N is the command byte & 0x1F
+    // WriteToInternalRAMByteN = 0x61,
+
+    // these are all deprecated 
     // PasswordInstalledTest = 0xA4,
     // LoadSecurity = 0xA5,
     // EnableSecurity = 0xA6,
+    
     /// sets [ControllerConfigurationByte] `port2_clock_disabled`
-    DisablePort2 = 0xA7, //NOTE: only if 2 PS/2 ports supported
+    /// 
+    /// Note: only if 2 PS/2 ports supported
+    DisablePort2 = 0xA7,
     /// clears [ControllerConfigurationByte] `port2_clock_disabled`
-    EnablePort2 = 0xA8,  //NOTE: only if 2 PS/2 ports supported
+    /// 
+    /// Note: only if 2 PS/2 ports supported
+    EnablePort2 = 0xA8,
     /// returns [PortTestResult]
-    TestPort2 = 0xA9, //NOTE: only if 2 PS/2 ports supported
+    /// 
+    /// Note: only if 2 PS/2 ports supported
+    TestPort2 = 0xA9,
     /// returns [ControllerTestResult]
     TestController = 0xAA,
     /// returns [PortTestResult]
     TestPort1 = 0xAB,
-    ///// read all bytes of internal RAM
+
+    // unused
+    // /// read all bytes of internal RAM
     // DiagnosticDump = 0xAC,
+
     /// sets [ControllerConfigurationByte] `port1_clock_disabled`
     DisablePort1 = 0xAD,
     /// clears [ControllerConfigurationByte] `port1_clock_disabled`
     EnablePort1 = 0xAE,
-    // ReadControllerInputPort = 0xC0, //return Unknown/non-standard
+
+    // return is non-standard
+    // ReadControllerInputPort = 0xC0,
+
+    // both unused
     // CopyBits0to3ofInputPortToStatusBits4to7 = 0xC1,
     // CopyBits4to7ofInputPortToStatusBits4to7 = 0xC2,
-    ///// returns [ControllerOutputPort] (not implemented, https://wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Output_Port)
+
+    // both unused and therefore not implemented, https://wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Output_Port
+    // /// returns [ControllerOutputPort]
     // ReadControllerOutputPort = 0xD0,
-    ///// reads [ControllerOutputPort] (not implemented, https://wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Output_Port)
-    // WriteByteToControllerOutputPort = 0xD1, //Check if output buffer is empty first
-    ///// makes it look like the byte written was received from the first PS/2 port
-    // WriteByteToPort1OutputBuffer = 0xD2, //NOTE: only if 2 PS/2 ports supported
-    ///// makes it look like the byte written was received from the second PS/2 port
-    // WriteByteToPort2OutputBuffer = 0xD3, //NOTE: only if 2 PS/2 ports supported //https://wiki.osdev.org/%228042%22_PS/2_Controller#Buffer_Naming_Perspective OUTPUT means "out of the device into host"
+    // /// sets [ControllerOutputPort]
+    // ///
+    // /// Note: Check if the output buffer is empty first
+    // WriteByteToControllerOutputPort = 0xD1,
+
+    // both unused
+    // /// makes it look like the byte written was received from the first PS/2 port
+    // /// 
+    // /// Note: only if 2 PS/2 ports supported
+    // WriteByteToPort1OutputBuffer = 0xD2,
+    // /// makes it look like the byte written was received from the second PS/2 port
+    // /// 
+    // /// Note: only if 2 PS/2 ports supported
+    // WriteByteToPort2OutputBuffer = 0xD3,
+
     /// sends next byte to the second PS/2 port
-    WriteByteToPort2InputBuffer = 0xD4, //NOTE: only if 2 PS/2 ports supported
+    /// 
+    /// Note: only if 2 PS/2 ports supported
+    WriteByteToPort2InputBuffer = 0xD4,
+
+    // both unused
     // ReadTestInputs = 0xE0,
-    // PulseOutputLineLowFor6ms = 0xF0, //0xF0-0xFF; Bits 0 to 3 correspond to 4 different output lines and are used as a mask (0 = pulse line, 1 = don't pulse line); Bit 0 corresponds to the "reset" line. The other output lines don't have a standard/defined purpose.
+    // /// 0xF0-0xFF; Bits 0 to 3 correspond to 4 different output lines and are used as a mask:
+    // /// 0 = pulse line, 1 = don't pulse line; Bit 0 corresponds to the "reset" line.
+    // /// The other output lines don't have a standard/defined purpose.
+    // PulseOutputLineLowFor6ms = 0xF0,
 }
 
 /// Write a command to the PS/2 command port/register
