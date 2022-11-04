@@ -20,7 +20,7 @@ impl MouseMovementRelative {
 
 //NOTE: could be reduced to 8-bit
 #[derive(Debug, Clone)]
-pub struct ButtonAction {
+pub struct MouseButtons {
     pub left_button_hold: bool,
     pub right_button_hold: bool,
     pub middle_button_hold: bool,
@@ -28,7 +28,7 @@ pub struct ButtonAction {
     pub fifth_button_hold: bool,
 }
 
-impl ButtonAction {
+impl MouseButtons {
     pub fn new(
         left_button_hold: bool,
         right_button_hold: bool,
@@ -48,15 +48,15 @@ impl ButtonAction {
 
 #[derive(Debug, Clone)]
 pub struct MouseEvent {
-    pub buttonact: ButtonAction,
-    pub mousemove: MouseMovementRelative,
+    pub buttons: MouseButtons,
+    pub movement: MouseMovementRelative,
 }
 
 impl MouseEvent {
-    pub fn new(buttonact: ButtonAction, mousemove: MouseMovementRelative) -> MouseEvent {
+    pub fn new(buttons: MouseButtons, movement: MouseMovementRelative) -> MouseEvent {
         MouseEvent {
-            buttonact,
-            mousemove,
+            buttons,
+            movement,
         }
     }
 }

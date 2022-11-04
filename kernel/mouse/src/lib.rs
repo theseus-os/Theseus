@@ -8,7 +8,7 @@ use spin::Once;
 use mpmc::Queue;
 use event_types::Event;
 use x86_64::structures::idt::InterruptStackFrame;
-use mouse_data::{ButtonAction, MouseEvent, MouseMovementRelative};
+use mouse_data::{MouseButtons, MouseEvent, MouseMovementRelative};
 use ps2::{mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2, read_mouse_packet, MousePacketBits4, MouseId};
 
 /// The first PS/2 port for the mouse is connected directly to IRQ 0xC.
@@ -64,7 +64,7 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
     } else if mouse_packet.always_one() != 1 {
         // it's very likely that the PS/2 controller send us an [interrupt](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts),
         // if it did, the whole 32 bits of the mouse_packet are zero (at least on my end)
-        // checking the ps/2 controller status register's mouse_output_buffer_full might work, but this current solution does also work
+        // checking the PS/2 controller status register's mouse_output_buffer_full might work, but this current solution does also work
         // error!("Third bit in the mouse data packet's first byte should always be 1. Discarding the whole packet since the bit is 0.");
     } else if let Err(e) = handle_mouse_input(mouse_packet) {
         error!("ps2_mouse_handler: {e:?}");
@@ -76,10 +76,10 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
 
 /// enqueue a Mouse Event according to the data
 fn handle_mouse_input(mouse_packet: MousePacketBits4) -> Result<(), &'static str> {
-    let action = button_action_from(&mouse_packet);
-    let mmove = mouse_movement_from(&mouse_packet);
+    let buttons = Buttons::from(&mouse_packet).0;
+    let movement = Movement::from(&mouse_packet).0;
 
-    let mouse_event = MouseEvent::new(action, mmove);
+    let mouse_event = MouseEvent::new(buttons, movement);
     let event = Event::MouseMovementEvent(mouse_event);
 
     if let Some(producer) = MOUSE_PRODUCER.get() {
@@ -90,23 +90,28 @@ fn handle_mouse_input(mouse_packet: MousePacketBits4) -> Result<(), &'static str
     }
 }
 
-
-// NOTE: This crate depends on mouse_data and ps2, so I'm doing this here
-fn mouse_movement_from(mouse_packet: &MousePacketBits4) -> MouseMovementRelative {
-    MouseMovementRelative::new(
-        mouse_packet.x_movement(),
-        mouse_packet.y_movement(),
-        mouse_packet.scroll_movement()
-    )
+// both MouseMovementRelative and MousePacketBits4 are in different crates, so we need a newtype wrapper:
+struct Movement(MouseMovementRelative);
+impl From<&MousePacketBits4> for Movement {
+    fn from(mouse_packet: &MousePacketBits4) -> Self {
+        Self(MouseMovementRelative::new(
+            mouse_packet.x_movement(),
+            mouse_packet.y_movement(),
+            mouse_packet.scroll_movement()
+        ))
+    }
 }
 
-// NOTE: This crate depends on mouse_data and ps2, so I'm doing this here
-fn button_action_from(mouse_packet: &MousePacketBits4) -> ButtonAction {
-    ButtonAction::new(
-        mouse_packet.button_left(),
-        mouse_packet.button_right(),
-        mouse_packet.button_middle(),
-        mouse_packet.button_4(),
-        mouse_packet.button_5(),
-    )
+// both MouseButtons and MousePacketBits4 are in different crates, so we need a newtype wrapper:
+struct Buttons(MouseButtons);
+impl From<&MousePacketBits4> for Buttons {
+    fn from(mouse_packet: &MousePacketBits4) -> Self {
+        Self(MouseButtons::new(
+            mouse_packet.button_left(),
+            mouse_packet.button_right(),
+            mouse_packet.button_middle(),
+            mouse_packet.button_4(),
+            mouse_packet.button_5(),
+        ))
+    }
 }
