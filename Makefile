@@ -171,7 +171,7 @@ export override RUSTFLAGS += $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 ### See `theseus_features/src/lib.rs` for more details on what this includes.
 all: full
 full : export override FEATURES += --all-features
-ifneq (,$(findstring --workspace,$(CARGOFLAGS)))
+ifeq (,$(findstring --workspace,$(FEATURES)))
 full : export override FEATURES += --workspace
 endif
 full: iso
