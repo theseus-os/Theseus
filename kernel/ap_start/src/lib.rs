@@ -3,7 +3,6 @@
 //! 
 
 #![no_std]
-#![feature(const_btree_new)]
 
 extern crate alloc;
 #[macro_use] extern crate log;

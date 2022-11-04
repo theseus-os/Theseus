@@ -19,7 +19,6 @@
 //! The cache is basically a rectangular region in the destination framebuffer, and we define the structure `CacheBlock` to represent that cached region.
 
 #![no_std]
-#![feature(const_btree_new)]
 
 extern crate alloc;
 extern crate compositor;

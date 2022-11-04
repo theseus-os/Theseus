@@ -170,7 +170,10 @@ export override RUSTFLAGS += $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 ### with all optional features enabled. 
 ### See `theseus_features/src/lib.rs` for more details on what this includes.
 all: full
-full : export override FEATURES += --workspace --all-features
+full : export override FEATURES += --all-features
+ifeq (,$(findstring --workspace,$(FEATURES)))
+full : export override FEATURES += --workspace
+endif
 full: iso
 
 
@@ -583,19 +586,24 @@ RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
 ## The entire project is built as normal using the `cargo doc` command (`rustdoc` under the hood).
 docs: doc
 doc: export override RUSTDOCFLAGS += -A rustdoc::private_intra_doc_links
+doc : export override RUSTFLAGS=
+doc : export override CARGOFLAGS=
 doc: check-rustc
 ## Build the docs for select library crates, namely those not hosted online.
 ## We do this first such that the main `cargo doc` invocation below can see and link to these library docs.
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/atomic_linked_list/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/cow_arc/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/debugit/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/dereffer/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/dfqueue/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/keycodes_ascii/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/lockable/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/locked_idt/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/mouse_data/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/percent_encoding/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/port_io/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/stdio/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/str_ref/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/util/Cargo.toml
 ## Now, build the docs for all of Theseus's main kernel crates.
 	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))

@@ -13,7 +13,6 @@
 //! If an application itself spawns child tasks, those will not be able to properly print through these interfaces.
 
 #![no_std]
-#![feature(const_btree_new)]
 
 #[macro_use] extern crate alloc;
 extern crate logger;

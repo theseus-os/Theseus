@@ -6,7 +6,6 @@
 //! to point to other ACPI SDTs, while the RSDT uses 32-bit physical addresses.
 
 #![no_std]
-#![feature(const_btree_new)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
