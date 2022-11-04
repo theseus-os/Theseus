@@ -1,7 +1,7 @@
 [package]
 authors = ["Bowen Liu <liubowenbob@hotmail.com>", "Kevin Boos <kevinaboos@gmail.com>", "Hecatia Elegua"]
 name = "mouse"
-description = "A basic driver for a mouse connected to the legacy PS2 port"
+description = "A basic driver for a mouse connected to the legacy PS/2 port"
 version = "0.1.0"
 edition = "2021"
 

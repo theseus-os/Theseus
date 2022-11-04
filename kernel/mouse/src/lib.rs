@@ -1,4 +1,4 @@
-//! A basic driver for a mouse connected to the legacy PS2 port.
+//! A basic driver for a mouse connected to the legacy PS/2 port.
 
 #![no_std]
 #![feature(abi_x86_interrupt)]
@@ -11,19 +11,19 @@ use x86_64::structures::idt::InterruptStackFrame;
 use mouse_data::{ButtonAction, MouseEvent, MouseMovementRelative};
 use ps2::{mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2, read_mouse_packet, MousePacketBits4, MouseId};
 
-/// The first PS2 port for the mouse is connected directly to IRQ 0xC.
+/// The first PS/2 port for the mouse is connected directly to IRQ 0xC.
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.
 const PS2_MOUSE_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + 0xC;
 
 static MOUSE_PRODUCER: Once<Queue<Event>> = Once::new();
 
-/// Initialize the PS2 mouse driver and register its interrupt handler.
+/// Initialize the PS/2 mouse driver and register its interrupt handler.
 /// 
 /// ## Arguments
 /// * `mouse_queue_producer`: the queue onto which the mouse interrupt handler
 ///    will push new mouse events when a mouse action occurs.
 pub fn init(mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
-    // Init the second ps2 port, which is used for the mouse.
+    // Init the second PS/2 port, which is used for the mouse.
     init_ps2_port2();
     // Test the second port.
     test_ps2_port2()?;
@@ -51,7 +51,7 @@ pub fn init(mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
     Ok(())
 }
 
-/// The interrupt handler for a ps2-connected mouse, registered at IRQ 0x2C.
+/// The interrupt handler for a PS/2-connected mouse, registered at IRQ 0x2C.
 extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
     let mouse_packet = read_mouse_packet();
     if mouse_packet.x_overflow() || mouse_packet.y_overflow() {

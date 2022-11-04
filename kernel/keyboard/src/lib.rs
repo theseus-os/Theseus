@@ -1,4 +1,4 @@
-//! A basic driver for a keyboard connected to the legacy PS2 port.
+//! A basic driver for a keyboard connected to the legacy PS/2 port.
 
 #![no_std]
 #![feature(abi_x86_interrupt)]
@@ -13,7 +13,7 @@ use event_types::Event;
 use ps2::{init_ps2_port1, test_ps2_port1, keyboard_detect, KeyboardType, read_scancode, LEDState, keyboard_scancode_set, ScancodeSet};
 use x86_64::structures::idt::InterruptStackFrame;
 
-/// The first PS2 port for the keyboard is connected directly to IRQ 1.
+/// The first PS/2 port for the keyboard is connected directly to IRQ 1.
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x21.
 const PS2_KEYBOARD_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + 0x1;
 
@@ -22,13 +22,13 @@ static mut KBD_MODIFIERS: Lazy<KeyboardModifiers> = Lazy::new(KeyboardModifiers:
 
 static KEYBOARD_PRODUCER: Once<Queue<Event>> = Once::new();
 
-/// Initialize the PS2 keyboard driver and register its interrupt handler.
+/// Initialize the PS/2 keyboard driver and register its interrupt handler.
 /// 
 /// ## Arguments
 /// * `keyboard_queue_producer`: the queue onto which the keyboard interrupt handler
 ///    will push new keyboard events when a key action occurs.
 pub fn init(keyboard_queue_producer: Queue<Event>) -> Result<(), &'static str> {
-    // Init the first ps2 port, which is used for the keyboard.
+    // Init the first PS/2 port, which is used for the keyboard.
     init_ps2_port1();
     // Test the first port.
     test_ps2_port1()?;
@@ -41,7 +41,7 @@ pub fn init(keyboard_queue_producer: Queue<Event>) -> Result<(), &'static str> {
         Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator) => debug!("The PS/2 keyboard type is: MF2 Keyboard with translator enabled in PS/2 Controller"),
         Err(e) => {
             error!("Failed to detect the PS/2 keyboard type: {e}");
-            return Err("Failed to detect the PS2 keyboard type");
+            return Err("Failed to detect the PS/2 keyboard type");
         }
     }
 
@@ -58,7 +58,7 @@ pub fn init(keyboard_queue_producer: Queue<Event>) -> Result<(), &'static str> {
     Ok(())
 }
 
-/// The interrupt handler for a ps2-connected keyboard, registered at IRQ 0x21.
+/// The interrupt handler for a PS/2-connected keyboard, registered at IRQ 0x21.
 extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame) {
     // Some of the scancodes are "extended", which means they generate two different interrupts,
     // the first handling the E0 byte, the second handling their second byte.
@@ -83,9 +83,10 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame
         if extended {
             EXTENDED_SCANCODE.store(false, Ordering::SeqCst);
         }
-        if scan_code != 0 {  // a scan code of zero is a PS2_PORT error that we can ignore
+        // a scan code of zero is a PS2_PORT error that we can ignore
+        if scan_code != 0 {
             if let Err(e) = handle_keyboard_input(scan_code, extended) {
-                error!("ps2_keyboard_handler: error handling PS2_PORT input: {:?}", e);
+                error!("ps2_keyboard_handler: error handling PS2_PORT input: {e:?}");
             }
         }
     }

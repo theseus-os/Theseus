@@ -189,24 +189,24 @@ pub struct ControllerConfigurationByte {
     must_be_zero: u1,
 }
 
-/// read the config of the ps2 port
+/// read the config of the PS/2 port
 fn read_config() -> ControllerConfigurationByte {
     write_command(ReadFromInternalRAMByte0);
     ControllerConfigurationByte::from_bytes([read_data()])
 }
 
-/// write the new config to the ps2 command port (0x64)
+/// write the new config to the PS/2 command port (0x64)
 fn write_config(value: ControllerConfigurationByte) {
     write_command(WriteToInternalRAMByte0);
     write_data(WritableData::Configuration(value));
 }
 
-/// initialize the first ps2 data port
+/// initialize the first PS/2 data port
 pub fn init_ps2_port1() {
     init_ps2_port(PS2Port::One);
 }
 
-/// initialize the second ps2 data port
+/// initialize the second PS/2 data port
 pub fn init_ps2_port2() {
     init_ps2_port(PS2Port::Two);
 }
@@ -252,26 +252,26 @@ fn flush_output_buffer() {
     debug!("ps2::flush_output_buffer: {}", read_data());
 }
 
-/// test the first ps2 data port
+/// test the first PS/2 data port
 pub fn test_ps2_port1() -> Result<(), &'static str> {
     test_ps2_port(PS2Port::One)
 }
 
-// test the second ps2 data port
+// test the second PS/2 data port
 pub fn test_ps2_port2() -> Result<(), &'static str> {
     test_ps2_port(PS2Port::Two)
 }
 
 // see https://wiki.osdev.org/%228042%22_PS/2_Controller#Initialising_the_PS.2F2_Controller
 fn test_ps2_port(port: PS2Port) -> Result<(), &'static str> {
-    // test the ps2 controller
+    // test the PS/2 controller
     write_command(TestController);
     match read_controller_test_result()? {
         ControllerTestResult::Passed => debug!("passed PS/2 controller test"),
         ControllerTestResult::Failed => Err("failed PS/2 controller test")?,
     }
 
-    // test the ps2 data port
+    // test the PS/2 data port
     match port {
         PS2Port::One => write_command(TestPort1),
         PS2Port::Two => write_command(TestPort2),
@@ -285,7 +285,7 @@ fn test_ps2_port(port: PS2Port) -> Result<(), &'static str> {
         DataLineStuckHigh => Err("failed PS/2 port test, clock line stuck high")?,
     }
 
-    // enable PS2 interrupt and see the new config
+    // enable PS/2 interrupt and see the new config
     let config = read_config();
     let port_interrupt_enabled = match port {
         PS2Port::One => config.port1_interrupt_enabled(),
@@ -297,12 +297,12 @@ fn test_ps2_port(port: PS2Port) -> Result<(), &'static str> {
     };
 
     if port_interrupt_enabled {
-        debug!("ps2 port {} interrupt enabled", port as u8 + 1)
+        debug!("PS/2 port {} interrupt enabled", port as u8 + 1)
     } else {
         Err("PS/2 port test config's interrupt disabled")?
     }
     if clock_enabled {
-        debug!("ps2 port {} clock enabled", port as u8 + 1)
+        debug!("PS/2 port {} clock enabled", port as u8 + 1)
     } else {
         Err("PS/2 port test config's clock disabled")?
     }
@@ -580,7 +580,7 @@ pub enum SampleRate {
     _200 = 200
 }
 
-/// set ps2 mouse's sampling rate
+/// set PS/2 mouse's sampling rate
 fn set_mouse_sampling_rate(value: SampleRate) -> Result<(), &'static str> {
     command_to_mouse(HostToMouseCommandOrData::MouseCommand(SampleRate))
         .and(command_to_mouse(HostToMouseCommandOrData::SampleRate(value)))
