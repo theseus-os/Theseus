@@ -59,7 +59,6 @@
 //! So, if you run `pmu_x86::init()` and `pmu_x86::start_samples()` on CPU core 2, it will only sample events on core 2.
 
 #![no_std]
-#![feature(const_btree_new)]
 
 extern crate spin;
 #[macro_use] extern crate lazy_static;

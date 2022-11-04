@@ -4,7 +4,6 @@
 //! 
 
 #![no_std]
-#![feature(bench_black_box)]
 
 extern crate alloc;
 #[macro_use] extern crate log;

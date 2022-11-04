@@ -26,7 +26,9 @@ EXECUTABLE_PREFIX   ?= e\#
 ## as specified by the `members` set in the top-level `Cargo.toml` file
 ## (excluding the crates that are part of the `exclude` set).
 ## However, one can override which crates are built by setting `FEATURES`.
+ifneq (,$(findstring --workspace,$(FEATURES)))
 FEATURES ?= --workspace
+endif
 
 ## Build modes: debug is development mode, release is with full optimizations.
 ## We build using release mode by default, because running in debug mode is quite slow.

@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(let_chains)]
 
 use core::{fmt, sync::atomic::{AtomicU8, Ordering}};
 use volatile::{Volatile, ReadOnly, WriteOnly};

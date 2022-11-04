@@ -15,7 +15,6 @@
 //!    destructs all stdio queues
 
 #![no_std]
-#![feature(const_btree_new)]
 
 #[macro_use] extern crate log;
 extern crate stdio;

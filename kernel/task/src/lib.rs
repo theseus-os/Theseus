@@ -27,7 +27,6 @@
 
 #![no_std]
 #![feature(panic_info_message)]
-#![feature(const_btree_new)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
