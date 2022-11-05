@@ -365,18 +365,15 @@ fn test_ps2_port(port: PS2Port) -> Result<(), &'static str> {
     Ok(())
 }
 
-#[derive(TryFromPrimitive)]
-#[repr(u8)]
-enum ControllerTestResult {
-    Passed = 0x55,
-    //NOTE: can just be removed
-    Failed = 0xFC,
-}
-
 /// must only be called after writing the [TestController] command
 /// otherwise would read bogus data
-fn read_controller_test_result() -> Result<ControllerTestResult, &'static str> {
-    read_data().try_into().map_err(|_| "failed to read controller test result")
+fn read_controller_test_result() -> Result<(), &'static str> {
+    const CONTROLLER_TEST_PASSED: u8 = 0x55;
+    if read_data() != CONTROLLER_TEST_PASSED {
+        Err("failed PS/2 controller test")
+    } else {
+        Ok(())
+    }
 }
 
 #[derive(TryFromPrimitive)]
