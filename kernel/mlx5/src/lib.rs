@@ -671,7 +671,7 @@ impl ConnectX5Nic {
 
     /// Adds a packet to be sent to the transmit queue and returns once it is sent.
     pub fn send(&mut self, buffer: TransmitBuffer) -> Result<(), &'static str> {
-        let wqe_counter = self.send_queue.send(buffer.phys_addr, buffer.as_slice());
+        let wqe_counter = self.send_queue.send(buffer.phys_addr(), &buffer);
         // self.send_completion_queue.wqe_posted(wqe_counter);
         self.send_completion_queue.check_packet_transmission(0, wqe_counter);
         self.send_completion_queue.dump();

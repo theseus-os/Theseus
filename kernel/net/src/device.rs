@@ -83,13 +83,11 @@ impl phy::RxToken for RxToken {
                 self.inner.0.len()
             );
         }
-        // TODO: Which error variant?
         let mut slice = self
             .inner
             .0
             .first_mut()
-            .ok_or(Error::Unknown)?
-            .as_slice_mut();
+            .ok_or(Error::Exhausted)?;
         f(&mut slice)
     }
 }

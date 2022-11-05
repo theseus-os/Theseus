@@ -192,7 +192,7 @@ impl<'d, N: NetworkInterfaceCard + 'static> smoltcp::phy::Device<'d> for Etherne
             error!("EthernetDevice::receive(): WARNING: Ethernet frame consists of {} ReceiveBuffers, we currently only handle a single-buffer frame, so this may not work correctly!",  received_frame.0.len());
         }
 
-        let rxbuf_byte_slice = BoxRefMut::new(Box::new(received_frame)).map_mut(|rxframe| rxframe.0[0].as_slice_mut());
+        let rxbuf_byte_slice = BoxRefMut::new(Box::new(received_frame)).map_mut(|rxframe| core::ops::DerefMut::deref_mut(&mut rxframe.0[0]));
 
         // Just create and return a pair of (receive token, transmit token), 
         // the actual rx buffer handling is done in the RxToken::consume() function
@@ -241,8 +241,7 @@ impl<N: NetworkInterfaceCard + 'static> smoltcp::phy::TxToken for TxToken<N> {
         })?;
 
         let closure_retval = {
-            let txbuf_byte_slice = txbuf.as_slice_mut();
-            f(txbuf_byte_slice)?
+            f(&mut txbuf)?
         };
         self.nic_ref.lock()
             .send_packet(txbuf)

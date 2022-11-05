@@ -14,12 +14,13 @@ use memory::{PhysicalAddress, MappedPages, EntryFlags, create_contiguous_mapping
 
 /// A buffer that stores a packet to be transmitted through the NIC
 /// and is guaranteed to be contiguous in physical memory. 
-/// Auto-dereferences into a `MappedPages` object that represents its underlying memory. 
+/// Auto-dereferences into a byte slice that represents its underlying memory. 
 pub struct TransmitBuffer {
-    pub mp: MappedPages,
-    pub phys_addr: PhysicalAddress,
-    pub length: u16,
+    mp: MappedPages,
+    phys_addr: PhysicalAddress,
+    length: u16,
 }
+
 impl TransmitBuffer {
     /// Creates a new TransmitBuffer with the specified size in bytes.
     /// The size is a `u16` because that is the maximum size of an NIC transmit buffer. 
@@ -35,14 +36,40 @@ impl TransmitBuffer {
         })
     }
 
-    pub fn as_slice(&self) -> &[u8] {
+    pub fn phys_addr(&self) -> PhysicalAddress {
+        self.phys_addr
+    }
+
+    pub fn length(&self) -> u16 {
+        self.length
+    }
+
+    /// Sets the buffers length.
+    ///
+    /// Returns an error if the length is greater than the current length.
+    pub fn set_length(&mut self, length: u16) -> Result<(), &'static str> {
+        if length > self.length {
+            Err("ReceiveBuffer::set_length(): length too long")
+        } else {
+            self.length = length;
+            Ok(())
+        }
+    }
+}
+
+impl Deref for TransmitBuffer {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
         // We checked that the mapped pages are >= to self.length during initialisation.
         // There can be no overflows since length is a u16, nor can there be alignment
         // issues because we are operating on u8s.
         self.mp.as_slice(0, self.length.into()).unwrap() 
     }
-    
-    pub fn as_slice_mut(&mut self) -> &mut [u8] {
+}
+
+impl DerefMut for TransmitBuffer {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         // We checked that the mapped pages are >= to self.length during initialisation
         // and that they are writable. There can be no overflows since length is
         // a u16, nor can there be alignment issues because we are operating on
@@ -51,29 +78,18 @@ impl TransmitBuffer {
     }
 }
 
-impl Deref for TransmitBuffer {
-    type Target = MappedPages;
-    fn deref(&self) -> &MappedPages {
-        &self.mp
-    }
-}
-impl DerefMut for TransmitBuffer {
-    fn deref_mut(&mut self) -> &mut MappedPages {
-        &mut self.mp
-    }
-}
-
 
 /// A buffer that stores a packet (a piece of an Ethernet frame) that has been received from the NIC
 /// and is guaranteed to be contiguous in physical memory. 
-/// Auto-dereferences into a `MappedPages` object that represents its underlying memory. 
+/// Auto-dereferences into a byte slice that represents its underlying memory. 
 /// When dropped, its underlying memory is automatically returned to the NIC driver for future reuse.
 pub struct ReceiveBuffer {
-    pub mp: MappedPages,
-    pub phys_addr: PhysicalAddress,
-    pub length: u16,
+    mp: MappedPages,
+    phys_addr: PhysicalAddress,
+    length: u16,
     pool: &'static mpmc::Queue<ReceiveBuffer>,
 }
+
 impl ReceiveBuffer {
     /// Creates a new ReceiveBuffer with the given `MappedPages`, `PhysicalAddress`, and `length`. 
     /// When this ReceiveBuffer object is dropped, it will be returned to the given `pool`.
@@ -92,14 +108,40 @@ impl ReceiveBuffer {
         }
     }
 
-    pub fn as_slice(&self) -> &[u8] {
+    pub fn phys_addr(&self) -> PhysicalAddress {
+        self.phys_addr
+    }
+
+    pub fn length(&self) -> u16 {
+        self.length
+    }
+
+    /// Sets the buffers length.
+    ///
+    /// Returns an error if the length is greater than the current length.
+    pub fn set_length(&mut self, length: u16) -> Result<(), &'static str> {
+        if length > self.length {
+            Err("ReceiveBuffer::set_length(): length too long")
+        } else {
+            self.length = length;
+            Ok(())
+        }
+    }
+}
+
+impl Deref for ReceiveBuffer {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target{
         // We checked that the mapped pages are >= to self.length during initialisation.
         // There can be no overflows since length is a u16, nor can there be alignment
         // issues because we are operating on u8s.
-        self.mp.as_slice(0, usize::from(self.length)).unwrap() 
+        self.mp.as_slice(0, usize::from(self.length)).unwrap()
     }
-    
-    pub fn as_slice_mut(&mut self) -> &mut [u8] {
+}
+
+impl DerefMut for ReceiveBuffer {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         // We checked that the mapped pages are >= to self.length during initialisation
         // and that they are writable. There can be no overflows since length is
         // a u16, nor can there be alignment issues because we are operating on
@@ -107,17 +149,7 @@ impl ReceiveBuffer {
         self.mp.as_slice_mut(0, usize::from(self.length)).unwrap()
     }
 }
-impl Deref for ReceiveBuffer {
-    type Target = MappedPages;
-    fn deref(&self) -> &MappedPages {
-        &self.mp
-    }
-}
-impl DerefMut for ReceiveBuffer {
-    fn deref_mut(&mut self) -> &mut MappedPages {
-        &mut self.mp
-    }
-}
+
 impl Drop for ReceiveBuffer {
     fn drop(&mut self) {
         // trace!("ReceiveBuffer::drop(): length: {:5}, phys_addr: {:#X}, vaddr: {:#X}", self.length,  self.phys_addr, self.mp.start_address());

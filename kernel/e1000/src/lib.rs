@@ -426,7 +426,7 @@ impl net::NetworkDevice for E1000Nic {
     fn send(&mut self, buf: &[u8]) -> net::Result<()> {
         // TODO: This is just a workaround to make the new API work with the old machinery.
         let mut transmit_buffer = TransmitBuffer::new(buf.len() as u16).map_err(|_| net::Error::Exhausted)?;
-        let transmit_buffer_mut = transmit_buffer.as_slice_mut();
+        let transmit_buffer_mut = &mut transmit_buffer;
         transmit_buffer_mut.clone_from_slice(buf);
         // TODO: Return specific error.
         self.send_packet(transmit_buffer).map_err(|_| net::Error::Unknown)?;

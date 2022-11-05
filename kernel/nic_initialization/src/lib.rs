@@ -119,7 +119,7 @@ pub fn init_rx_queue<T: RxDescriptor, S:RxQueueRegisters>(num_desc: usize, rx_bu
                         ReceiveBuffer::new(buf_mapped, buf_paddr, buffer_size as u16, rx_buffer_pool)
                     )
             })?;
-        let paddr_buf = rx_buf.phys_addr;
+        let paddr_buf = rx_buf.phys_addr();
         rx_bufs_in_use.push(rx_buf); 
 
 

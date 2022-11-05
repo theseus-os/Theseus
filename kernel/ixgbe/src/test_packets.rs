@@ -37,7 +37,7 @@ pub fn create_dhcp_test_packet() -> Result<TransmitBuffer, &'static str> {
     ];
     let mut transmit_buffer = TransmitBuffer::new(packet.len() as u16)?;
     { 
-        let buffer: &mut [u8] = transmit_buffer.as_slice_mut();
+        let buffer = &mut transmit_buffer;
         buffer.copy_from_slice(&packet);
     }
     Ok(transmit_buffer)
@@ -66,7 +66,7 @@ pub fn create_raw_packet(
     let ether_type: [u8; ETHER_TYPE_LEN] = [(len >> 8) as u8, len as u8];
 
     let mut transmit_buffer = TransmitBuffer::new(ETHERNET_HEADER_LEN as u16 + len)?;
-    let buffer = transmit_buffer.as_slice_mut();
+    let buffer = &mut transmit_buffer;
     buffer[0..MAC_ADDR_LEN].copy_from_slice(&dest_mac_address);
     buffer[6..(6 + MAC_ADDR_LEN)].copy_from_slice(&source_mac_address);
     buffer[12..(12 + ETHER_TYPE_LEN)].copy_from_slice(&ether_type);
