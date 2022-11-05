@@ -107,6 +107,7 @@ enum HostToControllerCommand {
 }
 
 /// Write a command to the PS/2 command port/register
+/// 
 /// Note: Devices attached to the controller should be disabled
 /// before sending commands that return data, otherwise the output buffer could get overwritten
 fn write_command(value: HostToControllerCommand) {
@@ -115,45 +116,44 @@ fn write_command(value: HostToControllerCommand) {
     }
 }
 
-#[allow(non_camel_case_types)]
-type u1 = B1;
-#[allow(non_camel_case_types)]
-type bool1 = bool;
-
+// workaround for `dead_code` warnings, https://github.com/Robbepop/modular-bitfield/issues/56
+#[allow(dead_code)] fn hi() {ControllerToHostStatus::new().into_bytes();}
 // see https://wiki.osdev.org/%228042%22_PS/2_Controller#Status_Register
 // and https://users.utcluj.ro/~baruch/sie/labor/PS2/PS-2_Keyboard_Interface.htm
-// `pub` because of `dead_code` warnings, see https://github.com/Robbepop/modular-bitfield/issues/56
 #[bitfield(bits = 8)]
-pub struct ControllerToHostStatus {
+struct ControllerToHostStatus {
     /// When using [Polling](https://wiki.osdev.org/%228042%22_PS/2_Controller#Polling), must be `true` before attempting to read data from [PS2_DATA_PORT].
     /// When using [Interrupts](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts), guaranteed to be `true`, because an interrupt only happens if the buffer is full
     /// Alternative name: output_register_full, which might make more sense because it only ever fits 1 byte. "Buffer" sounds like multiple.
-    output_buffer_full: bool1,
+    output_buffer_full: bool,
     /// Must be `false` before attempting to write data to [PS2_DATA_PORT] or [PS2_COMMAND_AND_STATUS_PORT] for 8042 keyboard controller
     /// Alternative name: input_register_full, which might make more sense because it only ever fits 1 byte. "Buffer" sounds like multiple.
-    input_buffer_full: bool1,
+    input_buffer_full: bool,
     /// Cleared on reset; set when the system passed Power-on self-test
     #[allow(dead_code)]
-    system_passed_self_test: bool1,
+    system_passed_self_test: bool,
     /// Input buffer should be written to: 0 - [PS2_DATA_PORT], 1 - [PS2_COMMAND_AND_STATUS_PORT]
     #[allow(dead_code)]
-    input_buffer_is_command: u1,
+    input_buffer_is_command: B1,
     /// Whether or not communication is inhibited (via switch) / Unknown (chipset specific) / (more likely unused on modern systems)
     #[allow(dead_code)]
-    keyboard_enabled: bool1,
-    ///// Keyboard didn't generate clock signals within 15 ms of "request-to-send" (exclusive to AT-compatible mode)
-    // transmit_timeout: bool1,
-    ///// Keyboard didn't generate clock signals within 20 ms of command reception (exclusive to AT-compatible mode)
-    // receive_timeout: bool1,
+    keyboard_enabled: bool,
+
+    //deprecated (exclusive to AT-compatible mode)
+    // /// Keyboard didn't generate clock signals within 15 ms of "request-to-send"
+    // transmit_timeout: bool,
+    // /// Keyboard didn't generate clock signals within 20 ms of command reception
+    // receive_timeout: bool,
+    
     /// Similar to `output_buffer_full`, except for mouse
     #[allow(dead_code)]
-    mouse_output_buffer_full: bool1,
-    /// Timeout during keyboard command receive or response (Same as [transmit_timeout] + [receive_timeout])
+    mouse_output_buffer_full: bool,
+    /// Timeout during keyboard command receive or response (Same as `transmit_timeout` + `receive_timeout`)
     #[allow(dead_code)]
-    timeout_error: bool1,
+    timeout_error: bool,
     /// Should be odd parity, set to `true` if even parity received
     #[allow(dead_code)]
-    parity_error: bool1,
+    parity_error: bool,
 }
 
 /// Read the PS/2 status port/register
@@ -214,24 +214,28 @@ fn write_data(value: WritableData) {
 #[derive(Debug)]
 pub struct ControllerConfigurationByte {
     /// interrupt on [ControllerToHostStatus] `output_buffer_full`
-    port1_interrupt_enabled: bool1,
+    port1_interrupt_enabled: bool,
     /// interrupt on [ControllerToHostStatus] `mouse_output_buffer_full`
-    port2_interrupt_enabled: bool1, //NOTE: only if 2 PS/2 ports supported
+    /// 
+    /// Note: only if 2 PS/2 ports supported
+    port2_interrupt_enabled: bool,
     /// Cleared on reset; set when the system passed Power-on self-test
     #[allow(dead_code)]
-    system_passed_self_test: bool1,
+    system_passed_self_test: bool,
     // or override_keyboard_inhibiting
     #[allow(dead_code)]
-    should_be_zero: u1,
+    should_be_zero: B1,
     /// disables the keyboard
-    port1_clock_disabled: bool1,
+    port1_clock_disabled: bool,
     /// disables the auxilary device (mouse)
-    port2_clock_disabled: bool1, //NOTE: only if 2 PS/2 ports supported
+    /// 
+    /// Note: only if 2 PS/2 ports supported
+    port2_clock_disabled: bool,
     /// whether IBM scancode translation is enabled (0=AT, 1=PC)
     #[allow(dead_code)]
-    port1_translation_enabled: bool1,
+    port1_translation_enabled: bool,
     #[allow(dead_code)]
-    must_be_zero: u1,
+    must_be_zero: B1,
 }
 
 /// read the config of the PS/2 port
@@ -390,11 +394,14 @@ fn read_port_test_result() -> Result<PortTestResult, &'static str> {
 #[repr(u8)]
 pub enum DeviceToHostResponse {
     KeyDetectionErrorOrInternalBufferOverrun1 = 0x00,
-    SelfTestPassed = 0xAA, //sent after "0xFF (reset)" command or keyboard power up
+    /// sent after "0xFF (reset)" command or keyboard power up
+    SelfTestPassed = 0xAA,
     ResponseToEcho = 0xEE,
     Acknowledge = 0xFA,
-    SelfTestFailed1 = 0xFC, //sent after "0xFF (reset)" command or keyboard power up
-    SelfTestFailed2 = 0xFD, //sent after "0xFF (reset)" command or keyboard power up
+    /// sent after "0xFF (reset)" command or keyboard power up
+    SelfTestFailed1 = 0xFC,
+    /// sent after "0xFF (reset)" command or keyboard power up
+    SelfTestFailed2 = 0xFD,
     ResendCommand = 0xFE,
     KeyDetectionErrorOrInternalBufferOverrun2 = 0xFF,
 }
@@ -438,8 +445,9 @@ pub enum HostToKeyboardCommandOrData {
 #[derive(Clone)]
 pub enum HostToKeyboardCommand {
     SetLEDStatus = 0xED,
-    ///// for diagnostic purposes and useful for device removal detection
-    //Echo = 0xEE,
+    // unused
+    // /// for diagnostic purposes and useful for device removal detection
+    // Echo = 0xEE,
     SetScancodeSet = 0xF0,
     IdentifyKeyboard = 0xF2,
     /// also called typematic
@@ -447,21 +455,18 @@ pub enum HostToKeyboardCommand {
     EnableScanning = 0xF4,
     /// might also restore default parameters
     DisableScanning = 0xF5,
+    // unused
     //SetDefaultParameters = 0xF6,
-    ///// scancode set 3 only
+
+    // unused and scancode set 3 only
     //SetAllKeysToAutorepeat = 0xF7,
-    ///// scancode set 3 only
     //SetAllKeysToMakeRelease = 0xF8,
-    ///// scancode set 3 only
     //SetAllKeysToMake = 0xF9,
-    ///// scancode set 3 only
-    //SetAllKeysToAutorepeatMakeRelease = 0xFA, //NOTE: same value as ACK
-    ///// scancode set 3 only
+    //SetAllKeysToAutorepeatMakeRelease = 0xFA,
     //SetKeyToAutorepeat = 0xFB,
-    ///// scancode set 3 only
-    //SetKeyToMakeRelease = 0xFC, //NOTE: same value as Self test failed
-    ///// scancode set 3 only
+    //SetKeyToMakeRelease = 0xFC,
     //SetKeyToMake = 0xFD,
+
     ResendByte = 0xFE,
     ResetAndStartSelfTest = 0xFF,
 }
@@ -543,16 +548,16 @@ fn command_to_mouse(value: HostToMouseCommandOrData) -> Result<(), &'static str>
 #[derive(Debug)]
 pub struct MousePacketBits4 {
     //1. byte starts here
-    pub button_left: bool1,
-    pub button_right: bool1,
-    pub button_middle: bool1,
-    pub always_one: u1,
+    pub button_left: bool,
+    pub button_right: bool,
+    pub button_middle: bool,
+    pub always_one: B1,
     /// see [x_1st_to_8th_bit]
-    x_9th_bit: bool1,
+    x_9th_bit: bool,
     /// see [y_1st_to_8th_bit]
-    y_9th_bit: bool1,
-    pub x_overflow: bool1,
-    pub y_overflow: bool1,
+    y_9th_bit: bool,
+    pub x_overflow: bool,
+    pub y_overflow: bool,
     //2. byte
     /// only a part of x_movement, needs to be combined with [x_9th_bit]
     x_1st_to_8th_bit: B8, //u8 with #[bits = 8] attribute didn't work
@@ -562,12 +567,12 @@ pub struct MousePacketBits4 {
     //4. byte starts here
     /// already stored in two's complement
     z_movement: B4, //u8 with #[bits = 4] attribute didn't work
-    pub button_4: bool1,
-    pub button_5: bool1,
+    pub button_4: bool,
+    pub button_5: bool,
     #[allow(dead_code)]
-    zero1: u1,
+    zero1: B1,
     #[allow(dead_code)]
-    zero2: u1,
+    zero2: B1,
 }
 
 impl MousePacketBits4 {
