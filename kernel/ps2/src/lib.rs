@@ -641,11 +641,15 @@ fn set_mouse_sampling_rate(value: SampleRate) -> Result<(), &'static str> {
         .map_err(|_| "failed to set the mouse sampling rate")
 }
 
+#[derive(Debug, TryFromPrimitive)]
+#[repr(u8)]
 pub enum MouseId {
+    /// the mouse has no scroll-movement
+    Zero = 0,
     /// the mouse has scroll-movement
-    Three,
+    Three = 3,
     /// the mouse has scroll-movement, fourth and fifth buttons
-    Four,
+    Four = 4,
 }
 
 /// set the [MouseId] by magic sequence
@@ -654,6 +658,7 @@ pub fn set_mouse_id(id: MouseId) -> Result<(), &'static str> {
 
     use crate::SampleRate::*;
     match id {
+        MouseId::Zero => { /* do nothing */ }
         MouseId::Three => {
             for rate in [_200, _100, _80] {
                 set_mouse_sampling_rate(rate)?;
@@ -671,16 +676,15 @@ pub fn set_mouse_id(id: MouseId) -> Result<(), &'static str> {
     Ok(())
 }
 
-
-pub fn mouse_id() -> Result<u8, &'static str> {
+/// get the [MouseId]
+pub fn mouse_id() -> Result<MouseId, &'static str> {
     disable_mouse_packet_streaming()?;
 
-    // check whether the command is acknowledged
     command_to_mouse(HostToMouseCommandOrData::MouseCommand(GetDeviceID))?;
-    let id_num = read_data();
+    let id = read_data().try_into().map_err(|_| "failed to get mouse id: bad response")?;
 
     enable_mouse_packet_streaming()?;
-    Ok(id_num)
+    Ok(id)
 }
 
 /// reset the mouse

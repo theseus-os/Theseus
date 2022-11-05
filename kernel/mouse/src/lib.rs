@@ -28,7 +28,8 @@ pub fn init(mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
     // Test the second port.
     test_ps2_port2()?;
 
-    //TODO: set to 3, failed? id = 0, otherwise set to 4, failed? id = 3, otheriwse id = 4
+    //TODO: set to 3, failed? id = 0, otherwise set to 4, failed? id = 3, otherwise id = 4
+    //the current code beneath just tries to set id = 4, so is not final
     // Set Mouse ID to 4.
     if let Err(e) = set_mouse_id(MouseId::Four) {
         error!("Failed to set the mouse id to four: {e}");
@@ -36,7 +37,13 @@ pub fn init(mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
     }
     // Read it back to check that it worked.
     match mouse_id() {
-        Ok(id) => debug!("The PS/2 mouse ID is: {id}"),
+        Ok(id) =>  {
+            debug!("The PS/2 mouse ID is: {id:?}");
+            if !matches!(id, MouseId::Four) {
+                error!("Failed to set the mouse id to four");
+                return Err("Failed to set the mouse id to four");
+            }
+        }
         Err(e) => {
             error!("Failed to read the PS/2 mouse ID: {e}");
             return Err("Failed to read the PS/2 mouse ID");
