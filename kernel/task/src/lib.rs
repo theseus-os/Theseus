@@ -418,28 +418,42 @@ impl Hash for Task {
 
 impl Task {
     /// Creates a new Task structure and initializes it to be non-Runnable.
-    /// By default, the new `Task` will inherit some of the same states from the currently-running `Task`:
+    /// 
+    /// By default, the new `Task` will inherit some of its states from the given `parent_task`:
     /// its `Environment`, `MemoryManagementInfo`, `CrateNamespace`, and `app_crate` reference.
-    /// If needed, those states can be changed by setting them for the returned `Task`.
+    /// If necessary, those states can be changed by setting them for the returned `Task`.
     /// 
     /// # Arguments
     /// * `kstack`: the optional kernel `Stack` for this `Task` to use.
-    ///    If not provided, a kernel stack of the default size will be allocated and used.
+    ///    * If `None`, a kernel stack of the default size will be allocated and used.
+    /// * `parent_task`: the optional `TaskRef` that acts as a sort of "parent" template
+    ///    for this new `Task`.
+    ///    Theseus doesn't have a true parent-child relationship between tasks;
+    ///    the new `Task` merely inherits certain states from this `parent_task`.
+    ///    * If `None`, the current task is used to determine the initial values of those states.
+    ///      This means that the tasking infrastructure must have been initialized before
+    ///      this function can be invoked with a `parent_task` value of `None`.
+    /// * `failure_cleanup_function`: an error handling function that acts as a last resort
+    ///    when all else fails, e.g., if unwinding crashes.
     /// 
-    /// # Note
-    /// This does not run the task, schedule it in, or switch to it.
-    /// 
-    /// However, it requires tasking to already be set up, i.e., the current task must be known.
+    /// ## Note
+    /// * If invoking this function with a `parent_task` value of `None`,
+    ///   tasking must have already been initialized so the current task can be obtained.
+    /// * This does not run the task, schedule it in, or switch to it.
+    /// * If you want to create a new task, you should use the `spawn` crate instead.
     pub fn new(
         kstack: Option<Stack>,
+        parent_task: Option<&TaskRef>,
         failure_cleanup_function: FailureCleanupFunction
     ) -> Result<Task, &'static str> {
-        let curr_task = get_my_current_task().ok_or("Task::new(): couldn't get current task (not yet initialized)")?;
+        let parent_task = parent_task
+            .or_else(|| get_my_current_task())
+            .ok_or("Task::new(): `parent_task` wasn't provided, and couldn't get current task")?;
         let (mmi, namespace, env, app_crate) = (
-            Arc::clone(&curr_task.mmi),
-            Arc::clone(&curr_task.namespace),
-            Arc::clone(&curr_task.inner.lock().env),
-            curr_task.app_crate.clone(),
+            Arc::clone(&parent_task.mmi),
+            Arc::clone(&parent_task.namespace),
+            Arc::clone(&parent_task.inner.lock().env),
+            parent_task.app_crate.clone(),
         );
 
         let kstack = kstack
