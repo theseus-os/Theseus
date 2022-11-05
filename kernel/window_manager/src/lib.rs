@@ -682,7 +682,7 @@ fn window_manager_loop(
                     keyboard_handle_application(key_input)?;
                 }
                 Event::MouseMovementEvent(ref mouse_event) => {
-                    //as isize probably because adding up mouse movements will overflow?
+                    //as isize to fit larger values
                     let mut x = mouse_event.movement.x_movement as isize;
                     let mut y = mouse_event.movement.y_movement as isize;
 
@@ -700,8 +700,8 @@ fn window_manager_loop(
                                         == mouse_event.buttons.fourth_button_hold
                                     && next_mouse_event.buttons.fifth_button_hold
                                         == mouse_event.buttons.fifth_button_hold {
-                                    x += next_mouse_event.movement.x_movement as isize;
-                                    y += next_mouse_event.movement.y_movement as isize;
+                                    x = x.saturating_add(next_mouse_event.movement.x_movement as isize);
+                                    y = y.saturating_add(next_mouse_event.movement.y_movement as isize);
                                 }
                             }
                             _ => {
