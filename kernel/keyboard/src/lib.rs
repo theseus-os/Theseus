@@ -45,7 +45,8 @@ pub fn init(keyboard_queue_producer: Queue<Event>) -> Result<(), &'static str> {
         }
     }
 
-    keyboard_scancode_set(ScancodeSet::Set2)?;
+    // TODO: figure out what we should do
+    // keyboard_scancode_set(ScancodeSet::Set2)?;
 
     // Register the interrupt handler
     interrupts::register_interrupt(PS2_KEYBOARD_IRQ, ps2_keyboard_handler).map_err(|e| {
