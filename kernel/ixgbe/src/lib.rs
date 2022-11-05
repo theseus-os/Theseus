@@ -27,7 +27,6 @@ extern crate pic;
 extern crate acpi;
 extern crate volatile;
 extern crate mpmc;
-extern crate owning_ref;
 extern crate rand;
 extern crate hpet;
 extern crate runqueue;
@@ -50,13 +49,13 @@ use queue_registers::*;
 
 use spin::Once;
 use alloc::{
-    vec::Vec,
+    boxed::Box,
     collections::VecDeque,
     sync::Arc,
-    boxed::Box,
+    vec::Vec,
 };
 use irq_safety::MutexIrqSafe;
-use memory::{PhysicalAddress, MappedPages};
+use memory::{PhysicalAddress, MappedPages, Mutable, BorrowedSliceMappedPages, BorrowedMappedPages};
 use pci::{PciDevice, MSIX_CAPABILITY, PciConfigSpaceAccessMechanism, PciLocation};
 use bit_field::BitField;
 use interrupts::register_msi_interrupt;
@@ -67,7 +66,6 @@ use nic_initialization::*;
 use intel_ethernet::descriptors::{AdvancedRxDescriptor, AdvancedTxDescriptor};    
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
 use nic_queues::{RxQueue, TxQueue};
-use owning_ref::BoxRefMut;
 use rand::{
     SeedableRng,
     RngCore,
@@ -162,15 +160,15 @@ pub struct IxgbeNic {
     /// The optional spoofed MAC address to use in place of `mac_hardware` when transmitting.  
     mac_spoofed: Option<[u8; 6]>,
     /// Memory-mapped control registers
-    regs1: BoxRefMut<MappedPages, IntelIxgbeRegisters1>,
+    regs1: BorrowedMappedPages<IntelIxgbeRegisters1, Mutable>,
     /// Memory-mapped control registers
-    regs2: BoxRefMut<MappedPages, IntelIxgbeRegisters2>,
+    regs2: BorrowedMappedPages<IntelIxgbeRegisters2, Mutable>,
     /// Memory-mapped control registers
-    regs3: BoxRefMut<MappedPages, IntelIxgbeRegisters3>,
+    regs3: BorrowedMappedPages<IntelIxgbeRegisters3, Mutable>,
     /// Memory-mapped control registers
-    regs_mac: BoxRefMut<MappedPages, IntelIxgbeMacRegisters>,
+    regs_mac: BorrowedMappedPages<IntelIxgbeMacRegisters, Mutable>,
     /// Memory-mapped msi-x vector table
-    msix_vector_table: BoxRefMut<MappedPages, MsixVectorTable>,
+    msix_vector_table: BorrowedMappedPages<MsixVectorTable, Mutable>,
     /// Array to store which L3/L4 5-tuple filters have been used.
     /// There are 128 such filters available.
     l34_5_tuple_filters: [bool; 128],
@@ -320,7 +318,7 @@ impl IxgbeNic {
         let mut id = 0;
         while !rx_descs.is_empty() {
             let rx_queue = RxQueue {
-                id: id,
+                id,
                 regs: rx_mapped_registers.remove(0),
                 rx_descs: rx_descs.remove(0),
                 num_rx_descs: num_rx_descriptors,
@@ -376,10 +374,10 @@ impl IxgbeNic {
         Self::wait_for_link(&mapped_registers2, 10_000_000);
 
         let ixgbe_nic = IxgbeNic {
-            dev_id: dev_id,
-            bar_type: bar_type,
-            mem_base: mem_base,
-            interrupt_num: interrupt_num,
+            dev_id,
+            bar_type,
+            mem_base,
+            interrupt_num,
             mac_hardware: mac_addr_hardware,
             mac_spoofed: None,
             regs1: mapped_registers1,
@@ -389,10 +387,10 @@ impl IxgbeNic {
             msix_vector_table: vector_table,
             l34_5_tuple_filters: [false; NUM_L34_5_TUPLE_FILTERS],
             num_rx_queues: IXGBE_NUM_RX_QUEUES_ENABLED,
-            rx_queues: rx_queues,
+            rx_queues,
             rx_registers_disabled: rx_mapped_registers,
             num_tx_queues: IXGBE_NUM_TX_QUEUES_ENABLED,
-            tx_queues: tx_queues,
+            tx_queues,
             tx_registers_disabled: tx_mapped_registers,
         };
 
@@ -410,11 +408,11 @@ impl IxgbeNic {
     fn mapped_reg(
         mem_base: PhysicalAddress
     ) -> Result<(
-        BoxRefMut<MappedPages, IntelIxgbeRegisters1>, 
-        BoxRefMut<MappedPages, IntelIxgbeRegisters2>, 
-        BoxRefMut<MappedPages, IntelIxgbeRegisters3>, 
-        BoxRefMut<MappedPages, IntelIxgbeMacRegisters>, 
-        Vec<IxgbeRxQueueRegisters>, 
+        BorrowedMappedPages<IntelIxgbeRegisters1, Mutable>,
+        BorrowedMappedPages<IntelIxgbeRegisters2, Mutable>,
+        BorrowedMappedPages<IntelIxgbeRegisters3, Mutable>,
+        BorrowedMappedPages<IntelIxgbeMacRegisters, Mutable>,
+        Vec<IxgbeRxQueueRegisters>,
         Vec<IxgbeTxQueueRegisters>
     ), &'static str> {
         // We've divided the memory-mapped registers into multiple regions.
@@ -449,10 +447,10 @@ impl IxgbeNic {
         let nic_regs3_mapped_page = allocate_memory(offset, GENERAL_REGISTERS_3_SIZE_BYTES)?;
 
         // Map the memory as the register struct and tie the lifetime of the struct with its backing mapped pages
-        let regs1 = BoxRefMut::new(Box::new(nic_regs1_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<IntelIxgbeRegisters1>(0))?;
-        let regs2 = BoxRefMut::new(Box::new(nic_regs2_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<IntelIxgbeRegisters2>(0))?;
-        let regs3 = BoxRefMut::new(Box::new(nic_regs3_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<IntelIxgbeRegisters3>(0))?;
-        let mac_regs = BoxRefMut::new(Box::new(nic_mac_regs_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<IntelIxgbeMacRegisters>(0))?;
+        let regs1    = nic_regs1_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        let regs2    = nic_regs2_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        let regs3    = nic_regs3_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        let mac_regs = nic_mac_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
         
         // Divide the pages of the Rx queue registers into multiple 64B regions
         let mut regs_rx = Self::mapped_regs_from_rx_memory(nic_rx_regs1_mapped_page);
@@ -482,7 +480,9 @@ impl IxgbeNic {
             // This is safe because we have checked that the number of queues we want to partition from these mapped pages fit into the allocated memory,
             // and that each queue starts at the end of the previous.
             // We also ensure that the backing mapped pages are included in the same struct as the registers, almost as a pseudo OwningRef
-            let registers = unsafe{ Box::from_raw((starting_address.value() + (i * RX_QUEUE_REGISTERS_SIZE_BYTES)) as *mut RegistersRx) };
+            let registers = unsafe {
+                Box::from_raw((starting_address.value() + (i * RX_QUEUE_REGISTERS_SIZE_BYTES)) as *mut RegistersRx)
+            };
             pointers_to_queues.push(
                 IxgbeRxQueueRegisters {
                     regs: ManuallyDrop::new(registers),
@@ -523,7 +523,7 @@ impl IxgbeNic {
     }
 
     /// Returns the memory mapped msix vector table
-    pub fn mem_map_msix(dev: &PciDevice) -> Result<BoxRefMut<MappedPages, MsixVectorTable>, &'static str> {
+    pub fn mem_map_msix(dev: &PciDevice) -> Result<BorrowedMappedPages<MsixVectorTable, Mutable>, &'static str> {
         // retreive the address in the pci config space for the msi-x capability
         let cap_addr = dev.find_pci_capability(MSIX_CAPABILITY).ok_or("ixgbe: device does not have MSI-X capability")?;
         // find the BAR used for msi-x
@@ -539,7 +539,8 @@ impl IxgbeNic {
         // debug!("msi-x vector table bar: {}, base_address: {:#X} and size: {} bytes", bar, mem_base, mem_size_in_bytes);
 
         let msix_mapped_pages = allocate_memory(mem_base, mem_size_in_bytes)?;
-        let vector_table = BoxRefMut::new(Box::new(msix_mapped_pages)).try_map_mut(|mp| mp.as_type_mut::<MsixVectorTable>(0))?;
+        let vector_table = BorrowedMappedPages::from_mut(msix_mapped_pages, 0)
+            .map_err(|(_mp, err)| err)?;
 
         Ok(vector_table)
     }
@@ -790,7 +791,7 @@ impl IxgbeNic {
         num_rx_descs: u16,
         rx_buffer_size_kbytes: RxBufferSizeKiB
     ) -> Result<(
-        Vec<BoxRefMut<MappedPages, [AdvancedRxDescriptor]>>, 
+        Vec<BorrowedSliceMappedPages<AdvancedRxDescriptor, Mutable>>, 
         Vec<Vec<ReceiveBuffer>>
     ), &'static str> {
 
@@ -874,7 +875,7 @@ impl IxgbeNic {
         regs_mac: &mut IntelIxgbeMacRegisters, 
         tx_regs: &mut Vec<IxgbeTxQueueRegisters>,
         num_tx_descs: u16
-    ) -> Result<Vec<BoxRefMut<MappedPages, [AdvancedTxDescriptor]>>, &'static str> {
+    ) -> Result<Vec<BorrowedSliceMappedPages<AdvancedTxDescriptor, Mutable>>, &'static str> {
         // disable transmission
         Self::disable_transmission(regs);
 

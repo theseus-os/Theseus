@@ -6,7 +6,6 @@ description = "an easy-to-use window object owned by application"
 
 [dependencies]
 spin = "0.9.0"
-owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 mpmc = "0.1.6"
 
 [dependencies.log]
@@ -40,7 +39,10 @@ path = "../spawn"
 path = "../mouse"
 
 [dependencies.path]
-path = "../../kernel/path"
+path = "../path"
+
+[dependencies.dereffer]
+path = "../../libs/dereffer"
 
 [lib]
 crate-type = ["rlib"]

@@ -28,7 +28,7 @@ extern crate libterm;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 
-use event_types::{Event};
+use event_types::Event;
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -106,11 +106,12 @@ pub fn main(_args: Vec<String>) -> isize {
         };
     }
 
+    // block this task, because it never needs to actually run again
+    task::get_my_current_task().unwrap().block().unwrap();
+    scheduler::schedule();
+
     loop {
-        // block this task, because it never needs to actually run again
-        if let Some(my_task) = task::get_my_current_task() {
-            my_task.block();
-        }
+        warn!("BUG: blocked shell task was scheduled in unexpectedly");
     }
 
     // TODO: when `join` puts this task to sleep instead of spinning, we can re-enable it.
@@ -460,8 +461,9 @@ impl Shell {
                 app_io::lock_and_execute(&|_flags_guard, _streams_guard| {
                     // Stop all tasks in the job.
                     for task_ref in task_refs {
-                        if task_ref.has_exited() { continue; }
-                        task_ref.block();
+                        if task_ref.block().is_err() {
+                            continue;
+                        }
 
                         // Here we must wait for the running application to stop before releasing the lock,
                         // because the previous `block` method will NOT stop the application immediately.
@@ -681,8 +683,13 @@ impl Shell {
     /// all tasks that have already been spawned will be killed immeidately before returning error.
     fn eval_cmdline(&mut self) -> Result<Vec<JoinableTaskRef>, AppErr> {
 
-        let cmdline = self.cmdline.clone();
+        let cmdline = self.cmdline.trim().to_string();
         let mut task_refs = Vec::new();
+
+        // If the command line is empty or starts with '|', return 'AppErr'
+        if cmdline.is_empty() || cmdline.starts_with('|') {
+            return Err(AppErr::NotFound(cmdline))
+        }
 
         for single_task_cmd in cmdline.split('|') {
             let mut args: Vec<String> = single_task_cmd.split_whitespace().map(|s| s.to_string()).collect();
@@ -768,7 +775,7 @@ impl Shell {
 
                 // All IO streams have been set up for the new tasks. Safe to unblock them now.
                 for task_ref in &new_job.tasks {
-                    task_ref.unblock();
+                    task_ref.unblock().unwrap();
                 }
 
                 // Allocate a job number for the new job. It will start from 1 and choose the smallest number
@@ -791,7 +798,15 @@ impl Shell {
             },
             Err(err) => {
                 let err_msg = match err {
-                    AppErr::NotFound(command) => format!("{:?} command not found.\n", command),
+                    AppErr::NotFound(command) => {
+                        // No need to return err if command is empty
+                        if command.trim().is_empty() {
+                            String::new()
+                        }
+                        else {
+                            format!("{:?} command not found.\n", command)
+                        }
+                    },
                     AppErr::NamespaceErr      => format!("Failed to find directory of application executables.\n"),
                     AppErr::SpawnErr(e)       => format!("Failed to spawn new task to run command. Error: {}.\n", e),
                 };
@@ -1416,10 +1431,11 @@ impl Shell {
             if let Ok(job_num) = job_num.parse::<isize>() {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
                     for task_ref in &job.tasks {
-                        if !task_ref.has_exited() {
-                            task_ref.unblock();
+                        if let Err(_) = task_ref.unblock() {
+                            job.status = JobStatus::Stopped;
+                        } else {
+                            job.status = JobStatus::Running;
                         }
-                        job.status = JobStatus::Running;
                     }
                     self.clear_cmdline(false)?;
                     self.redisplay_prompt();
@@ -1449,10 +1465,11 @@ impl Shell {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
                     self.fg_job_num = Some(job_num);
                     for task_ref in &job.tasks {
-                        if !task_ref.has_exited() {
-                            task_ref.unblock();
+                        if let Err(_) = task_ref.unblock() {
+                            job.status = JobStatus::Stopped;
+                        } else {
+                            job.status = JobStatus::Running;
                         }
-                        job.status = JobStatus::Running;
                     }
                     return Ok(());
                 }

@@ -27,7 +27,6 @@
 
 #![no_std]
 #![feature(panic_info_message)]
-#![feature(const_btree_new)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -419,28 +418,42 @@ impl Hash for Task {
 
 impl Task {
     /// Creates a new Task structure and initializes it to be non-Runnable.
-    /// By default, the new `Task` will inherit some of the same states from the currently-running `Task`:
+    /// 
+    /// By default, the new `Task` will inherit some of its states from the given `parent_task`:
     /// its `Environment`, `MemoryManagementInfo`, `CrateNamespace`, and `app_crate` reference.
-    /// If needed, those states can be changed by setting them for the returned `Task`.
+    /// If necessary, those states can be changed by setting them for the returned `Task`.
     /// 
     /// # Arguments
     /// * `kstack`: the optional kernel `Stack` for this `Task` to use.
-    ///    If not provided, a kernel stack of the default size will be allocated and used.
+    ///    * If `None`, a kernel stack of the default size will be allocated and used.
+    /// * `parent_task`: the optional `TaskRef` that acts as a sort of "parent" template
+    ///    for this new `Task`.
+    ///    Theseus doesn't have a true parent-child relationship between tasks;
+    ///    the new `Task` merely inherits certain states from this `parent_task`.
+    ///    * If `None`, the current task is used to determine the initial values of those states.
+    ///      This means that the tasking infrastructure must have been initialized before
+    ///      this function can be invoked with a `parent_task` value of `None`.
+    /// * `failure_cleanup_function`: an error handling function that acts as a last resort
+    ///    when all else fails, e.g., if unwinding crashes.
     /// 
-    /// # Note
-    /// This does not run the task, schedule it in, or switch to it.
-    /// 
-    /// However, it requires tasking to already be set up, i.e., the current task must be known.
+    /// ## Note
+    /// * If invoking this function with a `parent_task` value of `None`,
+    ///   tasking must have already been initialized so the current task can be obtained.
+    /// * This does not run the task, schedule it in, or switch to it.
+    /// * If you want to create a new task, you should use the `spawn` crate instead.
     pub fn new(
         kstack: Option<Stack>,
+        parent_task: Option<&TaskRef>,
         failure_cleanup_function: FailureCleanupFunction
     ) -> Result<Task, &'static str> {
-        let curr_task = get_my_current_task().ok_or("Task::new(): couldn't get current task (not yet initialized)")?;
+        let parent_task = parent_task
+            .or_else(|| get_my_current_task())
+            .ok_or("Task::new(): `parent_task` wasn't provided, and couldn't get current task")?;
         let (mmi, namespace, env, app_crate) = (
-            Arc::clone(&curr_task.mmi),
-            Arc::clone(&curr_task.namespace),
-            Arc::clone(&curr_task.inner.lock().env),
-            curr_task.app_crate.clone(),
+            Arc::clone(&parent_task.mmi),
+            Arc::clone(&parent_task.namespace),
+            Arc::clone(&parent_task.inner.lock().env),
+            parent_task.app_crate.clone(),
         );
 
         let kstack = kstack
@@ -679,13 +692,71 @@ impl Task {
     }
 
     /// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].
-    pub fn block(&self) {
-        self.runstate.store(RunState::Blocked);
+    ///
+    /// Returns the previous runstate on success, and the current runstate on
+    /// error. Will only suceed if the task is runnable or already blocked.
+    pub fn block(&self) -> Result<RunState, RunState> {
+        use RunState::{Blocked, Runnable};
+
+        if self.runstate.compare_exchange(Runnable, Blocked).is_ok() {
+            Ok(Runnable)
+        } else if self.runstate.compare_exchange(Blocked, Blocked).is_ok() {
+            warn!("Blocked an already blocked task: {:?}\n\t --> Current {:?}",
+                self, get_my_current_task()
+            );
+            Ok(Blocked)
+        } else {
+            Err(self.runstate.load())
+        }
+    }
+
+    /// Blocks this `Task` if it is a newly-spawned task currently being initialized.
+    ///
+    /// This is a special case only to be used when spawning a new task that
+    /// should not be immediately scheduled in; it will fail for all other cases.
+    ///
+    /// Returns the previous runstate (i.e. `RunState::Initing`) on success,
+    /// or the current runstate on error.
+    pub fn block_initing_task(&self) -> Result<RunState, RunState> {
+        if self.runstate.compare_exchange(RunState::Initing, RunState::Blocked).is_ok() {
+            Ok(RunState::Initing)
+        } else {
+            Err(self.runstate.load())
+        }
     }
 
     /// Unblocks this `Task` by setting its runstate to [`RunState::Runnable`].
-    pub fn unblock(&self) {
-        self.runstate.store(RunState::Runnable);
+    ///
+    /// Returns the previous runstate on success, and the current runstate on
+    /// error. Will only succed if the task is blocked or already runnable.
+    pub fn unblock(&self) -> Result<RunState, RunState> {
+        use RunState::{Blocked, Runnable};
+
+        if self.runstate.compare_exchange(Blocked, Runnable).is_ok() {
+            Ok(Blocked)
+        } else if self.runstate.compare_exchange(Runnable, Runnable).is_ok() {
+            warn!("Unblocked an already runnable task: {:?}\n\t --> Current {:?}",
+                self, get_my_current_task()
+            );
+            Ok(Runnable)
+        } else {
+            Err(self.runstate.load())
+        }
+    }
+
+    /// Makes this `Task` `Runnable` if it is a newly-spawned and fully initialized task.
+    ///
+    /// This is a special case only to be used when spawning a new task that
+    /// is ready to be scheduled in; it will fail for all other cases.
+    ///
+    /// Returns the previous runstate (i.e. `RunState::Initing`) on success, and
+    /// the current runstate on error.
+    pub fn make_inited_task_runnable(&self) -> Result<RunState, RunState> {
+        if self.runstate.compare_exchange(RunState::Initing, RunState::Runnable).is_ok() {
+            Ok(RunState::Initing)
+        } else {
+            Err(self.runstate.load())
+        }
     }
 
     /// Sets this `Task` as this core's current task.

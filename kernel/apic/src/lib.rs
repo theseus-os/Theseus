@@ -1,17 +1,14 @@
 #![no_std]
-
-extern crate alloc;
+#![feature(let_chains)]
 
 use core::{fmt, sync::atomic::{AtomicU8, Ordering}};
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use zerocopy::FromBytes;
-use alloc::boxed::Box;
-use owning_ref::BoxRefMut;
 use spin::Once;
 use raw_cpuid::CpuId;
 use msr::*;
 use irq_safety::RwLockIrqSafe;
-use memory::{PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages, allocate_frames_at, AllocatedFrames};
+use memory::{PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages, allocate_frames_at, AllocatedFrames, BorrowedMappedPages, Mutable};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
 use crossbeam_utils::atomic::AtomicCell;
@@ -125,9 +122,9 @@ impl LapicIpiDestination {
 }
 
 
-/// Initially maps the base APIC MMIO register frames so that we can know which LAPIC (core) we are.
-/// This only does something for apic/xapic systems, it does nothing for x2apic systems, as required.
-pub fn init(_page_table: &mut PageTable) -> Result<(), &'static str> {
+/// Determines whether this system contains an xapic or x2apic
+/// and enables the Local APIC hardware in the correct mode.
+pub fn init() {
     let is_x2apic = has_x2apic();
     debug!("is x2apic? {}. IA32_APIC_BASE (phys addr): {:X?}", is_x2apic, rdmsr(IA32_APIC_BASE));
 
@@ -135,8 +132,6 @@ pub fn init(_page_table: &mut PageTable) -> Result<(), &'static str> {
         // Ensure the local apic is enabled in xapic mode, otherwise we'll get a General Protection fault
         unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE); }
     }
-
-    Ok(())
 }
 
 
@@ -287,7 +282,7 @@ impl LvtLint {
 /// used within the [`LocalApic`] struct.
 enum LapicType {
     X2Apic,
-    XApic(BoxRefMut<MappedPages, ApicRegisters>),
+    XApic(BorrowedMappedPages<ApicRegisters, Mutable>),
 }
 impl fmt::Debug for LapicType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -300,19 +295,37 @@ impl fmt::Debug for LapicType {
     }
 }
 
+/// The possible errors that can occur in [`LocalApic::init()`].
+#[derive(Debug)]
+pub enum LapicInitError {
+    /// This CPU wasn't the BSP, as expected.
+    NotBSP,
+    /// This CPU wasn't an AP, as expected.
+    NotAP,
+    /// Invalid NMI local interrupt pin value; given by the included `u8`.
+    InvalidNmiLint(u8),
+    UnexpectedApicID {
+        expected: u8,
+        actual: u8,
+    },
+    /// An error occurred while mapping the Local APIC's MMIO registers into memory.
+    MemoryMappingError(&'static str),
+    /// The Local APIC already existed (BUG), given by the included `u8` APIC ID.
+    AlreadyExisted(u8),
+}
 
-/// This structure represents a single APIC in the system, there is one per core. 
+
+/// This structure represents a single Local APIC in the system; there is one per CPU. 
 #[doc(alias = "lapic")]
 pub struct LocalApic {
     /// The inner lapic object that disambiguates between xapic and x2apic.
     inner: LapicType,
-    /// The processor id of this APIC,
-    /// obtained from the `MADT` ACPI table entry.
-    processor: u8,
-    /// The APIC system id of this APIC,
-    /// obtained from the `MADT` ACPI table entry.
+    /// The hardware-provided ID of this Local APIC.
     apic_id: u8,
-    /// Whether this `LocalApic` is the bootstrap processor (the first processor to boot up).
+    /// The processor ID of this APIC (from the `MADT` ACPI table entry).
+    /// This is currently not used for anything in Theseus.
+    processor_id: u8,
+    /// Whether this Local APIC is the BootStrap Processor (the first CPU to boot up).
     is_bsp: bool,
 }
 impl fmt::Debug for LocalApic {
@@ -320,7 +333,7 @@ impl fmt::Debug for LocalApic {
         f.debug_struct("LocalApic")
             .field("type", &self.inner)
             .field("apic_id", &self.apic_id)
-            .field("processor", &self.processor)
+            .field("processor_id", &self.processor_id)
             .field("is_bsp", &self.is_bsp)
             .finish()
     }
@@ -335,80 +348,117 @@ impl LocalApic {
     /// Creates and initializes a new `LocalApic` for the current CPU core
     /// and adds it to the global set of initialized local APICs.
     /// 
+    /// ## Arguments
+    /// * `page_table`: the page table used to map the APIC MMIO registers
+    ///    (only used for xapic, not x2apic).
+    /// * `processor_id`: the processor ID specified in the ACPI `Madt` table.
+    ///    This value is currently unused in Theseus.
+    /// * `expected_apic_id`: the expected APIC ID as specified in the ACPI `Madt` table.
+    ///    * If `Some`, the APIC's own ID (given by [`LocalApic::id()`]) *must* match this value,
+    ///      otherwise an error will be returned.
+    ///    * If `None`, the local APIC will determine its own ID value, and no check is performed.
+    /// * `should_be_bsp`: whether or not this CPU is expected to be the BSP.
+    ///    * If `true`, this CPU must be the BSP (bootstrap processor).
+    ///    * If `false`, this CPU must *not* be the BSP -- it must be an AP.
+    ///    * An error is returned if the above checks fail.
+    /// * `nmi_lint`: the local interrupt pin used for NMI. Must be `0` or `1`.
+    /// * `nmi_flags`: the flags used to configure the local NMI interrupt.
+    /// 
     /// ## Important Usage Note
-    /// This MUST be invoked from the AP core itself when it is booting up.
-    /// The BSP cannot invoke this for other APs (it can only invoke it for itself).
+    /// This MUST be invoked from each CPU itself when it is booting up, i.e.,
+    /// the BSP cannot invoke this for other APs.
     pub fn init(
         page_table: &mut PageTable,
-        processor: u8,
-        apic_id: u8,
-        is_bsp: bool,
+        processor_id: u8,
+        expected_apic_id: Option<u8>,
+        should_be_bsp: bool,
         nmi_lint: u8,
-        nmi_flags: u16
-    ) -> Result<(), &'static str> {
-
-        trace!("size of LocalApic: {}", core::mem::size_of::<LocalApic>());
+        nmi_flags: u16,
+    ) -> Result<(), LapicInitError> {
 
         let nmi_lint = match nmi_lint {
             0 => LvtLint::Pin0,
             1 => LvtLint::Pin1,
             _invalid => {
                 error!("BUG: invalid `nmi_lint` value (must be `0` or `1`) in \
-                    LocalApic::init(processor: {}, apic_id: {}, is_bsp: {}, nmi_lint: {}, nmi_flags: {}",
-                    processor, apic_id, is_bsp, nmi_lint, nmi_flags
+                    LocalApic::init(processor_id: {}, expected_apic_id: {:?}, should_be_bsp: {}, nmi_lint: {}, nmi_flags: {}",
+                    processor_id, expected_apic_id, should_be_bsp, nmi_lint, nmi_flags
                 );
-                return Err("BUG: invalid `nmi_lint` value, must be `0` or `1`");
+                return Err(LapicInitError::InvalidNmiLint(nmi_lint));
             }
         };
 
-        // Theseus uses this MSR to hold each CPU's ID (which is an OS-chosen value).
-        unsafe { wrmsr(IA32_TSC_AUX, apic_id as u64); }
-
-        if is_bsp {
-            BSP_PROCESSOR_ID.call_once(|| apic_id); 
+        // Check whether the caller's expectations about BSP vs AP were met.
+        let is_bsp = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP;
+        if should_be_bsp && !is_bsp {
+            return Err(LapicInitError::NotBSP);
+        }
+        if !should_be_bsp && is_bsp {
+            return Err(LapicInitError::NotAP);
         }
 
-        let inner = if has_x2apic() {
-            LapicType::X2Apic
+        // Next, before we can check other conditions, we have to enable the APIC hardware
+        // (which, if xapic, also requires mapping the Local APIC's MMIO registers).
+        let inner: LapicType;
+        let enable_bitmask: u64;
+        if has_x2apic() {
+            inner = LapicType::X2Apic;
+            enable_bitmask = IA32_APIC_XAPIC_ENABLE | IA32_APIC_X2APIC_ENABLE;
         } else {
-            LapicType::XApic(
-                BoxRefMut::new(Box::new(map_apic(page_table)?))
-                    .try_map_mut(|mp| mp.as_type_mut::<ApicRegisters>(0))?
-            )
+            let apic_regs = map_apic(page_table)
+                .map_err(|e| LapicInitError::MemoryMappingError(e))
+                .and_then(|apic_mp| 
+                    apic_mp.into_borrowed_mut(0)
+                        .map_err(|(_mp, err)| LapicInitError::MemoryMappingError(err))
+                )?;
+
+            inner = LapicType::XApic(apic_regs);
+            enable_bitmask = IA32_APIC_XAPIC_ENABLE;
         };
+
+        // Enable the xapic/x2apic hardware.
+        unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | enable_bitmask); }
+
 		let mut lapic = LocalApic {
             inner,
-            processor,
-            apic_id,
+            processor_id,
+            apic_id: u8::MAX, // placeholder, is replaced below.
             is_bsp,
         };
 
-        lapic.enable();
+        // Now that the APIC hardware is enabled, we can safely obtain this Local APIC's ID.
+        let actual_apic_id = lapic.read_apic_id();
+        if let Some(expected) = expected_apic_id && expected != actual_apic_id {
+            return Err(LapicInitError::UnexpectedApicID { expected, actual: actual_apic_id });
+        }
+
+        lapic.apic_id = actual_apic_id;
+        lapic.clean_enable();
         lapic.init_lvt_timer();
         lapic.set_nmi(nmi_lint, nmi_flags);
-        info!("Found new processor core ({:?})", lapic);
+        info!("Initialized new CPU ({:?})", lapic);
 
-        let _existing = LOCAL_APICS.insert(apic_id, RwLockIrqSafe::new(lapic));
-        assert!(_existing.is_none(), "Local APIC should not already exist");
+        // Theseus uses this MSR to hold each CPU's ID (which is an OS-chosen value).
+        unsafe { wrmsr(IA32_TSC_AUX, actual_apic_id as u64); }
+        if is_bsp {
+            BSP_PROCESSOR_ID.call_once(|| actual_apic_id); 
+        }
+
+        let _existing = LOCAL_APICS.insert(actual_apic_id, RwLockIrqSafe::new(lapic));
+        if _existing.is_some() {
+            return Err(LapicInitError::AlreadyExisted(actual_apic_id));
+        }
+
         CPU_COUNT.fetch_add(1, Ordering::Relaxed);
-		Ok(())      
+        Ok(())
     }
 
 
-    /// Returns the APIC ID of this lapic.
+    /// Returns the "processor ID" of this local APIC, which is currently unused.
     /// 
     /// This value comes from the `MADT` ACPI table entry that was used
     /// to boot up this CPU core.
-    /// 
-    /// Currently this returns the same value as [`LocalApic::id()`].
-    pub fn apic_id(&self) -> u8 { self.apic_id }
-
-    /// Returns the "processor ID" of this lapic,
-    /// which is usually a meaningless value.
-    /// 
-    /// This value comes from the `MADT` ACPI table entry that was used
-    /// to boot up this CPU core.
-    pub fn processor(&self) -> u8 { self.processor }
+    pub fn processor_id(&self) -> u8 { self.processor_id }
 
     /// Returns `true` if this CPU core was the BootStrap Processor (BSP),
     /// i.e., the first CPU to boot and run the OS code.
@@ -416,19 +466,10 @@ impl LocalApic {
     /// There is only one BSP per system.
     pub fn is_bsp(&self) -> bool { self.is_bsp }
 
-    /// Enable this lapic by initializing it to a clean state
-    /// and enabling its spurious interrupt vector.
-    fn enable(&mut self) {
-        let is_bsp = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP;
-
-        // Globally enable the xapic/x2apic by setting the XAPIC_ENABLE (and optionally X2APIC_ENABLE) bits
-        let enable_bitmask = rdmsr(IA32_APIC_BASE) | match &mut self.inner {
-            LapicType::X2Apic   => IA32_APIC_XAPIC_ENABLE | IA32_APIC_X2APIC_ENABLE,
-            LapicType::XApic(_) => IA32_APIC_XAPIC_ENABLE
-        };
-        unsafe { wrmsr(IA32_APIC_BASE, enable_bitmask); }
-
-        let id = self.id();
+    /// Set this Local APIC to a known "clean state" and enable its spurious interrupt vector.
+    fn clean_enable(&mut self) {
+        let is_bsp = self.is_bsp;
+        let id = self.read_apic_id();
         let version = self.version();
 
         match &mut self.inner {
@@ -461,15 +502,12 @@ impl LocalApic {
                 }
             }
             LapicType::XApic(regs) => {
-                // Globally enable the apic by setting the XAPIC_ENABLE bit
-                let enable_bitmask = rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE;
-                unsafe { wrmsr(IA32_APIC_BASE, enable_bitmask); }
                 info!("LAPIC ID {:#x}, version: {:#x}, is_bsp: {}", id, version, is_bsp);
                 if is_bsp {
                     INTERRUPT_CHIP.store(InterruptChip::APIC);
                 }
 
-                // Init APIC to a clean known state.
+                // Init xAPIC to a clean known state.
                 // See <http://wiki.osdev.org/APIC#Logical_Destination_Mode>
                 regs.destination_format.write(0xFFFF_FFFF);
                 regs.lvt_timer.write(APIC_DISABLE);
@@ -573,10 +611,13 @@ impl LocalApic {
         }
     }
 
-    /// Reads the hardware-provided ID of this lapic (from its registers).
+    /// Returns the ID of this Local APIC (fast).
     /// 
-    /// Currently, this matches the value returned by [`LocalApic::apic_id()`].
-    pub fn id(&self) -> u8 {
+    /// Unlike [`read_apic_id()`], this does not read any hardware registers.
+    pub fn apic_id(&self) -> u8 { self.apic_id }
+
+    /// Reads the hardware-provided ID of this Local APIC from its registers (slow).
+    pub fn read_apic_id(&self) -> u8 {
         match &self.inner {
             LapicType::X2Apic => rdmsr(IA32_X2APIC_APICID) as u32 as u8,
             LapicType::XApic(regs) => {

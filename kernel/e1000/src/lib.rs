@@ -15,7 +15,6 @@ extern crate irq_safety;
 extern crate kernel_config;
 extern crate memory;
 extern crate pci; 
-extern crate owning_ref;
 extern crate interrupts;
 extern crate x86_64;
 extern crate mpmc;
@@ -34,11 +33,9 @@ use spin::Once;
 use alloc::vec::Vec;
 use alloc::collections::VecDeque;
 use irq_safety::MutexIrqSafe;
-use alloc::boxed::Box;
-use memory::{PhysicalAddress, MappedPages};
+use memory::{PhysicalAddress, BorrowedMappedPages, BorrowedSliceMappedPages, Mutable};
 use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
-use owning_ref::BoxRefMut;
 use interrupts::{eoi, register_interrupt};
 use x86_64::structures::idt::InterruptStackFrame;
 use network_interface_card:: NetworkInterfaceCard;
@@ -84,7 +81,7 @@ lazy_static! {
 
 /// A struct which contains the receive queue registers and implements the `RxQueueRegisters` trait,
 /// which is required to store the registers in an `RxQueue` object.
-struct E1000RxQueueRegisters(BoxRefMut<MappedPages, E1000RxRegisters>);
+struct E1000RxQueueRegisters(BorrowedMappedPages<E1000RxRegisters, Mutable>);
 
 impl RxQueueRegisters for E1000RxQueueRegisters {
     fn set_rdbal(&mut self, value: u32) {
@@ -106,7 +103,7 @@ impl RxQueueRegisters for E1000RxQueueRegisters {
 
 /// A struct which contains the transmit queue registers and implements the `TxQueueRegisters` trait,
 /// which is required to store the registers in a `TxQueue` object.
-struct E1000TxQueueRegisters(BoxRefMut<MappedPages, E1000TxRegisters>);
+struct E1000TxQueueRegisters(BorrowedMappedPages<E1000TxRegisters, Mutable>);
 
 impl TxQueueRegisters for E1000TxQueueRegisters {
     fn set_tdbal(&mut self, value: u32) {
@@ -139,13 +136,13 @@ pub struct E1000Nic {
     /// The optional spoofed MAC address to use in place of `mac_hardware` when transmitting.  
     mac_spoofed: Option<[u8; 6]>,
     /// Receive queue with descriptors
-    rx_queue: RxQueue<E1000RxQueueRegisters,LegacyRxDescriptor>,
+    rx_queue: RxQueue<E1000RxQueueRegisters, LegacyRxDescriptor>,
     /// Transmit queue with descriptors
-    tx_queue: TxQueue<E1000TxQueueRegisters,LegacyTxDescriptor>,     
+    tx_queue: TxQueue<E1000TxQueueRegisters, LegacyTxDescriptor>,     
     /// memory-mapped control registers
-    regs: BoxRefMut<MappedPages, E1000Registers>,
+    regs: BorrowedMappedPages<E1000Registers, Mutable>,
     /// memory-mapped registers holding the MAC address
-    mac_regs: BoxRefMut<MappedPages, E1000MacRegisters>
+    mac_regs: BorrowedMappedPages<E1000MacRegisters, Mutable>
 }
 
 
@@ -222,7 +219,7 @@ impl E1000Nic {
         let rxq = RxQueue {
             id: 0,
             regs: rx_registers,
-            rx_descs: rx_descs,
+            rx_descs,
             num_rx_descs: E1000_NUM_RX_DESC,
             rx_cur: 0,
             rx_bufs_in_use: rx_buffers,
@@ -238,16 +235,16 @@ impl E1000Nic {
         let txq = TxQueue {
             id: 0,
             regs: tx_registers,
-            tx_descs: tx_descs,
+            tx_descs,
             num_tx_descs: E1000_NUM_TX_DESC,
             tx_cur: 0,
             cpu_id: None,
         };
 
         let e1000_nic = E1000Nic {
-            bar_type: bar_type,
-            mem_base: mem_base,
-            interrupt_num: interrupt_num,
+            bar_type,
+            mem_base,
+            interrupt_num,
             mac_hardware: mac_addr_hardware,
             mac_spoofed: None,
             rx_queue: rxq,
@@ -270,10 +267,10 @@ impl E1000Nic {
         _device: &PciDevice, 
         mem_base: PhysicalAddress,
     ) -> Result<(
-        BoxRefMut<MappedPages, E1000Registers>, 
-        BoxRefMut<MappedPages, E1000RxRegisters>, 
-        BoxRefMut<MappedPages, E1000TxRegisters>, 
-        BoxRefMut<MappedPages, E1000MacRegisters>
+        BorrowedMappedPages<E1000Registers, Mutable>, 
+        BorrowedMappedPages<E1000RxRegisters, Mutable>, 
+        BorrowedMappedPages<E1000TxRegisters, Mutable>, 
+        BorrowedMappedPages<E1000MacRegisters, Mutable>
     ), &'static str> {
 
         const GENERAL_REGISTERS_SIZE_BYTES: usize = 8192;
@@ -281,15 +278,15 @@ impl E1000Nic {
         const TX_REGISTERS_SIZE_BYTES: usize = 4096;
         const MAC_REGISTERS_SIZE_BYTES: usize = 114_688;
 
-        let nic_regs_mapped_page = allocate_memory(mem_base, GENERAL_REGISTERS_SIZE_BYTES)?;
-        let nic_rx_regs_mapped_page = allocate_memory(mem_base + GENERAL_REGISTERS_SIZE_BYTES, RX_REGISTERS_SIZE_BYTES)?;
-        let nic_tx_regs_mapped_page = allocate_memory(mem_base + GENERAL_REGISTERS_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES, TX_REGISTERS_SIZE_BYTES)?;
+        let nic_regs_mapped_page     = allocate_memory(mem_base, GENERAL_REGISTERS_SIZE_BYTES)?;
+        let nic_rx_regs_mapped_page  = allocate_memory(mem_base + GENERAL_REGISTERS_SIZE_BYTES, RX_REGISTERS_SIZE_BYTES)?;
+        let nic_tx_regs_mapped_page  = allocate_memory(mem_base + GENERAL_REGISTERS_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES, TX_REGISTERS_SIZE_BYTES)?;
         let nic_mac_regs_mapped_page = allocate_memory(mem_base + GENERAL_REGISTERS_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES + TX_REGISTERS_SIZE_BYTES, MAC_REGISTERS_SIZE_BYTES)?;
 
-        let regs = BoxRefMut::new(Box::new(nic_regs_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<E1000Registers>(0))?;
-        let rx_regs = BoxRefMut::new(Box::new(nic_rx_regs_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<E1000RxRegisters>(0))?;
-        let tx_regs = BoxRefMut::new(Box::new(nic_tx_regs_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<E1000TxRegisters>(0))?;
-        let mac_regs = BoxRefMut::new(Box::new(nic_mac_regs_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<E1000MacRegisters>(0))?;
+        let regs     = nic_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        let rx_regs  = nic_rx_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        let tx_regs  = nic_tx_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        let mac_regs = nic_mac_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
 
         Ok((regs, rx_regs, tx_regs, mac_regs))
     }
@@ -348,7 +345,7 @@ impl E1000Nic {
         regs: &mut E1000Registers, 
         rx_regs: &mut E1000RxQueueRegisters
     ) -> Result<(
-        BoxRefMut<MappedPages, [LegacyRxDescriptor]>, 
+        BorrowedSliceMappedPages<LegacyRxDescriptor, Mutable>, 
         Vec<ReceiveBuffer>
     ), &'static str> {
         // get the queue of rx descriptors and its corresponding rx buffers     
@@ -372,7 +369,7 @@ impl E1000Nic {
     fn tx_init(
         regs: &mut E1000Registers, 
         tx_regs: &mut E1000TxQueueRegisters
-    ) -> Result<BoxRefMut<MappedPages, [LegacyTxDescriptor]>, &'static str> {
+    ) -> Result<BorrowedSliceMappedPages<LegacyTxDescriptor, Mutable>, &'static str> {
         // get the queue of tx descriptors     
         let tx_descs = init_tx_queue(E1000_NUM_TX_DESC as usize, tx_regs)?;
         regs.tctl.write(regs::TCTL_EN | regs::TCTL_PSP);

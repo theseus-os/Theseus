@@ -1,8 +1,6 @@
 use core::fmt;
 use core::ops::{Deref, DerefMut};
 use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use owning_ref::{OwningRef, OwningRefMut};
-use stable_deref_trait::StableDeref;
 use wait_queue::WaitQueue;
 use lockable::{Lockable, LockableSized};
 
@@ -305,15 +303,6 @@ impl<'rwlock, T: ?Sized> Drop for RwLockSleepWriteGuard<'rwlock, T> {
         self.queue.notify_one();
     }
 }
-
-// Implement the StableDeref trait for RwLockSleep guards, just like it's implemented for RwLock guards
-unsafe impl<'a, T: ?Sized> StableDeref for RwLockSleepReadGuard<'a, T> {}
-unsafe impl<'a, T: ?Sized> StableDeref for RwLockSleepWriteGuard<'a, T> {}
-
-/// Typedef of a owning reference that uses a `RwLockSleepSafeReadGuard` as the owner.
-pub type RwLockSleepReadGuardRef<'a, T, U = T> = OwningRef<RwLockSleepReadGuard<'a, T>, U>;
-/// Typedef of a mutable owning reference that uses a `RwLockSleepWriteGuard` as the owner.
-pub type RwLockSleepWriteGuardRefMut<'a, T, U = T> = OwningRefMut<RwLockSleepWriteGuard<'a, T>, U>;
 
 /// Implement `Lockable` for [`RwLockSleep`].
 /// Because [`RwLockSleep::read()`] and [`RwLockSleep::write()`] return `Result`s and may fail,

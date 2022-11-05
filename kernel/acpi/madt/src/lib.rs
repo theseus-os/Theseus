@@ -3,18 +3,13 @@
 
 #![no_std]
 
-#[macro_use] extern crate log;
-extern crate memory;
-extern crate ioapic;
-extern crate apic;
-extern crate pic;
-extern crate sdt;
-extern crate acpi_table;
-extern crate zerocopy;
+extern crate alloc;
 
 use core::mem::size_of;
+use alloc::{boxed::Box, format};
+use log::{error, warn, trace};
 use memory::{MappedPages, PageTable, PhysicalAddress}; 
-use apic::{LocalApic, get_my_apic_id, get_bsp_id};
+use apic::{LocalApic, get_bsp_id, LapicInitError, get_my_apic_id};
 use sdt::Sdt;
 use acpi_table::{AcpiSignature, AcpiTables};
 use zerocopy::FromBytes;
@@ -301,39 +296,49 @@ pub struct MadtLocalApicAddressOverride {
 fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Result<(), &'static str> {
     use pic::IRQ_BASE_OFFSET;
 
-    let me = get_my_apic_id();
-
     for madt_entry in madt_iter.clone() {
         if let MadtEntry::LocalApic(lapic_entry) = madt_entry { 
-            if lapic_entry.apic_id == me {
-                let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
+            let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
 
-                LocalApic::init(page_table, lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags)?;
-                let bsp_id = lapic_entry.apic_id;
+            match LocalApic::init(
+                page_table,
+                lapic_entry.processor,
+                None, // we don't know the hardware-assigned APIC ID of the BSP (this CPU) yet
+                true,
+                nmi_lint,
+                nmi_flags,
+            ) {
+                // this `lapic_entry` wasn't for the BSP, try the next one.
+                Err(LapicInitError::NotBSP) => continue,
+                Err(other_err) => return Err(Box::leak(format!("{:?}", other_err).into_boxed_str())),
+                Ok(()) => { } // fall through
+            };
 
-                // redirect every IoApic's interrupts to the one BSP
-                // TODO FIXME: I'm unsure if this is actually correct!
-                for ioapic in ioapic::get_ioapics().iter() {
-                    let mut ioapic_ref = ioapic.1.lock();
+            assert!(get_my_apic_id() == lapic_entry.apic_id);
+            let bsp_id = lapic_entry.apic_id;
 
-                    // Set the BSP to receive regular PIC interrupts routed through the IoApic.
-                    // Skip irq 2, since in the PIC that's the chained one (cascade line from PIC2 to PIC1) that isn't used.
-                    for irq in (0x0 ..= 0x1).chain(0x3 ..= 0xF) {
-                        ioapic_ref.set_irq(irq, bsp_id, IRQ_BASE_OFFSET + irq);
-                    }
+            // redirect every IoApic's interrupts to the one BSP
+            // TODO FIXME: I'm unsure if this is actually correct!
+            for ioapic in ioapic::get_ioapics().iter() {
+                let mut ioapic_ref = ioapic.1.lock();
 
-                    // ioapic_ref.set_irq(0x1, 0xFF, IRQ_BASE_OFFSET + 0x1); 
-                    // FIXME: the above line does indeed send the interrupt to all cores, but then they all handle it, instead of just one. 
+                // Set the BSP to receive regular PIC interrupts routed through the IoApic.
+                // Skip irq 2, since in the PIC that's the chained one (cascade line from PIC2 to PIC1) that isn't used.
+                for irq in (0x0 ..= 0x1).chain(0x3 ..= 0xF) {
+                    ioapic_ref.set_irq(irq, bsp_id, IRQ_BASE_OFFSET + irq);
                 }
-                // there's only ever one BSP, so we can exit the loop here
-                break;
+
+                // ioapic_ref.set_irq(0x1, 0xFF, IRQ_BASE_OFFSET + 0x1); 
+                // FIXME: the above line does indeed send the interrupt to all cores, but then they all handle it, instead of just one. 
             }
+            // there's only ever one BSP, so we can exit the loop here
+            break;
         }
     }
 
     let bsp_id = get_bsp_id().ok_or("handle_bsp_lapic_entry(): Couldn't find BSP LocalApic in Madt!")?;
 
-    // now that we've established the BSP,  go through the interrupt source override entries
+    // now that we've established the BSP, go through the interrupt source override entries
     for madt_entry in madt_iter {
         if let MadtEntry::IntSrcOverride(int_src) = madt_entry {
             let mut handled = false;

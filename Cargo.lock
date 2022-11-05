@@ -99,7 +99,6 @@ dependencies = [
  "scheduler",
  "spawn",
  "stack",
- "tlb_shootdown",
 ]
 
 [[package]]
@@ -114,7 +113,6 @@ dependencies = [
  "log",
  "memory",
  "msr",
- "owning_ref",
  "pit_clock_basic",
  "raw-cpuid",
  "spin 0.9.4",
@@ -372,6 +370,7 @@ dependencies = [
  "stack",
  "task",
  "task_fs",
+ "tlb_shootdown",
  "tsc",
  "window_manager",
 ]
@@ -559,8 +558,8 @@ dependencies = [
 name = "cow_arc"
 version = "0.1.0"
 dependencies = [
- "owning_ref",
- "spin 0.9.4",
+ "dereffer",
+ "spin 0.9.0",
 ]
 
 [[package]]
@@ -807,6 +806,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "dereffer"
+version = "0.1.0"
+
+[[package]]
 name = "derivative"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -919,7 +922,6 @@ dependencies = [
  "nic_buffers",
  "nic_initialization",
  "nic_queues",
- "owning_ref",
  "pci",
  "spin 0.9.4",
  "static_assertions",
@@ -975,7 +977,6 @@ dependencies = [
  "network_interface_card",
  "network_manager",
  "nic_buffers",
- "owning_ref",
  "smoltcp 0.5.0",
 ]
 
@@ -1132,7 +1133,6 @@ dependencies = [
  "log",
  "memory",
  "multicore_bringup",
- "owning_ref",
  "shapes",
  "zerocopy",
 ]
@@ -1324,7 +1324,6 @@ dependencies = [
  "kernel_config",
  "log",
  "memory",
- "owning_ref",
  "sdt",
  "spin 0.9.4",
  "volatile 0.2.7",
@@ -1438,8 +1437,7 @@ dependencies = [
  "atomic_linked_list",
  "log",
  "memory",
- "owning_ref",
- "spin 0.9.4",
+ "spin 0.9.0",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -1452,8 +1450,7 @@ dependencies = [
  "irq_safety",
  "log",
  "memory",
- "owning_ref",
- "spin 0.9.4",
+ "spin 0.9.0",
  "static_assertions",
  "volatile 0.2.7",
  "zerocopy",
@@ -1499,7 +1496,6 @@ dependencies = [
  "nic_buffers",
  "nic_initialization",
  "nic_queues",
- "owning_ref",
  "pci",
  "physical_nic",
  "pic",
@@ -1694,11 +1690,11 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.8"
+version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14b6052be84e6b71ab17edffc2eeabf5c2c3ae1fdb464aae35ac50c67a44e1f7"
+checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
 ]
 
 [[package]]
@@ -1922,7 +1918,6 @@ dependencies = [
  "mpmc",
  "nic_buffers",
  "nic_initialization",
- "owning_ref",
  "pci",
  "spin 0.9.4",
 ]
@@ -1941,7 +1936,6 @@ dependencies = [
  "nic_buffers",
  "nic_initialization",
  "num_enum",
- "owning_ref",
  "static_assertions",
  "volatile 0.2.7",
  "zerocopy",
@@ -2088,10 +2082,8 @@ name = "mutex_preemption"
 version = "0.1.0"
 dependencies = [
  "lockable",
- "owning_ref",
  "preemption",
- "spin 0.9.4",
- "stable_deref_trait 1.1.1",
+ "spin 0.9.0",
 ]
 
 [[package]]
@@ -2100,9 +2092,7 @@ version = "0.1.0"
 dependencies = [
  "lockable",
  "log",
- "owning_ref",
- "spin 0.9.4",
- "stable_deref_trait 1.1.1",
+ "spin 0.9.0",
  "task",
  "wait_queue",
 ]
@@ -2171,9 +2161,8 @@ version = "0.1.0"
 dependencies = [
  "e1000",
  "log",
- "owning_ref",
- "smoltcp 0.5.0",
- "spin 0.9.4",
+ "smoltcp",
+ "spin 0.9.0",
 ]
 
 [[package]]
@@ -2192,7 +2181,6 @@ dependencies = [
  "log",
  "memory",
  "mpmc",
- "owning_ref",
 ]
 
 [[package]]
@@ -2205,7 +2193,6 @@ dependencies = [
  "mpmc",
  "nic_buffers",
  "nic_queues",
- "owning_ref",
  "pci",
  "volatile 0.2.7",
 ]
@@ -2219,7 +2206,6 @@ dependencies = [
  "memory",
  "mpmc",
  "nic_buffers",
- "owning_ref",
 ]
 
 [[package]]
@@ -2319,7 +2305,6 @@ dependencies = [
  "itertools",
  "log",
  "network_manager",
- "owning_ref",
  "percent-encoding",
  "rand",
  "sha3",
@@ -2838,7 +2823,6 @@ name = "rsdp"
 version = "0.1.0"
 dependencies = [
  "memory",
- "owning_ref",
  "zerocopy",
 ]
 
@@ -3398,8 +3382,7 @@ dependencies = [
  "io",
  "lazy_static",
  "log",
- "owning_ref",
- "spin 0.9.4",
+ "spin 0.9.0",
 ]
 
 [[package]]
@@ -3408,7 +3391,6 @@ version = "0.1.0"
 dependencies = [
  "ata",
  "log",
- "owning_ref",
  "pci",
  "spin 0.9.4",
  "storage_device",
@@ -3846,6 +3828,15 @@ dependencies = [
 name = "thread_local_macro"
 version = "0.1.0"
 dependencies = [
+ "static_assertions",
+]
+
+[[package]]
+name = "time"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-utils",
+ "log",
  "static_assertions",
 ]
 
@@ -4325,13 +4316,13 @@ name = "window"
 version = "0.1.0"
 dependencies = [
  "color",
+ "dereffer",
  "event_types",
  "framebuffer",
  "framebuffer_drawer",
  "log",
  "mouse",
  "mpmc",
- "owning_ref",
  "path",
  "shapes",
  "spawn",

@@ -18,7 +18,7 @@ extern crate scheduler;
 use core::sync::atomic::{Ordering, AtomicUsize};
 use alloc::collections::binary_heap::BinaryHeap;
 use irq_safety::MutexIrqSafe;
-use task::{get_my_current_task, TaskRef};
+use task::{get_my_current_task, TaskRef, RunState};
 
 /// Contains the `TaskRef` and the associated wakeup time for an entry in DELAYED_TASKLIST.
 #[derive(Clone, Eq, PartialEq)]
@@ -88,7 +88,7 @@ fn add_to_delayed_tasklist(new_node: SleepingTaskNode) {
 fn remove_next_task_from_delayed_tasklist() {
     let mut delayed_tasklist = DELAYED_TASKLIST.lock();
     if let Some(SleepingTaskNode { taskref, .. }) = delayed_tasklist.pop() {
-        taskref.unblock();
+        taskref.unblock().expect("failed to unblock sleeping task");
 
         match delayed_tasklist.peek() {
             Some(SleepingTaskNode { resume_time, .. }) => 
@@ -108,29 +108,38 @@ pub fn unblock_sleeping_tasks() {
 }
 
 /// Blocks the current task by putting it to sleep for `duration` ticks.
-pub fn sleep(duration: usize) {
+///
+/// Returns the current task's run state if it can't be blocked.
+pub fn sleep(duration: usize) -> Result<(), RunState> {
     let current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
     let resume_time = current_tick_count + duration;
 
     let current_task = get_my_current_task().unwrap().clone();
     // Add the current task to the delayed tasklist and then block it.
     add_to_delayed_tasklist(SleepingTaskNode{taskref: current_task.clone(), resume_time});
-    current_task.block();
+    current_task.block()?;
     scheduler::schedule();
+    Ok(())
 }
 
 /// Blocks the current task by putting it to sleep until a specific tick count is reached,
 /// given by `resume_time`.
-pub fn sleep_until(resume_time: usize) {
+///
+/// Returns the current task's run state if it can't be blocked.
+pub fn sleep_until(resume_time: usize) -> Result<(), RunState> {
     let current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
 
     if resume_time > current_tick_count {
-        sleep(resume_time - current_tick_count);
+        sleep(resume_time - current_tick_count)?;
     }
+    
+    Ok(())
 }
 
 /// Blocks the current task for a fixed time `period`, which starts from the given `last_resume_time`.
-pub fn sleep_periodic(last_resume_time: &AtomicUsize, period: usize) {
+///
+/// Returns the current task's run state if it can't be blocked.
+pub fn sleep_periodic(last_resume_time: &AtomicUsize, period: usize) -> Result<(), RunState> {
     let new_resume_time = last_resume_time.fetch_add(period, Ordering::SeqCst) + period;
-    sleep_until(new_resume_time);
+    sleep_until(new_resume_time)
 }

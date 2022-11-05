@@ -42,7 +42,7 @@ pub fn main(_args: Vec<String>) -> isize {
         scheduler::set_periodicity(&periodic_task_1, 1000).unwrap();
 
         // start the tasks
-        periodic_task_1.unblock();
+        periodic_task_1.unblock().unwrap();
 
         0
     }
@@ -57,6 +57,6 @@ fn _task_delay_tester(_arg: usize) {
         iter += 1;
 
         // This desk will sleep periodically for 1000 systicks
-        sleep::sleep_periodic(&start_time, 1000);
+        sleep::sleep_periodic(&start_time, 1000).unwrap();
     }
 }
