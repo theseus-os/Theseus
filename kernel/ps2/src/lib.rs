@@ -756,14 +756,19 @@ pub enum KeyboardType {
     AncientATKeyboard,
 }
 
-///detect the keyboard's type
+/// detect the [KeyboardType]
+/// 
+/// Note:
+/// On the identify command, [KeyboardType::AncientATKeyboard] usually returns no bytes at all, but [read_data] always returns a byte.
+/// This means [read_data] would return 0x00 here, even though the value is already reserved for the device type "Standard PS/2 mouse".
+/// As we only care about detecting keyboard types here, it should work.
 pub fn keyboard_detect() -> Result<KeyboardType, &'static str> {
     command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(DisableScanning))?;
 
     command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(IdentifyKeyboard))?; 
 
     let keyboard_type = match read_data() {
-        //None => Ok(KeyboardType::AncientATKeyboard)
+        0x00 => Ok(KeyboardType::AncientATKeyboard),
         0xAB => {
             match read_data() {
                 0x41 | 0xC1 => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
