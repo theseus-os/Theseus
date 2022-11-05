@@ -3,21 +3,6 @@
 use bitflags::bitflags;
 use num_enum::TryFromPrimitive;
 
-// TODO: use these tables and tips:
-// https://sourceforge.net/p/oszur11/code/ci/master/tree/Chapter_06_Shell/04_Makepp/arch/i386/arch/devices/i8042.c
-// ^link dead; https://stackoverflow.com/questions/219120/protected-mode-keyboard-access-on-x86-assembly
-
-// TODO: seems like we actually can use phf crates
-// we can use the "core" feature enables libcore instead of libstd
-// you can use number literals like so: 
-/*
-static MYMAP: phf::Map<u8, &'static Keycode> = phf_map! {
-    0u8 => Keycode::BLAH,
-    1u8 => Keycode::BLAH2,
-    ... etc ...
-}
-*/
-
 // the implementation here follows the rule of representation, 
 // which is to use complicated data structures to permit simpler logic. 
 
@@ -130,7 +115,8 @@ impl KeyEvent {
     }
 }
 
-// FIXME: this is only true for scancode set 1
+// FIXME: this is only true for scancode set 1, set 2 uses (0xF0, make-code),
+// set 3 uses single byte make-codes and (0xF0, make-code) everywhere, no extended codes
 /// The offset that a keyboard adds to the scancode
 /// to indicate that the key was released rather than pressed. 
 /// So if a scancode of `1` means a key `foo` was pressed,
@@ -256,10 +242,10 @@ impl Keycode {
         // handle shift key being pressed
         if modifiers.is_shift() {
             if modifiers.is_caps_lock() && self.is_letter() {
-            // if shift is pressed and caps lock is on, give a regular lowercase letter
+                // if shift is pressed and caps lock is on, give a regular lowercase letter
                 return self.as_ascii();
             } else {
-            // if shift is pressed and caps lock is not, give a regular shifted key
+                // if shift is pressed and caps lock is not, give a regular shifted key
                 return self.as_ascii_shifted();
             }
         }
