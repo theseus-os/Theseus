@@ -934,6 +934,28 @@
 <span id="934">934</span>
 <span id="935">935</span>
 <span id="936">936</span>
+<span id="937">937</span>
+<span id="938">938</span>
+<span id="939">939</span>
+<span id="940">940</span>
+<span id="941">941</span>
+<span id="942">942</span>
+<span id="943">943</span>
+<span id="944">944</span>
+<span id="945">945</span>
+<span id="946">946</span>
+<span id="947">947</span>
+<span id="948">948</span>
+<span id="949">949</span>
+<span id="950">950</span>
+<span id="951">951</span>
+<span id="952">952</span>
+<span id="953">953</span>
+<span id="954">954</span>
+<span id="955">955</span>
+<span id="956">956</span>
+<span id="957">957</span>
+<span id="958">958</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks
 //! and convenient builder patterns for customizing new tasks. 
 //! 
@@ -1194,6 +1216,8 @@
     argument: A,
     _return_type: PhantomData&lt;R&gt;,
     name: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    stack: <span class="prelude-ty">Option</span>&lt;Stack&gt;,
+    parent: <span class="prelude-ty">Option</span>&lt;TaskRef&gt;,
     pin_on_core: <span class="prelude-ty">Option</span>&lt;u8&gt;,
     blocked: bool,
     idle: bool,
@@ -1216,6 +1240,8 @@
             func: func,
             _return_type: PhantomData,
             name: <span class="prelude-val">None</span>,
+            stack: <span class="prelude-val">None</span>,
+            parent: <span class="prelude-val">None</span>,
             pin_on_core: <span class="prelude-val">None</span>,
             blocked: <span class="bool-val">false</span>,
             idle: <span class="bool-val">false</span>,
@@ -1235,6 +1261,21 @@
     <span class="doccomment">/// Set the argument that will be passed to the new Task&#39;s entry function.
     </span><span class="kw">pub fn </span>argument(<span class="kw-2">mut </span><span class="self">self</span>, argument: A) -&gt; TaskBuilder&lt;F, A, R&gt; {
         <span class="self">self</span>.argument = argument;
+        <span class="self">self
+    </span>}
+
+    <span class="doccomment">/// Set the `Stack` that will be used by the new Task.
+    </span><span class="kw">pub fn </span>stack(<span class="kw-2">mut </span><span class="self">self</span>, stack: Stack) -&gt; TaskBuilder&lt;F, A, R&gt; {
+        <span class="self">self</span>.stack = <span class="prelude-val">Some</span>(stack);
+        <span class="self">self
+    </span>}
+
+    <span class="doccomment">/// Set the &quot;parent&quot; Task from which the new Task will inherit certain states.
+    ///
+    /// See [`Task::new()`] for more details on what states are inherited.
+    /// By default, the current task will be used if a specific parent task is not provided.
+    </span><span class="kw">pub fn </span>parent(<span class="kw-2">mut </span><span class="self">self</span>, parent_task: TaskRef) -&gt; TaskBuilder&lt;F, A, R&gt; {
+        <span class="self">self</span>.parent = <span class="prelude-val">Some</span>(parent_task);
         <span class="self">self
     </span>}
 
@@ -1263,12 +1304,14 @@
     </span>}
 
     <span class="doccomment">/// Finishes this `TaskBuilder` and spawns the new task as described by its builder functions.
-    /// 
-    /// This merely makes the new task Runnable, it does not switch to it immediately; that will happen on the next scheduler invocation.
+    ///
+    /// This merely creates the new task and makes it `Runnable`.
+    /// It does not switch to it immediately; that will happen on the next scheduler invocation.
     </span><span class="attr">#[inline(never)]
     </span><span class="kw">pub fn </span>spawn(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;JoinableTaskRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>new_task = Task::new(
-            <span class="prelude-val">None</span>,
+            <span class="self">self</span>.stack,
+            <span class="self">self</span>.parent.as_ref(),
             task_cleanup_failure::&lt;F, A, R&gt;,
         )<span class="question-mark">?</span>;
         <span class="comment">// If a Task name wasn&#39;t provided, then just use the function&#39;s name.
@@ -1305,7 +1348,8 @@
             new_task.is_an_idle_task = <span class="bool-val">true</span>;
         }
 
-        <span class="comment">// If there is a post-build function, invoke it now before finalizing the task and adding it to runqueues.
+        <span class="comment">// If there is a post-build function, invoke it now
+        // before finalizing the task and adding it to runqueues.
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pb_func) = <span class="self">self</span>.post_build_function {
             pb_func(<span class="kw-2">&amp;mut </span>new_task)<span class="question-mark">?</span>;
         }
@@ -1742,12 +1786,11 @@
 /// which removes the task from its runqueue and spawns it again with 
 /// same entry function (F) and argument (A). 
 </span><span class="kw">fn </span>task_restartable_cleanup_final&lt;F, A, R&gt;(preemption_guard: PreemptionGuard, current_task: TaskRef) -&gt; !
-   <span class="kw">where </span>A: Send + Clone + <span class="lifetime">&#39;static</span>, 
-         R: Send + <span class="lifetime">&#39;static</span>,
-         F: FnOnce(A) -&gt; R + Send + Clone + <span class="lifetime">&#39;static</span>, 
+<span class="kw">where
+    </span>A: Send + Clone + <span class="lifetime">&#39;static</span>,
+    R: Send + <span class="lifetime">&#39;static</span>,
+    F: FnOnce(A) -&gt; R + Send + Clone + <span class="lifetime">&#39;static</span>,
 {
-    task_cleanup_final_internal(<span class="kw-2">&amp;</span>current_task);
-
     {
         <span class="attr">#[cfg(use_crate_replacement)]
         </span><span class="kw">let </span><span class="kw-2">mut </span>se = fault_crate_swap::SwapRanges::default();
@@ -1809,6 +1852,7 @@
         }
     }
 
+    task_cleanup_final_internal(<span class="kw-2">&amp;</span>current_task);
     drop(current_task);
     drop(preemption_guard);
     <span class="comment">// ****************************************************

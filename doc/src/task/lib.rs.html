@@ -1395,6 +1395,20 @@
 <span id="1395">1395</span>
 <span id="1396">1396</span>
 <span id="1397">1397</span>
+<span id="1398">1398</span>
+<span id="1399">1399</span>
+<span id="1400">1400</span>
+<span id="1401">1401</span>
+<span id="1402">1402</span>
+<span id="1403">1403</span>
+<span id="1404">1404</span>
+<span id="1405">1405</span>
+<span id="1406">1406</span>
+<span id="1407">1407</span>
+<span id="1408">1408</span>
+<span id="1409">1409</span>
+<span id="1410">1410</span>
+<span id="1411">1411</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, 
 //! and the associated code for dealing with tasks.
 //! 
@@ -1815,28 +1829,42 @@
 
 <span class="kw">impl </span>Task {
     <span class="doccomment">/// Creates a new Task structure and initializes it to be non-Runnable.
-    /// By default, the new `Task` will inherit some of the same states from the currently-running `Task`:
+    /// 
+    /// By default, the new `Task` will inherit some of its states from the given `parent_task`:
     /// its `Environment`, `MemoryManagementInfo`, `CrateNamespace`, and `app_crate` reference.
-    /// If needed, those states can be changed by setting them for the returned `Task`.
+    /// If necessary, those states can be changed by setting them for the returned `Task`.
     /// 
     /// # Arguments
     /// * `kstack`: the optional kernel `Stack` for this `Task` to use.
-    ///    If not provided, a kernel stack of the default size will be allocated and used.
+    ///    * If `None`, a kernel stack of the default size will be allocated and used.
+    /// * `parent_task`: the optional `TaskRef` that acts as a sort of &quot;parent&quot; template
+    ///    for this new `Task`.
+    ///    Theseus doesn&#39;t have a true parent-child relationship between tasks;
+    ///    the new `Task` merely inherits certain states from this `parent_task`.
+    ///    * If `None`, the current task is used to determine the initial values of those states.
+    ///      This means that the tasking infrastructure must have been initialized before
+    ///      this function can be invoked with a `parent_task` value of `None`.
+    /// * `failure_cleanup_function`: an error handling function that acts as a last resort
+    ///    when all else fails, e.g., if unwinding crashes.
     /// 
-    /// # Note
-    /// This does not run the task, schedule it in, or switch to it.
-    /// 
-    /// However, it requires tasking to already be set up, i.e., the current task must be known.
+    /// ## Note
+    /// * If invoking this function with a `parent_task` value of `None`,
+    ///   tasking must have already been initialized so the current task can be obtained.
+    /// * This does not run the task, schedule it in, or switch to it.
+    /// * If you want to create a new task, you should use the `spawn` crate instead.
     </span><span class="kw">pub fn </span>new(
         kstack: <span class="prelude-ty">Option</span>&lt;Stack&gt;,
+        parent_task: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>TaskRef&gt;,
         failure_cleanup_function: FailureCleanupFunction
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Task, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="kw">let </span>curr_task = get_my_current_task().ok_or(<span class="string">&quot;Task::new(): couldn&#39;t get current task (not yet initialized)&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>parent_task = parent_task
+            .or_else(|| get_my_current_task())
+            .ok_or(<span class="string">&quot;Task::new(): `parent_task` wasn&#39;t provided, and couldn&#39;t get current task&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let </span>(mmi, namespace, env, app_crate) = (
-            Arc::clone(<span class="kw-2">&amp;</span>curr_task.mmi),
-            Arc::clone(<span class="kw-2">&amp;</span>curr_task.namespace),
-            Arc::clone(<span class="kw-2">&amp;</span>curr_task.inner.lock().env),
-            curr_task.app_crate.clone(),
+            Arc::clone(<span class="kw-2">&amp;</span>parent_task.mmi),
+            Arc::clone(<span class="kw-2">&amp;</span>parent_task.namespace),
+            Arc::clone(<span class="kw-2">&amp;</span>parent_task.inner.lock().env),
+            parent_task.app_crate.clone(),
         );
 
         <span class="kw">let </span>kstack = kstack
