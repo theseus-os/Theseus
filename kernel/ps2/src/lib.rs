@@ -161,9 +161,10 @@ fn status_register() -> ControllerToHostStatus {
     ControllerToHostStatus::from_bytes([PS2_COMMAND_AND_STATUS_PORT.lock().read()])
 }
 
-//NOTE: if we are _not_ in an interrupt handler, it might be necessary to check for `output_buffer_full` first
 /// Read data from the PS/2 data port.
-/// This is the lowest level interface to the port.
+/// 
+/// Note: this can be called directly when within a PS/2 device's interrupt handler.
+/// If polling is used (e.g. in a device's init function), [ControllerToHostStatus] `output_buffer_full` needs to be checked first.
 fn read_data() -> u8 {
     PS2_DATA_PORT.lock().read()
 }
@@ -201,9 +202,10 @@ impl From<WritableData> for u8 {
     }
 }
 
-//NOTE: it might be necessary to check for `!input_buffer_full` first
 /// Write data to the PS/2 data port.
-/// This is the lowest level interface to the port.
+/// 
+/// Note: when writing to the PS/2 controller, it might be necessary to check for
+/// [ControllerToHostStatus] `!input_buffer_full` first.
 fn write_data(value: WritableData) {
     unsafe { PS2_DATA_PORT.lock().write(value.into()) };
 }
@@ -266,11 +268,17 @@ enum PS2Port {
 
 // see https://wiki.osdev.org/%228042%22_PS/2_Controller#Initialising_the_PS.2F2_Controller
 fn init_ps2_port(port: PS2Port) {
+    // Step 1: Initialise USB Controllers
+    // no USB support yet
+
+    // Step 2: Determine if the PS/2 Controller Exists
+    // TODO: we support the FADT, so we can check this
+
     // Step 3: Disable Devices
     write_command(DisablePort2);
     write_command(DisablePort1);
 
-    // Step 4
+    // Step 4: Flush The Output Buffer
     flush_output_buffer();
 
     // Step 5: Set the Controller Configuration Byte
@@ -286,6 +294,8 @@ fn init_ps2_port(port: PS2Port) {
         }
     }
     write_config(config);
+
+    // Step 6/7/8 are inside [test_ps2_port]
 
     // Step 9: Enable Devices
     write_command(EnablePort1);
@@ -313,14 +323,16 @@ pub fn test_ps2_port2() -> Result<(), &'static str> {
 
 // see https://wiki.osdev.org/%228042%22_PS/2_Controller#Initialising_the_PS.2F2_Controller
 fn test_ps2_port(port: PS2Port) -> Result<(), &'static str> {
-    // test the PS/2 controller
-    write_command(TestController);
-    match read_controller_test_result()? {
-        ControllerTestResult::Passed => debug!("passed PS/2 controller test"),
-        ControllerTestResult::Failed => Err("failed PS/2 controller test")?,
-    }
+    // Step 1-5 are inside [init_ps2_port]
 
-    // test the PS/2 data port
+    // Step 6: Perform Controller Self Test
+    write_command(TestController);
+    read_controller_test_result()?;
+    debug!("passed PS/2 controller test");
+
+    // TODO: Step 7, but not here, maybe init and test both devices at once in a new PS/2 controller driver crate
+
+    // Step 8: Perform Interface Tests
     match port {
         PS2Port::One => write_command(TestPort1),
         PS2Port::Two => write_command(TestPort2),
@@ -334,7 +346,7 @@ fn test_ps2_port(port: PS2Port) -> Result<(), &'static str> {
         DataLineStuckHigh => Err("failed PS/2 port test, clock line stuck high")?,
     }
 
-    // enable PS/2 interrupt and see the new config
+    // print the config (?) see TODO above
     let config = read_config();
     let port_interrupt_enabled = match port {
         PS2Port::One => config.port1_interrupt_enabled(),
@@ -388,7 +400,7 @@ fn read_port_test_result() -> Result<PortTestResult, &'static str> {
     read_data().try_into().map_err(|_| "failed to read port test result")
 }
 
-// https://wiki.osdev.org/PS/2_Keyboard#Special_Bytes //NOTE: all other bytes sent by the keyboard are scan codes
+// https://wiki.osdev.org/PS/2_Keyboard#Special_Bytes all other bytes sent by the keyboard are scan codes
 // http://users.utcluj.ro/~baruch/sie/labor/PS2/PS-2_Mouse_Interface.htm mouse only returns AA, FC or FA, mouse_id and packet
 #[derive(TryFromPrimitive)]
 #[repr(u8)]
