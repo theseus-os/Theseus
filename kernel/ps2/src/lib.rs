@@ -637,9 +637,8 @@ pub enum SampleRate {
 /// set PS/2 mouse's sampling rate
 fn set_mouse_sampling_rate(value: SampleRate) -> Result<(), &'static str> {
     command_to_mouse(HostToMouseCommandOrData::MouseCommand(SampleRate))
-        .and(command_to_mouse(HostToMouseCommandOrData::SampleRate(value)))
+        .and_then(|_| command_to_mouse(HostToMouseCommandOrData::SampleRate(value)))
         .map_err(|_| "failed to set the mouse sampling rate")
-    
 }
 
 pub enum MouseId {
@@ -732,23 +731,21 @@ pub enum MouseResolution {
 #[allow(dead_code)]
 fn mouse_resolution(value: MouseResolution) -> Result<(), &'static str> {
     command_to_mouse(HostToMouseCommandOrData::MouseCommand(SetResolution))
-        .and(command_to_mouse(HostToMouseCommandOrData::MouseResolution(value)))
-        .map_err(|_| {
-            "failed to set the mouse resolution"
-        })
+        .and_then(|_| command_to_mouse(HostToMouseCommandOrData::MouseResolution(value)))
+        .map_err(|_| "failed to set the mouse resolution")
 }
 
 /// set LED status of the keyboard
 pub fn set_keyboard_led(value: LEDState) -> Result<(), &'static str> {
     command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetLEDStatus))
-        .and(command_to_keyboard(HostToKeyboardCommandOrData::LEDState(value)))
+        .and_then(|_| command_to_keyboard(HostToKeyboardCommandOrData::LEDState(value)))
         .map_err(|_| "failed to set the keyboard led")
 }
 
 /// set the scancode set of the keyboard
 pub fn keyboard_scancode_set(value: ScancodeSet) -> Result<(), &'static str> {
     command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetScancodeSet))
-        .and(command_to_keyboard(HostToKeyboardCommandOrData::ScancodeSet(value)))
+        .and_then(|_| command_to_keyboard(HostToKeyboardCommandOrData::ScancodeSet(value)))
         .map_err(|_| "failed to set the keyboard scancode set")
 }
 
