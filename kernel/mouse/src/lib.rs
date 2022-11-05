@@ -9,13 +9,14 @@ use mpmc::Queue;
 use event_types::Event;
 use x86_64::structures::idt::InterruptStackFrame;
 use mouse_data::{MouseButtons, MouseEvent, MouseMovementRelative};
-use ps2::{mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2, read_mouse_packet, MousePacketBits4, MouseId};
+use ps2::{mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2, read_mouse_packet, MouseId, MousePacket};
 
 /// The first PS/2 port for the mouse is connected directly to IRQ 0xC.
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.
 const PS2_MOUSE_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + 0xC;
 
 static MOUSE_PRODUCER: Once<Queue<Event>> = Once::new();
+static MOUSE_ID: Once<MouseId> = Once::new();
 
 /// Initialize the PS/2 mouse driver and register its interrupt handler.
 /// 
@@ -49,6 +50,7 @@ pub fn init(mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
             return Err("Failed to read the PS/2 mouse ID");
         }
     }
+    MOUSE_ID.call_once(|| MouseId::Four);
 
     // Register the interrupt handler
     interrupts::register_interrupt(PS2_MOUSE_IRQ, ps2_mouse_handler).map_err(|e| {
@@ -63,18 +65,18 @@ pub fn init(mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
 
 /// The interrupt handler for a PS/2-connected mouse, registered at IRQ 0x2C.
 extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
-    let mouse_packet = read_mouse_packet();
-    if mouse_packet.x_overflow() || mouse_packet.y_overflow() {
-        //NOTE: overflow should maybe just be handled by using the max value on overflow, though it's apparently impossible to trigger it
-        //and often the hardware clamps it anyways (https://forum.osdev.org/viewtopic.php?f=1&t=31176)
-        error!("The overflow bits in the mouse data packet's first byte are set! Discarding the whole packet.");
-    } else if mouse_packet.always_one() != 1 {
-        // it's very likely that the PS/2 controller send us an [interrupt](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts),
-        // if it did, the whole 32 bits of the mouse_packet are zero (at least on my end)
-        // checking the PS/2 controller status register's mouse_output_buffer_full might work, but this current solution does also work
-        // error!("Third bit in the mouse data packet's first byte should always be 1. Discarding the whole packet since the bit is 0.");
-    } else if let Err(e) = handle_mouse_input(mouse_packet) {
-        error!("ps2_mouse_handler: {e:?}");
+    if let Some(id) = MOUSE_ID.get() {
+        let mouse_packet = read_mouse_packet(id);
+        if mouse_packet.always_one() != 1 {
+            // it's very likely that the PS/2 controller send us an [interrupt](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts),
+            // if it did, the whole 32 bits of the mouse_packet are zero (at least on my end)
+            // checking the PS/2 controller status register's mouse_output_buffer_full might work, but this current solution does also work
+            // error!("Third bit in the mouse data packet's first byte should always be 1. Discarding the whole packet since the bit is 0.");
+        } else if let Err(e) = handle_mouse_input(mouse_packet) {
+            error!("ps2_mouse_handler: {e:?}");
+        }
+    } else {
+        warn!("MOUSE_ID wasn't yet initialized, dropping the mouse packet.");
     }
 
     interrupts::eoi(Some(PS2_MOUSE_IRQ));
@@ -82,7 +84,7 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
 
 
 /// enqueue a Mouse Event according to the data
-fn handle_mouse_input(mouse_packet: MousePacketBits4) -> Result<(), &'static str> {
+fn handle_mouse_input(mouse_packet: MousePacket) -> Result<(), &'static str> {
     let buttons = Buttons::from(&mouse_packet).0;
     let movement = Movement::from(&mouse_packet).0;
 
@@ -99,8 +101,8 @@ fn handle_mouse_input(mouse_packet: MousePacketBits4) -> Result<(), &'static str
 
 // both MouseMovementRelative and MousePacketBits4 are in different crates, so we need a newtype wrapper:
 struct Movement(MouseMovementRelative);
-impl From<&MousePacketBits4> for Movement {
-    fn from(mouse_packet: &MousePacketBits4) -> Self {
+impl From<&MousePacket> for Movement {
+    fn from(mouse_packet: &MousePacket) -> Self {
         Self(MouseMovementRelative::new(
             mouse_packet.x_movement(),
             mouse_packet.y_movement(),
@@ -111,8 +113,8 @@ impl From<&MousePacketBits4> for Movement {
 
 // both MouseButtons and MousePacketBits4 are in different crates, so we need a newtype wrapper:
 struct Buttons(MouseButtons);
-impl From<&MousePacketBits4> for Buttons {
-    fn from(mouse_packet: &MousePacketBits4) -> Self {
+impl From<&MousePacket> for Buttons {
+    fn from(mouse_packet: &MousePacket) -> Self {
         Self(MouseButtons::new(
             mouse_packet.button_left(),
             mouse_packet.button_right(),

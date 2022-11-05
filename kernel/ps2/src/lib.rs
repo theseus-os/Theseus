@@ -4,7 +4,7 @@ use log::debug;
 use num_enum::TryFromPrimitive;
 use port_io::Port;
 use spin::Mutex;
-use modular_bitfield::{specifiers::{B1, B4, B8}, bitfield};
+use modular_bitfield::{specifiers::{B1, B4, B8}, bitfield, BitfieldSpecifier};
 
 use HostToControllerCommand::*;
 use HostToKeyboardCommand::*;
@@ -546,11 +546,9 @@ fn command_to_mouse(value: HostToMouseCommandOrData) -> Result<(), &'static str>
     Err("mouse doesn't support the command or there has been a hardware failure")
 }
 
-//TODO: different MousePacketBits for different MouseId?
-// see https://wiki.osdev.org/PS/2_Mouse#5_buttons
-#[bitfield(bits = 32)]
-#[derive(Debug)]
-pub struct MousePacketBits4 {
+#[bitfield(bits = 24)]
+#[derive(Debug, BitfieldSpecifier)]
+pub struct MousePacketGeneric {
     //1. byte starts here
     pub button_left: bool,
     pub button_right: bool,
@@ -568,26 +566,29 @@ pub struct MousePacketBits4 {
     //3. byte
     /// only a part of y_movement, needs to be combined with [y_9th_bit]
     y_1st_to_8th_bit: B8, //u8 with #[bits = 8] attribute didn't work
-    //4. byte starts here
-    /// already stored in two's complement
-    z_movement: B4, //u8 with #[bits = 4] attribute didn't work
-    pub button_4: bool,
-    pub button_5: bool,
-    #[allow(dead_code)]
-    zero1: B1,
-    #[allow(dead_code)]
-    zero2: B1,
 }
 
-impl MousePacketBits4 {
+impl MousePacketGeneric {
     /// `x_1st_to_8th_bit` and `x_9th_bit` should not be accessed directly, because they're part of one signed 9-bit number
     pub fn x_movement(&self) -> i16 {
-        Self::to_2s_complement(self.x_1st_to_8th_bit(), self.x_9th_bit())
+        // NOTE: not sure if this ever happens (https://forum.osdev.org/viewtopic.php?f=1&t=31176)
+        let x_1st_to_8th_bit = if self.x_overflow() {
+            u8::MAX
+        } else {
+            self.x_1st_to_8th_bit()
+        };
+        Self::to_2s_complement(x_1st_to_8th_bit, self.x_9th_bit())
     }
 
     /// `y_1st_to_8th_bit` and `y_9th_bit` should not be accessed directly, because they're part of one signed 9-bit number
     pub fn y_movement(&self) -> i16 {
-        Self::to_2s_complement(self.y_1st_to_8th_bit(), self.y_9th_bit())
+        // NOTE: not sure if this ever happens (https://forum.osdev.org/viewtopic.php?f=1&t=31176)
+        let y_1st_to_8th_bit = if self.y_overflow() {
+            u8::MAX
+        } else {
+            self.y_1st_to_8th_bit()
+        };
+        Self::to_2s_complement(y_1st_to_8th_bit, self.y_9th_bit())
     }
 
     // implementation from https://wiki.osdev.org/PS/2_Mouse
@@ -605,22 +606,136 @@ impl MousePacketBits4 {
             signed
         }
     }
+}
 
-    //currently limited to mouse id 4
+#[bitfield(bits = 32)]
+#[derive(Debug)]
+pub struct MousePacket3 {
+    generic_part: MousePacketGeneric,
+    //4. byte
+    /// already stored in two's complement, valid values are -8 to +7
+    z_movement: u8,
+}
+impl MousePacket3 {
+    //TODO: see osdev wiki, might be wrong
     /// often called `z_movement`, renamed to disambiguate
     pub fn scroll_movement(&self) -> i8 {
-        self.z_movement() as i8 //TODO: see osdev wiki, might be wrong
+        self.z_movement() as i8
+    }
+}
+
+// see https://wiki.osdev.org/PS/2_Mouse#5_buttons
+#[bitfield(bits = 32)]
+#[derive(Debug)]
+pub struct MousePacket4 {
+    generic_part: MousePacketGeneric,
+    //4. byte starts here
+    /// already stored in two's complement
+    z_movement: B4,
+    pub button_4: bool,
+    pub button_5: bool,
+    #[allow(dead_code)]
+    zero1: B1,
+    #[allow(dead_code)]
+    zero2: B1,
+}
+impl MousePacket4 {
+    //TODO: see osdev wiki, might be wrong
+    /// often called `z_movement`, renamed to disambiguate
+    pub fn scroll_movement(&self) -> i8 {
+        self.z_movement() as i8
+    }
+}
+
+pub enum MousePacket {
+    Zero(MousePacketGeneric),
+    Three(MousePacket3),
+    Four(MousePacket4)
+}
+
+impl MousePacket {
+    pub fn button_left(&self) -> bool {
+        match self {
+            MousePacket::Zero(m) => m.button_left(),
+            MousePacket::Three(m) => m.generic_part().button_left(),
+            MousePacket::Four(m) => m.generic_part().button_left(),
+        }
+    }
+    pub fn button_right(&self) -> bool {
+        match self {
+            MousePacket::Zero(m) => m.button_right(),
+            MousePacket::Three(m) => m.generic_part().button_right(),
+            MousePacket::Four(m) => m.generic_part().button_right(),
+        }
+    }
+    pub fn button_middle(&self) -> bool {
+        match self {
+            MousePacket::Zero(m) => m.button_middle(),
+            MousePacket::Three(m) => m.generic_part().button_middle(),
+            MousePacket::Four(m) => m.generic_part().button_middle(),
+        }
+    }
+    pub fn always_one(&self) -> u8 {
+        match self {
+            MousePacket::Zero(m) => m.always_one(),
+            MousePacket::Three(m) => m.generic_part().always_one(),
+            MousePacket::Four(m) => m.generic_part().always_one(),
+        }
+    }
+    pub fn x_movement(&self) -> i16 {
+        match self {
+            MousePacket::Zero(m) => m.x_movement(),
+            MousePacket::Three(m) => m.generic_part().x_movement(),
+            MousePacket::Four(m) => m.generic_part().x_movement(),
+        }
+    }
+    pub fn y_movement(&self) -> i16 {
+        match self {
+            MousePacket::Zero(m) => m.y_movement(),
+            MousePacket::Three(m) => m.generic_part().y_movement(),
+            MousePacket::Four(m) => m.generic_part().y_movement(),
+        }
+    }
+    pub fn scroll_movement(&self) -> i8 {
+        match self {
+            MousePacket::Three(m) => m.scroll_movement(),
+            MousePacket::Four(m) => m.scroll_movement(),
+            _ => 0,
+        }
+    }
+    pub fn button_4(&self) -> bool {
+        match self {
+            MousePacket::Four(m) => m.button_4(),
+            _ => false,
+        }
+    }
+    pub fn button_5(&self) -> bool {
+        match self {
+            MousePacket::Four(m) => m.button_5(),
+            _ => false,
+        }
     }
 }
 
 /// read mouse data packet; will work for mouse with ID 4 and probably 3
-pub fn read_mouse_packet() -> MousePacketBits4 {
-    MousePacketBits4::from_bytes([
-        read_data(),
-        read_data(),
-        read_data(),
-        read_data()
+pub fn read_mouse_packet(id: &MouseId) -> MousePacket {
+    match id {
+        MouseId::Zero => MousePacket::Zero(
+            MousePacketGeneric::from_bytes([
+                read_data(), read_data(), read_data()
     ])
+        ),
+        MouseId::Three => MousePacket::Three(
+            MousePacket3::from_bytes([
+                read_data(), read_data(), read_data(), read_data()
+            ])
+        ),
+        MouseId::Four => MousePacket::Four(
+            MousePacket4::from_bytes([
+                read_data(), read_data(), read_data(), read_data()
+            ])
+        ),
+    }
 }
 
 #[derive(Clone)]
@@ -641,6 +756,7 @@ fn set_mouse_sampling_rate(value: SampleRate) -> Result<(), &'static str> {
         .map_err(|_| "failed to set the mouse sampling rate")
 }
 
+/// See [MousePacket] and its enum variants for further information.
 #[derive(Debug, TryFromPrimitive)]
 #[repr(u8)]
 pub enum MouseId {
