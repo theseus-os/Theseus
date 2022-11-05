@@ -175,27 +175,22 @@ enum WritableData {
     HostToDevice(HostToDevice)
 }
 
-// NOTE: could also use a macro / reminds me of serde
 impl From<WritableData> for u8 {
     fn from(value: WritableData) -> Self {
+        use HostToKeyboardCommandOrData::*;
+        use HostToMouseCommandOrData::*;
         match value {
-            WritableData::Configuration(value) => value.into_bytes()[0],
-            WritableData::HostToDevice(value) => {
-                match value {
-                    HostToDevice::Keyboard(value) => {
-                        match value {
-                            HostToKeyboardCommandOrData::KeyboardCommand(c) => c as u8,
-                            HostToKeyboardCommandOrData::LEDState(l) => l.into_bytes()[0],
-                            HostToKeyboardCommandOrData::ScancodeSet(s) => s as u8,
+            WritableData::Configuration(value) => u8::from_ne_bytes(value.into_bytes()),
+            WritableData::HostToDevice(value) => match value {
+                HostToDevice::Keyboard(value) => match value {
+                    KeyboardCommand(c) => c as u8,
+                    LEDState(l) => u8::from_ne_bytes(l.into_bytes()),
+                    ScancodeSet(s) => s as u8,
                         }
-                    }
-                    HostToDevice::Mouse(value) => {
-                        match value {
-                            HostToMouseCommandOrData::MouseCommand(c) => c as u8,
-                            HostToMouseCommandOrData::MouseResolution(r) => r as u8,
-                            HostToMouseCommandOrData::SampleRate(s) => s as u8,
-                        }
-                    }
+                HostToDevice::Mouse(value) => match value {
+                    MouseCommand(c) => c as u8,
+                    MouseResolution(r) => r as u8,
+                    SampleRate(s) => s as u8,
                 }
             }
         }
