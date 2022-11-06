@@ -255,6 +255,8 @@ pub fn init_ps2_port1() {
 pub fn init_ps2_port2() {
     init_ps2_port(PS2Port::Two);
 }
+
+#[derive(Clone, Copy)]
 enum PS2Port {
     One,
     Two,
@@ -510,23 +512,26 @@ pub enum HostToMouseCommandOrData {
 }
 
 // https://wiki.osdev.org/PS/2_Mouse#Mouse_Device_Over_PS.2F2
+// the comments right beside the fields are just there for some intuition on PS/2
 #[derive(Clone)]
 pub enum HostToMouseCommand {
-    SetScaling = 0xE6, //1 or 2
-    SetResolution = 0xE8, //[MouseResolution]
+    /// either to 1 or 2
+    SetScaling = 0xE6,
+    /// set [MouseResolution]
+    SetResolution = 0xE8,
     StatusRequest = 0xE9,
     SetStreamMode = 0xEA,
     ReadData = 0xEB,
     ResetWrapMode = 0xEC,
     SetWrapMode = 0xEE,
-    SetRemoteMode = 0xF0, //NOTE: same value as SetScancodeSet
-    GetDeviceID = 0xF2, //NOTE: same value as IdentifyKeyboard
-    SampleRate = 0xF3,  //NOTE: same value as SetRepeatRateAndDelay
-    EnableDataReporting = 0xF4, //NOTE: same value as EnableScanning
-    DisableDataReporting = 0xF5, //NOTE: same value as DisableScanning
-    SetDefaults = 0xF6, //NOTE: same
-    ResendByte = 0xFE,  //NOTE: same
-    Reset = 0xFF,       //NOTE: same
+    SetRemoteMode = 0xF0, //same value as SetScancodeSet
+    GetDeviceID = 0xF2, //same value as IdentifyKeyboard
+    SampleRate = 0xF3,  //same value as SetRepeatRateAndDelay
+    EnableDataReporting = 0xF4, //same value as EnableScanning
+    DisableDataReporting = 0xF5, //same value as DisableScanning
+    SetDefaults = 0xF6, //same
+    ResendByte = 0xFE,  //same
+    Reset = 0xFF,       //same
 }
 
 /// write command to the keyboard and handle the result
@@ -664,6 +669,7 @@ pub enum MousePacket {
     Four(MousePacket4)
 }
 
+// demultiplexes [MousePacket] and provides standard values
 impl MousePacket {
     pub fn button_left(&self) -> bool {
         match self {
@@ -913,6 +919,7 @@ pub fn keyboard_detect() -> Result<KeyboardType, &'static str> {
     keyboard_type
 }
 
+/// reads a Scancode (for now an untyped u8)
 pub fn read_scancode() -> u8 {
     read_data()
 }
