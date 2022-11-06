@@ -1,5 +1,7 @@
 #![no_std]
 
+use modular_bitfield::{bitfield, specifiers::B3};
+
 //NOTE: could be reduced to 9+9+4=22-bit, +2-bit padding = 3*8-bit
 #[derive(Debug, Clone)]
 pub struct MouseMovementRelative {
@@ -18,32 +20,15 @@ impl MouseMovementRelative {
     }
 }
 
-//NOTE: could be reduced to 8-bit
+#[bitfield(bits = 8)]
 #[derive(Debug, Clone)]
 pub struct MouseButtons {
-    pub left_button_hold: bool,
-    pub right_button_hold: bool,
-    pub middle_button_hold: bool,
-    pub fourth_button_hold: bool,
-    pub fifth_button_hold: bool,
-}
-
-impl MouseButtons {
-    pub fn new(
-        left_button_hold: bool,
-        right_button_hold: bool,
-        middle_button_hold: bool,
-        fourth_button_hold: bool,
-        fifth_button_hold: bool,
-    ) -> Self {
-        Self {
-            left_button_hold,
-            right_button_hold,
-            middle_button_hold,
-            fourth_button_hold,
-            fifth_button_hold,
-        }
-    }
+    pub left: bool,
+    pub right: bool,
+    pub middle: bool,
+    pub fourth: bool,
+    pub fifth: bool,
+    #[skip] __: B3
 }
 
 #[derive(Debug, Clone)]

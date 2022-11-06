@@ -7,3 +7,4 @@ categories = ["no-std", "hardware-support"]
 edition = "2021"
 
 [dependencies]
+modular-bitfield = "0.11.2"

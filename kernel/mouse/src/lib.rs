@@ -127,12 +127,12 @@ impl From<&MousePacket> for Movement {
 struct Buttons(MouseButtons);
 impl From<&MousePacket> for Buttons {
     fn from(mouse_packet: &MousePacket) -> Self {
-        Self(MouseButtons::new(
-            mouse_packet.button_left(),
-            mouse_packet.button_right(),
-            mouse_packet.button_middle(),
-            mouse_packet.button_4(),
-            mouse_packet.button_5(),
-        ))
+        Self(MouseButtons::new()
+            .with_left(mouse_packet.button_left())
+            .with_right(mouse_packet.button_right())
+            .with_middle(mouse_packet.button_middle())
+            .with_fourth(mouse_packet.button_4())
+            .with_fifth(mouse_packet.button_5())
+        )
     }
 }

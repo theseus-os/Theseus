@@ -354,10 +354,10 @@ impl WindowManager {
             gcoordinate: coordinate.clone(),
             scrolling_up: mouse_event.movement.scroll_movement > 0, //TODO: might be more beneficial to save scroll_movement here
             scrolling_down: mouse_event.movement.scroll_movement < 0, //FIXME: also might be the wrong way around
-            left_button_hold: mouse_event.buttons.left_button_hold,
-            right_button_hold: mouse_event.buttons.right_button_hold,
-            fourth_button_hold: mouse_event.buttons.fourth_button_hold,
-            fifth_button_hold: mouse_event.buttons.fifth_button_hold,
+            left_button_hold: mouse_event.buttons.left(),
+            right_button_hold: mouse_event.buttons.right(),
+            fourth_button_hold: mouse_event.buttons.fourth(),
+            fifth_button_hold: mouse_event.buttons.fifth(),
         };
 
         // TODO: FIXME:  improve this logic to just send the mouse event to the top-most window in the entire WM list,
@@ -692,14 +692,14 @@ fn window_manager_loop(
                             Event::MouseMovementEvent(ref next_mouse_event) => {
                                 if next_mouse_event.movement.scroll_movement
                                     == mouse_event.movement.scroll_movement
-                                    && next_mouse_event.buttons.left_button_hold
-                                        == mouse_event.buttons.left_button_hold
-                                    && next_mouse_event.buttons.right_button_hold
-                                        == mouse_event.buttons.right_button_hold
-                                    && next_mouse_event.buttons.fourth_button_hold
-                                        == mouse_event.buttons.fourth_button_hold
-                                    && next_mouse_event.buttons.fifth_button_hold
-                                        == mouse_event.buttons.fifth_button_hold {
+                                    && next_mouse_event.buttons.left()
+                                        == mouse_event.buttons.left()
+                                    && next_mouse_event.buttons.right()
+                                        == mouse_event.buttons.right()
+                                    && next_mouse_event.buttons.fourth()
+                                        == mouse_event.buttons.fourth()
+                                    && next_mouse_event.buttons.fifth()
+                                        == mouse_event.buttons.fifth() {
                                     x = x.saturating_add(next_mouse_event.movement.x_movement as isize);
                                     y = y.saturating_add(next_mouse_event.movement.y_movement as isize);
                                 }

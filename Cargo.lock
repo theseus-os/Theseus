@@ -1907,6 +1907,9 @@ dependencies = [
 [[package]]
 name = "mouse_data"
 version = "0.1.0"
+dependencies = [
+ "modular-bitfield",
+]
 
 [[package]]
 name = "mpmc"
