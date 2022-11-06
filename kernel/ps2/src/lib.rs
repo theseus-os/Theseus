@@ -144,7 +144,7 @@ pub struct ControllerToHostStatus {
     // transmit_timeout: bool,
     // /// Keyboard didn't generate clock signals within 20 ms of command reception
     // receive_timeout: bool,
-    
+
     /// Similar to `output_buffer_full`, except for mouse
     pub mouse_output_buffer_full: bool,
     /// Timeout during keyboard command receive or response (Same as `transmit_timeout` + `receive_timeout`)
@@ -185,7 +185,7 @@ impl From<WritableData> for u8 {
                     KeyboardCommand(c) => c as u8,
                     LEDState(l) => u8::from_ne_bytes(l.into_bytes()),
                     ScancodeSet(s) => s as u8,
-                        }
+                }
                 HostToDevice::Mouse(value) => match value {
                     MouseCommand(c) => c as u8,
                     MouseResolution(r) => r as u8,
@@ -409,25 +409,37 @@ pub enum DeviceToHostResponse {
     KeyDetectionErrorOrInternalBufferOverrun2 = 0xFF,
 }
 
-// https://wiki.osdev.org/%228042%22_PS/2_Controller#Sending_Bytes_To_Device.2Fs
-// and https://wiki.osdev.org/PS/2_Mouse#Set_Sample_Rate_Example
-// AND https://wiki.osdev.org/%228042%22_PS/2_Controller#Polling, which still has some _maybe relevant information_:
-// We might still need to disable one of the devices every time we send so we can read_data reliably.
-// As it currently works, it might only be a problem for older devices, so I won't overoptimize.
-/// write data to the data port and return the response
-fn send(value: HostToDevice) -> Result<DeviceToHostResponse, &'static str> {
-    const VERY_ARBITRARY_TIMEOUT_VALUE: u8 = 3;
+/// https://wiki.osdev.org/%228042%22_PS/2_Controller#Sending_Bytes_To_Device.2Fs
+fn polling_send(value: HostToDevice) -> Result<(), &'static str> {
+    const VERY_ARBITRARY_TIMEOUT_VALUE: u8 = u8::MAX;
     for _ in 0..VERY_ARBITRARY_TIMEOUT_VALUE {
-        // so that we don't overwrite the previously sent command
+        // so that we don't overwrite the previously sent value
         if !status_register().input_buffer_full() {
-            write_data(WritableData::HostToDevice(value.clone()));
-            // so that we only read when data is available
-            if status_register().output_buffer_full() {
-                return read_data().try_into().map_err(|_| "failed to read device response");
-            }
+            write_data(WritableData::HostToDevice(value));
+            return Ok(());
         }
     }
-    Err("timeout value exceeded")
+    Err("polling_send timeout value exceeded")
+}
+
+/// https://wiki.osdev.org/%228042%22_PS/2_Controller#Polling, which still has some _maybe relevant information_:
+/// We might still need to disable one of the devices every time we send so we can read_data reliably.
+/// As it currently works, it might only be a problem for older devices, so I won't overoptimize.
+fn polling_receive() -> Result<DeviceToHostResponse, &'static str> {
+    const VERY_ARBITRARY_TIMEOUT_VALUE: u8 = u8::MAX;
+    for _ in 0..VERY_ARBITRARY_TIMEOUT_VALUE {
+        // so that we only read when data is available
+        if status_register().output_buffer_full() {
+            return read_data().try_into().map_err(|_| "failed to read device response");
+        }
+    }
+    Err("polling_receive timeout value exceeded")
+}
+
+/// e.g. https://wiki.osdev.org/PS/2_Mouse#Set_Sample_Rate_Example
+fn polling_send_receive(value: HostToDevice) -> Result<DeviceToHostResponse, &'static str> {
+    polling_send(value)?;
+    polling_receive()
 }
 
 #[derive(Clone)]
@@ -490,20 +502,6 @@ pub enum ScancodeSet {
     Set3 = 3,
 }
 
-/// write command to the keyboard and return the result
-fn command_to_keyboard(value: HostToKeyboardCommandOrData) -> Result<(), &'static str> {
-    for _ in 0..3 {
-        let response = send(HostToDevice::Keyboard(value.clone()));
-
-        match response {
-            Ok(Acknowledge) => return Ok(()),
-            Ok(ResendCommand) => continue,
-            _ => continue,
-        }
-    }
-    Err("keyboard doesn't support the command or there has been a hardware failure")
-}
-
 #[derive(Clone)]
 pub enum HostToMouseCommandOrData {
     MouseCommand(HostToMouseCommand),
@@ -531,16 +529,29 @@ pub enum HostToMouseCommand {
     Reset = 0xFF,       //NOTE: same
 }
 
-/// write command to the mouse and return the result
-fn command_to_mouse(value: HostToMouseCommandOrData) -> Result<(), &'static str> {
-    for _ in 0..3 {
-        write_command(WriteByteToPort2InputBuffer);
-        let response = send(HostToDevice::Mouse(value.clone()));
+/// write command to the keyboard and handle the result
+fn command_to_keyboard(value: HostToKeyboardCommandOrData) -> Result<(), &'static str> {
+    const RETRIES: u8 = 3;
+    for _ in 0..=RETRIES {
+        return match polling_send_receive(HostToDevice::Keyboard(value.clone()))? {
+            Acknowledge => Ok(()),
+            ResendCommand => continue,
+            _ => Err("wrong response type")
+        };
+    }
+    Err("keyboard doesn't support the command or there has been a hardware failure")
+}
 
-        match response {
-            Ok(Acknowledge) => return Ok(()),
-            _ => continue,
-        }
+/// write command to the mouse and handle the result
+fn command_to_mouse(value: HostToMouseCommandOrData) -> Result<(), &'static str> {
+    write_command(WriteByteToPort2InputBuffer);
+    const RETRIES: u8 = 3;
+    for _ in 0..=RETRIES {
+        return match polling_send_receive(HostToDevice::Mouse(value.clone()))? {
+            Acknowledge => Ok(()),
+            ResendCommand => continue,
+            _ => Err("wrong response type")
+        };
     }
     Err("mouse doesn't support the command or there has been a hardware failure")
 }
@@ -723,7 +734,7 @@ pub fn read_mouse_packet(id: &MouseId) -> MousePacket {
         MouseId::Zero => MousePacket::Zero(
             MousePacketGeneric::from_bytes([
                 read_data(), read_data(), read_data()
-    ])
+            ])
         ),
         MouseId::Three => MousePacket::Three(
             MousePacket3::from_bytes([
