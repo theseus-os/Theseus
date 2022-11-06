@@ -121,7 +121,7 @@ fn write_command(value: HostToControllerCommand) {
 // see https://wiki.osdev.org/%228042%22_PS/2_Controller#Status_Register
 // and https://users.utcluj.ro/~baruch/sie/labor/PS2/PS-2_Keyboard_Interface.htm
 #[bitfield(bits = 8)]
-struct ControllerToHostStatus {
+pub struct ControllerToHostStatus {
     /// When using [Polling](https://wiki.osdev.org/%228042%22_PS/2_Controller#Polling), must be `true` before attempting to read data from [PS2_DATA_PORT].
     /// When using [Interrupts](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts), guaranteed to be `true`, because an interrupt only happens if the buffer is full
     /// Alternative name: output_register_full, which might make more sense because it only ever fits 1 byte. "Buffer" sounds like multiple.
@@ -146,8 +146,7 @@ struct ControllerToHostStatus {
     // receive_timeout: bool,
     
     /// Similar to `output_buffer_full`, except for mouse
-    #[allow(dead_code)]
-    mouse_output_buffer_full: bool,
+    pub mouse_output_buffer_full: bool,
     /// Timeout during keyboard command receive or response (Same as `transmit_timeout` + `receive_timeout`)
     #[allow(dead_code)]
     timeout_error: bool,
@@ -157,7 +156,7 @@ struct ControllerToHostStatus {
 }
 
 /// Read the PS/2 status port/register
-fn status_register() -> ControllerToHostStatus {
+pub fn status_register() -> ControllerToHostStatus {
     ControllerToHostStatus::from_bytes([PS2_COMMAND_AND_STATUS_PORT.lock().read()])
 }
 
@@ -294,6 +293,7 @@ fn init_ps2_port(port: PS2Port) {
 
     // Step 9: Enable Devices
     write_command(EnablePort1);
+    // NOTE: we might not need to do this conditionally
     match port {
         PS2Port::Two => write_command(EnablePort2),
         PS2Port::One => (),
@@ -302,8 +302,7 @@ fn init_ps2_port(port: PS2Port) {
 
 /// Clean the [PS2_DATA_PORT] output buffer, skipping the [ControllerToHostStatus] `output_buffer_full` check
 fn flush_output_buffer() {
-    //NOTE(hecatia): on my end, this is always 250 for port 1 and 65 for port 2, even if read multiple times
-    debug!("ps2::flush_output_buffer: {}", read_data());
+    read_data();
 }
 
 /// test the first PS/2 data port
@@ -647,6 +646,7 @@ impl MousePacket4 {
     }
 }
 
+#[derive(Debug)]
 pub enum MousePacket {
     Zero(MousePacketGeneric),
     Three(MousePacket3),
@@ -717,7 +717,7 @@ impl MousePacket {
     }
 }
 
-/// read mouse data packet; will work for mouse with ID 4 and probably 3
+/// read the correct [MousePacket] according to [MouseId]
 pub fn read_mouse_packet(id: &MouseId) -> MousePacket {
     match id {
         MouseId::Zero => MousePacket::Zero(

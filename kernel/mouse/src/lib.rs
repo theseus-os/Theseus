@@ -9,7 +9,7 @@ use mpmc::Queue;
 use event_types::Event;
 use x86_64::structures::idt::InterruptStackFrame;
 use mouse_data::{MouseButtons, MouseEvent, MouseMovementRelative};
-use ps2::{mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2, read_mouse_packet, MouseId, MousePacket};
+use ps2::{mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2, read_mouse_packet, MouseId, MousePacket, status_register};
 
 /// The first PS/2 port for the mouse is connected directly to IRQ 0xC.
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.
@@ -64,16 +64,28 @@ pub fn init(mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
 }
 
 /// The interrupt handler for a PS/2-connected mouse, registered at IRQ 0x2C.
+///
+/// When a mouse with id 4 is not scrolling, one interrupt without a mouse packet happens (mouse output buffer not full),
+/// then one interrupt with a mouse packet.
+/// When a mouse with id 4 is scrolling, one interrupt without a mouse packet happens (mouse output buffer not full),
+/// then two interrupts with mouse packets (the first one containing only the generic_part, the second one containing the complete packet).
+/// 
+/// In some cases (e.g. on device init), [the PS/2 controller can also send an interrupt](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts).
 extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
     if let Some(id) = MOUSE_ID.get() {
-        let mouse_packet = read_mouse_packet(id);
-        if mouse_packet.always_one() != 1 {
-            // it's very likely that the PS/2 controller send us an [interrupt](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts),
-            // if it did, the whole 32 bits of the mouse_packet are zero (at least on my end)
-            // checking the PS/2 controller status register's mouse_output_buffer_full might work, but this current solution does also work
-            // error!("Third bit in the mouse data packet's first byte should always be 1. Discarding the whole packet since the bit is 0.");
-        } else if let Err(e) = handle_mouse_input(mouse_packet) {
-            error!("ps2_mouse_handler: {e:?}");
+        if status_register().mouse_output_buffer_full() {
+            // NOTE: having read some more forum comments now, if this ever breaks on real hardware,
+            // try to redesign this to only get one byte per interrupt instead of the 3-4 bytes we
+            // currently get in read_mouse_packet and merge them afterwards
+            let mouse_packet = read_mouse_packet(id);
+            // warn!("read_mouse_packet: {mouse_packet:?}");
+            
+            if mouse_packet.always_one() != 1 {
+                // this could signal a hardware error or a mouse which doesn't conform to the rule
+                warn!("Discarding mouse data packet since its third bit should always be 1.");
+            } else if let Err(e) = handle_mouse_input(mouse_packet) {
+                error!("ps2_mouse_handler: {e:?}");
+            }
         }
     } else {
         warn!("MOUSE_ID wasn't yet initialized, dropping the mouse packet.");
