@@ -1,0 +1,9 @@
+[package]
+name = "nano_core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+uefi = { version = "0.16.1", features = [ "alloc", "exts", "logger" ] }
+uefi-services = "0.13.1"
+pl011_qemu = { git = "https://github.com/theseus-os/pl011/", branch = "aarch64-qemu-virt-test" }

@@ -34,6 +34,9 @@ exclude = [
 	"build",
 	"target",
 
+	## Exclude the aarch64 experiment
+	"aarch64",
+
 	## Exclude configuration, tools, scripts, etc
 	"cfg",
 	"compiler_plugins",
