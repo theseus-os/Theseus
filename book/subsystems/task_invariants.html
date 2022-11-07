@@ -179,7 +179,7 @@ There are several examples of how the multiple stages of task cleanup each permi
 </ul>
 <p>The task cleanup functions described in the <a href="./task.html#cleaning-up-tasks">previous chapter</a> demonstrate the lengths to which Theseus goes to ensure that task states and resources are fully released in both normal and exceptional execution paths. 
 In addition, as mentioned above, all cleanup functions are parameterized with the same <code>&lt;F, A, R&gt;</code> generic type parameters, 
-which is crucial for realizing restartable tasks because the failure handler for a restartable task must known its specific type parameters for the entry function, argument, and return type in order to re-spawn a new instance of the failed task.</p>
+which is crucial for realizing restartable tasks because the failure handler for a restartable task must know its specific type parameters for the entry function, argument, and return type in order to re-spawn a new instance of the failed task.</p>
 <h2 id="invariant-3-all-memory-transitively-reachable-from-a-tasks-entry-function-must-outlive-that-task"><a class="header" href="#invariant-3-all-memory-transitively-reachable-from-a-tasks-entry-function-must-outlive-that-task">Invariant 3: All memory transitively reachable from a task’s entry function must outlive that task.</a></h2>
 <p>Although all memory regions in Theseus are represented by <code>MappedPages</code>, which prevents use-after-free via lifetime invariants,
 it is difficult to use Rust lifetimes to sufficiently express the relationship between a task and arbitrary memory regions it accesses.

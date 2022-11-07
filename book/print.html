@@ -315,7 +315,7 @@ Isolation should be the responsibility of software alone.</p>
 <p><em>But why?</em></p>
 <p>For one, speculative execution exploits like Meltdown and Spectre have shown that hardware-ensured isolation does not protect kernel data from untrusted user space applications to the extent we once thought. It is difficult if not impossible to verify the true behavior of closed-source hardware (CPU architectures), so we turn to open-source software instead, where the OS, compiler, language libraries, and more are subject to scrutiny and even formal verification. </p>
 <p>In addition, modern languages like Rust are able to ensure type safety and memory safety at compile time, without the overhead of traditional safe/managed languages that rely upon inefficient garbage collection and transparent heap-based object management.
-Thus, we can leverage these safety guarantees to ensure that compiled code does not violation isolation between tasks (threads of execution) and software modules without the need for significant runtime checks.</p>
+Thus, we can leverage these safety guarantees to ensure that compiled code does not violate isolation between tasks (threads of execution) and software modules without the need for significant runtime checks.</p>
 <p>Theseus transcends the reliance on hardware to provide isolation, and completely foregoes hardware privilege levels (x86's Ring 0 vs. Ring 3 distinction) and multiple address spaces.
 Instead, we run all code at Ring 0 in a single virtual address space, including user applications that are written in purely safe Rust.
 This maximizes efficiency whilst preserving protection, because we can guarantee at compile time that a given application or kernel component cannot violate isolation between modules, rendering hardware privilege levels obsolete.
@@ -1315,7 +1315,7 @@ There are several examples of how the multiple stages of task cleanup each permi
 </ul>
 <p>The task cleanup functions described in the <a href="subsystems/./task.html#cleaning-up-tasks">previous chapter</a> demonstrate the lengths to which Theseus goes to ensure that task states and resources are fully released in both normal and exceptional execution paths. 
 In addition, as mentioned above, all cleanup functions are parameterized with the same <code>&lt;F, A, R&gt;</code> generic type parameters, 
-which is crucial for realizing restartable tasks because the failure handler for a restartable task must known its specific type parameters for the entry function, argument, and return type in order to re-spawn a new instance of the failed task.</p>
+which is crucial for realizing restartable tasks because the failure handler for a restartable task must know its specific type parameters for the entry function, argument, and return type in order to re-spawn a new instance of the failed task.</p>
 <h2 id="invariant-3-all-memory-transitively-reachable-from-a-tasks-entry-function-must-outlive-that-task"><a class="header" href="#invariant-3-all-memory-transitively-reachable-from-a-tasks-entry-function-must-outlive-that-task">Invariant 3: All memory transitively reachable from a task’s entry function must outlive that task.</a></h2>
 <p>Although all memory regions in Theseus are represented by <code>MappedPages</code>, which prevents use-after-free via lifetime invariants,
 it is difficult to use Rust lifetimes to sufficiently express the relationship between a task and arbitrary memory regions it accesses.
