@@ -3,7 +3,22 @@ name = "nano_core"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "nano_core"
+path = "main.rs"
+
 [dependencies]
-uefi = { version = "0.16.1", features = [ "alloc", "exts", "logger" ] }
-uefi-services = "0.13.1"
-pl011_qemu = { git = "https://github.com/theseus-os/pl011/", branch = "aarch64-qemu-virt-test" }
+log = "0.4.17"
+logger = { path = "../logger" }
+
+[dependencies.uefi]
+git = "https://github.com/theseus-os/uefi-rs/"
+branch = "until-upstream-pr-merged"
+default-features = false
+features = [ "alloc", "exts" ]
+
+[dependencies.uefi-services]
+git = "https://github.com/theseus-os/uefi-rs/"
+branch = "until-upstream-pr-merged"
+default-features = false
+features = [ "panic_handler" ]
