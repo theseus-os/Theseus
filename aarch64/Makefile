@@ -1,6 +1,6 @@
 TARGET=aarch64-unknown-uefi
 
-CARGOFLAGS += -p nano_core
+CARGOFLAGS += --workspace
 CARGOFLAGS += --release
 
 BUILD_STD_CARGOFLAGS += -Z unstable-options
@@ -41,7 +41,7 @@ create-build-structure:
 cargo-build: create-build-structure
 	@echo -e "\n=================== BUILDING ALL CRATES ==================="
 	@echo -e "\t TARGET: \"$(TARGET)\""
-	cargo +nightly build $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) --target $(TARGET)
+	cargo build $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) --target $(TARGET)
 
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
 $(nano_core_binary): cargo-build

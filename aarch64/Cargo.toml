@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
 
+default-members = [
+    "kernel/nano_core"
+]
+
 members = [
     "kernel/[!.]*/",
 ]
