@@ -7,11 +7,13 @@ BUILD_STD_CARGOFLAGS += -Z unstable-options
 BUILD_STD_CARGOFLAGS += -Z build-std=core,alloc
 BUILD_STD_CARGOFLAGS += -Z build-std-features=compiler-builtins-mem
 
-AARCH64_DIR = .
-BUILD_DIR = $(AARCH64_DIR)/build
-QEMU_EFI_FD = $(AARCH64_DIR)/resources/qemu-efi.fd
-NATIVE_OUTPUT = $(AARCH64_DIR)/target/aarch64-unknown-uefi/release/nano_core.efi
-nano_core_binary = $(BUILD_DIR)/efi
+QEMU_EFI_FD_URL ?= https://l0.pm/qemu-efi.fd
+
+AARCH64_DIR ?= .
+BUILD_DIR ?= $(AARCH64_DIR)/build
+QEMU_EFI_FD ?= $(AARCH64_DIR)/resources/qemu-efi.fd
+NATIVE_OUTPUT ?= $(AARCH64_DIR)/target/aarch64-unknown-uefi/release/nano_core.efi
+nano_core_binary ?= $(BUILD_DIR)/efi
 
 # Configure the machine
 QEMU_FLAGS += -machine virt
@@ -47,7 +49,10 @@ cargo-build: create-build-structure
 $(nano_core_binary): cargo-build
 	cp $(NATIVE_OUTPUT) $(nano_core_binary)
 
+$(QEMU_EFI_FD):
+	wget $(QEMU_EFI_FD_URL) -O $(QEMU_EFI_FD)
+
 ### builds and runs Theseus in QEMU
-run: $(nano_core_binary)
+run: $(nano_core_binary) $(QEMU_EFI_FD)
 	cat resources/qemu-instructions.txt
 	qemu-system-aarch64 $(QEMU_FLAGS)
