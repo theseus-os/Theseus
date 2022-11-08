@@ -49,10 +49,13 @@ cargo-build: create-build-structure
 $(nano_core_binary): cargo-build
 	cp $(NATIVE_OUTPUT) $(nano_core_binary)
 
+build: $(nano_core_binary)
+
+## This downloads the binary blob making Qemu compatible with UEFI
 $(QEMU_EFI_FD):
 	wget $(QEMU_EFI_FD_URL) -O $(QEMU_EFI_FD)
 
 ### builds and runs Theseus in QEMU
-run: $(nano_core_binary) $(QEMU_EFI_FD)
+run: build $(QEMU_EFI_FD)
 	cat resources/qemu-instructions.txt
 	qemu-system-aarch64 $(QEMU_FLAGS)

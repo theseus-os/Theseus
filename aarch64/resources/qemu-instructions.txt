@@ -10,7 +10,7 @@
 2. Click "Serial" to see the serial output
 3. spam [enter] a few times until you see a prompt
 4. write "fs0:\efi"
-5. You should see the "Hello world" message
+5. You should see the "Hello world" line among the other ones
 
 
 
