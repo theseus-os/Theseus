@@ -28,10 +28,10 @@ impl Log for Logger {
 
 pub static mut LOGGER: Logger = unsafe { MaybeUninit::uninit().assume_init() };
 
-pub fn init() {
+pub fn init() -> Result<(), &'static str> {
+    set_max_level(STATIC_MAX_LEVEL);
     unsafe {
         LOGGER = Logger { pl011: QemuVirtUart::new(UART1::take().unwrap()) };
-        set_logger(&LOGGER).unwrap();
-        set_max_level(STATIC_MAX_LEVEL);
+        set_logger(&LOGGER).map_err(|_| "logger::init - couldn't set logger")
     }
 }
