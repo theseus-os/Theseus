@@ -28,7 +28,7 @@ use spin::Mutex;
 use irq_safety::enable_interrupts;
 use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
-use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef, RunState, get_my_current_task_id};
+use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef, RunState, get_current_task};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use apic::get_my_apic_id;
@@ -648,13 +648,12 @@ where
     // *No* local variables should exist on the stack at the end of this function,
     // except for the task's `func` and `arg`, which are obviously required.
     {
-        let current_task_id_old = get_my_current_task_id().unwrap();
-        warn!("TASK_WRAPPER_INTERNAL: CURRENT_TASK_ID: {}, should be {}", current_task_id, current_task_id_old);
-
         // Set this task as the current task.
         // We cannot do until this task is actually running, because it uses thread-local storage.
         let current_task = task::init_current_task(current_task_id)
             .expect("BUG: task_wrapper: couldn't init this task as the current task");
+        assert!(current_task_id == current_task.id);
+        assert!(get_current_task().unwrap() == get_my_current_task().unwrap().clone());
 
         // The first time that a task runs, its entry function `task_wrapper()` is jumped to
         // from the `task_switch()` function, right after the end of `context_switch`().
@@ -853,6 +852,11 @@ fn task_cleanup_final_internal(current_task: &TaskRef) {
         let _exit_value = current_task.take_exit_value();
         // trace!("Reaped orphaned task {:?}, {:?}", current_task, _exit_value);
     }
+
+    // Fourth, deinit this task's TLS variable used for keeping the current task.
+    // let _prev_taskref = task::deinit_current_task();
+    // trace!("dropping CURRENT_TASK TLS for exited cleaned up task {:?}", _prev_taskref);
+    // drop(_prev_taskref);
 }
 
 
@@ -864,6 +868,7 @@ fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: 
           F: FnOnce(A) -> R, 
 {
     task_cleanup_final_internal(&current_task);
+    warn!("task_cleanup_final(): {:?} strong_count: {}", current_task, current_task.strong_count());
     drop(current_task);
     drop(preemption_guard);
     // ****************************************************

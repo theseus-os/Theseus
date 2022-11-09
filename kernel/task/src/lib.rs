@@ -878,18 +878,6 @@ impl Task {
         //     }
         // }
        
-        // Set runstates and current task *atomically*, i.e., by disabling interrupts.
-        // This is necessary to ensure that any interrupt handlers that may run on this CPU
-        // during the schedule/task_switch routines cannot observe inconsistencies
-        // in task runstates, e.g., when an interrupt handler accesses the current task context.
-        {
-            let _held_interrupts = hold_interrupts();
-            self.running_on_cpu.store(None.into()); // no longer running
-            next.running_on_cpu.store(Some(apic_id).into()); // now running on this core
-            next.set_as_current_task();
-            drop(_held_interrupts);
-        }
-
         // Move the preemption guard into the next task such that we can use retrieve it
         // after the below context switch operation has completed.
         //
@@ -901,9 +889,28 @@ impl Task {
         // If the current task is exited, then we need to remove the cyclical TaskRef reference in its TaskLocalData.
         // We store the removed TaskLocalData in the next Task struct so that we can access it after the context switch.
         if self.has_exited() {
-            // trace!("task_switch(): preparing to drop TaskLocalData for running task {}", self);
+            trace!("task_switch(): preparing to drop TaskLocalData for running task self: {}, next: {}", self, next.deref());
             next.inner.lock().drop_after_task_switch = self.inner.lock().task_local_data.take();
+            trace!("Trying to drop CURRENT_TASK TLS for current task {:?}", self);
+            trace!("get_current_task(): {:?}", get_current_task());
+            trace!("get_my_current_task(): {:?}", get_my_current_task());
+            let _prev_taskref = deinit_current_task();
+            trace!("Dropping value from deinit_current_task: {:?}", _prev_taskref);
+            drop(_prev_taskref);
         }
+
+        // Set runstates and current task *atomically*, i.e., by disabling interrupts.
+        // This is necessary to ensure that any interrupt handlers that may run on this CPU
+        // during the schedule/task_switch routines cannot observe inconsistencies
+        // in task runstates, e.g., when an interrupt handler accesses the current task context.
+        {
+            let _held_interrupts = hold_interrupts();
+            self.running_on_cpu.store(None.into()); // no longer running
+            next.running_on_cpu.store(Some(apic_id).into()); // now running on this core
+            next.set_as_current_task();
+            drop(_held_interrupts);
+        }
+        
 
         let prev_task_saved_sp: *mut usize = {
             let mut inner = self.inner.lock(); // ensure the lock is released
@@ -1263,7 +1270,7 @@ impl TaskRef {
             // Corner case: if the task isn't currently running (as with killed tasks), 
             // we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.
             if !self.0.is_running() {
-                trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*self.0);
+                warn!("internal_exit(): [untested] dropping TaskLocalData for non-running task {}", &*self.0);
                 drop(inner.task_local_data.take());
             }
         }
@@ -1277,6 +1284,10 @@ impl TaskRef {
         }
 
         Ok(())
+    }
+
+    pub fn strong_count(&self) -> usize {
+        Arc::strong_count(&self.0)
     }
 }
 
@@ -1337,18 +1348,21 @@ pub fn bootstrap_task(
     let bootstrap_task_id = bootstrap_task.id;
     let task_ref = TaskRef::new(bootstrap_task);
 
-    // Set this task as this CPU's current task, as it's already running.
+    // [TODO: remove, old] Set this task as this CPU's current task, as it's already running.
     task_ref.set_as_current_task();
-    let _prev_val = CURRENT_TASK.replace(Some(task_ref.clone()));
-    if _prev_val.is_some() {
-        return Err("BUG: bootstrap_task(): current task was unexpectedly already set");
-    }
     if get_my_current_task().is_none() {
         error!("BUG: bootstrap_task(): failed to properly set the new boostrapped task as the current task on AP {}", apic_id);
         // Don't drop the bootstrap task upon error, because it contains the stack
         // used for the currently running code -- that would trigger an exception.
         let _task_ref = NoDrop::new(task_ref);
         return Err("BUG: bootstrap_task(): failed to properly set the new bootstrapped task as the current task");
+    }
+    // Set this task as this CPU's current task, as it's already running.
+    CURRENT_TASK_ID.set(bootstrap_task_id);
+    let _prev_val = CURRENT_TASK.replace(Some(task_ref.clone()));
+    if _prev_val.is_some() {
+        let _task_ref = NoDrop::new(task_ref);
+        return Err("BUG: bootstrap_task(): current task was unexpectedly already set");
     }
 
     // insert the new task into the task list
@@ -1429,7 +1443,7 @@ pub fn current_task_id() -> usize {
 /// Returns an `Err` if the current task has already been set.
 #[doc(hidden)]
 pub fn init_current_task(current_task_id: usize) -> Result<TaskRef, ()> {
-    CURRENT_TASK_ID.set(current_task_id);
+    debug!("init_current_task({current_task_id}): TASKLIST: {:?}", TASKLIST.lock().deref());
     let taskref = TASKLIST.lock()
         .get(&current_task_id)
         .cloned()
@@ -1438,6 +1452,8 @@ pub fn init_current_task(current_task_id: usize) -> Result<TaskRef, ()> {
     match CURRENT_TASK.try_borrow_mut() {
         Ok(mut t_opt) if t_opt.is_none() => {
             *t_opt = Some(taskref.clone());
+            CURRENT_TASK_ID.set(current_task_id);
+            debug!("init_current_task({current_task_id}): taskref: {:?}", taskref);
             Ok(taskref)
         }
         _ => Err(()),
@@ -1454,14 +1470,21 @@ pub fn init_current_task(current_task_id: usize) -> Result<TaskRef, ()> {
 /// * The current task TLS variable is currently borrowed.
 #[doc(hidden)]
 pub fn deinit_current_task() -> Result<TaskRef, ()> {
-    if with_current_task(|t| t.has_exited()).unwrap_or(true) {
+    if with_current_task(|t| {
+        trace!("deinit_current_task(): {:?}", t);
+        !t.has_exited()
+    }).unwrap_or(true) {
+        trace!("deinit_current_task(): task has not yet exited");
         return Err(());
     }
     CURRENT_TASK.try_borrow_mut()
         .map_err(|_| ())
-        .and_then(|mut t_opt| t_opt
-            .take()
-            .ok_or(())
+        .and_then(|mut t_opt| {
+            trace!("deinit_current_task(): CURRENT_TASK was {:?}", t_opt);
+            t_opt
+                .take()
+                .ok_or(())
+            }
         )
 }
 
