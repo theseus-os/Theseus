@@ -852,11 +852,6 @@ fn task_cleanup_final_internal(current_task: &TaskRef) {
         let _exit_value = current_task.take_exit_value();
         // trace!("Reaped orphaned task {:?}, {:?}", current_task, _exit_value);
     }
-
-    // Fourth, deinit this task's TLS variable used for keeping the current task.
-    // let _prev_taskref = task::deinit_current_task();
-    // trace!("dropping CURRENT_TASK TLS for exited cleaned up task {:?}", _prev_taskref);
-    // drop(_prev_taskref);
 }
 
 
@@ -868,7 +863,6 @@ fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: 
           F: FnOnce(A) -> R, 
 {
     task_cleanup_final_internal(&current_task);
-    warn!("task_cleanup_final(): {:?} strong_count: {}", current_task, current_task.strong_count());
     drop(current_task);
     drop(preemption_guard);
     // ****************************************************

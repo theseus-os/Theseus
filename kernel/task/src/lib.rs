@@ -889,19 +889,20 @@ impl Task {
         // If the current task is exited, then we need to remove the cyclical TaskRef reference in its TaskLocalData.
         // We store the removed TaskLocalData in the next Task struct so that we can access it after the context switch.
         if self.has_exited() {
-            trace!("task_switch(): preparing to drop TaskLocalData for running task self: {}, next: {}", self, next.deref());
+            // trace!("task_switch(): preparing to drop TaskLocalData for running task self: {}, next: {}", self, next.deref());
             next.inner.lock().drop_after_task_switch = self.inner.lock().task_local_data.take();
-            trace!("Trying to drop CURRENT_TASK TLS for current task {:?}", self);
-            trace!("get_current_task(): {:?}", get_current_task());
-            trace!("get_my_current_task(): {:?}", get_my_current_task());
             let _prev_taskref = deinit_current_task();
-            trace!("Dropping value from deinit_current_task: {:?}", _prev_taskref);
             drop(_prev_taskref);
         }
 
-        // Set runstates and current task *atomically*, i.e., by disabling interrupts.
-        // This is necessary to ensure that any interrupt handlers that may run on this CPU
-        // during the schedule/task_switch routines cannot observe inconsistencies
+        // The final step before we actually perform the context switch is to
+        // atomically update runstates and the current task.
+        // Note that we cannot do this until we've done the above part that cleans up
+        // TLS variables for the current task (if exited), since the below call to 
+        // `set_as_current_task()` will change the currently active TLS area on this CPU.
+        //
+        // We briefly disable interrupts below to ensure that any interrupt handlers that may run
+        // on this CPU during the schedule/task_switch routines cannot observe inconsistencies
         // in task runstates, e.g., when an interrupt handler accesses the current task context.
         {
             let _held_interrupts = hold_interrupts();
@@ -1403,7 +1404,7 @@ static CURRENT_TASK: RefCell<Option<TaskRef>> = RefCell::new(None);
 /// 
 /// This is useful to avoid cloning a reference to the current task.
 /// 
-/// Returns an empty `Err` if the current task cannot be obtained.
+/// Returns an `Err` if the current task cannot be obtained.
 pub fn with_current_task<F, R>(function: F) -> Result<R, ()>
 where
     F: Fn(&TaskRef) -> R
@@ -1443,7 +1444,6 @@ pub fn current_task_id() -> usize {
 /// Returns an `Err` if the current task has already been set.
 #[doc(hidden)]
 pub fn init_current_task(current_task_id: usize) -> Result<TaskRef, ()> {
-    debug!("init_current_task({current_task_id}): TASKLIST: {:?}", TASKLIST.lock().deref());
     let taskref = TASKLIST.lock()
         .get(&current_task_id)
         .cloned()
@@ -1453,7 +1453,6 @@ pub fn init_current_task(current_task_id: usize) -> Result<TaskRef, ()> {
         Ok(mut t_opt) if t_opt.is_none() => {
             *t_opt = Some(taskref.clone());
             CURRENT_TASK_ID.set(current_task_id);
-            debug!("init_current_task({current_task_id}): taskref: {:?}", taskref);
             Ok(taskref)
         }
         _ => Err(()),
@@ -1470,21 +1469,14 @@ pub fn init_current_task(current_task_id: usize) -> Result<TaskRef, ()> {
 /// * The current task TLS variable is currently borrowed.
 #[doc(hidden)]
 pub fn deinit_current_task() -> Result<TaskRef, ()> {
-    if with_current_task(|t| {
-        trace!("deinit_current_task(): {:?}", t);
-        !t.has_exited()
-    }).unwrap_or(true) {
-        trace!("deinit_current_task(): task has not yet exited");
+    if with_current_task(|t| !t.has_exited()).unwrap_or(true) {
         return Err(());
     }
     CURRENT_TASK.try_borrow_mut()
         .map_err(|_| ())
-        .and_then(|mut t_opt| {
-            trace!("deinit_current_task(): CURRENT_TASK was {:?}", t_opt);
-            t_opt
-                .take()
-                .ok_or(())
-            }
+        .and_then(|mut t_opt| t_opt
+            .take()
+            .ok_or(())
         )
 }
 
