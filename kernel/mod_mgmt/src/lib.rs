@@ -3261,7 +3261,7 @@ pub struct TlsDataImage {
     ptr:   usize,
 }
 impl TlsDataImage {
-    /// Returns the value of the TLS selft pointer for this TLS data image.
+    /// Returns the value of the TLS self pointer for this TLS data image.
     /// If it has no TLS data sections, the returned value will be zero.
     #[inline(always)]
     pub fn pointer_value(&self) -> usize {

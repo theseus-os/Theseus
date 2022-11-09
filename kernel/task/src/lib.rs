@@ -27,6 +27,7 @@
 
 #![no_std]
 #![feature(panic_info_message)]
+#![feature(thread_local)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -53,7 +54,7 @@ use core::{
     hash::{Hash, Hasher},
     ops::Deref,
     panic::PanicInfo,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering}, cell::{RefCell, Cell},
 };
 use alloc::{
     boxed::Box,
@@ -1336,8 +1337,12 @@ pub fn bootstrap_task(
     let bootstrap_task_id = bootstrap_task.id;
     let task_ref = TaskRef::new(bootstrap_task);
 
-    // set this as this core's current task, since it's obviously running
+    // Set this task as this CPU's current task, as it's already running.
     task_ref.set_as_current_task();
+    let _prev_val = CURRENT_TASK.replace(Some(task_ref.clone()));
+    if _prev_val.is_some() {
+        return Err("BUG: bootstrap_task(): current task was unexpectedly already set");
+    }
     if get_my_current_task().is_none() {
         error!("BUG: bootstrap_task(): failed to properly set the new boostrapped task as the current task on AP {}", apic_id);
         // Don't drop the bootstrap task upon error, because it contains the stack
@@ -1371,6 +1376,96 @@ fn bootstrap_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason
     loop { }
 }
 
+
+/// The TLS area that holds the current task's ID.
+#[thread_local]
+static CURRENT_TASK_ID: Cell<usize> = Cell::new(0);
+
+/// The TLS area that holds the current task.
+#[thread_local]
+static CURRENT_TASK: RefCell<Option<TaskRef>> = RefCell::new(None);
+
+/// Invokes the given `function` with a reference to the current task.
+/// 
+/// This is useful to avoid cloning a reference to the current task.
+/// 
+/// Returns an empty `Err` if the current task cannot be obtained.
+pub fn with_current_task<F, R>(function: F) -> Result<R, ()>
+where
+    F: Fn(&TaskRef) -> R
+{
+    // First, the common case: current task has been initialized and can be used.
+    if let Ok(Some(ref t)) = CURRENT_TASK.try_borrow().as_deref() {
+        Ok(function(t))
+    } else {
+        Err(())
+    }
+}
+
+/// Returns a cloned reference to the current task.
+/// 
+/// This function clones the current task's `TaskRef` in order to ensure
+/// that this task cannot be dropped for the lifetime of the returned `TaskRef`.
+/// Because the "current task" feature uses thread-local storage (TLS),
+/// there is no safe way to avoid the cloning operation because it is impossible
+/// to specify the lifetime of the returned thread-local reference in Rust.
+/// 
+/// Use [`with_current_task()`] if you want to avoid a clone operation or
+/// want to operate on a borrowed reference to the current task instead.
+pub fn get_current_task() -> Option<TaskRef> {
+    with_current_task(|t| t.clone()).ok()
+}
+
+/// Returns the unique ID of the current task.
+pub fn current_task_id() -> usize {
+    CURRENT_TASK_ID.get()
+}
+
+/// Set the given task as the current task.
+///
+/// This can only be called once, at the beginning of a task's first execution.
+/// The task must have already been added to the system-wide task list.
+///
+/// Returns an `Err` if the current task has already been set.
+#[doc(hidden)]
+pub fn init_current_task(current_task_id: usize) -> Result<TaskRef, ()> {
+    CURRENT_TASK_ID.set(current_task_id);
+    let taskref = TASKLIST.lock()
+        .get(&current_task_id)
+        .cloned()
+        .ok_or(())?;
+
+    match CURRENT_TASK.try_borrow_mut() {
+        Ok(mut t_opt) if t_opt.is_none() => {
+            *t_opt = Some(taskref.clone());
+            Ok(taskref)
+        }
+        _ => Err(()),
+    }
+}
+
+/// De-initializes the current task TLS variable, ensuring that the task can be dropped.
+/// 
+/// This can only be called once, after the current task has exited.
+/// 
+/// This returns an error if:
+/// * The current task has not yet exited.
+/// * The current task TLS variable hasn't been initialized.
+/// * The current task TLS variable is currently borrowed.
+#[doc(hidden)]
+pub fn deinit_current_task() -> Result<TaskRef, ()> {
+    if with_current_task(|t| t.has_exited()).unwrap_or(true) {
+        return Err(());
+    }
+    CURRENT_TASK.try_borrow_mut()
+        .map_err(|_| ())
+        .and_then(|mut t_opt| t_opt
+            .take()
+            .ok_or(())
+        )
+}
+
+// TODO: remove old stuff below once TLS-based `CURRENT_TASK` works.
 
 /// The structure that holds information local to each Task,
 /// effectively a form of thread-local storage (TLS).
