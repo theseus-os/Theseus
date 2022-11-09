@@ -1432,7 +1432,7 @@ pub fn get_current_task() -> Option<TaskRef> {
 }
 
 /// Returns the unique ID of the current task.
-pub fn current_task_id() -> usize {
+pub fn get_my_current_task_id() -> usize {
     CURRENT_TASK_ID.get()
 }
 
@@ -1513,9 +1513,4 @@ fn get_task_local_data() -> Option<&'static TaskLocalData> {
 /// Returns a reference to the current task.
 pub fn get_my_current_task() -> Option<&'static TaskRef> {
     get_task_local_data().map(|tld| &tld.taskref)
-}
-
-/// Returns the current task's ID.
-pub fn get_my_current_task_id() -> Option<usize> {
-    get_task_local_data().map(|tld| tld.task_id)
 }

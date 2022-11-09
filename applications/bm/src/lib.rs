@@ -245,7 +245,7 @@ fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'static
 
 	start_hpet = hpet.get_counter();
 	for _ in 0..tmp_iterations {
-		mypid = task::get_my_current_task_id().unwrap();
+		mypid = task::get_my_current_task_id();
 	}
 	end_hpet = hpet.get_counter();
 
