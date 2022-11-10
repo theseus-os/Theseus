@@ -15,6 +15,7 @@ It is not tested on any real-life machine at the moment.
 - `qemu-system-aarch64`
 - `wget`
 - make
+- unzip
 
 1. Build the UEFI app:
 

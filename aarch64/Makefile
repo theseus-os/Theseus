@@ -7,7 +7,7 @@ BUILD_STD_CARGOFLAGS += -Z unstable-options
 BUILD_STD_CARGOFLAGS += -Z build-std=core,alloc
 BUILD_STD_CARGOFLAGS += -Z build-std-features=compiler-builtins-mem
 
-QEMU_EFI_FD_URL ?= https://l0.pm/qemu-efi.fd
+QEMU_EFI_ZIP_URL ?= https://github.com/theseus-os/prebuilt-resources/raw/main/qemu-efi.fd.zip
 
 AARCH64_DIR ?= .
 BUILD_DIR ?= $(AARCH64_DIR)/build
@@ -53,7 +53,10 @@ build: $(nano_core_binary)
 
 ## This downloads the binary blob making Qemu compatible with UEFI
 $(QEMU_EFI_FD):
-	wget $(QEMU_EFI_FD_URL) -O $(QEMU_EFI_FD)
+	wget $(QEMU_EFI_ZIP_URL) -O qemu-efi.zip
+	@# this will extract to ./resources/qemu-efi.fd
+	unzip qemu-efi.zip
+	rm qemu-efi.zip
 
 ### builds and runs Theseus in QEMU
 run: build $(QEMU_EFI_FD)
