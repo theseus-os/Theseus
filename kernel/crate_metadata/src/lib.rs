@@ -657,7 +657,7 @@ pub struct LoadedSection {
     pub mapped_pages: Arc<Mutex<MappedPages>>, 
     /// The offset into the `mapped_pages` where this section starts
     pub mapped_pages_offset: usize,
-    /// The starting `VirtualAddress` of by this section.
+    /// The starting `VirtualAddress` of this section.
     ///
     /// For TLS sections, this is *not* a `VirtualAddress`, but rather the offset
     /// (from the TLS base) into the TLS area where this section's data exists.
