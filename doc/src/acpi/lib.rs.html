@@ -206,7 +206,7 @@
         <span class="kw">let </span>acpi_tables = ACPI_TABLES.lock();
         <span class="kw">let </span>_fadt = fadt::Fadt::get(<span class="kw-2">&amp;</span>acpi_tables).ok_or(<span class="string">&quot;The required FADT APIC table wasn&#39;t found (signature &#39;FACP&#39;)&quot;</span>)<span class="question-mark">?</span>;
         <span class="comment">// here: do something with the DSDT here, when needed.
-        // debug!(&quot;DSDT physical address: {:#X}&quot;, fadt.dsdt);
+        // debug!(&quot;DSDT physical address: {:#X}&quot;, {_fadt.dsdt});
     </span>}
     
     <span class="comment">// HPET is optional, but usually present.

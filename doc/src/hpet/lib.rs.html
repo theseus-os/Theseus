@@ -192,29 +192,18 @@
 <span id="192">192</span>
 <span id="193">193</span>
 <span id="194">194</span>
-<span id="195">195</span>
-<span id="196">196</span>
-<span id="197">197</span>
-<span id="198">198</span>
-</pre><pre class="rust"><code><span class="doccomment">//! Support for the x86 HPET: High Precision Event Timer.
+</pre><pre class="rust"><code><span class="doccomment">//! Support for the HPET: High Precision Event Timer.
 
 </span><span class="attr">#![no_std]
 
-#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>kernel_config;
-<span class="kw">extern crate </span>memory;
-<span class="kw">extern crate </span>volatile;
-<span class="kw">extern crate </span>zerocopy;
-<span class="kw">extern crate </span>sdt;
-<span class="kw">extern crate </span>acpi_table;
-<span class="kw">extern crate </span>spin;
-
+</span><span class="kw">use </span>log::debug;
 <span class="kw">use </span>volatile::{Volatile, ReadOnly};
 <span class="kw">use </span>zerocopy::FromBytes;
 <span class="kw">use </span>spin::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
 <span class="kw">use </span>memory::{allocate_pages, allocate_frames_by_bytes_at, PageTable, PhysicalAddress, EntryFlags, BorrowedMappedPages, Mutable};
 <span class="kw">use </span>sdt::{Sdt, GenericAddressStructure};
 <span class="kw">use </span>acpi_table::{AcpiTables, AcpiSignature};
+<span class="kw">use </span>static_assertions::const_assert_eq;
 
 <span class="doccomment">/// The static instance of the HPET&#39;s ACPI memory region, which derefs to an Hpet instance.
 </span><span class="kw">static </span>HPET: Once&lt;RwLock&lt;BorrowedMappedPages&lt;Hpet, Mutable&gt;&gt;&gt; = Once::new();
@@ -263,6 +252,7 @@
     /// Call [`num_timers`](#method.num_timers) to get the actual number of HPET timers.
     </span><span class="kw">pub </span>timers:                      [HpetTimer; <span class="number">32</span>],
 }
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;Hpet&gt;(), <span class="number">1280</span>);
 
 <span class="kw">impl </span>Hpet {
     <span class="doccomment">/// Returns the HPET&#39;s main counter value
@@ -326,6 +316,7 @@
     </span><span class="kw">pub </span>fsb_interrupt_route:          Volatile&lt;u64&gt;,
     _padding:                         u64,
 }
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;HpetTimer&gt;(), <span class="number">32</span>);
 
 
 <span class="kw">pub const </span>HPET_SIGNATURE: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8; <span class="number">4</span>] = <span class="string">b&quot;HPET&quot;</span>;
@@ -354,6 +345,7 @@
     <span class="doccomment">/// also called &#39;page_protection&#39;
     </span>_oem_attribute: u8,
 }
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;HpetAcpiTable&gt;(), <span class="number">56</span>);
 
 <span class="kw">impl </span>HpetAcpiTable {
     <span class="doccomment">/// Finds the HPET in the given `AcpiTables` and returns a reference to it.

@@ -80,12 +80,16 @@
 <span id="80">80</span>
 <span id="81">81</span>
 <span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for ACPI RSDP (Root System Descriptor Pointer).
 
 </span><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>memory;
 <span class="kw">extern crate </span>zerocopy;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
 
 <span class="kw">use </span>core::mem;
 <span class="kw">use </span>memory::{PageTable, MappedPages, PhysicalAddress, allocate_pages_by_bytes, allocate_frames_by_bytes_at, EntryFlags, BorrowedMappedPages};
@@ -118,6 +122,8 @@
     extended_checksum: u8,
     reserved: [u8; <span class="number">3</span>]
 }
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;Rsdp&gt;(), <span class="number">36</span>);
+<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;Rsdp&gt;(), <span class="number">1</span>);
 
 <span class="kw">impl </span>Rsdp {
     <span class="doccomment">/// Search for the RSDP in the BIOS memory area from 0xE_0000 to 0xF_FFFF.

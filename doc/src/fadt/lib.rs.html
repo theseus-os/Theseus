@@ -78,6 +78,23 @@
 <span id="78">78</span>
 <span id="79">79</span>
 <span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Definitions for FADT, the Fixed ACPI Description Table.
 
 </span><span class="attr">#![no_std]
@@ -86,9 +103,10 @@
 <span class="kw">extern crate </span>sdt;
 <span class="kw">extern crate </span>acpi_table;
 <span class="kw">extern crate </span>zerocopy;
+<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
 
 <span class="kw">use </span>memory::PhysicalAddress;
-<span class="kw">use </span>sdt::Sdt;
+<span class="kw">use </span>sdt::{Sdt, GenericAddressStructure};
 <span class="kw">use </span>acpi_table::{AcpiSignature, AcpiTables};
 <span class="kw">use </span>zerocopy::FromBytes;
 
@@ -112,7 +130,7 @@
 </span><span class="kw">pub struct </span>Fadt {
     <span class="kw">pub </span>header: Sdt,
     <span class="kw">pub </span>firmware_ctrl: u32,
-    <span class="doccomment">/// The physical address of the DSDT table
+    <span class="doccomment">/// 32-bit physical address of the DSDT.
     </span><span class="kw">pub </span>dsdt: u32,
     _reserved: u8, 
     <span class="kw">pub </span>preferred_power_managament: u8,
@@ -134,7 +152,7 @@
     <span class="kw">pub </span>pm1_control_length: u8,
     <span class="kw">pub </span>pm2_control_length: u8,
     <span class="kw">pub </span>pm_timer_length: u8,
-    <span class="kw">pub </span>gpe0_ength: u8,
+    <span class="kw">pub </span>gpe0_length: u8,
     <span class="kw">pub </span>gpe1_length: u8,
     <span class="kw">pub </span>gpe1_base: u8,
     <span class="kw">pub </span>c_state_control: u8,
@@ -147,10 +165,26 @@
     <span class="kw">pub </span>day_alarm: u8,
     <span class="kw">pub </span>month_alarm: u8,
     <span class="kw">pub </span>century: u8,
-    <span class="kw">pub </span>boot_architecture_flags: u16,
+    <span class="kw">pub </span>iapc_boot_architecture_flags: u16,
     _reserved2: u8,
     <span class="kw">pub </span>flags: u32,
+    <span class="kw">pub </span>reset_reg: GenericAddressStructure,
+    <span class="kw">pub </span>reset_value: u8,
+    _reserved3: [u8; <span class="number">3</span>],
+    <span class="doccomment">/// 64-bit physical address of the FACS.
+    </span><span class="kw">pub </span>x_firmware_control: u64,
+    <span class="doccomment">/// 64-bit physical address of the DSDT.
+    </span><span class="kw">pub </span>x_dsdt: u64,
+    <span class="kw">pub </span>x_pm1a_event_block: GenericAddressStructure,
+    <span class="kw">pub </span>x_pm1b_event_block: GenericAddressStructure,
+    <span class="kw">pub </span>x_pm1a_control_block: GenericAddressStructure,
+    <span class="kw">pub </span>x_pm1b_control_block: GenericAddressStructure,
+    <span class="kw">pub </span>x_pm2_control_block: GenericAddressStructure,
+    <span class="kw">pub </span>x_pm_timer_block: GenericAddressStructure,
+    <span class="kw">pub </span>x_gpe0_block: GenericAddressStructure,
+    <span class="kw">pub </span>x_gpe1_block: GenericAddressStructure,
 }
+<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;Fadt&gt;(), <span class="number">244</span>);
 
 <span class="kw">impl </span>Fadt {
     <span class="doccomment">/// Finds the FADT in the given `AcpiTables` and returns a reference to it.
