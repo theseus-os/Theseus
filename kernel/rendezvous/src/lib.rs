@@ -250,7 +250,7 @@ impl <T: Send> Sender<T> {
                 ExchangeState::Init => {
                     // Hold interrupts to avoid blocking & descheduling this task until we release the slot lock,
                     // which is currently done automatically because the slot uses a MutexIrqSafe.
-                    *exchange_state = ExchangeState::WaitingForReceiver(WaitGuard::new(curr_task.clone()), msg);
+                    *exchange_state = ExchangeState::WaitingForReceiver(WaitGuard::new(curr_task.clone()).map_err(|_| "failed to create wait guard")?, msg);
                     None
                 }
                 ExchangeState::WaitingForSender(receiver_to_notify) => {
@@ -296,7 +296,7 @@ impl <T: Send> Sender<T> {
                         if blocked_sender.task() != curr_task {
                             return Err("BUG: CURR TASK WAS DIFFERENT THAN BLOCKED SENDER");
                         }
-                        blocked_sender.block_again();
+                        blocked_sender.block_again().map_err(|_| "failed to block sender")?;
                     }
                     _ => break,
                 }
@@ -398,7 +398,7 @@ impl <T: Send> Receiver<T> {
                 ExchangeState::Init => {
                     // Hold interrupts to avoid blocking & descheduling this task until we release the slot lock,
                     // which is currently done automatically because the slot uses a MutexIrqSafe.
-                    *exchange_state = ExchangeState::WaitingForSender(WaitGuard::new(curr_task.clone()));
+                    *exchange_state = ExchangeState::WaitingForSender(WaitGuard::new(curr_task.clone()).map_err(|_| "failed to create wait guard")?);
                     None
                 }
                 ExchangeState::WaitingForReceiver(sender_to_notify, msg) => {
@@ -447,7 +447,7 @@ impl <T: Send> Receiver<T> {
                         if blocked_receiver.task() != curr_task {
                             return Err("BUG: CURR TASK WAS DIFFERENT THAN BLOCKED RECEIVER");
                         }
-                        blocked_receiver.block_again();
+                        blocked_receiver.block_again().map_err(|_| "failed to block receiver")?;
                     }
                     _ => break,
                 }

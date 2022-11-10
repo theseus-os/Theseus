@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(let_chains)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -1330,13 +1331,16 @@ impl CrateNamespace {
             }
 
             // Actually copy the section data from the ELF file to the given destination MappedPages.
-            let dest_slice: &mut [u8] = mapped_pages.as_slice_mut(mapped_pages_offset, sec_size)?;
-            match sec.get_data(&elf_file) {
-                Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                Ok(SectionData::Empty) => dest_slice.fill(0),
-                _other => {
-                    error!("Couldn't get section data for merged section: {:?}", _other);
-                    return Err("couldn't get section data for merged section");
+            // Skip TLS BSS (.tbss) sections, which have no data and occupy no space in memory.
+            if typ != SectionType::TlsBss {
+                let dest_slice: &mut [u8] = mapped_pages.as_slice_mut(mapped_pages_offset, sec_size)?;
+                match sec.get_data(&elf_file) {
+                    Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                    Ok(SectionData::Empty) => dest_slice.fill(0),
+                    _other => {
+                        error!("Couldn't get section data for merged section: {:?}", _other);
+                        return Err("couldn't get section data for merged section");
+                    }
                 }
             }
 

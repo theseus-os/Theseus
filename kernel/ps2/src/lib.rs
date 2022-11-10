@@ -447,14 +447,12 @@ pub fn mouse_resolution(value: u8) -> Result<(), &'static str> {
     if let Err(_e) = command_to_mouse(0xE8) {
         warn!("command set mouse resolution is not accepted");
         Err("set mouse resolution failed!!!")
-    } else {
-        if let Err(_e) = command_to_mouse(value) {
+    } else if let Err(_e) = command_to_mouse(value) {
             warn!("the resolution value is not accepted");
             Err("set mouse resolution failed!!!")
-        } else {
+    } else {
             // info!("set mouse resolution succeeded!!!");
             Ok(())
-        }
     }
 }
 

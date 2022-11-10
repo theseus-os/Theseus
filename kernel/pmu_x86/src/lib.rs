@@ -59,7 +59,6 @@
 //! So, if you run `pmu_x86::init()` and `pmu_x86::start_samples()` on CPU core 2, it will only sample events on core 2.
 
 #![no_std]
-#![feature(const_btree_new)]
 
 extern crate spin;
 #[macro_use] extern crate lazy_static;
@@ -339,10 +338,8 @@ impl Counter {
         let num_pmc = num_general_purpose_counters();
 
         //checks to make sure the counter hasn't already been released
-        if self.msr_mask < num_pmc as u32 {
-            if counter_is_available(self.core, self.msr_mask as u8)? {
-                return Err("Counter used for this event was marked as free, value stored is likely inaccurate.");
-            } 
+        if self.msr_mask < num_pmc as u32 && counter_is_available(self.core, self.msr_mask as u8)? {
+            return Err("Counter used for this event was marked as free, value stored is likely inaccurate.");
         }
         
         Ok(rdpmc(self.msr_mask) - self.start_count)

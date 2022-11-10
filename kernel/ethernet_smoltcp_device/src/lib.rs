@@ -8,14 +8,10 @@ extern crate smoltcp;
 extern crate network_interface_card;
 extern crate nic_buffers;
 extern crate irq_safety;
-extern crate owning_ref;
 extern crate network_manager;
 
 
-use alloc::{
-    boxed::Box,
-    collections::BTreeMap,
-};
+use alloc::collections::BTreeMap;
 use irq_safety::MutexIrqSafe;
 use smoltcp::{
     socket::SocketSet,
@@ -26,7 +22,6 @@ use smoltcp::{
 };
 use network_interface_card::NetworkInterfaceCard;
 use nic_buffers::{TransmitBuffer, ReceivedFrame};
-use owning_ref::BoxRefMut;
 use network_manager::NetworkInterface;
 use core::str::FromStr;
 
@@ -192,19 +187,10 @@ impl<'d, N: NetworkInterfaceCard + 'static> smoltcp::phy::Device<'d> for Etherne
             error!("EthernetDevice::receive(): WARNING: Ethernet frame consists of {} ReceiveBuffers, we currently only handle a single-buffer frame, so this may not work correctly!",  received_frame.0.len());
         }
 
-        let first_buf_len = received_frame.0[0].length;
-        let rxbuf_byte_slice = BoxRefMut::new(Box::new(received_frame))
-            .try_map_mut(|rxframe| rxframe.0[0].as_slice_mut::<u8>(0, first_buf_len as usize))
-            .map_err(|e| {
-                error!("EthernetDevice::receive(): couldn't convert receive buffer of length {} into byte slice, error {:?}", first_buf_len, e);
-                e
-            })
-            .ok()?;
-
         // Just create and return a pair of (receive token, transmit token), 
         // the actual rx buffer handling is done in the RxToken::consume() function
         Some((
-            RxToken(rxbuf_byte_slice),
+            RxToken(received_frame),
             TxToken {
                 nic_ref: self.nic_ref,
             },
@@ -268,12 +254,23 @@ impl<N: NetworkInterfaceCard + 'static> smoltcp::phy::TxToken for TxToken<N> {
 
 /// The receive token type used by smoltcp, 
 /// which contains only a `ReceivedFrame` to be consumed later.
-pub struct RxToken(BoxRefMut<ReceivedFrame, [u8]>);
+pub struct RxToken(ReceivedFrame);
 
 impl smoltcp::phy::RxToken for RxToken {
     fn consume<R, F>(mut self, _timestamp: Instant, f: F) -> smoltcp::Result<R>
         where F: FnOnce(&mut [u8]) -> smoltcp::Result<R>
     {
-        f(self.0.as_mut())
+        let first_buf = self.0.0.first_mut().ok_or_else(|| {
+            error!("ReceivedFrame contained no receive buffers");
+            smoltcp::Error::Exhausted
+        })?;
+
+        let first_buf_len = first_buf.length as usize;
+        let slice_mut: &mut [u8] = first_buf.mp.as_slice_mut(0, first_buf_len).map_err(|e| {
+            error!("EthernetDevice::receive(): couldn't convert receive buffer of length {} into byte slice, error {:?}", first_buf_len, e);
+            smoltcp::Error::Exhausted
+        })?;
+
+        f(slice_mut)
     }
 }

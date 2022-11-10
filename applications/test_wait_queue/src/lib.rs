@@ -55,7 +55,7 @@ fn rmain() -> Result<(), &'static str> {
     let t3 = spawn::new_task_builder(
         |tref| {
             warn!("DeezNutz:  testing spurious wakeup on task {:?}", tref);
-            tref.unblock();
+            tref.unblock().unwrap();
         }, 
         t1.clone(),
         )
@@ -68,10 +68,10 @@ fn rmain() -> Result<(), &'static str> {
 
     // give the wait task (t1) a chance to run before the notify task
     for _ in 0..100 { scheduler::schedule(); }
-    t3.unblock();
+    t3.unblock().unwrap();
     
     for _ in 0..100 { scheduler::schedule(); }
-    t2.unblock();
+    t2.unblock().unwrap();
 
 
     t1.join()?;

@@ -11,13 +11,14 @@
 //!
 
 #![no_std]
+#![feature(type_alias_impl_trait)]
+
 extern crate alloc;
 extern crate mpmc;
 extern crate event_types;
 extern crate spin;
 #[macro_use]
 extern crate log;
-extern crate owning_ref;
 extern crate framebuffer;
 extern crate framebuffer_drawer;
 extern crate mouse;
@@ -25,15 +26,16 @@ extern crate window_inner;
 extern crate window_manager;
 extern crate shapes;
 extern crate color;
+extern crate dereffer;
 
 use alloc::sync::Arc;
+use dereffer::{DerefsTo, DerefsToMut};
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use owning_ref::{MutexGuardRef, MutexGuardRefMut};
 use framebuffer::{Framebuffer, AlphaPixel};
-use color::{Color};
+use color::Color;
 use shapes::{Coord, Rectangle};
-use spin::Mutex;
+use spin::{Mutex, MutexGuard};
 use window_inner::{WindowInner, WindowMovingStatus, DEFAULT_BORDER_SIZE, DEFAULT_TITLE_BAR_HEIGHT};
 use window_manager::{WINDOW_MANAGER};
 
@@ -150,11 +152,6 @@ impl Window {
             window.show_button(TopButton::MinimizeMaximize, 1, &mut inner);
             window.show_button(TopButton::Hide, 1, &mut inner);
         }
-
-        let _window_bounding_box = Rectangle {
-            top_left: coordinate,
-            bottom_right: coordinate + (width as isize, height as isize)
-        };
 
         let mut wm = wm_ref.lock();
         wm.set_active(&window.inner, false)?; 
@@ -355,13 +352,20 @@ impl Window {
     }
 
     /// Returns an immutable reference to this window's virtual `Framebuffer`. 
-    pub fn framebuffer(&self) -> MutexGuardRef<WindowInner, Framebuffer<AlphaPixel>> {
-        MutexGuardRef::new(self.inner.lock()).map(|inner| inner.framebuffer())
+    pub fn framebuffer(&self) -> FramebufferRef {
+        FramebufferRef::new(
+            self.inner.lock(),
+            |guard| guard.framebuffer(),
+        )
     }
 
     /// Returns a mutable reference to this window's virtual `Framebuffer`. 
-    pub fn framebuffer_mut(&mut self) -> MutexGuardRefMut<WindowInner, Framebuffer<AlphaPixel>> {
-        MutexGuardRefMut::new(self.inner.lock()).map_mut(|inner| inner.framebuffer_mut())
+    pub fn framebuffer_mut(&mut self) -> FramebufferRefMut {
+        FramebufferRefMut::new(
+            self.inner.lock(),
+            |guard| guard.framebuffer(),
+            |guard| guard.framebuffer_mut(),
+        )
     }
 
     /// Returns `true` if this window is the currently active window. 
@@ -493,7 +497,6 @@ impl Window {
     }
 }
 
-
 impl Drop for Window{
     fn drop(&mut self){
         if let Some(wm) = WINDOW_MANAGER.get() {
@@ -505,3 +508,13 @@ impl Drop for Window{
         }
     }
 }
+
+/// A wrapper around a locked inner window that immutably derefs to a `Framebuffer`.
+///
+/// The lock is auto-released when this object is dropped.
+pub type FramebufferRef<'g> = DerefsTo<MutexGuard<'g, WindowInner>, Framebuffer<AlphaPixel>>;
+
+/// A wrapper around a locked inner window that mutably derefs to a `Framebuffer`.
+///
+/// The lock is auto-released when this object is dropped.
+pub type FramebufferRefMut<'g> = DerefsToMut<MutexGuard<'g, WindowInner>, Framebuffer<AlphaPixel>>;

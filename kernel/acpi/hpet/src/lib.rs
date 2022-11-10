@@ -1,49 +1,37 @@
-//! Support for the x86 HPET: High Precision Event Timer.
+//! Support for the HPET: High Precision Event Timer.
 
 #![no_std]
 
-extern crate alloc;
-#[macro_use] extern crate log;
-extern crate kernel_config;
-extern crate memory;
-extern crate volatile;
-extern crate zerocopy;
-extern crate sdt;
-extern crate acpi_table;
-extern crate spin;
-extern crate owning_ref;
-#[macro_use] extern crate static_assertions;
-
+use log::debug;
 use volatile::{Volatile, ReadOnly};
 use zerocopy::FromBytes;
-use owning_ref::BoxRefMut;
-use alloc::boxed::Box;
 use spin::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use memory::{MappedPages, allocate_pages, allocate_frames_by_bytes_at, PageTable, PhysicalAddress, EntryFlags};
+use memory::{allocate_pages, allocate_frames_by_bytes_at, PageTable, PhysicalAddress, EntryFlags, BorrowedMappedPages, Mutable};
 use sdt::{Sdt, GenericAddressStructure};
 use acpi_table::{AcpiTables, AcpiSignature};
+use static_assertions::const_assert_eq;
 
 /// The static instance of the HPET's ACPI memory region, which derefs to an Hpet instance.
-static HPET: Once<RwLock<BoxRefMut<MappedPages, Hpet>>> = Once::new();
+static HPET: Once<RwLock<BorrowedMappedPages<Hpet, Mutable>>> = Once::new();
 
 
-/// Returns a reference to the HPET timer structure, wrapped in an Option,
-/// because it is not guaranteed that HPET exists or has been initialized.
+/// Returns a locked guard that immutably derefs to the HPET timer.
+/// 
 /// # Example
 /// ```
 /// let counter_val = get_hpet().as_ref().unwrap().get_counter();
 /// ```
-pub fn get_hpet() -> Option<RwLockReadGuard<'static, BoxRefMut<MappedPages, Hpet>>> {
+pub fn get_hpet() -> Option<RwLockReadGuard<'static, BorrowedMappedPages<Hpet, Mutable>>> {
     HPET.get().map(|h| h.read())
 }
 
-/// Returns a mutable reference to the HPET timer structure, wrapped in an Option,
-/// because it is not guaranteed that HPET exists or has been initialized.
+/// Returns a locked guard that mutably derefs to the HPET timer.
+/// 
 /// # Example
 /// ```
 /// get_hpet_mut().as_mut().unwrap().enable_counter(true);
 /// ```
-pub fn get_hpet_mut() -> Option<RwLockWriteGuard<'static, BoxRefMut<MappedPages, Hpet>>> {
+pub fn get_hpet_mut() -> Option<RwLockWriteGuard<'static, BorrowedMappedPages<Hpet, Mutable>>> {
     HPET.get().map(|h| h.write())
 }
 
@@ -175,7 +163,10 @@ impl HpetAcpiTable {
     /// based on the hardware details from this ACPI table.
     /// 
     /// Returns a reference to the initialized `Hpet` structure.
-    pub fn init_hpet(&self, page_table: &mut PageTable) -> Result<&'static RwLock<BoxRefMut<MappedPages, Hpet>>, &'static str> {
+    pub fn init_hpet(
+        &self,
+        page_table: &mut PageTable,
+    ) -> Result<&'static RwLock<BorrowedMappedPages<Hpet, Mutable>>, &'static str> {
         let phys_addr = PhysicalAddress::new(self.gen_addr_struct.phys_addr as usize)
             .ok_or("HPET physical address was invalid")?;
         let frames = allocate_frames_by_bytes_at(phys_addr, self.header.length as usize)
@@ -188,7 +179,8 @@ impl HpetAcpiTable {
             EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
         )?;
 
-        let mut hpet = BoxRefMut::new(Box::new(hpet_mp)).try_map_mut(|mp| mp.as_type_mut::<Hpet>(phys_addr.frame_offset()))?;
+        let mut hpet = hpet_mp.into_borrowed_mut::<Hpet>(phys_addr.frame_offset())
+            .map_err(|(|_mp, s)| s)?;
         // enable the main counter
         {
             hpet.enable_counter(true);

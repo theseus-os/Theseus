@@ -33,6 +33,7 @@ use path::Path;
 use apic::get_my_apic_id;
 use fs_node::FileOrDir;
 use preemption::{hold_preemption, PreemptionGuard};
+use no_drop::NoDrop;
 
 #[cfg(simd_personality)]
 use task::SimdExt;
@@ -43,7 +44,7 @@ use task::SimdExt;
 pub fn init(
     kernel_mmi_ref: MmiRef,
     apic_id: u8,
-    stack: Stack,
+    stack: NoDrop<Stack>,
 ) -> Result<BootstrapTaskRef, &'static str> {
     runqueue::init(apic_id)?;
     
@@ -257,6 +258,8 @@ pub struct TaskBuilder<F, A, R> {
     argument: A,
     _return_type: PhantomData<R>,
     name: Option<String>,
+    stack: Option<Stack>,
+    parent: Option<TaskRef>,
     pin_on_core: Option<u8>,
     blocked: bool,
     idle: bool,
@@ -279,6 +282,8 @@ impl<F, A, R> TaskBuilder<F, A, R>
             func: func,
             _return_type: PhantomData,
             name: None,
+            stack: None,
+            parent: None,
             pin_on_core: None,
             blocked: false,
             idle: false,
@@ -298,6 +303,21 @@ impl<F, A, R> TaskBuilder<F, A, R>
     /// Set the argument that will be passed to the new Task's entry function.
     pub fn argument(mut self, argument: A) -> TaskBuilder<F, A, R> {
         self.argument = argument;
+        self
+    }
+
+    /// Set the `Stack` that will be used by the new Task.
+    pub fn stack(mut self, stack: Stack) -> TaskBuilder<F, A, R> {
+        self.stack = Some(stack);
+        self
+    }
+
+    /// Set the "parent" Task from which the new Task will inherit certain states.
+    ///
+    /// See [`Task::new()`] for more details on what states are inherited.
+    /// By default, the current task will be used if a specific parent task is not provided.
+    pub fn parent(mut self, parent_task: TaskRef) -> TaskBuilder<F, A, R> {
+        self.parent = Some(parent_task);
         self
     }
 
@@ -326,12 +346,14 @@ impl<F, A, R> TaskBuilder<F, A, R>
     }
 
     /// Finishes this `TaskBuilder` and spawns the new task as described by its builder functions.
-    /// 
-    /// This merely makes the new task Runnable, it does not switch to it immediately; that will happen on the next scheduler invocation.
+    ///
+    /// This merely creates the new task and makes it `Runnable`.
+    /// It does not switch to it immediately; that will happen on the next scheduler invocation.
     #[inline(never)]
     pub fn spawn(self) -> Result<JoinableTaskRef, &'static str> {
         let mut new_task = Task::new(
-            None,
+            self.stack,
+            self.parent.as_ref(),
             task_cleanup_failure::<F, A, R>,
         )?;
         // If a Task name wasn't provided, then just use the function's name.
@@ -356,9 +378,11 @@ impl<F, A, R> TaskBuilder<F, A, R>
 
         // The new task is ready to be scheduled in, now that its stack trampoline has been set up.
         if self.blocked {
-            new_task.block();
+            new_task.block_initing_task()
+                .map_err(|_| "BUG: newly-spawned blocked task was not in the Initing runstate")?;
         } else {
-            new_task.unblock();
+            new_task.make_inited_task_runnable()
+                .map_err(|_| "BUG: newly-spawned task was not in the Initing runstate")?;
         }
 
         // The new task is marked as idle
@@ -366,7 +390,8 @@ impl<F, A, R> TaskBuilder<F, A, R>
             new_task.is_an_idle_task = true;
         }
 
-        // If there is a post-build function, invoke it now before finalizing the task and adding it to runqueues.
+        // If there is a post-build function, invoke it now
+        // before finalizing the task and adding it to runqueues.
         if let Some(pb_func) = self.post_build_function {
             pb_func(&mut new_task)?;
         }
@@ -803,12 +828,11 @@ fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: 
 /// which removes the task from its runqueue and spawns it again with 
 /// same entry function (F) and argument (A). 
 fn task_restartable_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: TaskRef) -> !
-   where A: Send + Clone + 'static, 
-         R: Send + 'static,
-         F: FnOnce(A) -> R + Send + Clone + 'static, 
+where
+    A: Send + Clone + 'static,
+    R: Send + 'static,
+    F: FnOnce(A) -> R + Send + Clone + 'static,
 {
-    task_cleanup_final_internal(&current_task);
-
     {
         #[cfg(use_crate_replacement)]
         let mut se = fault_crate_swap::SwapRanges::default();
@@ -870,6 +894,7 @@ fn task_restartable_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, cu
         }
     }
 
+    task_cleanup_final_internal(&current_task);
     drop(current_task);
     drop(preemption_guard);
     // ****************************************************

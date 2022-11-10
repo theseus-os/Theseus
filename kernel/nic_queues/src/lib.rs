@@ -13,14 +13,12 @@ extern crate alloc;
 extern crate memory;
 extern crate intel_ethernet;
 extern crate nic_buffers;
-extern crate owning_ref;
 
-use owning_ref::BoxRefMut;
 use alloc::{
     vec::Vec,
     collections::VecDeque
 };
-use memory::{MappedPages, create_contiguous_mapping, EntryFlags};
+use memory::{create_contiguous_mapping, EntryFlags, BorrowedSliceMappedPages, Mutable};
 use intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 use nic_buffers::{ReceiveBuffer, ReceivedFrame, TransmitBuffer};
 
@@ -60,7 +58,7 @@ pub struct RxQueue<S: RxQueueRegisters, T: RxDescriptor> {
     /// Registers for this receive queue
     pub regs: S,
     /// Receive descriptors
-    pub rx_descs: BoxRefMut<MappedPages, [T]>,
+    pub rx_descs: BorrowedSliceMappedPages<T, Mutable>,
     /// The number of receive descriptors in the descriptor ring
     pub num_rx_descs: u16,
     /// Current receive descriptor index
@@ -154,7 +152,7 @@ pub struct TxQueue<S: TxQueueRegisters, T: TxDescriptor> {
     /// Registers for this transmit queue
     pub regs: S,
     /// Transmit descriptors 
-    pub tx_descs: BoxRefMut<MappedPages, [T]>,
+    pub tx_descs: BorrowedSliceMappedPages<T, Mutable>,
     /// The number of transmit descriptors in the descriptor ring
     pub num_tx_descs: u16,
     /// Current transmit descriptor index

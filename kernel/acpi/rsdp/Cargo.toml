@@ -5,7 +5,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "Support for ACPI RSDP"
 
 [dependencies]
-owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 zerocopy = "0.5.0"
 static_assertions = "1.1.0"
 

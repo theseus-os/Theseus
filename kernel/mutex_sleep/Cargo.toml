@@ -7,22 +7,7 @@ edition = "2018"
 
 [dependencies]
 spin = "0.9.0"
-
-[dependencies.log]
-version = "0.4.8"
-
-
-[dependencies.stable_deref_trait]
-git = "https://github.com/theseus-os/stable_deref_trait.git"
-branch = "spin"
-default-features = false
-features = [ "alloc", "spin" ]
-
-[dependencies.owning_ref]
-# version = "0.3.3"
-# path = "../../libs/owning-ref-rs"
-git = "https://github.com/theseus-os/owning-ref-rs.git"
-
+log = "0.4.8"
 
 [dependencies.wait_queue]
 path = "../wait_queue"

@@ -2,11 +2,11 @@
 
 extern crate alloc;
 extern crate spin;
-extern crate owning_ref;
+extern crate dereffer;
 
 use alloc::sync::{Arc, Weak};
-use spin::Mutex;
-use owning_ref::{MutexGuardRef, MutexGuardRefMut};
+use spin::{Mutex, MutexGuard};
+use dereffer::{DerefsTo, DerefsToMut};
 
 /// A special form of an `Arc` reference that uses two nested `Arc`s to support a 
 /// mechanism similar to copy-on-write or clone-on-write.
@@ -57,8 +57,8 @@ impl<T> CowArc<T> {
     /// regardless of whether the data is `Shared` or `Exclusive`.
     /// 
     /// The returned value derefs to and can be used exactly like `&T`.
-    pub fn lock_as_ref(&self) -> MutexGuardRef<T> {
-        MutexGuardRef::new(self.arc.inner_arc.lock())
+    pub fn lock_as_ref(&self) -> DerefsTo<MutexGuard<T>, T> {
+        DerefsTo::new_default(self.arc.inner_arc.lock())
     }
 
     /// This attempts to acquire the lock on the inner `Mutex` wrapping the data `T`.
@@ -69,8 +69,8 @@ impl<T> CowArc<T> {
     /// regardless of whether the data is `Shared` or `Exclusive`.
     /// 
     /// The returned value derefs to and can be used exactly like `&T`.
-    pub fn try_lock_as_ref(&self) -> Option<MutexGuardRef<T>> {
-        self.arc.inner_arc.try_lock().map(|guard| MutexGuardRef::new(guard))
+    pub fn try_lock_as_ref(&self) -> Option<DerefsTo<MutexGuard<T>, T>> {
+        self.arc.inner_arc.try_lock().map(DerefsTo::new_default)
     }
 
     /// This acquires the lock on the inner `Mutex` wrapping the data `T` if it succeeds,
@@ -78,13 +78,13 @@ impl<T> CowArc<T> {
     /// only a single strong reference to the inner `Arc` is held.
     /// 
     /// The returned value derefs to and can be used exactly like `&mut T`.
-    pub fn lock_as_mut(&self) -> Option<MutexGuardRefMut<T>> {
+    pub fn lock_as_mut(&self) -> Option<DerefsToMut<MutexGuard<T>, T>> {
         if self.is_shared() {
             // shared state, should not mutate 
             None
         }
         else {
-            Some(MutexGuardRefMut::new(self.arc.inner_arc.lock()))
+            Some(DerefsToMut::new_default(self.arc.inner_arc.lock()))
         }
     }
 

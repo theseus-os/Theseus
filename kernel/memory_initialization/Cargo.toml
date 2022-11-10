@@ -5,6 +5,7 @@ description = "Initialization routine for the virtual memory subsystem."
 version = "0.1.0"
 
 [dependencies]
+log = "0.4.8"
 multiboot2 = "0.14.0"
 
 [dependencies.memory]
@@ -13,14 +14,14 @@ path = "../memory"
 [dependencies.stack]
 path = "../stack"
 
+[dependencies.no_drop]
+path = "../no_drop"
+
 [dependencies.kernel_config]
 path = "../kernel_config"
 
 [dependencies.bootloader_modules]
 path = "../bootloader_modules"
-
-[dependencies.log]
-version = "0.4.8"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
