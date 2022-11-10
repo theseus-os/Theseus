@@ -10,7 +10,7 @@ use once_cell::unsync::Lazy;
 use spin::Once;
 use mpmc::Queue;
 use event_types::Event;
-use ps2::{init_ps2_port1, test_ps2_port1, keyboard_detect, KeyboardType, read_scancode, LEDState, keyboard_scancode_set, ScancodeSet};
+use ps2::{init_ps2_port1, test_ps2_port1, keyboard_detect, KeyboardType, read_scancode, LEDState};
 use x86_64::structures::idt::InterruptStackFrame;
 
 /// The first PS/2 port for the keyboard is connected directly to IRQ 1.
