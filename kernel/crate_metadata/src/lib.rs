@@ -472,7 +472,7 @@ impl LoadedCrate {
                 new_sec_mapped_pages_ref,               // mapped_pages is different, points to the new duplicated one
                 new_sec_mapped_pages_offset,            // mapped_pages_offset is the same
                 new_sec_virt_addr,                      // virt_addr is different, based on the new mapped_pages
-                old_sec.size,                         // size is the same
+                old_sec.size,                           // size is the same
                 old_sec.global,                         // globalness is the same
                 new_crate_weak_ref.clone(),             // parent_crate is different, points to the newly-copied crate
                 old_sec_inner.sections_i_depend_on.clone(),   // dependencies are the same, but relocations need to be re-written
