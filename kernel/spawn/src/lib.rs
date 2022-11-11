@@ -544,10 +544,7 @@ struct TaskFuncArg<F, A, R> {
 /// This function sets up the given new task's kernel stack contents to properly jump
 /// to the given `entry_point_function` when the new `Task` is first switched to. 
 ///
-/// The `entry_point_function` will be invoked with one argument, the new task's ID,
-/// in order to allow that new task to identify itself (and set itself as the current task).
-///
-/// This function can only be invoked on a new task that is being initialized,
+/// This function can only be invoked on a `new_task` that is being initialized,
 /// otherwise it will return an error.
 ///
 /// ## How this works 
@@ -648,8 +645,8 @@ where
 
     // This is scoped to ensure that absolutely no resources that require dropping are held
     // when invoking the task's entry function, in order to simplify cleanup when unwinding.
-    // *No* local variables should exist on the stack at the end of this function,
-    // except for the task's `func` and `arg`, which are obviously required.
+    // *No* local variables that require `Drop` should exist on the stack at the end of
+    // this function, except for the task's `func` and `arg`, which are obviously required.
     {
         // Set this task as the current task.
         // We cannot do until this task is actually running, because it uses thread-local storage.
@@ -677,7 +674,7 @@ where
 
         #[cfg(not(any(rq_eval, downtime_eval)))]
         debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
-            current_task.name.clone(), debugit!(task_entry_func), core::any::type_name::<F>(), debugit!(task_arg)
+            &*current_task, debugit!(task_entry_func), core::any::type_name::<F>(), debugit!(task_arg)
         );
     };
 
@@ -692,7 +689,8 @@ where
     drop(recovered_preemption_guard);
     enable_interrupts();
 
-    // Now we actually invoke the entry point function that this Task was spawned for, catching a panic if one occurs.
+    // Now we actually invoke the entry point function that this Task was spawned for,
+    // catching a panic if one occurs.
     catch_unwind::catch_unwind_with_arg(task_entry_func, task_arg)
 }
 
