@@ -433,9 +433,9 @@ pub fn swap_crates(
 
                         write_relocation(
                             relocation_entry, 
-                            target_sec_mapped_pages.as_slice_mut(0, target_sec.mapped_pages_offset + target_sec.size())?,
+                            target_sec_mapped_pages.as_slice_mut(0, target_sec.mapped_pages_offset + target_sec.size)?,
                             target_sec.mapped_pages_offset, 
-                            new_source_sec.start_address(),
+                            new_source_sec.virt_addr,
                             verbose_log
                         )?;
 

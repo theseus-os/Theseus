@@ -983,9 +983,9 @@ impl CrateNamespace {
 
                 write_relocation(
                     relocation_entry,
-                    target_sec_mapped_pages.as_slice_mut(0, target_sec.mapped_pages_offset + target_sec.size())?,
+                    target_sec_mapped_pages.as_slice_mut(0, target_sec.mapped_pages_offset + target_sec.size)?,
                     target_sec.mapped_pages_offset,
-                    new_section.start_address(),
+                    new_section.virt_addr,
                     false
                 )?;
 
@@ -1488,13 +1488,13 @@ impl CrateNamespace {
                 if let Some((tdata_shndx, ref tdata_sec)) = tdata_shndx_and_section && sym_shndx == tdata_shndx {
                     typ = SectionType::TlsData;
                     mapped_pages_offset = tdata_sec.mapped_pages_offset + sec_value;
-                    virt_addr = tdata_sec.start_address() + sec_value;
+                    virt_addr = tdata_sec.virt_addr + sec_value;
                 } else if let Some((tbss_shndx, ref tbss_sec)) = tbss_shndx_and_section && sym_shndx == tbss_shndx {
                     typ = SectionType::TlsBss;
                     // Here: a TLS .tbss section has no actual content, so we use a max-value offset
                     // as a canary value to ensure it cannot be used to index into a MappedPages.
                     mapped_pages_offset = usize::MAX;
-                    virt_addr = tbss_sec.start_address() + sec_value;
+                    virt_addr = tbss_sec.virt_addr + sec_value;
                 } else {
                     error!("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss: {}", symbol_entry as &dyn Entry);
                     return Err("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss");
@@ -1541,8 +1541,8 @@ impl CrateNamespace {
         //         for sec in loaded_sections.values() {
         //             if sec.typ == SectionType::Data && sec.name.as_str() != SectionType::Data.name() {
         //                 warn!("\t\t data symbol: {:?}", sec);
-        //                 data_symbols_start_vaddr = core::cmp::min(data_symbols_start_vaddr, sec.address_range.start.value());
-        //                 data_symbols_end_vaddr = core::cmp::max(data_symbols_end_vaddr, sec.address_range.end.value());
+        //                 data_symbols_start_vaddr = core::cmp::min(data_symbols_start_vaddr, sec.virt_addr.value());
+        //                 data_symbols_end_vaddr = core::cmp::max(data_symbols_end_vaddr, sec.virt_addr.value() + sec.size);
         //             }
         //         }
         //         let total_size_of_data_symbols = data_symbols_end_vaddr - data_symbols_start_vaddr;
@@ -1557,8 +1557,8 @@ impl CrateNamespace {
         //         for sec in loaded_sections.values() {
         //             if sec.typ == SectionType::Bss && sec.name.as_str() != SectionType::Bss.name() {
         //                 warn!("\t\t bss symbol: {:?}", sec);
-        //                 bss_symbols_start_vaddr = core::cmp::min(bss_symbols_start_vaddr, sec.address_range.start.value());
-        //                 bss_symbols_end_vaddr = core::cmp::max(bss_symbols_end_vaddr, sec.address_range.end.value());
+        //                 bss_symbols_start_vaddr = core::cmp::min(bss_symbols_start_vaddr, sec.virt_addr.value());
+        //                 bss_symbols_end_vaddr = core::cmp::max(bss_symbols_end_vaddr, sec.virt_addr.value() + sec.size);
         //             }
         //         }
         //         let total_size_of_bss_symbols = bss_symbols_end_vaddr - bss_symbols_start_vaddr;
@@ -2120,7 +2120,7 @@ impl CrateNamespace {
                 let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
                 let target_sec_slice: &mut [u8] = target_sec_mapped_pages.as_slice_mut(
                     0,
-                    target_sec.mapped_pages_offset + target_sec.size(),
+                    target_sec.mapped_pages_offset + target_sec.size,
                 )?;
 
                 // iterate through each relocation entry in the relocation array for the target_sec
@@ -2186,7 +2186,7 @@ impl CrateNamespace {
                         relocation_entry,
                         target_sec_slice,
                         target_sec.mapped_pages_offset,
-                        source_sec.start_address() + source_sec_value,
+                        source_sec.virt_addr + source_sec_value,
                         verbose_log
                     )?;
                     target_sec_data_was_modified = true;
@@ -2256,7 +2256,7 @@ impl CrateNamespace {
         {
             new_crate.sections.retain(|_shndx, sec| {
                 let should_remove = !sec.global 
-                    && sec.get_type() == SectionType::Rodata
+                    && sec.typ == SectionType::Rodata
                     && sec.inner.read().sections_i_depend_on.is_empty();
                 
                 // For an element to be removed, this closure should return `false`.
@@ -2282,8 +2282,8 @@ impl CrateNamespace {
                 if log_replacements {
                     if let Some(old_sec) = old_val.get().upgrade() {
                         // debug!("       add_symbol(): replacing section: old: {:?}, new: {:?}", old_sec, new_section);
-                        if new_section.size() != old_sec.size() {
-                            warn!("Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}", old_sec.size(), old_sec.name, new_section.size(), new_section.name);
+                        if new_section.size != old_sec.size {
+                            warn!("Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}", old_sec.size, old_sec.name, new_section.size, new_section.name);
                         } 
                         else {
                             warn!("Replacing new symbol already present: old {:?}, new: {:?}", old_sec.name, new_section.name);
@@ -2468,8 +2468,11 @@ impl CrateNamespace {
             
             // If the section's address bounds contain the address, then we've found it.
             // Only a single section can contain the address, so it's safe to stop once we've found a match.
-            if eligible_section && sec.address_range.contains(&virt_addr) {
-                let offset = virt_addr.value() - sec.start_address().value();
+            if eligible_section
+                && sec.virt_addr <= virt_addr
+                && virt_addr.value() < (sec.virt_addr.value() + sec.size)
+            {
+                let offset = virt_addr.value() - sec.virt_addr.value();
                 merged_section_and_offset = Some((sec.clone(), offset));
                 
                 if sec.name.as_str() == sec.typ.name() {
@@ -3082,7 +3085,7 @@ impl TlsInitializer {
         offset: usize,
         tls_section: StrongSectionRef,
     ) -> Result<(), ()> {
-        let range = offset .. (offset + tls_section.size());
+        let range = offset .. (offset + tls_section.size);
         if self.static_section_offsets.contains_key(&range.start) || 
             self.static_section_offsets.contains_key(&(range.end - 1))
         {
@@ -3116,23 +3119,21 @@ impl TlsInitializer {
         mut section: LoadedSection,
         alignment: usize,
     ) -> Result<(usize, StrongSectionRef), ()> {
-        let sec_size = section.size();
         let mut start_index = None;
         // Find the next "gap" big enough to fit the new TLS section, 
         // skipping the first `POINTER_SIZE` bytes, which are reserved for the TLS self pointer.
         let range_after_tls_self_pointer = POINTER_SIZE .. usize::MAX;
         for gap in self.dynamic_section_offsets.gaps(&range_after_tls_self_pointer) {
             let aligned_start = util::round_up(gap.start, alignment);
-            if aligned_start + sec_size <= gap.end {
+            if aligned_start + section.size <= gap.end {
                 start_index = Some(aligned_start);
                 break;
             }
         }
 
         if let Some(start) = start_index {
-            let range = start .. (start + sec_size);
-            section.address_range = 
-                VirtualAddress::new_canonical(range.start) .. VirtualAddress::new_canonical(range.end);
+            let range = start .. (start + section.size);
+            section.virt_addr = VirtualAddress::new(range.start).ok_or(())?;
             let section_ref = Arc::new(section);
             self.end_of_dynamic_sections = max(self.end_of_dynamic_sections, range.end);
             self.dynamic_section_offsets.insert(range, StrongSectionRefWrapper(Arc::clone(&section_ref)));
@@ -3175,13 +3176,13 @@ impl TlsInitializer {
                 new_data.extend(core::iter::repeat(0).take(num_padding_bytes));
 
                 // Insert the section data into the new data vec.
-                if sec.get_type() == SectionType::TlsData {
+                if sec.typ == SectionType::TlsData {
                     let sec_mp = sec.mapped_pages.lock();
-                    let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size()).unwrap();
+                    let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size).unwrap();
                     new_data.extend_from_slice(sec_data);
                 } else {
                     // For TLS BSS sections (.tbss), fill the section size with all zeroes.
-                    new_data.extend(core::iter::repeat(0).take(sec.size()));
+                    new_data.extend(core::iter::repeat(0).take(sec.size));
                 }
                 *end_of_previous_range = range.end;
             }
