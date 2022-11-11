@@ -684,7 +684,7 @@ impl ParsedCrateItems {
 /// .text, .rodata, .data, and .bss.
 /// 
 /// If TLS sections are present, e.g., .tdata or .tbss, 
-/// their `shndx`, virtul address, and size are also included here.
+/// their `shndx` and virtual address are also included here.
 struct MainSectionInfo {
     text_shndx:      Shndx,
     rodata_shndx:    Shndx,
