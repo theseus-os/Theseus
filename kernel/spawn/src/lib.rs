@@ -655,8 +655,6 @@ where
         // We cannot do until this task is actually running, because it uses thread-local storage.
         let current_task = task::init_current_task(current_task_id, None)
             .expect("BUG: task_wrapper: couldn't init this task as the current task");
-        assert!(current_task_id == current_task.id);
-        assert!(get_current_task().unwrap() == get_my_current_task().unwrap().clone());
 
         // The first time that a task runs, its entry function `task_wrapper()` is jumped to
         // from the `task_switch()` function, right after the end of `context_switch`().

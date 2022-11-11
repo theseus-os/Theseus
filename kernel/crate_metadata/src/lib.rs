@@ -1070,12 +1070,12 @@ pub fn write_relocation(
             if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
             target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
-        R_X86_64_GOTTPOFF => {
-            // 32-bit signed PC-relative offset to the GOT entry for the IE (Initial Exec(utable) TLS model))
-            debug!("R_X86_64_GOTTPOFF: {:#X?}", relocation_entry);
-            debug!("R_X86_64_GOTTPOFF: target: {:#X}, source: {:#X}", target_sec_slice.as_ptr() as usize + target_sec_offset, source_sec_vaddr);
-            todo!("finish")
-        }
+        // R_X86_64_GOTTPOFF => {
+        //     // 32-bit signed PC-relative offset to the GOT entry for the IE (Initial Exec(utable) TLS model))
+        //     debug!("R_X86_64_GOTTPOFF: {:#X?}", relocation_entry);
+        //     debug!("R_X86_64_GOTTPOFF: target: {:#X}, source: {:#X}", target_sec_slice.as_ptr() as usize + target_sec_offset, source_sec_vaddr);
+        //     unimplemented!()
+        // }
         // R_X86_64_GOTPCREL => { 
         //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table
         // }
