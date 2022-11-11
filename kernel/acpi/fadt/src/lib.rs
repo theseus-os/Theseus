@@ -6,9 +6,10 @@ extern crate memory;
 extern crate sdt;
 extern crate acpi_table;
 extern crate zerocopy;
+#[macro_use] extern crate static_assertions;
 
 use memory::PhysicalAddress;
-use sdt::Sdt;
+use sdt::{Sdt, GenericAddressStructure};
 use acpi_table::{AcpiSignature, AcpiTables};
 use zerocopy::FromBytes;
 
@@ -32,7 +33,7 @@ pub fn handle(
 pub struct Fadt {
     pub header: Sdt,
     pub firmware_ctrl: u32,
-    /// The physical address of the DSDT table
+    /// 32-bit physical address of the DSDT.
     pub dsdt: u32,
     _reserved: u8, 
     pub preferred_power_managament: u8,
@@ -54,7 +55,7 @@ pub struct Fadt {
     pub pm1_control_length: u8,
     pub pm2_control_length: u8,
     pub pm_timer_length: u8,
-    pub gpe0_ength: u8,
+    pub gpe0_length: u8,
     pub gpe1_length: u8,
     pub gpe1_base: u8,
     pub c_state_control: u8,
@@ -67,10 +68,26 @@ pub struct Fadt {
     pub day_alarm: u8,
     pub month_alarm: u8,
     pub century: u8,
-    pub boot_architecture_flags: u16,
+    pub iapc_boot_architecture_flags: u16,
     _reserved2: u8,
     pub flags: u32,
+    pub reset_reg: GenericAddressStructure,
+    pub reset_value: u8,
+    _reserved3: [u8; 3],
+    /// 64-bit physical address of the FACS.
+    pub x_firmware_control: u64,
+    /// 64-bit physical address of the DSDT.
+    pub x_dsdt: u64,
+    pub x_pm1a_event_block: GenericAddressStructure,
+    pub x_pm1b_event_block: GenericAddressStructure,
+    pub x_pm1a_control_block: GenericAddressStructure,
+    pub x_pm1b_control_block: GenericAddressStructure,
+    pub x_pm2_control_block: GenericAddressStructure,
+    pub x_pm_timer_block: GenericAddressStructure,
+    pub x_gpe0_block: GenericAddressStructure,
+    pub x_gpe1_block: GenericAddressStructure,
 }
+const_assert_eq!(core::mem::size_of::<Fadt>(), 244);
 
 impl Fadt {
     /// Finds the FADT in the given `AcpiTables` and returns a reference to it.

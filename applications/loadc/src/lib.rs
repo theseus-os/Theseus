@@ -459,7 +459,7 @@ fn overwrite_relocations(
                     relocation_entry,
                     target_segment_slice,
                     offset_into_target_segment,
-                    existing_source_sec.start_address(),
+                    existing_source_sec.virt_addr,
                     verbose_log
                 )?;
                 relocation_entry.offset = original_relocation_offset;

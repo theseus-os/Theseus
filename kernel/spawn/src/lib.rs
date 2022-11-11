@@ -217,7 +217,7 @@ pub fn new_application_task_builder(
         let app_crate = app_crate_ref.lock_as_ref();
         let expected_main_section_name = format!("{}{}{}", app_crate.crate_name_as_prefix(), ENTRY_POINT_SECTION_NAME, SECTION_HASH_DELIMITER);
         app_crate.find_section(|sec| 
-            sec.get_type() == SectionType::Text && sec.name_without_hash() == &expected_main_section_name
+            sec.typ == SectionType::Text && sec.name_without_hash() == &expected_main_section_name
         ).cloned()
     };
     let main_func_sec = main_func_sec_opt.ok_or("spawn::new_application_task_builder(): couldn't find \"main\" function, expected function name like \"<crate_name>::main::<hash>\"\

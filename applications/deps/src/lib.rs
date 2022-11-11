@@ -249,7 +249,7 @@ fn count_private_rodata_sections() -> Result<(), String> {
         let mut prv = 0;
         let mut publ = 0;
         let mut disc = 0;
-        for sec in crate_ref.lock_as_ref().sections.values().filter(|sec| sec.get_type() == mod_mgmt::SectionType::Rodata) {
+        for sec in crate_ref.lock_as_ref().sections.values().filter(|sec| sec.typ == mod_mgmt::SectionType::Rodata) {
             section_count += 1;
             let mut can_discard = true;
             if sec.global {

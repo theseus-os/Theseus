@@ -65,7 +65,7 @@ pub(crate) fn into_loaded_crate(
     // // Dump loaded sections for verification. See pull request #542/#559 for more details:
     // let loaded_crate_ref = loaded_crate.lock_as_ref();
     // for (_, section) in loaded_crate_ref.sections.iter() {
-    //     trace!("{:016x} {} {}", section.address_range.start.value(), section.name, section.mapped_pages_offset);
+    //     trace!("{:016x} {} {}", section.virt_addr.value(), section.name, section.mapped_pages_offset);
     // }
     // drop(loaded_crate_ref);
 
@@ -104,7 +104,8 @@ fn into_loaded_section(
         global: serialized_section.global,
         mapped_pages_offset: serialized_section.offset,
         mapped_pages,
-        address_range: virtual_address..(virtual_address + serialized_section.size),
+        virt_addr: virtual_address,
+        size: serialized_section.size,
         parent_crate,
         inner: Default::default(),
     });

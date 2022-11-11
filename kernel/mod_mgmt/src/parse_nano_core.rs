@@ -194,7 +194,7 @@ fn parse_nano_core_symbol_file_or_binary(
     
     // // Dump loaded sections for verification. See pull request #559 for more details:
     // for (_, section) in new_crate_mut.sections.iter() {
-    //     trace!("{:016x} {} {}", section.address_range.start.value(), section.name, section.mapped_pages_offset);
+    //     trace!("{:016x} {} {}", section.virt_addr.value(), section.name, section.mapped_pages_offset);
     // }
 
     drop(new_crate_mut);

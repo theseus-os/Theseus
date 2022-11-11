@@ -39,7 +39,7 @@ There are several examples of how the multiple stages of task cleanup each permi
 
 The task cleanup functions described in the [previous chapter](./task.md#cleaning-up-tasks) demonstrate the lengths to which Theseus goes to ensure that task states and resources are fully released in both normal and exceptional execution paths. 
 In addition, as mentioned above, all cleanup functions are parameterized with the same `<F, A, R>` generic type parameters, 
-which is crucial for realizing restartable tasks because the failure handler for a restartable task must known its specific type parameters for the entry function, argument, and return type in order to re-spawn a new instance of the failed task.
+which is crucial for realizing restartable tasks because the failure handler for a restartable task must know its specific type parameters for the entry function, argument, and return type in order to re-spawn a new instance of the failed task.
 
 
 ## Invariant 3: All memory transitively reachable from a task’s entry function must outlive that task.
