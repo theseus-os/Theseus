@@ -7,7 +7,7 @@ BUILD_STD_CARGOFLAGS += -Z unstable-options
 BUILD_STD_CARGOFLAGS += -Z build-std=core,alloc
 BUILD_STD_CARGOFLAGS += -Z build-std-features=compiler-builtins-mem
 
-QEMU_EFI_ZIP_URL ?= https://github.com/theseus-os/prebuilt-resources/raw/main/qemu-efi.fd.zip
+QEMU_EFI_ZIP_URL ?= https://github.com/theseus-os/prebuilt-aavmf/raw/main/qemu-efi.fd.zip
 
 AARCH64_DIR ?= .
 BUILD_DIR ?= $(AARCH64_DIR)/build
