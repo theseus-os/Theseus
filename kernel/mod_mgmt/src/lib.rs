@@ -1476,6 +1476,13 @@ impl CrateNamespace {
 
             // Handle a "TLS" symbol, which exists in .tdata or .tbss
             else if is_tls {
+                let sym_shndx = symbol_entry.shndx() as Shndx;
+                // A TLS symbol with an shndx of 0 is a reference to a foreign dependency,
+                // so we skip it just like we do for `NoType` symbols at the top of this loop.
+                if sym_shndx == 0 {
+                    continue;
+                }
+
                 // TLS sections have been copied into the read-only pages.
                 // The merged TLS sections have already been dynamically assigned a virtual address above,
                 // so we can calculate a TLS symbol's vaddr and mapped_pages_offset by adding 
@@ -1484,7 +1491,6 @@ impl CrateNamespace {
                     .map(|(mp_arc, ..)| mp_arc)
                     .ok_or("BUG: found TLS symbol but no rodata_pages were allocated")?;
 
-                let sym_shndx = symbol_entry.shndx() as Shndx;
                 if let Some((tdata_shndx, ref tdata_sec)) = tdata_shndx_and_section && sym_shndx == tdata_shndx {
                     typ = SectionType::TlsData;
                     mapped_pages_offset = tdata_sec.mapped_pages_offset + sec_value;
@@ -2223,7 +2229,7 @@ impl CrateNamespace {
             if target_sec_data_was_modified && 
                 (target_sec.typ == SectionType::TlsData || target_sec.typ == SectionType::TlsBss)
             {
-                debug!("Invalidating TlsInitializer due to relocation written to section {:?}", &*target_sec);
+                // debug!("Invalidating TlsInitializer due to relocation written to section {:?}", &*target_sec);
                 self.tls_initializer.lock().invalidate();
             }
 
@@ -3074,17 +3080,33 @@ impl TlsInitializer {
     }
 
     /// Add a TLS section that has pre-determined offset, e.g.,
-    /// one that was specified in the statically-linked nano_core kernel image.
-    /// 
-    /// Returns an Error if inserting the given `tls_section` at the given `offset`
-    /// would overlap with an existing section.
-    /// Note: an error occurring here would indicate a link-time bug 
-    /// or a bug in the symbol parsing code that invokes this function.
+    /// one that was specified in the statically-linked base kernel image.
+    ///
+    /// This function modifies the `tls_section`'s starting virtual address field
+    /// to hold the proper value such that this `tls_section` can be correctly used
+    /// as the source of a relocation calculation (e.g., when another section depends on it).
+    /// That value will be a negative offset from the end of all the static TLS sections,
+    /// i.e., where the TLS self pointer exists in memory.
+    ///
+    /// ## Arguments
+    /// * `tls_section`: the TLS section present in base kernel image.
+    /// * `offset`: the offset of this section as determined by the linker.
+    ///    This corresponds to the "value" of this section's symbol in the ELF file.
+    /// * `total_static_tls_size`: the total size of all statically-known TLS sections,
+    ///    including both TLS BSS (`.tbss`) and TLS data (`.tdata`) sections.
+    ///
+    /// ## Return
+    /// * A reference to the newly added and properly modified section, if successful.
+    /// * An error if inserting the given `tls_section` at the given `offset`
+    ///   would overlap with an existing section. 
+    ///   An error occurring here would indicate a link-time bug 
+    ///   or a bug in the symbol parsing code that invokes this function.
     pub(crate) fn add_existing_static_tls_section(
         &mut self,
+        mut tls_section: LoadedSection,
         offset: usize,
-        tls_section: StrongSectionRef,
-    ) -> Result<(), ()> {
+        total_static_tls_size: usize,
+    ) -> Result<StrongSectionRef, ()> {
         let range = offset .. (offset + tls_section.size);
         if self.static_section_offsets.contains_key(&range.start) || 
             self.static_section_offsets.contains_key(&(range.end - 1))
@@ -3092,10 +3114,14 @@ impl TlsInitializer {
             return Err(());
         }
 
+        // Calculate the new value of this section's virtual address based on its offset.
+        let starting_offset = (total_static_tls_size - offset).wrapping_neg();
+        tls_section.virt_addr = VirtualAddress::new(starting_offset).ok_or(())?;
         self.end_of_static_sections = max(self.end_of_static_sections, range.end);
-        self.static_section_offsets.insert(range, StrongSectionRefWrapper(tls_section));
+        let section_ref = Arc::new(tls_section);
+        self.static_section_offsets.insert(range, StrongSectionRefWrapper(section_ref.clone()));
         self.cache_status = CacheStatus::Invalidated;
-        Ok(())
+        Ok(section_ref)
     }
 
     /// Inserts the given `section` into this TLS area at the next index
@@ -3131,18 +3157,15 @@ impl TlsInitializer {
             }
         }
 
-        if let Some(start) = start_index {
-            let range = start .. (start + section.size);
-            section.virt_addr = VirtualAddress::new(range.start).ok_or(())?;
-            let section_ref = Arc::new(section);
-            self.end_of_dynamic_sections = max(self.end_of_dynamic_sections, range.end);
-            self.dynamic_section_offsets.insert(range, StrongSectionRefWrapper(Arc::clone(&section_ref)));
-            // Now that we've added a new section, the cached data is invalid.
-            self.cache_status = CacheStatus::Invalidated;
-            Ok((start, section_ref))
-        } else {
-            Err(())
-        }
+        let start = start_index.ok_or(())?;
+        let range = start .. (start + section.size);
+        section.virt_addr = VirtualAddress::new(range.start).ok_or(())?;
+        let section_ref = Arc::new(section);
+        self.end_of_dynamic_sections = max(self.end_of_dynamic_sections, range.end);
+        self.dynamic_section_offsets.insert(range, StrongSectionRefWrapper(section_ref.clone()));
+        // Now that we've added a new section, the cached data is invalid.
+        self.cache_status = CacheStatus::Invalidated;
+        Ok((start, section_ref))
     }
 
     /// Invalidates the cached data image in this `TlsInitializer` area.
@@ -3262,7 +3285,7 @@ pub struct TlsDataImage {
     ptr:   usize,
 }
 impl TlsDataImage {
-    /// Returns the value of the TLS selft pointer for this TLS data image.
+    /// Returns the value of the TLS self pointer for this TLS data image.
     /// If it has no TLS data sections, the returned value will be zero.
     #[inline(always)]
     pub fn pointer_value(&self) -> usize {

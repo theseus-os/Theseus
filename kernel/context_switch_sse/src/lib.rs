@@ -62,6 +62,16 @@ impl ContextSSE {
             regular: ContextRegular::new(rip),
         }
     }
+
+    /// Sets the value of the first regular (non-SSE) register to the given `value`.
+    /// 
+    /// This is useful for storing a value (e.g., task ID) in that register
+    /// and then recovering it later with [`ContextRegular::read_first_reg()`].
+    /// 
+    /// On x86_64, this is the `r15` register.
+    pub fn set_first_register(&mut self, value: usize) {
+        self.regular.set_first_register(value);
+    }
 }
 
 

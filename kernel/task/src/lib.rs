@@ -27,6 +27,7 @@
 
 #![no_std]
 #![feature(panic_info_message)]
+#![feature(thread_local)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -154,8 +155,9 @@ pub fn set_kill_handler(function: KillHandler) -> Result<(), &'static str> {
 /// # Locking / Deadlock
 /// Obtains the lock on this `Task`'s inner state in order to mutate it.
 pub fn take_kill_handler() -> Option<KillHandler> {
-    get_my_current_task()
-        .and_then(|t| t.inner.lock().kill_handler.take())
+    with_current_task(|t| t.inner.lock().kill_handler.take())
+        .ok()
+        .flatten()
 }
 
 
@@ -877,18 +879,6 @@ impl Task {
         //     }
         // }
        
-        // Set runstates and current task *atomically*, i.e., by disabling interrupts.
-        // This is necessary to ensure that any interrupt handlers that may run on this CPU
-        // during the schedule/task_switch routines cannot observe inconsistencies
-        // in task runstates, e.g., when an interrupt handler accesses the current task context.
-        {
-            let _held_interrupts = hold_interrupts();
-            self.running_on_cpu.store(None.into()); // no longer running
-            next.running_on_cpu.store(Some(apic_id).into()); // now running on this core
-            next.set_as_current_task();
-            drop(_held_interrupts);
-        }
-
         // Move the preemption guard into the next task such that we can use retrieve it
         // after the below context switch operation has completed.
         //
@@ -900,9 +890,29 @@ impl Task {
         // If the current task is exited, then we need to remove the cyclical TaskRef reference in its TaskLocalData.
         // We store the removed TaskLocalData in the next Task struct so that we can access it after the context switch.
         if self.has_exited() {
-            // trace!("task_switch(): preparing to drop TaskLocalData for running task {}", self);
+            // trace!("task_switch(): preparing to drop TaskLocalData for running task self: {}, next: {}", self, next.deref());
             next.inner.lock().drop_after_task_switch = self.inner.lock().task_local_data.take();
+            let _prev_taskref = deinit_current_task();
+            drop(_prev_taskref);
         }
+
+        // The final step before we actually perform the context switch is to
+        // atomically update runstates and the current task.
+        // Note that we cannot do this until we've done the above part that cleans up
+        // TLS variables for the current task (if exited), since the below call to 
+        // `set_as_current_task()` will change the currently active TLS area on this CPU.
+        //
+        // We briefly disable interrupts below to ensure that any interrupt handlers that may run
+        // on this CPU during the schedule/task_switch routines cannot observe inconsistencies
+        // in task runstates, e.g., when an interrupt handler accesses the current task context.
+        {
+            let _held_interrupts = hold_interrupts();
+            self.running_on_cpu.store(None.into()); // no longer running
+            next.running_on_cpu.store(Some(apic_id).into()); // now running on this core
+            next.set_as_current_task();
+            drop(_held_interrupts);
+        }
+        
 
         let prev_task_saved_sp: *mut usize = {
             let mut inner = self.inner.lock(); // ensure the lock is released
@@ -1262,7 +1272,7 @@ impl TaskRef {
             // Corner case: if the task isn't currently running (as with killed tasks), 
             // we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.
             if !self.0.is_running() {
-                trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*self.0);
+                warn!("internal_exit(): [untested] dropping TaskLocalData for non-running task {}", &*self.0);
                 drop(inner.task_local_data.take());
             }
         }
@@ -1336,7 +1346,7 @@ pub fn bootstrap_task(
     let bootstrap_task_id = bootstrap_task.id;
     let task_ref = TaskRef::new(bootstrap_task);
 
-    // set this as this core's current task, since it's obviously running
+    // Set this task as this CPU's current task, as it's already running.
     task_ref.set_as_current_task();
     if get_my_current_task().is_none() {
         error!("BUG: bootstrap_task(): failed to properly set the new boostrapped task as the current task on AP {}", apic_id);
@@ -1344,6 +1354,11 @@ pub fn bootstrap_task(
         // used for the currently running code -- that would trigger an exception.
         let _task_ref = NoDrop::new(task_ref);
         return Err("BUG: bootstrap_task(): failed to properly set the new bootstrapped task as the current task");
+    }
+    // Set this task as this CPU's current task, as it's already running.
+    if let Err(_) = init_current_task(bootstrap_task_id, Some(task_ref.clone())) {
+        let _task_ref = NoDrop::new(task_ref);
+        return Err("BUG: bootstrap_task(): failed to set bootstrapped task as current task");
     }
 
     // insert the new task into the task list
@@ -1372,6 +1387,118 @@ fn bootstrap_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason
 }
 
 
+pub use tls_current_task::*;
+
+/// A private module to ensure the below TLS variables aren't modified directly.
+mod tls_current_task {
+    use core::cell::{Cell, RefCell};
+    use super::{TASKLIST, TaskRef};
+
+    /// The TLS area that holds the current task's ID.
+    #[thread_local]
+    static CURRENT_TASK_ID: Cell<usize> = Cell::new(0);
+
+    /// The TLS area that holds the current task.
+    #[thread_local]
+    static CURRENT_TASK: RefCell<Option<TaskRef>> = RefCell::new(None);
+
+    /// Invokes the given `function` with a reference to the current task.
+    /// 
+    /// This is useful to avoid cloning a reference to the current task.
+    /// 
+    /// Returns an `Err` if the current task cannot be obtained.
+    pub fn with_current_task<F, R>(function: F) -> Result<R, ()>
+    where
+        F: FnOnce(&TaskRef) -> R
+    {
+        if let Ok(Some(ref t)) = CURRENT_TASK.try_borrow().as_deref() {
+            Ok(function(t))
+        } else {
+            Err(())
+        }
+    }
+
+    /// Returns a cloned reference to the current task.
+    ///
+    /// Using [`with_current_task()`] is preferred because it operates on a
+    /// borrowed reference to the current task and avoids cloning that reference.
+    ///
+    /// This function must clone the current task's `TaskRef` in order to ensure
+    /// that this task cannot be dropped for the lifetime of the returned `TaskRef`.
+    /// Because the "current task" feature uses thread-local storage (TLS),
+    /// there is no safe way to avoid the cloning operation because it is impossible
+    /// to specify the lifetime of the returned thread-local reference in Rust.
+    pub fn get_current_task() -> Option<TaskRef> {
+        with_current_task(|t| t.clone()).ok()
+    }
+
+    /// Returns the unique ID of the current task.
+    pub fn get_my_current_task_id() -> Option<usize> {
+        Some(CURRENT_TASK_ID.get())
+    }
+
+    /// Set the given task as the current task.
+    ///
+    /// This function being public is completely safe, as it will only ever execute
+    /// once per task, typically at the beginning of a task's first execution.
+    ///
+    /// If `current_task` is `Some`, its task ID must match `current_task_id`.
+    /// If `current_task` is `None`, the task must have already been added to 
+    /// the system-wide task list such that a reference to it can be retrieved.
+    ///
+    /// Returns an `Err` if the current task has already been set.
+    #[doc(hidden)]
+    pub fn init_current_task(
+        current_task_id: usize,
+        current_task: Option<TaskRef>,
+    ) -> Result<TaskRef, ()> {
+        let taskref = if let Some(t) = current_task {
+            if t.id != current_task_id {
+                return Err(());
+            }
+            t
+        } else {
+            TASKLIST.lock()
+                .get(&current_task_id)
+                .cloned()
+                .ok_or(())?
+        };
+
+        match CURRENT_TASK.try_borrow_mut() {
+            Ok(mut t_opt) if t_opt.is_none() => {
+                *t_opt = Some(taskref.clone());
+                CURRENT_TASK_ID.set(current_task_id);
+                Ok(taskref)
+            }
+            _ => Err(()),
+        }
+    }
+
+    /// De-initializes the current task TLS variable, ensuring that the task can be dropped.
+    ///
+    /// This function being public is completely safe, as it will only ever execute
+    /// once per task, typically after the task has exited and is being cleaned up.
+    ///
+    /// This returns an error if:
+    /// * The current task has not yet exited.
+    /// * The current task TLS variable hasn't been initialized.
+    /// * The current task TLS variable is currently borrowed.
+    #[doc(hidden)]
+    pub fn deinit_current_task() -> Result<TaskRef, ()> {
+        if with_current_task(|t| !t.has_exited()).unwrap_or(true) {
+            return Err(());
+        }
+        CURRENT_TASK.try_borrow_mut()
+            .map_err(|_| ())
+            .and_then(|mut t_opt| t_opt
+                .take()
+                .ok_or(())
+            )
+    }
+}
+
+// TODO: remove old stuff below once TLS-based `CURRENT_TASK` works.
+
 /// The structure that holds information local to each Task,
 /// effectively a form of thread-local storage (TLS).
 /// A pointer to this structure is stored in the `GS_BASE` MSR (model-specific register),
@@ -1382,6 +1509,7 @@ fn bootstrap_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason
 #[derive(Debug)]
 struct TaskLocalData {
     taskref: TaskRef,
+    #[allow(dead_code)]
     task_id: usize,
 }
 
@@ -1403,9 +1531,4 @@ fn get_task_local_data() -> Option<&'static TaskLocalData> {
 /// Returns a reference to the current task.
 pub fn get_my_current_task() -> Option<&'static TaskRef> {
     get_task_local_data().map(|tld| &tld.taskref)
-}
-
-/// Returns the current task's ID.
-pub fn get_my_current_task_id() -> Option<usize> {
-    get_task_local_data().map(|tld| tld.task_id)
 }
