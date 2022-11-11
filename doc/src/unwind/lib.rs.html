@@ -1637,7 +1637,7 @@
         </span><span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.eh_frame_sec {
             EhFrameReference::Section(sec) =&gt; {
                 <span class="kw">let </span>sec_pages = sec.mapped_pages.lock();
-                <span class="kw">let </span>eh_frame_slice: <span class="kw-2">&amp;</span>[u8] = sec_pages.as_slice(sec.mapped_pages_offset, sec.size())<span class="question-mark">?</span>;
+                <span class="kw">let </span>eh_frame_slice: <span class="kw-2">&amp;</span>[u8] = sec_pages.as_slice(sec.mapped_pages_offset, sec.size)<span class="question-mark">?</span>;
                 invoke_f_with_eh_frame_slice(eh_frame_slice)
             }
             EhFrameReference::External(uw_info) =&gt; {
@@ -1665,7 +1665,7 @@
     <span class="kw">let </span>eh_frame_sec = krate.sections.values()
         .find(|s| s.typ == SectionType::EhFrame)<span class="question-mark">?</span>;
     
-    <span class="kw">let </span>eh_frame_vaddr = eh_frame_sec.start_address().value();
+    <span class="kw">let </span>eh_frame_vaddr = eh_frame_sec.virt_addr.value();
     <span class="kw">let </span>text_pages_vaddr = krate.text_pages.as_ref()<span class="question-mark">?</span>.<span class="number">1</span>.start.value();
     <span class="kw">let </span>base_addrs = BaseAddresses::default()
         .set_eh_frame(eh_frame_vaddr <span class="kw">as </span>u64)
@@ -1777,8 +1777,8 @@
                 <span class="attr">#[cfg(not(downtime_eval))]
                 </span><span class="macro">info!</span>(<span class="string">&quot;  parsing LSDA section: {:?}&quot;</span>, sec);
                 
-                <span class="kw">let </span>starting_offset = sec.mapped_pages_offset + (lsda.value() - sec.address_range.start.value());
-                <span class="kw">let </span>length_til_end_of_mp = sec.address_range.end.value() - lsda.value();
+                <span class="kw">let </span>starting_offset = sec.mapped_pages_offset + (lsda.value() - sec.virt_addr.value());
+                <span class="kw">let </span>length_til_end_of_mp = sec.virt_addr.value() + sec.size - lsda.value();
                 <span class="kw">let </span>sec_mp = sec.mapped_pages.lock();
                 <span class="kw">let </span>lsda_slice = sec_mp.as_slice::&lt;u8&gt;(starting_offset, length_til_end_of_mp)
                     .map_err(|_e| <span class="string">&quot;continue_unwinding(): couldn&#39;t get LSDA pointer as a slice&quot;</span>)<span class="question-mark">?</span>;

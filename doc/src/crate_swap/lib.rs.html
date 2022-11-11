@@ -1538,9 +1538,9 @@
 
                         write_relocation(
                             relocation_entry, 
-                            target_sec_mapped_pages.as_slice_mut(<span class="number">0</span>, target_sec.mapped_pages_offset + target_sec.size())<span class="question-mark">?</span>,
+                            target_sec_mapped_pages.as_slice_mut(<span class="number">0</span>, target_sec.mapped_pages_offset + target_sec.size)<span class="question-mark">?</span>,
                             target_sec.mapped_pages_offset, 
-                            new_source_sec.start_address(),
+                            new_source_sec.virt_addr,
                             verbose_log
                         )<span class="question-mark">?</span>;
 

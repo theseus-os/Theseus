@@ -145,7 +145,7 @@
         <span class="kw">let </span>krate = rq_rr_crate.lock_as_ref();
         <span class="kw">for </span>sec <span class="kw">in </span>krate.sections.values() {
             <span class="kw">if </span>sec.name.contains(<span class="string">&quot;RUNQUEUES&quot;</span>) {
-                <span class="macro">debug!</span>(<span class="string">&quot;Section {}\n\ttype: {:?}\n\tvaddr: {:#X}\n\tsize: {}\n&quot;</span>, sec.name, sec.typ, sec.start_address(), sec.size());
+                <span class="macro">debug!</span>(<span class="string">&quot;Section {}\n\ttype: {:?}\n\tvaddr: {:#X}\n\tsize: {}\n&quot;</span>, sec.name, sec.typ, sec.virt_addr, sec.size);
             }
         }
         <span class="macro">warn!</span>(<span class="string">&quot;REPLACING LAZY_STATIC RUNQUEUES...&quot;</span>);

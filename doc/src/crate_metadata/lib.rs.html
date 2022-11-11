@@ -1077,20 +1077,6 @@
 <span id="1077">1077</span>
 <span id="1078">1078</span>
 <span id="1079">1079</span>
-<span id="1080">1080</span>
-<span id="1081">1081</span>
-<span id="1082">1082</span>
-<span id="1083">1083</span>
-<span id="1084">1084</span>
-<span id="1085">1085</span>
-<span id="1086">1086</span>
-<span id="1087">1087</span>
-<span id="1088">1088</span>
-<span id="1089">1089</span>
-<span id="1090">1090</span>
-<span id="1091">1091</span>
-<span id="1092">1092</span>
-<span id="1093">1093</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines types that contain metadata about crates loaded in Theseus and their dependencies.
 //! 
 //! ## Representing dependencies between sections
@@ -1373,7 +1359,7 @@
     /// Only matches demangled names, e.g., &quot;my_crate::foo&quot;.
     </span><span class="kw">pub fn </span>get_function_section(<span class="kw-2">&amp;</span><span class="self">self</span>, func_name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>StrongSectionRef&gt; {
         <span class="self">self</span>.find_section(|sec| 
-            sec.get_type() == SectionType::Text &amp;&amp;
+            sec.typ == SectionType::Text &amp;&amp;
             sec.name.as_str() == func_name
         )
     }
@@ -1565,7 +1551,7 @@
                 </span>new_sec_mapped_pages_ref,               <span class="comment">// mapped_pages is different, points to the new duplicated one
                 </span>new_sec_mapped_pages_offset,            <span class="comment">// mapped_pages_offset is the same
                 </span>new_sec_virt_addr,                      <span class="comment">// virt_addr is different, based on the new mapped_pages
-                </span>old_sec.size(),                         <span class="comment">// size is the same
+                </span>old_sec.size,                           <span class="comment">// size is the same
                 </span>old_sec.global,                         <span class="comment">// globalness is the same
                 </span>new_crate_weak_ref.clone(),             <span class="comment">// parent_crate is different, points to the newly-copied crate
                 </span>old_sec_inner.sections_i_depend_on.clone(),   <span class="comment">// dependencies are the same, but relocations need to be re-written
@@ -1601,7 +1587,7 @@
             <span class="kw">let </span>new_sec_mapped_pages_offset = new_sec.mapped_pages_offset;
             <span class="kw">let </span>new_sec_slice: <span class="kw-2">&amp;mut </span>[u8] = new_sec_mapped_pages.as_slice_mut(
                 <span class="number">0</span>,
-                new_sec_mapped_pages_offset + new_sec.size(),
+                new_sec_mapped_pages_offset + new_sec.size,
             )<span class="question-mark">?</span>;
 
             <span class="comment">// The newly-duplicated crate still depends on the same sections, so we keep those as is, 
@@ -1750,15 +1736,17 @@
     </span><span class="kw">pub </span>mapped_pages: Arc&lt;Mutex&lt;MappedPages&gt;&gt;, 
     <span class="doccomment">/// The offset into the `mapped_pages` where this section starts
     </span><span class="kw">pub </span>mapped_pages_offset: usize,
-    <span class="doccomment">/// The range of `VirtualAddress`es covered by this section, i.e., 
-    /// the starting (inclusive) and ending (exclusive) `VirtualAddress` of this section.
-    /// This can be used to calculate size, but is primarily a performance optimization
-    /// so we can avoid locking this section&#39;s `MappedPages` and avoid recalculating 
-    /// its bounds based on its offset and size. 
-    /// 
-    /// For TLS sections, this `address_range.start` holds the offset (from the TLS base)
-    /// into the TLS area where this section&#39;s data exists.
-    </span><span class="kw">pub </span>address_range: Range&lt;VirtualAddress&gt;, 
+    <span class="doccomment">/// The starting `VirtualAddress` of this section.
+    ///
+    /// For TLS sections, this is *not* a `VirtualAddress`, but rather the offset
+    /// (from the TLS base) into the TLS area where this section&#39;s data exists.
+    ///
+    /// For all other sections, this is simply a performance optimization that avoids
+    /// having to calculate its starting virtual address by invoking
+    /// `self.mapped_pages.address_at_offset(self.mapped_pages_offset)`.
+    </span><span class="kw">pub </span>virt_addr: VirtualAddress,
+    <span class="doccomment">/// The size in bytes of this section.
+    </span><span class="kw">pub </span>size: usize,
     <span class="doccomment">/// The `LoadedCrate` object that contains/owns this section
     </span><span class="kw">pub </span>parent_crate: WeakCrateRef,
     <span class="doccomment">/// The inner contents of a section that could possibly change
@@ -1813,7 +1801,8 @@
             name,
             mapped_pages,
             mapped_pages_offset,
-            address_range: virt_addr .. (virt_addr + size),
+            virt_addr,
+            size,
             global,
             parent_crate,
             inner: RwLock::new(LoadedSectionInner {
@@ -1825,28 +1814,12 @@
         }
     }
 
-    <span class="doccomment">/// Returns the starting `VirtualAddress` of where this section is loaded into memory. 
-    </span><span class="kw">pub fn </span>start_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; VirtualAddress {
-        <span class="self">self</span>.address_range.start
-    }
-
-    <span class="doccomment">/// Returns the size in bytes of this section.
-    </span><span class="kw">pub fn </span>size(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.address_range.end.value() - <span class="self">self</span>.address_range.start.value()
-    }
-
-    <span class="doccomment">/// Returns the type of this section.
-    </span><span class="kw">pub fn </span>get_type(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; SectionType {
-        <span class="self">self</span>.typ
-    }
-
     <span class="doccomment">/// Returns the substring of this section&#39;s name that excludes the trailing hash. 
     /// 
     /// See the identical associated function [`section_name_without_hash()`](#fn.section_name_without_hash.html) for more. 
     </span><span class="kw">pub fn </span>name_without_hash(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
         <span class="self">Self</span>::section_name_without_hash(<span class="self">self</span>.name.as_str())
     }
-
 
     <span class="doccomment">/// Returns the substring of the given section&#39;s name that excludes the trailing hash,
     /// but includes the hash delimiter &quot;`::h`&quot;. 
@@ -1860,7 +1833,6 @@
             .and_then(|end| sec_name.get(<span class="number">0 </span>.. (end + SECTION_HASH_DELIMITER.len())))
             .unwrap_or(<span class="kw-2">&amp;</span>sec_name)
     }
-
 
     <span class="doccomment">/// Returns the index of the first `WeakDependent` object in this `LoadedSection`&#39;s `sections_dependent_on_me` list
     /// in which the section matches the given `matching_section` 
@@ -1884,20 +1856,20 @@
     </span><span class="kw">pub fn </span>copy_section_data_to(<span class="kw-2">&amp;</span><span class="self">self</span>, destination_section: <span class="kw-2">&amp;</span>LoadedSection) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 
         <span class="kw">let </span><span class="kw-2">mut </span>dest_sec_mapped_pages = destination_section.mapped_pages.lock();
-        <span class="kw">let </span>dest_sec_data: <span class="kw-2">&amp;mut </span>[u8] = dest_sec_mapped_pages.as_slice_mut(destination_section.mapped_pages_offset, destination_section.size())<span class="question-mark">?</span>;
+        <span class="kw">let </span>dest_sec_data: <span class="kw-2">&amp;mut </span>[u8] = dest_sec_mapped_pages.as_slice_mut(destination_section.mapped_pages_offset, destination_section.size)<span class="question-mark">?</span>;
 
         <span class="kw">let </span>source_sec_mapped_pages = <span class="self">self</span>.mapped_pages.lock();
-        <span class="kw">let </span>source_sec_data: <span class="kw-2">&amp;</span>[u8] = source_sec_mapped_pages.as_slice(<span class="self">self</span>.mapped_pages_offset, <span class="self">self</span>.size())<span class="question-mark">?</span>;
+        <span class="kw">let </span>source_sec_data: <span class="kw-2">&amp;</span>[u8] = source_sec_mapped_pages.as_slice(<span class="self">self</span>.mapped_pages_offset, <span class="self">self</span>.size)<span class="question-mark">?</span>;
 
         <span class="kw">if </span>dest_sec_data.len() == source_sec_data.len() {
             dest_sec_data.copy_from_slice(source_sec_data);
             <span class="comment">// debug!(&quot;Copied data from source section {:?} {:?} ({:#X}) to dest section {:?} {:?} ({:#X})&quot;,
-            //     self.typ, self.name, self.size(), destination_section.typ, destination_section.name, destination_section.size());
+            //     self.typ, self.name, self.size, destination_section.typ, destination_section.name, destination_section.size);
             </span><span class="prelude-val">Ok</span>(())
         }
         <span class="kw">else </span>{
             <span class="macro">error!</span>(<span class="string">&quot;This source section {:?}&#39;s size ({:#X}) is different from the destination section {:?}&#39;s size ({:#X})&quot;</span>,
-                <span class="self">self</span>.name, <span class="self">self</span>.size(), destination_section.name, destination_section.size());
+                <span class="self">self</span>.name, <span class="self">self</span>.size, destination_section.name, destination_section.size);
             <span class="prelude-val">Err</span>(<span class="string">&quot;this source section has a different length than the destination section&quot;</span>)
         }
     }
@@ -1946,7 +1918,7 @@
         }
 
         <span class="comment">// Check that the bounds of this entire section fit within its MappedPages
-        </span><span class="kw">let </span>end = <span class="self">self</span>.mapped_pages_offset + <span class="self">self</span>.size();
+        </span><span class="kw">let </span>end = <span class="self">self</span>.mapped_pages_offset + <span class="self">self</span>.size;
         <span class="kw">if </span>end &gt; mp.size_in_bytes() {
             <span class="macro">error!</span>(<span class="string">&quot;Requested LoadedSection as function {:?}, but section&#39;s end offset ({:X?}) was beyond its MappedPages ({:X?})&quot;</span>,
                 core::any::type_name::&lt;F&gt;(), end, mp.size_in_bytes()
@@ -1973,8 +1945,8 @@
             <span class="string">&quot;LoadedSection({:?}, typ: {:?}, vaddr: {:#X}, size: {})&quot;</span>, 
             <span class="self">self</span>.name,
             <span class="self">self</span>.typ,
-            <span class="self">self</span>.start_address(),
-            <span class="self">self</span>.size(),
+            <span class="self">self</span>.virt_addr,
+            <span class="self">self</span>.size,
         )
     }
 }
@@ -2000,8 +1972,8 @@
         }
 
         <span class="comment">// Add the rest of the typical fields
-        </span>dbg.field(<span class="string">&quot;vaddr&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.start_address())
-            .field(<span class="string">&quot;size&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.size())
+        </span>dbg.field(<span class="string">&quot;vaddr&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.virt_addr)
+            .field(<span class="string">&quot;size&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.size)
             .finish_non_exhaustive()
     }
 }

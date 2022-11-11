@@ -3303,6 +3303,7 @@
 <span id="3303">3303</span>
 <span id="3304">3304</span>
 <span id="3305">3305</span>
+<span id="3306">3306</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 #![feature(let_chains)]
 
@@ -4288,9 +4289,9 @@
 
                 write_relocation(
                     relocation_entry,
-                    target_sec_mapped_pages.as_slice_mut(<span class="number">0</span>, target_sec.mapped_pages_offset + target_sec.size())<span class="question-mark">?</span>,
+                    target_sec_mapped_pages.as_slice_mut(<span class="number">0</span>, target_sec.mapped_pages_offset + target_sec.size)<span class="question-mark">?</span>,
                     target_sec.mapped_pages_offset,
-                    new_section.start_address(),
+                    new_section.virt_addr,
                     <span class="bool-val">false
                 </span>)<span class="question-mark">?</span>;
 
@@ -4793,13 +4794,13 @@
                 <span class="kw">if let </span><span class="prelude-val">Some</span>((tdata_shndx, <span class="kw-2">ref </span>tdata_sec)) = tdata_shndx_and_section &amp;&amp; sym_shndx == tdata_shndx {
                     typ = SectionType::TlsData;
                     mapped_pages_offset = tdata_sec.mapped_pages_offset + sec_value;
-                    virt_addr = tdata_sec.start_address() + sec_value;
+                    virt_addr = tdata_sec.virt_addr + sec_value;
                 } <span class="kw">else if let </span><span class="prelude-val">Some</span>((tbss_shndx, <span class="kw-2">ref </span>tbss_sec)) = tbss_shndx_and_section &amp;&amp; sym_shndx == tbss_shndx {
                     typ = SectionType::TlsBss;
                     <span class="comment">// Here: a TLS .tbss section has no actual content, so we use a max-value offset
                     // as a canary value to ensure it cannot be used to index into a MappedPages.
                     </span>mapped_pages_offset = usize::MAX;
-                    virt_addr = tbss_sec.start_address() + sec_value;
+                    virt_addr = tbss_sec.virt_addr + sec_value;
                 } <span class="kw">else </span>{
                     <span class="macro">error!</span>(<span class="string">&quot;BUG: found TLS symbol with an shndx that wasn&#39;t in .tdata or .tbss: {}&quot;</span>, symbol_entry <span class="kw">as </span><span class="kw-2">&amp;</span><span class="kw">dyn </span>Entry);
                     <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: found TLS symbol with an shndx that wasn&#39;t in .tdata or .tbss&quot;</span>);
@@ -4846,8 +4847,8 @@
         //         for sec in loaded_sections.values() {
         //             if sec.typ == SectionType::Data &amp;&amp; sec.name.as_str() != SectionType::Data.name() {
         //                 warn!(&quot;\t\t data symbol: {:?}&quot;, sec);
-        //                 data_symbols_start_vaddr = core::cmp::min(data_symbols_start_vaddr, sec.address_range.start.value());
-        //                 data_symbols_end_vaddr = core::cmp::max(data_symbols_end_vaddr, sec.address_range.end.value());
+        //                 data_symbols_start_vaddr = core::cmp::min(data_symbols_start_vaddr, sec.virt_addr.value());
+        //                 data_symbols_end_vaddr = core::cmp::max(data_symbols_end_vaddr, sec.virt_addr.value() + sec.size);
         //             }
         //         }
         //         let total_size_of_data_symbols = data_symbols_end_vaddr - data_symbols_start_vaddr;
@@ -4862,8 +4863,8 @@
         //         for sec in loaded_sections.values() {
         //             if sec.typ == SectionType::Bss &amp;&amp; sec.name.as_str() != SectionType::Bss.name() {
         //                 warn!(&quot;\t\t bss symbol: {:?}&quot;, sec);
-        //                 bss_symbols_start_vaddr = core::cmp::min(bss_symbols_start_vaddr, sec.address_range.start.value());
-        //                 bss_symbols_end_vaddr = core::cmp::max(bss_symbols_end_vaddr, sec.address_range.end.value());
+        //                 bss_symbols_start_vaddr = core::cmp::min(bss_symbols_start_vaddr, sec.virt_addr.value());
+        //                 bss_symbols_end_vaddr = core::cmp::max(bss_symbols_end_vaddr, sec.virt_addr.value() + sec.size);
         //             }
         //         }
         //         let total_size_of_bss_symbols = bss_symbols_end_vaddr - bss_symbols_start_vaddr;
@@ -5425,7 +5426,7 @@
                 <span class="kw">let </span><span class="kw-2">mut </span>target_sec_mapped_pages = target_sec.mapped_pages.lock();
                 <span class="kw">let </span>target_sec_slice: <span class="kw-2">&amp;mut </span>[u8] = target_sec_mapped_pages.as_slice_mut(
                     <span class="number">0</span>,
-                    target_sec.mapped_pages_offset + target_sec.size(),
+                    target_sec.mapped_pages_offset + target_sec.size,
                 )<span class="question-mark">?</span>;
 
                 <span class="comment">// iterate through each relocation entry in the relocation array for the target_sec
@@ -5491,7 +5492,7 @@
                         relocation_entry,
                         target_sec_slice,
                         target_sec.mapped_pages_offset,
-                        source_sec.start_address() + source_sec_value,
+                        source_sec.virt_addr + source_sec_value,
                         verbose_log
                     )<span class="question-mark">?</span>;
                     target_sec_data_was_modified = <span class="bool-val">true</span>;
@@ -5561,7 +5562,7 @@
         </span>{
             new_crate.sections.retain(|_shndx, sec| {
                 <span class="kw">let </span>should_remove = !sec.global 
-                    &amp;&amp; sec.get_type() == SectionType::Rodata
+                    &amp;&amp; sec.typ == SectionType::Rodata
                     &amp;&amp; sec.inner.read().sections_i_depend_on.is_empty();
                 
                 <span class="comment">// For an element to be removed, this closure should return `false`.
@@ -5587,8 +5588,8 @@
                 <span class="kw">if </span>log_replacements {
                     <span class="kw">if let </span><span class="prelude-val">Some</span>(old_sec) = old_val.get().upgrade() {
                         <span class="comment">// debug!(&quot;       add_symbol(): replacing section: old: {:?}, new: {:?}&quot;, old_sec, new_section);
-                        </span><span class="kw">if </span>new_section.size() != old_sec.size() {
-                            <span class="macro">warn!</span>(<span class="string">&quot;Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}&quot;</span>, old_sec.size(), old_sec.name, new_section.size(), new_section.name);
+                        </span><span class="kw">if </span>new_section.size != old_sec.size {
+                            <span class="macro">warn!</span>(<span class="string">&quot;Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}&quot;</span>, old_sec.size, old_sec.name, new_section.size, new_section.name);
                         } 
                         <span class="kw">else </span>{
                             <span class="macro">warn!</span>(<span class="string">&quot;Replacing new symbol already present: old {:?}, new: {:?}&quot;</span>, old_sec.name, new_section.name);
@@ -5773,8 +5774,11 @@
             
             <span class="comment">// If the section&#39;s address bounds contain the address, then we&#39;ve found it.
             // Only a single section can contain the address, so it&#39;s safe to stop once we&#39;ve found a match.
-            </span><span class="kw">if </span>eligible_section &amp;&amp; sec.address_range.contains(<span class="kw-2">&amp;</span>virt_addr) {
-                <span class="kw">let </span>offset = virt_addr.value() - sec.start_address().value();
+            </span><span class="kw">if </span>eligible_section
+                &amp;&amp; sec.virt_addr &lt;= virt_addr
+                &amp;&amp; virt_addr.value() &lt; (sec.virt_addr.value() + sec.size)
+            {
+                <span class="kw">let </span>offset = virt_addr.value() - sec.virt_addr.value();
                 merged_section_and_offset = <span class="prelude-val">Some</span>((sec.clone(), offset));
                 
                 <span class="kw">if </span>sec.name.as_str() == sec.typ.name() {
@@ -6387,7 +6391,7 @@
         offset: usize,
         tls_section: StrongSectionRef,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), ()&gt; {
-        <span class="kw">let </span>range = offset .. (offset + tls_section.size());
+        <span class="kw">let </span>range = offset .. (offset + tls_section.size);
         <span class="kw">if </span><span class="self">self</span>.static_section_offsets.contains_key(<span class="kw-2">&amp;</span>range.start) || 
             <span class="self">self</span>.static_section_offsets.contains_key(<span class="kw-2">&amp;</span>(range.end - <span class="number">1</span>))
         {
@@ -6421,23 +6425,21 @@
         <span class="kw-2">mut </span>section: LoadedSection,
         alignment: usize,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(usize, StrongSectionRef), ()&gt; {
-        <span class="kw">let </span>sec_size = section.size();
         <span class="kw">let </span><span class="kw-2">mut </span>start_index = <span class="prelude-val">None</span>;
         <span class="comment">// Find the next &quot;gap&quot; big enough to fit the new TLS section, 
         // skipping the first `POINTER_SIZE` bytes, which are reserved for the TLS self pointer.
         </span><span class="kw">let </span>range_after_tls_self_pointer = POINTER_SIZE .. usize::MAX;
         <span class="kw">for </span>gap <span class="kw">in </span><span class="self">self</span>.dynamic_section_offsets.gaps(<span class="kw-2">&amp;</span>range_after_tls_self_pointer) {
             <span class="kw">let </span>aligned_start = util::round_up(gap.start, alignment);
-            <span class="kw">if </span>aligned_start + sec_size &lt;= gap.end {
+            <span class="kw">if </span>aligned_start + section.size &lt;= gap.end {
                 start_index = <span class="prelude-val">Some</span>(aligned_start);
                 <span class="kw">break</span>;
             }
         }
 
         <span class="kw">if let </span><span class="prelude-val">Some</span>(start) = start_index {
-            <span class="kw">let </span>range = start .. (start + sec_size);
-            section.address_range = 
-                VirtualAddress::new_canonical(range.start) .. VirtualAddress::new_canonical(range.end);
+            <span class="kw">let </span>range = start .. (start + section.size);
+            section.virt_addr = VirtualAddress::new(range.start).ok_or(())<span class="question-mark">?</span>;
             <span class="kw">let </span>section_ref = Arc::new(section);
             <span class="self">self</span>.end_of_dynamic_sections = max(<span class="self">self</span>.end_of_dynamic_sections, range.end);
             <span class="self">self</span>.dynamic_section_offsets.insert(range, StrongSectionRefWrapper(Arc::clone(<span class="kw-2">&amp;</span>section_ref)));
@@ -6480,13 +6482,13 @@
                 new_data.extend(core::iter::repeat(<span class="number">0</span>).take(num_padding_bytes));
 
                 <span class="comment">// Insert the section data into the new data vec.
-                </span><span class="kw">if </span>sec.get_type() == SectionType::TlsData {
+                </span><span class="kw">if </span>sec.typ == SectionType::TlsData {
                     <span class="kw">let </span>sec_mp = sec.mapped_pages.lock();
-                    <span class="kw">let </span>sec_data: <span class="kw-2">&amp;</span>[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size()).unwrap();
+                    <span class="kw">let </span>sec_data: <span class="kw-2">&amp;</span>[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size).unwrap();
                     new_data.extend_from_slice(sec_data);
                 } <span class="kw">else </span>{
                     <span class="comment">// For TLS BSS sections (.tbss), fill the section size with all zeroes.
-                    </span>new_data.extend(core::iter::repeat(<span class="number">0</span>).take(sec.size()));
+                    </span>new_data.extend(core::iter::repeat(<span class="number">0</span>).take(sec.size));
                 }
                 <span class="kw-2">*</span>end_of_previous_range = range.end;
             }

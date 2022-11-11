@@ -1018,7 +1018,7 @@
     
     <span class="comment">// // Dump loaded sections for verification. See pull request #559 for more details:
     // for (_, section) in new_crate_mut.sections.iter() {
-    //     trace!(&quot;{:016x} {} {}&quot;, section.address_range.start.value(), section.name, section.mapped_pages_offset);
+    //     trace!(&quot;{:016x} {} {}&quot;, section.virt_addr.value(), section.name, section.mapped_pages_offset);
     // }
 
     </span>drop(new_crate_mut);

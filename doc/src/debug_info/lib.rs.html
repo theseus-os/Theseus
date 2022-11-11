@@ -1695,14 +1695,14 @@
                     <span class="comment">// trace!(&quot;             Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}&quot;, 
                     //     source_sec_entry.name(), source_sec_entry.get_name(&amp;elf_file), 
                     //     source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
-                    //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
+                    //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size);
                 </span>}
                 
                 <span class="kw">let </span><span class="kw-2">mut </span>source_and_target_in_same_crate = <span class="bool-val">false</span>;
 
                 <span class="comment">// We first check if the source section is another debug section, then check if its a local section from the given `loaded_crate`.
                 </span><span class="kw">let </span>(source_sec_vaddr, source_sec_dep) = <span class="kw">match </span>shndx_map.get(<span class="kw-2">&amp;</span>source_sec_shndx).map(|s| (s.virt_addr, <span class="prelude-val">None</span>))
-                    .or_else(|| loaded_crate.lock_as_ref().sections.get(<span class="kw-2">&amp;</span>source_sec_shndx).map(|sec| (sec.address_range.start, <span class="prelude-val">Some</span>(sec.clone()))))
+                    .or_else(|| loaded_crate.lock_as_ref().sections.get(<span class="kw-2">&amp;</span>source_sec_shndx).map(|sec| (sec.virt_addr, <span class="prelude-val">Some</span>(sec.clone()))))
                 {
                     <span class="comment">// We found the source section in the local debug sections or the given loaded crate. 
                     </span><span class="prelude-val">Some</span>(found) =&gt; {
@@ -1729,7 +1729,7 @@
                             </span>namespace.get_symbol_or_load(<span class="kw-2">&amp;</span>demangled, <span class="prelude-val">None</span>, kernel_mmi_ref, <span class="bool-val">false</span>)
                                 .upgrade()
                                 .ok_or(<span class="string">&quot;Couldn&#39;t get symbol for .debug section&#39;s foreign relocation entry, nor load its containing crate&quot;</span>)
-                                .map(|sec| (sec.address_range.start, <span class="prelude-val">Some</span>(sec)))
+                                .map(|sec| (sec.virt_addr, <span class="prelude-val">Some</span>(sec)))
                         }
                         <span class="kw">else </span>{
                             <span class="kw">let </span>_source_sec_header = source_sec_entry
