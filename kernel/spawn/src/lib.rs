@@ -627,7 +627,8 @@ pub fn setup_context_trampoline(
     Ok(())
 }
 
-/// Internal code of `task_wrapper` shared by `task_wrapper` and `task_wrapper_restartable`.
+/// Internal routine that runs when a task is first switched to,
+/// shared by `task_wrapper` and `task_wrapper_restartable`.
 fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
 where
     A: Send + 'static,
