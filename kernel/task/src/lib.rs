@@ -1433,8 +1433,8 @@ mod tls_current_task {
     }
 
     /// Returns the unique ID of the current task.
-    pub fn get_my_current_task_id() -> usize {
-        CURRENT_TASK_ID.get()
+    pub fn get_my_current_task_id() -> Option<usize> {
+        Some(CURRENT_TASK_ID.get())
     }
 
     /// Set the given task as the current task.
