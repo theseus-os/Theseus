@@ -1,0 +1,12 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "static_array_collections"
+description = "Static-Array Linked List & RB Tree"
+version = "0.1.0"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+intrusive-collections = "0.9.0"
+log = "0.4.8"
