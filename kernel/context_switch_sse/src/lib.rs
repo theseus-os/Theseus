@@ -10,6 +10,7 @@ extern crate zerocopy;
 use context_switch_regular::ContextRegular;
 use zerocopy::FromBytes;
 
+pub use context_switch_regular::read_first_register;
 
 /// The registers saved before a context switch and restored after a context switch
 /// for SSE-enabled Tasks.
@@ -66,9 +67,9 @@ impl ContextSSE {
     /// Sets the value of the first regular (non-SSE) register to the given `value`.
     /// 
     /// This is useful for storing a value (e.g., task ID) in that register
-    /// and then recovering it later with [`ContextRegular::read_first_reg()`].
+    /// and then recovering it later with [`read_first_register()`].
     /// 
-    /// On x86_64, this is the `r15` register.
+    /// On x86_64, this sets the `r15` register.
     pub fn set_first_register(&mut self, value: usize) {
         self.regular.set_first_register(value);
     }

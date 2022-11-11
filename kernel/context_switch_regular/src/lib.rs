@@ -51,7 +51,7 @@ impl ContextRegular {
     /// This is useful for storing a value (e.g., task ID) in that register
     /// and then recovering it later with [`ContextRegular::read_first_reg()`].
     /// 
-    /// On x86_64, this is the `r15` register.
+    /// On x86_64, this sets the `r15` register.
     pub fn set_first_register(&mut self, value: usize) {
         self.r15 = value;
     }
@@ -66,9 +66,10 @@ impl ContextRegular {
 /// `ContextRegular` has been used for switching to a new task for the first time.
 /// 
 /// Returns the current value held in the specified CPU register.
-/// On x86_64, this is the `r15` register.
+/// On x86_64, this reads the `r15` register.
 #[naked]
 pub extern "C" fn read_first_register() -> usize {
+    // SAFE: simply reads and returns the value of `r15`.
     unsafe {
         core::arch::asm!(
             "mov rax, r15", // rax is used for return values on x86_64
