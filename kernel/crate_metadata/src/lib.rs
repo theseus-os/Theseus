@@ -657,7 +657,7 @@ pub struct LoadedSection {
     pub mapped_pages: Arc<Mutex<MappedPages>>, 
     /// The offset into the `mapped_pages` where this section starts
     pub mapped_pages_offset: usize,
-    /// The starting `VirtualAddress` of this section.
+    /// The starting `VirtualAddress` of this section (except for TLS sections).
     ///
     /// For TLS sections, this is *not* a `VirtualAddress`, but rather the offset
     /// (from the TLS base) into the TLS area where this section's data exists.
@@ -1027,7 +1027,7 @@ pub fn write_relocation(
 
     // Perform the actual writing of relocation data here.
     // There is a great, succint table of relocation types here:
-    // <https://docs.rs/goblin/0.0.24/goblin/elf/reloc/index.html>
+    // <https://docs.rs/goblin/0.6.0/goblin/elf/reloc/index.html>
     match relocation_entry.typ {
         R_X86_64_32 => {
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
@@ -1059,19 +1059,34 @@ pub fn write_relocation(
             target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
         R_X86_64_TPOFF32 => {
-            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<i32>());
             let target_ref = &mut target_sec_slice[target_range];
-            let source_val = u32::try_from(source_sec_vaddr.value())
-                .map_err(|_| "BUG: TLS relocation (R_X86_64_TPOFF32) source section value (TLS offset) cannot fit in a `u32`")?;
+            // Here we treat the `source_sec_vaddr` value as a signed value 
+            // by casting its bit value directly, i.e., `usize as isize`.
+            let offset_val = source_sec_vaddr.value() as isize;
+            // Now we must check that the signed `offset_val` fits in `i32`
+            let source_val = i32::try_from(offset_val)
+                .map_err(|_| "BUG: TLS relocation (R_X86_64_TPOFF32) source section value (TLS offset) cannot fit in a `i32`")?;
             if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
             target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
+        // R_X86_64_GOTTPOFF => {
+        //     // 32-bit signed PC-relative offset to the GOT entry for the IE (Initial Exec(utable) TLS model))
+        //     debug!("R_X86_64_GOTTPOFF: {:#X?}", relocation_entry);
+        //     debug!("R_X86_64_GOTTPOFF: target: {:#X}, source: {:#X}", target_sec_slice.as_ptr() as usize + target_sec_offset, source_sec_vaddr);
+        //     unimplemented!()
+        // }
         // R_X86_64_GOTPCREL => { 
         //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table
         // }
         _ => {
-            error!("found unsupported relocation type {}\n  --> Are you compiling crates with 'code-model=large'?", relocation_entry.typ);
-            return Err("found unsupported relocation type. Are you compiling crates with 'code-model=large'?");
+            error!("found unsupported relocation type {}\n    \
+                --> Are you compiling crates with 'code-model=large' and 'tls-model=local-exec'?",
+                relocation_entry.typ
+            );
+            return Err("found unsupported relocation type. \
+                Are you compiling crates with 'code-model=large' and 'tls-model=local-exec'?"
+            );
         }
     }
 

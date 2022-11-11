@@ -11,6 +11,7 @@
 
 #![no_std]
 #![feature(stmt_expr_attributes)]
+#![feature(naked_functions)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -27,7 +28,7 @@ use spin::Mutex;
 use irq_safety::enable_interrupts;
 use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
-use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef};
+use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef, RunState, get_current_task};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use apic::get_my_apic_id;
@@ -278,8 +279,8 @@ impl<F, A, R> TaskBuilder<F, A, R>
     /// that will be passed the argument `arg` when spawned. 
     fn new(func: F, argument: A) -> TaskBuilder<F, A, R> {
         TaskBuilder {
-            argument: argument,
-            func: func,
+            argument,
+            func,
             _return_type: PhantomData,
             name: None,
             stack: None,
@@ -365,25 +366,18 @@ impl<F, A, R> TaskBuilder<F, A, R>
 
         setup_context_trampoline(&mut new_task, task_wrapper::<F, A, R>)?;
 
-        // Currently we're using the very bottom of the kstack for kthread arguments. 
-        // This is probably stupid (it'd be best to put them directly where they need to go towards the top of the stack),
-        // but it simplifies type safety in the `task_wrapper` entry point and removes uncertainty from assumed calling conventions.
+        // We use the bottom of the new task's stack for its entry function and arguments. 
+        // This is a bit inefficient; it'd be optimal to put them directly where they need to go
+        // (in registers or at the top of the stack).
+        // However, it vastly simplifies type safety since we don't need to mess with pointers,
+        // and it removes uncertainty associated with assuming different calling conventions.
         let bottom_of_stack: &mut usize = new_task.inner_mut().kstack.as_type_mut(0)?;
         let box_ptr = Box::into_raw(Box::new(TaskFuncArg::<F, A, R> {
             arg:  self.argument,
             func: self.func,
-            _rettype: PhantomData,
+            _ret: PhantomData,
         }));
         *bottom_of_stack = box_ptr as usize;
-
-        // The new task is ready to be scheduled in, now that its stack trampoline has been set up.
-        if self.blocked {
-            new_task.block_initing_task()
-                .map_err(|_| "BUG: newly-spawned blocked task was not in the Initing runstate")?;
-        } else {
-            new_task.make_inited_task_runnable()
-                .map_err(|_| "BUG: newly-spawned task was not in the Initing runstate")?;
-        }
 
         // The new task is marked as idle
         if self.idle {
@@ -396,9 +390,17 @@ impl<F, A, R> TaskBuilder<F, A, R>
             pb_func(&mut new_task)?;
         }
 
-        let new_task_id = new_task.id;
+        // Now that it has been fully initialized, mark the task as no longer `Initing`.
+        if self.blocked {
+            new_task.block_initing_task()
+                .map_err(|_| "BUG: newly-spawned blocked task was not in the Initing runstate")?;
+        } else {
+            new_task.make_inited_task_runnable()
+                .map_err(|_| "BUG: newly-spawned task was not in the Initing runstate")?;
+        }
+
         let task_ref = TaskRef::new(new_task);
-        let _existing_task = TASKLIST.lock().insert(new_task_id, task_ref.clone());
+        let _existing_task = TASKLIST.lock().insert(task_ref.id, task_ref.clone());
         // insert should return None, because that means there was no existing task with the same ID 
         if let Some(_existing_task) = _existing_task {
             error!("BUG: TaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID! {:?}", _existing_task);
@@ -535,34 +537,65 @@ impl<F, A, R> TaskBuilder<F, A, R>
 struct TaskFuncArg<F, A, R> {
     func: F,
     arg:  A,
-    // not necessary, just for consistency in "<F, A, R>" signatures.
-    _rettype: PhantomData<*const R>,
+    _ret: PhantomData<*const R>,
 }
 
 
-/// This function sets up the given new `Task`'s kernel stack pointer to properly jump
-/// to the given entry point function when the new `Task` is first scheduled in. 
-/// 
-/// When a new task is first scheduled in, a `Context` struct will be popped off the stack,
-/// and at the end of that struct is the address of the next instruction that will be popped off as part of the "ret" instruction, 
-/// i.e., the entry point into the new task. 
-/// 
-/// So, this function allocates space for the saved context registers to be popped off when this task is first switched to.
-/// It also sets the given `new_task`'s `saved_sp` (its saved stack pointer, which holds the Context for task switching).
-/// 
-fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !) -> Result<(), &'static str> {
+/// This function sets up the given new task's kernel stack contents to properly jump
+/// to the given `entry_point_function` when the new `Task` is first switched to. 
+///
+/// This function can only be invoked on a `new_task` that is being initialized,
+/// otherwise it will return an error.
+///
+/// ## How this works 
+/// When a new task is first switched to, a [`Context`] struct will be popped off the stack
+/// and its values used to populate the initial values of select CPU registers.
+/// The address of that `Context` struct is used to initialized the new task's `saved_sp`
+/// (saved stack pointer).
+///
+/// We also use one of the free registers in the new `Context` struct to store
+/// the ID of the new task, which enables the new task to identify itself and set up
+/// its TLS-based "current task" variable when it first runs (see [`task_wrapper`]).
+///
+/// During the final part of the context switch operation, the `ret` instruction will
+/// implicitly pop an address value off of the stack (the last item of that Context struct);
+/// that address represents the next instruction that will run right after
+/// the context switch completes, as control flow "returns" to that instruction address.
+/// This function sets that "return address" to the given `entry_point_function`.
+#[doc(hidden)]
+pub fn setup_context_trampoline(
+    new_task: &mut Task,
+    entry_point_function: fn() -> !
+) -> Result<(), &'static str> {
+    if new_task.runstate() != RunState::Initing {
+        return Err("`setup_context_trampoline()` can only be invoked on `Initing` tasks");
+    }
     
+    let new_task_id = new_task.id;
+    let new_task_inner = new_task.inner_mut();
+
     /// A private macro that actually creates the Context and sets it up in the `new_task`.
     /// We use a macro here so we can pass in the proper `ContextType` at runtime, 
     /// which is useful for both the simd_personality config and regular/SSE configs.
     macro_rules! set_context {
         ($ContextType:ty) => (
-            // We write the new Context struct at the top of the stack, which is at the end of the stack's MappedPages. 
-            // We subtract "size of usize" (8) bytes to ensure the new Context struct doesn't spill over past the top of the stack.
-            let mp_offset = new_task.inner_mut().kstack.size_in_bytes() - mem::size_of::<usize>() - mem::size_of::<$ContextType>();
-            let new_context_destination: &mut $ContextType = new_task.inner_mut().kstack.as_type_mut(mp_offset)?;
-            *new_context_destination = <$ContextType>::new(entry_point_function as usize);
-            new_task.inner_mut().saved_sp = new_context_destination as *const _ as usize;
+            // We write the new Context struct at the "top" (usable top) of the stack,
+            // which is at the end of the stack's MappedPages. 
+            // We must subtract "size of usize" (8) bytes from the offset to ensure
+            // that the new Context struct doesn't spill over past the top of the stack.
+            let context_mp_offset = new_task_inner.kstack.size_in_bytes()
+                - mem::size_of::<usize>()
+                - mem::size_of::<$ContextType>();
+            let context_dest: &mut $ContextType = new_task_inner.kstack
+                .as_type_mut(context_mp_offset)?;
+            let mut new_context =  <$ContextType>::new(entry_point_function as usize);
+            // Store the new task's ID in an unused register in the new Context struct. 
+            new_context.set_first_register(new_task_id);
+            *context_dest = new_context;
+            // Save the address of this newly-stored Context struct
+            // (which is within the new task's stack) so that it can be used by the
+            // context switch routine in the future when this task is first switched to.
+            new_task_inner.saved_sp = context_dest as *const _ as usize;
         );
     }
 
@@ -594,23 +627,32 @@ fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !
     Ok(())
 }
 
-/// Internal code of `task_wrapper` shared by `task_wrapper` and 
-/// `task_wrapper_restartable`. 
+/// Internal routine that runs when a task is first switched to,
+/// shared by `task_wrapper` and `task_wrapper_restartable`.
 fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
-    where A: Send + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R, 
+where
+    A: Send + 'static,
+    R: Send + 'static,
+    F: FnOnce(A) -> R,
 {
+    // This should be the first statement in this function in order to ensure
+    // that no other code utilizes the "first register" before we can read it.
+    // See `setup_context_trampoline()` for more info on how this works.
+    let current_task_id = context_switch::read_first_register();
+
     let task_entry_func;
     let task_arg;
     let recovered_preemption_guard;
 
     // This is scoped to ensure that absolutely no resources that require dropping are held
     // when invoking the task's entry function, in order to simplify cleanup when unwinding.
-    // *No* local variables should exist on the stack at the end of this function,
-    // except for the task's `func` and `arg`, which are obviously required.
+    // *No* local variables that require `Drop` should exist on the stack at the end of
+    // this function, except for the task's `func` and `arg`, which are obviously required.
     {
-        let curr_task = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (before task func).");
+        // Set this task as the current task.
+        // We cannot do until this task is actually running, because it uses thread-local storage.
+        let current_task = task::init_current_task(current_task_id, None)
+            .expect("BUG: task_wrapper: couldn't init this task as the current task");
 
         // The first time that a task runs, its entry function `task_wrapper()` is jumped to
         // from the `task_switch()` function, right after the end of `context_switch`().
@@ -618,10 +660,10 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
         // because this is the first code to run immediately after a context switch
         // switches to this task for the first time.
         // For more details, see the comments at the end of `Task::task_switch()`.
-        recovered_preemption_guard = curr_task.post_context_switch_action();
+        recovered_preemption_guard = current_task.post_context_switch_action();
 
         // This task's function and argument were placed at the bottom of the stack when this task was spawned.
-        let task_func_arg = curr_task.with_kstack(|kstack| {
+        let task_func_arg = current_task.with_kstack(|kstack| {
             kstack.as_type(0).map(|tfa_box_raw_ptr: &usize| {
                 // SAFE: we placed this Box in this task's stack in the `spawn()` function when creating the TaskFuncArg struct.
                 let tfa_boxed = unsafe { Box::from_raw((*tfa_box_raw_ptr) as *mut TaskFuncArg<F, A, R>) };
@@ -629,11 +671,11 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
             })
         }).expect("BUG: task_wrapper: couldn't access task's function/argument at bottom of stack");
         task_entry_func = task_func_arg.func;
-        task_arg  = task_func_arg.arg;
+        task_arg        = task_func_arg.arg;
 
         #[cfg(not(any(rq_eval, downtime_eval)))]
         debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
-            curr_task.name.clone(), debugit!(task_entry_func), core::any::type_name::<F>(), debugit!(task_arg)
+            &*current_task, debugit!(task_entry_func), core::any::type_name::<F>(), debugit!(task_arg)
         );
     };
 
@@ -648,16 +690,19 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
     drop(recovered_preemption_guard);
     enable_interrupts();
 
-    // Now we actually invoke the entry point function that this Task was spawned for, catching a panic if one occurs.
+    // Now we actually invoke the entry point function that this Task was spawned for,
+    // catching a panic if one occurs.
     catch_unwind::catch_unwind_with_arg(task_entry_func, task_arg)
 }
 
-/// The entry point for all new `Task`s except restartable tasks. 
-/// This does not return, because it doesn't really have anywhere to return.
+/// The entry point for all new `Task`s.
+/// 
+/// This does not return, as it doesn't really have anywhere to return to.
 fn task_wrapper<F, A, R>() -> !
-    where A: Send + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R, 
+where
+    A: Send + 'static,
+    R: Send + 'static,
+    F: FnOnce(A) -> R,
 {
     let result = task_wrapper_internal::<F, A, R>();
 
@@ -672,7 +717,9 @@ fn task_wrapper<F, A, R>() -> !
     //
     // Operations 1 happen in `task_cleanup_success` or `task_cleanup_failure`, 
     // while operations 2 and 3 then happen in `task_cleanup_final`.
-    let curr_task = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).").clone();
+    let curr_task = get_my_current_task()
+        .expect("BUG: task_wrapper: couldn't get current task (after task func).")
+        .clone();
     match result {
         Ok(exit_value)   => task_cleanup_success::<F, A, R>(curr_task, exit_value),
         Err(kill_reason) => task_cleanup_failure::<F, A, R>(curr_task, kill_reason),
@@ -683,14 +730,17 @@ fn task_wrapper<F, A, R>() -> !
 /// restartable tasks. Further restricts `argument` to implement `Clone` trait. 
 /// // We cannot use `task_wrapper` as it is not bounded by `Clone` trait.
 fn task_wrapper_restartable<F, A, R>() -> !
-    where A: Send + Clone + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R + Send + Clone + 'static,
+where
+    A: Send + Clone + 'static,
+    R: Send + 'static,
+    F: FnOnce(A) -> R + Send + Clone + 'static,
 {
     let result = task_wrapper_internal::<F, A, R>();
 
     // See `task_wrapper` for an explanation of how the below functions work.
-    let curr_task = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).").clone();
+    let curr_task = get_my_current_task()
+        .expect("BUG: task_wrapper: couldn't get current task (after task func).")
+        .clone();
     match result {
         Ok(exit_value)   => task_restartable_cleanup_success::<F, A, R>(curr_task, exit_value),
         Err(kill_reason) => task_restartable_cleanup_failure::<F, A, R>(curr_task, kill_reason),
