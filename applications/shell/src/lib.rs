@@ -109,12 +109,7 @@ pub fn main(_args: Vec<String>) -> isize {
     debug!("shell::main(): trying to call with_current_task... for {:?}", task::get_my_current_task());
 
     // block this task, because it never needs to actually run again
-    task::with_current_task(|t| {
-        debug!("shell::main(): about to print current task...");
-        debug!("shell::main(): current task: {:?}", t);
-        debug!("shell::main(): current task: {}", &**t);
-        t.block()
-    })
+    task::with_current_task(|t| t.block())
         .expect("shell::main(): failed to get current task")
         .expect("shell:main(): failed to block the main shell task");
     scheduler::schedule();
