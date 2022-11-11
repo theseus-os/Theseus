@@ -50,7 +50,6 @@ extern crate no_drop;
 
 use core::{
     any::Any,
-    cell::{RefCell, Cell},
     fmt,
     hash::{Hash, Hasher},
     ops::Deref,
@@ -1388,106 +1387,114 @@ fn bootstrap_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason
 }
 
 
-/// The TLS area that holds the current task's ID.
-#[thread_local]
-static CURRENT_TASK_ID: Cell<usize> = Cell::new(0);
+pub use tls_current_task::*;
 
-/// The TLS area that holds the current task.
-#[thread_local]
-static CURRENT_TASK: RefCell<Option<TaskRef>> = RefCell::new(None);
+/// A private module to ensure the below TLS variables aren't modified directly.
+mod tls_current_task {
+    use core::cell::{Cell, RefCell};
+    use super::{TASKLIST, TaskRef};
 
-/// Invokes the given `function` with a reference to the current task.
-/// 
-/// This is useful to avoid cloning a reference to the current task.
-/// 
-/// Returns an `Err` if the current task cannot be obtained.
-pub fn with_current_task<F, R>(function: F) -> Result<R, ()>
-where
-    F: FnOnce(&TaskRef) -> R
-{
-    if let Ok(Some(ref t)) = CURRENT_TASK.try_borrow().as_deref() {
-        Ok(function(t))
-    } else {
-        Err(())
+    /// The TLS area that holds the current task's ID.
+    #[thread_local]
+    static CURRENT_TASK_ID: Cell<usize> = Cell::new(0);
+
+    /// The TLS area that holds the current task.
+    #[thread_local]
+    static CURRENT_TASK: RefCell<Option<TaskRef>> = RefCell::new(None);
+
+    /// Invokes the given `function` with a reference to the current task.
+    /// 
+    /// This is useful to avoid cloning a reference to the current task.
+    /// 
+    /// Returns an `Err` if the current task cannot be obtained.
+    pub fn with_current_task<F, R>(function: F) -> Result<R, ()>
+    where
+        F: FnOnce(&TaskRef) -> R
+    {
+        if let Ok(Some(ref t)) = CURRENT_TASK.try_borrow().as_deref() {
+            Ok(function(t))
+        } else {
+            Err(())
+        }
     }
-}
 
-/// Returns a cloned reference to the current task.
-///
-/// Using [`with_current_task()`] is preferred because it operates on a borrowed reference
-/// to the current task and avoids cloning that reference.
-///
-/// This function must clone the current task's `TaskRef` in order to ensure
-/// that this task cannot be dropped for the lifetime of the returned `TaskRef`.
-/// Because the "current task" feature uses thread-local storage (TLS),
-/// there is no safe way to avoid the cloning operation because it is impossible
-/// to specify the lifetime of the returned thread-local reference in Rust.
-pub fn get_current_task() -> Option<TaskRef> {
-    with_current_task(|t| t.clone()).ok()
-}
+    /// Returns a cloned reference to the current task.
+    ///
+    /// Using [`with_current_task()`] is preferred because it operates on a
+    /// borrowed reference to the current task and avoids cloning that reference.
+    ///
+    /// This function must clone the current task's `TaskRef` in order to ensure
+    /// that this task cannot be dropped for the lifetime of the returned `TaskRef`.
+    /// Because the "current task" feature uses thread-local storage (TLS),
+    /// there is no safe way to avoid the cloning operation because it is impossible
+    /// to specify the lifetime of the returned thread-local reference in Rust.
+    pub fn get_current_task() -> Option<TaskRef> {
+        with_current_task(|t| t.clone()).ok()
+    }
 
-/// Returns the unique ID of the current task.
-pub fn get_my_current_task_id() -> usize {
-    CURRENT_TASK_ID.get()
-}
+    /// Returns the unique ID of the current task.
+    pub fn get_my_current_task_id() -> usize {
+        CURRENT_TASK_ID.get()
+    }
 
-/// Set the given task as the current task.
-///
-/// This function being public is completely safe, as it will only ever execute
-/// once per task, typically at the beginning of a task's first execution.
-///
-/// If `current_task` is `Some`, its task ID must match `current_task_id`.
-/// If `current_task` is `None`, the task must have already been added to 
-/// the system-wide task list such that a reference to it can be retrieved.
-///
-/// Returns an `Err` if the current task has already been set.
-#[doc(hidden)]
-pub fn init_current_task(
-    current_task_id: usize,
-    current_task: Option<TaskRef>,
-) -> Result<TaskRef, ()> {
-    let taskref = if let Some(t) = current_task {
-        if t.id != current_task_id {
+    /// Set the given task as the current task.
+    ///
+    /// This function being public is completely safe, as it will only ever execute
+    /// once per task, typically at the beginning of a task's first execution.
+    ///
+    /// If `current_task` is `Some`, its task ID must match `current_task_id`.
+    /// If `current_task` is `None`, the task must have already been added to 
+    /// the system-wide task list such that a reference to it can be retrieved.
+    ///
+    /// Returns an `Err` if the current task has already been set.
+    #[doc(hidden)]
+    pub fn init_current_task(
+        current_task_id: usize,
+        current_task: Option<TaskRef>,
+    ) -> Result<TaskRef, ()> {
+        let taskref = if let Some(t) = current_task {
+            if t.id != current_task_id {
+                return Err(());
+            }
+            t
+        } else {
+            TASKLIST.lock()
+                .get(&current_task_id)
+                .cloned()
+                .ok_or(())?
+        };
+
+        match CURRENT_TASK.try_borrow_mut() {
+            Ok(mut t_opt) if t_opt.is_none() => {
+                *t_opt = Some(taskref.clone());
+                CURRENT_TASK_ID.set(current_task_id);
+                Ok(taskref)
+            }
+            _ => Err(()),
+        }
+    }
+
+    /// De-initializes the current task TLS variable, ensuring that the task can be dropped.
+    ///
+    /// This function being public is completely safe, as it will only ever execute
+    /// once per task, typically after the task has exited and is being cleaned up.
+    ///
+    /// This returns an error if:
+    /// * The current task has not yet exited.
+    /// * The current task TLS variable hasn't been initialized.
+    /// * The current task TLS variable is currently borrowed.
+    #[doc(hidden)]
+    pub fn deinit_current_task() -> Result<TaskRef, ()> {
+        if with_current_task(|t| !t.has_exited()).unwrap_or(true) {
             return Err(());
         }
-        t
-    } else {
-        TASKLIST.lock()
-            .get(&current_task_id)
-            .cloned()
-            .ok_or(())?
-    };
-
-    match CURRENT_TASK.try_borrow_mut() {
-        Ok(mut t_opt) if t_opt.is_none() => {
-            *t_opt = Some(taskref.clone());
-            CURRENT_TASK_ID.set(current_task_id);
-            Ok(taskref)
-        }
-        _ => Err(()),
+        CURRENT_TASK.try_borrow_mut()
+            .map_err(|_| ())
+            .and_then(|mut t_opt| t_opt
+                .take()
+                .ok_or(())
+            )
     }
-}
-
-/// De-initializes the current task TLS variable, ensuring that the task can be dropped.
-///
-/// This function being public is completely safe, as it will only ever execute
-/// once per task, typically after the task has exited and is being cleaned up.
-///
-/// This returns an error if:
-/// * The current task has not yet exited.
-/// * The current task TLS variable hasn't been initialized.
-/// * The current task TLS variable is currently borrowed.
-#[doc(hidden)]
-pub fn deinit_current_task() -> Result<TaskRef, ()> {
-    if with_current_task(|t| !t.has_exited()).unwrap_or(true) {
-        return Err(());
-    }
-    CURRENT_TASK.try_borrow_mut()
-        .map_err(|_| ())
-        .and_then(|mut t_opt| t_opt
-            .take()
-            .ok_or(())
-        )
 }
 
 // TODO: remove old stuff below once TLS-based `CURRENT_TASK` works.
