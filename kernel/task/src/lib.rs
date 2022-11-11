@@ -50,11 +50,12 @@ extern crate no_drop;
 
 use core::{
     any::Any,
+    cell::{RefCell, Cell},
     fmt,
     hash::{Hash, Hasher},
     ops::Deref,
     panic::PanicInfo,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering}, cell::{RefCell, Cell},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use alloc::{
     boxed::Box,
@@ -1287,10 +1288,6 @@ impl TaskRef {
 
         Ok(())
     }
-
-    pub fn strong_count(&self) -> usize {
-        Arc::strong_count(&self.0)
-    }
 }
 
 impl PartialEq for TaskRef {
@@ -1350,7 +1347,7 @@ pub fn bootstrap_task(
     let bootstrap_task_id = bootstrap_task.id;
     let task_ref = TaskRef::new(bootstrap_task);
 
-    // [TODO: remove, old] Set this task as this CPU's current task, as it's already running.
+    // Set this task as this CPU's current task, as it's already running.
     task_ref.set_as_current_task();
     if get_my_current_task().is_none() {
         error!("BUG: bootstrap_task(): failed to properly set the new boostrapped task as the current task on AP {}", apic_id);
@@ -1360,11 +1357,9 @@ pub fn bootstrap_task(
         return Err("BUG: bootstrap_task(): failed to properly set the new bootstrapped task as the current task");
     }
     // Set this task as this CPU's current task, as it's already running.
-    CURRENT_TASK_ID.set(bootstrap_task_id);
-    let _prev_val = CURRENT_TASK.replace(Some(task_ref.clone()));
-    if _prev_val.is_some() {
+    if let Err(_) = init_current_task(bootstrap_task_id, Some(task_ref.clone())) {
         let _task_ref = NoDrop::new(task_ref);
-        return Err("BUG: bootstrap_task(): current task was unexpectedly already set");
+        return Err("BUG: bootstrap_task(): failed to set bootstrapped task as current task");
     }
 
     // insert the new task into the task list
@@ -1438,16 +1433,30 @@ pub fn get_my_current_task_id() -> usize {
 
 /// Set the given task as the current task.
 ///
-/// This can only be called once, at the beginning of a task's first execution.
-/// The task must have already been added to the system-wide task list.
+/// This function being public is completely safe, as it will only ever execute
+/// once per task, typically at the beginning of a task's first execution.
+///
+/// If `current_task` is `Some`, its task ID must match `current_task_id`.
+/// If `current_task` is `None`, the task must have already been added to 
+/// the system-wide task list such that a reference to it can be retrieved.
 ///
 /// Returns an `Err` if the current task has already been set.
 #[doc(hidden)]
-pub fn init_current_task(current_task_id: usize) -> Result<TaskRef, ()> {
-    let taskref = TASKLIST.lock()
-        .get(&current_task_id)
-        .cloned()
-        .ok_or(())?;
+pub fn init_current_task(
+    current_task_id: usize,
+    current_task: Option<TaskRef>,
+) -> Result<TaskRef, ()> {
+    let taskref = if let Some(t) = current_task {
+        if t.id != current_task_id {
+            return Err(());
+        }
+        t
+    } else {
+        TASKLIST.lock()
+            .get(&current_task_id)
+            .cloned()
+            .ok_or(())?
+    };
 
     match CURRENT_TASK.try_borrow_mut() {
         Ok(mut t_opt) if t_opt.is_none() => {
@@ -1460,9 +1469,10 @@ pub fn init_current_task(current_task_id: usize) -> Result<TaskRef, ()> {
 }
 
 /// De-initializes the current task TLS variable, ensuring that the task can be dropped.
-/// 
-/// This can only be called once, after the current task has exited.
-/// 
+///
+/// This function being public is completely safe, as it will only ever execute
+/// once per task, typically after the task has exited and is being cleaned up.
+///
 /// This returns an error if:
 /// * The current task has not yet exited.
 /// * The current task TLS variable hasn't been initialized.
@@ -1492,6 +1502,7 @@ pub fn deinit_current_task() -> Result<TaskRef, ()> {
 #[derive(Debug)]
 struct TaskLocalData {
     taskref: TaskRef,
+    #[allow(dead_code)]
     task_id: usize,
 }
 

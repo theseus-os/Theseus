@@ -653,7 +653,7 @@ where
     {
         // Set this task as the current task.
         // We cannot do until this task is actually running, because it uses thread-local storage.
-        let current_task = task::init_current_task(current_task_id)
+        let current_task = task::init_current_task(current_task_id, None)
             .expect("BUG: task_wrapper: couldn't init this task as the current task");
         assert!(current_task_id == current_task.id);
         assert!(get_current_task().unwrap() == get_my_current_task().unwrap().clone());
