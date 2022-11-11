@@ -543,19 +543,23 @@ struct TaskFuncArg<F, A, R> {
 
 /// This function sets up the given new task's kernel stack contents to properly jump
 /// to the given `entry_point_function` when the new `Task` is first switched to. 
-/// 
+///
 /// The `entry_point_function` will be invoked with one argument, the new task's ID,
 /// in order to allow that new task to identify itself (and set itself as the current task).
 ///
 /// This function can only be invoked on a new task that is being initialized,
 /// otherwise it will return an error.
-/// 
+///
 /// ## How this works 
 /// When a new task is first switched to, a [`Context`] struct will be popped off the stack
 /// and its values used to populate the initial values of select CPU registers.
 /// The address of that `Context` struct is used to initialized the new task's `saved_sp`
 /// (saved stack pointer).
-/// 
+///
+/// We also use one of the free registers in the new `Context` struct to store
+/// the ID of the new task, which enables the new task to identify itself and set up
+/// its TLS-based "current task" variable when it first runs (see [`task_wrapper`]).
+///
 /// During the final part of the context switch operation, the `ret` instruction will
 /// implicitly pop an address value off of the stack (the last item of that Context struct);
 /// that address represents the next instruction that will run right after
@@ -626,8 +630,7 @@ pub fn setup_context_trampoline(
     Ok(())
 }
 
-/// Internal code of `task_wrapper` shared by `task_wrapper` and 
-/// `task_wrapper_restartable`. 
+/// Internal code of `task_wrapper` shared by `task_wrapper` and `task_wrapper_restartable`.
 fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
 where
     A: Send + 'static,
@@ -636,7 +639,7 @@ where
 {
     // This should be the first statement in this function in order to ensure
     // that no other code utilizes the "first register" before we can read it.
-    // See `setup_context_trampoline` for more info on how this works.
+    // See `setup_context_trampoline()` for more info on how this works.
     let current_task_id = context_switch::read_first_register();
 
     let task_entry_func;
