@@ -83,6 +83,13 @@ export override RUSTFLAGS += -Z merge-functions=disabled
 ## As far as I can tell, this does not have a significant impact on object code size or performance.
 export override RUSTFLAGS += -Z share-generics=no
 
+## This forces all code to use the simplest (and most efficient) model
+## for Thread-Local Storage (TLS): the "Local Exec" model.
+## We don't currently support the three other forms, as some of them
+## (e.g., "Initial Exec") require support for a Global Offset Table (GOT).
+## If we support GOT in the future, we can remove this.
+export override RUSTFLAGS += -Z tls-model=local-exec
+
 ## This forces frame pointers to be generated, i.e., the stack base pointer (RBP register on x86_64)
 ## will be used to store the starting address of the current stack frame.
 ## This can be used for obtaining a backtrace/stack trace,

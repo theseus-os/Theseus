@@ -41,19 +41,13 @@ struct LineSlice {
 
 /// Read the whole file to a String.
 fn get_content_string(file_path: String) -> Result<String, String> {
-    let taskref = match task::get_my_current_task() {
-        Some(t) => t,
-        None => {
-            return Err("failed to get current task".to_string());
-        }
+    let Ok(curr_wd) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
+        return Err("failed to get current task".to_string());
     };
-
-    // grabs the current working directory pointer; this is scoped so that we drop the lock on the task as soon as we get the working directory pointer
-    let curr_wr = Arc::clone(&taskref.get_env().lock().working_dir);
     let path = Path::new(file_path);
     
     // navigate to the filepath specified by first argument
-    match path.get(&curr_wr) {
+    match path.get(&curr_wd) {
         Some(file_dir_enum) => { 
             match file_dir_enum {
                 FileOrDir::Dir(directory) => {

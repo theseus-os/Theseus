@@ -155,8 +155,9 @@ pub fn set_kill_handler(function: KillHandler) -> Result<(), &'static str> {
 /// # Locking / Deadlock
 /// Obtains the lock on this `Task`'s inner state in order to mutate it.
 pub fn take_kill_handler() -> Option<KillHandler> {
-    get_my_current_task()
-        .and_then(|t| t.inner.lock().kill_handler.take())
+    with_current_task(|t| t.inner.lock().kill_handler.take())
+        .ok()
+        .flatten()
 }
 
 
@@ -1407,9 +1408,8 @@ static CURRENT_TASK: RefCell<Option<TaskRef>> = RefCell::new(None);
 /// Returns an `Err` if the current task cannot be obtained.
 pub fn with_current_task<F, R>(function: F) -> Result<R, ()>
 where
-    F: Fn(&TaskRef) -> R
+    F: FnOnce(&TaskRef) -> R
 {
-    // First, the common case: current task has been initialized and can be used.
     if let Ok(Some(ref t)) = CURRENT_TASK.try_borrow().as_deref() {
         Ok(function(t))
     } else {
@@ -1418,15 +1418,15 @@ where
 }
 
 /// Returns a cloned reference to the current task.
-/// 
-/// This function clones the current task's `TaskRef` in order to ensure
+///
+/// Using [`with_current_task()`] is preferred because it operates on a borrowed reference
+/// to the current task and avoids cloning that reference.
+///
+/// This function must clone the current task's `TaskRef` in order to ensure
 /// that this task cannot be dropped for the lifetime of the returned `TaskRef`.
 /// Because the "current task" feature uses thread-local storage (TLS),
 /// there is no safe way to avoid the cloning operation because it is impossible
 /// to specify the lifetime of the returned thread-local reference in Rust.
-/// 
-/// Use [`with_current_task()`] if you want to avoid a clone operation or
-/// want to operate on a borrowed reference to the current task instead.
 pub fn get_current_task() -> Option<TaskRef> {
     with_current_task(|t| t.clone()).ok()
 }
