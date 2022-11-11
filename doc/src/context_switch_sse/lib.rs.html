@@ -146,6 +146,17 @@
 <span id="146">146</span>
 <span id="147">147</span>
 <span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains structures and routines for context switching 
 //! when SSE extensions are enabled. 
 
@@ -158,6 +169,7 @@
 <span class="kw">use </span>context_switch_regular::ContextRegular;
 <span class="kw">use </span>zerocopy::FromBytes;
 
+<span class="kw">pub use </span>context_switch_regular::read_first_register;
 
 <span class="doccomment">/// The registers saved before a context switch and restored after a context switch
 /// for SSE-enabled Tasks.
@@ -209,6 +221,16 @@
             xmm0:  <span class="number">0</span>,   
             regular: ContextRegular::new(rip),
         }
+    }
+
+    <span class="doccomment">/// Sets the value of the first regular (non-SSE) register to the given `value`.
+    /// 
+    /// This is useful for storing a value (e.g., task ID) in that register
+    /// and then recovering it later with [`read_first_register()`].
+    /// 
+    /// On x86_64, this sets the `r15` register.
+    </span><span class="kw">pub fn </span>set_first_register(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: usize) {
+        <span class="self">self</span>.regular.set_first_register(value);
     }
 }
 

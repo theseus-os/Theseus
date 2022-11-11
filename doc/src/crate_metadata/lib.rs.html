@@ -1077,6 +1077,21 @@
 <span id="1077">1077</span>
 <span id="1078">1078</span>
 <span id="1079">1079</span>
+<span id="1080">1080</span>
+<span id="1081">1081</span>
+<span id="1082">1082</span>
+<span id="1083">1083</span>
+<span id="1084">1084</span>
+<span id="1085">1085</span>
+<span id="1086">1086</span>
+<span id="1087">1087</span>
+<span id="1088">1088</span>
+<span id="1089">1089</span>
+<span id="1090">1090</span>
+<span id="1091">1091</span>
+<span id="1092">1092</span>
+<span id="1093">1093</span>
+<span id="1094">1094</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines types that contain metadata about crates loaded in Theseus and their dependencies.
 //! 
 //! ## Representing dependencies between sections
@@ -1736,7 +1751,7 @@
     </span><span class="kw">pub </span>mapped_pages: Arc&lt;Mutex&lt;MappedPages&gt;&gt;, 
     <span class="doccomment">/// The offset into the `mapped_pages` where this section starts
     </span><span class="kw">pub </span>mapped_pages_offset: usize,
-    <span class="doccomment">/// The starting `VirtualAddress` of this section.
+    <span class="doccomment">/// The starting `VirtualAddress` of this section (except for TLS sections).
     ///
     /// For TLS sections, this is *not* a `VirtualAddress`, but rather the offset
     /// (from the TLS base) into the TLS area where this section&#39;s data exists.
@@ -2106,7 +2121,7 @@
 
     <span class="comment">// Perform the actual writing of relocation data here.
     // There is a great, succint table of relocation types here:
-    // &lt;https://docs.rs/goblin/0.0.24/goblin/elf/reloc/index.html&gt;
+    // &lt;https://docs.rs/goblin/0.6.0/goblin/elf/reloc/index.html&gt;
     </span><span class="kw">match </span>relocation_entry.typ {
         R_X86_64_32 =&gt; {
             <span class="kw">let </span>target_range = target_sec_offset .. (target_sec_offset + size_of::&lt;u32&gt;());
@@ -2138,19 +2153,34 @@
             target_ref.copy_from_slice(<span class="kw-2">&amp;</span>source_val.to_ne_bytes());
         }
         R_X86_64_TPOFF32 =&gt; {
-            <span class="kw">let </span>target_range = target_sec_offset .. (target_sec_offset + size_of::&lt;u32&gt;());
+            <span class="kw">let </span>target_range = target_sec_offset .. (target_sec_offset + size_of::&lt;i32&gt;());
             <span class="kw">let </span>target_ref = <span class="kw-2">&amp;mut </span>target_sec_slice[target_range];
-            <span class="kw">let </span>source_val = u32::try_from(source_sec_vaddr.value())
-                .map_err(|<span class="kw">_</span>| <span class="string">&quot;BUG: TLS relocation (R_X86_64_TPOFF32) source section value (TLS offset) cannot fit in a `u32`&quot;</span>)<span class="question-mark">?</span>;
+            <span class="comment">// Here we treat the `source_sec_vaddr` value as a signed value 
+            // by casting its bit value directly, i.e., `usize as isize`.
+            </span><span class="kw">let </span>offset_val = source_sec_vaddr.value() <span class="kw">as </span>isize;
+            <span class="comment">// Now we must check that the signed `offset_val` fits in `i32`
+            </span><span class="kw">let </span>source_val = i32::try_from(offset_val)
+                .map_err(|<span class="kw">_</span>| <span class="string">&quot;BUG: TLS relocation (R_X86_64_TPOFF32) source section value (TLS offset) cannot fit in a `i32`&quot;</span>)<span class="question-mark">?</span>;
             <span class="kw">if </span>verbose_log { <span class="macro">trace!</span>(<span class="string">&quot;                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})&quot;</span>, target_ref.as_ptr(), source_val, source_sec_vaddr); }
             target_ref.copy_from_slice(<span class="kw-2">&amp;</span>source_val.to_ne_bytes());
         }
-        <span class="comment">// R_X86_64_GOTPCREL =&gt; { 
+        <span class="comment">// R_X86_64_GOTTPOFF =&gt; {
+        //     // 32-bit signed PC-relative offset to the GOT entry for the IE (Initial Exec(utable) TLS model))
+        //     debug!(&quot;R_X86_64_GOTTPOFF: {:#X?}&quot;, relocation_entry);
+        //     debug!(&quot;R_X86_64_GOTTPOFF: target: {:#X}, source: {:#X}&quot;, target_sec_slice.as_ptr() as usize + target_sec_offset, source_sec_vaddr);
+        //     unimplemented!()
+        // }
+        // R_X86_64_GOTPCREL =&gt; { 
         //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table
         // }
         </span><span class="kw">_ </span>=&gt; {
-            <span class="macro">error!</span>(<span class="string">&quot;found unsupported relocation type {}\n  --&gt; Are you compiling crates with &#39;code-model=large&#39;?&quot;</span>, relocation_entry.typ);
-            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;found unsupported relocation type. Are you compiling crates with &#39;code-model=large&#39;?&quot;</span>);
+            <span class="macro">error!</span>(<span class="string">&quot;found unsupported relocation type {}\n    \
+                --&gt; Are you compiling crates with &#39;code-model=large&#39; and &#39;tls-model=local-exec&#39;?&quot;</span>,
+                relocation_entry.typ
+            );
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;found unsupported relocation type. \
+                Are you compiling crates with &#39;code-model=large&#39; and &#39;tls-model=local-exec&#39;?&quot;
+            </span>);
         }
     }
 

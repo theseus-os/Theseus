@@ -173,30 +173,19 @@
 <span id="173">173</span>
 <span id="174">174</span>
 <span id="175">175</span>
-<span id="176">176</span>
-<span id="177">177</span>
-<span id="178">178</span>
-<span id="179">179</span>
-<span id="180">180</span>
-<span id="181">181</span>
-<span id="182">182</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This is a wrapper crate around all other context switch implementation crates
 //! that helps to manage the complex configuration options involving SIMD and personalities.
 
 </span><span class="attr">#![no_std]
 #![feature(naked_functions)]
 
-#[macro_use] </span><span class="kw">extern crate </span>cfg_if;
+</span><span class="kw">pub use </span>context_switch_regular::read_first_register;
 
 <span class="comment">// If `simd_personality` is enabled, all of the `context_switch*` implementation crates are simultaneously enabled,
 // in order to allow choosing one of them based on the configuration options of each Task (SIMD, regular, etc).
 // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
-</span><span class="macro">cfg_if! </span>{
+</span><span class="macro">cfg_if::cfg_if! </span>{
     <span class="kw">if </span><span class="attr">#[cfg(simd_personality)] </span>{
-        <span class="kw">extern crate </span>context_switch_regular;
-        <span class="kw">extern crate </span>context_switch_sse;
-        <span class="kw">extern crate </span>context_switch_avx;
-
         <span class="kw">use </span>core::arch::asm;
         <span class="kw">pub use </span>context_switch_sse::<span class="kw-2">*</span>;
         <span class="kw">pub use </span>context_switch_regular::<span class="kw-2">*</span>;
@@ -343,22 +332,19 @@
     // For example, AVX512 is above AVX2, which is above AVX, which is above SSE, which is above regular (non-SIMD).
 
     </span><span class="kw">else if </span><span class="attr">#[cfg(target_feature = <span class="string">&quot;avx&quot;</span>)] </span>{
-        <span class="kw">extern crate </span>context_switch_avx;
         <span class="kw">pub use </span>context_switch_avx::ContextAVX <span class="kw">as </span>Context;
         <span class="kw">pub use </span>context_switch_avx::context_switch_avx <span class="kw">as </span>context_switch;
     }
 
     <span class="kw">else if </span><span class="attr">#[cfg(target_feature = <span class="string">&quot;sse2&quot;</span>)] </span>{
         <span class="comment">// this crate covers SSE, SSE2, SSE3, SSE4, but we&#39;re only currently using it for SSE2
-        </span><span class="kw">extern crate </span>context_switch_sse;
-        <span class="kw">pub use </span>context_switch_sse::ContextSSE <span class="kw">as </span>Context;
+        </span><span class="kw">pub use </span>context_switch_sse::ContextSSE <span class="kw">as </span>Context;
         <span class="kw">pub use </span>context_switch_sse::context_switch_sse <span class="kw">as </span>context_switch;
     }
 
     <span class="kw">else </span>{
         <span class="comment">// this covers only the default x86_64 registers
-        </span><span class="kw">extern crate </span>context_switch_regular;
-        <span class="kw">pub use </span>context_switch_regular::ContextRegular <span class="kw">as </span>Context;
+        </span><span class="kw">pub use </span>context_switch_regular::ContextRegular <span class="kw">as </span>Context;
         <span class="kw">pub use </span>context_switch_regular::context_switch_regular <span class="kw">as </span>context_switch;
     }
 }

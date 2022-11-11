@@ -3304,6 +3304,29 @@
 <span id="3304">3304</span>
 <span id="3305">3305</span>
 <span id="3306">3306</span>
+<span id="3307">3307</span>
+<span id="3308">3308</span>
+<span id="3309">3309</span>
+<span id="3310">3310</span>
+<span id="3311">3311</span>
+<span id="3312">3312</span>
+<span id="3313">3313</span>
+<span id="3314">3314</span>
+<span id="3315">3315</span>
+<span id="3316">3316</span>
+<span id="3317">3317</span>
+<span id="3318">3318</span>
+<span id="3319">3319</span>
+<span id="3320">3320</span>
+<span id="3321">3321</span>
+<span id="3322">3322</span>
+<span id="3323">3323</span>
+<span id="3324">3324</span>
+<span id="3325">3325</span>
+<span id="3326">3326</span>
+<span id="3327">3327</span>
+<span id="3328">3328</span>
+<span id="3329">3329</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 #![feature(let_chains)]
 
@@ -4782,6 +4805,13 @@
 
             <span class="comment">// Handle a &quot;TLS&quot; symbol, which exists in .tdata or .tbss
             </span><span class="kw">else if </span>is_tls {
+                <span class="kw">let </span>sym_shndx = symbol_entry.shndx() <span class="kw">as </span>Shndx;
+                <span class="comment">// A TLS symbol with an shndx of 0 is a reference to a foreign dependency,
+                // so we skip it just like we do for `NoType` symbols at the top of this loop.
+                </span><span class="kw">if </span>sym_shndx == <span class="number">0 </span>{
+                    <span class="kw">continue</span>;
+                }
+
                 <span class="comment">// TLS sections have been copied into the read-only pages.
                 // The merged TLS sections have already been dynamically assigned a virtual address above,
                 // so we can calculate a TLS symbol&#39;s vaddr and mapped_pages_offset by adding 
@@ -4790,7 +4820,6 @@
                     .map(|(mp_arc, ..)| mp_arc)
                     .ok_or(<span class="string">&quot;BUG: found TLS symbol but no rodata_pages were allocated&quot;</span>)<span class="question-mark">?</span>;
 
-                <span class="kw">let </span>sym_shndx = symbol_entry.shndx() <span class="kw">as </span>Shndx;
                 <span class="kw">if let </span><span class="prelude-val">Some</span>((tdata_shndx, <span class="kw-2">ref </span>tdata_sec)) = tdata_shndx_and_section &amp;&amp; sym_shndx == tdata_shndx {
                     typ = SectionType::TlsData;
                     mapped_pages_offset = tdata_sec.mapped_pages_offset + sec_value;
@@ -5529,8 +5558,8 @@
             </span><span class="kw">if </span>target_sec_data_was_modified &amp;&amp; 
                 (target_sec.typ == SectionType::TlsData || target_sec.typ == SectionType::TlsBss)
             {
-                <span class="macro">debug!</span>(<span class="string">&quot;Invalidating TlsInitializer due to relocation written to section {:?}&quot;</span>, <span class="kw-2">&amp;*</span>target_sec);
-                <span class="self">self</span>.tls_initializer.lock().invalidate();
+                <span class="comment">// debug!(&quot;Invalidating TlsInitializer due to relocation written to section {:?}&quot;, &amp;*target_sec);
+                </span><span class="self">self</span>.tls_initializer.lock().invalidate();
             }
 
             <span class="comment">// add the target section&#39;s dependencies and relocation details all at once
@@ -6380,17 +6409,33 @@
     }
 
     <span class="doccomment">/// Add a TLS section that has pre-determined offset, e.g.,
-    /// one that was specified in the statically-linked nano_core kernel image.
-    /// 
-    /// Returns an Error if inserting the given `tls_section` at the given `offset`
-    /// would overlap with an existing section.
-    /// Note: an error occurring here would indicate a link-time bug 
-    /// or a bug in the symbol parsing code that invokes this function.
+    /// one that was specified in the statically-linked base kernel image.
+    ///
+    /// This function modifies the `tls_section`&#39;s starting virtual address field
+    /// to hold the proper value such that this `tls_section` can be correctly used
+    /// as the source of a relocation calculation (e.g., when another section depends on it).
+    /// That value will be a negative offset from the end of all the static TLS sections,
+    /// i.e., where the TLS self pointer exists in memory.
+    ///
+    /// ## Arguments
+    /// * `tls_section`: the TLS section present in base kernel image.
+    /// * `offset`: the offset of this section as determined by the linker.
+    ///    This corresponds to the &quot;value&quot; of this section&#39;s symbol in the ELF file.
+    /// * `total_static_tls_size`: the total size of all statically-known TLS sections,
+    ///    including both TLS BSS (`.tbss`) and TLS data (`.tdata`) sections.
+    ///
+    /// ## Return
+    /// * A reference to the newly added and properly modified section, if successful.
+    /// * An error if inserting the given `tls_section` at the given `offset`
+    ///   would overlap with an existing section. 
+    ///   An error occurring here would indicate a link-time bug 
+    ///   or a bug in the symbol parsing code that invokes this function.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>add_existing_static_tls_section(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        <span class="kw-2">mut </span>tls_section: LoadedSection,
         offset: usize,
-        tls_section: StrongSectionRef,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), ()&gt; {
+        total_static_tls_size: usize,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;StrongSectionRef, ()&gt; {
         <span class="kw">let </span>range = offset .. (offset + tls_section.size);
         <span class="kw">if </span><span class="self">self</span>.static_section_offsets.contains_key(<span class="kw-2">&amp;</span>range.start) || 
             <span class="self">self</span>.static_section_offsets.contains_key(<span class="kw-2">&amp;</span>(range.end - <span class="number">1</span>))
@@ -6398,10 +6443,14 @@
             <span class="kw">return </span><span class="prelude-val">Err</span>(());
         }
 
+        <span class="comment">// Calculate the new value of this section&#39;s virtual address based on its offset.
+        </span><span class="kw">let </span>starting_offset = (total_static_tls_size - offset).wrapping_neg();
+        tls_section.virt_addr = VirtualAddress::new(starting_offset).ok_or(())<span class="question-mark">?</span>;
         <span class="self">self</span>.end_of_static_sections = max(<span class="self">self</span>.end_of_static_sections, range.end);
-        <span class="self">self</span>.static_section_offsets.insert(range, StrongSectionRefWrapper(tls_section));
+        <span class="kw">let </span>section_ref = Arc::new(tls_section);
+        <span class="self">self</span>.static_section_offsets.insert(range, StrongSectionRefWrapper(section_ref.clone()));
         <span class="self">self</span>.cache_status = CacheStatus::Invalidated;
-        <span class="prelude-val">Ok</span>(())
+        <span class="prelude-val">Ok</span>(section_ref)
     }
 
     <span class="doccomment">/// Inserts the given `section` into this TLS area at the next index
@@ -6437,18 +6486,15 @@
             }
         }
 
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(start) = start_index {
-            <span class="kw">let </span>range = start .. (start + section.size);
-            section.virt_addr = VirtualAddress::new(range.start).ok_or(())<span class="question-mark">?</span>;
-            <span class="kw">let </span>section_ref = Arc::new(section);
-            <span class="self">self</span>.end_of_dynamic_sections = max(<span class="self">self</span>.end_of_dynamic_sections, range.end);
-            <span class="self">self</span>.dynamic_section_offsets.insert(range, StrongSectionRefWrapper(Arc::clone(<span class="kw-2">&amp;</span>section_ref)));
-            <span class="comment">// Now that we&#39;ve added a new section, the cached data is invalid.
-            </span><span class="self">self</span>.cache_status = CacheStatus::Invalidated;
-            <span class="prelude-val">Ok</span>((start, section_ref))
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(())
-        }
+        <span class="kw">let </span>start = start_index.ok_or(())<span class="question-mark">?</span>;
+        <span class="kw">let </span>range = start .. (start + section.size);
+        section.virt_addr = VirtualAddress::new(range.start).ok_or(())<span class="question-mark">?</span>;
+        <span class="kw">let </span>section_ref = Arc::new(section);
+        <span class="self">self</span>.end_of_dynamic_sections = max(<span class="self">self</span>.end_of_dynamic_sections, range.end);
+        <span class="self">self</span>.dynamic_section_offsets.insert(range, StrongSectionRefWrapper(section_ref.clone()));
+        <span class="comment">// Now that we&#39;ve added a new section, the cached data is invalid.
+        </span><span class="self">self</span>.cache_status = CacheStatus::Invalidated;
+        <span class="prelude-val">Ok</span>((start, section_ref))
     }
 
     <span class="doccomment">/// Invalidates the cached data image in this `TlsInitializer` area.
@@ -6568,7 +6614,7 @@
     ptr:   usize,
 }
 <span class="kw">impl </span>TlsDataImage {
-    <span class="doccomment">/// Returns the value of the TLS selft pointer for this TLS data image.
+    <span class="doccomment">/// Returns the value of the TLS self pointer for this TLS data image.
     /// If it has no TLS data sections, the returned value will be zero.
     </span><span class="attr">#[inline(always)]
     </span><span class="kw">pub fn </span>pointer_value(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {

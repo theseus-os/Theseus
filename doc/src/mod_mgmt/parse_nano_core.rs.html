@@ -822,6 +822,32 @@
 <span id="822">822</span>
 <span id="823">823</span>
 <span id="824">824</span>
+<span id="825">825</span>
+<span id="826">826</span>
+<span id="827">827</span>
+<span id="828">828</span>
+<span id="829">829</span>
+<span id="830">830</span>
+<span id="831">831</span>
+<span id="832">832</span>
+<span id="833">833</span>
+<span id="834">834</span>
+<span id="835">835</span>
+<span id="836">836</span>
+<span id="837">837</span>
+<span id="838">838</span>
+<span id="839">839</span>
+<span id="840">840</span>
+<span id="841">841</span>
+<span id="842">842</span>
+<span id="843">843</span>
+<span id="844">844</span>
+<span id="845">845</span>
+<span id="846">846</span>
+<span id="847">847</span>
+<span id="848">848</span>
+<span id="849">849</span>
+<span id="850">850</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for parsing the `nano_core`, the fully-linked, already-loaded base kernel image,
 //! in other words, the code that is currently executing.
 //! As such, it performs no loading, but rather just creates metadata that represents
@@ -1053,8 +1079,9 @@
     <span class="kw">let </span><span class="kw-2">mut </span>rodata_shndx:   <span class="prelude-ty">Option</span>&lt;Shndx&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>data_shndx:     <span class="prelude-ty">Option</span>&lt;Shndx&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>bss_shndx:      <span class="prelude-ty">Option</span>&lt;Shndx&gt; = <span class="prelude-val">None</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>tls_data_shndx: <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt; = <span class="prelude-val">None</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>tls_bss_shndx:  <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>tls_data_info:  <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>tls_bss_info:   <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>total_tls_size: usize = <span class="number">0</span>;
 
     <span class="doccomment">/// An internal function that parses a section header&#39;s index (e.g., &quot;[7]&quot;) out of the given str.
     /// Returns a tuple of the parsed `Shndx` and the rest of the unparsed str after the shndx.
@@ -1111,14 +1138,22 @@
             rodata_shndx = parse_section_ndx(line).map(|(shndx, <span class="kw">_</span>)| shndx);
         }
         <span class="kw">else if </span>line.contains(<span class="string">&quot;.tdata &quot;</span>) &amp;&amp; line.contains(<span class="string">&quot;PROGBITS&quot;</span>) {
-            tls_data_shndx = parse_section_ndx(line).and_then(|(shndx, rest_of_line)| 
-                parse_section_vaddr_size(rest_of_line).map(|(vaddr, <span class="kw">_</span>)| (shndx, vaddr))
-            );
+            tls_data_info = parse_section_ndx(line)
+                .and_then(|(shndx, rest_of_line)| parse_section_vaddr_size(rest_of_line)
+                    .map(|(vaddr, size)| {
+                        total_tls_size += size;
+                        (shndx, vaddr)
+                    })
+                );
         }
         <span class="kw">else if </span>line.contains(<span class="string">&quot;.tbss &quot;</span>) &amp;&amp; line.contains(<span class="string">&quot;NOBITS&quot;</span>) {
-            tls_bss_shndx = parse_section_ndx(line).and_then(|(shndx, rest_of_line)| 
-                parse_section_vaddr_size(rest_of_line).map(|(vaddr, <span class="kw">_</span>)| (shndx, vaddr))
-            );
+            tls_bss_info = parse_section_ndx(line)
+                    .and_then(|(shndx, rest_of_line)| parse_section_vaddr_size(rest_of_line)
+                    .map(|(vaddr, size)| {
+                        total_tls_size += size;
+                        (shndx, vaddr)
+                    })
+                );
         }
         <span class="kw">else if </span>line.contains(<span class="string">&quot;.data &quot;</span>) &amp;&amp; line.contains(<span class="string">&quot;PROGBITS&quot;</span>) {
             data_shndx = parse_section_ndx(line).map(|(shndx, <span class="kw">_</span>)| shndx);
@@ -1170,11 +1205,14 @@
         }
     }
 
-    <span class="kw">let </span>text_shndx   = text_shndx  .ok_or(<span class="string">&quot;parse_nano_core_symbol_file(): couldn&#39;t find .text section index&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>rodata_shndx = rodata_shndx.ok_or(<span class="string">&quot;parse_nano_core_symbol_file(): couldn&#39;t find .rodata section index&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>data_shndx   = data_shndx  .ok_or(<span class="string">&quot;parse_nano_core_symbol_file(): couldn&#39;t find .data section index&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>bss_shndx    = bss_shndx   .ok_or(<span class="string">&quot;parse_nano_core_symbol_file(): couldn&#39;t find .bss section index&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>shndxs = MainShndx { text_shndx, rodata_shndx, data_shndx, bss_shndx, tls_data_shndx, tls_bss_shndx };
+    <span class="kw">let </span>text_shndx    = text_shndx  .ok_or(<span class="string">&quot;parse_nano_core_symbol_file(): couldn&#39;t find .text section index&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>rodata_shndx  = rodata_shndx.ok_or(<span class="string">&quot;parse_nano_core_symbol_file(): couldn&#39;t find .rodata section index&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>data_shndx    = data_shndx  .ok_or(<span class="string">&quot;parse_nano_core_symbol_file(): couldn&#39;t find .data section index&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>bss_shndx     = bss_shndx   .ok_or(<span class="string">&quot;parse_nano_core_symbol_file(): couldn&#39;t find .bss section index&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>main_sec_info = MainSectionInfo {
+        text_shndx, rodata_shndx, data_shndx, bss_shndx,
+        tls_data_info, tls_bss_info, total_tls_size,
+    };
 
     <span class="comment">// second, skip ahead to the start of the symbol table: a line which contains &quot;.symtab&quot; but does NOT contain &quot;SYMTAB&quot;
     </span><span class="kw">let </span>is_start_of_symbol_table = |line: <span class="kw-2">&amp;</span>str| { line.contains(<span class="string">&quot;.symtab&quot;</span>) &amp;&amp; !line.contains(<span class="string">&quot;SYMTAB&quot;</span>) };
@@ -1258,7 +1296,7 @@
 
             </span>add_new_section(
                 namespace,
-                <span class="kw-2">&amp;</span>shndxs, 
+                <span class="kw-2">&amp;</span>main_sec_info, 
                 <span class="kw-2">&amp;mut </span>crate_items, 
                 text_pages, 
                 rodata_pages, 
@@ -1307,14 +1345,14 @@
         }
     };
     
-    <span class="comment">// find the .text, .data, and .rodata sections
+    <span class="comment">// Find info about the main sections: .text, .rodata, .data, .bss, and optionally TLS sections
     </span><span class="kw">let </span><span class="kw-2">mut </span>text_shndx:     <span class="prelude-ty">Option</span>&lt;Shndx&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>rodata_shndx:   <span class="prelude-ty">Option</span>&lt;Shndx&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>data_shndx:     <span class="prelude-ty">Option</span>&lt;Shndx&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>bss_shndx:      <span class="prelude-ty">Option</span>&lt;Shndx&gt; = <span class="prelude-val">None</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>tls_data_shndx: <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt; = <span class="prelude-val">None</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>tls_bss_shndx:  <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt; = <span class="prelude-val">None</span>;
-
+    <span class="kw">let </span><span class="kw-2">mut </span>tls_data_info:  <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>tls_bss_info:   <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>total_tls_size: usize = <span class="number">0</span>;
 
     <span class="comment">// We will fill in these crate items while parsing the symbol file.
     </span><span class="kw">let </span><span class="kw-2">mut </span>crate_items = ParsedCrateItems::empty();
@@ -1358,7 +1396,8 @@
                 }
                 <span class="kw">let </span>sec_vaddr = VirtualAddress::new(sec.address() <span class="kw">as </span>usize)
                     .ok_or(<span class="string">&quot;the nano_core .tdata section had an invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
-                tls_data_shndx = <span class="prelude-val">Some</span>((shndx, sec_vaddr));
+                tls_data_info = <span class="prelude-val">Some</span>((shndx, sec_vaddr));
+                total_tls_size += sec_size;
             }
             <span class="prelude-val">Ok</span>(<span class="string">&quot;.tbss&quot;</span>) =&gt; {
                 <span class="kw">if </span>sec.flags() &amp; (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR | SHF_TLS) != (SHF_ALLOC | SHF_WRITE | SHF_TLS) {
@@ -1366,7 +1405,8 @@
                 }
                 <span class="kw">let </span>sec_vaddr = VirtualAddress::new(sec.address() <span class="kw">as </span>usize)
                     .ok_or(<span class="string">&quot;the nano_core .tbss section had an invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
-                tls_bss_shndx = <span class="prelude-val">Some</span>((shndx, sec_vaddr));
+                    tls_bss_info = <span class="prelude-val">Some</span>((shndx, sec_vaddr));
+                    total_tls_size += sec_size;
             }
             <span class="prelude-val">Ok</span>(<span class="string">&quot;.gcc_except_table&quot;</span>) =&gt; {
                 <span class="kw">let </span>sec_vaddr = VirtualAddress::new(sec.address() <span class="kw">as </span>usize)
@@ -1416,11 +1456,14 @@
         }
     }
 
-    <span class="kw">let </span>text_shndx   = text_shndx.ok_or(<span class="string">&quot;couldn&#39;t find .text section in nano_core ELF&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>rodata_shndx = rodata_shndx.ok_or(<span class="string">&quot;couldn&#39;t find .rodata section in nano_core ELF&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>data_shndx   = data_shndx.ok_or(<span class="string">&quot;couldn&#39;t find .data section in nano_core ELF&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>bss_shndx    = bss_shndx.ok_or(<span class="string">&quot;couldn&#39;t find .bss section in nano_core ELF&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>shndxs = MainShndx { text_shndx, rodata_shndx, data_shndx, bss_shndx, tls_data_shndx, tls_bss_shndx };
+    <span class="kw">let </span>text_shndx    = text_shndx.ok_or(<span class="string">&quot;couldn&#39;t find .text section in nano_core ELF&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>rodata_shndx  = rodata_shndx.ok_or(<span class="string">&quot;couldn&#39;t find .rodata section in nano_core ELF&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>data_shndx    = data_shndx.ok_or(<span class="string">&quot;couldn&#39;t find .data section in nano_core ELF&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>bss_shndx     = bss_shndx.ok_or(<span class="string">&quot;couldn&#39;t find .bss section in nano_core ELF&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>main_sec_info = MainSectionInfo {
+        text_shndx, rodata_shndx, data_shndx, bss_shndx,
+        tls_data_info, tls_bss_info, total_tls_size,
+    };
     
     {
         <span class="kw">let </span>text_pages_locked = text_pages.lock();
@@ -1443,7 +1486,7 @@
 
                     </span>add_new_section(
                         namespace,
-                        <span class="kw-2">&amp;</span>shndxs, 
+                        <span class="kw-2">&amp;</span>main_sec_info, 
                         <span class="kw-2">&amp;mut </span>crate_items, 
                         text_pages, 
                         rodata_pages, 
@@ -1491,14 +1534,15 @@
 /// .text, .rodata, .data, and .bss.
 /// 
 /// If TLS sections are present, e.g., .tdata or .tbss, 
-/// their `shndx`s and starting virtul addresses are also included here.
-</span><span class="kw">struct </span>MainShndx {
+/// their `shndx` and virtual address are also included here.
+</span><span class="kw">struct </span>MainSectionInfo {
     text_shndx:      Shndx,
     rodata_shndx:    Shndx,
     data_shndx:      Shndx,
     bss_shndx:       Shndx,
-    tls_data_shndx:  <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt;,
-    tls_bss_shndx:   <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt;,
+    tls_data_info:   <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt;,
+    tls_bss_info:    <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt;,
+    total_tls_size:  usize,
 }
 
 <span class="doccomment">/// A convenience function that separates out the logic 
@@ -1506,7 +1550,7 @@
 /// after it has been parsed. 
 </span><span class="kw">fn </span>add_new_section(
     namespace:           <span class="kw-2">&amp;</span>Arc&lt;CrateNamespace&gt;,
-    shndxs:              <span class="kw-2">&amp;</span>MainShndx,
+    main_section_info:   <span class="kw-2">&amp;</span>MainSectionInfo,
     crate_items:         <span class="kw-2">&amp;mut </span>ParsedCrateItems,
     text_pages:          <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;MappedPages&gt;&gt;,
     rodata_pages:        <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;MappedPages&gt;&gt;,
@@ -1523,7 +1567,7 @@
     sec_vaddr: usize,
     global: bool,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>new_section = <span class="kw">if </span>sec_ndx == shndxs.text_shndx {
+    <span class="kw">let </span>new_section = <span class="kw">if </span>sec_ndx == main_section_info.text_shndx {
         <span class="kw">let </span>sec_vaddr = VirtualAddress::new(sec_vaddr)
             .ok_or(<span class="string">&quot;new text section had invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Some</span>(Arc::new(LoadedSection::new(
@@ -1537,7 +1581,7 @@
             new_crate_weak_ref.clone(), 
         )))
     }
-    <span class="kw">else if </span>sec_ndx == shndxs.rodata_shndx {
+    <span class="kw">else if </span>sec_ndx == main_section_info.rodata_shndx {
         <span class="kw">let </span>sec_vaddr = VirtualAddress::new(sec_vaddr)
             .ok_or(<span class="string">&quot;new rodata section had invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Some</span>(Arc::new(LoadedSection::new(
@@ -1551,7 +1595,7 @@
             new_crate_weak_ref.clone(),
         )))
     }
-    <span class="kw">else if </span>sec_ndx == shndxs.data_shndx {
+    <span class="kw">else if </span>sec_ndx == main_section_info.data_shndx {
         <span class="kw">let </span>sec_vaddr = VirtualAddress::new(sec_vaddr)
             .ok_or(<span class="string">&quot;new data section had invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Some</span>(Arc::new(LoadedSection::new(
@@ -1565,7 +1609,7 @@
             new_crate_weak_ref.clone(),
         )))
     }
-    <span class="kw">else if </span>sec_ndx == shndxs.bss_shndx {
+    <span class="kw">else if </span>sec_ndx == main_section_info.bss_shndx {
         <span class="kw">let </span>sec_vaddr = VirtualAddress::new(sec_vaddr)
             .ok_or(<span class="string">&quot;new bss section had invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Some</span>(Arc::new(LoadedSection::new(
@@ -1579,16 +1623,16 @@
             new_crate_weak_ref.clone(),
         )))
     }
-    <span class="kw">else if </span>shndxs.tls_data_shndx.map_or(<span class="bool-val">false</span>, |(shndx, <span class="kw">_</span>)| sec_ndx == shndx) {
+    <span class="kw">else if </span>main_section_info.tls_data_info.map_or(<span class="bool-val">false</span>, |(shndx, <span class="kw">_</span>)| sec_ndx == shndx) {
         <span class="comment">// TLS sections encode their TLS offset in the virtual address field,
         // which is necessary to properly calculate relocation entries that depend upon them.
         </span><span class="kw">let </span>tls_offset = sec_vaddr;
         <span class="comment">// We do need to calculate the real virtual address so we can use that 
         // to calculate the real mapped_pages_offset where its data exists.
         // so we can use that to calculate the real virtual address where it&#39;s loaded.
-        </span><span class="kw">let </span>tls_sec_data_vaddr = shndxs.tls_data_shndx.unwrap().<span class="number">1 </span>+ tls_offset; 
+        </span><span class="kw">let </span>tls_sec_data_vaddr = main_section_info.tls_data_info.unwrap().<span class="number">1 </span>+ tls_offset; 
 
-        <span class="kw">let </span>tls_section = Arc::new(LoadedSection::new(
+        <span class="kw">let </span>tls_section = LoadedSection::new(
             SectionType::TlsData,
             sec_name,
             Arc::clone(rodata_pages),
@@ -1598,12 +1642,16 @@
             sec_size,
             global,
             new_crate_weak_ref.clone(),
-        ));
+        );
         <span class="comment">// Add this new TLS section to this namespace&#39;s TLS area image.
-        </span>namespace.tls_initializer.lock().add_existing_static_tls_section(tls_offset, Arc::clone(<span class="kw-2">&amp;</span>tls_section)).unwrap();
-        <span class="prelude-val">Some</span>(tls_section)
+        </span><span class="kw">let </span>tls_section_ref = namespace.tls_initializer.lock().add_existing_static_tls_section(
+            tls_section,
+            tls_offset,
+            main_section_info.total_tls_size,
+        ).map_err(|<span class="kw">_</span>| <span class="string">&quot;BUG: failed to add static TLS section to the TLS area&quot;</span>)<span class="question-mark">?</span>;
+        <span class="prelude-val">Some</span>(tls_section_ref)
     }
-    <span class="kw">else if </span>shndxs.tls_bss_shndx.map_or(<span class="bool-val">false</span>, |(shndx, <span class="kw">_</span>)| sec_ndx == shndx) {
+    <span class="kw">else if </span>main_section_info.tls_bss_info.map_or(<span class="bool-val">false</span>, |(shndx, <span class="kw">_</span>)| sec_ndx == shndx) {
         <span class="comment">// TLS sections encode their TLS offset in the virtual address field,
         // which is necessary to properly calculate relocation entries that depend upon them.
         </span><span class="kw">let </span>tls_offset = sec_vaddr;
@@ -1613,7 +1661,7 @@
         // as that value should never be used anyway.
         </span><span class="kw">let </span>mapped_pages_offset = usize::MAX;
 
-        <span class="kw">let </span>tls_section = Arc::new(LoadedSection::new(
+        <span class="kw">let </span>tls_section = LoadedSection::new(
             SectionType::TlsBss,
             sec_name,
             Arc::clone(rodata_pages),
@@ -1622,10 +1670,14 @@
             sec_size,
             global,
             new_crate_weak_ref.clone(),
-        ));
+        );
         <span class="comment">// Add this new TLS section to this namespace&#39;s TLS area image.
-        </span>namespace.tls_initializer.lock().add_existing_static_tls_section(tls_offset, Arc::clone(<span class="kw-2">&amp;</span>tls_section)).unwrap();
-        <span class="prelude-val">Some</span>(tls_section)
+        </span><span class="kw">let </span>tls_section_ref = namespace.tls_initializer.lock().add_existing_static_tls_section(
+            tls_section,
+            tls_offset,
+            main_section_info.total_tls_size,
+        ).map_err(|<span class="kw">_</span>| <span class="string">&quot;BUG: failed to add static TLS section to the TLS area initializer&quot;</span>)<span class="question-mark">?</span>;
+        <span class="prelude-val">Some</span>(tls_section_ref)
     }
     <span class="kw">else </span>{
         crate_items.init_symbols.insert(String::from(sec_name.as_str()), sec_vaddr);

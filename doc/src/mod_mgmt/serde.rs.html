@@ -122,6 +122,15 @@
 <span id="122">122</span>
 <span id="123">123</span>
 <span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for converting serializable crate metadata types
 //! into the actual runtime `LoadedCrate` and `LoadedSection` types.
 //! 
@@ -142,6 +151,12 @@
     verbose_log: bool,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(StrongCrateRef, BTreeMap&lt;String, usize&gt;, usize), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>crate_name: StrRef = serialized_crate.crate_name.as_str().into();
+
+    <span class="kw">let </span>total_tls_size: usize = serialized_crate.tls_sections
+        .iter()
+        .filter_map(|shndx| serialized_crate.sections.get(shndx))
+        .map(|tls_sec| tls_sec.size)
+        .sum();
     
     <span class="comment">// The sections need a weak reference back to the loaded_crate, and so we first create
     // the loaded_crate so we have something to reference when loading the sections.
@@ -170,6 +185,7 @@
                 text_pages,
                 rodata_pages,
                 data_pages,
+                total_tls_size,
             )<span class="question-mark">?</span>,
         );
     }
@@ -200,11 +216,12 @@
 <span class="doccomment">/// Convert the given [`SerializedSection`] into a [`LoadedSection`].
 </span><span class="kw">fn </span>into_loaded_section(
     serialized_section: SerializedSection,
-    parent_crate: WeakCrateRef,
-    namespace: <span class="kw-2">&amp;</span>Arc&lt;CrateNamespace&gt;,
-    text_pages: <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;MappedPages&gt;&gt;,
-    rodata_pages: <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;MappedPages&gt;&gt;,
-    data_pages: <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;MappedPages&gt;&gt;,
+    parent_crate:       WeakCrateRef,
+    namespace:          <span class="kw-2">&amp;</span>Arc&lt;CrateNamespace&gt;,
+    text_pages:         <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;MappedPages&gt;&gt;,
+    rodata_pages:       <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;MappedPages&gt;&gt;,
+    data_pages:         <span class="kw-2">&amp;</span>Arc&lt;Mutex&lt;MappedPages&gt;&gt;,
+    total_tls_size:     usize,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Arc&lt;LoadedSection&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>mapped_pages = <span class="kw">match </span>serialized_section.ty {
         SectionType::Text =&gt; Arc::clone(text_pages),
@@ -213,12 +230,13 @@
         | SectionType::TlsBss
         | SectionType::GccExceptTable
         | SectionType::EhFrame =&gt; Arc::clone(rodata_pages),
-        SectionType::Data | SectionType::Bss =&gt; Arc::clone(data_pages),
+        SectionType::Data
+        | SectionType::Bss =&gt; Arc::clone(data_pages),
     };
     <span class="kw">let </span>virtual_address = VirtualAddress::new(serialized_section.virtual_address)
         .ok_or(<span class="string">&quot;SerializedSection::into_loaded_section(): invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
 
-    <span class="kw">let </span>loaded_section = Arc::new(LoadedSection {
+    <span class="kw">let </span>loaded_section = LoadedSection {
         name: <span class="kw">match </span>serialized_section.ty {
             SectionType::EhFrame
             | SectionType::GccExceptTable =&gt; <span class="kw">crate</span>::section_name_str_ref(<span class="kw-2">&amp;</span>serialized_section.ty),
@@ -232,19 +250,19 @@
         size: serialized_section.size,
         parent_crate,
         inner: Default::default(),
-    });
+    };
 
     <span class="kw">if let </span>SectionType::TlsData | SectionType::TlsBss = serialized_section.ty {
         namespace.tls_initializer.lock().add_existing_static_tls_section(
+            loaded_section,
             <span class="comment">// TLS sections encode their TLS offset in the virtual address field,
             // which is necessary to properly calculate relocation entries that depend upon them.
             </span>serialized_section.virtual_address,
-            Arc::clone(<span class="kw-2">&amp;</span>loaded_section),
-        )
-        .unwrap();
+            total_tls_size,
+        ).map_err(|<span class="kw">_</span>| <span class="string">&quot;BUG: failed to add deserialized static TLS section to the TLS area&quot;</span>)
+    } <span class="kw">else </span>{
+        <span class="prelude-val">Ok</span>(Arc::new(loaded_section))
     }
-
-    <span class="prelude-val">Ok</span>(loaded_section)
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mod_mgmt" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>
