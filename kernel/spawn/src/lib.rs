@@ -28,7 +28,7 @@ use spin::Mutex;
 use irq_safety::enable_interrupts;
 use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
-use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef, RunState, get_current_task};
+use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef, RunState};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use apic::get_my_apic_id;
@@ -196,8 +196,9 @@ pub fn new_application_task_builder(
     new_namespace: Option<Arc<CrateNamespace>>,
 ) -> Result<TaskBuilder<MainFunc, MainFuncArg, MainFuncRet>, &'static str> {
     
-    let namespace = new_namespace.or_else(|| task::get_my_current_task().map(|t| t.get_namespace().clone()))
-        .ok_or("spawn::new_application_task_builder(): couldn't get current task to use its CrateNamespace")?;
+    let namespace = new_namespace
+        .or_else(|| task::with_current_task(|t| t.get_namespace().clone()).ok())
+        .ok_or("spawn::new_application_task_builder(): couldn't get current task")?;
     
     let crate_object_file = match crate_object_file.get(namespace.dir())
         .or_else(|| Path::new(format!("{}.o", &crate_object_file)).get(namespace.dir())) // retry with ".o" extension

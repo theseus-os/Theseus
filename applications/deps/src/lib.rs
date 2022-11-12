@@ -444,9 +444,10 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
 
 
 fn get_my_current_namespace() -> Arc<CrateNamespace> {
-    task::get_my_current_task().map(|t| Arc::clone(t.get_namespace())).unwrap_or_else(|| 
-        mod_mgmt::get_initial_kernel_namespace().expect("BUG: initial kernel namespace wasn't initialized").clone()
-    )
+    task::with_current_task(|t| t.get_namespace().clone())
+        .or_else(|_| mod_mgmt::get_initial_kernel_namespace().cloned().ok_or(()))
+        .map_err(|_| "couldn't get current task's namespace or default namespace")
+        .unwrap()
 }
 
 

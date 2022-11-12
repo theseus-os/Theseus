@@ -106,8 +106,6 @@ pub fn main(_args: Vec<String>) -> isize {
         };
     }
 
-    debug!("shell::main(): trying to call with_current_task... for {:?}", task::get_my_current_task());
-
     // block this task, because it never needs to actually run again
     task::with_current_task(|t| t.block())
         .expect("shell::main(): failed to get current task")
@@ -1058,6 +1056,9 @@ impl Shell {
             let task_refs = &job.tasks;
             for task_ref in task_refs {
                 if task_ref.has_exited() { // a task has exited
+                    if task_ref.name.starts_with("ps-") {
+                        warn!("shell::task_handler(): task {:?} strong_count: {}", task_ref, task_ref.strong_count());
+                    }
                     let exited_task_id = task_ref.id;
                     if let Some(exit_val) = task_ref.take_exit_value() {
                         match exit_val {

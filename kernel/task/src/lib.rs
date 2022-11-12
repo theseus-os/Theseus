@@ -70,7 +70,7 @@ use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use mod_mgmt::{AppCrateRef, CrateNamespace, TlsDataImage};
 use environment::Environment;
 use spin::Mutex;
-use x86_64::registers::model_specific::{GsBase, FsBase};
+use x86_64::registers::model_specific::FsBase;
 use preemption::PreemptionGuard;
 use no_drop::NoDrop;
 
@@ -138,9 +138,10 @@ pub fn get_task(task_id: usize) -> Option<TaskRef> {
 /// # Locking / Deadlock
 /// Obtains the lock on this `Task`'s inner state in order to mutate it.
 pub fn set_kill_handler(function: KillHandler) -> Result<(), &'static str> {
-    get_my_current_task()
-        .ok_or("couldn't get current task")
-        .map(|t| t.inner.lock().kill_handler = Some(function))
+    with_current_task(|t| {
+        t.inner.lock().kill_handler = Some(function);
+    })
+    .map_err(|_| "couldn't get current task")
 }
 
 
@@ -288,23 +289,18 @@ pub struct TaskInner {
     exit_value: Option<ExitValue>,
     /// the saved stack pointer value, used for task switching.
     pub saved_sp: usize,
-    /// A reference to this task's `TaskLocalData` struct, which is used to quickly retrieve the "current" Task
-    /// on a given CPU core. 
-    /// The `TaskLocalData` refers back to this `Task` struct, thus it must be initialized later
-    /// after the task has been fully created, which currently occurs in `TaskRef::new()`.
-    task_local_data: Option<Box<TaskLocalData>>,
     /// The preemption guard that was used for safely task switching to this task.
     ///
     /// The `PreemptionGuard` is stored here right before a context switch begins
     /// and then retrieved from here right after the context switch ends.
     ///
-    /// TODO: this (and perhaps `task_local_data`) should be kept in per-CPU variables
-    ///       rather than within the `TaskInner` structure, because they aren't really related
+    /// TODO: this should be kept in a per-CPU variable rather than within
+    ///       the `TaskInner` structure, because it's not really related
     ///       to a specific task, but rather to a specific CPU's preemption status.
     preemption_guard: Option<PreemptionGuard>,
     /// Data that should be dropped after switching away from a task that has exited.
-    /// Currently, this only contains the previous Task's [`TaskLocalData`].
-    drop_after_task_switch: Option<Box<TaskLocalData>>,
+    /// Currently, this contains the previous Task's `TaskRef` removed from its TLS area.
+    drop_after_task_switch: Option<Box<dyn Any + Send>>,
     /// The kernel stack, which all `Task`s must have in order to execute.
     pub kstack: Stack,
     /// Whether or not this task is pinned to a certain core.
@@ -448,15 +444,19 @@ impl Task {
         parent_task: Option<&TaskRef>,
         failure_cleanup_function: FailureCleanupFunction
     ) -> Result<Task, &'static str> {
-        let parent_task = parent_task
-            .or_else(|| get_my_current_task())
-            .ok_or("Task::new(): `parent_task` wasn't provided, and couldn't get current task")?;
-        let (mmi, namespace, env, app_crate) = (
-            Arc::clone(&parent_task.mmi),
-            Arc::clone(&parent_task.namespace),
-            Arc::clone(&parent_task.inner.lock().env),
-            parent_task.app_crate.clone(),
-        );
+        let clone_inherited_items = |taskref: &TaskRef| {
+            (
+                taskref.mmi.clone(),
+                taskref.namespace.clone(),
+                taskref.inner.lock().env.clone(),
+                taskref.app_crate.clone(),
+            )
+        };
+        let (mmi, namespace, env, app_crate) = parent_task
+            .map(clone_inherited_items)
+            .ok_or(())
+            .or_else(|_| with_current_task(clone_inherited_items))
+            .map_err(|_| "Task::new(): `parent_task` wasn't provided, and couldn't get current task")?;
 
         let kstack = kstack
             .or_else(|| stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut mmi.lock().page_table))
@@ -490,7 +490,6 @@ impl Task {
             inner: MutexIrqSafe::new(TaskInner {
                 exit_value: None,
                 saved_sp: 0,
-                task_local_data: None,
                 preemption_guard: None,
                 drop_after_task_switch: None,
                 kstack,
@@ -763,23 +762,9 @@ impl Task {
 
     /// Sets this `Task` as this core's current task.
     /// 
-    /// Currently this is achieved by writing a pointer to the `TaskLocalData` 
-    /// into the `GS_BASE` register.
-    /// This also updates the current TLS region, which is stored in `FS_BASE`.
-    ///
-    /// # Locking / Deadlock
-    /// Obtains the lock on this `Task`'s inner state in order to access it. 
+    /// This updates the current TLS area, which is written to the `FS_BASE` MSR on x86_64.
     fn set_as_current_task(&self) {
         FsBase::write(x86_64::VirtAddr::new(self.tls_area.pointer_value() as u64));
-
-        // TODO: now that proper ELF TLS areas are supported, 
-        //       use that TLS area for the `TaskLocalData` instead of `GS_BASE`. 
-
-        if let Some(ref tld) = self.inner.lock().task_local_data {
-            GsBase::write(x86_64::VirtAddr::new(tld.deref() as *const _ as u64));
-        } else {
-            error!("BUG: failed to set current task, it had no TaskLocalData. {:?}", self);
-        }
     }
 
     /// Switches from the current task (`self`) to the given `next` task.
@@ -887,13 +872,17 @@ impl Task {
             next.inner.lock().preemption_guard = Some(preemption_guard);
         }
 
-        // If the current task is exited, then we need to remove the cyclical TaskRef reference in its TaskLocalData.
-        // We store the removed TaskLocalData in the next Task struct so that we can access it after the context switch.
+        // If the current task has exited at this point, then it will never run again.
+        // Thus, we need to remove the `TaskRef` in its TLS area (via `deinit_current_task`)
+        // in order to ensure that its `TaskRef` reference count will be decremented properly
+        // and thus its task struct will eventually be dropped.
+        // We store the removed `TaskRef` in the next Task struct so that it remains accessible
+        // after the context switch.
         if self.has_exited() {
-            // trace!("task_switch(): preparing to drop TaskLocalData for running task self: {}, next: {}", self, next.deref());
-            next.inner.lock().drop_after_task_switch = self.inner.lock().task_local_data.take();
+            trace!("task_switch(): preparing to deinit current task TLS for running task self: {}, next: {}", self, next.deref());
             let _prev_taskref = deinit_current_task();
             drop(_prev_taskref);
+            // next.inner.lock().drop_after_task_switch = _prev_taskref????;
         }
 
         // The final step before we actually perform the context switch is to
@@ -1128,23 +1117,14 @@ pub struct TaskRef(Arc<Task>);
 impl TaskRef {
     /// Creates a new `TaskRef`, a shareable wrapper around the given `Task`.
     /// 
-    /// This function also initializes the given `Task`'s `TaskLocalData` struct,
-    /// which will be used to determine the current `Task` on each CPU.
-    /// 
-    /// It does *not* add this task to the system-wide task list or any runqueues,
+    /// This does *not* add this task to the system-wide task list or any runqueues,
     /// nor does it schedule this task in.
     /// 
     /// ## Return
     /// Returns a [`JoinableTaskRef`], which derefs into the newly-created `TaskRef`
     /// and can be used to "join" this task (wait for it to exit) and obtain its exit value.
     pub fn new(task: Task) -> JoinableTaskRef {
-        let task_id = task.id;
         let taskref = TaskRef(Arc::new(task));
-        let tld = TaskLocalData {
-            taskref: taskref.clone(),
-            task_id,
-        };
-        taskref.0.inner.lock().task_local_data = Some(Box::new(tld));
 
         // Mark this task as joinable, now that it has been wrapped in the proper type.
         taskref.joinable.store(true, Ordering::Relaxed);
@@ -1162,9 +1142,10 @@ impl TaskRef {
     /// * You cannot call `join()` with interrupts disabled, because it will result in permanent deadlock
     ///   (well, this is only true if the requested `task` is running on the same cpu...  but good enough for now).
     pub fn join(&self) -> Result<(), &'static str> {
-        let curr_task = get_my_current_task().ok_or("join(): failed to check what current task is")?;
-        if Arc::ptr_eq(&self.0, &curr_task.0) {
-            return Err("BUG: cannot call join() on yourself (the current task).");
+        let self_is_current_task = with_current_task(|t| t == self) 
+            .map_err(|_| "join(): failed to check what current task is")?;
+        if self_is_current_task {
+            return Err("BUG: cannot call `join()` on yourself (the current task)");
         }
 
         if !interrupts_enabled() {
@@ -1223,8 +1204,9 @@ impl TaskRef {
     /// it will finish running its current timeslice, and then never be run again.
     #[doc(hidden)]
     pub fn mark_as_killed(&self, reason: KillReason) -> Result<(), &'static str> {
-        let curr_task = get_my_current_task().ok_or("mark_as_exited(): failed to check the current task")?;
-        if curr_task == self {
+        if with_current_task(|t| t == self)
+            .unwrap_or(false)
+        {
             self.internal_exit(ExitValue::Killed(reason))
         } else {
             Err("`mark_as_exited()` can only be invoked on the current task, not on another task.")
@@ -1272,8 +1254,9 @@ impl TaskRef {
             // Corner case: if the task isn't currently running (as with killed tasks), 
             // we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.
             if !self.0.is_running() {
-                warn!("internal_exit(): [untested] dropping TaskLocalData for non-running task {}", &*self.0);
-                drop(inner.task_local_data.take());
+                warn!("\n\ninternal_exit(): [untested] de-initing current task TLS variable for non-running task {}", &*self.0);
+                let _taskref_in_tls = deinit_current_task();
+                drop(_taskref_in_tls);
             }
         }
 
@@ -1286,6 +1269,10 @@ impl TaskRef {
         }
 
         Ok(())
+    }
+
+    pub fn strong_count(&self) -> usize {
+        Arc::strong_count(&self.0)
     }
 }
 
@@ -1309,11 +1296,13 @@ impl Deref for TaskRef {
     }
 }
 
-// impl Drop for TaskRef {
-//     fn drop(&mut self) {
-//         trace!("Dropping TaskRef: strong_refs: {}, {:?}", Arc::strong_count(&self.0), self);
-//     }
-// }
+impl Drop for TaskRef {
+    fn drop(&mut self) {
+        if self.name.starts_with("ps-") {
+            trace!("[Curr {}] Dropping TaskRef: strong_refs: {}, {:?}", get_my_current_task_id(), Arc::strong_count(&self.0), self);
+        }
+    }
+}
 
 
 /// Bootstrap a new task from the current thread of execution.
@@ -1348,15 +1337,11 @@ pub fn bootstrap_task(
 
     // Set this task as this CPU's current task, as it's already running.
     task_ref.set_as_current_task();
-    if get_my_current_task().is_none() {
-        error!("BUG: bootstrap_task(): failed to properly set the new boostrapped task as the current task on AP {}", apic_id);
-        // Don't drop the bootstrap task upon error, because it contains the stack
-        // used for the currently running code -- that would trigger an exception.
-        let _task_ref = NoDrop::new(task_ref);
-        return Err("BUG: bootstrap_task(): failed to properly set the new bootstrapped task as the current task");
-    }
     // Set this task as this CPU's current task, as it's already running.
     if let Err(_) = init_current_task(bootstrap_task_id, Some(task_ref.clone())) {
+        error!("BUG: failed to set boostrapped task as current task on AP {}", apic_id);
+        // Don't drop the bootstrap task upon error, because it contains the stack
+        // used for the currently running code -- that would trigger an exception.
         let _task_ref = NoDrop::new(task_ref);
         return Err("BUG: bootstrap_task(): failed to set bootstrapped task as current task");
     }
@@ -1428,13 +1413,13 @@ mod tls_current_task {
     /// Because the "current task" feature uses thread-local storage (TLS),
     /// there is no safe way to avoid the cloning operation because it is impossible
     /// to specify the lifetime of the returned thread-local reference in Rust.
-    pub fn get_current_task() -> Option<TaskRef> {
+    pub fn get_my_current_task() -> Option<TaskRef> {
         with_current_task(|t| t.clone()).ok()
     }
 
     /// Returns the unique ID of the current task.
-    pub fn get_my_current_task_id() -> Option<usize> {
-        Some(CURRENT_TASK_ID.get())
+    pub fn get_my_current_task_id() -> usize {
+        CURRENT_TASK_ID.get()
     }
 
     /// Set the given task as the current task.
@@ -1486,49 +1471,20 @@ mod tls_current_task {
     #[doc(hidden)]
     pub fn deinit_current_task() -> Result<TaskRef, ()> {
         if with_current_task(|t| !t.has_exited()).unwrap_or(true) {
+            warn!("deinit_current_task(): task hadn't exited or was `None`, task ID {}", get_my_current_task_id());
             return Err(());
         }
         CURRENT_TASK.try_borrow_mut()
-            .map_err(|_| ())
+            .map_err(|_| {
+                warn!("deinit_current_task(): couldn't mutably borrow CURRENT_TASK, task ID {}", get_my_current_task_id());
+                ()
+            })
             .and_then(|mut t_opt| t_opt
                 .take()
-                .ok_or(())
+                .ok_or_else(|| {
+                    warn!("deinit_current_task(): CURRENT_TASK was `None`, task ID {}", get_my_current_task_id());
+                    ()
+                })
             )
     }
-}
-
-// TODO: remove old stuff below once TLS-based `CURRENT_TASK` works.
-
-/// The structure that holds information local to each Task,
-/// effectively a form of thread-local storage (TLS).
-/// A pointer to this structure is stored in the `GS_BASE` MSR (model-specific register),
-/// such that any task can easily and quickly access their local data.
-/// 
-/// TODO: combine this into the standard TLS area, which uses FS_BASE plus the FS segment register.
-// #[repr(C)]
-#[derive(Debug)]
-struct TaskLocalData {
-    taskref: TaskRef,
-    #[allow(dead_code)]
-    task_id: usize,
-}
-
-/// Returns a reference to the current task's `TaskLocalData` 
-/// by using the `TaskLocalData` pointer stored in the `GS_BASE` register.
-fn get_task_local_data() -> Option<&'static TaskLocalData> {
-    let tld: &'static TaskLocalData = {
-        let tld_ptr = GsBase::read().as_u64() as *const TaskLocalData;
-        if tld_ptr.is_null() {
-            return None;
-        }
-        // SAFE: it's safe to cast this as a static reference
-        // because it will always be valid for the life of a given Task's execution.
-        unsafe { &*tld_ptr }
-    };
-    Some(tld)
-}
-
-/// Returns a reference to the current task.
-pub fn get_my_current_task() -> Option<&'static TaskRef> {
-    get_task_local_data().map(|tld| &tld.taskref)
 }

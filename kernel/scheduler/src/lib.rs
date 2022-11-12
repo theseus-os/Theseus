@@ -37,6 +37,9 @@ pub fn schedule() -> bool {
     let apic_id = get_my_apic_id();
 
     let curr_task = if let Some(curr) = get_my_current_task() {
+        if curr.name.starts_with("ps-") {
+            warn!("schedule(): curr_task {:?} strong_count: {}", curr, curr.strong_count());
+        }
         curr
     } else {
         error!("BUG: schedule(): could not get current task.");
