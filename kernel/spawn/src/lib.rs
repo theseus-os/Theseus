@@ -571,15 +571,14 @@ pub fn setup_context_trampoline(
     if new_task.runstate() != RunState::Initing {
         return Err("`setup_context_trampoline()` can only be invoked on `Initing` tasks");
     }
-    
-    let new_task_id = new_task.id;
-    let new_task_inner = new_task.inner_mut();
 
     /// A private macro that actually creates the Context and sets it up in the `new_task`.
     /// We use a macro here so we can pass in the proper `ContextType` at runtime, 
     /// which is useful for both the simd_personality config and regular/SSE configs.
     macro_rules! set_context {
         ($ContextType:ty) => (
+            let new_task_id = new_task.id;
+            let new_task_inner = new_task.inner_mut();
             // We write the new Context struct at the "top" (usable top) of the stack,
             // which is at the end of the stack's MappedPages. 
             // We must subtract "size of usize" (8) bytes from the offset to ensure
