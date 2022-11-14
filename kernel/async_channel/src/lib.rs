@@ -221,7 +221,7 @@ impl <T: Send> Sender<T> {
 
             let is_restartable = task::with_current_task(|t| t.is_restartable()).unwrap_or(false);
             // We restrict the fault to a specific task to make measurements consistent
-            if (value % 4096) == 0  && curr_task.is_restartable() {
+            if (value % 4096) == 0  && is_restartable {
                 // debug!("Fake error {}", value);
                 unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
             }

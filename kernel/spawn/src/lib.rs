@@ -630,17 +630,12 @@ pub fn setup_context_trampoline(
 
 /// Internal routine that runs when a task is first switched to,
 /// shared by `task_wrapper` and `task_wrapper_restartable`.
-fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
+fn task_wrapper_internal<F, A, R>(current_task_id: usize) -> Result<R, task::KillReason>
 where
     A: Send + 'static,
     R: Send + 'static,
     F: FnOnce(A) -> R,
 {
-    // This should be the first statement in this function in order to ensure
-    // that no other code utilizes the "first register" before we can read it.
-    // See `setup_context_trampoline()` for more info on how this works.
-    let current_task_id = context_switch::read_first_register();
-
     let task_entry_func;
     let task_arg;
     let recovered_preemption_guard;
@@ -652,8 +647,9 @@ where
     {
         // Set this task as the current task.
         // We cannot do until this task is actually running, because it uses thread-local storage.
-        let current_task = task::init_current_task(current_task_id, None)
-            .expect("BUG: task_wrapper: couldn't init this task as the current task");
+        let current_task = task::init_current_task(current_task_id, None).unwrap_or_else(|_|
+            panic!("BUG: task_wrapper: couldn't init task {} as the current task", current_task_id)
+        );
 
         // The first time that a task runs, its entry function `task_wrapper()` is jumped to
         // from the `task_switch()` function, right after the end of `context_switch`().
@@ -705,7 +701,11 @@ where
     R: Send + 'static,
     F: FnOnce(A) -> R,
 {
-    let result = task_wrapper_internal::<F, A, R>();
+    // This must be the first statement in this function in order to ensure
+    // that no other code utilizes the "first register" before we can read it.
+    // See `setup_context_trampoline()` for more info on how this works.
+    let current_task_id = context_switch::read_first_register();
+    let result = task_wrapper_internal::<F, A, R>(current_task_id);
 
     // Here: now that the task is finished running, we must clean in up by doing three things:
     // 1. Put the task into a non-runnable mode (exited or killed) and set its exit value or killed reason
@@ -735,7 +735,11 @@ where
     R: Send + 'static,
     F: FnOnce(A) -> R + Send + Clone + 'static,
 {
-    let result = task_wrapper_internal::<F, A, R>();
+    // This must be the first statement in this function in order to ensure
+    // that no other code utilizes the "first register" before we can read it.
+    // See `setup_context_trampoline()` for more info on how this works.
+    let current_task_id = context_switch::read_first_register();
+    let result = task_wrapper_internal::<F, A, R>(current_task_id);
 
     // See `task_wrapper` for an explanation of how the below functions work.
     let curr_task = get_my_current_task()
