@@ -66,10 +66,7 @@ fn test1(_a: u32) -> u32 {
     //let mut i = 1;
     //loop{
     for i in 0..1000 {
-       let task_id = match task::get_my_current_task_id() {
-            Some(task_id) => {task_id},
-            None => 0
-       };
+       let task_id = task::get_my_current_task_id();
        debug!("Task_ID : {} , Instance : {}", task_id, i);
        scheduler::schedule();
        //i = i + 1; 
@@ -81,10 +78,7 @@ fn test2(_a: u32) -> u32 {
     //let mut i = 1;
     //loop{
     for i in 0..1000 {
-       let task_id = match task::get_my_current_task_id() {
-            Some(task_id) => {task_id},
-            None => 0
-       };
+       let task_id = task::get_my_current_task_id();
        debug!("Task_ID : {} , Instance : {}", task_id, i);
        scheduler::schedule();
        //i = i + 1; 
@@ -96,10 +90,7 @@ fn test3(_a: u32) -> u32 {
     //let mut i = 1;
     //loop{
     for i in 0..1000 {
-       let task_id = match task::get_my_current_task_id() {
-            Some(task_id) => {task_id},
-            None => 0
-       };
+       let task_id = task::get_my_current_task_id();
        debug!("Task_ID : {} , Instance : {}", task_id, i);
        scheduler::schedule();
        //i = i + 1; 

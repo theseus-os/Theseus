@@ -28,7 +28,7 @@ use spin::Mutex;
 use irq_safety::enable_interrupts;
 use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
-use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef, RunState, get_current_task};
+use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef, RunState};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use apic::get_my_apic_id;
@@ -196,8 +196,9 @@ pub fn new_application_task_builder(
     new_namespace: Option<Arc<CrateNamespace>>,
 ) -> Result<TaskBuilder<MainFunc, MainFuncArg, MainFuncRet>, &'static str> {
     
-    let namespace = new_namespace.or_else(|| task::get_my_current_task().map(|t| t.get_namespace().clone()))
-        .ok_or("spawn::new_application_task_builder(): couldn't get current task to use its CrateNamespace")?;
+    let namespace = new_namespace
+        .or_else(|| task::with_current_task(|t| t.get_namespace().clone()).ok())
+        .ok_or("spawn::new_application_task_builder(): couldn't get current task")?;
     
     let crate_object_file = match crate_object_file.get(namespace.dir())
         .or_else(|| Path::new(format!("{}.o", &crate_object_file)).get(namespace.dir())) // retry with ".o" extension
@@ -570,15 +571,14 @@ pub fn setup_context_trampoline(
     if new_task.runstate() != RunState::Initing {
         return Err("`setup_context_trampoline()` can only be invoked on `Initing` tasks");
     }
-    
-    let new_task_id = new_task.id;
-    let new_task_inner = new_task.inner_mut();
 
     /// A private macro that actually creates the Context and sets it up in the `new_task`.
     /// We use a macro here so we can pass in the proper `ContextType` at runtime, 
     /// which is useful for both the simd_personality config and regular/SSE configs.
     macro_rules! set_context {
         ($ContextType:ty) => (
+            let new_task_id = new_task.id;
+            let new_task_inner = new_task.inner_mut();
             // We write the new Context struct at the "top" (usable top) of the stack,
             // which is at the end of the stack's MappedPages. 
             // We must subtract "size of usize" (8) bytes from the offset to ensure
@@ -629,17 +629,12 @@ pub fn setup_context_trampoline(
 
 /// Internal routine that runs when a task is first switched to,
 /// shared by `task_wrapper` and `task_wrapper_restartable`.
-fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
+fn task_wrapper_internal<F, A, R>(current_task_id: usize) -> Result<R, task::KillReason>
 where
     A: Send + 'static,
     R: Send + 'static,
     F: FnOnce(A) -> R,
 {
-    // This should be the first statement in this function in order to ensure
-    // that no other code utilizes the "first register" before we can read it.
-    // See `setup_context_trampoline()` for more info on how this works.
-    let current_task_id = context_switch::read_first_register();
-
     let task_entry_func;
     let task_arg;
     let recovered_preemption_guard;
@@ -651,8 +646,9 @@ where
     {
         // Set this task as the current task.
         // We cannot do until this task is actually running, because it uses thread-local storage.
-        let current_task = task::init_current_task(current_task_id, None)
-            .expect("BUG: task_wrapper: couldn't init this task as the current task");
+        let current_task = task::init_current_task(current_task_id, None).unwrap_or_else(|_|
+            panic!("BUG: task_wrapper: couldn't init task {} as the current task", current_task_id)
+        );
 
         // The first time that a task runs, its entry function `task_wrapper()` is jumped to
         // from the `task_switch()` function, right after the end of `context_switch`().
@@ -704,7 +700,11 @@ where
     R: Send + 'static,
     F: FnOnce(A) -> R,
 {
-    let result = task_wrapper_internal::<F, A, R>();
+    // This must be the first statement in this function in order to ensure
+    // that no other code utilizes the "first register" before we can read it.
+    // See `setup_context_trampoline()` for more info on how this works.
+    let current_task_id = context_switch::read_first_register();
+    let result = task_wrapper_internal::<F, A, R>(current_task_id);
 
     // Here: now that the task is finished running, we must clean in up by doing three things:
     // 1. Put the task into a non-runnable mode (exited or killed) and set its exit value or killed reason
@@ -718,8 +718,7 @@ where
     // Operations 1 happen in `task_cleanup_success` or `task_cleanup_failure`, 
     // while operations 2 and 3 then happen in `task_cleanup_final`.
     let curr_task = get_my_current_task()
-        .expect("BUG: task_wrapper: couldn't get current task (after task func).")
-        .clone();
+        .expect("BUG: task_wrapper: couldn't get current task (after task func).");
     match result {
         Ok(exit_value)   => task_cleanup_success::<F, A, R>(curr_task, exit_value),
         Err(kill_reason) => task_cleanup_failure::<F, A, R>(curr_task, kill_reason),
@@ -735,12 +734,15 @@ where
     R: Send + 'static,
     F: FnOnce(A) -> R + Send + Clone + 'static,
 {
-    let result = task_wrapper_internal::<F, A, R>();
+    // This must be the first statement in this function in order to ensure
+    // that no other code utilizes the "first register" before we can read it.
+    // See `setup_context_trampoline()` for more info on how this works.
+    let current_task_id = context_switch::read_first_register();
+    let result = task_wrapper_internal::<F, A, R>(current_task_id);
 
     // See `task_wrapper` for an explanation of how the below functions work.
     let curr_task = get_my_current_task()
-        .expect("BUG: task_wrapper: couldn't get current task (after task func).")
-        .clone();
+        .expect("BUG: task_wrapper: couldn't get current task (after task func).");
     match result {
         Ok(exit_value)   => task_restartable_cleanup_success::<F, A, R>(curr_task, exit_value),
         Err(kill_reason) => task_restartable_cleanup_failure::<F, A, R>(curr_task, kill_reason),

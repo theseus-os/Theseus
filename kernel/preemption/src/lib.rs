@@ -96,6 +96,11 @@ impl PreemptionGuard {
     pub fn preemption_was_enabled(&self) -> bool {
         self.preemption_was_enabled
     }
+
+    /// Returns the APIC ID of the CPU on which this guard was created.
+    pub fn apic_id(&self) -> u8 {
+        self.apic_id
+    }
 }
 
 impl Drop for PreemptionGuard {
