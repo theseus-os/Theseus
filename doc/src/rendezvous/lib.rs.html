@@ -727,21 +727,15 @@
         <span class="attr">#[cfg(trace_channel)]
         </span><span class="macro">trace!</span>(<span class="string">&quot;rendezvous: sending msg: {:?}&quot;</span>, <span class="macro">debugit!</span>(msg));
 
-        <span class="attr">#[cfg(downtime_eval)]
-        </span><span class="kw">let </span>value = hpet::get_hpet().as_ref().unwrap().get_counter();
-        <span class="comment">// debug!(&quot;Value {} {}&quot;, value, value % 1024);
-
-        </span><span class="kw">let </span>curr_task = task::get_my_current_task().ok_or(<span class="string">&quot;couldn&#39;t get current task&quot;</span>)<span class="question-mark">?</span>;
-
-        <span class="comment">// Fault mimicing a memory write. Function could panic when getting task
-        </span><span class="attr">#[cfg(downtime_eval)]
-        </span>{
-            <span class="kw">if </span>(value % <span class="number">4096</span>) == <span class="number">0  </span>&amp;&amp; curr_task.is_restartable() {
+        <span class="attr">#[cfg(downtime_eval)] </span>{
+            <span class="kw">let </span>value = hpet::get_hpet().as_ref().unwrap().get_counter();
+            <span class="comment">// debug!(&quot;Value {} {}&quot;, value, value % 1024);
+            // Fault mimicing a memory write. Function could panic when getting task
+            </span><span class="kw">if </span>(value % <span class="number">4096</span>) == <span class="number">0  </span>&amp;&amp; task::with_current_task(|t| t.is_restartable()).unwrap_or(<span class="bool-val">false</span>) {
                 <span class="comment">// debug!(&quot;Fake error {}&quot;, value);
                 </span><span class="kw">unsafe </span>{ <span class="kw-2">*</span>(<span class="number">0x5050DEADBEEF </span><span class="kw">as </span><span class="kw-2">*mut </span>usize) = <span class="number">0x5555_5555_5555</span>; }
             }
         }
-
 
         <span class="comment">// obtain a sender-side exchange slot, blocking if necessary
         </span><span class="kw">let </span>sender_slot = <span class="self">self</span>.channel.take_sender_slot().map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to take_sender_slot&quot;</span>)<span class="question-mark">?</span>;
@@ -757,7 +751,11 @@
                 ExchangeState::Init =&gt; {
                     <span class="comment">// Hold interrupts to avoid blocking &amp; descheduling this task until we release the slot lock,
                     // which is currently done automatically because the slot uses a MutexIrqSafe.
-                    </span><span class="kw-2">*</span>exchange_state = ExchangeState::WaitingForReceiver(WaitGuard::new(curr_task.clone()).map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to create wait guard&quot;</span>)<span class="question-mark">?</span>, msg);
+                    </span><span class="kw">let </span>curr = task::get_my_current_task().ok_or(<span class="string">&quot;couldn&#39;t get current task&quot;</span>)<span class="question-mark">?</span>;
+                    <span class="kw-2">*</span>exchange_state = ExchangeState::WaitingForReceiver(
+                        WaitGuard::new(curr).map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to create wait guard&quot;</span>)<span class="question-mark">?</span>,
+                        msg,
+                    );
                     <span class="prelude-val">None
                 </span>}
                 ExchangeState::WaitingForSender(receiver_to_notify) =&gt; {
@@ -800,7 +798,9 @@
                 <span class="kw">let </span>exchange_state = sender_slot.<span class="number">0</span>.lock();
                 <span class="kw">match </span><span class="kw-2">&amp;*</span>exchange_state {
                     ExchangeState::WaitingForReceiver(blocked_sender, ..) =&gt; {
-                        <span class="kw">if </span>blocked_sender.task() != curr_task {
+                        <span class="kw">if </span>task::with_current_task(|t| t != blocked_sender.task())
+                            .unwrap_or(<span class="bool-val">true</span>)
+                        {
                             <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: CURR TASK WAS DIFFERENT THAN BLOCKED SENDER&quot;</span>);
                         }
                         blocked_sender.block_again().map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to block sender&quot;</span>)<span class="question-mark">?</span>;
@@ -951,7 +951,7 @@
                 <span class="kw">match </span><span class="kw-2">&amp;*</span>exchange_state {
                     ExchangeState::WaitingForSender(blocked_receiver) =&gt; {
                         <span class="macro">warn!</span>(<span class="string">&quot;spurious wakeup while receiver is WaitingForSender... re-blocking task.&quot;</span>);
-                        <span class="kw">if </span>blocked_receiver.task() != curr_task {
+                        <span class="kw">if </span>blocked_receiver.task() != <span class="kw-2">&amp;</span>curr_task {
                             <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: CURR TASK WAS DIFFERENT THAN BLOCKED RECEIVER&quot;</span>);
                         }
                         blocked_receiver.block_again().map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to block receiver&quot;</span>)<span class="question-mark">?</span>;

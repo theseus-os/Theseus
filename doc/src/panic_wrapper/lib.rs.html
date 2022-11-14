@@ -110,6 +110,11 @@
 <span id="110">110</span>
 <span id="111">111</span>
 <span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Provides types and simple routines for handling panics.
 //! This is similar to what&#39;s found in Rust&#39;s `core::panic` crate, 
 //! but is much simpler and doesn&#39;t require lifetimes 
@@ -168,17 +173,22 @@
         }
         <span class="attr">#[cfg(frame_pointers)] </span>{
             <span class="macro">error!</span>(<span class="string">&quot;------------------ Stack Trace (frame pointers) ------------------&quot;</span>);
-            <span class="kw">let </span>namespace = task::get_my_current_task()
-                .map(|t| t.get_namespace())
-                .or_else(|| mod_mgmt::get_initial_kernel_namespace())
-                .ok_or(<span class="string">&quot;couldn&#39;t get current task&#39;s or default namespace&quot;</span>)<span class="question-mark">?</span>;
-            <span class="kw">let </span>mmi_ref = task::get_my_current_task()
-                .map(|t| <span class="kw-2">&amp;</span>t.mmi)
-                .or_else(|| memory::get_kernel_mmi_ref())
-                .ok_or(<span class="string">&quot;couldn&#39;t get current task&#39;s or default kernel MMI&quot;</span>)<span class="question-mark">?</span>;
-
+            <span class="kw">let </span>(namespace, mmi_ref) = <span class="kw">match </span>task::with_current_task(|t|
+                (t.get_namespace().clone(), t.mmi.clone())
+            ) {
+                <span class="prelude-val">Ok</span>((ns, mmi)) =&gt; (ns, mmi),
+                <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; (
+                    mod_mgmt::get_initial_kernel_namespace()
+                        .ok_or(<span class="string">&quot;couldn&#39;t get current task&#39;s or default namespace&quot;</span>)<span class="question-mark">?
+                        </span>.clone(),
+                    memory::get_kernel_mmi_ref()
+                        .ok_or(<span class="string">&quot;couldn&#39;t get current task&#39;s or default kernel MMI&quot;</span>)<span class="question-mark">?
+                        </span>.clone(),
+                )
+            };
+            <span class="kw">let </span>mmi = mmi_ref.lock();
             stack_trace_frame_pointers::stack_trace_using_frame_pointers(
-                <span class="kw-2">&amp;</span>mmi_ref.lock().page_table,
+                <span class="kw-2">&amp;</span>mmi.page_table,
                 <span class="kw-2">&amp;mut </span>|_frame_pointer, instruction_pointer: VirtualAddress| {
                     <span class="kw">let </span>symbol_offset = namespace.get_section_containing_address(instruction_pointer, <span class="bool-val">false</span>)
                         .map(|(sec, offset)| (sec.name.clone(), offset));

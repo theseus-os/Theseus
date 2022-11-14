@@ -1692,8 +1692,8 @@
 </span><span class="kw">pub fn </span>start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="comment">// Here we have to be careful to have no resources waiting to be dropped/freed/released on the stack. 
     </span><span class="kw">let </span>unwinding_context_ptr = {
-        <span class="kw">let </span>curr_task = task::get_my_current_task().ok_or(<span class="string">&quot;get_my_current_task() failed&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let </span>namespace = curr_task.get_namespace();
+        <span class="kw">let </span>current_task = task::get_my_current_task().ok_or(<span class="string">&quot;couldn&#39;t get current task&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>namespace = current_task.get_namespace();
 
         Box::into_raw(Box::new(
             UnwindingContext {
@@ -1703,7 +1703,7 @@
                     </span>Registers::default()
                 ), 
                 cause: reason,
-                current_task: curr_task.clone(),
+                current_task,
             }
         ))
     };

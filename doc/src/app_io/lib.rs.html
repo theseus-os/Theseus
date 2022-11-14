@@ -325,23 +325,6 @@
 <span id="325">325</span>
 <span id="326">326</span>
 <span id="327">327</span>
-<span id="328">328</span>
-<span id="329">329</span>
-<span id="330">330</span>
-<span id="331">331</span>
-<span id="332">332</span>
-<span id="333">333</span>
-<span id="334">334</span>
-<span id="335">335</span>
-<span id="336">336</span>
-<span id="337">337</span>
-<span id="338">338</span>
-<span id="339">339</span>
-<span id="340">340</span>
-<span id="341">341</span>
-<span id="342">342</span>
-<span id="343">343</span>
-<span id="344">344</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A simple library that handles stdio queues for applications running in terminal instances.
 //! 
 //! This provides some APIs similar to Rust&#39;s `std::io` for applications to access those queues.
@@ -470,11 +453,9 @@
 
 <span class="doccomment">/// An application can call this function to get the terminal to which it should print.
 </span><span class="kw">pub fn </span>get_my_terminal() -&gt; <span class="prelude-ty">Option</span>&lt;Arc&lt;Mutex&lt;Terminal&gt;&gt;&gt; {
-    task::get_my_current_task_id()
-        .and_then(|id| shared_maps::lock_stream_map()
-            .get(<span class="kw-2">&amp;</span>id)
-            .map(|property| property.terminal.clone())
-        )
+    shared_maps::lock_stream_map()
+        .get(<span class="kw-2">&amp;</span>task::get_my_current_task_id())
+        .map(|property| property.terminal.clone())
 }
 
 <span class="doccomment">/// Lock all shared states (i.e. those defined as `static`s) and execute the closure.
@@ -511,7 +492,7 @@
 /// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
 /// to let it run.
 </span><span class="kw">pub fn </span>stdin() -&gt; <span class="prelude-ty">Result</span>&lt;StdioReader, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>task_id = task::get_my_current_task_id().ok_or(<span class="string">&quot;failed to get task_id to get stdin&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>task_id = task::get_my_current_task_id();
     <span class="kw">let </span>locked_streams = shared_maps::lock_stream_map();
     <span class="kw">match </span>locked_streams.get(<span class="kw-2">&amp;</span>task_id) {
         <span class="prelude-val">Some</span>(queues) =&gt; <span class="prelude-val">Ok</span>(queues.stdin.clone()),
@@ -526,7 +507,7 @@
 /// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
 /// to let it run.
 </span><span class="kw">pub fn </span>stdout() -&gt; <span class="prelude-ty">Result</span>&lt;StdioWriter, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>task_id = task::get_my_current_task_id().ok_or(<span class="string">&quot;failed to get task_id to get stdout&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>task_id = task::get_my_current_task_id();
     <span class="kw">let </span>locked_streams = shared_maps::lock_stream_map();
     <span class="kw">match </span>locked_streams.get(<span class="kw-2">&amp;</span>task_id) {
         <span class="prelude-val">Some</span>(queues) =&gt; <span class="prelude-val">Ok</span>(queues.stdout.clone()),
@@ -541,7 +522,7 @@
 /// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
 /// to let it run.
 </span><span class="kw">pub fn </span>stderr() -&gt; <span class="prelude-ty">Result</span>&lt;StdioWriter, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>task_id = task::get_my_current_task_id().ok_or(<span class="string">&quot;failed to get task_id to get stderr&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>task_id = task::get_my_current_task_id();
     <span class="kw">let </span>locked_streams = shared_maps::lock_stream_map();
     <span class="kw">match </span>locked_streams.get(<span class="kw-2">&amp;</span>task_id) {
         <span class="prelude-val">Some</span>(queues) =&gt; <span class="prelude-val">Ok</span>(queues.stderr.clone()),
@@ -559,7 +540,7 @@
 /// already been taken by some other task, which may be running simultaneously, or be killed
 /// prematurely so that it cannot return the key event reader on exit.
 </span><span class="kw">pub fn </span>take_key_event_queue() -&gt; <span class="prelude-ty">Result</span>&lt;KeyEventReadGuard, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>task_id = task::get_my_current_task_id().ok_or(<span class="string">&quot;failed to get task_id to take key event queue&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>task_id = task::get_my_current_task_id();
     <span class="kw">let </span>locked_streams = shared_maps::lock_stream_map();
     <span class="kw">match </span>locked_streams.get(<span class="kw-2">&amp;</span>task_id) {
         <span class="prelude-val">Some</span>(queues) =&gt; {
@@ -578,19 +559,13 @@
 <span class="doccomment">/// This function is automatically invoked upon dropping of `KeyEventReadGuard`.
 /// It returns the reader of key event queue back to the shell.
 </span><span class="kw">fn </span>return_event_queue(reader: <span class="kw-2">&amp;mut </span><span class="prelude-ty">Option</span>&lt;KeyEventQueueReader&gt;) {
-    <span class="kw">match </span>task::get_my_current_task_id().ok_or(<span class="string">&quot;failed to get task_id to return event queue&quot;</span>) {
-        <span class="prelude-val">Ok</span>(task_id) =&gt; {
-            <span class="kw">let </span>locked_streams = shared_maps::lock_stream_map();
-            <span class="kw">match </span>locked_streams.get(<span class="kw-2">&amp;</span>task_id) {
-                <span class="prelude-val">Some</span>(queues) =&gt; {
-                    core::mem::swap(<span class="kw-2">&amp;mut *</span>queues.key_event_reader.lock(), reader);
-                },
-                <span class="prelude-val">None </span>=&gt; { <span class="macro">error!</span>(<span class="string">&quot;no stderr for this task&quot;</span>); }
-            };
+    <span class="kw">let </span>task_id = task::get_my_current_task_id();
+    <span class="kw">let </span>locked_streams = shared_maps::lock_stream_map();
+    <span class="kw">match </span>locked_streams.get(<span class="kw-2">&amp;</span>task_id) {
+        <span class="prelude-val">Some</span>(queues) =&gt; {
+            core::mem::swap(<span class="kw-2">&amp;mut *</span>queues.key_event_reader.lock(), reader);
         },
-        <span class="prelude-val">Err</span>(e) =&gt; {
-            <span class="macro">error!</span>(<span class="string">&quot;app_io::return_event_queue(): Failed to get task_id to store new event queue. Error: {}&quot;</span>, e);
-        }
+        <span class="prelude-val">None </span>=&gt; { <span class="macro">error!</span>(<span class="string">&quot;no stderr for this task&quot;</span>); }
     };
 }
 
@@ -600,7 +575,7 @@
 /// Errors can occur in two cases, when it fails to get the `task_id` of the calling task,
 /// or it finds no IoControlFlags structure for that task.
 </span><span class="kw">pub fn </span>request_stdin_instant_flush() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>task_id = task::get_my_current_task_id().ok_or(<span class="string">&quot;failed to get task_id to request stdin instant flush&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>task_id = task::get_my_current_task_id();
     <span class="kw">let </span><span class="kw-2">mut </span>locked_flags = shared_maps::lock_flag_map();
     <span class="kw">match </span>locked_flags.get_mut(<span class="kw-2">&amp;</span>task_id) {
         <span class="prelude-val">Some</span>(flags) =&gt; {
@@ -617,7 +592,7 @@
 /// Errors can occur in two cases, when it fails to get the `task_id` of the calling task,
 /// or it finds no IoControlFlags structure for that task.
 </span><span class="kw">pub fn </span>cancel_stdin_instant_flush() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>task_id = task::get_my_current_task_id().ok_or(<span class="string">&quot;failed to get task_id to cancel stdin instant flush&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>task_id = task::get_my_current_task_id();
     <span class="kw">let </span><span class="kw-2">mut </span>locked_flags = shared_maps::lock_flag_map();
     <span class="kw">match </span>locked_flags.get_mut(<span class="kw-2">&amp;</span>task_id) {
         <span class="prelude-val">Some</span>(flags) =&gt; {
@@ -662,17 +637,8 @@
 <span class="doccomment">/// Converts the given `core::fmt::Arguments` to a `String` and enqueues the string into the correct
 /// terminal print-producer
 </span><span class="kw">pub fn </span>print_to_stdout_args(fmt_args: fmt::Arguments) {
-    <span class="kw">let </span>task_id = <span class="kw">match </span>task::get_my_current_task_id() {
-        <span class="prelude-val">Some</span>(task_id) =&gt; task_id,
-        <span class="prelude-val">None </span>=&gt; {
-            <span class="comment">// We cannot use log macros here, because when they&#39;re mirrored to the vga, they will cause
-            // infinite loops on an error. Instead, we write directly to the logger&#39;s output streams. 
-            </span><span class="kw">let _ </span>= logger::write_str(<span class="string">&quot;\x1b[31m [E] error in print!/println! macro: failed to get current task id \x1b[0m\n&quot;</span>);
-            <span class="kw">return</span>;
-        }
-    };
-
-    <span class="comment">// Obtains the correct stdout stream and push the output bytes.
+    <span class="kw">let </span>task_id = task::get_my_current_task_id();
+    <span class="comment">// Obtain the correct stdout stream and push the output bytes.
     </span><span class="kw">let </span>locked_streams = shared_maps::lock_stream_map();
     <span class="kw">match </span>locked_streams.get(<span class="kw-2">&amp;</span>task_id) {
         <span class="prelude-val">Some</span>(queues) =&gt; {

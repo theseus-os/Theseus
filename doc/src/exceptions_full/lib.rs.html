@@ -442,6 +442,12 @@
 <span id="442">442</span>
 <span id="443">443</span>
 <span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Exception handlers that are task-aware, and will kill a task on an exception.
 
 </span><span class="attr">#![no_std]
@@ -657,10 +663,16 @@
         }
     }
     <span class="attr">#[cfg(not(unwind_exceptions))] </span>{
-        <span class="kw">let </span>res = task::get_my_current_task().ok_or(<span class="string">&quot;couldn&#39;t get current task&quot;</span>).and_then(|taskref| taskref.kill(cause));
-        <span class="kw">match </span>res {
-            <span class="prelude-val">Ok</span>(()) =&gt; { <span class="macro">println_both!</span>(<span class="string">&quot;Task {:?} killed itself successfully&quot;</span>, task::get_my_current_task()); }
-            <span class="prelude-val">Err</span>(e) =&gt; { <span class="macro">println_both!</span>(<span class="string">&quot;Task {:?} was unable to kill itself. Error: {:?}&quot;</span>, task::get_my_current_task(), e); }
+        <span class="kw">let </span>res = task::with_current_task(|t| {
+            <span class="kw">let </span>kill_result = t.kill(cause);
+            <span class="kw">match </span>kill_result {
+                <span class="prelude-val">Ok</span>(()) =&gt; { <span class="macro">println_both!</span>(<span class="string">&quot;Task {:?} killed itself successfully&quot;</span>, t); }
+                <span class="prelude-val">Err</span>(e) =&gt; { <span class="macro">println_both!</span>(<span class="string">&quot;Task {:?} was unable to kill itself. Error: {:?}&quot;</span>, t, e); }
+            }
+            kill_result
+        });
+        <span class="kw">if let </span><span class="prelude-val">Err</span>(()) = res {
+            <span class="macro">println_both!</span>(<span class="string">&quot;BUG: kill_and_halt(): Couldn&#39;t get current task in order to kill it.&quot;</span>);
         }
     }
 
@@ -676,9 +688,9 @@
 <span class="doccomment">/// Checks whether the given `vaddr` falls within a stack guard page, indicating stack overflow. 
 </span><span class="kw">fn </span>is_stack_overflow(vaddr: VirtualAddress) -&gt; bool {
     <span class="kw">let </span>page = Page::containing_address(vaddr);
-    task::get_my_current_task()
-        .map(|curr_task| curr_task.with_kstack(|kstack| kstack.guard_page().contains(<span class="kw-2">&amp;</span>page)))
-        .unwrap_or(<span class="bool-val">false</span>)
+    task::with_current_task(|t|
+        t.with_kstack(|kstack| kstack.guard_page().contains(<span class="kw-2">&amp;</span>page))
+    ).unwrap_or(<span class="bool-val">false</span>)
 }
 
 <span class="doccomment">/// Converts the given `exception_number` into a [`Signal`] category, if relevant.

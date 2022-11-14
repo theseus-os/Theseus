@@ -1006,6 +1006,8 @@
 <span id="1006">1006</span>
 <span id="1007">1007</span>
 <span id="1008">1008</span>
+<span id="1009">1009</span>
+<span id="1010">1010</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks
 //! and convenient builder patterns for customizing new tasks. 
 //! 
@@ -1036,7 +1038,7 @@
 <span class="kw">use </span>irq_safety::enable_interrupts;
 <span class="kw">use </span>memory::{get_kernel_mmi_ref, MmiRef};
 <span class="kw">use </span>stack::Stack;
-<span class="kw">use </span>task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef, RunState, get_current_task};
+<span class="kw">use </span>task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef, RunState};
 <span class="kw">use </span>mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 <span class="kw">use </span>path::Path;
 <span class="kw">use </span>apic::get_my_apic_id;
@@ -1204,8 +1206,9 @@
     </span>new_namespace: <span class="prelude-ty">Option</span>&lt;Arc&lt;CrateNamespace&gt;&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;TaskBuilder&lt;MainFunc, MainFuncArg, MainFuncRet&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     
-    <span class="kw">let </span>namespace = new_namespace.or_else(|| task::get_my_current_task().map(|t| t.get_namespace().clone()))
-        .ok_or(<span class="string">&quot;spawn::new_application_task_builder(): couldn&#39;t get current task to use its CrateNamespace&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>namespace = new_namespace
+        .or_else(|| task::with_current_task(|t| t.get_namespace().clone()).ok())
+        .ok_or(<span class="string">&quot;spawn::new_application_task_builder(): couldn&#39;t get current task&quot;</span>)<span class="question-mark">?</span>;
     
     <span class="kw">let </span>crate_object_file = <span class="kw">match </span>crate_object_file.get(namespace.dir())
         .or_else(|| Path::new(<span class="macro">format!</span>(<span class="string">&quot;{}.o&quot;</span>, <span class="kw-2">&amp;</span>crate_object_file)).get(namespace.dir())) <span class="comment">// retry with &quot;.o&quot; extension
@@ -1578,15 +1581,14 @@
     <span class="kw">if </span>new_task.runstate() != RunState::Initing {
         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;`setup_context_trampoline()` can only be invoked on `Initing` tasks&quot;</span>);
     }
-    
-    <span class="kw">let </span>new_task_id = new_task.id;
-    <span class="kw">let </span>new_task_inner = new_task.inner_mut();
 
     <span class="doccomment">/// A private macro that actually creates the Context and sets it up in the `new_task`.
     /// We use a macro here so we can pass in the proper `ContextType` at runtime, 
     /// which is useful for both the simd_personality config and regular/SSE configs.
     </span><span class="macro">macro_rules! </span>set_context {
         (<span class="macro-nonterminal">$ContextType</span>:ty) =&gt; (
+            <span class="kw">let </span>new_task_id = new_task.id;
+            <span class="kw">let </span>new_task_inner = new_task.inner_mut();
             <span class="comment">// We write the new Context struct at the &quot;top&quot; (usable top) of the stack,
             // which is at the end of the stack&#39;s MappedPages. 
             // We must subtract &quot;size of usize&quot; (8) bytes from the offset to ensure
@@ -1637,17 +1639,12 @@
 
 <span class="doccomment">/// Internal routine that runs when a task is first switched to,
 /// shared by `task_wrapper` and `task_wrapper_restartable`.
-</span><span class="kw">fn </span>task_wrapper_internal&lt;F, A, R&gt;() -&gt; <span class="prelude-ty">Result</span>&lt;R, task::KillReason&gt;
+</span><span class="kw">fn </span>task_wrapper_internal&lt;F, A, R&gt;(current_task_id: usize) -&gt; <span class="prelude-ty">Result</span>&lt;R, task::KillReason&gt;
 <span class="kw">where
     </span>A: Send + <span class="lifetime">&#39;static</span>,
     R: Send + <span class="lifetime">&#39;static</span>,
     F: FnOnce(A) -&gt; R,
 {
-    <span class="comment">// This should be the first statement in this function in order to ensure
-    // that no other code utilizes the &quot;first register&quot; before we can read it.
-    // See `setup_context_trampoline()` for more info on how this works.
-    </span><span class="kw">let </span>current_task_id = context_switch::read_first_register();
-
     <span class="kw">let </span>task_entry_func;
     <span class="kw">let </span>task_arg;
     <span class="kw">let </span>recovered_preemption_guard;
@@ -1659,8 +1656,9 @@
     </span>{
         <span class="comment">// Set this task as the current task.
         // We cannot do until this task is actually running, because it uses thread-local storage.
-        </span><span class="kw">let </span>current_task = task::init_current_task(current_task_id, <span class="prelude-val">None</span>)
-            .expect(<span class="string">&quot;BUG: task_wrapper: couldn&#39;t init this task as the current task&quot;</span>);
+        </span><span class="kw">let </span>current_task = task::init_current_task(current_task_id, <span class="prelude-val">None</span>).unwrap_or_else(|<span class="kw">_</span>|
+            <span class="macro">panic!</span>(<span class="string">&quot;BUG: task_wrapper: couldn&#39;t init task {} as the current task&quot;</span>, current_task_id)
+        );
 
         <span class="comment">// The first time that a task runs, its entry function `task_wrapper()` is jumped to
         // from the `task_switch()` function, right after the end of `context_switch`().
@@ -1712,7 +1710,11 @@
     R: Send + <span class="lifetime">&#39;static</span>,
     F: FnOnce(A) -&gt; R,
 {
-    <span class="kw">let </span>result = task_wrapper_internal::&lt;F, A, R&gt;();
+    <span class="comment">// This must be the first statement in this function in order to ensure
+    // that no other code utilizes the &quot;first register&quot; before we can read it.
+    // See `setup_context_trampoline()` for more info on how this works.
+    </span><span class="kw">let </span>current_task_id = context_switch::read_first_register();
+    <span class="kw">let </span>result = task_wrapper_internal::&lt;F, A, R&gt;(current_task_id);
 
     <span class="comment">// Here: now that the task is finished running, we must clean in up by doing three things:
     // 1. Put the task into a non-runnable mode (exited or killed) and set its exit value or killed reason
@@ -1726,8 +1728,7 @@
     // Operations 1 happen in `task_cleanup_success` or `task_cleanup_failure`, 
     // while operations 2 and 3 then happen in `task_cleanup_final`.
     </span><span class="kw">let </span>curr_task = get_my_current_task()
-        .expect(<span class="string">&quot;BUG: task_wrapper: couldn&#39;t get current task (after task func).&quot;</span>)
-        .clone();
+        .expect(<span class="string">&quot;BUG: task_wrapper: couldn&#39;t get current task (after task func).&quot;</span>);
     <span class="kw">match </span>result {
         <span class="prelude-val">Ok</span>(exit_value)   =&gt; task_cleanup_success::&lt;F, A, R&gt;(curr_task, exit_value),
         <span class="prelude-val">Err</span>(kill_reason) =&gt; task_cleanup_failure::&lt;F, A, R&gt;(curr_task, kill_reason),
@@ -1743,12 +1744,15 @@
     R: Send + <span class="lifetime">&#39;static</span>,
     F: FnOnce(A) -&gt; R + Send + Clone + <span class="lifetime">&#39;static</span>,
 {
-    <span class="kw">let </span>result = task_wrapper_internal::&lt;F, A, R&gt;();
+    <span class="comment">// This must be the first statement in this function in order to ensure
+    // that no other code utilizes the &quot;first register&quot; before we can read it.
+    // See `setup_context_trampoline()` for more info on how this works.
+    </span><span class="kw">let </span>current_task_id = context_switch::read_first_register();
+    <span class="kw">let </span>result = task_wrapper_internal::&lt;F, A, R&gt;(current_task_id);
 
     <span class="comment">// See `task_wrapper` for an explanation of how the below functions work.
     </span><span class="kw">let </span>curr_task = get_my_current_task()
-        .expect(<span class="string">&quot;BUG: task_wrapper: couldn&#39;t get current task (after task func).&quot;</span>)
-        .clone();
+        .expect(<span class="string">&quot;BUG: task_wrapper: couldn&#39;t get current task (after task func).&quot;</span>);
     <span class="kw">match </span>result {
         <span class="prelude-val">Ok</span>(exit_value)   =&gt; task_restartable_cleanup_success::&lt;F, A, R&gt;(curr_task, exit_value),
         <span class="prelude-val">Err</span>(kill_reason) =&gt; task_restartable_cleanup_failure::&lt;F, A, R&gt;(curr_task, kill_reason),

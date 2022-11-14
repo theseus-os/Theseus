@@ -147,13 +147,6 @@
 <span id="147">147</span>
 <span id="148">148</span>
 <span id="149">149</span>
-<span id="150">150</span>
-<span id="151">151</span>
-<span id="152">152</span>
-<span id="153">153</span>
-<span id="154">154</span>
-<span id="155">155</span>
-<span id="156">156</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Interpreter for executing WASI-compliant WASM binaries.
 //!
 //! `wasi_interpreter` provides an interface between the `wasmi` crate (used to interpret
@@ -188,7 +181,6 @@
 <span class="kw">extern crate </span>wasmi;
 
 <span class="kw">use </span>alloc::string::String;
-<span class="kw">use </span>alloc::sync::Arc;
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>core::convert::TryFrom;
 <span class="kw">use </span>core::str::FromStr;
@@ -259,11 +251,9 @@
     .unwrap();
 
     <span class="comment">// Populate environment variables.
-    </span><span class="kw">let </span>pwd: String = task::get_my_current_task()
-        .unwrap()
-        .get_env()
-        .lock()
-        .cwd();
+    </span><span class="kw">let </span>pwd: String = task::with_current_task(|t|
+        t.get_env().lock().cwd()
+    ).expect(<span class="string">&quot;couldn&#39;t get current task&quot;</span>);
 
     <span class="kw">let </span><span class="kw-2">mut </span>theseus_env_vars: Vec&lt;String&gt; = Vec::new();
     theseus_env_vars.push(<span class="macro">format!</span>(<span class="string">&quot;PWD={}&quot;</span>, pwd));
@@ -285,13 +275,9 @@
             .fd_table
             .open_path(
                 <span class="kw-2">&amp;</span>preopen_dir,
-                Arc::clone(
-                    <span class="kw-2">&amp;</span>task::get_my_current_task()
-                        .unwrap()
-                        .get_env()
-                        .lock()
-                        .working_dir,
-                ),
+                task::with_current_task(|t|
+                    t.get_env().lock().working_dir.clone()
+                ).expect(<span class="string">&quot;couldn&#39;t get current task&quot;</span>),
                 wasi::LOOKUPFLAGS_SYMLINK_FOLLOW,
                 wasi::OFLAGS_DIRECTORY,
                 wasi_definitions::FULL_DIR_RIGHTS,

@@ -259,7 +259,7 @@
     <span class="kw">let </span>current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
     <span class="kw">let </span>resume_time = current_tick_count + duration;
 
-    <span class="kw">let </span>current_task = get_my_current_task().unwrap().clone();
+    <span class="kw">let </span>current_task = get_my_current_task().unwrap();
     <span class="comment">// Add the current task to the delayed tasklist and then block it.
     </span>add_to_delayed_tasklist(SleepingTaskNode{taskref: current_task.clone(), resume_time});
     current_task.block()<span class="question-mark">?</span>;

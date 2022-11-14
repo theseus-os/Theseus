@@ -227,8 +227,6 @@
 <span id="227">227</span>
 <span id="228">228</span>
 <span id="229">229</span>
-<span id="230">230</span>
-<span id="231">231</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
@@ -256,9 +254,7 @@
     ///  more details.
     </span><span class="kw">pub fn </span>new(task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;WaitGuard, RunState&gt; {
         task.block()<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(WaitGuard {
-            task,
-        })
+        <span class="prelude-val">Ok</span>(WaitGuard { task })
     }
 
     <span class="doccomment">/// Blocks the task guarded by this waitguard,
@@ -346,8 +342,6 @@
     </span><span class="comment">// /// The `condition` closure is invoked with one argument, an immutable reference to the waitqueue, 
     // /// to allow the closure to examine the condition of the waitqueue if necessary. 
     </span><span class="kw">pub fn </span>wait_until&lt;R&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, condition: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Fn(<span class="comment">/* &amp;VecDeque&lt;TaskRef&gt; */</span>) -&gt; <span class="prelude-ty">Option</span>&lt;R&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;R, WaitError&gt; {
-        <span class="kw">let </span>curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)<span class="question-mark">?</span>;
-
         <span class="comment">// Do the following atomically:
         // (1) Obtain the waitqueue lock
         // (2) Add the current task to the waitqueue
@@ -359,14 +353,16 @@
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(ret) = condition(<span class="comment">/* &amp;wq_locked */</span>) {
                     <span class="kw">return </span><span class="prelude-val">Ok</span>(ret);
                 }
-                <span class="comment">// This is only necessary because we&#39;re using a non-Set waitqueue collection that allows duplicates
-                </span><span class="kw">if </span>!wq_locked.contains(curr_task) {
-                    wq_locked.push_back(curr_task.clone());
-                } <span class="kw">else </span>{
-                    <span class="macro">warn!</span>(<span class="string">&quot;WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}&quot;</span>, curr_task);
-                }
-                <span class="comment">// trace!(&quot;WaitQueue::wait_until():  putting task to sleep: {:?}\n    --&gt; WQ: {:?}&quot;, curr_task, &amp;*wq_locked);
-                </span>curr_task.block().map_err(|<span class="kw">_</span>| WaitError::CantBlockCurrentTask)<span class="question-mark">?</span>;
+                task::with_current_task(|curr_task| {
+                    <span class="comment">// This is only necessary because we&#39;re using a non-Set waitqueue collection that allows duplicates
+                    </span><span class="kw">if </span>!wq_locked.contains(curr_task) {
+                        wq_locked.push_back(curr_task.clone());
+                    } <span class="kw">else </span>{
+                        <span class="macro">warn!</span>(<span class="string">&quot;WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}&quot;</span>, curr_task);
+                    }
+                    <span class="comment">// trace!(&quot;WaitQueue::wait_until():  putting task to sleep: {:?}\n    --&gt; WQ: {:?}&quot;, curr_task, &amp;*wq_locked);
+                    </span>curr_task.block().map_err(|<span class="kw">_</span>| WaitError::CantBlockCurrentTask)
+                }).map_err(|<span class="kw">_</span>| WaitError::NoCurrentTask)<span class="question-mark">??</span>;
             }
             scheduler::schedule();
 
@@ -378,8 +374,6 @@
     <span class="doccomment">/// Similar to [`wait_until`](#method.wait_until), but this function accepts a `condition` closure
     /// that can mutate its environment (a `FnMut`).
     </span><span class="kw">pub fn </span>wait_until_mut&lt;R&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, condition: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>FnMut(<span class="comment">/* &amp;VecDeque&lt;TaskRef&gt; */</span>) -&gt; <span class="prelude-ty">Option</span>&lt;R&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;R, WaitError&gt; {
-        <span class="kw">let </span>curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)<span class="question-mark">?</span>;
-
         <span class="comment">// Do the following atomically:
         // (1) Obtain the waitqueue lock
         // (2) Add the current task to the waitqueue
@@ -391,14 +385,16 @@
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(ret) = condition(<span class="comment">/* &amp;wq_locked */</span>) {
                     <span class="kw">return </span><span class="prelude-val">Ok</span>(ret);
                 }
-                <span class="comment">// This is only necessary because we&#39;re using a non-Set waitqueue collection that allows duplicates
-                </span><span class="kw">if </span>!wq_locked.contains(curr_task) {
-                    wq_locked.push_back(curr_task.clone());
-                } <span class="kw">else </span>{
-                    <span class="macro">warn!</span>(<span class="string">&quot;WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}&quot;</span>, curr_task);
-                }
-                <span class="comment">// trace!(&quot;WaitQueue::wait_until():  putting task to sleep: {:?}\n    --&gt; WQ: {:?}&quot;, curr_task, &amp;*wq_locked);
-                </span>curr_task.block().map_err(|<span class="kw">_</span>| WaitError::CantBlockCurrentTask)<span class="question-mark">?</span>;
+                task::with_current_task(|curr_task| {
+                    <span class="comment">// This is only necessary because we&#39;re using a non-Set waitqueue collection that allows duplicates
+                    </span><span class="kw">if </span>!wq_locked.contains(curr_task) {
+                        wq_locked.push_back(curr_task.clone());
+                    } <span class="kw">else </span>{
+                        <span class="macro">warn!</span>(<span class="string">&quot;WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}&quot;</span>, curr_task);
+                    }
+                    <span class="comment">// trace!(&quot;WaitQueue::wait_until():  putting task to sleep: {:?}\n    --&gt; WQ: {:?}&quot;, curr_task, &amp;*wq_locked);
+                    </span>curr_task.block().map_err(|<span class="kw">_</span>| WaitError::CantBlockCurrentTask)
+                }).map_err(|<span class="kw">_</span>| WaitError::NoCurrentTask)<span class="question-mark">??</span>;
             }
             scheduler::schedule();
 

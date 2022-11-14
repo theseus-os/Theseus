@@ -136,6 +136,11 @@
 <span id="136">136</span>
 <span id="137">137</span>
 <span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Manages preemption on a per-CPU core basis.
 //! 
 //! Supports enabling and disabling preemption for the purpose of 
@@ -233,6 +238,11 @@
     ///    obtained this guard.
     </span><span class="kw">pub fn </span>preemption_was_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.preemption_was_enabled
+    }
+
+    <span class="doccomment">/// Returns the APIC ID of the CPU on which this guard was created.
+    </span><span class="kw">pub fn </span>apic_id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 {
+        <span class="self">self</span>.apic_id
     }
 }
 

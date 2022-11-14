@@ -75,15 +75,6 @@
 <span id="75">75</span>
 <span id="76">76</span>
 <span id="77">77</span>
-<span id="78">78</span>
-<span id="79">79</span>
-<span id="80">80</span>
-<span id="81">81</span>
-<span id="82">82</span>
-<span id="83">83</span>
-<span id="84">84</span>
-<span id="85">85</span>
-<span id="86">86</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Applications that want to print to their parent terminal must import this crate
 //! To print, applications can call the println! or print! macros
 //! 
@@ -152,17 +143,8 @@
 <span class="kw">use </span>core::fmt;
 <span class="doccomment">/// Converts the given `core::fmt::Arguments` to a `String` and enqueues the string into the correct terminal print-producer
 </span><span class="kw">pub fn </span>print_to_stdout_args(fmt_args: fmt::Arguments) {
-    <span class="kw">let </span>task_id = <span class="kw">match </span>task::get_my_current_task_id() {
-        <span class="prelude-val">Some</span>(task_id) =&gt; {task_id},
-        <span class="prelude-val">None </span>=&gt; {
-            <span class="comment">// We cannot use log macros here, because when they&#39;re mirrored to the vga, they will cause infinite loops on an error.
-            // Instead, we write direclty to the serial port. 
-            </span><span class="kw">let _ </span>= logger::write_str(<span class="string">&quot;\x1b[31m [E] error in print!/println! macro: failed to get current task id \x1b[0m\n&quot;</span>);
-            <span class="kw">return</span>;
-        }
-    };
-    
-    <span class="comment">// Obtains the correct terminal print producer and enqueues the print event, which will later be popped off
+    <span class="kw">let </span>task_id = task::get_my_current_task_id();    
+    <span class="comment">// Obtain the correct terminal print producer and enqueues the print event, which will later be popped off
     // and handled by the infinite terminal instance loop 
     </span><span class="kw">let </span>print_map = TERMINAL_PRINT_PRODUCERS.lock();
     <span class="kw">let </span>result = print_map.get(<span class="kw-2">&amp;</span>task_id);

@@ -335,6 +335,7 @@
 <span id="335">335</span>
 <span id="336">336</span>
 <span id="337">337</span>
+<span id="338">338</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
 //! `memory` uses this crate to get the memory layout and do other arch-specific operations on x86_64.  
 //! 
@@ -545,7 +546,8 @@
             </span>}
             <span class="string">&quot;.tbss&quot; </span>=&gt; {
                 <span class="comment">// Ignore .tbss (see above) because it is a read-only section of all zeroes.
-                </span><span class="kw">continue</span>;
+                </span><span class="macro">debug!</span>(<span class="string">&quot;     no need to map kernel section \&quot;.tbss\&quot;, it contains no content&quot;</span>);
+                <span class="kw">continue</span>;
             }
             <span class="string">&quot;.data&quot; </span>=&gt; {
                 data_start.get_or_insert((start_virt_addr, start_phys_addr));

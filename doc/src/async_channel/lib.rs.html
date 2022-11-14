@@ -364,11 +364,6 @@
 <span id="364">364</span>
 <span id="365">365</span>
 <span id="366">366</span>
-<span id="367">367</span>
-<span id="368">368</span>
-<span id="369">369</span>
-<span id="370">370</span>
-<span id="371">371</span>
 </pre><pre class="rust"><code><span class="doccomment">//! An asynchronous channel for Inter-Task Communication (ITC) with an internal queue for buffering messages.
 //! 
 //! This crate offers an asynchronous channel that allows multiple tasks
@@ -590,16 +585,11 @@
             <span class="kw">let </span>value = hpet::get_hpet().as_ref().unwrap().get_counter();
             <span class="comment">// debug!(&quot;Value {} {}&quot;, value, value % 1024);
 
-            </span><span class="kw">match </span>task::get_my_current_task() {
-                <span class="prelude-val">Some</span>(curr_task) =&gt; {
-
-                    <span class="comment">// We restrict the fault to a specific task to make measurements consistent
-                    </span><span class="kw">if </span>(value % <span class="number">4096</span>) == <span class="number">0  </span>&amp;&amp; curr_task.is_restartable() {
-                        <span class="comment">// debug!(&quot;Fake error {}&quot;, value);
-                        </span><span class="kw">unsafe </span>{ <span class="kw-2">*</span>(<span class="number">0x5050DEADBEEF </span><span class="kw">as </span><span class="kw-2">*mut </span>usize) = <span class="number">0x5555_5555_5555</span>; }
-                    }
-                },
-                <span class="kw">_ </span>=&gt; (),
+            </span><span class="kw">let </span>is_restartable = task::with_current_task(|t| t.is_restartable()).unwrap_or(<span class="bool-val">false</span>);
+            <span class="comment">// We restrict the fault to a specific task to make measurements consistent
+            </span><span class="kw">if </span>(value % <span class="number">4096</span>) == <span class="number">0  </span>&amp;&amp; is_restartable {
+                <span class="comment">// debug!(&quot;Fake error {}&quot;, value);
+                </span><span class="kw">unsafe </span>{ <span class="kw-2">*</span>(<span class="number">0x5050DEADBEEF </span><span class="kw">as </span><span class="kw-2">*mut </span>usize) = <span class="number">0x5555_5555_5555</span>; }
             }
         }
 

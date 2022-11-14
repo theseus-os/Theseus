@@ -495,10 +495,6 @@
 <span id="495">495</span>
 <span id="496">496</span>
 <span id="497">497</span>
-<span id="498">498</span>
-<span id="499">499</span>
-<span id="500">500</span>
-<span id="501">501</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Types for interacting with Theseus standard I/O and file system via POSIX-style abstraction.
 //!
 //! This module provides APIs to:
@@ -649,13 +645,9 @@
     /// Returns relative path of file descriptor as a string.
     </span><span class="kw">pub fn </span>get_relative_path(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
         <span class="kw">let </span>absolute_path = Path::new(<span class="self">self</span>.theseus_file_or_dir.get_absolute_path());
-        <span class="kw">let </span>wd_path = Path::new(
-            task::get_my_current_task()
-                .unwrap()
-                .get_env()
-                .lock()
-                .cwd(),
-        );
+        <span class="kw">let </span>wd_path = task::with_current_task(|t|
+            Path::new(t.get_env().lock().cwd())
+        ).expect(<span class="string">&quot;couldn&#39;t get current task&quot;</span>);
 
         <span class="kw">let </span>relative_path: Path = absolute_path.relative(<span class="kw-2">&amp;</span>wd_path).unwrap();
         String::from(relative_path)

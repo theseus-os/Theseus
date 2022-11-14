@@ -896,7 +896,6 @@
 <span id="896">896</span>
 <span id="897">897</span>
 <span id="898">898</span>
-<span id="899">899</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the Performance Monitoring Unit 
 //! 
 //! We have support for PMU version 2. Each succesive PMU version includes the features provided by the previous versions.
@@ -1679,8 +1678,8 @@
 
 <span class="doccomment">/// Finds the corresponding function for each instruction pointer and calculates the percentage amount each function occured in the samples
 </span><span class="kw">pub fn </span>find_function_names_from_samples(sample_results: <span class="kw-2">&amp;</span>SampleResults) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>taskref = task::get_my_current_task().ok_or(<span class="string">&quot;pmu_x86::get_function_names_from_samples: Could not get reference to current task&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>namespace = taskref.get_namespace();
+    <span class="kw">let </span>namespace = task::with_current_task(|f| f.get_namespace().clone())
+        .map_err(|<span class="kw">_</span>| <span class="string">&quot;pmu_x86::get_function_names_from_samples: couldn&#39;t get current task&quot;</span>)<span class="question-mark">?</span>;
     <span class="macro">debug!</span>(<span class="string">&quot;Analyze Samples:&quot;</span>);
 
     <span class="kw">let </span><span class="kw-2">mut </span>sections: BTreeMap&lt;String, usize&gt; = BTreeMap::new();
@@ -1751,18 +1750,17 @@
     samples.sample_count = current_count - <span class="number">1</span>;
 
     <span class="comment">// if the running task is the requested one or if one isn&#39;t requested, records the IP
-    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(taskref) = task::get_my_current_task() {
+    </span>task::with_current_task(|taskref| {
         <span class="kw">let </span>requested_task_id = samples.task_id;
-        
         <span class="kw">let </span>task_id = taskref.id;
         <span class="kw">if </span>(requested_task_id == <span class="number">0</span>) | (requested_task_id == task_id) {
             samples.ip_list.push(stack_frame.instruction_pointer);
             samples.task_id_list.push(task_id);
         }
-    } <span class="kw">else </span>{
+    }).unwrap_or_else(|<span class="kw">_</span>| {
         samples.ip_list.push(stack_frame.instruction_pointer);
         samples.task_id_list.push(<span class="number">0</span>);
-    }
+    });
 
     <span class="comment">// stops the counter, resets it, and restarts it
     </span><span class="kw">unsafe </span>{
