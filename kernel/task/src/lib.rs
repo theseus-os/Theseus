@@ -1072,10 +1072,6 @@ fn task_switch_inner(
     let curr_task_has_exited = curr.has_exited();
     #[cfg(simd_personality)]
     let curr_simd = curr.simd;
-    drop(curr);
-    // ------------------------------------------------------
-    // --- At this point, `curr` is no longer accessible. ---
-    // ------------------------------------------------------
 
     // If the current task has exited at this point, then it will never run again.
     // Thus, we need to remove or "deinit" the `TaskRef` in its TLS area
