@@ -719,8 +719,7 @@ where
     // Operations 1 happen in `task_cleanup_success` or `task_cleanup_failure`, 
     // while operations 2 and 3 then happen in `task_cleanup_final`.
     let curr_task = get_my_current_task()
-        .expect("BUG: task_wrapper: couldn't get current task (after task func).")
-        .clone();
+        .expect("BUG: task_wrapper: couldn't get current task (after task func).");
     match result {
         Ok(exit_value)   => task_cleanup_success::<F, A, R>(curr_task, exit_value),
         Err(kill_reason) => task_cleanup_failure::<F, A, R>(curr_task, kill_reason),
@@ -740,8 +739,7 @@ where
 
     // See `task_wrapper` for an explanation of how the below functions work.
     let curr_task = get_my_current_task()
-        .expect("BUG: task_wrapper: couldn't get current task (after task func).")
-        .clone();
+        .expect("BUG: task_wrapper: couldn't get current task (after task func).");
     match result {
         Ok(exit_value)   => task_restartable_cleanup_success::<F, A, R>(curr_task, exit_value),
         Err(kill_reason) => task_restartable_cleanup_failure::<F, A, R>(curr_task, kill_reason),
