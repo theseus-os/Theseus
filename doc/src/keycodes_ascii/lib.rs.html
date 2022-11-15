@@ -420,187 +420,13 @@
 <span id="420">420</span>
 <span id="421">421</span>
 <span id="422">422</span>
-<span id="423">423</span>
-<span id="424">424</span>
-<span id="425">425</span>
-<span id="426">426</span>
-<span id="427">427</span>
-<span id="428">428</span>
-<span id="429">429</span>
-<span id="430">430</span>
-<span id="431">431</span>
-<span id="432">432</span>
-<span id="433">433</span>
-<span id="434">434</span>
-<span id="435">435</span>
-<span id="436">436</span>
-<span id="437">437</span>
-<span id="438">438</span>
-<span id="439">439</span>
-<span id="440">440</span>
-<span id="441">441</span>
-<span id="442">442</span>
-<span id="443">443</span>
-<span id="444">444</span>
-<span id="445">445</span>
-<span id="446">446</span>
-<span id="447">447</span>
-<span id="448">448</span>
-<span id="449">449</span>
-<span id="450">450</span>
-<span id="451">451</span>
-<span id="452">452</span>
-<span id="453">453</span>
-<span id="454">454</span>
-<span id="455">455</span>
-<span id="456">456</span>
-<span id="457">457</span>
-<span id="458">458</span>
-<span id="459">459</span>
-<span id="460">460</span>
-<span id="461">461</span>
-<span id="462">462</span>
-<span id="463">463</span>
-<span id="464">464</span>
-<span id="465">465</span>
-<span id="466">466</span>
-<span id="467">467</span>
-<span id="468">468</span>
-<span id="469">469</span>
-<span id="470">470</span>
-<span id="471">471</span>
-<span id="472">472</span>
-<span id="473">473</span>
-<span id="474">474</span>
-<span id="475">475</span>
-<span id="476">476</span>
-<span id="477">477</span>
-<span id="478">478</span>
-<span id="479">479</span>
-<span id="480">480</span>
-<span id="481">481</span>
-<span id="482">482</span>
-<span id="483">483</span>
-<span id="484">484</span>
-<span id="485">485</span>
-<span id="486">486</span>
-<span id="487">487</span>
-<span id="488">488</span>
-<span id="489">489</span>
-<span id="490">490</span>
-<span id="491">491</span>
-<span id="492">492</span>
-<span id="493">493</span>
-<span id="494">494</span>
-<span id="495">495</span>
-<span id="496">496</span>
-<span id="497">497</span>
-<span id="498">498</span>
-<span id="499">499</span>
-<span id="500">500</span>
-<span id="501">501</span>
-<span id="502">502</span>
-<span id="503">503</span>
-<span id="504">504</span>
-<span id="505">505</span>
-<span id="506">506</span>
-<span id="507">507</span>
-<span id="508">508</span>
-<span id="509">509</span>
-<span id="510">510</span>
-<span id="511">511</span>
-<span id="512">512</span>
-<span id="513">513</span>
-<span id="514">514</span>
-<span id="515">515</span>
-<span id="516">516</span>
-<span id="517">517</span>
-<span id="518">518</span>
-<span id="519">519</span>
-<span id="520">520</span>
-<span id="521">521</span>
-<span id="522">522</span>
-<span id="523">523</span>
-<span id="524">524</span>
-<span id="525">525</span>
-<span id="526">526</span>
-<span id="527">527</span>
-<span id="528">528</span>
-<span id="529">529</span>
-<span id="530">530</span>
-<span id="531">531</span>
-<span id="532">532</span>
-<span id="533">533</span>
-<span id="534">534</span>
-<span id="535">535</span>
-<span id="536">536</span>
-<span id="537">537</span>
-<span id="538">538</span>
-<span id="539">539</span>
-<span id="540">540</span>
-<span id="541">541</span>
-<span id="542">542</span>
-<span id="543">543</span>
-<span id="544">544</span>
-<span id="545">545</span>
-<span id="546">546</span>
-<span id="547">547</span>
-<span id="548">548</span>
-<span id="549">549</span>
-<span id="550">550</span>
-<span id="551">551</span>
-<span id="552">552</span>
-<span id="553">553</span>
-<span id="554">554</span>
-<span id="555">555</span>
-<span id="556">556</span>
-<span id="557">557</span>
-<span id="558">558</span>
-<span id="559">559</span>
-<span id="560">560</span>
-<span id="561">561</span>
-<span id="562">562</span>
-<span id="563">563</span>
-<span id="564">564</span>
-<span id="565">565</span>
-<span id="566">566</span>
-<span id="567">567</span>
-<span id="568">568</span>
-<span id="569">569</span>
-<span id="570">570</span>
-<span id="571">571</span>
-<span id="572">572</span>
-<span id="573">573</span>
-<span id="574">574</span>
-<span id="575">575</span>
-<span id="576">576</span>
-<span id="577">577</span>
-<span id="578">578</span>
-</pre><pre class="rust"><code><span class="attr">#![allow(dead_code)]
-#![no_std]
+</pre><pre class="rust"><code><span class="attr">#![no_std]
 
+</span><span class="kw">use </span>bitflags::bitflags;
+<span class="kw">use </span>num_enum::TryFromPrimitive;
 
-#[macro_use] </span><span class="kw">extern crate </span>bitflags;
-
-<span class="comment">// use core::cell::RefCell;
-
-// TODO: use these tables and tips:
-// https://sourceforge.net/p/oszur11/code/ci/master/tree/Chapter_06_Shell/04_Makepp/arch/i386/arch/devices/i8042.c
-
-// TODO: seems like we actually can use phf crates
-// we can use the &quot;core&quot; feature enables libcore instead of libstd
-// you can use number literals like so: 
-/*
-static MYMAP: phf::Map&lt;u8, &amp;&#39;static Keycode&gt; = phf_map! {
-    0u8 =&gt; Keycode::BLAH,
-    1u8 =&gt; Keycode::BLAH2,
-    ... etc ...
-}
-*/
-
-// the implementation here follows the rule of representation, 
+<span class="comment">// the implementation here follows the rule of representation, 
 // which is to use complicated data structures to permit simpler logic. 
-
 
 </span><span class="macro">bitflags! </span>{
     <span class="doccomment">/// The set of modifier keys that can be held down while other keys are pressed.
@@ -702,7 +528,7 @@ static MYMAP: phf::Map&lt;u8, &amp;&#39;static Keycode&gt; = phf_map! {
 }
 
 <span class="kw">impl </span>KeyEvent {
-    <span class="kw">pub fn </span>new(keycode: Keycode, action: KeyAction, modifiers: KeyboardModifiers,) -&gt; KeyEvent {
+    <span class="kw">pub fn </span>new(keycode: Keycode, action: KeyAction, modifiers: KeyboardModifiers) -&gt; KeyEvent {
         KeyEvent {
             keycode, 
             action,
@@ -711,7 +537,9 @@ static MYMAP: phf::Map&lt;u8, &amp;&#39;static Keycode&gt; = phf_map! {
     }
 }
 
-<span class="doccomment">/// The offset that a keyboard adds to the scancode
+<span class="comment">// FIXME: this is only true for scancode set 1, set 2 uses (0xF0, make-code),
+// set 3 uses single byte make-codes and (0xF0, make-code) everywhere, no extended codes
+</span><span class="doccomment">/// The offset that a keyboard adds to the scancode
 /// to indicate that the key was released rather than pressed. 
 /// So if a scancode of `1` means a key `foo` was pressed,
 /// a scancode of `129` (1 + 128) means that key `foo` was released. 
@@ -719,11 +547,14 @@ static MYMAP: phf::Map&lt;u8, &amp;&#39;static Keycode&gt; = phf_map! {
 
 <span class="doccomment">/// convenience function for obtaining the ascii value for a raw scancode under the given modifiers
 </span><span class="kw">pub fn </span>scancode_to_ascii(modifiers: KeyboardModifiers, scan_code: u8) -&gt; <span class="prelude-ty">Option</span>&lt;char&gt; {
-	Keycode::from_scancode(scan_code).and_then(|k| k.to_ascii(modifiers))
+    scan_code
+        .try_into()
+        .ok()
+        .and_then(|k: Keycode| k.to_ascii(modifiers))
 }
 
-
-<span class="attr">#[derive(Debug, PartialEq, Clone, Copy)]
+<span class="attr">#[derive(Debug, PartialEq, Clone, Copy, TryFromPrimitive)]
+#[repr(u8)]
 </span><span class="kw">pub enum </span>Keycode {
     OverflowError = <span class="number">0</span>,
     Escape,
@@ -796,19 +627,19 @@ static MYMAP: phf::Map&lt;u8, &amp;&#39;static Keycode&gt; = phf_map! {
     F10,
     NumLock,
     ScrollLock,
-    Home, <span class="comment">// Also Pad7
-    </span>Up, <span class="comment">// Also Pad8
+    Home,   <span class="comment">// Also Pad7
+    </span>Up,     <span class="comment">// Also Pad8
     </span>PageUp, <span class="comment">// Also Pad9
     </span>PadMinus,
     Left, <span class="comment">// Also Pad4
     </span>Pad5,
     Right, <span class="comment">// Also Pad6
     </span>PadPlus,
-    End, <span class="comment">// Also Pad1
-    </span>Down, <span class="comment">// Also Pad2
+    End,      <span class="comment">// Also Pad1
+    </span>Down,     <span class="comment">// Also Pad2
     </span>PageDown, <span class="comment">// Also Pad3
-    </span>Insert, <span class="comment">// Also Pad0
-    </span>Delete, <span class="comment">// Also PadDecimal
+    </span>Insert,   <span class="comment">// Also Pad0
+    </span>Delete,   <span class="comment">// Also PadDecimal
     </span>Unknown1,
     Unknown2,
     NonUsBackslash,
@@ -819,127 +650,25 @@ static MYMAP: phf::Map&lt;u8, &amp;&#39;static Keycode&gt; = phf_map! {
     SuperKeyLeft,
     SuperKeyRight,
     Menu,
+    ControlReleased = Keycode::Control <span class="kw">as </span>u8 + KEY_RELEASED_OFFSET,
+    AltReleased = Keycode::Alt <span class="kw">as </span>u8 + KEY_RELEASED_OFFSET,
+    LeftShiftReleased = Keycode::LeftShift <span class="kw">as </span>u8 + KEY_RELEASED_OFFSET,
+    RightShiftReleased = Keycode::RightShift <span class="kw">as </span>u8 + KEY_RELEASED_OFFSET,
+    SuperKeyLeftReleased = Keycode::SuperKeyLeft <span class="kw">as </span>u8 + KEY_RELEASED_OFFSET,
+    SuperKeyRightReleased = Keycode::SuperKeyRight <span class="kw">as </span>u8 + KEY_RELEASED_OFFSET,
 } 
 
-
-
-
 <span class="kw">impl </span>Keycode {
-
-    <span class="kw">pub fn </span>from_scancode(scancode: u8)  -&gt; <span class="prelude-ty">Option</span>&lt;Keycode&gt; {
-        <span class="kw">match </span>scancode {
-            <span class="number">0 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::OverflowError),
-            <span class="number">1 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Escape),
-            <span class="number">2 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Num1),
-            <span class="number">3 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Num2),
-            <span class="number">4 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Num3),
-            <span class="number">5 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Num4),
-            <span class="number">6 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Num5),
-            <span class="number">7 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Num6),
-            <span class="number">8 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Num7),
-            <span class="number">9 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Num8),
-            <span class="number">10 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Num9),
-            <span class="number">11 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Num0),
-            <span class="number">12 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Minus),
-            <span class="number">13 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Equals),
-            <span class="number">14 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Backspace),
-            <span class="number">15 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Tab),
-            <span class="number">16 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Q),
-            <span class="number">17 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::W),
-            <span class="number">18 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::E),
-            <span class="number">19 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::R),
-            <span class="number">20 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::T),
-            <span class="number">21 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Y),
-            <span class="number">22 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::U),
-            <span class="number">23 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::I),
-            <span class="number">24 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::O),
-            <span class="number">25 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::P),
-            <span class="number">26 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::LeftBracket),
-            <span class="number">27 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::RightBracket),
-            <span class="number">28 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Enter),
-            <span class="number">29 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Control),
-            <span class="number">30 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::A),
-            <span class="number">31 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::S),
-            <span class="number">32 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::D),
-            <span class="number">33 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::F),
-            <span class="number">34 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::G),
-            <span class="number">35 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::H),
-            <span class="number">36 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::J),
-            <span class="number">37 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::K),
-            <span class="number">38 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::L),
-            <span class="number">39 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Semicolon),
-            <span class="number">40 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Quote),
-            <span class="number">41 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Backtick),
-            <span class="number">42 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::LeftShift),
-            <span class="number">43 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Backslash),
-            <span class="number">44 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Z),
-            <span class="number">45 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::X),
-            <span class="number">46 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::C),
-            <span class="number">47 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::V),
-            <span class="number">48 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::B),
-            <span class="number">49 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::N),
-            <span class="number">50 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::M),
-            <span class="number">51 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Comma),
-            <span class="number">52 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Period),
-            <span class="number">53 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Slash),
-            <span class="number">54 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::RightShift),
-            <span class="number">55 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::PadMultiply), <span class="comment">// Also PrintScreen
-            </span><span class="number">56 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Alt),
-            <span class="number">57 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Space),
-            <span class="number">58 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::CapsLock),
-            <span class="number">59 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::F1),
-            <span class="number">60 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::F2),
-            <span class="number">61 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::F3),
-            <span class="number">62 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::F4),
-            <span class="number">63 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::F5),
-            <span class="number">64 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::F6),
-            <span class="number">65 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::F7),
-            <span class="number">66 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::F8),
-            <span class="number">67 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::F9),
-            <span class="number">68 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::F10),
-            <span class="number">69 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::NumLock),
-            <span class="number">70 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::ScrollLock),
-            <span class="number">71 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Home), <span class="comment">// Also Pad7
-            </span><span class="number">72 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Up), <span class="comment">// Also Pad8
-            </span><span class="number">73 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::PageUp), <span class="comment">// Also Pad9
-            </span><span class="number">74 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::PadMinus),
-            <span class="number">75 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Left), <span class="comment">// Also Pad4
-            </span><span class="number">76 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Pad5),
-            <span class="number">77 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Right), <span class="comment">// Also Pad6
-            </span><span class="number">78 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::PadPlus),
-            <span class="number">79 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::End), <span class="comment">// Also Pad1
-            </span><span class="number">80 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Down), <span class="comment">// Also Pad2
-            </span><span class="number">81 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::PageDown), <span class="comment">// Also Pad3
-            </span><span class="number">82 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Insert), <span class="comment">// Also Pad0
-            </span><span class="number">83 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Delete), <span class="comment">// Also PadDecimal
-            </span><span class="number">84 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Unknown1),
-            <span class="number">85 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Unknown2),
-            <span class="number">86 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::NonUsBackslash),
-            <span class="number">87 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::F11),
-            <span class="number">88 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::F12),
-            <span class="number">89 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Pause),
-            <span class="number">90 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Unknown3),
-            <span class="number">91 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::SuperKeyLeft),
-            <span class="number">92 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::SuperKeyRight),
-            <span class="number">93 </span>=&gt; <span class="prelude-val">Some</span>(Keycode::Menu),
-
-            <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
-        }
-    }
-
-
-
     <span class="doccomment">/// Obtains the ascii value for a keycode under the given modifiers
     </span><span class="kw">pub fn </span>to_ascii(<span class="kw-2">&amp;</span><span class="self">self</span>, modifiers: KeyboardModifiers) -&gt; <span class="prelude-ty">Option</span>&lt;char&gt; {
         <span class="comment">// handle shift key being pressed
         </span><span class="kw">if </span>modifiers.is_shift() {
-            <span class="comment">// if shift is pressed and caps lock is on, give a regular lowercase letter
-            </span><span class="kw">if </span>modifiers.is_caps_lock() &amp;&amp; <span class="self">self</span>.is_letter() {
-                <span class="kw">return </span><span class="self">self</span>.as_ascii();
-            }
-            <span class="comment">// if shift is pressed and caps lock is not, give a regular shifted key
-            </span><span class="kw">else </span>{
-                <span class="kw">return </span><span class="self">self</span>.as_ascii_shifted()
+            <span class="kw">if </span>modifiers.is_caps_lock() &amp;&amp; <span class="self">self</span>.is_letter() {
+                <span class="comment">// if shift is pressed and caps lock is on, give a regular lowercase letter
+                </span><span class="kw">return </span><span class="self">self</span>.as_ascii();
+            } <span class="kw">else </span>{
+                <span class="comment">// if shift is pressed and caps lock is not, give a regular shifted key
+                </span><span class="kw">return </span><span class="self">self</span>.as_ascii_shifted();
             }
         }
         
@@ -947,10 +676,9 @@ static MYMAP: phf::Map&lt;u8, &amp;&#39;static Keycode&gt; = phf_map! {
         // (we already covered the shift &amp;&amp; caps_lock scenario above)
         </span><span class="kw">if </span>modifiers.is_caps_lock() {
             <span class="kw">if </span><span class="self">self</span>.is_letter() {
-                <span class="kw">return </span><span class="self">self</span>.as_ascii_shifted()
-            }
-            <span class="kw">else </span>{
-                <span class="kw">return </span><span class="self">self</span>.as_ascii()
+                <span class="kw">return </span><span class="self">self</span>.as_ascii_shifted();
+            } <span class="kw">else </span>{
+                <span class="kw">return </span><span class="self">self</span>.as_ascii();
             }
         }
 
@@ -959,8 +687,6 @@ static MYMAP: phf::Map&lt;u8, &amp;&#39;static Keycode&gt; = phf_map! {
         
         <span class="comment">// TODO: handle numlock
     </span>}
-
-
 
     <span class="doccomment">/// returns true if this keycode was a letter from A-Z
     </span><span class="kw">pub fn </span>is_letter(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
@@ -995,8 +721,6 @@ static MYMAP: phf::Map&lt;u8, &amp;&#39;static Keycode&gt; = phf_map! {
             <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
         }
     }
-
-
 
     <span class="doccomment">/// maps a Keycode to ASCII char values without any &quot;shift&quot; modifiers.
     </span><span class="kw">fn </span>as_ascii(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;char&gt; {
@@ -1057,11 +781,9 @@ static MYMAP: phf::Map&lt;u8, &amp;&#39;static Keycode&gt; = phf_map! {
             Keycode::PadMinus =&gt; <span class="prelude-val">Some</span>(<span class="string">&#39;-&#39;</span>),
             Keycode::PadPlus =&gt; <span class="prelude-val">Some</span>(<span class="string">&#39;+&#39;</span>),
             <span class="comment">// PadSlash / PadDivide?? 
-
             </span><span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
         }
     }
-
 
     <span class="doccomment">/// same as as_ascii, but adds the effect of the &quot;shift&quot; modifier key. 
     /// If a Keycode&#39;s ascii value doesn&#39;t change when shifted,
@@ -1120,39 +842,5 @@ static MYMAP: phf::Map&lt;u8, &amp;&#39;static Keycode&gt; = phf_map! {
         }
     }
 }
-
-
-
-
-<span class="comment">// // I cant get TryFrom to work with core library
-// use try_from::Err;
-
-// #[derive(Debug)]
-// pub struct TryFromKeycodeError { 
-//     scan_code: u8,
-// }
-
-// impl Err for TryFromKeycodeError {
-//     fn description(&amp;self) -&gt; &amp;str {
-//         &quot;out of range integral type conversion attempted&quot;
-//     }
-// }
-
-// impl fmt::Display for TryFromKeycodeError {
-//     fn fmt(&amp;self, fmt: &amp;mut fmt::Formatter) -&gt; fmt::Result {
-//         fmt.write_str(self.description())
-//     }
-// }
-
-// impl TryFrom&lt;u8&gt; for Keycode {
-//     type Err = TryFromKeycodeError;
-//     fn try_from(original: u8) -&gt; Result&lt;Keycode, TryFromKeycodeError&gt; {
-//         let kc = get_keycode(original);
-//         match kc {
-//             Some(x) =&gt; Ok(x),
-//             fail =&gt; Err(TryFromKeycodeError{ scan_code: original }),
-//         }
-//     }
-// }
-</span></code></pre></div>
+</code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="keycodes_ascii" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

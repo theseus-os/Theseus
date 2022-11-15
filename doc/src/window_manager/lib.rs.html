@@ -816,10 +816,6 @@
 <span id="816">816</span>
 <span id="817">817</span>
 <span id="818">818</span>
-<span id="819">819</span>
-<span id="820">820</span>
-<span id="821">821</span>
-<span id="822">822</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate acts as a manager of a list of windows. It defines a `WindowManager` structure and an instance of it. 
 //!
 //! A window manager holds a set of `WindowInner` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.
@@ -1174,12 +1170,12 @@
         <span class="kw">let </span><span class="kw-2">mut </span>event: MousePositionEvent = MousePositionEvent {
             coordinate: Coord::new(<span class="number">0</span>, <span class="number">0</span>),
             gcoordinate: coordinate.clone(),
-            scrolling_up: mouse_event.mousemove.scrolling_up,
-            scrolling_down: mouse_event.mousemove.scrolling_down,
-            left_button_hold: mouse_event.buttonact.left_button_hold,
-            right_button_hold: mouse_event.buttonact.right_button_hold,
-            fourth_button_hold: mouse_event.buttonact.fourth_button_hold,
-            fifth_button_hold: mouse_event.buttonact.fifth_button_hold,
+            scrolling_up: mouse_event.movement.scroll_movement &gt; <span class="number">0</span>, <span class="comment">//TODO: might be more beneficial to save scroll_movement here
+            </span>scrolling_down: mouse_event.movement.scroll_movement &lt; <span class="number">0</span>, <span class="comment">//FIXME: also might be the wrong way around
+            </span>left_button_hold: mouse_event.buttons.left(),
+            right_button_hold: mouse_event.buttons.right(),
+            fourth_button_hold: mouse_event.buttons.fourth(),
+            fifth_button_hold: mouse_event.buttons.fifth(),
         };
 
         <span class="comment">// TODO: FIXME:  improve this logic to just send the mouse event to the top-most window in the entire WM list,
@@ -1504,30 +1500,26 @@
                     keyboard_handle_application(key_input)<span class="question-mark">?</span>;
                 }
                 Event::MouseMovementEvent(<span class="kw-2">ref </span>mouse_event) =&gt; {
-                    <span class="comment">// mouse::mouse_to_print(&amp;mouse_event);
-                    </span><span class="kw">let </span>mouse_displacement = <span class="kw-2">&amp;</span>mouse_event.displacement;
-                    <span class="kw">let </span><span class="kw-2">mut </span>x = (mouse_displacement.x <span class="kw">as </span>i8) <span class="kw">as </span>isize;
-                    <span class="kw">let </span><span class="kw-2">mut </span>y = (mouse_displacement.y <span class="kw">as </span>i8) <span class="kw">as </span>isize;
-                    <span class="comment">// need to combine mouse events if there pending a lot
+                    <span class="comment">//as isize to fit larger values
+                    </span><span class="kw">let </span><span class="kw-2">mut </span>x = mouse_event.movement.x_movement <span class="kw">as </span>isize;
+                    <span class="kw">let </span><span class="kw-2">mut </span>y = mouse_event.movement.y_movement <span class="kw">as </span>isize;
 
+                    <span class="comment">// need to combine mouse events if there pending a lot
                     </span><span class="kw">while let </span><span class="prelude-val">Some</span>(next_event) = mouse_consumer.pop() {
                         <span class="kw">match </span>next_event {
                             Event::MouseMovementEvent(<span class="kw-2">ref </span>next_mouse_event) =&gt; {
-                                <span class="kw">if </span>next_mouse_event.mousemove.scrolling_up
-                                    == mouse_event.mousemove.scrolling_up
-                                    &amp;&amp; next_mouse_event.mousemove.scrolling_down
-                                        == mouse_event.mousemove.scrolling_down
-                                    &amp;&amp; next_mouse_event.buttonact.left_button_hold
-                                        == mouse_event.buttonact.left_button_hold
-                                    &amp;&amp; next_mouse_event.buttonact.right_button_hold
-                                        == mouse_event.buttonact.right_button_hold
-                                    &amp;&amp; next_mouse_event.buttonact.fourth_button_hold
-                                        == mouse_event.buttonact.fourth_button_hold
-                                    &amp;&amp; next_mouse_event.buttonact.fifth_button_hold
-                                        == mouse_event.buttonact.fifth_button_hold
-                                {
-                                    x += (next_mouse_event.displacement.x <span class="kw">as </span>i8) <span class="kw">as </span>isize;
-                                    y += (next_mouse_event.displacement.y <span class="kw">as </span>i8) <span class="kw">as </span>isize;
+                                <span class="kw">if </span>next_mouse_event.movement.scroll_movement
+                                    == mouse_event.movement.scroll_movement
+                                    &amp;&amp; next_mouse_event.buttons.left()
+                                        == mouse_event.buttons.left()
+                                    &amp;&amp; next_mouse_event.buttons.right()
+                                        == mouse_event.buttons.right()
+                                    &amp;&amp; next_mouse_event.buttons.fourth()
+                                        == mouse_event.buttons.fourth()
+                                    &amp;&amp; next_mouse_event.buttons.fifth()
+                                        == mouse_event.buttons.fifth() {
+                                    x = x.saturating_add(next_mouse_event.movement.x_movement <span class="kw">as </span>isize);
+                                    y = y.saturating_add(next_mouse_event.movement.y_movement <span class="kw">as </span>isize);
                                 }
                             }
                             <span class="kw">_ </span>=&gt; {
@@ -1545,7 +1537,7 @@
                             Coord::new(x <span class="kw">as </span>isize, -(y <span class="kw">as </span>isize))
                         )<span class="question-mark">?</span>;
                     }
-                    cursor_handle_application(<span class="kw-2">*</span>mouse_event)<span class="question-mark">?</span>; <span class="comment">// tell the event to application, or moving window
+                    cursor_handle_application(mouse_event.clone())<span class="question-mark">?</span>; <span class="comment">// tell the event to application, or moving window
                 </span>}
                 _other =&gt; {
                     <span class="macro">trace!</span>(<span class="string">&quot;WINDOW_MANAGER: ignoring unexpected event: {:?}&quot;</span>, _other);

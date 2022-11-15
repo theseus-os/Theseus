@@ -97,18 +97,13 @@
 <span id="97">97</span>
 <span id="98">98</span>
 <span id="99">99</span>
-<span id="100">100</span>
-<span id="101">101</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
-</span><span class="kw">extern crate </span>keycodes_ascii;
-<span class="kw">extern crate </span>mouse_data;
-<span class="kw">extern crate </span>alloc;
-<span class="kw">extern crate </span>shapes;
+</span><span class="kw">extern crate </span>alloc;
 
+<span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>keycodes_ascii::KeyEvent;
 <span class="kw">use </span>mouse_data::MouseEvent;
-<span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>shapes::{Coord, Rectangle};
 
 <span class="doccomment">/// An event describing mouse position rather than movement differential from last event.
@@ -133,7 +128,7 @@
     </span><span class="kw">pub </span>fifth_button_hold: bool,
 }
 
-<span class="kw">impl </span>Default <span class="kw">for </span>MousePositionEvent  {
+<span class="kw">impl </span>Default <span class="kw">for </span>MousePositionEvent {
     <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
         MousePositionEvent {
             coordinate: Coord::new(<span class="number">0</span>, <span class="number">0</span>),
@@ -158,10 +153,10 @@
     </span>OutputEvent(String),
     <span class="doccomment">/// Tells an application that the window manager has resized or moved its window
     /// so that it knows to refresh its display and perform any necessary tasks, such as text reflow.
-    /// 
+    ///
     /// The new position and size of the window is given by the `Rectangle` within,
     /// and represents the content area within the window that is accessible to the application,
-    /// which excludes the window title bar, borders, etc. 
+    /// which excludes the window title bar, borders, etc.
     </span>WindowResizeEvent(Rectangle),
     <span class="doccomment">/// The event tells application about mouse&#39;s position currently (including relative to a window and relative to a screen)
     </span>MousePositionEvent(MousePositionEvent),
@@ -175,7 +170,10 @@
     }
 
     <span class="doccomment">/// Create a new output event
-    </span><span class="kw">pub fn </span>new_output_event&lt;S&gt;(s: S) -&gt; Event <span class="kw">where </span>S: Into&lt;String&gt; {
+    </span><span class="kw">pub fn </span>new_output_event&lt;S&gt;(s: S) -&gt; Event
+    <span class="kw">where
+        </span>S: Into&lt;String&gt;,
+    {
         Event::OutputEvent(s.into())
     }
 
@@ -194,11 +192,8 @@
 
 <span class="kw">impl </span>KeyboardInputEvent {
     <span class="doccomment">/// Create a new key board input event. `key` is the key input from the keyboard
-    </span><span class="kw">pub fn </span>new(key: KeyEvent) -&gt; KeyboardInputEvent {
-        KeyboardInputEvent { 
-            key_event: key 
-        }
+    </span><span class="kw">pub fn </span>new(key_event: KeyEvent) -&gt; KeyboardInputEvent {
+        KeyboardInputEvent { key_event }
     }
-}
-</code></pre></div>
+}</code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="event_types" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>
