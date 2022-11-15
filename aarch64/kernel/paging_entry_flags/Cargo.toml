@@ -1,0 +1,9 @@
+[package]
+name = "paging_entry_flags"
+authors = ["Nathan Royer <nathan.royer.pro@gmail.com>"]
+description = "The flags for page table slots."
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "lib.rs"
