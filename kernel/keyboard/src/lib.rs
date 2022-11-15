@@ -84,8 +84,9 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame
         if extended {
             EXTENDED_SCANCODE.store(false, Ordering::SeqCst);
         }
-        // a scan code of zero is a PS2_PORT error that we can ignore
-        if scan_code != 0 {
+        // a scan code of zero is a PS2_PORT error that we can ignore,
+        // a scan code of 0xFA is a command ACK response, already handled in polling (when sending a command, see ps2 crate)
+        if scan_code != 0 && scan_code != 0xFA {
             if let Err(e) = handle_keyboard_input(scan_code, extended) {
                 error!("ps2_keyboard_handler: error handling PS2_PORT input: {e:?}");
             }
