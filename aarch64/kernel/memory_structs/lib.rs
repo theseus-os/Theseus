@@ -5,9 +5,9 @@
 
 #[macro_use] extern crate derive_more;
 extern crate bit_field;
+extern crate kernel_config;
 extern crate zerocopy;
 extern crate paste;
-
 
 use bit_field::BitField;
 use core::{
@@ -19,9 +19,7 @@ use core::{
 use zerocopy::FromBytes;
 use paste::paste;
 
-// temporary redefinitions
-pub const PAGE_SIZE: usize = 4096;
-pub const MAX_PAGE_NUMBER: usize = usize::MAX / PAGE_SIZE;
+pub use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER};
 
 /// A macro for defining `VirtualAddress` and `PhysicalAddress` structs
 /// and implementing their common traits, which are generally identical.
