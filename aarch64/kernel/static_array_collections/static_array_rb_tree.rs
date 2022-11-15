@@ -36,7 +36,7 @@ impl <T: Ord> DerefMut for Wrapper<T> {
 }
 impl <T: Ord> Wrapper<T> {
     /// Convenience method for creating a new link
-    pub(crate) fn new_link(value: T) -> Box<Self> {
+    pub fn new_link(value: T) -> Box<Self> {
         Box::new(Wrapper {
             link: RBTreeLink::new(),
             inner: value,
