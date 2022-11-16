@@ -9,16 +9,8 @@ path = "main.rs"
 
 [dependencies]
 log = "0.4.17"
+
 logger = { path = "../logger" }
 
-[dependencies.uefi]
-git = "https://github.com/theseus-os/uefi-rs/"
-branch = "until-upstream-pr-merged"
-default-features = false
-features = [ "alloc", "exts" ]
-
-[dependencies.uefi-services]
-git = "https://github.com/theseus-os/uefi-rs/"
-branch = "until-upstream-pr-merged"
-default-features = false
-features = [ "panic_handler" ]
+uefi = { version = "0.18", default-features = false, features = [ "alloc", "exts" ] }
+uefi-services = { version = "0.15", default-features = false, features = [ "panic_handler" ] }
