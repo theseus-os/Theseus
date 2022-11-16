@@ -1,172 +1,142 @@
 #![no_std]
 
-#[repr(transparent)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct PagingEntryFlags(u64);
+use bitflags::bitflags;
 
-impl PagingEntryFlags {
-    pub fn new(
-        valid_entry: bool,
-        writeable: bool,
-        executable: bool,
-        cacheable: bool,
-        global: bool,
-        userland: bool,
-        exclusive: bool,
-    ) -> Self {
-        let mut flags = 0;
+bitflags! {
+    pub struct MappedPageAttributes: u8 {
+        const VALID_ENTRY = 0b0000_0001;
+        const WRITEABLE   = 0b0000_0010;
+        const EXECUTABLE  = 0b0000_0100;
+        const CACHEABLE   = 0b0000_1000;
+        const GLOBAL      = 0b0001_0000;
+        const EXCLUSIVE   = 0b0010_0000;
+        const DEFAULT = Self::VALID_ENTRY.bits | Self::CACHEABLE.bits;
+    }
+}
 
-        flags |= match valid_entry {
-            true  => arch::USED_ENTRY,
-            false => arch::UNUSED_ENTRY,
-        };
-
-        flags |= match writeable {
-            true  => arch::WRITEABLE,
-            false => arch::NON_WRITEABLE,
-        };
-
-        flags |= match executable {
-            true  => arch::EXECUTABLE,
-            false => arch::NON_EXECUTABLE,
-        };
-
-        flags |= match cacheable {
-            true  => arch::CACHEABLE,
-            false => arch::NON_CACHEABLE,
-        };
-
-        flags |= match global {
-            true  => arch::GLOBAL,
-            false => arch::NON_GLOBAL,
-        };
-
-        flags |= match userland {
-            true  => arch::USERLAND_ACCESSIBLE,
-            false => arch::USERLAND_INACCESSIBLE,
-        };
-
-        flags |= match exclusive {
-            true  => EXCLUSIVE,
-            false => NON_EXCLUSIVE,
-        };
-
-        Self(flags)
+impl MappedPageAttributes {
+    fn cond(self, enable: bool, flag: MappedPageAttributes) -> Self {
+        self & !flag | match enable {
+            true => flag,
+            false => Self::empty(),
+        }
     }
 
-    fn clear_and_set(self, pair: (u64, u64)) -> Self {
-        let (to_clear, to_set) = pair;
-        Self((self.0 & !to_clear) | to_set)
+    fn has(self, flag: MappedPageAttributes, shift: u64, yes_bits: u64, no_bits:u64) -> u64 {
+        match self.contains(flag) {
+            true => yes_bits << shift,
+            false => no_bits << shift,
+        }
     }
 
-    pub fn valid(self, valid: bool) -> Self {
-        self.clear_and_set(match valid {
-            true  => (arch::UNUSED_ENTRY, arch::USED_ENTRY),
-            false => (arch::USED_ENTRY, arch::UNUSED_ENTRY),
-        })
+    // The processor will stop a page
+    // table walk upon encountering a
+    // slot without this bit.
+    pub fn valid(self, enable: bool) -> Self {
+        self.cond(enable, Self::VALID_ENTRY)
     }
 
-    pub fn writeable(self, writeable: bool) -> Self {
-        self.clear_and_set(match writeable {
-            true  => (arch::NON_WRITEABLE, arch::WRITEABLE),
-            false => (arch::WRITEABLE, arch::NON_WRITEABLE),
-        })
+    // The mapped page can be written to
+    pub fn writeable(self, enable: bool) -> Self {
+        self.cond(enable, Self::WRITEABLE)
     }
 
-    pub fn executable(self, executable: bool) -> Self {
-        self.clear_and_set(match executable {
-            true  => (arch::NON_EXECUTABLE, arch::EXECUTABLE),
-            false => (arch::EXECUTABLE, arch::NON_EXECUTABLE),
-        })
+    // The mapped page contains code to
+    // be jumped to
+    pub fn executable(self, enable: bool) -> Self {
+        self.cond(enable, Self::EXECUTABLE)
     }
 
-    pub fn cacheable(self, cacheable: bool) -> Self {
-        self.clear_and_set(match cacheable {
-            true  => (arch::NON_CACHEABLE, arch::CACHEABLE),
-            false => (arch::CACHEABLE, arch::NON_CACHEABLE),
-        })
+    // The mapped page can be stored in
+    // internal CPU caches (like the L2
+    // cache) for faster access (this
+    // process is automatic)
+    pub fn cacheable(self, enable: bool) -> Self {
+        self.cond(enable, Self::CACHEABLE)
     }
 
-    pub fn global(self, global: bool) -> Self {
-        self.clear_and_set(match global {
-            true  => (arch::NON_GLOBAL, arch::GLOBAL),
-            false => (arch::GLOBAL, arch::NON_GLOBAL),
-        })
+    // This mapped page is mapped in
+    // all address spaces
+    pub fn global(self, enable: bool) -> Self {
+        self.cond(enable, Self::GLOBAL)
     }
 
-    pub fn userland(self, userland: bool) -> Self {
-        self.clear_and_set(match userland {
-            true  => (arch::USERLAND_INACCESSIBLE, arch::USERLAND_ACCESSIBLE),
-            false => (arch::USERLAND_ACCESSIBLE, arch::USERLAND_INACCESSIBLE),
-        })
+    // This mapped page is owned by this
+    // address space and cannot be mapped
+    // in other address spaces
+    pub fn exclusive(self, enable: bool) -> Self {
+        self.cond(enable, Self::EXCLUSIVE)
     }
 
-    pub fn exclusive(self, exclusive: bool) -> Self {
-        self.clear_and_set(match exclusive {
-            true  => (NON_EXCLUSIVE, EXCLUSIVE),
-            false => (EXCLUSIVE, NON_EXCLUSIVE),
-        })
+    pub fn is_valid(&self) -> bool {
+        self.contains(Self::VALID_ENTRY)
+    }
+
+    pub fn is_writeable(&self) -> bool {
+        self.contains(Self::WRITEABLE)
+    }
+
+    pub fn is_executable(&self) -> bool {
+        self.contains(Self::EXECUTABLE)
+    }
+
+    pub fn is_cacheable(&self) -> bool {
+        self.contains(Self::CACHEABLE)
+    }
+
+    pub fn is_global(&self) -> bool {
+        self.contains(Self::GLOBAL)
+    }
+
+    pub fn is_exclusive(&self) -> bool {
+        self.contains(Self::EXCLUSIVE)
     }
 }
 
 #[cfg(target_arch = "aarch64")]
-mod arch {
-    // with the mandatory NOT_A_BLOCK flag
-    pub const            USED_ENTRY: u64 = 0b11 <<  0;
-    pub const          UNUSED_ENTRY: u64 = 0b10 <<  0;
+impl MappedPageAttributes {
+    pub fn to_hardware(self) -> u64 {
+        let mut hw = 0;
 
-    pub const             WRITEABLE: u64 =  0b0 <<  7;
-    pub const         NON_WRITEABLE: u64 =  0b1 <<  7;
+        // with the mandatory NOT_A_BLOCK flag
+        hw |= self.has(Self::VALID_ENTRY,  0, 0b11, 0b10);
+        hw |= self.has(Self::WRITEABLE,    7,  0b0,  0b1);
 
-    // only one bit is used when the cpu supports
-    // one privilege level; when two are supported,
-    // we disable execution for both
-    pub const            EXECUTABLE: u64 = 0b00 << 53;
-    pub const        NON_EXECUTABLE: u64 = 0b11 << 53;
+        // only one bit is used when the cpu supports
+        // one privilege level; when two are supported,
+        // we disable execution for both
+        hw |= self.has(Self::EXECUTABLE,  53, 0b00, 0b11);
 
-    // this assumes the MAIR register has a first
-    // entry for non cacheable/device memory and
-    // a second entry for cacheable memory;
-    // additionally, it sets the entry as describing
-    // a page that has inner shareability.
-    //
-    //                                 shareable   MAIR index
-    pub const             CACHEABLE: u64 = 0b11 << 8 | 0b1 << 2;
-    pub const         NON_CACHEABLE: u64 = 0b00 << 8 | 0b0 << 2;
+        // this assumes the MAIR register has a first
+        // entry for non cacheable/device memory and
+        // a second entry for cacheable memory;
+        // additionally, it sets the entry as describing
+        // a page that has inner shareability.
+        //
+        //              shareable   MAIR index
+        let cacheable = 0b11 << 8 | 0b1 << 2;
+        let no_cache  = 0b00 << 8 | 0b0 << 2;
+        hw |= self.has(Self::CACHEABLE,   0, cacheable, no_cache);
 
-    pub const                GLOBAL: u64 =  0b0 << 11;
-    pub const            NON_GLOBAL: u64 =  0b1 << 11;
+        hw |= self.has(Self::GLOBAL,      11,  0b0,  0b1);
+        hw |= self.has(Self::EXCLUSIVE,   55,  0b1,  0b0);
 
-    pub const   USERLAND_ACCESSIBLE: u64 =  0b1 << 6;
-    pub const USERLAND_INACCESSIBLE: u64 =  0b0 << 6;
-
-    pub const        SOFTWARE_1_SET: u64 =  0b1 << 55;
-    pub const      SOFTWARE_1_CLEAR: u64 =  0b0 << 55;
+        hw
+    }
 }
 
 #[cfg(target_arch = "x86_64")]
-mod arch {
-    pub const            USED_ENTRY: u64 =  0b1 <<  0;
-    pub const          UNUSED_ENTRY: u64 =  0b0 <<  0;
+impl MappedPageAttributes {
+    pub fn to_hardware(self) -> u64 {
+        let mut hw = 0;
 
-    pub const             WRITEABLE: u64 =  0b1 <<  1;
-    pub const         NON_WRITEABLE: u64 =  0b0 <<  1;
+        hw |= self.has(Self::VALID_ENTRY,  0,  0b1,  0b0);
+        hw |= self.has(Self::WRITEABLE,    1,  0b1,  0b0);
+        hw |= self.has(Self::EXECUTABLE,  63,  0b0,  0b1);
+        hw |= self.has(Self::CACHEABLE,    4,  0b0,  0b1);
+        hw |= self.has(Self::GLOBAL,       8,  0b1,  0b0);
+        hw |= self.has(Self::EXCLUSIVE,    9,  0b1,  0b0);
 
-    pub const            EXECUTABLE: u64 =  0b0 << 63;
-    pub const        NON_EXECUTABLE: u64 =  0b1 << 63;
-
-    pub const             CACHEABLE: u64 =  0b0 << 4;
-    pub const         NON_CACHEABLE: u64 =  0b1 << 4;
-
-    pub const                GLOBAL: u64 =  0b1 << 8;
-    pub const            NON_GLOBAL: u64 =  0b0 << 8;
-
-    pub const   USERLAND_ACCESSIBLE: u64 =  0b1 << 2;
-    pub const USERLAND_INACCESSIBLE: u64 =  0b0 << 2;
-
-    pub const        SOFTWARE_1_SET: u64 =  0b1 << 9;
-    pub const      SOFTWARE_1_CLEAR: u64 =  0b0 << 9;
+        hw
+    }
 }
-
-pub const     EXCLUSIVE: u64 = arch::SOFTWARE_1_SET;
-pub const NON_EXCLUSIVE: u64 = arch::SOFTWARE_1_CLEAR;
