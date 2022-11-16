@@ -9,13 +9,13 @@ extern crate frame_allocator;
 extern crate page_allocator;
 extern crate memory_structs;
 
-use alloc::{vec, vec::Vec};
-use core::{arch::asm, mem::MaybeUninit};
+use alloc::vec;
+use core::arch::asm;
 
 use uefi::{prelude::entry, Status, Handle, table::{SystemTable, Boot, boot::MemoryType}};
 
 use frame_allocator::{PhysicalMemoryRegion, MemoryRegionType};
-use memory_structs::{PAGE_SIZE, PhysicalAddress, Frame, FrameRange};
+use memory_structs::{PAGE_SIZE, PhysicalAddress, Frame, FrameRange, VirtualAddress};
 
 use log::{info, error};
 
@@ -75,10 +75,13 @@ fn main(
         }
     }
 
-    let callback = frame_allocator::init(
+    let _callback = frame_allocator::init(
         free_regions.iter().flatten(),
         reserved_regions.iter().flatten(),
     )?;
+
+    // for now, virtual addresses will be above 4GB
+    page_allocator::init(VirtualAddress::new_canonical(0x100_000_000))?;
 
     info!("Going to infinite loop now.");
     inf_loop_0xbeef();
