@@ -128,7 +128,6 @@ pub fn init<F, R, P>(
         }
     }
 
-
     // Finally, one last sanity check -- ensure no two regions overlap. 
     let all_areas = free_list[..free_list_idx].iter().flatten()
         .chain(reserved_list[..reserved_list_idx].iter().flatten());

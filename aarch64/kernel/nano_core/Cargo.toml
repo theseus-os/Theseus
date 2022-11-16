@@ -11,6 +11,9 @@ path = "main.rs"
 log = "0.4.17"
 
 logger = { path = "../logger" }
+frame_allocator = { path = "../frame_allocator" }
+page_allocator = { path = "../page_allocator" }
+memory_structs = { path = "../memory_structs" }
 
 uefi = { version = "0.18", default-features = false, features = [ "alloc", "exts" ] }
 uefi-services = { version = "0.15", default-features = false, features = [ "panic_handler" ] }

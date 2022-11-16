@@ -5,11 +5,17 @@
 
 extern crate alloc;
 extern crate logger;
+extern crate frame_allocator;
+extern crate page_allocator;
+extern crate memory_structs;
 
-use alloc::vec;
-use core::arch::asm;
+use alloc::{vec, vec::Vec};
+use core::{arch::asm, mem::MaybeUninit};
 
-use uefi::{prelude::entry, Status, Handle, table::{SystemTable, Boot}};
+use uefi::{prelude::entry, Status, Handle, table::{SystemTable, Boot, boot::MemoryType}};
+
+use frame_allocator::{PhysicalMemoryRegion, MemoryRegionType};
+use memory_structs::{PAGE_SIZE, PhysicalAddress, Frame, FrameRange};
 
 use log::{info, error};
 
@@ -30,15 +36,49 @@ fn main(
     uefi_services::init(&mut system_table)
         .map_err(|_| "nano_core::main - couldn't init uefi services")?;
 
-    let bootsvc = system_table.boot_services();
+    let boot_svc = system_table.boot_services();
 
     let safety = 16;
 
-    let mmap_size = bootsvc.memory_map_size();
+    let mmap_size = boot_svc.memory_map_size();
     let mut mmap = vec![0; mmap_size.map_size + safety * mmap_size.entry_size];
 
-    let _ = system_table.exit_boot_services(handle, &mut mmap)
+    let (_runtime_svc, mem_iter) = system_table.exit_boot_services(handle, &mut mmap)
         .map_err(|_| "nano_core::main - couldn't exit uefi boot services")?;
+
+    // Now set up the list of free regions and reserved regions so we can initialize the frame allocator.
+    let mut free_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
+    let mut free_index = 0;
+    let mut reserved_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
+    let mut reserved_index = 0;
+
+    for descriptor in mem_iter {
+        let size = descriptor.page_count as usize * PAGE_SIZE;
+        if size > 0 {
+            let (dst, index, region_type) = match descriptor.ty {
+                MemoryType::CONVENTIONAL => (&mut free_regions, &mut free_index, MemoryRegionType::Free),
+                _ => (&mut reserved_regions, &mut reserved_index, MemoryRegionType::Reserved),
+            };
+
+            let start_addr = descriptor.phys_start as usize;
+            let start_addr = PhysicalAddress::new_canonical(start_addr);
+            let end_addr = start_addr + size;
+
+            let first_frame = Frame::containing_address(start_addr);
+            let last_frame = Frame::containing_address(end_addr - 1);
+
+            let range = FrameRange::new(first_frame, last_frame);
+            let region = PhysicalMemoryRegion::new(range, region_type);
+
+            dst[*index] = Some(region);
+            *index += 1;
+        }
+    }
+
+    let callback = frame_allocator::init(
+        free_regions.iter().flatten(),
+        reserved_regions.iter().flatten(),
+    )?;
 
     info!("Going to infinite loop now.");
     inf_loop_0xbeef();
