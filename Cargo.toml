@@ -34,7 +34,7 @@ exclude = [
 	"build",
 	"target",
 
-	## Exclude the aarch64 experiment
+	## Exclude the `aarch64` directory, which is a WIP port that currently must be built separately.
 	"aarch64",
 
 	## Exclude configuration, tools, scripts, etc
