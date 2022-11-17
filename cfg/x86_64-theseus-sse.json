@@ -8,5 +8,10 @@
   "arch": "x86_64",
   "os": "theseus",
   "features": "+sse2",
+  "code-model": "large",
+  "relocation-model": "static",
+  "tls-model": "local-exec",
+  "has-thread-local": true,
+  "merge-functions": "disabled",
   "disable-redzone": true
 }
