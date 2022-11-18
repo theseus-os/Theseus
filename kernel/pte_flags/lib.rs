@@ -1,3 +1,9 @@
+//! This crate defines the structure of page table entry flags on x86_64 & aarch64.
+//! 
+//! This crate assumes MAIR slot 0 has a
+//! "DEVICE nGnRE" entry and slot 1 has a
+//! Normal + Outer Shareable entry.
+
 #![no_std]
 
 use bitflags::bitflags;
@@ -274,9 +280,12 @@ mod arch {
                 true => Self::empty(),
             };
 
+            // This crate assumes MAIR slot 0 has a
+            // "DEVICE nGnRE" entry and slot 1 has a
+            /// Normal + Outer Shareable entry.
             hw |= match sw.contains(PteFlags::CACHEABLE) {
                 true => Self::OUTER_SHAREABLE | Self::MAIR_SLOT_1,
-                false => Self::empty(),
+                false => Self::MAIR_SLOT_0_Z, // => 0
             };
 
             hw |= match sw.contains(PteFlags::GLOBAL) {
