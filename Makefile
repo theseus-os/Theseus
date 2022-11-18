@@ -504,10 +504,10 @@ clean-old-build:
 
 
 ## This is a special target that enables SIMD personalities.
-## It builds everything with the SIMD-enabled x86_64-theseus-sse target,
-## and then builds everything again with the regular x86_64-theseus target. 
+## It builds everything with the SIMD-enabled x86_64-unknown-theseus-sse target,
+## and then builds everything again with the regular x86_64-unknown-theseus target. 
 ## The "normal" target must come last ('build_sse', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
-simd_personality_sse : export TARGET := x86_64-theseus
+simd_personality_sse : export TARGET := x86_64-unknown-theseus
 simd_personality_sse : export BUILD_MODE = release
 simd_personality_sse : export override THESEUS_CONFIG += simd_personality simd_personality_sse
 simd_personality_sse: clean-old-build build_sse build
@@ -520,10 +520,10 @@ simd_personality_sse: clean-old-build build_sse build
 
 
 ## This target is like "simd_personality_sse", but uses AVX instead of SSE.
-## It builds everything with the SIMD-enabled x86_64-theseus-avx target,
-## and then builds everything again with the regular x86_64-theseus target. 
+## It builds everything with the SIMD-enabled x86_64-unknown-theseus-avx target,
+## and then builds everything again with the regular x86_64-unknown-theseus target. 
 ## The "normal" target must come last ('build_avx', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
-simd_personality_avx : export TARGET := x86_64-theseus
+simd_personality_avx : export TARGET := x86_64-unknown-theseus
 simd_personality_avx : export BUILD_MODE = release
 simd_personality_avx : export override THESEUS_CONFIG += simd_personality simd_personality_avx
 simd_personality_avx : export override CFLAGS += -DENABLE_AVX
@@ -536,9 +536,9 @@ simd_personality_avx: clean-old-build build_avx build
 
 
 
-### build_sse builds the kernel and applications with the x86_64-theseus-sse target.
+### build_sse builds the kernel and applications with the x86_64-unknown-theseus-sse target.
 ### It can serve as part of the simd_personality_sse target.
-build_sse : export override TARGET := x86_64-theseus-sse
+build_sse : export override TARGET := x86_64-unknown-theseus-sse
 build_sse : export override RUSTFLAGS += -C no-vectorize-loops
 build_sse : export override RUSTFLAGS += -C no-vectorize-slp
 build_sse : export KERNEL_PREFIX := ksse\#
@@ -547,9 +547,9 @@ build_sse:
 	$(MAKE) build
 
 
-### build_avx builds the kernel and applications with the x86_64-theseus-avx target.
+### build_avx builds the kernel and applications with the x86_64-unknown-theseus-avx target.
 ### It can serve as part of the simd_personality_avx target.
-build_avx : export override TARGET := x86_64-theseus-avx
+build_avx : export override TARGET := x86_64-unknown-theseus-avx
 build_avx : export override RUSTFLAGS += -C no-vectorize-loops
 build_avx : export override RUSTFLAGS += -C no-vectorize-slp
 build_avx : export KERNEL_PREFIX := kavx\#

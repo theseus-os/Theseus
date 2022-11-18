@@ -3188,9 +3188,8 @@ dependencies = [
 
 [[package]]
 name = "target-lexicon"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9bffcddbc2458fa3e6058414599e3c838a022abae82e5c67b4f7f80298d5bff"
+version = "0.12.5"
+source = "git+https://github.com/theseus-os/target-lexicon?branch=theseus#75d36cc66df0ac4569df1b20a16ca914f417b85a"
 
 [[package]]
 name = "task"

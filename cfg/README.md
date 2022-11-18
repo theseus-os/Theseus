@@ -1,11 +1,24 @@
 ## Theseus OS target specifications
 
 Theseus OS uses its own target specification to configure how `rustc` compiles its code.
-The default target spec is [x86_64-theseus.json], which builds Theseus for the `x86_64` architecture.
+The default target spec is [x86_64-unknown-theseus.json], which builds Theseus for the `x86_64` architecture.
+If you're unfamiliar with [target triples] or [how Rust handles targets] or how Rust [supports platform cfg via targets], here's a quick breakdown:
+* `x86_64`: the architecture.
+  * A "sub-architecture" can also be provided, but we do not use this on x86,
+    as it typically only applies to ARM architectures.
+* `unknown`: the vendor.
+  * Theseus doesn't have a specific vendor; the default value is `unknown`.
+* `theseus`: the operating system.
+  * Optionally, the OS parameter can be appended with other items, such as the system environment or ABI.
+    * Theseus doesn't yet specify an environment or ABI,
+      but our `llvm-target` item selects `elf`.
 
 We describe the key items in the target spec below; you can read more about the various options
-in [`rustc`'s `TargetSpec` type documentation](https://docs.rs/rustc-ap-rustc_target/196.0.0/rustc_target/spec/struct.TargetOptions.html).
+in [`rustc`'s `TargetSpec` type documentation](https://docs.rs/rustc-ap-rustc_target/latest/rustc_ap_rustc_target/spec/struct.TargetOptions.html).
 
+* `llvm-target`: all Theseus targets are based on `x86_64-unknown-none-elf`,
+  which is a minimal target that specifies no underlying OS and
+  uses the ELF file format for compiled artifacts.
 * `features`: `-mmx,-sse,+soft-float`.
   This builds Theseus with hardware floating point support disabled in favor of soft floating point.
   This is the typical choice for most OS kernels, since using hardware floating point and/or SIMD
@@ -42,17 +55,20 @@ in [`rustc`'s `TargetSpec` type documentation](https://docs.rs/rustc-ap-rustc_ta
     so we may not need it, but it doesn't hurt to explicitly disable it.
 
 ### Other target specs
-* [x86_64-theseus-sse.json]: similar to the default `x86_64-theseus`, but enables the compiler to
-  generate instructions that use SSE2 (and higher SSE versions) SIMD features.
+* [x86_64-unknown-theseus-sse.json]: similar to the default `x86_64-unknown-theseus`, but enables the compiler to
+  generate instructions that use SSE2 (and lower SSE versions) SIMD features.
   With this, all crates across Theseus can use SSE2 SIMD instructions and registers.
-* [x86_64-theseus-avx.json]: similar to above, but enables AVX (version 1) instructions/registers.
+* [x86_64-unknown-theseus-avx.json]: similar to above, but enables AVX (version 1) instructions/registers.
   With this, all crates across Theseus can use AVX SIMD instructions and registers.
   This does not yet enable support for AVX2 or AVX512.
 
 
-[x86_64-theseus.json]: ./x86_64-theseus.json
-[x86_64-theseus-sse.json]: ./x86_64-theseus-sse.json
-[x86_64-theseus-avx.json]: ./x86_64-theseus-avx.json
+[x86_64-unknown-theseus.json]: ./x86_64-unknown-theseus.json
+[x86_64-unknown-theseus-sse.json]: ./x86_64-unknown-theseus-sse.json
+[x86_64-unknown-theseus-avx.json]: ./x86_64-unknown-theseus-avx.json
 [`code-model`]: https://doc.rust-lang.org/rustc/codegen-options/index.html#code-model
 [`relocation-model`]: https://doc.rust-lang.org/rustc/codegen-options/index.html#relocation-model
 [`tls-model`]: https://doc.rust-lang.org/beta/unstable-book/compiler-flags/tls-model.html#tls_model
+[target triples]: https://clang.llvm.org/docs/CrossCompilation.html#target-triple
+[how Rust handles targets]: https://doc.rust-lang.org/rustc/targets/index.html
+[supports platform cfg via targets]: https://doc.rust-lang.org/nightly/rustc/platform-support.html
