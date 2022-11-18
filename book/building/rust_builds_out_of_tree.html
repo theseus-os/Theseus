@@ -213,7 +213,7 @@ It is invoked like so (details omitted):</p>
 </ol>
 <p>Afterwards, the <code>build/deps/</code> directory contains all prebuilt dependencies needed to compile an out-of-tree crate against the existing build of Theseus, with all the properly versioned (correctly hashed) crates and symbols.
 This tool also generates a <code>TheseusBuild.toml</code> file that describes the parameters of this build of Theseus, such that it can be replicated by <code>theseus_cargo</code>. For example:</p>
-<pre><code class="language-toml">target = &quot;x86_64-theseus&quot;
+<pre><code class="language-toml">target = &quot;x86_64-unknown-theseus&quot;
 rustflags = &quot;--emit=obj -C debuginfo=2 -C code-model=large -C relocation-model=static -D unused-must-use -Z merge-functions=disabled -Z share-generics=no&quot;
 cargoflags = &quot;--release&quot;
 host_deps = &quot;./host_deps&quot;
