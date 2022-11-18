@@ -9,7 +9,7 @@ SHELL := /bin/bash
 ARCH ?= x86_64
 
 ## The name of the target JSON file (without the ".json" suffix)
-TARGET ?= $(ARCH)-theseus
+TARGET ?= $(ARCH)-unknown-theseus
 
 ## The top level directory of the Theseus project
 ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
