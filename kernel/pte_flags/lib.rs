@@ -1,8 +1,7 @@
 //! This crate defines the structure of page table entry flags on x86_64 & aarch64.
 //! 
-//! This crate assumes MAIR slot 0 has a
-//! "DEVICE nGnRE" entry and slot 1 has a
-//! Normal + Outer Shareable entry.
+//! Under aarch64, this crate assumes [MAIR](https://docs.rs/cortex-a/latest/cortex_a/registers/MAIR_EL1/index.html)
+//! slot 0 has a "DEVICE nGnRE" entry and slot 1 has a Normal + Outer Shareable entry.
 
 #![no_std]
 
