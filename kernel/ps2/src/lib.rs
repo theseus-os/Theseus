@@ -1,6 +1,5 @@
 #![no_std]
 
-use log::debug;
 use num_enum::TryFromPrimitive;
 use port_io::Port;
 use spin::Mutex;
@@ -22,7 +21,7 @@ static PS2_COMMAND_AND_STATUS_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x64)
 /// 
 /// Naming perspective: Output means "out of the device into the host".
 /// e.g. [WriteByteToPort2InputBuffer] means "write byte out of the host into port 2"
-enum HostToControllerCommand {
+pub enum HostToControllerCommand {
     /// returns [ControllerConfigurationByte]
     ReadFromInternalRAMByte0 = 0x20,
     
@@ -110,7 +109,7 @@ enum HostToControllerCommand {
 /// 
 /// Note: Devices attached to the controller should be disabled
 /// before sending commands that return data, otherwise the output buffer could get overwritten
-fn write_command(value: HostToControllerCommand) {
+pub fn write_command(value: HostToControllerCommand) {
     unsafe {
         PS2_COMMAND_AND_STATUS_PORT.lock().write(value as u8);
     }
@@ -207,14 +206,14 @@ fn write_data(value: WritableData) {
 // wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Configuration_Byte
 /// Used for [HostToControllerCommand::ReadFromInternalRAMByte0] and [HostToControllerCommand::WriteToInternalRAMByte0]
 #[bitfield(bits = 8)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ControllerConfigurationByte {
     /// interrupt on [ControllerToHostStatus] `output_buffer_full`
-    port1_interrupt_enabled: bool,
+    pub port1_interrupt_enabled: bool,
     /// interrupt on [ControllerToHostStatus] `mouse_output_buffer_full`
     /// 
     /// Note: only if 2 PS/2 ports supported
-    port2_interrupt_enabled: bool,
+    pub port2_interrupt_enabled: bool,
     /// Cleared on reset; set when the system passed Power-on self-test
     #[allow(dead_code)]
     system_passed_self_test: bool,
@@ -222,153 +221,38 @@ pub struct ControllerConfigurationByte {
     #[allow(dead_code)]
     should_be_zero: B1,
     /// disables the keyboard
+    #[allow(dead_code)]
     port1_clock_disabled: bool,
     /// disables the auxilary device (mouse)
     /// 
     /// Note: only if 2 PS/2 ports supported
-    port2_clock_disabled: bool,
+    pub port2_clock_disabled: bool,
     /// whether IBM scancode translation is enabled (0=AT, 1=PC)
-    #[allow(dead_code)]
-    port1_translation_enabled: bool,
+    pub port1_translation_enabled: bool,
     #[allow(dead_code)]
     must_be_zero: B1,
 }
 
 /// read the config of the PS/2 port
-fn read_config() -> ControllerConfigurationByte {
+pub fn read_config() -> ControllerConfigurationByte {
     write_command(ReadFromInternalRAMByte0);
     ControllerConfigurationByte::from_bytes([read_data()])
 }
 
 /// write the new config to the PS/2 command port (0x64)
-fn write_config(value: ControllerConfigurationByte) {
+pub fn write_config(value: ControllerConfigurationByte) {
     write_command(WriteToInternalRAMByte0);
     write_data(WritableData::Configuration(value));
 }
 
-/// initialize the first PS/2 data port
-pub fn init_ps2_port1() {
-    init_ps2_port(PS2Port::One);
-}
-
-/// initialize the second PS/2 data port
-pub fn init_ps2_port2() {
-    init_ps2_port(PS2Port::Two);
-}
-
-#[derive(Clone, Copy)]
-enum PS2Port {
-    One,
-    Two,
-}
-
-// see https://wiki.osdev.org/%228042%22_PS/2_Controller#Initialising_the_PS.2F2_Controller
-fn init_ps2_port(port: PS2Port) {
-    // Step 1: Initialise USB Controllers
-    // no USB support yet
-
-    // Step 2: Determine if the PS/2 Controller Exists
-    // TODO: we support the FADT, so we can check this
-
-    // Step 3: Disable Devices
-    write_command(DisablePort2);
-    write_command(DisablePort1);
-
-    // Step 4: Flush The Output Buffer
-    flush_output_buffer();
-
-    // Step 5: Set the Controller Configuration Byte
-    let mut config = read_config();
-    match port {
-        PS2Port::One => {
-            config.set_port1_clock_disabled(false);
-            config.set_port1_interrupt_enabled(true);
-        }
-        PS2Port::Two => {
-            config.set_port2_clock_disabled(false);
-            config.set_port2_interrupt_enabled(true);
-        }
-    }
-    write_config(config);
-
-    // Step 6/7/8 are inside [test_ps2_port]
-
-    // Step 9: Enable Devices
-    write_command(EnablePort1);
-    // NOTE: we might not need to do this conditionally
-    match port {
-        PS2Port::Two => write_command(EnablePort2),
-        PS2Port::One => (),
-    };
-}
-
 /// Clean the [PS2_DATA_PORT] output buffer, skipping the [ControllerToHostStatus] `output_buffer_full` check
-fn flush_output_buffer() {
+pub fn flush_output_buffer() {
     read_data();
-}
-
-/// test the first PS/2 data port
-pub fn test_ps2_port1() -> Result<(), &'static str> {
-    test_ps2_port(PS2Port::One)
-}
-
-// test the second PS/2 data port
-pub fn test_ps2_port2() -> Result<(), &'static str> {
-    test_ps2_port(PS2Port::Two)
-}
-
-// see https://wiki.osdev.org/%228042%22_PS/2_Controller#Initialising_the_PS.2F2_Controller
-fn test_ps2_port(port: PS2Port) -> Result<(), &'static str> {
-    // Step 1-5 are inside [init_ps2_port]
-
-    // Step 6: Perform Controller Self Test
-    write_command(TestController);
-    read_controller_test_result()?;
-    debug!("passed PS/2 controller test");
-
-    // TODO: Step 7, but not here, maybe init and test both devices at once in a new PS/2 controller driver crate
-
-    // Step 8: Perform Interface Tests
-    match port {
-        PS2Port::One => write_command(TestPort1),
-        PS2Port::Two => write_command(TestPort2),
-    }
-    use PortTestResult::*;
-    match read_port_test_result()? {
-        Passed => debug!("passed PS/2 port {} test", port as u8 + 1),
-        ClockLineStuckLow => Err("failed PS/2 port test, clock line stuck low")?,
-        ClockLineStuckHigh => Err("failed PS/2 port test, clock line stuck high")?,
-        DataLineStuckLow => Err("failed PS/2 port test, data line stuck low")?,
-        DataLineStuckHigh => Err("failed PS/2 port test, clock line stuck high")?,
-    }
-
-    // print the config (?) see TODO above
-    let config = read_config();
-    let port_interrupt_enabled = match port {
-        PS2Port::One => config.port1_interrupt_enabled(),
-        PS2Port::Two => config.port2_interrupt_enabled(),
-    };
-    let clock_enabled = match port {
-        PS2Port::One => !config.port1_clock_disabled(),
-        PS2Port::Two => !config.port2_clock_disabled(),
-    };
-
-    if port_interrupt_enabled {
-        debug!("PS/2 port {} interrupt enabled", port as u8 + 1)
-    } else {
-        Err("PS/2 port test config's interrupt disabled")?
-    }
-    if clock_enabled {
-        debug!("PS/2 port {} clock enabled", port as u8 + 1)
-    } else {
-        Err("PS/2 port test config's clock disabled")?
-    }
-    Ok(())
 }
 
 /// must only be called after writing the [TestController] command
 /// otherwise would read bogus data
-fn read_controller_test_result() -> Result<(), &'static str> {
+pub fn read_controller_test_result() -> Result<(), &'static str> {
     const CONTROLLER_TEST_PASSED: u8 = 0x55;
     if read_data() != CONTROLLER_TEST_PASSED {
         Err("failed PS/2 controller test")
@@ -379,7 +263,7 @@ fn read_controller_test_result() -> Result<(), &'static str> {
 
 #[derive(TryFromPrimitive)]
 #[repr(u8)]
-enum PortTestResult {
+pub enum PortTestResult {
     Passed = 0x00,
     ClockLineStuckLow = 0x01,
     ClockLineStuckHigh = 0x02,
@@ -389,7 +273,7 @@ enum PortTestResult {
 
 /// must only be called after writing the [TestPort1] or [TestPort2] command
 /// otherwise would read bogus data
-fn read_port_test_result() -> Result<PortTestResult, &'static str> {
+pub fn read_port_test_result() -> Result<PortTestResult, &'static str> {
     read_data().try_into().map_err(|_| "failed to read port test result")
 }
 
@@ -498,7 +382,7 @@ pub struct LEDState {
 
 #[derive(Clone)]
 pub enum ScancodeSet {
-    GetCurrentSet = 0,
+    // GetCurrentSet = 0, //TODO, if needed
     Set1 = 1,
     Set2 = 2,
     Set3 = 3,
@@ -577,10 +461,10 @@ pub struct MousePacketGeneric {
     pub y_overflow: bool,
     //2. byte
     /// only a part of x_movement, needs to be combined with [x_9th_bit]
-    x_1st_to_8th_bit: B8, //u8 with #[bits = 8] attribute didn't work
+    x_1st_to_8th_bit: B8,
     //3. byte
     /// only a part of y_movement, needs to be combined with [y_9th_bit]
-    y_1st_to_8th_bit: B8, //u8 with #[bits = 8] attribute didn't work
+    y_1st_to_8th_bit: B8,
 }
 
 impl MousePacketGeneric {
@@ -821,18 +705,22 @@ pub fn mouse_id() -> Result<MouseId, &'static str> {
 }
 
 /// reset the mouse
-#[allow(dead_code)]
-fn reset_mouse() -> Result<(), &'static str> {
+pub fn reset_mouse() -> Result<(), &'static str> {
     command_to_mouse(HostToMouseCommandOrData::MouseCommand(Reset))?; 
-    for _ in 0..14 {
-        //BAT = Basic Assurance Test
-        let bat_code = read_data();
-        if bat_code == 0xAA {
-            // command reset mouse succeeded
-            return Ok(());
-        }
+    if let Ok(SelfTestPassed) = read_data().try_into() {
+        //returns mouse id 0
+        read_data();
+        return Ok(());
     }
     Err("failed to reset mouse")
+}
+/// reset the keyboard
+pub fn reset_keyboard() -> Result<(), &'static str> {
+    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(ResetAndStartSelfTest))?; 
+    if let Ok(SelfTestPassed) = read_data().try_into() {
+        return Ok(())
+    }
+    Err("failed to reset keyboard")
 }
 
 /// resend the most recent packet again

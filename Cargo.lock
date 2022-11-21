@@ -754,6 +754,7 @@ dependencies = [
  "mpmc",
  "network_manager",
  "pci",
+ "ps2_controller",
  "serial_port",
  "spin 0.9.0",
  "storage_manager",
@@ -2436,6 +2437,16 @@ dependencies = [
  "num_enum",
  "port_io",
  "spin 0.9.0",
+]
+
+[[package]]
+name = "ps2_controller"
+version = "0.1.0"
+dependencies = [
+ "acpi",
+ "fadt",
+ "log",
+ "ps2",
 ]
 
 [[package]]
