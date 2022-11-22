@@ -213,10 +213,16 @@ fn kill_and_halt(
         }
     }
     #[cfg(not(unwind_exceptions))] {
-        let res = task::get_my_current_task().ok_or("couldn't get current task").and_then(|taskref| taskref.kill(cause));
-        match res {
-            Ok(()) => { println_both!("Task {:?} killed itself successfully", task::get_my_current_task()); }
-            Err(e) => { println_both!("Task {:?} was unable to kill itself. Error: {:?}", task::get_my_current_task(), e); }
+        let res = task::with_current_task(|t| {
+            let kill_result = t.kill(cause);
+            match kill_result {
+                Ok(()) => { println_both!("Task {:?} killed itself successfully", t); }
+                Err(e) => { println_both!("Task {:?} was unable to kill itself. Error: {:?}", t, e); }
+            }
+            kill_result
+        });
+        if let Err(()) = res {
+            println_both!("BUG: kill_and_halt(): Couldn't get current task in order to kill it.");
         }
     }
 
@@ -232,9 +238,9 @@ fn kill_and_halt(
 /// Checks whether the given `vaddr` falls within a stack guard page, indicating stack overflow. 
 fn is_stack_overflow(vaddr: VirtualAddress) -> bool {
     let page = Page::containing_address(vaddr);
-    task::get_my_current_task()
-        .map(|curr_task| curr_task.with_kstack(|kstack| kstack.guard_page().contains(&page)))
-        .unwrap_or(false)
+    task::with_current_task(|t|
+        t.with_kstack(|kstack| kstack.guard_page().contains(&page))
+    ).unwrap_or(false)
 }
 
 /// Converts the given `exception_number` into a [`Signal`] category, if relevant.

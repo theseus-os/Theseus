@@ -63,10 +63,13 @@ pub fn main(args: Vec<String>) -> isize {
 
 
 fn rmain(matches: Matches) -> Result<c_int, String> {
-    let curr_task = task::get_my_current_task().unwrap();
-    let curr_wd   = Arc::clone(&curr_task.get_env().lock().working_dir);
-    let namespace = curr_task.get_namespace();
-    let mmi       = &curr_task.mmi;
+    let (curr_wd, namespace, mmi) = task::with_current_task(|curr_task|
+        (
+            curr_task.get_env().lock().working_dir.clone(),
+            curr_task.get_namespace().clone(),
+            curr_task.mmi.clone(),
+        )
+    ).map_err(|_| String::from("failed to get current task"))?;
 
     let path = matches.free.get(0).ok_or_else(|| format!("Missing path to ELF executable"))?;
     let path = Path::new(path.clone());
@@ -85,7 +88,7 @@ fn rmain(matches: Matches) -> Result<c_int, String> {
     // most important of which are static data sections, 
     // as it is logically incorrect to have duplicates of data that are supposed to be global system-wide singletons.
     // We should throw a warning here if there are no relocations in the file, as it was probably built/linked with the wrong arguments.
-    overwrite_relocations(&namespace, &mut segments, &elf_file, mmi, false)?;
+    overwrite_relocations(&namespace, &mut segments, &elf_file, &mmi, false)?;
 
     // Remap each segment's mapped pages using the correct flags; they were previously mapped as always writable.
     {
@@ -274,7 +277,7 @@ fn parse_and_load_elf_executable<'f>(
         // debug!("Adjusted segment vaddr: {:#X}, size: {:#X}, {:?}", start_vaddr, memory_size_in_bytes, this_ap.start_address());
 
         let initial_flags = EntryFlags::from_elf_program_flags(prog_hdr.flags());
-        let mmi = &task::get_my_current_task().unwrap().mmi;
+        let mmi = task::with_current_task(|t| t.mmi.clone()).unwrap();
         // Must initially map the memory as writable so we can copy the segment data to it later. 
         let mut mp = mmi.lock().page_table
             .map_allocated_pages(this_ap, initial_flags | EntryFlags::WRITABLE)
@@ -393,6 +396,11 @@ fn overwrite_relocations(
             })?;
         
         let mut target_segment_dependencies: Vec<StrongDependency> = Vec::new();
+        let target_segment_start_addr = target_segment.bounds.start;
+        let target_segment_slice: &mut [u8] = target_segment.mp.as_slice_mut(
+            0,
+            target_segment.bounds.end.value() - target_segment.bounds.start.value(),
+        )?;
 
         // iterate through each relocation entry in the relocation array for the target_sec
         for rela_entry in rela_array {
@@ -436,26 +444,25 @@ fn overwrite_relocations(
                 // rather than an offset from the beginning of the section/segment (I think).
                 // Therefore, we need to adjust that value before we invoke `write_relocation()`, 
                 // which expects a regular `offset` + an offset into the target segment's mapped pages. 
-                let offset_into_target_segment = target_segment.mp.offset_of_address(
-                    VirtualAddress::new(relocation_entry.offset).ok_or_else(|| 
-                        format!("relocation_entry.offset {:#X} was not a valid virtual address", relocation_entry.offset)
-                    )?
-                ).ok_or(format!("target segment {:X?} did not contain relocation_entry.offset {:#X}", target_segment, relocation_entry.offset))?;
+                let relocation_offset_as_vaddr = VirtualAddress::new(relocation_entry.offset).ok_or_else(|| 
+                    format!("relocation_entry.offset {:#X} was not a valid virtual address", relocation_entry.offset)
+                )?;
+                let offset_into_target_segment = relocation_offset_as_vaddr.value() - target_segment_start_addr.value();
                 // Now that we have incorporated the relocation_entry's actual offset into the target_segment offset,
                 // we set it to zero for the duration of this call. 
                 // TODO: this is hacky as hell, we should just create a new `write_relocation()` function instead.
                 relocation_entry.offset = 0;
 
                 if verbose_log { 
-                    debug!("                 Performing relocation target {} + {:#X} <-- source {}", 
-                        target_segment.mp.start_address(), offset_into_target_segment, existing_source_sec.name
+                    debug!("                 Performing relocation target {:#X} + {:#X} <-- source {}", 
+                        target_segment_start_addr, offset_into_target_segment, existing_source_sec.name
                     );
                 }
                 write_relocation(
                     relocation_entry,
-                    &mut target_segment.mp,
+                    target_segment_slice,
                     offset_into_target_segment,
-                    existing_source_sec.start_address(),
+                    existing_source_sec.virt_addr,
                     verbose_log
                 )?;
                 relocation_entry.offset = original_relocation_offset;

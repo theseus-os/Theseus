@@ -134,7 +134,7 @@ fn shell_loop(
         },
     );
 
-    task.unblock();
+    task.unblock().unwrap();
     task.join().unwrap();
 
     reader_task.kill(KillReason::Requested).unwrap();

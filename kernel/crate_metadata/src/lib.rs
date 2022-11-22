@@ -45,7 +45,7 @@
 
 extern crate alloc;
 
-use core::convert::TryFrom;
+use core::{convert::TryFrom, mem::size_of};
 use core::fmt;
 use core::ops::Range;
 use log::{error, debug, trace};
@@ -280,7 +280,7 @@ impl LoadedCrate {
     /// Only matches demangled names, e.g., "my_crate::foo".
     pub fn get_function_section(&self, func_name: &str) -> Option<&StrongSectionRef> {
         self.find_section(|sec| 
-            sec.get_type() == SectionType::Text &&
+            sec.typ == SectionType::Text &&
             sec.name.as_str() == func_name
         )
     }
@@ -472,7 +472,7 @@ impl LoadedCrate {
                 new_sec_mapped_pages_ref,               // mapped_pages is different, points to the new duplicated one
                 new_sec_mapped_pages_offset,            // mapped_pages_offset is the same
                 new_sec_virt_addr,                      // virt_addr is different, based on the new mapped_pages
-                old_sec.size(),                         // size is the same
+                old_sec.size,                           // size is the same
                 old_sec.global,                         // globalness is the same
                 new_crate_weak_ref.clone(),             // parent_crate is different, points to the newly-copied crate
                 old_sec_inner.sections_i_depend_on.clone(),   // dependencies are the same, but relocations need to be re-written
@@ -506,6 +506,10 @@ impl LoadedCrate {
                     .ok_or("BUG: missing data pages in newly-copied crate")?,
             };
             let new_sec_mapped_pages_offset = new_sec.mapped_pages_offset;
+            let new_sec_slice: &mut [u8] = new_sec_mapped_pages.as_slice_mut(
+                0,
+                new_sec_mapped_pages_offset + new_sec.size,
+            )?;
 
             // The newly-duplicated crate still depends on the same sections, so we keep those as is, 
             // but we do need to recalculate those relocations.
@@ -517,7 +521,7 @@ impl LoadedCrate {
                     // perform the actual fix by writing the relocation
                     write_relocation(
                         strong_dep.relocation, 
-                        new_sec_mapped_pages, 
+                        new_sec_slice, 
                         new_sec_mapped_pages_offset,
                         source_sec.start_address(),
                         true
@@ -552,7 +556,7 @@ impl LoadedCrate {
                 };
                 write_relocation(
                     internal_dep.relocation, 
-                    new_sec_mapped_pages, 
+                    new_sec_slice, 
                     new_sec_mapped_pages_offset,
                     source_sec_vaddr,
                     true
@@ -653,15 +657,17 @@ pub struct LoadedSection {
     pub mapped_pages: Arc<Mutex<MappedPages>>, 
     /// The offset into the `mapped_pages` where this section starts
     pub mapped_pages_offset: usize,
-    /// The range of `VirtualAddress`es covered by this section, i.e., 
-    /// the starting (inclusive) and ending (exclusive) `VirtualAddress` of this section.
-    /// This can be used to calculate size, but is primarily a performance optimization
-    /// so we can avoid locking this section's `MappedPages` and avoid recalculating 
-    /// its bounds based on its offset and size. 
-    /// 
-    /// For TLS sections, this `address_range.start` holds the offset (from the TLS base)
-    /// into the TLS area where this section's data exists.
-    pub address_range: Range<VirtualAddress>, 
+    /// The starting `VirtualAddress` of this section (except for TLS sections).
+    ///
+    /// For TLS sections, this is *not* a `VirtualAddress`, but rather the offset
+    /// (from the TLS base) into the TLS area where this section's data exists.
+    ///
+    /// For all other sections, this is simply a performance optimization that avoids
+    /// having to calculate its starting virtual address by invoking
+    /// `self.mapped_pages.address_at_offset(self.mapped_pages_offset)`.
+    pub virt_addr: VirtualAddress,
+    /// The size in bytes of this section.
+    pub size: usize,
     /// The `LoadedCrate` object that contains/owns this section
     pub parent_crate: WeakCrateRef,
     /// The inner contents of a section that could possibly change
@@ -716,7 +722,8 @@ impl LoadedSection {
             name,
             mapped_pages,
             mapped_pages_offset,
-            address_range: virt_addr .. (virt_addr + size),
+            virt_addr,
+            size,
             global,
             parent_crate,
             inner: RwLock::new(LoadedSectionInner {
@@ -728,28 +735,12 @@ impl LoadedSection {
         }
     }
 
-    /// Returns the starting `VirtualAddress` of where this section is loaded into memory. 
-    pub fn start_address(&self) -> VirtualAddress {
-        self.address_range.start
-    }
-
-    /// Returns the size in bytes of this section.
-    pub fn size(&self) -> usize {
-        self.address_range.end.value() - self.address_range.start.value()
-    }
-
-    /// Returns the type of this section.
-    pub fn get_type(&self) -> SectionType {
-        self.typ
-    }
-
     /// Returns the substring of this section's name that excludes the trailing hash. 
     /// 
     /// See the identical associated function [`section_name_without_hash()`](#fn.section_name_without_hash.html) for more. 
     pub fn name_without_hash(&self) -> &str {
         Self::section_name_without_hash(self.name.as_str())
     }
-
 
     /// Returns the substring of the given section's name that excludes the trailing hash,
     /// but includes the hash delimiter "`::h`". 
@@ -763,7 +754,6 @@ impl LoadedSection {
             .and_then(|end| sec_name.get(0 .. (end + SECTION_HASH_DELIMITER.len())))
             .unwrap_or(&sec_name)
     }
-
 
     /// Returns the index of the first `WeakDependent` object in this `LoadedSection`'s `sections_dependent_on_me` list
     /// in which the section matches the given `matching_section` 
@@ -787,20 +777,20 @@ impl LoadedSection {
     pub fn copy_section_data_to(&self, destination_section: &LoadedSection) -> Result<(), &'static str> {
 
         let mut dest_sec_mapped_pages = destination_section.mapped_pages.lock();
-        let dest_sec_data: &mut [u8] = dest_sec_mapped_pages.as_slice_mut(destination_section.mapped_pages_offset, destination_section.size())?;
+        let dest_sec_data: &mut [u8] = dest_sec_mapped_pages.as_slice_mut(destination_section.mapped_pages_offset, destination_section.size)?;
 
         let source_sec_mapped_pages = self.mapped_pages.lock();
-        let source_sec_data: &[u8] = source_sec_mapped_pages.as_slice(self.mapped_pages_offset, self.size())?;
+        let source_sec_data: &[u8] = source_sec_mapped_pages.as_slice(self.mapped_pages_offset, self.size)?;
 
         if dest_sec_data.len() == source_sec_data.len() {
             dest_sec_data.copy_from_slice(source_sec_data);
             // debug!("Copied data from source section {:?} {:?} ({:#X}) to dest section {:?} {:?} ({:#X})",
-            //     self.typ, self.name, self.size(), destination_section.typ, destination_section.name, destination_section.size());
+            //     self.typ, self.name, self.size, destination_section.typ, destination_section.name, destination_section.size);
             Ok(())
         }
         else {
             error!("This source section {:?}'s size ({:#X}) is different from the destination section {:?}'s size ({:#X})",
-                self.name, self.size(), destination_section.name, destination_section.size());
+                self.name, self.size, destination_section.name, destination_section.size);
             Err("this source section has a different length than the destination section")
         }
     }
@@ -849,7 +839,7 @@ impl LoadedSection {
         }
 
         // Check that the bounds of this entire section fit within its MappedPages
-        let end = self.mapped_pages_offset + self.size();
+        let end = self.mapped_pages_offset + self.size;
         if end > mp.size_in_bytes() {
             error!("Requested LoadedSection as function {:?}, but section's end offset ({:X?}) was beyond its MappedPages ({:X?})",
                 core::any::type_name::<F>(), end, mp.size_in_bytes()
@@ -876,8 +866,8 @@ impl fmt::Display for LoadedSection {
             "LoadedSection({:?}, typ: {:?}, vaddr: {:#X}, size: {})", 
             self.name,
             self.typ,
-            self.start_address(),
-            self.size(),
+            self.virt_addr,
+            self.size,
         )
     }
 }
@@ -903,8 +893,8 @@ impl fmt::Debug for LoadedSection {
         }
 
         // Add the rest of the typical fields
-        dbg.field("vaddr", &self.start_address())
-            .field("size", &self.size())
+        dbg.field("vaddr", &self.virt_addr)
+            .field("size", &self.size)
             .finish_non_exhaustive()
     }
 }
@@ -1014,65 +1004,89 @@ impl InternalDependency {
 }
 
 
-/// Write an actual relocation entry.
+/// Actually write the value of a relocation entry.
+/// 
 /// # Arguments
-/// * `relocation_entry`: the relocation entry from the ELF file that specifies the details of the relocation action to perform.
-/// * `target_sec_mapped_pages`: the `MappedPages` that covers the target section, i.e., the section where the relocation data will be written to.
-/// * `target_sec_mapped_pages_offset`: the offset into `target_sec_mapped_pages` where the target section is located.
-/// * `source_sec_vaddr`: the `VirtualAddress` of the source section of the relocation, i.e., the section that the `target_sec` depends on and "points" to.
+/// * `relocation_entry`: the relocation entry from the ELF file that specifies the details
+///    of the relocation action to perform.
+/// * `target_sec_slice`: a byte slice holding the entire contents of the target section,
+///    i.e., the section where the relocation data will be written to.
+/// * `target_sec_offset`: the offset into `target_sec_slice` where the target section's contents begin.
+/// * `source_sec_vaddr`: the `VirtualAddress` of the source section of the relocation, i.e.,
+///    the section that the `target_sec` depends on and "points" to.
 /// * `verbose_log`: whether to output verbose logging information about this relocation action.
 pub fn write_relocation(
     relocation_entry: RelocationEntry,
-    target_sec_mapped_pages: &mut MappedPages,
-    target_sec_mapped_pages_offset: usize,
+    target_sec_slice: &mut [u8],
+    target_sec_offset: usize,
     source_sec_vaddr: VirtualAddress,
     verbose_log: bool
 ) -> Result<(), &'static str> {
     // Calculate exactly where we should write the relocation data to.
-    let target_offset = target_sec_mapped_pages_offset + relocation_entry.offset;
+    let target_sec_offset = target_sec_offset + relocation_entry.offset;
 
-    // Perform the actual relocation data writing here.
-    // There is a great, succint table of relocation types here
-    // https://docs.rs/goblin/0.0.24/goblin/elf/reloc/index.html
+    // Perform the actual writing of relocation data here.
+    // There is a great, succint table of relocation types here:
+    // <https://docs.rs/goblin/0.6.0/goblin/elf/reloc/index.html>
     match relocation_entry.typ {
         R_X86_64_32 => {
-            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
-            *target_ref = source_val as u32;
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u32;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
         R_X86_64_64 => {
-            let target_ref: &mut u64 = target_sec_mapped_pages.as_type_mut(target_offset)?;
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
-            *target_ref = source_val as u64;
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u64>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u64;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
         R_X86_64_PC32 |
         R_X86_64_PLT32 => {
-            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
-            *target_ref = source_val as u32;
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize) as u32;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
         R_X86_64_PC64 => {
-            let target_ref: &mut u64 = target_sec_mapped_pages.as_type_mut(target_offset)?;
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
-            *target_ref = source_val as u64;
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u64>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize);
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
         R_X86_64_TPOFF32 => {
-            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
-            let source_val = u32::try_from(source_sec_vaddr.value())
-                .map_err(|_| "BUG: TLS relocation (R_X86_64_TPOFF32) source section value (TLS offset) cannot fit in a `u32`")?;
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
-            *target_ref = source_val;
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<i32>());
+            let target_ref = &mut target_sec_slice[target_range];
+            // Here we treat the `source_sec_vaddr` value as a signed value 
+            // by casting its bit value directly, i.e., `usize as isize`.
+            let offset_val = source_sec_vaddr.value() as isize;
+            // Now we must check that the signed `offset_val` fits in `i32`
+            let source_val = i32::try_from(offset_val)
+                .map_err(|_| "BUG: TLS relocation (R_X86_64_TPOFF32) source section value (TLS offset) cannot fit in a `i32`")?;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
+        // R_X86_64_GOTTPOFF => {
+        //     // 32-bit signed PC-relative offset to the GOT entry for the IE (Initial Exec(utable) TLS model))
+        //     debug!("R_X86_64_GOTTPOFF: {:#X?}", relocation_entry);
+        //     debug!("R_X86_64_GOTTPOFF: target: {:#X}, source: {:#X}", target_sec_slice.as_ptr() as usize + target_sec_offset, source_sec_vaddr);
+        //     unimplemented!()
+        // }
         // R_X86_64_GOTPCREL => { 
         //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table
         // }
         _ => {
-            error!("found unsupported relocation type {}\n  --> Are you compiling crates with 'code-model=large'?", relocation_entry.typ);
-            return Err("found unsupported relocation type. Are you compiling crates with 'code-model=large'?");
+            error!("found unsupported relocation type {}\n    \
+                --> Are you compiling crates with 'code-model=large' and 'tls-model=local-exec'?",
+                relocation_entry.typ
+            );
+            return Err("found unsupported relocation type. \
+                Are you compiling crates with 'code-model=large' and 'tls-model=local-exec'?"
+            );
         }
     }
 

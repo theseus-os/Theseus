@@ -11,9 +11,8 @@ extern crate core2;
 
 use core::str;
 use alloc::{
-    vec::Vec,
     string::{String, ToString},
-    sync::Arc,
+    vec::Vec,
 };
 use getopts::Options;
 use path::Path;
@@ -44,20 +43,15 @@ pub fn main(args: Vec<String>) -> isize {
         }
         return 0;
     }
-    let taskref = match task::get_my_current_task() {
-        Some(t) => t,
-        None => {
-            println!("failed to get current task");
-            return -1;
-        }
+    
+    let Ok(cwd) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
+        println!("failed to get current task");
+        return -1;
     };
-
-    // grabs the current working directory pointer; this is scoped so that we drop the lock on the task as soon as we get the working directory pointer
-    let curr_wr = Arc::clone(&taskref.get_env().lock().working_dir);
     let path = Path::new(matches.free[0].to_string());
     
     // navigate to the filepath specified by first argument
-    match path.get(&curr_wr) {
+    match path.get(&cwd) {
         Some(file_dir_enum) => { 
             match file_dir_enum {
                 FileOrDir::Dir(directory) => {

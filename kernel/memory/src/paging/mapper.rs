@@ -8,10 +8,14 @@
 // except according to those terms.
 
 use core::{
-    mem,
+    borrow::{Borrow, BorrowMut},
+    cmp::Ordering,
     fmt::{self, Write},
-    ops::Deref,
-    ptr::Unique,
+    hash::{Hash, Hasher},
+    marker::PhantomData,
+    mem,
+    ops::{Deref, DerefMut},
+    ptr::{NonNull, Unique},
     slice,
 };
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames}; 
@@ -681,158 +685,259 @@ impl MappedPages {
     /// from "untyped" memory, i.e., an array of bytes.
     /// 
     /// # Arguments
-    /// `offset`: the offset into the memory region at which the struct is located (where it should start).
+    /// * `byte_offset`: the offset (in number of bytes) from the beginning of the memory region
+    ///    at which the struct is located (where it should start).
+    ///    This offset must be properly aligned with respect to the alignment requirements
+    ///    of type `T`, otherwise an error will be returned.
     /// 
     /// Returns a reference to the new struct (`&T`) that is formed from the underlying memory region,
     /// with a lifetime dependent upon the lifetime of this `MappedPages` object.
     /// This ensures safety by guaranteeing that the returned struct reference 
     /// cannot be used after this `MappedPages` object is dropped and unmapped.
-    pub fn as_type<T: FromBytes>(&self, offset: usize) -> Result<&T, &'static str> {
+    pub fn as_type<T: FromBytes>(&self, byte_offset: usize) -> Result<&T, &'static str> {
         let size = mem::size_of::<T>();
         if false {
-            debug!("MappedPages::as_type(): requested type {} with size {} at offset {}, MappedPages size {}!",
+            debug!("MappedPages::as_type(): requested type {} with size {} at byte_offset {}, MappedPages size {}!",
                 core::any::type_name::<T>(),
-                size, offset, self.size_in_bytes()
+                size, byte_offset, self.size_in_bytes()
             );
         }
 
-        // check that size of the type T fits within the size of the mapping
-        let end = offset + size;
-        if end > self.size_in_bytes() {
-            error!("MappedPages::as_type(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
+        if byte_offset % mem::align_of::<T>() != 0 {
+            error!("MappedPages::as_type(): requested type {} with size {}, but the byte_offset {} is unaligned with type alignment {}!",
                 core::any::type_name::<T>(),
-                size, offset, self.size_in_bytes()
+                size, byte_offset, mem::align_of::<T>()
             );
-            return Err("requested type and offset would not fit within the MappedPages bounds");
+        }
+
+        let start_vaddr = self.start_address().value().checked_add(byte_offset)
+            .ok_or("MappedPages::as_type(): overflow: start_address + byte_offset")?;
+        // check that size of type T fits within the size of the mapping
+        let end_bound = byte_offset.checked_add(size)
+            .ok_or("MappedPages::as_type(): overflow: byte_offset + size_of::<T>())")?;
+        if end_bound > self.size_in_bytes() {
+            error!("MappedPages::as_type(): requested type {} with size {} at byte_offset {}, which is too large for MappedPages of size {}!",
+                core::any::type_name::<T>(),
+                size, byte_offset, self.size_in_bytes()
+            );
+            return Err("MappedPages::as_type(): requested type and byte_offset would not fit within the MappedPages bounds");
         }
 
         // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
-        let t: &T = unsafe { 
-            &*((self.pages.start_address().value() + offset) as *const T)
+        let t: &T = unsafe {
+            &*(start_vaddr as *const T)
         };
 
         Ok(t)
     }
 
 
-    /// Same as [`as_type()`](#method.as_type), but returns a *mutable* reference to the type `T`.
+    /// Same as [`MappedPages::as_type()`], but returns a *mutable* reference to the type `T`.
     /// 
-    /// Thus, it checks to make sure that the underlying mapping is writable.
-    pub fn as_type_mut<T: FromBytes>(&mut self, offset: usize) -> Result<&mut T, &'static str> {
+    /// Thus, it also checks that the underlying mapping is writable.
+    pub fn as_type_mut<T: FromBytes>(&mut self, byte_offset: usize) -> Result<&mut T, &'static str> {
         let size = mem::size_of::<T>();
         if false {
-            debug!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, MappedPages size {}!",
+            debug!("MappedPages::as_type_mut(): requested type {} with size {} at byte_offset {}, MappedPages size {}!",
                 core::any::type_name::<T>(),
-                size, offset, self.size_in_bytes()
+                size, byte_offset, self.size_in_bytes()
+            );
+        }
+
+        if byte_offset % mem::align_of::<T>() != 0 {
+            error!("MappedPages::as_type_mut(): requested type {} with size {}, but the byte_offset {} is unaligned with type alignment {}!",
+                core::any::type_name::<T>(),
+                size, byte_offset, mem::align_of::<T>()
             );
         }
 
         // check flags to make sure mutability is allowed (otherwise a page fault would occur on a write)
         if !self.flags.is_writable() {
-            error!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, but MappedPages weren't writable (flags: {:?})",
+            error!("MappedPages::as_type_mut(): requested type {} with size {} at byte_offset {}, but MappedPages weren't writable (flags: {:?})",
                 core::any::type_name::<T>(),
-                size, offset, self.flags
+                size, byte_offset, self.flags
             );
-            return Err("as_type_mut(): MappedPages were not writable");
+            return Err("MappedPages::as_type_mut(): MappedPages were not writable");
         }
         
+        let start_vaddr = self.start_address().value().checked_add(byte_offset)
+            .ok_or("MappedPages::as_type_mut(): overflow: start_address + byte_offset")?;
         // check that size of type T fits within the size of the mapping
-        let end = offset + size;
-        if end > self.size_in_bytes() {
-            error!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
+        let end_bound = byte_offset.checked_add(size)
+            .ok_or("MappedPages::as_type_mut(): overflow: byte_offset + size_of::<T>())")?;
+        if end_bound > self.size_in_bytes() {
+            error!("MappedPages::as_type_mut(): requested type {} with size {} at byte_offset {}, which is too large for MappedPages of size {}!",
                 core::any::type_name::<T>(),
-                size, offset, self.size_in_bytes()
+                size, byte_offset, self.size_in_bytes()
             );
-            return Err("requested type and offset would not fit within the MappedPages bounds");
+            return Err("MappedPages::as_type_mut(): requested type and byte_offset would not fit within the MappedPages bounds");
         }
 
         // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
         let t: &mut T = unsafe {
-            &mut *((self.pages.start_address().value() + offset) as *mut T)
+            &mut *(start_vaddr as *mut T)
         };
 
         Ok(t)
     }
 
 
-    /// Reinterprets this `MappedPages`'s underlying memory region as a slice of any type.
+    /// Reinterprets this `MappedPages`'s underlying memory region as `&[T]`, a `length`-element slice of type `T`.
     /// 
-    /// It has similar type requirements as the [`as_type()`](#method.as_type) method.
+    /// It has similar requirements and behavior as [`MappedPages::as_type()`].
     /// 
     /// # Arguments
-    /// * `byte_offset`: the offset (in number of bytes) into the memory region at which the slice should start.
-    /// * `length`: the length of the slice, i.e., the number of `T` elements in the slice. 
-    ///   Thus, the slice will go from `offset` to `offset` + (sizeof(`T`) * `length`).
+    /// * `byte_offset`: the offset (in number of bytes) into the memory region
+    ///    at which the slice should start.
+    ///    This offset must be properly aligned with respect to the alignment requirements
+    ///    of type `T`, otherwise an error will be returned.
+    /// * `length`: the length of the slice, i.e., the number of elements of type `T` in the slice. 
+    ///    Thus, the slice's address bounds will span the range from
+    ///    `byte_offset` (inclusive) to `byte_offset + (size_of::<T>() * length)` (exclusive).
     /// 
     /// Returns a reference to the new slice that is formed from the underlying memory region,
     /// with a lifetime dependent upon the lifetime of this `MappedPages` object.
     /// This ensures safety by guaranteeing that the returned slice 
     /// cannot be used after this `MappedPages` object is dropped and unmapped.
     pub fn as_slice<T: FromBytes>(&self, byte_offset: usize, length: usize) -> Result<&[T], &'static str> {
-        let size_in_bytes = mem::size_of::<T>() * length;
+        let size_in_bytes = length.checked_mul(mem::size_of::<T>())
+            .ok_or("MappedPages::as_slice(): overflow: length * size_of::<T>()")?;
         if false {
             debug!("MappedPages::as_slice(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
                 core::any::type_name::<T>(),
                 length, size_in_bytes, byte_offset, self.size_in_bytes()
             );
         }
+
+        if size_in_bytes > isize::MAX as usize {
+            return Err("MappedPages::as_slice(): length * size_of::<T>() must be no larger than isize::MAX");
+        }
+
+        if byte_offset % mem::align_of::<T>() != 0 {
+            error!("MappedPages::as_slice(): requested slice of type {} with length {} (total size {}), but the byte_offset {} is unaligned with type alignment {}!",
+                core::any::type_name::<T>(),
+                length, size_in_bytes, byte_offset, mem::align_of::<T>()
+            );
+        }
         
+        let start_vaddr = self.start_address().value().checked_add(byte_offset)
+            .ok_or("MappedPages::as_slice(): overflow: start_address + byte_offset")?;
         // check that size of slice fits within the size of the mapping
-        let end = byte_offset + (length * mem::size_of::<T>());
-        if end > self.size_in_bytes() {
+        let end_bound = byte_offset.checked_add(size_in_bytes)
+            .ok_or("MappedPages::as_slice_mut(): overflow: byte_offset + (length * size_of::<T>())")?;
+        if end_bound > self.size_in_bytes() {
             error!("MappedPages::as_slice(): requested slice of type {} with length {} (total size {}) at byte_offset {}, which is too large for MappedPages of size {}!",
                 core::any::type_name::<T>(),
                 length, size_in_bytes, byte_offset, self.size_in_bytes()
             );
-            return Err("requested slice length and offset would not fit within the MappedPages bounds");
+            return Err("MappedPages::as_slice(): requested slice length and byte_offset would not fit within the MappedPages bounds");
         }
 
-        // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
+        // SAFETY:
+        // ✅ The pointer is properly aligned (checked above) and is non-null.
+        // ✅ The entire memory range of the slice is contained within this `MappedPages` (bounds checked above).
+        // ✅ The pointer points to `length` consecutive values of type T.
+        // ✅ The slice memory cannot be mutated by anyone else because we only return an immutable reference to it.
+        // ✅ The total size of the slice does not exceed isize::MAX (checked above).
+        // ✅ The lifetime of the returned slice reference is tied to the lifetime of this `MappedPages`.
         let slc: &[T] = unsafe {
-            slice::from_raw_parts((self.pages.start_address().value() + byte_offset) as *const T, length)
+            slice::from_raw_parts(start_vaddr as *const T, length)
         };
 
         Ok(slc)
     }
 
 
-    /// Same as [`as_slice()`](#method.as_slice), but returns a *mutable* slice. 
+    /// Same as [`MappedPages::as_slice()`], but returns a *mutable* slice. 
     /// 
-    /// Thus, it checks to make sure that the underlying mapping is writable.
+    /// Thus, it checks that the underlying mapping is writable.
     pub fn as_slice_mut<T: FromBytes>(&mut self, byte_offset: usize, length: usize) -> Result<&mut [T], &'static str> {
-        let size_in_bytes = mem::size_of::<T>() * length;
+        let size_in_bytes = length.checked_mul(mem::size_of::<T>())
+            .ok_or("MappedPages::as_slice_mut(): overflow: length * size_of::<T>()")?;
+
         if false {
             debug!("MappedPages::as_slice_mut(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
                 core::any::type_name::<T>(), 
                 length, size_in_bytes, byte_offset, self.size_in_bytes()
             );
         }
-        
+
+        if size_in_bytes > isize::MAX as usize {
+            return Err("MappedPages::as_slice_mut(): length * size_of::<T>() must be no larger than isize::MAX");
+        }
+
+        if byte_offset % mem::align_of::<T>() != 0 {
+            error!("MappedPages::as_slice_mut(): requested slice of type {} with length {} (total size {}), but the byte_offset {} is unaligned with type alignment {}!",
+                core::any::type_name::<T>(),
+                length, size_in_bytes, byte_offset, mem::align_of::<T>()
+            );
+        }
+
         // check flags to make sure mutability is allowed (otherwise a page fault would occur on a write)
         if !self.flags.is_writable() {
             error!("MappedPages::as_slice_mut(): requested mutable slice of type {} with length {} (total size {}) at byte_offset {}, but MappedPages weren't writable (flags: {:?})",
                 core::any::type_name::<T>(),
                 length, size_in_bytes, byte_offset, self.flags
             );
-            return Err("as_slice_mut(): MappedPages were not writable");
+            return Err("MappedPages::as_slice_mut(): MappedPages were not writable");
         }
 
+        let start_vaddr = self.start_address().value().checked_add(byte_offset)
+            .ok_or("MappedPages::as_slice_mut(): overflow: start_address + byte_offset")?;
         // check that size of slice fits within the size of the mapping
-        let end = byte_offset + (length * mem::size_of::<T>());
-        if end > self.size_in_bytes() {
+        let end_bound = byte_offset.checked_add(size_in_bytes)
+            .ok_or("MappedPages::as_slice_mut(): overflow: byte_offset + (length * size_of::<T>())")?;
+        if end_bound > self.size_in_bytes() {
             error!("MappedPages::as_slice_mut(): requested mutable slice of type {} with length {} (total size {}) at byte_offset {}, which is too large for MappedPages of size {}!",
                 core::any::type_name::<T>(),
                 length, size_in_bytes, byte_offset, self.size_in_bytes()
             );
-            return Err("requested slice length and offset would not fit within the MappedPages bounds");
+            return Err("MappedPages::as_slice_mut(): requested slice length and byte_offset would not fit within the MappedPages bounds");
         }
 
-        // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
+        // SAFETY:
+        // ✅ same as for `MappedPages::as_slice()`, plus:
+        // ✅ The underlying memory is not accessible through any other pointer, as we require a `&mut self` above.
+        // ✅ The underlying memory can be mutated because it is mapped as writable (checked above).
         let slc: &mut [T] = unsafe {
-            slice::from_raw_parts_mut((self.pages.start_address().value() + byte_offset) as *mut T, length)
+            slice::from_raw_parts_mut(start_vaddr as *mut T, length)
         };
 
         Ok(slc)
+    }
+
+    /// A convenience function for [`BorrowedMappedPages::from()`].
+    pub fn into_borrowed<T: FromBytes>(
+        self,
+        byte_offset: usize,
+    ) -> Result<BorrowedMappedPages<T, Immutable>, (MappedPages, &'static str)> {
+        BorrowedMappedPages::from(self, byte_offset)
+    }
+
+    /// A convenience function for [`BorrowedMappedPages::from_mut()`].
+    pub fn into_borrowed_mut<T: FromBytes>(
+        self,
+        byte_offset: usize,
+    ) -> Result<BorrowedMappedPages<T, Mutable>, (MappedPages, &'static str)> {
+        BorrowedMappedPages::from_mut(self, byte_offset)
+    }
+
+    /// A convenience function for [`BorrowedSliceMappedPages::from()`].
+    pub fn into_borrowed_slice<T: FromBytes>(
+        self,
+        byte_offset: usize,
+        length: usize,
+    ) -> Result<BorrowedSliceMappedPages<T, Immutable>, (MappedPages, &'static str)> {
+        BorrowedSliceMappedPages::from(self, byte_offset, length)
+    }
+
+    /// A convenience function for [`BorrowedSliceMappedPages::from_mut()`].
+    pub fn into_borrowed_slice_mut<T: FromBytes>(
+        self,
+        byte_offset: usize,
+        length: usize,
+    ) -> Result<BorrowedSliceMappedPages<T, Mutable>, (MappedPages, &'static str)> {
+        BorrowedSliceMappedPages::from_mut(self, byte_offset, length)
     }
 }
 
@@ -866,4 +971,283 @@ pub fn mapped_pages_unmap(
 #[cfg(mapper_spillful)]
 pub fn mapper_from_current() -> Mapper {
     Mapper::from_current()
+}
+
+
+/// A borrowed [`MappedPages`] object that derefs to `&T` and optionally also `&mut T`.
+/// 
+/// By default, the `Mutability` type parameter is `Immutable` for ease of use.
+///
+/// When dropped, the borrow ends and the contained `MappedPages` is dropped and unmapped.
+/// You can manually end the borrow and reclaim the inner `MappedPages` via [`Self::into_inner()`].
+pub struct BorrowedMappedPages<T: FromBytes, M: Mutability = Immutable> {
+    ptr: Unique<T>,
+    mp: MappedPages,
+    _mut: PhantomData<M>,
+}
+
+impl<T: FromBytes> BorrowedMappedPages<T, Immutable> {
+    /// Immutably borrows the given `MappedPages` as an instance of type `&T` 
+    /// located at the given `byte_offset` into the `MappedPages`.
+    ///
+    /// See [`MappedPages::as_type()`] for more info.
+    ///
+    /// Upon failure, returns an error containing the unmodified `MappedPages` and a string
+    /// describing the error.
+    pub fn from(
+        mp: MappedPages,
+        byte_offset: usize,
+    ) -> Result<BorrowedMappedPages<T>, (MappedPages, &'static str)> {
+        Ok(Self {
+            ptr: match mp.as_type::<T>(byte_offset) {
+                Ok(r) => {
+                    let nn: NonNull<T> = r.into();
+                    nn.into()
+                }
+                Err(e_str) => return Err((mp, e_str)),
+            },
+            mp,
+            _mut: PhantomData,
+        })
+    }
+}
+
+impl<T: FromBytes> BorrowedMappedPages<T, Mutable> {
+    /// Mutably borrows the given `MappedPages` as an instance of type `&mut T` 
+    /// located at the given `byte_offset` into the `MappedPages`.
+    /// 
+    /// See [`MappedPages::as_type_mut()`] for more info.
+    /// 
+    /// Upon failure, returns an error containing the unmodified `MappedPages`
+    /// and a string describing the error.
+    pub fn from_mut(
+        mut mp: MappedPages,
+        byte_offset: usize,
+    ) -> Result<BorrowedMappedPages<T, Mutable>, (MappedPages, &'static str)> {
+        Ok(Self {
+            ptr: match mp.as_type_mut::<T>(byte_offset) {
+                Ok(r) => r.into(),
+                Err(e_str) => return Err((mp, e_str)),
+            },
+            mp,
+            _mut: PhantomData,
+        })
+    }
+}
+
+impl<T: FromBytes, M: Mutability> BorrowedMappedPages<T, M> {
+    /// Consumes this object and returns the inner `MappedPages`.
+    pub fn into_inner(self) -> MappedPages {
+        self.mp
+    }
+}
+
+/// Both [`Mutable`] and [`Immutable`] [`BorrowedMappedPages`] can deref into `&T`.
+impl<T: FromBytes, M: Mutability> Deref for BorrowedMappedPages<T, M> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        // SAFETY:
+        // ✅ The pointer is properly aligned; its alignment has been checked in `MappedPages::as_type()`.
+        // ✅ The pointer is dereferenceable; it has been bounds checked by `MappedPages::as_type()`.
+        // ✅ The pointer has been initialized in the constructor `from()`.
+        // ✅ The lifetime of the returned reference `&T` is tied to the lifetime of the `MappedPages`,
+        //     ensuring that the `MappedPages` object will persist at least as long as the reference.
+        unsafe { self.ptr.as_ref() }
+    }
+}
+/// Only [`Mutable`] [`BorrowedMappedPages`] can deref into `&mut T`.
+impl<T: FromBytes> DerefMut for BorrowedMappedPages<T, Mutable> {
+    fn deref_mut(&mut self) -> &mut T {
+        // SAFETY:
+        // ✅ Same as the above `Deref` block, plus:
+        // ✅ The underlying `MappedPages` is guaranteed to be writable by `MappedPages::as_type_mut()`.
+        unsafe { self.ptr.as_mut() }
+    }
+}
+/// Both [`Mutable`] and [`Immutable`] [`BorrowedMappedPages`] implement `AsRef<T>`.
+impl<T: FromBytes, M: Mutability> AsRef<T> for BorrowedMappedPages<T, M> {
+    fn as_ref(&self) -> &T { self.deref() }
+}
+/// Only [`Mutable`] [`BorrowedMappedPages`] implement `AsMut<T>`.
+impl<T: FromBytes> AsMut<T> for BorrowedMappedPages<T, Mutable> {
+    fn as_mut(&mut self) -> &mut T { self.deref_mut() }
+}
+/// Both [`Mutable`] and [`Immutable`] [`BorrowedMappedPages`] implement `Borrow<T>`.
+impl<T: FromBytes, M: Mutability> Borrow<T> for BorrowedMappedPages<T, M> {
+    fn borrow(&self) -> &T { self.deref() }
+}
+/// Only [`Mutable`] [`BorrowedMappedPages`] implement `BorrowMut<T>`.
+impl<T: FromBytes> BorrowMut<T> for BorrowedMappedPages<T, Mutable> {
+    fn borrow_mut(&mut self) -> &mut T { self.deref_mut() }
+}
+
+// Forward the impls of `PartialEq`, `Eq`, `PartialOrd`, `Ord`, and `Hash`.
+impl<T: FromBytes + PartialEq, M: Mutability> PartialEq for BorrowedMappedPages<T, M> {
+    fn eq(&self, other: &Self) -> bool { self.deref().eq(other.deref()) }
+}
+impl<T: FromBytes + Eq, M: Mutability> Eq for BorrowedMappedPages<T, M> { }
+impl<T: FromBytes + PartialOrd, M: Mutability> PartialOrd for BorrowedMappedPages<T, M> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { self.deref().partial_cmp(other.deref()) }
+}
+impl<T: FromBytes + Ord, M: Mutability> Ord for BorrowedMappedPages<T, M> {
+    fn cmp(&self, other: &Self) -> Ordering { self.deref().cmp(other.deref()) }
+}
+impl<T: FromBytes + Hash, M: Mutability> Hash for BorrowedMappedPages<T, M> {
+    fn hash<H: Hasher>(&self, state: &mut H) { self.deref().hash(state) }
+}
+
+
+/// A borrowed [`MappedPages`] object that derefs to a slice `&[T]` and optionally also `&mut [T]`.
+/// 
+/// For ease of use, the default `Mutability` type parameter is `Immutable`.
+///
+/// When dropped, the borrow ends and the contained `MappedPages` is dropped and unmapped.
+/// You can manually end the borrow and reclaim the inner `MappedPages` via [`Self::into_inner()`].
+pub struct BorrowedSliceMappedPages<T: FromBytes, M: Mutability = Immutable> {
+    ptr: Unique<[T]>,
+    mp: MappedPages,
+    _mut: PhantomData<M>,
+}
+
+impl<T: FromBytes> BorrowedSliceMappedPages<T, Immutable> {
+    /// Immutably borrows the given `MappedPages` as a slice `&[T]`
+    /// of `length` elements of type `T` starting at the given `byte_offset` into the `MappedPages`.
+    ///
+    /// See [`MappedPages::as_slice()`] for more info.
+    ///
+    /// Upon failure, returns an error containing the unmodified `MappedPages` and a string
+    /// describing the error.
+    pub fn from(
+        mp: MappedPages,
+        byte_offset: usize,
+        length: usize,
+    ) -> Result<BorrowedSliceMappedPages<T>, (MappedPages, &'static str)> {
+        Ok(Self {
+            ptr: match mp.as_slice::<T>(byte_offset, length) {
+                Ok(r) => {
+                    let nn: NonNull<[T]> = r.into();
+                    nn.into()
+                }
+                Err(e_str) => return Err((mp, e_str)),
+            },
+            mp,
+            _mut: PhantomData,
+        })
+    }
+}
+
+impl<T: FromBytes> BorrowedSliceMappedPages<T, Mutable> {
+    /// Mutably borrows the given `MappedPages` as an instance of type `&mut T` 
+    /// starting at the given `byte_offset` into the `MappedPages`.
+    /// 
+    /// See [`MappedPages::as_type_mut()`] for more info.
+    /// 
+    /// Upon failure, returns an error containing the unmodified `MappedPages`
+    /// and a string describing the error.
+    pub fn from_mut(
+        mut mp: MappedPages,
+        byte_offset: usize,
+        length: usize,
+    ) -> Result<Self, (MappedPages, &'static str)> {
+        Ok(Self {
+            ptr: match mp.as_slice_mut::<T>(byte_offset, length) {
+                Ok(r) => r.into(),
+                Err(e_str) => return Err((mp, e_str)),
+            },
+            mp,
+            _mut: PhantomData,
+        })
+    }
+}
+
+impl<T: FromBytes, M: Mutability> BorrowedSliceMappedPages<T, M> {
+    /// Consumes this object and returns the inner `MappedPages`.
+    pub fn into_inner(self) -> MappedPages {
+        self.mp
+    }
+}
+
+/// Both [`Mutable`] and [`Immutable`] [`BorrowedSliceMappedPages`] can deref into `&[T]`.
+impl<T: FromBytes, M: Mutability> Deref for BorrowedSliceMappedPages<T, M> {
+    type Target = [T];
+    fn deref(&self) -> &[T] {
+        // SAFETY:
+        // ✅ The pointer is properly aligned; its alignment has been checked in `MappedPages::as_slice()`.
+        // ✅ The pointer is dereferenceable; it has been bounds checked by `MappedPages::as_slice()`.
+        // ✅ The pointer has been initialized in the constructor `from()`.
+        // ✅ The lifetime of the returned reference `&[T]` is tied to the lifetime of the `MappedPages`,
+        //     ensuring that the `MappedPages` object will persist at least as long as the reference.
+        unsafe { self.ptr.as_ref() }
+    }
+}
+/// Only [`Mutable`] [`BorrowedSliceMappedPages`] can deref into `&mut T`.
+impl<T: FromBytes> DerefMut for BorrowedSliceMappedPages<T, Mutable> {
+    fn deref_mut(&mut self) -> &mut [T] {
+        // SAFETY:
+        // ✅ Same as the above `Deref` block, plus:
+        // ✅ The underlying `MappedPages` is guaranteed to be writable by `MappedPages::as_slice_mut()`.
+        unsafe { self.ptr.as_mut() }
+    }
+}
+
+/// Both [`Mutable`] and [`Immutable`] [`BorrowedSliceMappedPages`] implement `AsRef<[T]>`.
+impl<T: FromBytes, M: Mutability> AsRef<[T]> for BorrowedSliceMappedPages<T, M> {
+    fn as_ref(&self) -> &[T] { self.deref() }
+}
+/// Only [`Mutable`] [`BorrowedSliceMappedPages`] implement `AsMut<T>`.
+impl<T: FromBytes> AsMut<[T]> for BorrowedSliceMappedPages<T, Mutable> {
+    fn as_mut(&mut self) -> &mut [T] { self.deref_mut() }
+}
+/// Both [`Mutable`] and [`Immutable`] [`BorrowedSliceMappedPages`] implement `Borrow<T>`.
+impl<T: FromBytes, M: Mutability> Borrow<[T]> for BorrowedSliceMappedPages<T, M> {
+    fn borrow(&self) -> &[T] { self.deref() }
+}
+/// Only [`Mutable`] [`BorrowedSliceMappedPages`] implement `BorrowMut<T>`.
+impl<T: FromBytes> BorrowMut<[T]> for BorrowedSliceMappedPages<T, Mutable> {
+    fn borrow_mut(&mut self) -> &mut [T] { self.deref_mut() }
+}
+
+// Forward the impls of `PartialEq`, `Eq`, `PartialOrd`, `Ord`, and `Hash`.
+impl<T: FromBytes + PartialEq, M: Mutability> PartialEq for BorrowedSliceMappedPages<T, M> {
+    fn eq(&self, other: &Self) -> bool { self.deref().eq(other.deref()) }
+}
+impl<T: FromBytes + Eq, M: Mutability> Eq for BorrowedSliceMappedPages<T, M> { }
+impl<T: FromBytes + PartialOrd, M: Mutability> PartialOrd for BorrowedSliceMappedPages<T, M> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { self.deref().partial_cmp(other.deref()) }
+}
+impl<T: FromBytes + Ord, M: Mutability> Ord for BorrowedSliceMappedPages<T, M> {
+    fn cmp(&self, other: &Self) -> Ordering { self.deref().cmp(other.deref()) }
+}
+impl<T: FromBytes + Hash, M: Mutability> Hash for BorrowedSliceMappedPages<T, M> {
+    fn hash<H: Hasher>(&self, state: &mut H) { self.deref().hash(state) }
+}
+
+
+/// A marker type used to indicate that a [`BorrowedMappedPages`]
+/// or [`BorrowedSliceMappedPages`] is borrowed mutably.
+/// 
+/// Implements the [`Mutability`] trait. 
+#[non_exhaustive]
+pub struct Mutable { }
+
+/// A marker type used to indicate that a [`BorrowedMappedPages`]
+/// or [`BorrowedSliceMappedPages`] is borrowed immutably.
+/// 
+/// Implements the [`Mutability`] trait.
+#[non_exhaustive]
+pub struct Immutable { }
+
+/// A trait for parameterizing a [`BorrowedMappedPages`]
+/// or [`BorrowedSliceMappedPages`] as mutably or immutably borrowed.
+/// 
+/// Only [`Mutable`] and [`Immutable`] are able to implement this trait.
+pub trait Mutability: private::Sealed { }
+
+impl private::Sealed for Immutable { }
+impl private::Sealed for Mutable { }
+impl Mutability for Immutable { }
+impl Mutability for Mutable { }
+
+mod private {
+    pub trait Sealed { }
 }

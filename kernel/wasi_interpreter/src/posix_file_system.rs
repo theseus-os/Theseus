@@ -148,13 +148,9 @@ impl PosixNode {
     /// Returns relative path of file descriptor as a string.
     pub fn get_relative_path(&self) -> String {
         let absolute_path = Path::new(self.theseus_file_or_dir.get_absolute_path());
-        let wd_path = Path::new(
-            task::get_my_current_task()
-                .unwrap()
-                .get_env()
-                .lock()
-                .cwd(),
-        );
+        let wd_path = task::with_current_task(|t|
+            Path::new(t.get_env().lock().cwd())
+        ).expect("couldn't get current task");
 
         let relative_path: Path = absolute_path.relative(&wd_path).unwrap();
         String::from(relative_path)
@@ -413,15 +409,13 @@ impl FileDescriptorTable {
                         return Err(wasi::ERRNO_EXIST);
                     } else if fail_if_not_dir {
                         return Err(wasi::ERRNO_NOTDIR);
+                    } else if truncate_file_to_size_zero {
+                        // HACK: Truncate file by overwriting file.
+                        let new_file: FileRef =
+                            MemFile::new(String::from(base_name), &parent_dir).unwrap();
+                        FileOrDir::File(new_file)
                     } else {
-                        if truncate_file_to_size_zero {
-                            // HACK: Truncate file by overwriting file.
-                            let new_file: FileRef =
-                                MemFile::new(String::from(base_name), &parent_dir).unwrap();
-                            FileOrDir::File(new_file)
-                        } else {
-                            file_or_dir
-                        }
+                        file_or_dir
                     }
                 }
                 FileOrDir::Dir { .. } => file_or_dir,

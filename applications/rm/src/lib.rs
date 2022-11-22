@@ -11,7 +11,6 @@ extern crate root;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use alloc::sync::Arc;
 use alloc::string::ToString;
 use getopts::Options;
 use path::Path;
@@ -46,15 +45,11 @@ pub fn remove_node(args: Vec<String>) -> Result<(), String> {
         return Ok(());
     }
 
-
-    let taskref = match task::get_my_current_task() {
-        Some(t) => t,
-        None => {
-            return Err("failed to get current task".into());
-        }
+    let Ok(working_dir) = task::with_current_task(|t|
+        t.get_env().lock().working_dir.clone()
+    ) else {
+        return Err("failed to get current task".into());
     };
-
-    let working_dir = Arc::clone(&taskref.get_env().lock().working_dir);
 
     if matches.free.is_empty() {
         return Err("rm: missing argument".into());

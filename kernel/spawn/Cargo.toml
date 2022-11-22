@@ -68,5 +68,8 @@ path = "../thread_local_macro"
 [dependencies.preemption]
 path = "../preemption"
 
+[dependencies.no_drop]
+path = "../no_drop"
+
 [lib]
 crate-type = ["rlib"]

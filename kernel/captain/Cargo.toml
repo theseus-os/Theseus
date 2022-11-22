@@ -31,6 +31,9 @@ path = "../first_application"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.no_drop]
+path = "../no_drop"
+
 [dependencies.stack]
 path = "../stack"
 
@@ -39,6 +42,9 @@ path = "../mod_mgmt"
 
 [dependencies.exceptions_full]
 path = "../exceptions_full"
+
+[dependencies.tlb_shootdown]
+path = "../tlb_shootdown"
 
 [dependencies.apic]
 path = "../apic"

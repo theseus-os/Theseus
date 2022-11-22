@@ -7,7 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use core::{mem::ManuallyDrop, ops::Deref};
+use core::mem::ManuallyDrop;
 use super::{
     AllocatedPages, AllocatedFrames, PageTable, MappedPages, VirtualAddress,
     table::{Table, Level1},
@@ -89,14 +89,5 @@ impl TemporaryPage {
             error!("TemporaryPage::unmap_into_parts(): failed to unmap internal {:?}", e_mp);
             "BUG: TemporaryPage::unmap_into_parts(): failed to unmap internal MappedPages into its parts."
         })
-    }
-}
-
-impl Drop for TemporaryPage {
-    fn drop(&mut self) {
-        error!("LIKELY BUG: TemporaryPage was dropped, should use `unmap_into_parts()` instead. \
-            Contained {:?}, {:?}",
-            self.mapped_page, self.frame.deref(),
-        );
     }
 }

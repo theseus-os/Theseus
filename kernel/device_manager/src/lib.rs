@@ -51,8 +51,9 @@ const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slir
 /// * local APICs ([`apic`]),
 /// * [`acpi`] tables for system configuration info, including the IOAPIC.
 pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
-    // First, initialize the local apic info.
-    apic::init(&mut kernel_mmi.page_table)?;
+    // First, initialize the local APIC hardware such that we can populate
+    // and initialize each LocalAPIC discovered in the ACPI table initialization routine below.
+    apic::init();
     
     // Then, parse the ACPI tables to acquire system configuration info.
     acpi::init(&mut kernel_mmi.page_table)?;

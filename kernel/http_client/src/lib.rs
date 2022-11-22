@@ -254,17 +254,15 @@ pub fn send_request(
                                         }
                                     }
                                 } 
+                                else if let Some(_connection_close_header) = response.headers.iter().find(|h| h.name == "Connection" && h.value == b"close") {
+                                    // Here: the remote endpoint closed the connection, meaning that the entire response is on the recv buffer.
+                                    new_state = HttpState::Responded;
+                                    data.len()
+                                }
                                 else {
-                                    if let Some(_connection_close_header) = response.headers.iter().find(|h| h.name == "Connection" && h.value == b"close") {
-                                        // Here: the remote endpoint closed the connection, meaning that the entire response is on the recv buffer.
-                                        new_state = HttpState::Responded;
-                                        data.len()
-                                    }
-                                    else {
-                                        error!("http_client: couldn't find Content-Length or Connection header, can't determine end of HTTP response");
-                                        // upon error, return 0, which instructs the recv() method to pop off no bytes from the recv buffer
-                                        0
-                                    }
+                                    error!("http_client: couldn't find Content-Length or Connection header, can't determine end of HTTP response");
+                                    // upon error, return 0, which instructs the recv() method to pop off no bytes from the recv buffer
+                                    0
                                 }
                             }
 

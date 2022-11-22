@@ -249,7 +249,7 @@ fn count_private_rodata_sections() -> Result<(), String> {
         let mut prv = 0;
         let mut publ = 0;
         let mut disc = 0;
-        for sec in crate_ref.lock_as_ref().sections.values().filter(|sec| sec.get_type() == mod_mgmt::SectionType::Rodata) {
+        for sec in crate_ref.lock_as_ref().sections.values().filter(|sec| sec.typ == mod_mgmt::SectionType::Rodata) {
             section_count += 1;
             let mut can_discard = true;
             if sec.global {
@@ -444,9 +444,10 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
 
 
 fn get_my_current_namespace() -> Arc<CrateNamespace> {
-    task::get_my_current_task().map(|t| Arc::clone(t.get_namespace())).unwrap_or_else(|| 
-        mod_mgmt::get_initial_kernel_namespace().expect("BUG: initial kernel namespace wasn't initialized").clone()
-    )
+    task::with_current_task(|t| t.get_namespace().clone())
+        .or_else(|_| mod_mgmt::get_initial_kernel_namespace().cloned().ok_or(()))
+        .map_err(|_| "couldn't get current task's namespace or default namespace")
+        .unwrap()
 }
 
 

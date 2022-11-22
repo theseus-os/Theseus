@@ -37,7 +37,7 @@ pub fn init() {
 /// which will invoke it as needed (on remap/unmap operations).
 fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
     if let Some(my_lapic) = get_my_apic() {
-        // info!("broadcast_tlb_shootdown():  AP {}, vaddrs: {:?}", my_lapic.read().apic_id, virtual_addresses);
+        // log::info!("broadcast_tlb_shootdown():  AP {}, pages: {:?}", my_lapic.read().apic_id(), pages_to_invalidate);
         send_tlb_shootdown_ipi(&mut my_lapic.write(), pages_to_invalidate);
     }
 }
@@ -48,7 +48,7 @@ fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
 /// 
 /// There is no need to invoke this directly, it will be called by an IPI interrupt handler.
 pub fn handle_tlb_shootdown_ipi(pages_to_invalidate: PageRange) {
-    // trace!("handle_tlb_shootdown_ipi(): AP {}, pages: {:?}", apic::get_my_apic_id(), pages_to_invalidate);
+    // log::trace!("handle_tlb_shootdown_ipi(): AP {}, pages: {:?}", apic::get_my_apic_id(), pages_to_invalidate);
 
     for page in pages_to_invalidate {
         x86_64::instructions::tlb::flush(x86_64::VirtAddr::new(page.start_address().value() as u64));
@@ -66,7 +66,7 @@ pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, pages_to_invalidate: Pag
         return;
     }
 
-    // trace!("send_tlb_shootdown_ipi(): from AP {}, cpu_count: {}, {:?}", my_lapic.apic_id, cpu_count, pages_to_invalidate);
+    // log::trace!("send_tlb_shootdown_ipi(): from AP {}, cpu_count: {}, {:?}", my_lapic.apic_id(), cpu_count, pages_to_invalidate);
 
     // interrupts must be disabled here, because this IPI sequence must be fully synchronous with other cores,
     // and we wouldn't want this core to be interrupted while coordinating IPI responses across multiple cores.

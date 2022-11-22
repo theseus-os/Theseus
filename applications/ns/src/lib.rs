@@ -59,10 +59,9 @@ pub fn main(args: Vec<String>) -> isize {
 
 
 fn rmain(matches: Matches) -> Result<(), String> {
-    let curr_task = task::get_my_current_task().ok_or_else(|| format!("unable to get current task"))?;
-    let namespace = curr_task.get_namespace();
-    let env = curr_task.get_env();
-    let curr_wd = env.lock().working_dir.clone();
+    let (namespace, curr_wd) = task::with_current_task(|t|
+        (t.get_namespace().clone(), t.get_env().lock().working_dir.clone())
+    ).map_err(|_| String::from("failed to get current task"))?;
 
     let recursive = matches.opt_present("r");
     let mut output = String::new();

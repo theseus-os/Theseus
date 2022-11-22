@@ -14,7 +14,6 @@ use alloc::string::ToString;
 use fs_node::{FileOrDir, DirRef};
 use getopts::Options;
 use path::Path;
-use alloc::sync::Arc;
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
@@ -34,16 +33,10 @@ pub fn main(args: Vec<String>) -> isize {
         return 0;
     }
 
-    let taskref = match task::get_my_current_task() {
-        Some(t) => t,
-        None => {
-            println!("failed to get current task");
-            return -1;
-        }
+    let Ok(curr_wd) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
+        println!("failed to get current task");
+        return -1;
     };
-
-    let curr_wd = Arc::clone(&taskref.get_env().lock().working_dir);
-    
     // print children of working directory if no child is specified
     if matches.free.is_empty() {
         print_children(&curr_wd);

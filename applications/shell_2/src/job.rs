@@ -22,7 +22,7 @@ impl Job {
 
     pub(crate) fn unsuspend(&mut self) {
         for mut part in self.parts.iter_mut() {
-            part.task.unblock();
+            part.task.unblock().unwrap();
             part.state = State::Running;
         }
     }

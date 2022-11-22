@@ -1,0 +1,16 @@
+[package]
+name = "nano_core"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "nano_core"
+path = "main.rs"
+
+[dependencies]
+log = "0.4.17"
+
+logger = { path = "../logger" }
+
+uefi = { version = "0.18", default-features = false, features = [ "alloc", "exts" ] }
+uefi-services = { version = "0.15", default-features = false, features = [ "panic_handler" ] }

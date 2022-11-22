@@ -291,12 +291,10 @@ pub fn swap_crates(
                 // get the section from the new crate that corresponds to the `old_sec`
                 let prefix = if crates_have_same_name {
                     Cow::from(old_sec_name_without_hash)
+                } else if let Some(s) = replace_containing_crate_name(old_sec_name_without_hash, &old_crate_name_without_hash, &new_crate_name_without_hash) {
+                    Cow::from(s)
                 } else {
-                    if let Some(s) = replace_containing_crate_name(old_sec_name_without_hash, &old_crate_name_without_hash, &new_crate_name_without_hash) {
-                        Cow::from(s)
-                    } else {
-                        Cow::from(old_sec_name_without_hash)
-                    }
+                    Cow::from(old_sec_name_without_hash)
                 };
                 let new_dest_sec = {
                     let mut iter = new_crate.data_sections_iter().filter(|sec| sec.name.starts_with(&*prefix));
@@ -435,9 +433,9 @@ pub fn swap_crates(
 
                         write_relocation(
                             relocation_entry, 
-                            &mut target_sec_mapped_pages, 
+                            target_sec_mapped_pages.as_slice_mut(0, target_sec.mapped_pages_offset + target_sec.size)?,
                             target_sec.mapped_pages_offset, 
-                            new_source_sec.start_address(), 
+                            new_source_sec.virt_addr,
                             verbose_log
                         )?;
 

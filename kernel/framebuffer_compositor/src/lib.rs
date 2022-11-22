@@ -19,7 +19,6 @@
 //! The cache is basically a rectangular region in the destination framebuffer, and we define the structure `CacheBlock` to represent that cached region.
 
 #![no_std]
-#![feature(const_btree_new)]
 
 extern crate alloc;
 extern crate compositor;
@@ -247,11 +246,9 @@ impl Compositor for FrameCompositor {
                         }
                         let cache_range = row_range.start..(row_range.start + CACHE_BLOCK_HEIGHT);
                         // check cache if the bounding box is not a single pixel
-                        if bounding_box.size() > 1 {
-                            if self.check_and_cache(src_fb, coordinate, &cache_range)? {
-                                 row_range.start += CACHE_BLOCK_HEIGHT;
-                                 continue;
-                            }
+                        if bounding_box.size() > 1 && self.check_and_cache(src_fb, coordinate, &cache_range)? {
+                            row_range.start += CACHE_BLOCK_HEIGHT;
+                            continue;
                         };
                         bounding_box.blend_buffers(
                             src_fb,

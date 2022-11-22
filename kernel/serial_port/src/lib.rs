@@ -186,12 +186,18 @@ impl SerialPort {
                 match SerialPortAddress::try_from(base_port) {
                     Ok(SerialPortAddress::COM1 | SerialPortAddress::COM3) => {
                         INTERRUPT_ACTION_COM1_COM3.call_once(|| 
-                            Box::new(move || { deferred_task.unblock(); })
+                            Box::new(move || {
+                                deferred_task.unblock()
+                                    .expect("BUG: com_1_com3_interrupt_handler: couldn't unblock deferred task");
+                            })
                         );
                     }
                     Ok(SerialPortAddress::COM2 | SerialPortAddress::COM4) => {
                         INTERRUPT_ACTION_COM2_COM4.call_once(|| 
-                            Box::new(move || { deferred_task.unblock(); })
+                            Box::new(move || {
+                                deferred_task.unblock()
+                                    .expect("BUG: com_2_com4_interrupt_handler: couldn't unblock deferred task");
+                            })
                         );
                     }
                     Err(_) => warn!("Registering interrupt handler for unknown serial port at {:#X}", base_port),
