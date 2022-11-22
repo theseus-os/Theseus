@@ -1,0 +1,5 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "no_drop"
+description = "Simple wrapper type for preventing an object from being dropped"
+version = "0.1.0"

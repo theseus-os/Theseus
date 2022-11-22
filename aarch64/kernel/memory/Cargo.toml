@@ -1,0 +1,51 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "memory"
+description = "The virtual memory subsystem."
+version = "0.1.0"
+
+[dependencies]
+spin = "0.9.0"
+bitflags = "1.1.0"
+multiboot2 = "0.14.0"
+xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
+bit_field = "0.7.0"
+x86_64 = "0.14.8"
+zerocopy = "0.5.0"
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "1.4.0"
+
+[dependencies.irq_safety]
+git = "https://github.com/theseus-os/irq_safety"
+
+[dependencies.atomic_linked_list]
+path = "../../libs/atomic_linked_list"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[dependencies.memory_x86_64]
+path = "../memory_x86_64"
+
+[dependencies.memory_structs]
+path = "../memory_structs"
+
+[dependencies.page_table_entry]
+path = "../page_table_entry"
+
+[dependencies.page_allocator]
+path = "../page_allocator"
+
+[dependencies.frame_allocator]
+path = "../frame_allocator"
+
+[dependencies.no_drop]
+path = "../no_drop"
+
+[lib]
+crate-type = ["rlib"]
