@@ -9,21 +9,17 @@
 #![feature(result_option_inspect)]
 
 extern crate spin;
-extern crate multiboot2;
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate irq_safety;
 extern crate kernel_config;
 extern crate atomic_linked_list;
-extern crate xmas_elf;
 extern crate bit_field;
-#[cfg(target_arch = "x86_64")]
-extern crate memory_x86_64;
-extern crate x86_64;
 extern crate memory_structs;
-extern crate page_table_entry;
 extern crate page_allocator;
 extern crate frame_allocator;
+extern crate page_table_entry;
+extern crate memory_aarch64;
 extern crate zerocopy;
 extern crate no_drop;
 
@@ -39,7 +35,7 @@ pub use self::paging::{
     MappedPages, BorrowedMappedPages, BorrowedSliceMappedPages,
 };
 
-pub use memory_structs::{Frame, Page, FrameRange, PageRange, VirtualAddress, PhysicalAddress};
+pub use memory_structs::{Frame, Page, FrameRange, PageRange, VirtualAddress, PhysicalAddress, PteFlags};
 pub use page_allocator::{AllocatedPages, allocate_pages, allocate_pages_at,
     allocate_pages_by_bytes, allocate_pages_by_bytes_at};
 
@@ -50,8 +46,8 @@ pub use frame_allocator::{AllocatedFrames, MemoryRegionType, PhysicalMemoryRegio
 use memory_x86_64::{BootInformation, get_kernel_address, get_boot_info_mem_area, find_section_memory_bounds,
     get_vga_mem_addr, get_modules_address, tlb_flush_virt_addr, tlb_flush_all, get_p4};
 
-#[cfg(target_arch = "x86_64")]
-pub use memory_x86_64::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
+#[cfg(target_arch = "aarch64")]
+use memory_aarch64::{tlb_flush_virt_addr, tlb_flush_all, get_p4};
 
 use spin::Once;
 use irq_safety::MutexIrqSafe;
@@ -95,7 +91,7 @@ pub struct MemoryManagementInfo {
 /// # Locking / Deadlock
 /// Currently, this function acquires the lock on the frame allocator and the kernel's `MemoryManagementInfo` instance.
 /// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
-pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<(MappedPages, PhysicalAddress), &'static str> {
+pub fn create_contiguous_mapping(size_in_bytes: usize, flags: PteFlags) -> Result<(MappedPages, PhysicalAddress), &'static str> {
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous pages!")?;
     let allocated_frames = allocate_frames_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous frames!")?;
@@ -113,7 +109,7 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
 /// # Locking / Deadlock
 /// Currently, this function acquires the lock on the kernel's `MemoryManagementInfo` instance.
 /// Thus, the caller should ensure that lock is not held when invoking this function.
-pub fn create_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<MappedPages, &'static str> {
+pub fn create_mapping(size_in_bytes: usize, flags: PteFlags) -> Result<MappedPages, &'static str> {
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_mapping(): couldn't allocate pages!")?;
     kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags)
@@ -129,7 +125,7 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
 }
 
 
-
+/*
 /// Initializes the virtual memory management system.
 /// Consumes the given BootInformation, because after the memory system is initialized,
 /// the original BootInformation will be unmapped and inaccessible.
@@ -223,6 +219,7 @@ pub fn init(
             debug!("Done with paging::init(). new page table: {:?}", new_page_table);
         })
 }
+*/
 
 /// Finishes initializing the memory management system after the heap is ready.
 /// 

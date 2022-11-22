@@ -29,13 +29,14 @@ use core::{
     fmt,
 };
 use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
-    AllocatedPages, allocate_pages, AllocatedFrames, EntryFlags,
-    tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
-    get_vga_mem_addr, KERNEL_OFFSET};
+    AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
+    tlb_flush_all, tlb_flush_virt_addr, get_p4, KERNEL_OFFSET};
 use no_drop::NoDrop;
 use kernel_config::memory::{RECURSIVE_P4_INDEX};
 // use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
+#[cfg(target_arch = "x86_64")]
+use super::{find_section_memory_bounds, get_vga_mem_addr};
 
 /// A top-level root (P4) page table.
 /// 
@@ -101,7 +102,7 @@ impl PageTable {
         let mut temporary_page = TemporaryPage::create_and_map_table_frame(page, new_p4_frame, current_page_table)?;
         temporary_page.with_table_and_frame(|table, frame| {
             table.zero();
-            table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), PteFlags::VALID | PteFlags::WRITABLE);
         })?;
 
         let (_temp_page, inited_new_p4_frame) = temporary_page.unmap_into_parts(current_page_table)?;
@@ -136,7 +137,9 @@ impl PageTable {
         let mut temporary_page = TemporaryPage::create_and_map_table_frame(None, this_p4, self)?;
 
         // overwrite recursive mapping
-        self.p4_mut()[RECURSIVE_P4_INDEX].set_entry(other_table.p4_table.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
+        // todo: set PAGE_DESCRIPTOR & ACCESSED for aarch64
+        error!("todo: set PAGE_DESCRIPTOR & ACCESSED for aarch64");
+        self.p4_mut()[RECURSIVE_P4_INDEX].set_entry(other_table.p4_table.as_allocated_frame(), PteFlags::VALID | PteFlags::WRITABLE); 
         tlb_flush_all();
 
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
@@ -150,7 +153,9 @@ impl PageTable {
 
         // restore recursive mapping to original p4 table
         temporary_page.with_table_and_frame(|p4_table, frame| {
-            p4_table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            // todo: set PAGE_DESCRIPTOR & ACCESSED for aarch64
+            error!("todo: set PAGE_DESCRIPTOR & ACCESSED for aarch64");
+            p4_table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), PteFlags::VALID | PteFlags::WRITABLE);
         })?;
         tlb_flush_all();
 
@@ -169,13 +174,20 @@ impl PageTable {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
         // perform the actual page table switch
-        unsafe { 
+
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
             use x86_64::{PhysAddr, structures::paging::frame::PhysFrame, registers::control::{Cr3, Cr3Flags}};
             Cr3::write(
                 PhysFrame::containing_address(PhysAddr::new_truncate(new_table.p4_table.start_address().value() as u64)),
                 Cr3Flags::empty(),
             )
         };
+
+        #[cfg(target_arch = "aarch64")]
+        // todo
+        // see https://discord.com/channels/977298261566181456/1010499501821272167/1044595516153016362
+        error!("PageTable::switch - todo for aarch64");
     }
 
 
@@ -191,7 +203,7 @@ pub fn get_current_p4() -> Frame {
     Frame::containing_address(get_p4())
 }
 
-
+/*
 /// Initializes a new page table and sets up all necessary mappings for the kernel to continue running. 
 /// Returns the following tuple, if successful:
 /// 
@@ -343,7 +355,7 @@ pub fn init(
         boot_info_mapped_pages = Some(mapper.map_allocated_pages_to(
             boot_info_pages,
             boot_info_frames,
-            EntryFlags::PRESENT,
+            PteFlags::PRESENT,
         )?);
 
         debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[..index]);
@@ -377,3 +389,4 @@ pub fn init(
         identity_mapped_pages
     ))
 }
+*/

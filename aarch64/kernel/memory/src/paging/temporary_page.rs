@@ -10,7 +10,7 @@
 use core::mem::ManuallyDrop;
 use super::{
     AllocatedPages, AllocatedFrames, PageTable, MappedPages, VirtualAddress,
-    table::{Table, Level1},
+    table::{Table, Level1}, PteFlags,
 };
 use kernel_config::memory::{TEMPORARY_PAGE_VIRT_ADDR, PAGE_SIZE};
 
@@ -57,7 +57,7 @@ impl TemporaryPage {
         let (mapped_page, frame) = page_table.internal_map_to(
             page.ok_or("Couldn't allocate a new Page for the temporary P4 table frame")?,
             frame,
-            super::EntryFlags::WRITABLE,
+            PteFlags::WRITABLE,
         )?;
         Ok(TemporaryPage {
             mapped_page,
