@@ -75,10 +75,9 @@ impl ImmutableWrite for Slave {
     }
 }
 
-/// Stores the stdio queues, key event queue and the pointer to the terminal
-/// for applications. This structure is provided for application's use and only
-/// contains necessary one-end readers/writers to queues. On the shell side, we
-/// have full control to queues.
+/// Stores the stdio queues and line discipline. The stored queues are for use
+/// by applications e.g. `stdin` is a reader. The other end of the queue is held
+/// by the shell.
 #[derive(Clone)]
 pub struct IoStreams {
     /// The reader to stdin.
