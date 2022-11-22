@@ -3,7 +3,7 @@
 extern crate alloc;
 
 mod error;
-mod internal;
+mod builtin;
 mod job;
 mod wrapper;
 

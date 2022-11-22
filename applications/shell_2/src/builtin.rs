@@ -1,12 +1,14 @@
 use crate::{Error, Result, Shell};
 use alloc::{borrow::ToOwned, vec::Vec};
+use app_io::println;
 use path::Path;
 
-// TODO: Decide which internal commands we don't need.
+// TODO: Decide which builtins we don't need.
 
 impl Shell {
     pub(crate) fn alias(&self, _args: Vec<&str>) -> Result<()> {
-        todo!();
+        println!("not yet implemented");
+        Err(Error::Command(1))
     }
 
     pub(crate) fn bg(&mut self, args: Vec<&str>) -> Result<()> {
@@ -55,7 +57,8 @@ impl Shell {
     }
 
     pub(crate) fn exec(&self, _args: Vec<&str>) -> Result<()> {
-        todo!();
+        println!("not yet implemented");
+        Err(Error::Command(1))
     }
 
     pub(crate) fn exit(&self, _args: Vec<&str>) -> Result<()> {
@@ -64,46 +67,57 @@ impl Shell {
     }
 
     pub(crate) fn export(&self, _args: Vec<&str>) -> Result<()> {
-        todo!();
+        println!("not yet implemented");
+        Err(Error::Command(1))
     }
 
     pub(crate) fn fc(&self, _args: Vec<&str>) -> Result<()> {
-        todo!();
+        println!("not yet implemented");
+        Err(Error::Command(1))
     }
 
     pub(crate) fn fg(&self, _args: Vec<&str>) -> Result<()> {
-        todo!();
+        println!("not yet implemented");
+        Err(Error::Command(1))
     }
 
     pub(crate) fn getopts(&self, _args: Vec<&str>) -> Result<()> {
-        todo!();
+        println!("not yet implemented");
+        Err(Error::Command(1))
     }
 
     pub(crate) fn hash(&self, _args: Vec<&str>) -> Result<()> {
-        todo!();
+        println!("not yet implemented");
+        Err(Error::Command(1))
     }
 
     pub(crate) fn history(&self, _args: Vec<&str>) -> Result<()> {
-        todo!();
+        println!("not yet implemented");
+        Err(Error::Command(1))
     }
 
     pub(crate) fn jobs(&self, _args: Vec<&str>) -> Result<()> {
-        todo!();
+        println!("not yet implemented");
+        Err(Error::Command(1))
     }
 
     pub(crate) fn set(&self, _args: Vec<&str>) -> Result<()> {
-        todo!();
+        println!("not yet implemented");
+        Err(Error::Command(1))
     }
 
     pub(crate) fn unalias(&self, _args: Vec<&str>) -> Result<()> {
-        todo!();
+        println!("not yet implemented");
+        Err(Error::Command(1))
     }
 
     pub(crate) fn unset(&self, _args: Vec<&str>) -> Result<()> {
-        todo!();
+        println!("not yet implemented");
+        Err(Error::Command(1))
     }
 
     pub(crate) fn wait(&self, _args: Vec<&str>) -> Result<()> {
-        todo!();
+        println!("not yet implemented");
+        Err(Error::Command(1))
     }
 }
