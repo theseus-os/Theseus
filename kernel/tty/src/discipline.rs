@@ -125,7 +125,7 @@ impl LineDiscipline {
 
     fn clear_input_buf(&self) {
         if let Some(ref mut input_buf) = *self.canonical.lock().unwrap() {
-            *input_buf = Vec::new();
+            input_buf.clear();
         }
     }
 
