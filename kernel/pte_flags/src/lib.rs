@@ -2,24 +2,22 @@
 //! 
 //! This crate offers two main types:
 //! * [`PteFlags`]: the set of bit flags that apply to all architectures.
-//! * [`PteFlagsArch`]: the arch-specific set of bit flags that apply to
-//!   only x86_64 or aarch64, depending on build target.
-//!   * On x86_64, this is a re-export of the `PteFlagsX86_64` type.
-//!   * On aarch64, this is a re-export of the `PteFlagsAarch64` type.
+//! * [`PteFlagsX86_64`] or [`PteFlagsAarch64`]: the arch-specific set of bit flags
+//!   that apply to only the given platform.
 //! 
 //! ## Type conversions
 //! *Notably*, you can convert to and from these architecture-specific types
 //! and architecture-generic type easily.
-//! `PteFlags` can be losslessly converted into `PteFlagsX86_64` or `PteFlagsAarch64`,
+//! [`PteFlags`] can be losslessly converted into [`PteFlagsX86_64`] or [`PteFlagsAarch64`],
 //! with the typical [`From`] and [`Into`] traits.
 //! This makes it possible to set general architecture-indepedent flags first,
 //! and then convert it in order to set more architecture-specific flags.
 //! 
-//! You can also convert `PteFlagsX86_64` or `PteFlagsAarch64` into `PteFlags`,
-//! but it may be lossy as only the bit flags defined in `PteFlags` are preserved.
+//! You can also convert [`PteFlagsX86_64`] or [`PteFlagsAarch64`] into [`PteFlags`],
+//! but it may be lossy as only the bit flags defined in [`PteFlags`] are preserved.
 //! 
 //! ## aarch64 considerations
-//! When converting from `PteFlags` to `PteFlagsAarch64`,
+//! When converting from [`PteFlags`] to [`PteFlagsAarch64`],
 //! certain bits will be set by default;
 //! see [`PteFlagsAarch64::from()`] for more information.
 //! 
@@ -29,21 +27,24 @@
 //! [MAIR]: https://docs.rs/cortex-a/latest/cortex_a/registers/MAIR_EL1/index.html
 
 #![no_std]
+#![feature(doc_cfg)]
 
 use cfg_if::cfg_if;
 use bitflags::bitflags;
 
-cfg_if!{ if #[cfg(target_arch = "x86_64")] {
+cfg_if!{ if #[cfg(any(target_arch = "x86_64", doc))] {
     mod pte_flags_x86_64;
     pub use pte_flags_x86_64::PteFlagsX86_64;
-    /// A re-export of `PteFlagsX86_64` for convenience.
-    pub use pte_flags_x86_64::PteFlagsX86_64 as PteFlagsArch;
-} else if #[cfg(target_arch = "aarch64")] {
+}}
+cfg_if!{ if #[cfg(any(target_arch = "aarch64", doc))] {
     mod pte_flags_aarch64;
     pub use pte_flags_aarch64::PteFlagsAarch64;
-    /// A re-export of `PteFlagsAarch64` for convenience.
-    pub use pte_flags_aarch64::PteFlagsAarch64 as PteFlagsArch;
 }}
+
+#[cfg(target_arch = "x86_64")]
+use pte_flags_x86_64::PteFlagsX86_64 as PteFlagsArch;
+#[cfg(target_arch = "aarch64")]
+use pte_flags_aarch64::PteFlagsAarch64 as PteFlagsArch;
 
 bitflags! {
     /// Common, architecture-independent flags for a page table entry (PTE)

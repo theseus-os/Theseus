@@ -20,6 +20,7 @@ bitflags! {
     /// * Bits `[51:54]` (inclusive) are reserved by hardware for more access flags.
     /// * Bits `[55:58]` (inclusive) are available for custom OS usage.
     /// * Bits `[59:63]` (inclusive) are reserved by hardware for extended access flags.
+    #[doc(cfg(target_arch = "aarch64"))]
     pub struct PteFlagsAarch64: u64 {
         /// * If set, this page is currently "present" in memory. 
         /// * If not set, this page is not in memory, which could mean one of several things:

@@ -14,6 +14,7 @@ bitflags! {
     /// * Bits `[12:51]` (inclusive) are reserved by hardware to hold the physical frame address.
     /// * Bits `[52:62]` (inclusive) are available for custom OS usage.
     /// * Bit  `63` is reserved by hardware for access flags (noexec).
+    #[doc(cfg(target_arch = "x86_64"))]
     pub struct PteFlagsX86_64: u64 {
         /// * If set, this page is currently "present" in memory. 
         /// * If not set, this page is not in memory, which could mean one of several things:
