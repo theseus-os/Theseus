@@ -1,11 +1,37 @@
 //! This crate defines the structure of page table entry (PTE) flags on x86_64 and aarch64.
 //! 
-//! For aarch64, the definition of these flags assumed that the [MAIR] index 0
+//! This crate offers two main types:
+//! * [`PteFlags`]: the set of bit flags that apply to all architectures.
+//! * [`PteFlagsArch`]: the arch-specific set of bit flags that apply to
+//!   only x86_64 or aarch64, depending on build target.
+//!   * On x86_64, this is a re-export of the `PteFlagsX86_64` type.
+//!   * On aarch64, this is a re-export of the `PteFlagsAarch64` type.
+//! 
+//! ## Type conversions
+//! *Notably*, you can convert to and from these architecture-specific types
+//! and architecture-generic type easily.
+//! `PteFlags` can be losslessly converted into `PteFlagsX86_64` or `PteFlagsAarch64`,
+//! with the typical [`From`] and [`Into`] traits.
+//! This makes it possible to set general architecture-indepedent flags first,
+//! and then convert it in order to set more architecture-specific flags.
+//! 
+//! You can also convert `PteFlagsX86_64` or `PteFlagsAarch64` into `PteFlags`,
+//! but it may be lossy as only the bit flags defined in `PteFlags` are preserved.
+//! 
+//! ## aarch64 considerations
+//! When converting from `PteFlags` to `PteFlagsAarch64`,
+//! certain bits will be set by default;
+//! see [`PteFlagsAarch64::from()`] for more information.
+//! 
+//! For aarch64, the definition of these flags assumes that the [MAIR] index 0
 //! has a "DEVICE nGnRE" entry, and [MAIR] Index 1 has a Normal + Outer Shareable entry.
 //!
 //! [MAIR]: https://docs.rs/cortex-a/latest/cortex_a/registers/MAIR_EL1/index.html
 
 #![no_std]
+
+#[cfg(test)]
+extern crate std;
 
 use cfg_if::cfg_if;
 use bitflags::bitflags;
@@ -13,10 +39,12 @@ use bitflags::bitflags;
 cfg_if!{ if #[cfg(target_arch = "x86_64")] {
     mod pte_flags_x86_64;
     pub use pte_flags_x86_64::PteFlagsX86_64;
+    /// A re-export of `PteFlagsX86_64` for convenience.
     pub use pte_flags_x86_64::PteFlagsX86_64 as PteFlagsArch;
 } else if #[cfg(target_arch = "aarch64")] {
     mod pte_flags_aarch64;
     pub use pte_flags_aarch64::PteFlagsAarch64;
+    /// A re-export of `PteFlagsAarch64` for convenience.
     pub use pte_flags_aarch64::PteFlagsAarch64 as PteFlagsArch;
 }}
 
@@ -26,15 +54,16 @@ bitflags! {
     ///
     /// **Note:** items beginning with an underscore `_` are not used in Theseus.
     ///
-    /// Also, this contains only the flags that are common to both `x86_64` and `aarch64`.
+    /// This contains only the flags that are common to both `x86_64` and `aarch64`.
     ///
+    /// ## Converting to/from arch-specific flags
     /// This type can be losslessly converted into `PteFlagsX86_64` and `PteFlagsAarch64`
     /// with the typical [`From`] and [`Into`] traits.
-    /// This makes it to set general architecture-indepedent flags first,
+    /// This makes it easier to set general architecture-indepedent flags first,
     /// and then convert it in order to set more architecture-specific flags.
     /// 
     /// This type can also be converted *from* `PteFlagsX86_64` and `PteFlagsAarch64`,
-    /// but it may be lossless as only the bit flags defined herein are preserved.
+    /// but it may be lossy as only the bit flags defined herein are preserved.
     pub struct PteFlags: u64 {
         /// * If set, this page is currently "present" in memory. 
         /// * If not set, this page is not in memory, which could mean one of several things:
@@ -133,10 +162,22 @@ impl Default for PteFlags {
 }
 
 impl PteFlags {
-    /// Returns a new `PteFlags` with the default value, in which
-    /// only the `NOT_EXECUTABLE` bit is set.
+    /// Returns a new `PteFlagsX86_64` with the default value, in which:
+    /// * `ACCESSED` is set.
+    /// * the `NOT_EXECUTABLE` bit is set.
+    /// 
+    /// Note: the `ACCESSED` bit is set by default because Theseus 
+    ///       currently doesn't perform any paging/swapping of pages to disk,
+    ///       which is what this bit is typically used for.
+    ///       On aarch64, not setting this bit can cause an Access Flag Fault
+    ///       (which is useful only for software-managed LRU paging algorithms),
+    ///       so we just set that bit by default to avoid any faults
+    ///       that we don't care about.
     pub const fn new() -> Self {
-        Self::NOT_EXECUTABLE
+        Self::from_bits_truncate(
+            Self::ACCESSED.bits
+            | Self::NOT_EXECUTABLE.bits
+        )
     }
 
     /// Returns a copy of this `PteFlags` with the `VALID` bit set or cleared.
@@ -151,7 +192,6 @@ impl PteFlags {
     ///
     /// * If `enable` is `true`, this will be writable.
     /// * If `enable` is `false`, this will be read-only.
-    ///   (`NOT_EXECUTABLE` will be set).
     #[must_use]
     #[doc(alias("read_only"))]
     pub fn writable(mut self, enable: bool) -> Self {

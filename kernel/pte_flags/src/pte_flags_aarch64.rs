@@ -92,6 +92,11 @@ bitflags! {
         /// * The hardware will set this bit when the page is accessed.
         /// * The OS can then clear this bit once it has acknowledged that the page was accessed,
         ///   if it cares at all about this information.
+        /// 
+        /// On aarch64, an "Access Flag Fault" may be raised if this bit is not set
+        /// when this page is first accessed and is trying to be cached in the TLB.
+        /// This fault can only occur when the Access Flag bit is `0` and the flag is being
+        /// managed by software.
         const ACCESSED           = 1 << 10;
         /// * If set, this page is mapped into only one or less than all address spaces,
         ///   or is mapped differently across different address spaces,
@@ -135,17 +140,35 @@ impl Default for PteFlagsAarch64 {
 }
 
 impl PteFlagsAarch64 {
+    /// The mask of bits that should be overwritten with default values
+    /// when converting a generic `PteFlags` into a specific `PteFlagsAarch64`.
+    /// Currently this includes:
+    /// * The two bits `[8:9]` for shareability.
+    pub const OVERWRITTEN_BITS_FOR_CONVERSION: PteFlagsAarch64 =
+        PteFlagsAarch64::_INNER_SHAREABLE;
+
+
     /// Returns a new `PteFlagsAarch64` with the default value, in which:
     /// * `NORMAL_MEMORY` (not `DEVICE_MEMORY`) is set.
     /// * `OUTER_SHAREABLE` is set.
     /// * `READ_ONLY` is set.
+    /// * `ACCESSED` is set.
     /// * `NOT_GLOBAL` is set.
     /// * the `NOT_EXECUTABLE` bits are set.
+    ///
+    /// Note: the `ACCESSED` bit is set by default because Theseus 
+    ///       currently doesn't perform any paging/swapping of pages to disk,
+    ///       which is what this bit is typically used for.
+    ///       On aarch64, not setting this bit can cause an Access Flag Fault
+    ///       (which is useful only for software-managed LRU paging algorithms),
+    ///       so we just set that bit by default to avoid any faults
+    ///       that we don't care about.
     pub const fn new() -> Self {
         Self::from_bits_truncate(
             Self::NORMAL_MEMORY.bits
             | Self::OUTER_SHAREABLE.bits
             | Self::READ_ONLY.bits
+            | Self::ACCESSED.bits
             | Self::_NOT_GLOBAL.bits
             | Self::NOT_EXECUTABLE.bits
         )
@@ -153,9 +176,17 @@ impl PteFlagsAarch64 {
 }
 
 impl From<PteFlags> for PteFlagsAarch64 {
+    /// When converting from `PteFlags` to `PteFlagsAarch64`, the bits given by
+    /// [`PteFlagsAarch64::OVERWRITTEN_BITS_FOR_CONVERSION`] will be overwritten
+    /// with a default value.
+    /// 
+    /// Currently, this includes:
+    /// * `OUTER_SHAREABLE` will be set.
     fn from(general: PteFlags) -> Self {
         let mut specific = Self::from_bits_truncate(general.bits());
         specific.toggle(super::WRITABLE_BIT | super::GLOBAL_BIT);
+        specific &= !Self::OVERWRITTEN_BITS_FOR_CONVERSION; // clear the masked bits
+        specific |= Self::OUTER_SHAREABLE; // set the masked bits to their default
         specific
     }
 }
