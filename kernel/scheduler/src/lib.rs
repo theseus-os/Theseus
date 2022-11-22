@@ -24,12 +24,9 @@ use task::TaskRef;
 ///    meaning the current task will continue running.
 pub fn schedule() -> bool {
     let preemption_guard = preemption::hold_preemption();
-
     // If preemption was not previously enabled (before we disabled it above),
     // then we shouldn't perform a task switch here.
     if !preemption_guard.preemption_was_enabled() {
-        // let task = get_my_current_task().unwrap();
-        // trace!("name: {}", task.name);
         // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", get_my_apic_id());
         return false;
     }
