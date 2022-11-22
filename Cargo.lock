@@ -2097,7 +2097,7 @@ version = "0.1.0"
 [[package]]
 name = "noline"
 version = "0.2.0"
-source = "git+https://github.com/tsoutsman/noline?branch=history-dedup#f5b6e4e1be89d1c13f5443b1bdc1fb6e1d17ccc7"
+source = "git+https://github.com/theseus-os/noline?branch=history-dedup#f5b6e4e1be89d1c13f5443b1bdc1fb6e1d17ccc7"
 dependencies = [
  "embedded-hal",
  "nb 1.0.0",

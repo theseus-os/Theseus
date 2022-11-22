@@ -129,7 +129,7 @@ bincode = { git = "https://github.com/bincode-org/bincode" }
 wasmparser = { git = "https://github.com/theseus-os/wasm-tools", branch = "no-std-wasmparser" }
 backtrace = { path = "ports/backtrace" }
 region = { path = "ports/region" }
-noline = { git = "https://github.com/tsoutsman/noline", branch = "history-dedup" }
+noline = { git = "https://github.com/theseus-os/noline", branch = "history-dedup" }
 target-lexicon = { git = "https://github.com/theseus-os/target-lexicon", branch = "theseus" }
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 
