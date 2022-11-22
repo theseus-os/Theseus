@@ -1,21 +1,13 @@
-//! A simple library that handles stdio queues for applications running in
-//! terminal instances.
+//! A simple library that handles stdio queues for applications invoked by a
+//! shell.
 //!
-//! This provides some APIs similar to Rust's `std::io` for applications to
-//! access those queues.
+//! The shell is responsible for setting the correct stdio queues prior to
+//! spawning the application, and destroying them after the application has
+//! completed.
 //!
-//! Usage example:
-//! 1. shell spawns a new app, and creates queues of `stdin`, `stdout`, and
-//! `stderr` for that app. 2. shell stores the reader for `stdin` and writers
-//! for `stdout` and `stderr` to `app_io`,    along with the reader of the key
-//! events queue and references to the running terminal instance. 3. app calls
-//! [`stdin()`] to get the reader of `stdin`, and can perform reading just like
-//!    using the standard library
-//! 4. app calls [`stdout()`] to get the writer of `stdin`, and can perform
-//! output just like    using the standard library
-//! 5. after app exits, shell would set `EOF` flags to its `stdin`, `stdout`,
-//! and `stderr` queues. 6. once all apps in a job exit, app shell removes all
-//! the structure stored in `app_io` and    destructs all stdio queues
+//! Applications can access their queues using [`stdin`], [`stdout`], and
+//! [`stderr`]. This crate also has support for line disciplines, which can be
+//! accessed using [`line_discipline`].
 
 #![no_std]
 
@@ -179,6 +171,7 @@ pub fn stderr() -> Result<Arc<dyn ImmutableWrite>, &'static str> {
     }
 }
 
+/// Returns the application's line discipline.
 pub fn line_discipline() -> Result<Arc<LineDiscipline>, &'static str> {
     let task_id = task::get_my_current_task_id();
     let locked_streams = shared_maps::lock_stream_map();
