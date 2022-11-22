@@ -20,7 +20,7 @@ use path::Path;
 use tty::{Event, LineDiscipline};
 
 pub fn main(_: Vec<String>) -> isize {
-    Shell::new().run().unwrap();
+    Shell::run().expect("shell failed");
     0
 }
 
@@ -33,26 +33,16 @@ pub struct Shell {
     stop_order: Vec<usize>,
 }
 
-impl Default for Shell {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Shell {
-    /// Creates a new shell.
-    pub fn new() -> Self {
-        Self {
+    /// Creates a new shell and runs it.
+    pub fn run() -> Result<()> {
+        let mut shell = Self {
             discipline: app_io::line_discipline().unwrap(),
             jobs: HashMap::new(),
             stop_order: Vec::new(),
-        }
-    }
-
-    /// Runs the shell, consuming it in the process.
-    pub fn run(mut self) -> Result<()> {
-        let result = self._run();
-        self.set_app_discipline();
+        };
+        let result = shell._run();
+        shell.set_app_discipline();
         result
     }
 }
@@ -137,7 +127,6 @@ impl Shell {
                 println!("{}: command not found", command);
                 Ok(())
             }
-            _ => Ok(()),
         }
     }
 
