@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 app_io = { path = "../../kernel/app_io" }
 embedded-hal = "0.2.7"
-hashbrown = "0.12.3"
+hashbrown = "0.11"
 mod_mgmt = { path = "../../kernel/mod_mgmt" }
 nb = "1.0"
 path = { path = "../../kernel/path" }
