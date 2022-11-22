@@ -19,8 +19,6 @@ use noline::{builder::EditorBuilder, sync::embedded::IO as Io};
 use path::Path;
 use tty::{Event, LineDiscipline};
 
-// FIXME: export main function rather than shell struct
-
 pub fn main(_: Vec<String>) -> isize {
     Shell::new().run().unwrap();
     0
