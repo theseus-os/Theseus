@@ -41,10 +41,13 @@ cfg_if!{ if #[cfg(any(target_arch = "aarch64", doc))] {
     pub use pte_flags_aarch64::PteFlagsAarch64;
 }}
 
-#[cfg(target_arch = "x86_64")]
-use pte_flags_x86_64::PteFlagsX86_64 as PteFlagsArch;
-#[cfg(target_arch = "aarch64")]
-use pte_flags_aarch64::PteFlagsAarch64 as PteFlagsArch;
+cfg_if! { if #[cfg(target_arch = "x86_64")] {
+    use pte_flags_x86_64::PteFlagsX86_64 as PteFlagsArch;
+    pub use pte_flags_x86_64::PTE_FRAME_MASK;
+} else if #[cfg(target_arch = "aarch64")] {
+    use pte_flags_aarch64::PteFlagsAarch64 as PteFlagsArch;
+    pub use pte_flags_aarch64::PTE_FRAME_MASK;
+}}
 
 bitflags! {
     /// Common, architecture-independent flags for a page table entry (PTE)
@@ -179,6 +182,12 @@ impl PteFlags {
     }
 
     /// Returns a copy of this `PteFlags` with the `VALID` bit set or cleared.
+    ///
+    /// * If `enable` is `true`, this PTE will be considered "present" and "valid",
+    ///   meaning that the mapping from this page to a physical frame is valid
+    ///   and that the translation of a virtual address in this page should succeed.
+    /// * If `enable` is `false`, this PTE will be considered "invalid",
+    ///   and any attempt to access it for translation purposes will cause a page fault.
     #[must_use]
     #[doc(alias("present"))]
     pub fn valid(mut self, enable: bool) -> Self {
@@ -197,10 +206,10 @@ impl PteFlags {
         self
     }
 
-    /// Returns a copy of this `PteFlags` with the `NOT_EXECUTABLE` bit set or cleared.
+    /// Returns a copy of this `PteFlags` with the `NOT_EXECUTABLE` bit cleared or set.
     ///
-    /// * If `enable` is `true`, this will be executable (`NOT_EXECUTABLE` will be cleared).
-    /// * If `enable` is `false`, this will be non-executable, which is the default
+    /// * If `enable` is `true`, this page will be executable (`NOT_EXECUTABLE` will be cleared).
+    /// * If `enable` is `false`, this page will be non-executable, which is the default
     ///   (`NOT_EXECUTABLE` will be set).
     #[must_use]
     #[doc(alias("no_exec"))]
@@ -227,6 +236,35 @@ impl PteFlags {
     #[must_use]
     pub fn exclusive(mut self, enable: bool) -> Self {
         self.set(Self::EXCLUSIVE, enable);
+        self
+    }
+
+    /// Returns a copy of this `PteFlags` with the `ACCESSED` bit set or cleared.
+    ///
+    /// Typically this is used to clear the `ACCESSED` bit, in order to indicate
+    /// that the OS has "acknowledged" the fact that this page was accessed
+    /// since the last time it checked.
+    ///
+    /// * If `enable` is `true`, this page will be marked as accessed.
+    /// * If `enable` is `false`, this page will be marked as not accessed.
+    #[must_use]
+    pub fn accessed(mut self, enable: bool) -> Self {
+        self.set(Self::ACCESSED, enable);
+        self
+    }
+
+    /// Returns a copy of this `PteFlags` with the `DIRTY` bit set or cleared.
+    ///
+    /// Typically this is used to clear the `DIRTY` bit, in order to indicate
+    /// that the OS has "acknowledged" the fact that this page was written to
+    /// since the last time it checked. 
+    /// This bit is typically set by the hardware.
+    ///
+    /// * If `enable` is `true`, this page will be marked as dirty.
+    /// * If `enable` is `false`, this page will be marked as clean.
+    #[must_use]
+    pub fn dirty(mut self, enable: bool) -> Self {
+        self.set(Self::DIRTY, enable);
         self
     }
 
