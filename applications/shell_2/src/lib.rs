@@ -141,7 +141,7 @@ impl Shell {
         }
     }
 
-    // TODO: Use guards?
+    // TODO: Use guards to reset line disciplines rather than an extra function.
     fn execute_external(&mut self, cmd: &str, args: Vec<&str>) -> Result<()> {
         self.set_app_discipline();
         let result = self._execute_external(cmd, args);
