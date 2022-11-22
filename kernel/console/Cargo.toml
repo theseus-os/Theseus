@@ -1,7 +1,7 @@
 [package]
 name = "console"
 version = "0.1.0"
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Klim Tsoutsman <klim@tsoutsman.com>"]
 description = "Creation and management of virtual consoles/terminals"
 edition = "2021"
 
