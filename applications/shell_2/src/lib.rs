@@ -2,8 +2,8 @@
 
 extern crate alloc;
 
-mod error;
 mod builtin;
+mod error;
 mod job;
 mod wrapper;
 
@@ -41,7 +41,7 @@ impl Shell {
             jobs: HashMap::new(),
             stop_order: Vec::new(),
         };
-        let result = shell._run();
+        let result = shell.run_inner();
         shell.set_app_discipline();
         result
     }
@@ -58,7 +58,7 @@ impl Shell {
         self.discipline.set_sane();
     }
 
-    fn _run(&mut self) -> Result<()> {
+    fn run_inner(&mut self) -> Result<()> {
         self.set_shell_discipline();
 
         let wrapper = wrapper::Wrapper {
@@ -133,12 +133,12 @@ impl Shell {
     // TODO: Use guards to reset line disciplines rather than an extra function.
     fn execute_external(&mut self, cmd: &str, args: Vec<&str>) -> Result<()> {
         self.set_app_discipline();
-        let result = self._execute_external(cmd, args);
+        let result = self.execute_external_inner(cmd, args);
         self.set_shell_discipline();
         result
     }
 
-    fn _execute_external(&mut self, cmd: &str, args: Vec<&str>) -> Result<()> {
+    fn execute_external_inner(&mut self, cmd: &str, args: Vec<&str>) -> Result<()> {
         let mut job = self.resolve_external(cmd, args)?;
 
         let mut num = 1;
