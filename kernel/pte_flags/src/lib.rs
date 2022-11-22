@@ -30,9 +30,6 @@
 
 #![no_std]
 
-#[cfg(test)]
-extern crate std;
-
 use cfg_if::cfg_if;
 use bitflags::bitflags;
 
