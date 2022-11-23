@@ -44,7 +44,7 @@ impl Shell {
     /// Creates a new shell and runs it.
     pub fn run() -> Result<()> {
         let mut shell = Self {
-            discipline: app_io::line_discipline().unwrap(),
+            discipline: app_io::line_discipline().expect("no line discipline"),
             jobs: HashMap::new(),
             stop_order: Vec::new(),
         };
@@ -69,14 +69,14 @@ impl Shell {
         self.set_shell_discipline();
 
         let wrapper = wrapper::Wrapper {
-            stdin: app_io::stdin().unwrap(),
-            stdout: app_io::stdout().unwrap(),
+            stdin: app_io::stdin().expect("no stdin"),
+            stdout: app_io::stdout().expect("no stdout"),
         };
         let mut io = Io::new(wrapper);
         let mut editor = EditorBuilder::new_unbounded()
             .with_unbounded_history()
             .build_sync(&mut io)
-            .unwrap();
+            .expect("couldn't instantiate line editor");
 
         loop {
             editor.dedup_history();
@@ -87,7 +87,7 @@ impl Shell {
                     Err(e) => return Err(e),
                 };
             } else {
-                write!(io, "failed to read line").unwrap();
+                write!(io, "failed to read line").expect("failed to write output");
             }
         }
     }
@@ -134,6 +134,10 @@ impl Shell {
                 println!("{}: command not found", command);
                 Ok(())
             }
+            Err(Error::SpawnFailed) => {
+                println!("failed to spawn task");
+                Ok(())
+            }
             Err(Error::KillFailed) => {
                 println!("failed to kill task");
                 Ok(())
@@ -170,6 +174,7 @@ impl Shell {
         }
 
         job.unblock()?;
+        // We just checked that num isn't in self.jobs.
         let job = self.jobs.try_insert(num, job).unwrap();
         self.discipline.clear_events();
 
@@ -178,7 +183,7 @@ impl Shell {
                 return match event {
                     Event::CtrlC => {
                         job.kill()?;
-                        self.jobs.remove(&num).unwrap();
+                        self.jobs.remove(&num);
                         Err(Error::Command(130))
                     }
                     Event::CtrlD => todo!(),
@@ -188,7 +193,7 @@ impl Shell {
                     }
                 };
             } else if let Some(exit_value) = job.update() {
-                self.jobs.remove(&num).unwrap();
+                self.jobs.remove(&num);
                 return match exit_value {
                     0 => Ok(()),
                     _ => Err(Error::Command(exit_value)),
@@ -217,7 +222,7 @@ impl Shell {
         }
 
         let task = spawn::new_application_task_builder(app_path, None)
-            .unwrap()
+            .map_err(|_| Error::SpawnFailed)?
             .argument(
                 args.into_iter()
                     .map(|arg| arg.to_owned())

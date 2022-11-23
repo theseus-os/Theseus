@@ -15,21 +15,40 @@ impl Shell {
 
     pub(crate) fn bg(&mut self, args: Vec<&str>) -> Result<()> {
         if args.is_empty() {
-            if let Some(num) = self.stop_order.pop() {
-                let task = self.jobs.get_mut(&num).unwrap();
-                task.unsuspend()?;
-                // TODO: Print
-                Ok(())
-            } else {
-                todo!("no current job");
+            loop {
+                let num = match self.stop_order.pop() {
+                    Some(n) => n,
+                    None => {
+                        println!("no current job");
+                        return Err(Error::Command(1));
+                    }
+                };
+                if let Some(task) = self.jobs.get_mut(&num) {
+                    task.unsuspend()?;
+                    // TODO: Print
+                    return Ok(());
+                }
             }
         } else {
             for arg in args {
                 if !arg.starts_with('%') {
-                    todo!("job not found: {arg}");
+                    println!("job not found: {}", arg);
+                    return Err(Error::Command(1));
                 } else {
-                    let num = arg[1..].parse().unwrap();
-                    let task = self.jobs.get_mut(&num).unwrap();
+                    let num = match arg[1..].parse() {
+                        Ok(n) => n,
+                        Err(_) => {
+                            println!("job not found: {}", &arg[1..]);
+                            return Err(Error::Command(1));
+                        }
+                    };
+                    let task = match self.jobs.get_mut(&num) {
+                        Some(t) => t,
+                        None => {
+                            println!("{}: no such job", arg);
+                            return Err(Error::Command(1));
+                        }
+                    };
                     task.unsuspend()?;
                     // TODO: Print
                     continue;
@@ -50,7 +69,7 @@ impl Shell {
             "/".to_owned()
         });
 
-        let task = task::get_my_current_task().unwrap();
+        let task = task::get_my_current_task().ok_or(Error::CurrentTaskUnavailable)?;
 
         match task.get_env().lock().chdir(&path) {
             Ok(()) => Ok(()),

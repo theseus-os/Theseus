@@ -21,6 +21,8 @@ pub enum Error {
     Command(isize),
     /// Failed to kill a task.
     KillFailed,
+    /// Failed to spawn a task.
+    SpawnFailed,
     /// Failed to suspend a task.
     ///
     /// The current runstate is stored in the field.
