@@ -8,6 +8,7 @@ extern crate logger;
 extern crate frame_allocator;
 extern crate page_allocator;
 extern crate memory_structs;
+extern crate memory;
 
 use alloc::vec;
 use core::arch::asm;
@@ -15,7 +16,7 @@ use core::arch::asm;
 use uefi::{prelude::entry, Status, Handle, table::{SystemTable, Boot, boot::MemoryType}};
 
 use frame_allocator::{PhysicalMemoryRegion, MemoryRegionType};
-use memory_structs::{PAGE_SIZE, PhysicalAddress, Frame, FrameRange, VirtualAddress};
+use memory_structs::{PAGE_SIZE, PhysicalAddress, Frame, FrameRange};
 
 use log::{info, error};
 
@@ -46,7 +47,7 @@ fn main(
     let (_runtime_svc, mem_iter) = system_table.exit_boot_services(handle, &mut mmap)
         .map_err(|_| "nano_core::main - couldn't exit uefi boot services")?;
 
-    // Now set up the list of free regions and reserved regions so we can initialize the frame allocator.
+    // Identifying free and reserved regions so we can initialize the frame allocator.
     let mut free_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
     let mut free_index = 0;
     let mut reserved_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
@@ -75,13 +76,8 @@ fn main(
         }
     }
 
-    let _callback = frame_allocator::init(
-        free_regions.iter().flatten(),
-        reserved_regions.iter().flatten(),
-    )?;
-
-    // for now, virtual addresses will be above 4GB
-    page_allocator::init(VirtualAddress::new_canonical(0x100_000_000))?;
+    info!("Calling memory::init();");
+    let page_table = memory::init(&free_regions, &reserved_regions)?;
 
     info!("Going to infinite loop now.");
     inf_loop_0xbeef();

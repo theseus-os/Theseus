@@ -30,7 +30,7 @@ use core::{
 };
 use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
     AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
-    tlb_flush_all, tlb_flush_virt_addr, get_p4, KERNEL_OFFSET};
+    tlb_flush_all, tlb_flush_virt_addr, get_p4, set_page_table_up};
 use no_drop::NoDrop;
 use kernel_config::memory::{RECURSIVE_P4_INDEX};
 // use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
@@ -137,9 +137,8 @@ impl PageTable {
         let mut temporary_page = TemporaryPage::create_and_map_table_frame(None, this_p4, self)?;
 
         // overwrite recursive mapping
-        // todo: set PAGE_DESCRIPTOR & ACCESSED for aarch64
-        error!("todo: set PAGE_DESCRIPTOR & ACCESSED for aarch64");
-        self.p4_mut()[RECURSIVE_P4_INDEX].set_entry(other_table.p4_table.as_allocated_frame(), PteFlags::VALID | PteFlags::WRITABLE); 
+        let p4_flags = PteFlags::VALID | PteFlags::WRITABLE | PteFlags::ACCESSED;
+        self.p4_mut()[RECURSIVE_P4_INDEX].set_entry(other_table.p4_table.as_allocated_frame(), p4_flags); 
         tlb_flush_all();
 
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
@@ -153,8 +152,6 @@ impl PageTable {
 
         // restore recursive mapping to original p4 table
         temporary_page.with_table_and_frame(|p4_table, frame| {
-            // todo: set PAGE_DESCRIPTOR & ACCESSED for aarch64
-            error!("todo: set PAGE_DESCRIPTOR & ACCESSED for aarch64");
             p4_table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), PteFlags::VALID | PteFlags::WRITABLE);
         })?;
         tlb_flush_all();
@@ -174,7 +171,6 @@ impl PageTable {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
         // perform the actual page table switch
-
         #[cfg(target_arch = "x86_64")]
         unsafe {
             use x86_64::{PhysAddr, structures::paging::frame::PhysFrame, registers::control::{Cr3, Cr3Flags}};
@@ -185,9 +181,7 @@ impl PageTable {
         };
 
         #[cfg(target_arch = "aarch64")]
-        // todo
-        // see https://discord.com/channels/977298261566181456/1010499501821272167/1044595516153016362
-        error!("PageTable::switch - todo for aarch64");
+        set_page_table_up(new_table.physical_address());
     }
 
 
@@ -203,190 +197,21 @@ pub fn get_current_p4() -> Frame {
     Frame::containing_address(get_p4())
 }
 
-/*
 /// Initializes a new page table and sets up all necessary mappings for the kernel to continue running. 
-/// Returns the following tuple, if successful:
-/// 
-///  1. The kernel's new PageTable, which is now currently active,
-///  2. the kernel's text section MappedPages,
-///  3. the kernel's rodata section MappedPages,
-///  4. the kernel's data section MappedPages,
-///  5. a tuple of the stack's underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
-///  6. the `MappedPages` holding the bootloader info,
-///  7. the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
-///  8. the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
-///
+/// Returns the kernel's current PageTable, if successful.
 /// Otherwise, it returns a str error message. 
-pub fn init(
-    boot_info: &multiboot2::BootInformation,
-    into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames,
-) -> Result<(
-        PageTable,
-        NoDrop<MappedPages>,
-        NoDrop<MappedPages>,
-        NoDrop<MappedPages>,
-        (AllocatedPages, NoDrop<MappedPages>),
-        MappedPages,
-        [Option<NoDrop<MappedPages>>; 32],
-        [Option<NoDrop<MappedPages>>; 32],
-    ), &'static str>
-{
+pub fn init(into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames) -> Result<PageTable, &'static str> {
     // Store the callback from `frame_allocator::init()` that allows the `Mapper` to convert
     // `page_table_entry::UnmappedFrames` back into `AllocatedFrames`.
     mapper::INTO_ALLOCATED_FRAMES_FUNC.call_once(|| into_alloc_frames_fn);
 
-    let (aggregated_section_memory_bounds, _sections_memory_bounds) = find_section_memory_bounds(boot_info)?;
-    debug!("{:X?}\n{:X?}", aggregated_section_memory_bounds, _sections_memory_bounds);
-    
     // bootstrap a PageTable from the currently-loaded page table
-    let current_active_p4 = frame_allocator::allocate_frames_at(aggregated_section_memory_bounds.page_table.start.1, 1)?;
-    let mut page_table = PageTable::from_current(current_active_p4)?;
-    debug!("Bootstrapped initial {:?}", page_table);
+    let current_p4 = get_current_p4().start_address();
+    let current_active_p4 = frame_allocator::allocate_frames_at(current_p4, 1)?;
+    let current_page_table = PageTable::from_current(current_active_p4)?;
+    debug!("Bootstrapped initial {:?}", current_page_table);
 
-    let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address()).ok_or("boot_info start virtual address was invalid")?;
-    let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
-    let boot_info_size = boot_info.total_size();
-    debug!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}\n", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
+    // todo: build new page table and switch to it
 
-    let new_p4_frame = frame_allocator::allocate_frames(1).ok_or("couldn't allocate frame for new page table")?; 
-    let mut new_table = PageTable::new_table(&mut page_table, new_p4_frame, None)?;
-
-    let mut text_mapped_pages:        Option<NoDrop<MappedPages>> = None;
-    let mut rodata_mapped_pages:      Option<NoDrop<MappedPages>> = None;
-    let mut data_mapped_pages:        Option<NoDrop<MappedPages>> = None;
-    let mut stack_page_group:         Option<(AllocatedPages, NoDrop<MappedPages>)> = None;
-    let mut boot_info_mapped_pages:   Option<MappedPages> = None;
-    let mut higher_half_mapped_pages: [Option<NoDrop<MappedPages>>; 32] = Default::default();
-    let mut identity_mapped_pages:    [Option<NoDrop<MappedPages>>; 32] = Default::default();
-
-    // Create and initialize a new page table with the same contents as the currently-executing kernel code/data sections.
-    page_table.with(&mut new_table, |mapper| {
-        
-        // Map every section found in the kernel image (given by the boot information above) into our new page table. 
-        // To allow the APs to boot up, we must identity map those kernel sections too, i.e., 
-        // map the same physical frames to both lower-half and higher-half virtual addresses. 
-        // This is the only time in Theseus that we permit non-bijective (non 1-to-1) virtual-to-physical memory mappings,
-        // since it is unavoidable if we want to place the kernel in the higher half. 
-        // Debatably, this is no longer needed because we're don't have a userspace, and there's no real reason to 
-        // place the kernel in the higher half. 
-        //
-        // These identity mappings are short-lived; they are unmapped later after all other CPUs are brought up
-        // but before we start running applications.
-
-        debug!("{:X?}", aggregated_section_memory_bounds);
-        let mut index = 0;
-
-        let (text_start_virt,    text_start_phys)    = aggregated_section_memory_bounds.text.start;
-        let (text_end_virt,      text_end_phys)      = aggregated_section_memory_bounds.text.end;
-        let (rodata_start_virt,  rodata_start_phys)  = aggregated_section_memory_bounds.rodata.start;
-        let (rodata_end_virt,    rodata_end_phys)    = aggregated_section_memory_bounds.rodata.end;
-        let (data_start_virt,    data_start_phys)    = aggregated_section_memory_bounds.data.start;
-        let (data_end_virt,      data_end_phys)      = aggregated_section_memory_bounds.data.end;
-        let (stack_start_virt,   stack_start_phys)   = aggregated_section_memory_bounds.stack.start;
-        let (stack_end_virt,     _stack_end_phys)    = aggregated_section_memory_bounds.stack.end;
-
-        let text_flags    = aggregated_section_memory_bounds.text.flags;
-        let rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
-        let data_flags    = aggregated_section_memory_bounds.data.flags;
-
-        let text_pages = page_allocator::allocate_pages_by_bytes_at(text_start_virt, text_end_virt.value() - text_start_virt.value())?;
-        let text_frames = frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())?;
-        let text_pages_identity = page_allocator::allocate_pages_by_bytes_at(text_start_virt - KERNEL_OFFSET, text_end_virt.value() - text_start_virt.value())?;
-        identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
-            Mapper::map_to_non_exclusive(mapper, text_pages_identity, &text_frames, text_flags)?
-        }));
-        text_mapped_pages = Some(NoDrop::new(mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)?));
-        index += 1;
-
-        let rodata_pages = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())?;
-        let rodata_frames = frame_allocator::allocate_frames_by_bytes_at(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value())?;
-        let rodata_pages_identity = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt - KERNEL_OFFSET, rodata_end_virt.value() - rodata_start_virt.value())?;
-        identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
-            Mapper::map_to_non_exclusive(mapper, rodata_pages_identity, &rodata_frames, rodata_flags)?
-        }));
-        rodata_mapped_pages = Some(NoDrop::new(mapper.map_allocated_pages_to(rodata_pages, rodata_frames, rodata_flags)?));
-        index += 1;
-
-        let data_pages = page_allocator::allocate_pages_by_bytes_at(data_start_virt, data_end_virt.value() - data_start_virt.value())?;
-        let data_frames = frame_allocator::allocate_frames_by_bytes_at(data_start_phys, data_end_phys.value() - data_start_phys.value())?;
-        let data_pages_identity = page_allocator::allocate_pages_by_bytes_at(data_start_virt - KERNEL_OFFSET, data_end_virt.value() - data_start_virt.value())?;
-        identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
-            Mapper::map_to_non_exclusive(mapper, data_pages_identity, &data_frames, data_flags)?
-        }));
-        data_mapped_pages = Some(NoDrop::new(mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)?));
-        index += 1;
-
-        // We don't need to do any mapping for the initial root (P4) page table stack (a separate data section),
-        // which was initially set up and created by the bootstrap assembly code. 
-        // It was used to bootstrap the initial page table at the beginning of this function. 
-
-        // Handle the stack (a separate data section), which consists of one guard page followed by the real stack pages.
-        // It does not need to be identity mapped because each AP core will have its own stack.
-        let stack_pages = page_allocator::allocate_pages_by_bytes_at(stack_start_virt, (stack_end_virt - stack_start_virt).value())?;
-        let start_of_stack_pages = *stack_pages.start() + 1; 
-        let (stack_guard_page, stack_allocated_pages) = stack_pages.split(start_of_stack_pages)
-            .map_err(|_ap| "BUG: initial stack's allocated pages were not split correctly after guard page")?;
-        let stack_start_frame = Frame::containing_address(stack_start_phys) + 1; // skip 1st frame, which corresponds to the guard page
-        let stack_allocated_frames = frame_allocator::allocate_frames_at(stack_start_frame.start_address(), stack_allocated_pages.size_in_pages())?;
-        let stack_mapped_pages = mapper.map_allocated_pages_to(
-            stack_allocated_pages,
-            stack_allocated_frames,
-            data_flags,
-        )?;
-        stack_page_group = Some((stack_guard_page, NoDrop::new(stack_mapped_pages)));
-
-        // Map the VGA display memory as writable. 
-        // We do an identity mapping for the VGA display too, because the AP cores may access it while booting.
-        let (vga_phys_addr, vga_size_in_bytes, vga_flags) = get_vga_mem_addr()?;
-        let vga_virt_addr_identity = VirtualAddress::new_canonical(vga_phys_addr.value());
-        let vga_display_pages = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity + KERNEL_OFFSET, vga_size_in_bytes)?;
-        let vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)?;
-        let vga_display_pages_identity = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity, vga_size_in_bytes)?;
-        identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
-            Mapper::map_to_non_exclusive(mapper, vga_display_pages_identity, &vga_display_frames, vga_flags)?
-        }));
-        higher_half_mapped_pages[index] = Some(NoDrop::new(mapper.map_allocated_pages_to(vga_display_pages, vga_display_frames, vga_flags)?));
-        index += 1;
-
-
-        // Map the multiboot boot_info at the same address it is currently at, so we can continue to validly access `boot_info`
-        let boot_info_pages = page_allocator::allocate_pages_by_bytes_at(boot_info_start_vaddr, boot_info_size)?;
-        let boot_info_frames = frame_allocator::allocate_frames_by_bytes_at(boot_info_start_paddr, boot_info_size)?;
-        boot_info_mapped_pages = Some(mapper.map_allocated_pages_to(
-            boot_info_pages,
-            boot_info_frames,
-            PteFlags::PRESENT,
-        )?);
-
-        debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[..index]);
-        debug!("higher_half_mapped_pages: {:?}", &higher_half_mapped_pages[..index]);
-
-        Ok(()) // mapping closure completed successfully
-
-    })?; // TemporaryPage is dropped here
-
-
-    let text_mapped_pages       = text_mapped_pages     .ok_or("Couldn't map .text section")?;
-    let rodata_mapped_pages     = rodata_mapped_pages   .ok_or("Couldn't map .rodata section")?;
-    let data_mapped_pages       = data_mapped_pages     .ok_or("Couldn't map .data section")?;
-    let boot_info_mapped_pages  = boot_info_mapped_pages.ok_or("Couldn't map boot_info pages section")?;
-    let stack_page_group        = stack_page_group      .ok_or("Couldn't map .stack section")?;
-
-    debug!("switching from old page table {:?} to new page table {:?}", page_table, new_table);
-    page_table.switch(&new_table); 
-    debug!("switched to new page table {:?}.", new_table); 
-    // The old page_table set up during bootstrap will be dropped here. It's no longer being used.
-
-    // Return the new page table because that's the one that should be used by the kernel in future mappings. 
-    Ok((
-        new_table,
-        text_mapped_pages,
-        rodata_mapped_pages,
-        data_mapped_pages,
-        stack_page_group,
-        boot_info_mapped_pages,
-        higher_half_mapped_pages,
-        identity_mapped_pages
-    ))
+    Ok(current_page_table)
 }
-*/

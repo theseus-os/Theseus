@@ -42,9 +42,9 @@ cfg_if!{ if #[cfg(any(target_arch = "aarch64", doc))] {
 }}
 
 #[cfg(target_arch = "x86_64")]
-use pte_flags_x86_64::PteFlagsX86_64 as PteFlagsArch;
+pub use pte_flags_x86_64::PteFlagsX86_64 as PteFlagsArch;
 #[cfg(target_arch = "aarch64")]
-use pte_flags_aarch64::PteFlagsAarch64 as PteFlagsArch;
+pub use pte_flags_aarch64::PteFlagsAarch64 as PteFlagsArch;
 
 bitflags! {
     /// Common, architecture-independent flags for a page table entry (PTE)

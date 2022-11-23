@@ -25,7 +25,7 @@ use paging::{
     table::{P4, Table, Level4},
 };
 use spin::Once;
-use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
+use kernel_config::memory::{PAGE_SIZE};
 use super::{PteFlags, tlb_flush_virt_addr};
 use zerocopy::FromBytes;
 use page_table_entry::UnmapResult;
@@ -116,8 +116,8 @@ impl Mapper {
     pub fn translate_page(&self, page: Page) -> Option<Frame> {
         let p3 = self.p4().next_table(page.p4_index());
 
-        // temporarily removing these checks while we
-        // learn their aarch64 equivalent
+        // Temporarily removing these checks while we
+        // Learn how to create huge pages on aarch64.
         /*
         let huge_page = || {
             p3.and_then(|p3| {

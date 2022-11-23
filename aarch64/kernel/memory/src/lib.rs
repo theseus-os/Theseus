@@ -47,14 +47,13 @@ use memory_x86_64::{BootInformation, get_kernel_address, get_boot_info_mem_area,
     get_vga_mem_addr, get_modules_address, tlb_flush_virt_addr, tlb_flush_all, get_p4};
 
 #[cfg(target_arch = "aarch64")]
-use memory_aarch64::{tlb_flush_virt_addr, tlb_flush_all, get_p4};
+use memory_aarch64::{tlb_flush_virt_addr, tlb_flush_all, get_p4, set_page_table_up};
 
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 use no_drop::NoDrop;
-use kernel_config::memory::KERNEL_OFFSET;
 pub use kernel_config::memory::PAGE_SIZE;
 
 /// The memory management info and address space of the kernel
@@ -125,101 +124,30 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
 }
 
 
-/*
 /// Initializes the virtual memory management system.
-/// Consumes the given BootInformation, because after the memory system is initialized,
-/// the original BootInformation will be unmapped and inaccessible.
 /// 
-/// Returns the following tuple, if successful:
-///  1. the kernel's new `PageTable`, which is now currently active,
-///  2. the `MappedPages` of the kernel's text section,
-///  3. the `MappedPages` of the kernel's rodata section,
-///  4. the `MappedPages` of the kernel's data section,
-///  5. a tuple of the stack's underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
-///  6. the `MappedPages` holding the bootloader info,
-///  7. the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
-///  8. the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
+/// Returns the kernel's current PageTable, if successful.
 pub fn init(
-    boot_info: &BootInformation
-) -> Result<(
-    PageTable,
-    NoDrop<MappedPages>,
-    NoDrop<MappedPages>,
-    NoDrop<MappedPages>,
-    (AllocatedPages, NoDrop<MappedPages>),
-    MappedPages,
-    [Option<NoDrop<MappedPages>>; 32],
-    [Option<NoDrop<MappedPages>>; 32],
-), &'static str> {
-    // Get the start and end addresses of the kernel, boot info, boot modules, etc.
-    let (kernel_phys_start, kernel_phys_end, kernel_virt_end) = get_kernel_address(&boot_info)?;
-    let (boot_info_paddr_start, boot_info_paddr_end) = get_boot_info_mem_area(&boot_info)?;
-    let (modules_start_paddr, modules_end_paddr) = get_modules_address(&boot_info);
-    debug!("bootloader info memory: p{:#X} to p{:#X}, bootloader modules: p{:#X} to p{:#X}", 
-        boot_info_paddr_start, boot_info_paddr_end, modules_start_paddr, modules_end_paddr,
-    );
-    debug!("kernel_phys_start: p{:#X}, kernel_phys_end: p{:#X} kernel_virt_end = v{:#x}",
-        kernel_phys_start, kernel_phys_end, kernel_virt_end
-    );
-
-    // In addition to the information about the hardware's physical memory map provided by the bootloader,
-    // Theseus chooses to reserve the following regions of physical memory for specific use.
-    let low_memory_frames   = FrameRange::from_phys_addr(PhysicalAddress::zero(), 0x10_0000); // suggested by most OS developers
-    let kernel_frames       = FrameRange::from_phys_addr(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value());
-    let boot_modules_frames = FrameRange::from_phys_addr(modules_start_paddr, modules_end_paddr.value() - modules_start_paddr.value());
-    let boot_info_frames    = FrameRange::from_phys_addr(boot_info_paddr_start, boot_info_paddr_end.value() - boot_info_paddr_start.value());
-    
-    // Add the VGA display's memory region to the list of reserved physical memory areas.
-    // Currently this is covered by the first 1MiB region, but it's okay to duplicate it here.
-    let (vga_start_paddr, vga_size, _vga_flags) = memory_x86_64::get_vga_mem_addr()?;
-    let vga_display_frames = FrameRange::from_phys_addr(vga_start_paddr, vga_size);
-    
-    // Now set up the list of free regions and reserved regions so we can initialize the frame allocator.
-    let mut free_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
-    let mut free_index = 0;
-    let mut reserved_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
-    let mut reserved_index = 0;
-
-    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(low_memory_frames, MemoryRegionType::Reserved));
-    reserved_index += 1;
-    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(kernel_frames, MemoryRegionType::Reserved));
-    reserved_index += 1;
-    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(boot_modules_frames, MemoryRegionType::Reserved));
-    reserved_index += 1;
-    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(boot_info_frames, MemoryRegionType::Reserved));
-    reserved_index += 1;
-    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(vga_display_frames, MemoryRegionType::Reserved));
-    reserved_index += 1;
-
-    for area in boot_info.memory_map_tag()
-        .ok_or("Multiboot2 boot information has no physical memory map information")?
-        .all_memory_areas()
-    {
-        let frames = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(area.start_address() as usize), area.size() as usize);
-        if area.typ() == multiboot2::MemoryAreaType::Available {
-            free_regions[free_index] = Some(PhysicalMemoryRegion::new(frames, MemoryRegionType::Free));
-            free_index += 1;
-        } else {
-            reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(frames, MemoryRegionType::Reserved));
-            reserved_index += 1;
-        }
-    }
-
+    free_regions: &[Option<PhysicalMemoryRegion>; 32],
+    reserved_regions: &[Option<PhysicalMemoryRegion>; 32],
+) -> Result<PageTable, &'static str> {
     let into_alloc_frames_fn = frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())?;
     debug!("Initialized new frame allocator!");
     frame_allocator::dump_frame_allocator_state();
 
-    page_allocator::init(VirtualAddress::new_canonical(kernel_phys_end.value()))?;
+    // On x86_64 `page_allocator` is initialized with a value
+    // obtained from the ELF layout.
+    // Here I'm choosing a value which is probably valid (uneducated guess);
+    // once we have an ELF aarch64 kernel we'll be able to use the original
+    // limit defined with KERNEL_OFFSET and the ELF layout.
+    page_allocator::init(VirtualAddress::new_canonical(0x100_000_000))?;
     debug!("Initialized new page allocator!");
     page_allocator::dump_page_allocator_state();
 
-    // Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
-    paging::init(boot_info, into_alloc_frames_fn)
-        .inspect(|(new_page_table, ..)| {
-            debug!("Done with paging::init(). new page table: {:?}", new_page_table);
-        })
+    // Initialize paging, which only bootstraps the current page table at the moment.
+    paging::init(into_alloc_frames_fn)
+        .inspect(|page_table| debug!("Done with paging::init(). page table: {:?}", page_table))
 }
-*/
 
 /// Finishes initializing the memory management system after the heap is ready.
 /// 

@@ -19,6 +19,9 @@ use kernel_config::memory::PAGE_SHIFT;
 use zerocopy::FromBytes;
 use frame_allocator::AllocatedFrame;
 
+#[cfg(target_arch = "aarch64")]
+use memory_structs::pte_flags::PteFlagsAarch64;
+
 /// A page table entry, which is a `u64` value under the hood.
 ///
 /// It contains a the physical address of the `Frame` being mapped by this entry
@@ -66,7 +69,17 @@ impl PageTableEntry {
 
     /// Returns this `PageTableEntry`'s flags.
     pub fn flags(&self) -> PteFlags {
-        PteFlagsArch::from_bits_truncate(self.0).into()
+        #[cfg(target_arch = "x86_64")]
+        {
+            PteFlagsArch::from_bits_truncate(self.0).into()
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        {
+            let mut arch_flags = PteFlagsArch::from_bits_truncate(self.0);
+            arch_flags.remove(PteFlagsAarch64::PAGE_DESCRIPTOR);
+            arch_flags.into()
+        }
     }
 
     /// Returns the physical `Frame` pointed to (mapped by) this `PageTableEntry`.
@@ -92,16 +105,36 @@ impl PageTableEntry {
     ///
     /// Note: this performs no checks about the current value of this page table entry.
     pub fn set_entry(&mut self, frame: AllocatedFrame, flags: PteFlags) {
-        let arch_flags: PteFlagsArch = flags.into();
-        self.0 = (frame.start_address().value() as u64) | arch_flags.bits();
+        #[cfg(target_arch = "x86_64")]
+        {
+            let arch_flags: PteFlagsArch = flags.into();
+            self.0 = (frame.start_address().value() as u64) | arch_flags.bits();
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        {
+            let mut arch_flags: PteFlagsArch = flags.into();
+            arch_flags.insert(PteFlagsAarch64::PAGE_DESCRIPTOR | PteFlagsAarch64::ACCESSED);
+            self.0 = (frame.start_address().value() as u64) | arch_flags.bits();
+        }
     }
 
     /// Sets the flags components of this `PageTableEntry` to `new_flags`.
     ///
     /// This does not modify the frame part of the page table entry.
     pub fn set_flags(&mut self, new_flags: PteFlags) {
-        let arch_flags: PteFlagsArch = new_flags.into();
-        self.0 = self.0 & PAGE_TABLE_ENTRY_FRAME_MASK | arch_flags.bits();
+        #[cfg(target_arch = "x86_64")]
+        {
+            let arch_flags: PteFlagsArch = new_flags.into();
+            self.0 = self.0 & PAGE_TABLE_ENTRY_FRAME_MASK | arch_flags.bits();
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        {
+            let mut arch_flags: PteFlagsArch = new_flags.into();
+            arch_flags.insert(PteFlagsAarch64::PAGE_DESCRIPTOR | PteFlagsAarch64::ACCESSED);
+            self.0 = self.0 & PAGE_TABLE_ENTRY_FRAME_MASK | arch_flags.bits();
+        }
     }
 
     pub fn value(&self) -> u64 {
