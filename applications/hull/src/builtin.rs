@@ -17,7 +17,7 @@ impl Shell {
         if args.is_empty() {
             if let Some(num) = self.stop_order.pop() {
                 let task = self.jobs.get_mut(&num).unwrap();
-                task.unsuspend();
+                task.unsuspend()?;
                 // TODO: Print
                 Ok(())
             } else {
@@ -30,7 +30,7 @@ impl Shell {
                 } else {
                     let num = arg[1..].parse().unwrap();
                     let task = self.jobs.get_mut(&num).unwrap();
-                    task.unsuspend();
+                    task.unsuspend()?;
                     // TODO: Print
                     continue;
                 }

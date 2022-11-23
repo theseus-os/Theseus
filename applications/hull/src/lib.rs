@@ -134,6 +134,22 @@ impl Shell {
                 println!("{}: command not found", command);
                 Ok(())
             }
+            Err(Error::KillFailed) => {
+                println!("failed to kill task");
+                Ok(())
+            }
+            Err(Error::SuspendFailed(state)) => {
+                println!("failed to suspend task with state {:?}", state);
+                Ok(())
+            }
+            Err(Error::UnsuspendFailed(state)) => {
+                println!("failed to unsuspend task with state {:?}", state);
+                Ok(())
+            }
+            Err(Error::UnblockFailed(state)) => {
+                println!("failed to unblock task with state {:?}", state);
+                Ok(())
+            }
         }
     }
 
@@ -153,7 +169,7 @@ impl Shell {
             num += 1;
         }
 
-        job.unsuspend();
+        job.unblock()?;
         let job = self.jobs.try_insert(num, job).unwrap();
         self.discipline.clear_events();
 
@@ -161,13 +177,13 @@ impl Shell {
             if let Ok(event) = self.discipline.event_receiver().try_receive() {
                 return match event {
                     Event::CtrlC => {
-                        job.kill();
+                        job.kill()?;
                         self.jobs.remove(&num).unwrap();
                         Err(Error::Command(130))
                     }
                     Event::CtrlD => todo!(),
                     Event::CtrlZ => {
-                        job.suspend();
+                        job.suspend()?;
                         todo!();
                     }
                 };

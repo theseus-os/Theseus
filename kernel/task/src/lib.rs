@@ -749,8 +749,32 @@ impl Task {
         }
     }
     
-    pub fn suspend(&self) {
-        self.runstate.store(RunState::Suspended);
+    /// Suspends this `Task` by setting its runstate to [`RunState::Suspended`].
+    ///
+    /// Returns the previous runstate on success, and the current runstate on
+    /// error. Will only succed if the task is blocked or runnable.
+    pub fn suspend(&self) -> Result<RunState, RunState> {
+        use RunState::{Blocked, Runnable, Suspended};
+
+        if self.runstate.compare_exchange(Runnable, Suspended).is_ok() {
+            Ok(Runnable)
+        } else if self.runstate.compare_exchange(Blocked, Suspended).is_ok() {
+            Ok(Blocked)
+        } else {
+            Err(self.runstate.load())
+        }
+    }
+    
+    /// Unsuspends this `Task` by setting its runstate to [`RunState::Runnable`].
+    ///
+    /// Returns the previous runstate (i.e. `RunState::Suspended`) on success,
+    /// or the current runstate on error.
+    pub fn unsuspend(&self) -> Result<RunState, RunState> {
+        if self.runstate.compare_exchange(RunState::Suspended, RunState::Runnable).is_ok() {
+            Ok(RunState::Suspended)
+        } else {
+            Err(self.runstate.load())
+        }
     }
 
     /// Makes this `Task` `Runnable` if it is a newly-spawned and fully initialized task.

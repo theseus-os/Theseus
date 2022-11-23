@@ -1,5 +1,6 @@
 //! Shell job control.
 
+use crate::{Error, Result};
 use alloc::vec::Vec;
 use task::{ExitValue, JoinableTaskRef, KillReason, RunState};
 
@@ -12,24 +13,43 @@ pub(crate) struct Job {
 }
 
 impl Job {
-    pub(crate) fn kill(&mut self) {
+    pub(crate) fn kill(&mut self) -> Result<()> {
         for mut part in self.parts.iter_mut() {
-            part.task.kill(KillReason::Requested).unwrap();
+            part.task
+                .kill(KillReason::Requested)
+                .map_err(|_| Error::KillFailed)?;
             part.state = State::Complete(130);
         }
+        Ok(())
     }
-    pub(crate) fn suspend(&mut self) {
+    pub(crate) fn suspend(&mut self) -> Result<()> {
         for mut part in self.parts.iter_mut() {
-            part.task.suspend();
+            part.task
+                .suspend()
+                .map_err(|state| Error::SuspendFailed(state))?;
             part.state = State::Suspended;
         }
+        Ok(())
     }
 
-    pub(crate) fn unsuspend(&mut self) {
+    pub(crate) fn unsuspend(&mut self) -> Result<()> {
         for mut part in self.parts.iter_mut() {
-            part.task.unblock().unwrap();
+            part.task
+                .unsuspend()
+                .map_err(|state| Error::UnsuspendFailed(state))?;
             part.state = State::Running;
         }
+        Ok(())
+    }
+
+    pub(crate) fn unblock(&mut self) -> Result<()> {
+        for mut part in self.parts.iter_mut() {
+            part.task
+                .unblock()
+                .map_err(|state| Error::UnblockFailed(state))?;
+            part.state = State::Running;
+        }
+        Ok(())
     }
 
     pub(crate) fn update(&mut self) -> Option<isize> {
@@ -64,7 +84,7 @@ impl Job {
     }
 
     pub(crate) fn exit_value(&mut self) -> Option<isize> {
-        if let State::Complete(value) = self.parts.last().unwrap().state {
+        if let State::Complete(value) = self.parts.last()?.state {
             Some(value)
         } else {
             None

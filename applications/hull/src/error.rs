@@ -1,6 +1,7 @@
 //! Shell-specific errors.
 
 use alloc::string::String;
+use task::RunState;
 
 pub type Result<T> = core::result::Result<T, Error>;
 
@@ -18,4 +19,18 @@ pub enum Error {
     ///
     /// The exit code is stored in the field.
     Command(isize),
+    /// Failed to kill a task.
+    KillFailed,
+    /// Failed to suspend a task.
+    ///
+    /// The current runstate is stored in the field.
+    SuspendFailed(RunState),
+    /// Failed to unsuspend a task.
+    ///
+    /// The current runstate is stored in the field.
+    UnsuspendFailed(RunState),
+    /// Failed to unblock a task.
+    ///
+    /// The current runstate is stored in the field.
+    UnblockFailed(RunState),
 }
