@@ -1242,16 +1242,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "immediate_input_echo"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "core2",
- "log",
- "stdio",
-]
-
-[[package]]
 name = "indexmap"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2568,6 +2558,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raw_mode"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "log",
+]
+
+[[package]]
 name = "rbtree"
 version = "0.1.5"
 source = "git+https://github.com/theseus-os/rbtree-rs.git#45aa9e94f7e7cf08d560498c314efb3e5f4ba198"
@@ -3515,7 +3513,6 @@ dependencies = [
  "heap_eval",
  "hello",
  "hull",
- "immediate_input_echo",
  "input_echo",
  "keyboard_echo",
  "kill",
@@ -3533,6 +3530,7 @@ dependencies = [
  "print_fault_log",
  "ps",
  "pwd",
+ "raw_mode",
  "rm",
  "rq_eval",
  "scheduler_eval",

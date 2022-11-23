@@ -46,7 +46,7 @@ unified_channel = { path = "../kernel/unified_channel", optional = true }
 ## Test applications.
 example = { path = "../applications/example", optional = true }
 hello = { path = "../applications/hello", optional = true }
-immediate_input_echo = { path = "../applications/immediate_input_echo", optional = true }
+raw_mode = { path = "../applications/raw_mode", optional = true }
 input_echo = { path = "../applications/input_echo", optional = true }
 keyboard_echo = { path = "../applications/keyboard_echo", optional = true }
 print_fault_log = { path = "../applications/print_fault_log", optional = true }
@@ -133,7 +133,7 @@ theseus_benchmarks = [
 theseus_tests = [
     "example",
     "hello",
-    "immediate_input_echo",
+    "raw_mode",
     "input_echo",
     "keyboard_echo",
     "test_backtrace",
