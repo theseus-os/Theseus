@@ -109,9 +109,8 @@ fn shell_loop(
 
     let new_app_ns = mod_mgmt::create_application_namespace(None).unwrap();
 
-    // TODO: Replace shell with shell_2
     let (app_file, _ns) =
-        mod_mgmt::CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "shell_2-")
+        mod_mgmt::CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "hull-")
             .expect("Couldn't find shell in default app namespace");
 
     let path = path::Path::new(app_file.lock().get_absolute_path());
@@ -151,10 +150,9 @@ fn shell_loop(
 }
 
 fn tty_to_port_loop((port, master): (Arc<MutexIrqSafe<SerialPort>>, tty::Master)) {
+    let mut data = [0; 256];
     loop {
-        let mut data = [0; 256];
         let len = master.read(&mut data).unwrap();
-        trace!("writing data to serial port: {:?}", &data[..len]);
         port.lock().write(&data[..len]).unwrap();
     }
 }
@@ -162,7 +160,6 @@ fn tty_to_port_loop((port, master): (Arc<MutexIrqSafe<SerialPort>>, tty::Master)
 fn port_to_tty_loop((receiver, master): (Receiver<DataChunk>, tty::Master)) {
     loop {
         let DataChunk { data, len } = receiver.receive().unwrap();
-        trace!("read data from serial port: {:?}", &data[..len.into()]);
         master.write(&data[..len as usize]).unwrap();
     }
 }

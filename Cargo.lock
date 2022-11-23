@@ -1224,6 +1224,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8734b0cfd3bc3e101ec59100e101c2eecd19282202e87808b3037b442777a83"
 
 [[package]]
+name = "hull"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "core2",
+ "embedded-hal",
+ "hashbrown",
+ "mod_mgmt",
+ "nb 1.0.0",
+ "noline",
+ "path",
+ "root",
+ "spawn",
+ "task",
+ "tty",
+]
+
+[[package]]
 name = "immediate_input_echo"
 version = "0.1.0"
 dependencies = [
@@ -2913,24 +2931,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "shell_2"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "core2",
- "embedded-hal",
- "hashbrown",
- "mod_mgmt",
- "nb 1.0.0",
- "noline",
- "path",
- "root",
- "spawn",
- "task",
- "tty",
-]
-
-[[package]]
 name = "signal_handler"
 version = "0.1.0"
 dependencies = [
@@ -3514,6 +3514,7 @@ dependencies = [
  "example",
  "heap_eval",
  "hello",
+ "hull",
  "immediate_input_echo",
  "input_echo",
  "keyboard_echo",
@@ -3535,7 +3536,7 @@ dependencies = [
  "rm",
  "rq_eval",
  "scheduler_eval",
- "shell_2",
+ "shell",
  "swap",
  "test_backtrace",
  "test_block_io",
