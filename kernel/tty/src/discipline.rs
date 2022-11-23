@@ -135,6 +135,17 @@ impl LineDiscipline {
         master: &Channel,
         slave: &Channel,
     ) -> Result<()> {
+        let mut canonical = self.canonical.lock().unwrap();
+        self.process_input_byte_internal(byte, master, slave, (&mut *canonical).as_mut())
+    }
+
+    fn process_input_byte_internal(
+        &self,
+        byte: u8,
+        master: &Channel,
+        slave: &Channel,
+        canonical: Option<&mut Vec<u8>>,
+    ) -> Result<()> {
         const ERASE: u8 = 0x7f; // DEL (backspace key)
         const WERASE: u8 = 0x17; // ^W
 
@@ -158,7 +169,7 @@ impl LineDiscipline {
         // TODO: EOF and EOL
         // TODO: UTF-8?
         if self.echo.load(Ordering::SeqCst) {
-            match (byte, &*self.canonical.lock().unwrap()) {
+            match (byte, &canonical) {
                 // TODO: Also pass-through START and STOP characters
                 (b'\t' | b'\n', _) => {
                     master.send(byte)?;
@@ -187,7 +198,7 @@ impl LineDiscipline {
             }
         }
 
-        if let Some(ref mut input_buf) = *self.canonical.lock().unwrap() {
+        if let Some(input_buf) = canonical {
             match byte {
                 b'\r' | b'\n' => {
                     slave.send_buf(core::mem::take(input_buf))?;
@@ -215,9 +226,9 @@ impl LineDiscipline {
         master: &Channel,
         slave: &Channel,
     ) -> Result<()> {
+        let mut canonical = self.canonical.lock().unwrap();
         for byte in buf {
-            // TODO: This locks internal channels on every byte.
-            self.process_input_byte(*byte, master, slave)?;
+            self.process_input_byte_internal(*byte, master, slave, (&mut *canonical).as_mut())?;
         }
         Ok(())
     }
@@ -232,7 +243,6 @@ impl LineDiscipline {
 
     pub(crate) fn process_output_buf(&self, buf: &[u8], master: &Channel) -> Result<()> {
         for byte in buf {
-            // TODO: This locks internal channels on every byte.
             self.process_output_byte(*byte, master)?;
         }
         Ok(())
