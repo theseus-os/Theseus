@@ -21,10 +21,7 @@
 //! certain bits will be set by default;
 //! see [`PteFlagsAarch64::from()`] for more information.
 //! 
-//! For aarch64, the definition of these flags assumes that the [MAIR] index 0
-//! has a "DEVICE nGnRE" entry, and [MAIR] Index 1 has a Normal + Outer Shareable entry.
-//!
-//! [MAIR]: https://docs.rs/cortex-a/latest/cortex_a/registers/MAIR_EL1/index.html
+//! See the docs for [`PteFlagsAarch64`] for its assumptions about system configuration.
 
 #![no_std]
 #![feature(doc_cfg)]
