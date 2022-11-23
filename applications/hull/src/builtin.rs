@@ -1,3 +1,5 @@
+//! Builtin shell commands.
+
 use crate::{Error, Result, Shell};
 use alloc::{borrow::ToOwned, vec::Vec};
 use app_io::println;

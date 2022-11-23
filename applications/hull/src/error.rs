@@ -1,3 +1,5 @@
+//! Shell-specific errors.
+
 use alloc::string::String;
 
 pub type Result<T> = core::result::Result<T, Error>;

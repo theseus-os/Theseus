@@ -1,6 +1,11 @@
+//! Shell job control.
+
 use alloc::vec::Vec;
 use task::{ExitValue, JoinableTaskRef, KillReason, RunState};
 
+/// A shell job consisting of multiple parts.
+///
+/// E.g. `sleep 5 | sleep 10` is one job consisting of two job parts.
 #[derive(Debug)]
 pub(crate) struct Job {
     pub(crate) parts: Vec<JobPart>,

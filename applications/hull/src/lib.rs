@@ -1,3 +1,10 @@
+//! Theseus' shell i.e. the shell of a ship i.e. the hull.
+//!
+//! This is equivalent to bash, zsh, fish, etc. on Linux.
+//!
+//! This shell will eventually supercede the shell located at
+//! `applications/shell`.
+
 #![no_std]
 
 extern crate alloc;

@@ -1,3 +1,8 @@
+//! This crate provides TTY abstractions.
+//!
+//! TTYs define the interface between a terminal and the application running in
+//! the terminal.
+
 #![no_std]
 
 extern crate alloc;

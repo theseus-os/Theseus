@@ -1,6 +1,8 @@
 [package]
 name = "hull"
 version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "A command line shell"
 edition = "2021"
 
 [dependencies]

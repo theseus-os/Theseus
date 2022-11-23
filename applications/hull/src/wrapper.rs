@@ -1,3 +1,5 @@
+//! Allows stdio to be used with `noline`.
+
 use alloc::sync::Arc;
 use app_io::{ImmutableRead, ImmutableWrite};
 use embedded_hal::serial;

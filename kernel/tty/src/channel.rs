@@ -1,6 +1,4 @@
 // TODO: Use more efficient data structure?
-// TODO: A sender and receiver are the same under the hood. Hypothetically we
-// could store just one.
 // FIXME: async_channel is not a proper mpmc
 // FIXME: Error handling
 

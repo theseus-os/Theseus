@@ -1,6 +1,8 @@
 [package]
 name = "tty"
 version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "TTY abstractions"
 edition = "2021"
 
 [dependencies]
