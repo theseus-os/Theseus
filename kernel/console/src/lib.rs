@@ -78,14 +78,18 @@ fn console_connection_detector(
             continue;
         }
 
-        let _ = spawn::new_task_builder(shell_loop, (serial_port, serial_port_address, receiver))
+        if spawn::new_task_builder(shell_loop, (serial_port, serial_port_address, receiver))
             .name(format!("{:?}_manager", serial_port_address))
             .spawn()
-            .unwrap();
+            .is_err()
+        {
+            warn!(
+                "failed to spawn manager for serial port {:?}",
+                serial_port_address
+            );
+        }
     }
 }
-
-// TODO: Remove unwraps
 
 fn shell_loop(
     (port, address, receiver): (
@@ -93,33 +97,29 @@ fn shell_loop(
         SerialPortAddress,
         Receiver<DataChunk>,
     ),
-) {
+) -> Result<(), &'static str> {
     info!("creating new tty for serial port {:?}", address);
 
     let tty = tty::Tty::new();
 
     let reader_task = spawn::new_task_builder(tty_to_port_loop, (port.clone(), tty.master()))
         .name(format!("tty_to_{:?}", address))
-        .spawn()
-        .unwrap();
+        .spawn()?;
     let writer_task = spawn::new_task_builder(port_to_tty_loop, (receiver, tty.master()))
         .name(format!("{:?}_to_tty", address))
-        .spawn()
-        .unwrap();
+        .spawn()?;
 
-    let new_app_ns = mod_mgmt::create_application_namespace(None).unwrap();
+    let new_app_ns = mod_mgmt::create_application_namespace(None)?;
 
     let (app_file, _ns) =
         mod_mgmt::CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "hull-")
             .expect("Couldn't find shell in default app namespace");
 
     let path = path::Path::new(app_file.lock().get_absolute_path());
-    let task = spawn::new_application_task_builder(path, Some(new_app_ns))
-        .unwrap()
+    let task = spawn::new_application_task_builder(path, Some(new_app_ns))?
         .name(format!("{:?}_shell", address))
         .block()
-        .spawn()
-        .unwrap();
+        .spawn()?;
 
     let id = task.id;
     let stream = Arc::new(tty.slave());
@@ -133,8 +133,8 @@ fn shell_loop(
         },
     );
 
-    task.unblock().unwrap();
-    task.join().unwrap();
+    task.unblock().map_err(|_| "couldn't unblock shell task")?;
+    task.join()?;
 
     reader_task.kill(KillReason::Requested).unwrap();
     writer_task.kill(KillReason::Requested).unwrap();
@@ -143,23 +143,45 @@ fn shell_loop(
     // shell wrote something to the slave end and us killing the task.
     let mut data = [0; 256];
     if let Ok(len) = tty.master().try_read(&mut data) {
-        port.lock().write(&data[..len]).unwrap();
+        port.lock()
+            .write(&data[..len])
+            .map_err(|_| "couldn't write to serial port")?;
     };
 
     // TODO: Close port?
+
+    Ok(())
 }
 
 fn tty_to_port_loop((port, master): (Arc<MutexIrqSafe<SerialPort>>, tty::Master)) {
     let mut data = [0; 256];
     loop {
-        let len = master.read(&mut data).unwrap();
-        port.lock().write(&data[..len]).unwrap();
+        let len = match master.read(&mut data) {
+            Ok(l) => l,
+            Err(e) => {
+                error!("couldn't read from master: {e}");
+                continue;
+            }
+        };
+
+        if let Err(e) = port.lock().write(&data[..len]) {
+            error!("couldn't write to port: {e}");
+        }
     }
 }
 
 fn port_to_tty_loop((receiver, master): (Receiver<DataChunk>, tty::Master)) {
     loop {
-        let DataChunk { data, len } = receiver.receive().unwrap();
-        master.write(&data[..len as usize]).unwrap();
+        let DataChunk { data, len } = match receiver.receive() {
+            Ok(d) => d,
+            Err(e) => {
+                error!("couldn't read from port: {e:?}");
+                continue;
+            },
+        };
+
+        if let Err(e) = master.write(&data[..len as usize]) {
+            error!("couldn't write to master: {e}");
+        }
     }
 }
