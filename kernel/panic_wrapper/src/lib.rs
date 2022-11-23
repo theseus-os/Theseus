@@ -56,17 +56,22 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
         }
         #[cfg(frame_pointers)] {
             error!("------------------ Stack Trace (frame pointers) ------------------");
-            let namespace = task::get_my_current_task()
-                .map(|t| t.get_namespace())
-                .or_else(|| mod_mgmt::get_initial_kernel_namespace())
-                .ok_or("couldn't get current task's or default namespace")?;
-            let mmi_ref = task::get_my_current_task()
-                .map(|t| &t.mmi)
-                .or_else(|| memory::get_kernel_mmi_ref())
-                .ok_or("couldn't get current task's or default kernel MMI")?;
-
+            let (namespace, mmi_ref) = match task::with_current_task(|t|
+                (t.get_namespace().clone(), t.mmi.clone())
+            ) {
+                Ok((ns, mmi)) => (ns, mmi),
+                Err(_) => (
+                    mod_mgmt::get_initial_kernel_namespace()
+                        .ok_or("couldn't get current task's or default namespace")?
+                        .clone(),
+                    memory::get_kernel_mmi_ref()
+                        .ok_or("couldn't get current task's or default kernel MMI")?
+                        .clone(),
+                )
+            };
+            let mmi = mmi_ref.lock();
             stack_trace_frame_pointers::stack_trace_using_frame_pointers(
-                &mmi_ref.lock().page_table,
+                &mmi.page_table,
                 &mut |_frame_pointer, instruction_pointer: VirtualAddress| {
                     let symbol_offset = namespace.get_section_containing_address(instruction_pointer, false)
                         .map(|(sec, offset)| (sec.name.clone(), offset));

@@ -114,7 +114,7 @@ pub fn sleep(duration: usize) -> Result<(), RunState> {
     let current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
     let resume_time = current_tick_count + duration;
 
-    let current_task = get_my_current_task().unwrap().clone();
+    let current_task = get_my_current_task().unwrap();
     // Add the current task to the delayed tasklist and then block it.
     add_to_delayed_tasklist(SleepingTaskNode{taskref: current_task.clone(), resume_time});
     current_task.block()?;

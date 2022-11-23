@@ -126,11 +126,9 @@ mod shared_maps {
 
 /// An application can call this function to get the terminal to which it should print.
 pub fn get_my_terminal() -> Option<Arc<Mutex<Terminal>>> {
-    task::get_my_current_task_id()
-        .and_then(|id| shared_maps::lock_stream_map()
-            .get(&id)
-            .map(|property| property.terminal.clone())
-        )
+    shared_maps::lock_stream_map()
+        .get(&task::get_my_current_task_id())
+        .map(|property| property.terminal.clone())
 }
 
 /// Lock all shared states (i.e. those defined as `static`s) and execute the closure.
@@ -167,7 +165,7 @@ pub fn remove_child_streams(task_id: &usize) -> Option<IoStreams> {
 /// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
 /// to let it run.
 pub fn stdin() -> Result<StdioReader, &'static str> {
-    let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to get stdin")?;
+    let task_id = task::get_my_current_task_id();
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => Ok(queues.stdin.clone()),
@@ -182,7 +180,7 @@ pub fn stdin() -> Result<StdioReader, &'static str> {
 /// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
 /// to let it run.
 pub fn stdout() -> Result<StdioWriter, &'static str> {
-    let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to get stdout")?;
+    let task_id = task::get_my_current_task_id();
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => Ok(queues.stdout.clone()),
@@ -197,7 +195,7 @@ pub fn stdout() -> Result<StdioWriter, &'static str> {
 /// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
 /// to let it run.
 pub fn stderr() -> Result<StdioWriter, &'static str> {
-    let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to get stderr")?;
+    let task_id = task::get_my_current_task_id();
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => Ok(queues.stderr.clone()),
@@ -215,7 +213,7 @@ pub fn stderr() -> Result<StdioWriter, &'static str> {
 /// already been taken by some other task, which may be running simultaneously, or be killed
 /// prematurely so that it cannot return the key event reader on exit.
 pub fn take_key_event_queue() -> Result<KeyEventReadGuard, &'static str> {
-    let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to take key event queue")?;
+    let task_id = task::get_my_current_task_id();
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => {
@@ -234,19 +232,13 @@ pub fn take_key_event_queue() -> Result<KeyEventReadGuard, &'static str> {
 /// This function is automatically invoked upon dropping of `KeyEventReadGuard`.
 /// It returns the reader of key event queue back to the shell.
 fn return_event_queue(reader: &mut Option<KeyEventQueueReader>) {
-    match task::get_my_current_task_id().ok_or("failed to get task_id to return event queue") {
-        Ok(task_id) => {
-            let locked_streams = shared_maps::lock_stream_map();
-            match locked_streams.get(&task_id) {
-                Some(queues) => {
-                    core::mem::swap(&mut *queues.key_event_reader.lock(), reader);
-                },
-                None => { error!("no stderr for this task"); }
-            };
+    let task_id = task::get_my_current_task_id();
+    let locked_streams = shared_maps::lock_stream_map();
+    match locked_streams.get(&task_id) {
+        Some(queues) => {
+            core::mem::swap(&mut *queues.key_event_reader.lock(), reader);
         },
-        Err(e) => {
-            error!("app_io::return_event_queue(): Failed to get task_id to store new event queue. Error: {}", e);
-        }
+        None => { error!("no stderr for this task"); }
     };
 }
 
@@ -256,7 +248,7 @@ fn return_event_queue(reader: &mut Option<KeyEventQueueReader>) {
 /// Errors can occur in two cases, when it fails to get the `task_id` of the calling task,
 /// or it finds no IoControlFlags structure for that task.
 pub fn request_stdin_instant_flush() -> Result<(), &'static str> {
-    let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to request stdin instant flush")?;
+    let task_id = task::get_my_current_task_id();
     let mut locked_flags = shared_maps::lock_flag_map();
     match locked_flags.get_mut(&task_id) {
         Some(flags) => {
@@ -273,7 +265,7 @@ pub fn request_stdin_instant_flush() -> Result<(), &'static str> {
 /// Errors can occur in two cases, when it fails to get the `task_id` of the calling task,
 /// or it finds no IoControlFlags structure for that task.
 pub fn cancel_stdin_instant_flush() -> Result<(), &'static str> {
-    let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to cancel stdin instant flush")?;
+    let task_id = task::get_my_current_task_id();
     let mut locked_flags = shared_maps::lock_flag_map();
     match locked_flags.get_mut(&task_id) {
         Some(flags) => {
@@ -318,17 +310,8 @@ use core2::io::Write;
 /// Converts the given `core::fmt::Arguments` to a `String` and enqueues the string into the correct
 /// terminal print-producer
 pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
-    let task_id = match task::get_my_current_task_id() {
-        Some(task_id) => task_id,
-        None => {
-            // We cannot use log macros here, because when they're mirrored to the vga, they will cause
-            // infinite loops on an error. Instead, we write directly to the logger's output streams. 
-            let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: failed to get current task id \x1b[0m\n");
-            return;
-        }
-    };
-
-    // Obtains the correct stdout stream and push the output bytes.
+    let task_id = task::get_my_current_task_id();
+    // Obtain the correct stdout stream and push the output bytes.
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => {

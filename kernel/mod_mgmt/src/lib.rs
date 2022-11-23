@@ -983,9 +983,9 @@ impl CrateNamespace {
 
                 write_relocation(
                     relocation_entry,
-                    target_sec_mapped_pages.as_slice_mut(0, target_sec.mapped_pages_offset + target_sec.size())?,
+                    target_sec_mapped_pages.as_slice_mut(0, target_sec.mapped_pages_offset + target_sec.size)?,
                     target_sec.mapped_pages_offset,
-                    new_section.start_address(),
+                    new_section.virt_addr,
                     false
                 )?;
 
@@ -1476,6 +1476,13 @@ impl CrateNamespace {
 
             // Handle a "TLS" symbol, which exists in .tdata or .tbss
             else if is_tls {
+                let sym_shndx = symbol_entry.shndx() as Shndx;
+                // A TLS symbol with an shndx of 0 is a reference to a foreign dependency,
+                // so we skip it just like we do for `NoType` symbols at the top of this loop.
+                if sym_shndx == 0 {
+                    continue;
+                }
+
                 // TLS sections have been copied into the read-only pages.
                 // The merged TLS sections have already been dynamically assigned a virtual address above,
                 // so we can calculate a TLS symbol's vaddr and mapped_pages_offset by adding 
@@ -1484,17 +1491,16 @@ impl CrateNamespace {
                     .map(|(mp_arc, ..)| mp_arc)
                     .ok_or("BUG: found TLS symbol but no rodata_pages were allocated")?;
 
-                let sym_shndx = symbol_entry.shndx() as Shndx;
                 if let Some((tdata_shndx, ref tdata_sec)) = tdata_shndx_and_section && sym_shndx == tdata_shndx {
                     typ = SectionType::TlsData;
                     mapped_pages_offset = tdata_sec.mapped_pages_offset + sec_value;
-                    virt_addr = tdata_sec.start_address() + sec_value;
+                    virt_addr = tdata_sec.virt_addr + sec_value;
                 } else if let Some((tbss_shndx, ref tbss_sec)) = tbss_shndx_and_section && sym_shndx == tbss_shndx {
                     typ = SectionType::TlsBss;
                     // Here: a TLS .tbss section has no actual content, so we use a max-value offset
                     // as a canary value to ensure it cannot be used to index into a MappedPages.
                     mapped_pages_offset = usize::MAX;
-                    virt_addr = tbss_sec.start_address() + sec_value;
+                    virt_addr = tbss_sec.virt_addr + sec_value;
                 } else {
                     error!("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss: {}", symbol_entry as &dyn Entry);
                     return Err("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss");
@@ -1541,8 +1547,8 @@ impl CrateNamespace {
         //         for sec in loaded_sections.values() {
         //             if sec.typ == SectionType::Data && sec.name.as_str() != SectionType::Data.name() {
         //                 warn!("\t\t data symbol: {:?}", sec);
-        //                 data_symbols_start_vaddr = core::cmp::min(data_symbols_start_vaddr, sec.address_range.start.value());
-        //                 data_symbols_end_vaddr = core::cmp::max(data_symbols_end_vaddr, sec.address_range.end.value());
+        //                 data_symbols_start_vaddr = core::cmp::min(data_symbols_start_vaddr, sec.virt_addr.value());
+        //                 data_symbols_end_vaddr = core::cmp::max(data_symbols_end_vaddr, sec.virt_addr.value() + sec.size);
         //             }
         //         }
         //         let total_size_of_data_symbols = data_symbols_end_vaddr - data_symbols_start_vaddr;
@@ -1557,8 +1563,8 @@ impl CrateNamespace {
         //         for sec in loaded_sections.values() {
         //             if sec.typ == SectionType::Bss && sec.name.as_str() != SectionType::Bss.name() {
         //                 warn!("\t\t bss symbol: {:?}", sec);
-        //                 bss_symbols_start_vaddr = core::cmp::min(bss_symbols_start_vaddr, sec.address_range.start.value());
-        //                 bss_symbols_end_vaddr = core::cmp::max(bss_symbols_end_vaddr, sec.address_range.end.value());
+        //                 bss_symbols_start_vaddr = core::cmp::min(bss_symbols_start_vaddr, sec.virt_addr.value());
+        //                 bss_symbols_end_vaddr = core::cmp::max(bss_symbols_end_vaddr, sec.virt_addr.value() + sec.size);
         //             }
         //         }
         //         let total_size_of_bss_symbols = bss_symbols_end_vaddr - bss_symbols_start_vaddr;
@@ -2120,7 +2126,7 @@ impl CrateNamespace {
                 let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
                 let target_sec_slice: &mut [u8] = target_sec_mapped_pages.as_slice_mut(
                     0,
-                    target_sec.mapped_pages_offset + target_sec.size(),
+                    target_sec.mapped_pages_offset + target_sec.size,
                 )?;
 
                 // iterate through each relocation entry in the relocation array for the target_sec
@@ -2186,7 +2192,7 @@ impl CrateNamespace {
                         relocation_entry,
                         target_sec_slice,
                         target_sec.mapped_pages_offset,
-                        source_sec.start_address() + source_sec_value,
+                        source_sec.virt_addr + source_sec_value,
                         verbose_log
                     )?;
                     target_sec_data_was_modified = true;
@@ -2223,7 +2229,7 @@ impl CrateNamespace {
             if target_sec_data_was_modified && 
                 (target_sec.typ == SectionType::TlsData || target_sec.typ == SectionType::TlsBss)
             {
-                debug!("Invalidating TlsInitializer due to relocation written to section {:?}", &*target_sec);
+                // debug!("Invalidating TlsInitializer due to relocation written to section {:?}", &*target_sec);
                 self.tls_initializer.lock().invalidate();
             }
 
@@ -2256,7 +2262,7 @@ impl CrateNamespace {
         {
             new_crate.sections.retain(|_shndx, sec| {
                 let should_remove = !sec.global 
-                    && sec.get_type() == SectionType::Rodata
+                    && sec.typ == SectionType::Rodata
                     && sec.inner.read().sections_i_depend_on.is_empty();
                 
                 // For an element to be removed, this closure should return `false`.
@@ -2282,8 +2288,8 @@ impl CrateNamespace {
                 if log_replacements {
                     if let Some(old_sec) = old_val.get().upgrade() {
                         // debug!("       add_symbol(): replacing section: old: {:?}, new: {:?}", old_sec, new_section);
-                        if new_section.size() != old_sec.size() {
-                            warn!("Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}", old_sec.size(), old_sec.name, new_section.size(), new_section.name);
+                        if new_section.size != old_sec.size {
+                            warn!("Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}", old_sec.size, old_sec.name, new_section.size, new_section.name);
                         } 
                         else {
                             warn!("Replacing new symbol already present: old {:?}, new: {:?}", old_sec.name, new_section.name);
@@ -2468,8 +2474,11 @@ impl CrateNamespace {
             
             // If the section's address bounds contain the address, then we've found it.
             // Only a single section can contain the address, so it's safe to stop once we've found a match.
-            if eligible_section && sec.address_range.contains(&virt_addr) {
-                let offset = virt_addr.value() - sec.start_address().value();
+            if eligible_section
+                && sec.virt_addr <= virt_addr
+                && virt_addr.value() < (sec.virt_addr.value() + sec.size)
+            {
+                let offset = virt_addr.value() - sec.virt_addr.value();
                 merged_section_and_offset = Some((sec.clone(), offset));
                 
                 if sec.name.as_str() == sec.typ.name() {
@@ -3071,28 +3080,48 @@ impl TlsInitializer {
     }
 
     /// Add a TLS section that has pre-determined offset, e.g.,
-    /// one that was specified in the statically-linked nano_core kernel image.
-    /// 
-    /// Returns an Error if inserting the given `tls_section` at the given `offset`
-    /// would overlap with an existing section.
-    /// Note: an error occurring here would indicate a link-time bug 
-    /// or a bug in the symbol parsing code that invokes this function.
+    /// one that was specified in the statically-linked base kernel image.
+    ///
+    /// This function modifies the `tls_section`'s starting virtual address field
+    /// to hold the proper value such that this `tls_section` can be correctly used
+    /// as the source of a relocation calculation (e.g., when another section depends on it).
+    /// That value will be a negative offset from the end of all the static TLS sections,
+    /// i.e., where the TLS self pointer exists in memory.
+    ///
+    /// ## Arguments
+    /// * `tls_section`: the TLS section present in base kernel image.
+    /// * `offset`: the offset of this section as determined by the linker.
+    ///    This corresponds to the "value" of this section's symbol in the ELF file.
+    /// * `total_static_tls_size`: the total size of all statically-known TLS sections,
+    ///    including both TLS BSS (`.tbss`) and TLS data (`.tdata`) sections.
+    ///
+    /// ## Return
+    /// * A reference to the newly added and properly modified section, if successful.
+    /// * An error if inserting the given `tls_section` at the given `offset`
+    ///   would overlap with an existing section. 
+    ///   An error occurring here would indicate a link-time bug 
+    ///   or a bug in the symbol parsing code that invokes this function.
     pub(crate) fn add_existing_static_tls_section(
         &mut self,
+        mut tls_section: LoadedSection,
         offset: usize,
-        tls_section: StrongSectionRef,
-    ) -> Result<(), ()> {
-        let range = offset .. (offset + tls_section.size());
+        total_static_tls_size: usize,
+    ) -> Result<StrongSectionRef, ()> {
+        let range = offset .. (offset + tls_section.size);
         if self.static_section_offsets.contains_key(&range.start) || 
             self.static_section_offsets.contains_key(&(range.end - 1))
         {
             return Err(());
         }
 
+        // Calculate the new value of this section's virtual address based on its offset.
+        let starting_offset = (total_static_tls_size - offset).wrapping_neg();
+        tls_section.virt_addr = VirtualAddress::new(starting_offset).ok_or(())?;
         self.end_of_static_sections = max(self.end_of_static_sections, range.end);
-        self.static_section_offsets.insert(range, StrongSectionRefWrapper(tls_section));
+        let section_ref = Arc::new(tls_section);
+        self.static_section_offsets.insert(range, StrongSectionRefWrapper(section_ref.clone()));
         self.cache_status = CacheStatus::Invalidated;
-        Ok(())
+        Ok(section_ref)
     }
 
     /// Inserts the given `section` into this TLS area at the next index
@@ -3116,32 +3145,27 @@ impl TlsInitializer {
         mut section: LoadedSection,
         alignment: usize,
     ) -> Result<(usize, StrongSectionRef), ()> {
-        let sec_size = section.size();
         let mut start_index = None;
         // Find the next "gap" big enough to fit the new TLS section, 
         // skipping the first `POINTER_SIZE` bytes, which are reserved for the TLS self pointer.
         let range_after_tls_self_pointer = POINTER_SIZE .. usize::MAX;
         for gap in self.dynamic_section_offsets.gaps(&range_after_tls_self_pointer) {
             let aligned_start = util::round_up(gap.start, alignment);
-            if aligned_start + sec_size <= gap.end {
+            if aligned_start + section.size <= gap.end {
                 start_index = Some(aligned_start);
                 break;
             }
         }
 
-        if let Some(start) = start_index {
-            let range = start .. (start + sec_size);
-            section.address_range = 
-                VirtualAddress::new_canonical(range.start) .. VirtualAddress::new_canonical(range.end);
-            let section_ref = Arc::new(section);
-            self.end_of_dynamic_sections = max(self.end_of_dynamic_sections, range.end);
-            self.dynamic_section_offsets.insert(range, StrongSectionRefWrapper(Arc::clone(&section_ref)));
-            // Now that we've added a new section, the cached data is invalid.
-            self.cache_status = CacheStatus::Invalidated;
-            Ok((start, section_ref))
-        } else {
-            Err(())
-        }
+        let start = start_index.ok_or(())?;
+        let range = start .. (start + section.size);
+        section.virt_addr = VirtualAddress::new(range.start).ok_or(())?;
+        let section_ref = Arc::new(section);
+        self.end_of_dynamic_sections = max(self.end_of_dynamic_sections, range.end);
+        self.dynamic_section_offsets.insert(range, StrongSectionRefWrapper(section_ref.clone()));
+        // Now that we've added a new section, the cached data is invalid.
+        self.cache_status = CacheStatus::Invalidated;
+        Ok((start, section_ref))
     }
 
     /// Invalidates the cached data image in this `TlsInitializer` area.
@@ -3175,13 +3199,13 @@ impl TlsInitializer {
                 new_data.extend(core::iter::repeat(0).take(num_padding_bytes));
 
                 // Insert the section data into the new data vec.
-                if sec.get_type() == SectionType::TlsData {
+                if sec.typ == SectionType::TlsData {
                     let sec_mp = sec.mapped_pages.lock();
-                    let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size()).unwrap();
+                    let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size).unwrap();
                     new_data.extend_from_slice(sec_data);
                 } else {
                     // For TLS BSS sections (.tbss), fill the section size with all zeroes.
-                    new_data.extend(core::iter::repeat(0).take(sec.size()));
+                    new_data.extend(core::iter::repeat(0).take(sec.size));
                 }
                 *end_of_previous_range = range.end;
             }
@@ -3261,7 +3285,7 @@ pub struct TlsDataImage {
     ptr:   usize,
 }
 impl TlsDataImage {
-    /// Returns the value of the TLS selft pointer for this TLS data image.
+    /// Returns the value of the TLS self pointer for this TLS data image.
     /// If it has no TLS data sections, the returned value will be zero.
     #[inline(always)]
     pub fn pointer_value(&self) -> usize {

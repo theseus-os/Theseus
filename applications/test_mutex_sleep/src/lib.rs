@@ -73,8 +73,8 @@ fn test_contention() -> Result<(), &'static str> {
 
 
 fn mutex_sleep_task(lock: Arc<MutexSleep<usize>>) -> Result<(), &'static str> {
-    let curr_task = task::get_my_current_task().ok_or("couldn't get current task")?;
-    let curr_task = format!("{}", curr_task.deref());
+    let curr_task = task::with_current_task(|t| format!("{}", t.deref()))
+        .map_err(|_| "couldn't get current task")?;
     warn!("ENTERED TASK {}", curr_task);
 
     for _i in 0..1000 {
@@ -131,10 +131,8 @@ fn test_lockstep() -> Result<(), &'static str> {
 
 
 fn lockstep_task((lock, remainder): (Arc<MutexSleep<usize>>, usize)) -> Result<(), &'static str> {
-    let curr_task = {
-        let t = task::get_my_current_task().ok_or("couldn't get current task")?;
-        format!("{}", t.deref())
-    };
+    let curr_task = task::with_current_task(|t| format!("{}", t.deref()))
+        .map_err(|_| "couldn't get current task")?;
     warn!("ENTERED TASK {}", curr_task);
 
     for _i in 0..20 {
