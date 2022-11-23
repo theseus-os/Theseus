@@ -69,12 +69,7 @@ impl ReceiveBuffer {
     /// Creates a new ReceiveBuffer with the given `MappedPages`, `PhysicalAddress`, and `length`. 
     /// When this ReceiveBuffer object is dropped, it will be returned to the given `pool`.
     pub fn new(mp: MappedPages, phys_addr: PhysicalAddress, length: u16, pool: &'static mpmc::Queue<ReceiveBuffer>) -> ReceiveBuffer {
-        ReceiveBuffer {
-            mp: mp,
-            phys_addr: phys_addr,
-            length: length,
-            pool: pool,
-        }
+        ReceiveBuffer { mp, phys_addr, length, pool }
     }
 }
 impl Deref for ReceiveBuffer {

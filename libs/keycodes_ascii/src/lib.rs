@@ -1,28 +1,10 @@
-#![allow(dead_code)]
 #![no_std]
 
-
-#[macro_use] extern crate bitflags;
-
-// use core::cell::RefCell;
-
-// TODO: use these tables and tips:
-// https://sourceforge.net/p/oszur11/code/ci/master/tree/Chapter_06_Shell/04_Makepp/arch/i386/arch/devices/i8042.c
-
-// TODO: seems like we actually can use phf crates
-// we can use the "core" feature enables libcore instead of libstd
-// you can use number literals like so: 
-/*
-static MYMAP: phf::Map<u8, &'static Keycode> = phf_map! {
-    0u8 => Keycode::BLAH,
-    1u8 => Keycode::BLAH2,
-    ... etc ...
-}
-*/
+use bitflags::bitflags;
+use num_enum::TryFromPrimitive;
 
 // the implementation here follows the rule of representation, 
 // which is to use complicated data structures to permit simpler logic. 
-
 
 bitflags! {
     /// The set of modifier keys that can be held down while other keys are pressed.
@@ -124,7 +106,7 @@ pub struct KeyEvent {
 }
 
 impl KeyEvent {
-    pub fn new(keycode: Keycode, action: KeyAction, modifiers: KeyboardModifiers,) -> KeyEvent {
+    pub fn new(keycode: Keycode, action: KeyAction, modifiers: KeyboardModifiers) -> KeyEvent {
         KeyEvent {
             keycode, 
             action,
@@ -133,6 +115,8 @@ impl KeyEvent {
     }
 }
 
+// FIXME: this is only true for scancode set 1, set 2 uses (0xF0, make-code),
+// set 3 uses single byte make-codes and (0xF0, make-code) everywhere, no extended codes
 /// The offset that a keyboard adds to the scancode
 /// to indicate that the key was released rather than pressed. 
 /// So if a scancode of `1` means a key `foo` was pressed,
@@ -141,11 +125,14 @@ pub const KEY_RELEASED_OFFSET: u8 = 128;
 
 /// convenience function for obtaining the ascii value for a raw scancode under the given modifiers
 pub fn scancode_to_ascii(modifiers: KeyboardModifiers, scan_code: u8) -> Option<char> {
-	Keycode::from_scancode(scan_code).and_then(|k| k.to_ascii(modifiers))
+    scan_code
+        .try_into()
+        .ok()
+        .and_then(|k: Keycode| k.to_ascii(modifiers))
 }
 
-
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, TryFromPrimitive)]
+#[repr(u8)]
 pub enum Keycode {
     OverflowError = 0,
     Escape,
@@ -218,19 +205,19 @@ pub enum Keycode {
     F10,
     NumLock,
     ScrollLock,
-    Home, // Also Pad7
-    Up, // Also Pad8
+    Home,   // Also Pad7
+    Up,     // Also Pad8
     PageUp, // Also Pad9
     PadMinus,
     Left, // Also Pad4
     Pad5,
     Right, // Also Pad6
     PadPlus,
-    End, // Also Pad1
-    Down, // Also Pad2
+    End,      // Also Pad1
+    Down,     // Also Pad2
     PageDown, // Also Pad3
-    Insert, // Also Pad0
-    Delete, // Also PadDecimal
+    Insert,   // Also Pad0
+    Delete,   // Also PadDecimal
     Unknown1,
     Unknown2,
     NonUsBackslash,
@@ -241,127 +228,25 @@ pub enum Keycode {
     SuperKeyLeft,
     SuperKeyRight,
     Menu,
+    ControlReleased = Keycode::Control as u8 + KEY_RELEASED_OFFSET,
+    AltReleased = Keycode::Alt as u8 + KEY_RELEASED_OFFSET,
+    LeftShiftReleased = Keycode::LeftShift as u8 + KEY_RELEASED_OFFSET,
+    RightShiftReleased = Keycode::RightShift as u8 + KEY_RELEASED_OFFSET,
+    SuperKeyLeftReleased = Keycode::SuperKeyLeft as u8 + KEY_RELEASED_OFFSET,
+    SuperKeyRightReleased = Keycode::SuperKeyRight as u8 + KEY_RELEASED_OFFSET,
 } 
 
-
-
-
 impl Keycode {
-
-    pub fn from_scancode(scancode: u8)  -> Option<Keycode> {
-        match scancode {
-            0 => Some(Keycode::OverflowError),
-            1 => Some(Keycode::Escape),
-            2 => Some(Keycode::Num1),
-            3 => Some(Keycode::Num2),
-            4 => Some(Keycode::Num3),
-            5 => Some(Keycode::Num4),
-            6 => Some(Keycode::Num5),
-            7 => Some(Keycode::Num6),
-            8 => Some(Keycode::Num7),
-            9 => Some(Keycode::Num8),
-            10 => Some(Keycode::Num9),
-            11 => Some(Keycode::Num0),
-            12 => Some(Keycode::Minus),
-            13 => Some(Keycode::Equals),
-            14 => Some(Keycode::Backspace),
-            15 => Some(Keycode::Tab),
-            16 => Some(Keycode::Q),
-            17 => Some(Keycode::W),
-            18 => Some(Keycode::E),
-            19 => Some(Keycode::R),
-            20 => Some(Keycode::T),
-            21 => Some(Keycode::Y),
-            22 => Some(Keycode::U),
-            23 => Some(Keycode::I),
-            24 => Some(Keycode::O),
-            25 => Some(Keycode::P),
-            26 => Some(Keycode::LeftBracket),
-            27 => Some(Keycode::RightBracket),
-            28 => Some(Keycode::Enter),
-            29 => Some(Keycode::Control),
-            30 => Some(Keycode::A),
-            31 => Some(Keycode::S),
-            32 => Some(Keycode::D),
-            33 => Some(Keycode::F),
-            34 => Some(Keycode::G),
-            35 => Some(Keycode::H),
-            36 => Some(Keycode::J),
-            37 => Some(Keycode::K),
-            38 => Some(Keycode::L),
-            39 => Some(Keycode::Semicolon),
-            40 => Some(Keycode::Quote),
-            41 => Some(Keycode::Backtick),
-            42 => Some(Keycode::LeftShift),
-            43 => Some(Keycode::Backslash),
-            44 => Some(Keycode::Z),
-            45 => Some(Keycode::X),
-            46 => Some(Keycode::C),
-            47 => Some(Keycode::V),
-            48 => Some(Keycode::B),
-            49 => Some(Keycode::N),
-            50 => Some(Keycode::M),
-            51 => Some(Keycode::Comma),
-            52 => Some(Keycode::Period),
-            53 => Some(Keycode::Slash),
-            54 => Some(Keycode::RightShift),
-            55 => Some(Keycode::PadMultiply), // Also PrintScreen
-            56 => Some(Keycode::Alt),
-            57 => Some(Keycode::Space),
-            58 => Some(Keycode::CapsLock),
-            59 => Some(Keycode::F1),
-            60 => Some(Keycode::F2),
-            61 => Some(Keycode::F3),
-            62 => Some(Keycode::F4),
-            63 => Some(Keycode::F5),
-            64 => Some(Keycode::F6),
-            65 => Some(Keycode::F7),
-            66 => Some(Keycode::F8),
-            67 => Some(Keycode::F9),
-            68 => Some(Keycode::F10),
-            69 => Some(Keycode::NumLock),
-            70 => Some(Keycode::ScrollLock),
-            71 => Some(Keycode::Home), // Also Pad7
-            72 => Some(Keycode::Up), // Also Pad8
-            73 => Some(Keycode::PageUp), // Also Pad9
-            74 => Some(Keycode::PadMinus),
-            75 => Some(Keycode::Left), // Also Pad4
-            76 => Some(Keycode::Pad5),
-            77 => Some(Keycode::Right), // Also Pad6
-            78 => Some(Keycode::PadPlus),
-            79 => Some(Keycode::End), // Also Pad1
-            80 => Some(Keycode::Down), // Also Pad2
-            81 => Some(Keycode::PageDown), // Also Pad3
-            82 => Some(Keycode::Insert), // Also Pad0
-            83 => Some(Keycode::Delete), // Also PadDecimal
-            84 => Some(Keycode::Unknown1),
-            85 => Some(Keycode::Unknown2),
-            86 => Some(Keycode::NonUsBackslash),
-            87 => Some(Keycode::F11),
-            88 => Some(Keycode::F12),
-            89 => Some(Keycode::Pause),
-            90 => Some(Keycode::Unknown3),
-            91 => Some(Keycode::SuperKeyLeft),
-            92 => Some(Keycode::SuperKeyRight),
-            93 => Some(Keycode::Menu),
-
-            _ => None,
-        }
-    }
-
-
-
     /// Obtains the ascii value for a keycode under the given modifiers
     pub fn to_ascii(&self, modifiers: KeyboardModifiers) -> Option<char> {
         // handle shift key being pressed
         if modifiers.is_shift() {
-            // if shift is pressed and caps lock is on, give a regular lowercase letter
             if modifiers.is_caps_lock() && self.is_letter() {
+                // if shift is pressed and caps lock is on, give a regular lowercase letter
                 return self.as_ascii();
-            }
-            // if shift is pressed and caps lock is not, give a regular shifted key
-            else {
-                return self.as_ascii_shifted()
+            } else {
+                // if shift is pressed and caps lock is not, give a regular shifted key
+                return self.as_ascii_shifted();
             }
         }
         
@@ -369,10 +254,9 @@ impl Keycode {
         // (we already covered the shift && caps_lock scenario above)
         if modifiers.is_caps_lock() {
             if self.is_letter() {
-                return self.as_ascii_shifted()
-            }
-            else {
-                return self.as_ascii()
+                return self.as_ascii_shifted();
+            } else {
+                return self.as_ascii();
             }
         }
 
@@ -381,8 +265,6 @@ impl Keycode {
         
         // TODO: handle numlock
     }
-
-
 
     /// returns true if this keycode was a letter from A-Z
     pub fn is_letter(&self) -> bool {
@@ -417,8 +299,6 @@ impl Keycode {
             _ => false,
         }
     }
-
-
 
     /// maps a Keycode to ASCII char values without any "shift" modifiers.
     fn as_ascii(&self) -> Option<char> {
@@ -479,11 +359,9 @@ impl Keycode {
             Keycode::PadMinus => Some('-'),
             Keycode::PadPlus => Some('+'),
             // PadSlash / PadDivide?? 
-
             _ => None,
         }
     }
-
 
     /// same as as_ascii, but adds the effect of the "shift" modifier key. 
     /// If a Keycode's ascii value doesn't change when shifted,
@@ -542,37 +420,3 @@ impl Keycode {
         }
     }
 }
-
-
-
-
-// // I cant get TryFrom to work with core library
-// use try_from::Err;
-
-// #[derive(Debug)]
-// pub struct TryFromKeycodeError { 
-//     scan_code: u8,
-// }
-
-// impl Err for TryFromKeycodeError {
-//     fn description(&self) -> &str {
-//         "out of range integral type conversion attempted"
-//     }
-// }
-
-// impl fmt::Display for TryFromKeycodeError {
-//     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-//         fmt.write_str(self.description())
-//     }
-// }
-
-// impl TryFrom<u8> for Keycode {
-//     type Err = TryFromKeycodeError;
-//     fn try_from(original: u8) -> Result<Keycode, TryFromKeycodeError> {
-//         let kc = get_keycode(original);
-//         match kc {
-//             Some(x) => Ok(x),
-//             fail => Err(TryFromKeycodeError{ scan_code: original }),
-//         }
-//     }
-// }

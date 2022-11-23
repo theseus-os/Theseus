@@ -86,7 +86,7 @@ The arguments above specify that we wish to
 Afterwards, the `build/deps/` directory contains all prebuilt dependencies needed to compile an out-of-tree crate against the existing build of Theseus, with all the properly versioned (correctly hashed) crates and symbols.
 This tool also generates a `TheseusBuild.toml` file that describes the parameters of this build of Theseus, such that it can be replicated by `theseus_cargo`. For example:
 ```toml
-target = "x86_64-theseus"
+target = "x86_64-unknown-theseus"
 rustflags = "--emit=obj -C debuginfo=2 -C code-model=large -C relocation-model=static -D unused-must-use -Z merge-functions=disabled -Z share-generics=no"
 cargoflags = "--release"
 host_deps = "./host_deps"

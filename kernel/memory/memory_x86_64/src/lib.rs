@@ -208,6 +208,7 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
             }
             ".tbss" => {
                 // Ignore .tbss (see above) because it is a read-only section of all zeroes.
+                debug!("     no need to map kernel section \".tbss\", it contains no content");
                 continue;
             }
             ".data" => {

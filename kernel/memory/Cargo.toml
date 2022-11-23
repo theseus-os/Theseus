@@ -47,5 +47,8 @@ path = "./frame_allocator"
 [dependencies.block_allocator]
 path = "./block_allocator"
 
+[dependencies.no_drop]
+path = "../no_drop"
+
 [lib]
 crate-type = ["rlib"]

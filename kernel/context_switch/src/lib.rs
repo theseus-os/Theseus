@@ -4,17 +4,13 @@
 #![no_std]
 #![feature(naked_functions)]
 
-#[macro_use] extern crate cfg_if;
+pub use context_switch_regular::read_first_register;
 
 // If `simd_personality` is enabled, all of the `context_switch*` implementation crates are simultaneously enabled,
 // in order to allow choosing one of them based on the configuration options of each Task (SIMD, regular, etc).
 // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
-cfg_if! {
+cfg_if::cfg_if! {
     if #[cfg(simd_personality)] {
-        extern crate context_switch_regular;
-        extern crate context_switch_sse;
-        extern crate context_switch_avx;
-
         use core::arch::asm;
         pub use context_switch_sse::*;
         pub use context_switch_regular::*;
@@ -161,21 +157,18 @@ cfg_if! {
     // For example, AVX512 is above AVX2, which is above AVX, which is above SSE, which is above regular (non-SIMD).
 
     else if #[cfg(target_feature = "avx")] {
-        extern crate context_switch_avx;
         pub use context_switch_avx::ContextAVX as Context;
         pub use context_switch_avx::context_switch_avx as context_switch;
     }
 
     else if #[cfg(target_feature = "sse2")] {
         // this crate covers SSE, SSE2, SSE3, SSE4, but we're only currently using it for SSE2
-        extern crate context_switch_sse;
         pub use context_switch_sse::ContextSSE as Context;
         pub use context_switch_sse::context_switch_sse as context_switch;
     }
 
     else {
         // this covers only the default x86_64 registers
-        extern crate context_switch_regular;
         pub use context_switch_regular::ContextRegular as Context;
         pub use context_switch_regular::context_switch_regular as context_switch;
     }

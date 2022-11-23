@@ -1,0 +1,11 @@
+[package]
+name = "logger"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+log = "0.4.17"
+pl011_qemu = { git = "https://github.com/theseus-os/pl011/", branch = "aarch64-qemu-virt-test" }

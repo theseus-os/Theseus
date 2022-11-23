@@ -1,16 +1,12 @@
  //! Defines the Command Queue that is used to pass commands from the driver to the NIC.
  //! Also defines multiple enums that specify the valid input and output values for different commands.
 
-use alloc::{
-    vec::Vec,
-    boxed::Box
-};
-use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
+use alloc::{vec::Vec, boxed::Box};
+use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
 use volatile::{ReadOnly,Volatile};
 use bit_field::BitField;
 use zerocopy::{U32, FromBytes};
 use byteorder::BigEndian;
-use owning_ref:: BoxRefMut;
 use nic_initialization::NIC_MAPPING_FLAGS;
 use kernel_config::memory::PAGE_SIZE;
 use core::fmt;
@@ -512,7 +508,7 @@ impl Command<{CmdState::Initialized}> {
         mut entry: CommandQueueEntry, 
         input_mailbox_buffers: Box<[MailboxBuffer]>,
         output_mailbox_buffers: Box<[MailboxBuffer]>,
-        command_queue: &mut BoxRefMut<MappedPages, [CommandQueueEntry]>
+        command_queue: &mut BorrowedSliceMappedPages<CommandQueueEntry, Mutable>,
     ) -> Command<{CmdState::Initialized}> {
         core::mem::swap(&mut entry, &mut command_queue[entry_num]);
         Command {
@@ -694,7 +690,7 @@ impl CommandBuilder {
 /// (Section 8.24.1: HCA Command Queue)
 pub struct CommandQueue {
     /// Physically-contiguous command queue entries
-    entries: BoxRefMut<MappedPages, [CommandQueueEntry]>,
+    entries: BorrowedSliceMappedPages<CommandQueueEntry, Mutable>,
     /// Per-entry boolean flags to keep track of which entries are in use
     available_entries: Box<[bool]>,
     /// A random number that needs to be different for every command, and the same for all mailboxes that are part of a command.
@@ -710,7 +706,10 @@ impl CommandQueue {
     /// # Arguments
     /// * `entries`: physically contiguous memory that is mapped as a slice of command queue entries.
     /// * `num_cmdq_entries`: number of entries in the queue.
-    pub fn create(entries: BoxRefMut<MappedPages, [CommandQueueEntry]>, num_cmdq_entries: usize) -> Result<CommandQueue, &'static str> {
+    pub fn create(
+        entries: BorrowedSliceMappedPages<CommandQueueEntry, Mutable>,
+        num_cmdq_entries: usize,
+    ) -> Result<CommandQueue, &'static str> {
         
         // initially, all command entries are available
         let available_entries = vec![true; num_cmdq_entries];
@@ -725,7 +724,7 @@ impl CommandQueue {
         // Assign a random number to token, another OS (Snabb) starts off with 0xAA
         let token = 0xAA;
 
-        Ok(CommandQueue{ entries, available_entries: available_entries.into_boxed_slice(), token, mailbox_buffers })
+        Ok(CommandQueue { entries, available_entries: available_entries.into_boxed_slice(), token, mailbox_buffers })
     }
 
     /// Find an command queue entry that is not in use

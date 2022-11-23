@@ -31,8 +31,8 @@ path = "../kernel_config"
 [dependencies.apic]
 path = "../apic"
 
-[dependencies.tlb_shootdown]
-path = "../tlb_shootdown"
+[dependencies.no_drop]
+path = "../no_drop"
 
 
 [lib]

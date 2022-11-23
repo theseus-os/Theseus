@@ -154,6 +154,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     let overhead = hpet_timing_overhead()?;
     let mut task = Task::new(
         None,
+        None,
         |_, _| loop { }, // dummy failure function
     )?;
     task.name = String::from("rq_eval_single_task_unrunnable");

@@ -1,8 +1,6 @@
 use core::fmt;
 use core::ops::{Deref, DerefMut};
 use spin::{Mutex, MutexGuard};
-use owning_ref::{OwningRef, OwningRefMut};
-use stable_deref_trait::StableDeref;
 use wait_queue::WaitQueue;
 use lockable::{Lockable, LockableSized};
 
@@ -144,14 +142,6 @@ impl<'a, T: ?Sized> Drop for MutexSleepGuard<'a, T> {
         self.queue.notify_one();
     }
 }
-
-// Implement the StableDeref trait for MutexSleep guards, just like it's implemented for Mutex guards
-unsafe impl<'a, T: ?Sized> StableDeref for MutexSleepGuard<'a, T> {}
-
-/// Typedef of a owning reference that uses a `MutexSleepGuard` as the owner.
-pub type MutexSleepGuardRef<'a, T, U = T> = OwningRef<MutexSleepGuard<'a, T>, U>;
-/// Typedef of a mutable owning reference that uses a `MutexSleepGuard` as the owner.
-pub type MutexSleepGuardRefMut<'a, T, U = T> = OwningRefMut<MutexSleepGuard<'a, T>, U>;
 
 /// Implement `Lockable` for [`MutexSleep`].
 /// Because [`MutexSleep::lock()`] returns a `Result` and may fail,

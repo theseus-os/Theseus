@@ -17,7 +17,6 @@ extern crate spin;
 extern crate irq_safety;
 extern crate memory;
 extern crate pci; 
-extern crate owning_ref;
 extern crate nic_initialization;
 extern crate mlx_ethernet;
 extern crate kernel_config;
@@ -27,14 +26,10 @@ extern crate mpmc;
 
 
 use spin::Once; 
-use alloc::{
-    vec::Vec,
-    boxed::Box
-};
+use alloc::vec::Vec;
 use irq_safety::MutexIrqSafe;
-use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, Page};
+use memory::{Page, PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedMappedPages, Mutable};
 use pci::PciDevice;
-use owning_ref::BoxRefMut;
 use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory, init_rx_buf_pool};
 use mlx_ethernet::{
     command_queue::{AccessRegisterOpMod, CommandBuilder, CommandOpcode, CommandQueue, CommandQueueEntry, HCACapabilities, ManagePagesOpMod, QueryHcaCapCurrentOpMod, QueryHcaCapMaxOpMod, QueryPagesOpMod}, 
@@ -90,7 +85,7 @@ pub struct ConnectX5Nic {
     /// Initialization segment base address
     mem_base: PhysicalAddress,
     /// Initialization segment
-    init_segment: BoxRefMut<MappedPages, InitializationSegment>,
+    init_segment: BorrowedMappedPages<InitializationSegment, Mutable>,
     /// Command Queue
     command_queue: CommandQueue,
     /// Boot pages passed to the NIC. Once transferred, they should not be accessed by the driver.
@@ -158,7 +153,7 @@ impl ConnectX5Nic {
         // map pages to the physical address given by mem_base as that is the intialization segment
         let mut init_segment = ConnectX5Nic::map_init_segment(mem_base)?;
 
-        trace!("{:?}", init_segment);
+        trace!("{:?}", &*init_segment);
         
         // find number of entries in command queue and stride
         let num_cmdq_entries = init_segment.num_cmdq_entries() as usize;
@@ -184,7 +179,7 @@ impl ConnectX5Nic {
     
         // cast our physically-contiguous MappedPages into a slice of command queue entries
         let mut cmdq = CommandQueue::create(
-            BoxRefMut::new(Box::new(cmdq_mapped_pages)).try_map_mut(|mp| mp.as_slice_mut::<CommandQueueEntry>(0, num_cmdq_entries))?,
+            cmdq_mapped_pages.into_borrowed_slice_mut(0, num_cmdq_entries).map_err(|(_mp, err)| err)?,
             num_cmdq_entries
         )?;
 
@@ -645,9 +640,10 @@ impl ConnectX5Nic {
     }
     
     /// Returns the memory-mapped initialization segment of the NIC
-    fn map_init_segment(mem_base: PhysicalAddress) -> Result<BoxRefMut<MappedPages, InitializationSegment>, &'static str> {
-        let mp = allocate_memory(mem_base, core::mem::size_of::<InitializationSegment>())?;
-        BoxRefMut::new(Box::new(mp)).try_map_mut(|mp| mp.as_type_mut::<InitializationSegment>(0))
+    fn map_init_segment(mem_base: PhysicalAddress) -> Result<BorrowedMappedPages<InitializationSegment, Mutable>, &'static str> {
+        allocate_memory(mem_base, core::mem::size_of::<InitializationSegment>())?
+            .into_borrowed_mut(0)
+            .map_err(|(_mp, err)| err)
     }
 
     /// Allocates `num_pages` [`MappedPages`] each of the standard kernel page size [`PAGE_SIZE`].

@@ -681,7 +681,7 @@ impl UnwindRowReference {
         match &self.eh_frame_sec {
             EhFrameReference::Section(sec) => {
                 let sec_pages = sec.mapped_pages.lock();
-                let eh_frame_slice: &[u8] = sec_pages.as_slice(sec.mapped_pages_offset, sec.size())?;
+                let eh_frame_slice: &[u8] = sec_pages.as_slice(sec.mapped_pages_offset, sec.size)?;
                 invoke_f_with_eh_frame_slice(eh_frame_slice)
             }
             EhFrameReference::External(uw_info) => {
@@ -709,7 +709,7 @@ fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, Ba
     let eh_frame_sec = krate.sections.values()
         .find(|s| s.typ == SectionType::EhFrame)?;
     
-    let eh_frame_vaddr = eh_frame_sec.start_address().value();
+    let eh_frame_vaddr = eh_frame_sec.virt_addr.value();
     let text_pages_vaddr = krate.text_pages.as_ref()?.1.start.value();
     let base_addrs = BaseAddresses::default()
         .set_eh_frame(eh_frame_vaddr as u64)
@@ -736,8 +736,8 @@ fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, Ba
 pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Result<(), &'static str> {
     // Here we have to be careful to have no resources waiting to be dropped/freed/released on the stack. 
     let unwinding_context_ptr = {
-        let curr_task = task::get_my_current_task().ok_or("get_my_current_task() failed")?;
-        let namespace = curr_task.get_namespace();
+        let current_task = task::get_my_current_task().ok_or("couldn't get current task")?;
+        let namespace = current_task.get_namespace();
 
         Box::into_raw(Box::new(
             UnwindingContext {
@@ -747,7 +747,7 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
                     Registers::default()
                 ), 
                 cause: reason,
-                current_task: curr_task.clone(),
+                current_task,
             }
         ))
     };
@@ -821,8 +821,8 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
                 #[cfg(not(downtime_eval))]
                 info!("  parsing LSDA section: {:?}", sec);
                 
-                let starting_offset = sec.mapped_pages_offset + (lsda.value() - sec.address_range.start.value());
-                let length_til_end_of_mp = sec.address_range.end.value() - lsda.value();
+                let starting_offset = sec.mapped_pages_offset + (lsda.value() - sec.virt_addr.value());
+                let length_til_end_of_mp = sec.virt_addr.value() + sec.size - lsda.value();
                 let sec_mp = sec.mapped_pages.lock();
                 let lsda_slice = sec_mp.as_slice::<u8>(starting_offset, length_til_end_of_mp)
                     .map_err(|_e| "continue_unwinding(): couldn't get LSDA pointer as a slice")?;

@@ -9,7 +9,7 @@ extern crate scheduler;
 
 use alloc::collections::VecDeque;
 use irq_safety::MutexIrqSafe;
-use task::TaskRef;
+use task::{TaskRef, RunState};
 
 
 /// An object that holds a blocked `Task` 
@@ -20,17 +20,21 @@ pub struct WaitGuard {
 impl WaitGuard {
     /// Blocks the given `Task` and returns a new `WaitGuard` object
     /// that will automatically unblock that Task when it is dropped. 
-    pub fn new(task: TaskRef) -> WaitGuard {
-        task.block();
-        WaitGuard {
-            task: task,
-        }
+    ///
+    /// Returns an error if the task cannot be blocked. See [`Task::block`] for
+    ///  more details.
+    pub fn new(task: TaskRef) -> Result<WaitGuard, RunState> {
+        task.block()?;
+        Ok(WaitGuard { task })
     }
 
     /// Blocks the task guarded by this waitguard,
     /// which is useful to re-block a task after it spuriously woke up. 
-    pub fn block_again(&self) {
-        self.task.block();
+    ///
+    /// Returns an error if the task cannot be blocked. See [`Task::block`] for
+    ///  more details.
+    pub fn block_again(&self) -> Result<RunState, RunState> {
+        self.task.block()
     }
 
     /// Returns a reference to the `Task` being blocked in this `WaitGuard`.
@@ -40,7 +44,7 @@ impl WaitGuard {
 }
 impl Drop for WaitGuard {
     fn drop(&mut self) {
-        self.task.unblock();
+        self.task.unblock().unwrap();
     }
 }
 
@@ -52,6 +56,7 @@ pub enum WaitError {
     Interrupted,
     Timeout,
     SpuriousWakeup,
+    CantBlockCurrentTask,
 }
 
 /// A queue in which multiple `Task`s can wait for other `Task`s to notify them.
@@ -108,8 +113,6 @@ impl WaitQueue {
     // /// The `condition` closure is invoked with one argument, an immutable reference to the waitqueue, 
     // /// to allow the closure to examine the condition of the waitqueue if necessary. 
     pub fn wait_until<R>(&self, condition: &dyn Fn(/* &VecDeque<TaskRef> */) -> Option<R>) -> Result<R, WaitError> {
-        let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
-
         // Do the following atomically:
         // (1) Obtain the waitqueue lock
         // (2) Add the current task to the waitqueue
@@ -121,14 +124,16 @@ impl WaitQueue {
                 if let Some(ret) = condition(/* &wq_locked */) {
                     return Ok(ret);
                 }
-                // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
-                if !wq_locked.contains(curr_task) {
-                    wq_locked.push_back(curr_task.clone());
-                } else {
-                    warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
-                }
-                // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
-                curr_task.block();
+                task::with_current_task(|curr_task| {
+                    // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
+                    if !wq_locked.contains(curr_task) {
+                        wq_locked.push_back(curr_task.clone());
+                    } else {
+                        warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
+                    }
+                    // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
+                    curr_task.block().map_err(|_| WaitError::CantBlockCurrentTask)
+                }).map_err(|_| WaitError::NoCurrentTask)??;
             }
             scheduler::schedule();
 
@@ -140,8 +145,6 @@ impl WaitQueue {
     /// Similar to [`wait_until`](#method.wait_until), but this function accepts a `condition` closure
     /// that can mutate its environment (a `FnMut`).
     pub fn wait_until_mut<R>(&self, condition: &mut dyn FnMut(/* &VecDeque<TaskRef> */) -> Option<R>) -> Result<R, WaitError> {
-        let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
-
         // Do the following atomically:
         // (1) Obtain the waitqueue lock
         // (2) Add the current task to the waitqueue
@@ -153,14 +156,16 @@ impl WaitQueue {
                 if let Some(ret) = condition(/* &wq_locked */) {
                     return Ok(ret);
                 }
-                // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
-                if !wq_locked.contains(curr_task) {
-                    wq_locked.push_back(curr_task.clone());
-                } else {
-                    warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
-                }
-                // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
-                curr_task.block();
+                task::with_current_task(|curr_task| {
+                    // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
+                    if !wq_locked.contains(curr_task) {
+                        wq_locked.push_back(curr_task.clone());
+                    } else {
+                        warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
+                    }
+                    // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
+                    curr_task.block().map_err(|_| WaitError::CantBlockCurrentTask)
+                }).map_err(|_| WaitError::NoCurrentTask)??;
             }
             scheduler::schedule();
 
@@ -198,23 +203,27 @@ impl WaitQueue {
         // (4) Release the lock on the waitqueue.
 
         let mut wq_locked = self.0.lock();
-        let tref = if let Some(ttw) = task_to_wakeup {
-            // find a specific task to wake up
-            let index = wq_locked.iter().position(|t| t == ttw);
-            index.and_then(|i| wq_locked.remove(i))
-        } else {
-            // just wake up the first task
-            wq_locked.pop_front()
-        };
+        
+        loop {
+            let tref = if let Some(ttw) = task_to_wakeup {
+                // find a specific task to wake up
+                let index = wq_locked.iter().position(|t| t == ttw);
+                index.and_then(|i| wq_locked.remove(i))
+            } else {
+                // just wake up the first task
+                wq_locked.pop_front()
+            };
 
-        // trace!("  notify: chose task to wakeup: {:?}", tref);
-        if let Some(t) = tref {
-            // trace!("WaitQueue::notify():  unblocked task on waitqueue\n    --> WQ: {:?}", &*wq_locked);
-            t.unblock();
-            true
-        } else {
-            // trace!("WaitQueue::notify():  did nothing");
-            false
+            // trace!("  notify: chose task to wakeup: {:?}", tref);
+            if let Some(t) = tref {
+                // trace!("WaitQueue::notify():  unblocked task on waitqueue\n    --> WQ: {:?}", &*wq_locked);
+                if t.unblock().is_ok() {
+                    return true;
+                }
+            } else {
+                // trace!("WaitQueue::notify():  did nothing");
+                return false;
+            }
         }
     }
 }

@@ -6,9 +6,7 @@
 use zerocopy::{U32, FromBytes};
 use volatile::Volatile;
 use byteorder::BigEndian;
-use alloc::boxed::Box;
-use memory::MappedPages;
-use owning_ref::BoxRefMut;
+use memory::{MappedPages, BorrowedSliceMappedPages, Mutable};
 #[allow(unused_imports)]
 use crate::{
     log_page_size, Cqn, Eqn, UAR_MASK, LOG_QUEUE_SIZE_MASK, LOG_QUEUE_SIZE_SHIFT, LOG_PAGE_SIZE_SHIFT, HW_OWNERSHIP,
@@ -122,7 +120,7 @@ impl EventQueueEntry {
 #[allow(dead_code)]
 pub struct EventQueue {
     /// Physically-contiguous event queue entries
-    entries: BoxRefMut<MappedPages, [EventQueueEntry]>,
+    entries: BorrowedSliceMappedPages<EventQueueEntry, Mutable>,
     /// EQ number that is returned by the [`CommandOpcode::CreateEq`] command
     eqn: Eqn
 }
@@ -137,11 +135,12 @@ impl EventQueue {
     /// * `num_entries`: number of entries in the EQ
     /// * `eqn`: EQ number returned by the HCA
     pub fn init(mp: MappedPages, num_entries: usize, eqn: Eqn) -> Result<EventQueue, &'static str> {
-        let mut entries = BoxRefMut::new(Box::new(mp)).try_map_mut(|mp| mp.as_slice_mut::<EventQueueEntry>(0, num_entries))?;
+        let mut entries = mp.into_borrowed_slice_mut::<EventQueueEntry>(0, num_entries)
+            .map_err(|(_mp, err)| err)?;
         for eqe in entries.iter_mut() {
             eqe.init()
         }
-        Ok( EventQueue{entries, eqn} )
+        Ok( EventQueue { entries, eqn } )
     }
 
     /// Prints out all entries in the EQ

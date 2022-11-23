@@ -189,7 +189,9 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
     };
     
     // save each new crate to a file 
-    let curr_dir = task::get_my_current_task().map(|t| t.get_env().lock().working_dir.clone()).ok_or_else(|| format!("couldn't get my current working directory"))?;
+    let Ok(curr_dir) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
+        return Err("failed to get current task's working directory".to_string());
+    };
     let new_namespace_dir = NamespaceDir::new(make_unique_directory(update_build, &curr_dir)?);
     for df in crates.into_iter() {
         let content = df.content.as_result_err_str()?;
@@ -219,7 +221,9 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     }
 
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| format!("couldn't get kernel MMI"))?;
-    let curr_dir = task::get_my_current_task().map(|t| t.get_env().lock().working_dir.clone()).ok_or_else(|| format!("couldn't get my current working directory"))?;
+    let Ok(curr_dir) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
+        return Err("failed to get current task's working directory".to_string());
+    };
     let new_namespace_dir = match base_dir_path.get(&curr_dir) {
         Some(FileOrDir::Dir(d)) => NamespaceDir::new(d),
         _ => return Err(format!("cannot find an update base directory at path {}", base_dir_path)),
@@ -291,10 +295,12 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
 
 
 fn get_my_current_namespace() -> Arc<CrateNamespace> {
-    task::get_my_current_task()
-        .map(|t| t.get_namespace().clone())
-        .or_else(|| mod_mgmt::get_initial_kernel_namespace().cloned())
-        .expect("BUG: initial kernel namespace wasn't initialized")
+    task::with_current_task(|t| t.get_namespace().clone())
+        .unwrap_or_else(|_|
+            mod_mgmt::get_initial_kernel_namespace()
+                .expect("BUG: initial kernel namespace wasn't initialized")
+                .clone()
+        )
 }
 
 

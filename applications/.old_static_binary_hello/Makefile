@@ -1,6 +1,6 @@
 
 PWD := $(shell pwd)
-TARGET := x86_64-theseus
+TARGET := x86_64-unknown-theseus
 RUSTFLAGS := "-C prefer-dynamic -Z pre-link-args=-nostartfiles"
 
 

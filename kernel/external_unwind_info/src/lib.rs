@@ -33,7 +33,6 @@
 
 #![no_std]
 #![feature(map_try_insert)]
-#![feature(const_btree_new)]
 
 extern crate alloc;
 

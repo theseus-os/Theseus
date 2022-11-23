@@ -9,12 +9,11 @@ use alloc::vec::Vec;
 use alloc::string::String;
 
 pub fn main(_args: Vec<String>) -> isize {
-    if let Some(taskref) = task::get_my_current_task() {
-        let curr_env = taskref.get_env();
-        println!("{}", curr_env.lock().cwd());
+    task::with_current_task(|t| {
+        println!("{}", t.get_env().lock().cwd());
         0
-    } else {
-        println!("failed to get current task");    
+    }).unwrap_or_else(|_| {
+        println!("failed to get current task");
         -1
-    }
+    })
 }

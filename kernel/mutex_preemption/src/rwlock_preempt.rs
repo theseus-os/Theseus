@@ -1,8 +1,6 @@
 use core::{fmt, ops::{Deref, DerefMut}};
 use preemption::{PreemptionGuard, hold_preemption};
 use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use owning_ref::{OwningRef, OwningRefMut};
-use stable_deref_trait::StableDeref;
 use lockable::{Lockable, LockableSized};
 
 /// A multi-reader, single-writer mutual exclusion wrapper that ensures preemption
@@ -278,15 +276,6 @@ impl<'rwlock, T: ?Sized> DerefMut for RwLockPreemptWriteGuard<'rwlock, T> {
         &mut *(self.guard)
     }
 }
-
-// Implement the StableDeref trait for RwLockPreempt guards, just like it's implemented for RwLock guards
-unsafe impl<'a, T: ?Sized> StableDeref for RwLockPreemptReadGuard<'a, T> {}
-unsafe impl<'a, T: ?Sized> StableDeref for RwLockPreemptWriteGuard<'a, T> {}
-
-/// Typedef of a owning reference that uses a `RwLockPreemptSafeReadGuard` as the owner.
-pub type RwLockPreemptReadGuardRef<'a, T, U = T> = OwningRef<RwLockPreemptReadGuard<'a, T>, U>;
-/// Typedef of a mutable owning reference that uses a `RwLockPreemptWriteGuard` as the owner.
-pub type RwLockPreemptWriteGuardRefMut<'a, T, U = T> = OwningRefMut<RwLockPreemptWriteGuard<'a, T>, U>;
 
 /// Implement `Lockable` for [`RwLockPreempt`].
 impl<'t, T> Lockable<'t, T> for RwLockPreempt<T> where T: 't + ?Sized {

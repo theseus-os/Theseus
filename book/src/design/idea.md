@@ -30,7 +30,7 @@ We sometimes refer to this as the **PHIS** principle: **Performance** in **Hardw
 For one, speculative execution exploits like Meltdown and Spectre have shown that hardware-ensured isolation does not protect kernel data from untrusted user space applications to the extent we once thought. It is difficult if not impossible to verify the true behavior of closed-source hardware (CPU architectures), so we turn to open-source software instead, where the OS, compiler, language libraries, and more are subject to scrutiny and even formal verification. 
 
 In addition, modern languages like Rust are able to ensure type safety and memory safety at compile time, without the overhead of traditional safe/managed languages that rely upon inefficient garbage collection and transparent heap-based object management.
-Thus, we can leverage these safety guarantees to ensure that compiled code does not violation isolation between tasks (threads of execution) and software modules without the need for significant runtime checks.
+Thus, we can leverage these safety guarantees to ensure that compiled code does not violate isolation between tasks (threads of execution) and software modules without the need for significant runtime checks.
 
 
 Theseus transcends the reliance on hardware to provide isolation, and completely foregoes hardware privilege levels (x86's Ring 0 vs. Ring 3 distinction) and multiple address spaces.
