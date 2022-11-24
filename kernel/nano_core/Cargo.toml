@@ -3,15 +3,16 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "nano_core"
 description = "The minimalist crate that takes over after the bootloader and is responsible for pre-initialization of Theseus, before handing off control to the captain"
 version = "0.1.0"
-build = "build.rs"
+edition = "2021"
 
 
 [dependencies]
-spin = "0.9.0"
+bootloader_api = { git = "https://github.com/rust-osdev/bootloader", optional = true }
 multiboot2 = "0.14.0"
 libm = "0.2.1"
+cfg-if = "1.0"
 
-
+# FIXME
 # [dependencies.compiler_builtins]
 # git = "https://github.com/rust-lang-nursery/compiler-builtins"
 # default-features = false
@@ -58,9 +59,14 @@ path = "../panic_entry"
 
 [dependencies.vga_buffer]
 path = "../vga_buffer"
+optional = true
 
 [dependencies.memory_initialization]
 path = "../memory_initialization"
+
+[features]
+bios = ["dep:vga_buffer"]
+uefi = ["dep:bootloader_api"]
 
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 

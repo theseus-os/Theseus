@@ -5,7 +5,7 @@ const EMIT_BUILT_RS_FILE: bool = false;
 
 /// The prefix that all custom rustc-known cfg keys are given by cargo
 /// when it transforms them into environment variables.
-const CARGO_CFG_PREFIX: &'static str = "CARGO_CFG_";
+const CARGO_CFG_PREFIX: &str = "CARGO_CFG_";
 
 /// The set of built-in environment variables defined by cargo.
 static NON_CUSTOM_CFGS: [&str; 12] = [

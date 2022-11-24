@@ -1,4 +1,4 @@
-ENTRY(start)
+ENTRY(_start)
 OUTPUT_FORMAT(elf64-x86-64)
 
 /*  this offset CANNOT be any smaller than 2GiB below the end of the 64-bit address space
@@ -50,8 +50,7 @@ SECTIONS {
 		*(.tdata .tdata.* )
 	}
 
-	/* Don't align .tbss up to a page boundary; it wastes space because .tdata and .tbss are merged. */
-	.tbss : AT(ADDR(.tbss) - KERNEL_OFFSET)
+	.tbss ALIGN(4K) : AT(ADDR(.tbss) - KERNEL_OFFSET)
 	{
 		*(.tbss .tbss.*)
 	}

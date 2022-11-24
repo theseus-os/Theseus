@@ -20,12 +20,12 @@
 %endif
 
 
-global start
+global _start
 
 ; Section must have the permissions of .text
 section .init.text32 progbits alloc exec nowrite
 bits 32 ;We are still in protected mode
-start:
+_start:
 	; The bootloader has loaded us into 32-bit protected mode. 
 	; Interrupts are disabled. Paging is disabled.
 
@@ -41,7 +41,7 @@ start:
 	; to the multiboot2 information structure in the `ebx` register. Here we
 	; mov it to `edi` so that rust can take it as a register. Because of this
 	; we cannot clobber the edi register in any code before nano_core_start
-	mov edi, ebx
+	; mov edi, ebx
 
 	call check_multiboot
 	call check_cpuid
@@ -352,9 +352,9 @@ start_high:
 
 	; First argument: the higher half address to the multiboot2 information structure
 	add rdi, KERNEL_OFFSET
-	; Second argument: the higher half address to the multiboot2 information structure
+	; Second argument: the top of the initial double fault stack
 	mov rsi, initial_double_fault_stack_top
-	call nano_core_start
+	call rust_entry
 
 	; rust main returned, print `OS returned!`
 	mov rdi, strings.os_return
@@ -453,4 +453,5 @@ initial_bsp_stack_bottom:
 global initial_bsp_stack_top
 initial_bsp_stack_top:
 	resb 4096
+global initial_double_fault_stack_top
 initial_double_fault_stack_top:
