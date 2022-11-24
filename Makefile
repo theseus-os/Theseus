@@ -110,7 +110,7 @@ NANO_CORE_SRC_DIR := $(ROOT_DIR)/kernel/nano_core/src
 ## The output directory of where the nano_core binary should go
 nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
 ## The linker script for linking the nano_core_binary to the assembly files
-linker_script := $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/linker_higher_half.ld
+linker_script := $(NANO_CORE_SRC_DIR)/asm/linker.ld
 assembly_source_files := $(wildcard $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/*.asm)
 assembly_object_files := $(patsubst $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm, \
 	$(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o, $(assembly_source_files))
@@ -182,7 +182,6 @@ iso: $(iso)
 
 ### This target builds an .iso OS image from all of the compiled crates.
 $(iso): clean-old-build build extra_files copy_kernel $(bootloader)
-
 
 ## Copy the kernel boot image into the proper ISOFILES directory.
 ## Should be invoked after building all Theseus kernel/application crates.
@@ -320,7 +319,6 @@ cargo: check-rustc
 # 	cd .. ; \
 # done
 
-
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
 $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
 	@mkdir -p $(BUILD_DIR)
@@ -328,7 +326,7 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
 	@mkdir -p $(DEPS_BUILD_DIR)
 
-	@$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
+	@$(CROSS)ld -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
 ## Dump readelf output for verification. See pull request #542 for more details:
 ##	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 ##		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
@@ -973,3 +971,10 @@ endif
 	@sudo cp -vf $(iso) /var/lib/tftpboot/theseus/
 	@sudo systemctl restart isc-dhcp-server 
 	@sudo systemctl restart tftpd-hpa
+
+# TODO: What is this !?
+.PHONY: uefi
+
+uefi: export override FEATURES += --features nano_core/uefi
+uefi: $(iso)
+	cargo r --release -Z bindeps --manifest-path $(ROOT_DIR)/tools/uefi_runner/Cargo.toml -- $(nano_core_binary) $(NANO_CORE_BUILD_DIR)/nano_core.efi

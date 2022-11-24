@@ -282,6 +282,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "bootloader_api"
+version = "0.1.0-alpha.0"
+source = "git+https://github.com/rust-osdev/bootloader#4e2b8d7e4b4fad3c7aefd7f8174f86ec2119ecc7"
+
+[[package]]
 name = "bootloader_modules"
 version = "0.1.0"
 dependencies = [
@@ -1987,7 +1992,9 @@ dependencies = [
 name = "nano_core"
 version = "0.1.0"
 dependencies = [
+ "bootloader_api",
  "captain",
+ "cfg-if 1.0.0",
  "exceptions_early",
  "irq_safety",
  "kernel_config",
@@ -2001,7 +2008,6 @@ dependencies = [
  "no_drop",
  "panic_entry",
  "serial_port_basic",
- "spin 0.9.0",
  "stack",
  "state_store",
  "vga_buffer",

@@ -1,0 +1,18 @@
+# if you encounter: 
+# `error: no matching package named `bootloader` found`
+# compile with -Z bindeps
+
+[package]
+name = "uefi_runner"
+version = "0.1.0"
+edition = "2021"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+
+[dependencies]
+# v0.11
+bootloader = { git = "https://github.com/rust-osdev/bootloader" }
+ovmf-prebuilt = "0.1.0-alpha.1"
+
+[patch.crates-io]
+# https://github.com/ferrilab/funty/issues/7
+funty = { git = "https://github.com/bitvecto-rs/funty/", rev = "7ef0d890fbcd8b3def1635ac1a877fc298488446" }
