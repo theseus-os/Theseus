@@ -135,9 +135,14 @@ bitflags! {
         /// * The OS can then clear this bit once it has acknowledged that the page was written to,
         ///   which is primarily useful for paging/swapping to disk.
         const DIRTY              = 1 << 51;
-        /// * If set, this translation table is contiguous with the previous one in memory.
-        /// * If not set, this translation table is not contiguous with the previous one in memory.
-        /// 
+        /// * If set, this translation table entry is part of a set that is contiguous in memory
+        ///   with adjacent entries that also have this bit set.
+        /// * If not set, this translation table entry is not contiguous in memory
+        ///   with entries that are adjancent to it.
+        ///
+        /// This is useful for reducing TLB pressure because the TLB entries for
+        /// multiple contiguous adjacent entries can be combined into one TLB entry.
+        ///
         /// This is currently not used in Theseus.
         const _CONTIGUOUS        = 1 << 52;
 
