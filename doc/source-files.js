@@ -111,6 +111,7 @@ var sourcesIndex = JSON.parse('{\
 "preemption":["",[],["lib.rs"]],\
 "print":["",[],["lib.rs"]],\
 "ps2":["",[],["lib.rs"]],\
+"pte_flags":["",[],["lib.rs","pte_flags_aarch64.rs","pte_flags_x86_64.rs"]],\
 "random":["",[],["lib.rs"]],\
 "rendezvous":["",[],["lib.rs"]],\
 "root":["",[],["lib.rs"]],\
