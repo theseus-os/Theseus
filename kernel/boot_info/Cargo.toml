@@ -1,0 +1,18 @@
+[package]
+name = "boot_info"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Abstraction over multiboot2 and UEFI boot information"
+edition = "2021"
+
+[dependencies]
+# v0.11
+bootloader_api = { git = "https://github.com/rust-osdev/bootloader", optional = true }
+kernel_config = { path = "../kernel_config" }
+memory_structs = { path = "../memory_structs" }
+multiboot2 = { version = "0.14", optional = true }
+
+[features]
+default = ["multiboot2"]
+uefi = ["dep:bootloader_api"]
+multiboot2 = ["dep:multiboot2"]

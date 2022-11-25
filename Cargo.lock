@@ -282,6 +282,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "boot_info"
+version = "0.1.0"
+dependencies = [
+ "bootloader_api",
+ "kernel_config",
+ "memory_structs",
+ "multiboot2",
+]
+
+[[package]]
 name = "bootloader_api"
 version = "0.1.0-alpha.0"
 source = "git+https://github.com/rust-osdev/bootloader#4e2b8d7e4b4fad3c7aefd7f8174f86ec2119ecc7"
