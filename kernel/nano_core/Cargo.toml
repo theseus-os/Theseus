@@ -13,12 +13,6 @@ multiboot2 = "0.14.0"
 libm = "0.2.1"
 cfg-if = "1.0"
 
-# FIXME
-# [dependencies.compiler_builtins]
-# git = "https://github.com/rust-lang-nursery/compiler-builtins"
-# default-features = false
-# features = [ "no-lang-items" ]
-
 [dependencies.log]
 version = "0.4.8"
 
@@ -68,13 +62,3 @@ path = "../memory_initialization"
 [features]
 bios = ["dep:vga_buffer"]
 uefi = ["dep:bootloader_api"]
-
-[lib]
-# staticlib is required to build a self-contained, fully-linked .a file 
-# that we can jump to from the bootloader.
-crate-type = ["staticlib"]  
-
-
-## Currently not used; see the `build.rs` script.
-# [build-dependencies]
-# built = "0.5"

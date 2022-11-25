@@ -336,6 +336,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
 
 [[package]]
+name = "ovmf-prebuilt"
+version = "0.1.0-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa50141d081512ab30fd9e7e7692476866df5098b028536ad6680212e717fa8d"
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -479,6 +485,7 @@ name = "uefi_runner"
 version = "0.1.0"
 dependencies = [
  "bootloader",
+ "ovmf-prebuilt",
 ]
 
 [[package]]

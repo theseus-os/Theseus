@@ -39,7 +39,8 @@ static EARLY_VGA_WRITER: Mutex<VgaBuffer> = Mutex::new(
 #[macro_export]
 macro_rules! print_raw {
     ($($arg:tt)*) => ({
-        let _ = $crate::print_args_raw(format_args!($($arg)*));
+        // FIXME
+        // let _ = $crate::print_args_raw(format_args!($($arg)*));
     });
 }
 

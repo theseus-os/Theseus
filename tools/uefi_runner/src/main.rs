@@ -9,9 +9,12 @@ fn main() {
         .create_disk_image(&output)
         .expect("failed to create uefi disk image");
 
-    let mut cmd = std::process::Command::new("qemu-system-x86_64")
-        .args(["-bios", ovmf_prebuilt::ovmf_pure_efi()])
-        .args(["-drive", format!("format=raw,file={uefi_path}")])
+    assert!(std::process::Command::new("qemu-system-x86_64")
+        .args(["-bios".as_ref(), ovmf_prebuilt::ovmf_pure_efi().as_os_str()])
+        .args(["-drive", &format!("format=raw,file={}", output.display())])
         // TODO: Make monitor configurable.
-        .args(["-monitor", format!("telnet:localhost:1235,server,nowait")]);
+        .args(["-monitor", &format!("telnet:localhost:1235,server,nowait")])
+        .status()
+        .expect("failed to acquire qemu output status")
+        .success());
 }

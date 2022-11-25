@@ -103,17 +103,10 @@ check-rustc:
 
 ## The linker script applied to each output file in $(OBJECT_FILES_BUILD_DIR).
 partial_relinking_script := cfg/partial_linking_combine_sections.ld
-## This is the default output path defined by cargo.
-nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 ## The directory where the nano_core source files are
 NANO_CORE_SRC_DIR := $(ROOT_DIR)/kernel/nano_core/src
 ## The output directory of where the nano_core binary should go
 nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
-## The linker script for linking the nano_core_binary to the assembly files
-linker_script := $(NANO_CORE_SRC_DIR)/asm/linker.ld
-assembly_source_files := $(wildcard $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/*.asm)
-assembly_object_files := $(patsubst $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm, \
-	$(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o, $(assembly_source_files))
 
 
 ## Specify which crates should be considered as application-level libraries. 
@@ -320,13 +313,13 @@ cargo: check-rustc
 # done
 
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
-$(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
+$(nano_core_binary): cargo
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
 	@mkdir -p $(DEPS_BUILD_DIR)
 
-	@$(CROSS)ld -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
+	cp $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/nano_core $(nano_core_binary)
 ## Dump readelf output for verification. See pull request #542 for more details:
 ##	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 ##		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
@@ -976,5 +969,5 @@ endif
 .PHONY: uefi
 
 uefi: export override FEATURES += --features nano_core/uefi
-uefi: $(iso)
+uefi: $(nano_core_binary)
 	cargo r --release -Z bindeps --manifest-path $(ROOT_DIR)/tools/uefi_runner/Cargo.toml -- $(nano_core_binary) $(NANO_CORE_BUILD_DIR)/nano_core.efi

@@ -1,6 +1,7 @@
 // FIXME: Redocument
 
 #![no_std]
+#![no_main]
 
 #[cfg(all(feature = "bios", feature = "uefi"))]
 compile_error!("either the bios or uefi features must be enabled, not both");
@@ -19,11 +20,21 @@ use memory::VirtualAddress;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "uefi")] {
+        use bootloader_api::BootloaderConfig;
+
         #[no_mangle]
         pub extern "C" fn rust_entry(boot_info: &'static mut bootloader_api::BootInfo, stack: usize) {
+            bootloader_api::__force_use(&__BOOTLOADER_CONFIG);
             try_exit!(early_setup(stack));
-            try_exit!(nano_core(boot_info));
+            loop {}
+            // try_exit!(nano_core(boot_info));
         }
+
+        #[link_section = ".bootloader-config"]
+        pub static __BOOTLOADER_CONFIG: [u8; BootloaderConfig::SERIALIZED_LEN] = {
+            // FIXME: Is the default config ok?
+            BootloaderConfig::new_default().serialize()
+        };
 
         impl BootInformation for bootloader_api::BootInfo {}
     } else if #[cfg(feature = "bios")] {
@@ -94,8 +105,3 @@ mod libm;
 /// You can disable the need for this via the `-fno-stack-protection` GCC
 /// option.
 mod stack_smash_protection;
-
-// Used to obtain information about this build of Theseus.
-mod build_info {
-    include!(concat!(env!("OUT_DIR"), "/built.rs"));
-}

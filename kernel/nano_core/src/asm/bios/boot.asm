@@ -9,17 +9,6 @@
 
 %include "defines.asm"
 
-; Debug builds require a larger initial boot stack,
-; because their code is larger and less optimized.
-%ifndef INITIAL_STACK_SIZE
-%ifdef DEBUG
-	INITIAL_STACK_SIZE equ 32 ; 32 pages for debug builds
-%else 
-	INITIAL_STACK_SIZE equ 16 ; 16 pages for release builds
-%endif 
-%endif
-
-
 global _start
 
 ; Section must have the permissions of .text
@@ -296,7 +285,7 @@ long_mode_start:
 	jmp rax
 
 section .text
-extern nano_core_start
+extern rust_entry
 extern eputs
 extern puts
 

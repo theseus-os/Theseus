@@ -1,3 +1,5 @@
+%include "defines.asm"
+
 global _start
 
 _start:
@@ -26,6 +28,10 @@ KEXIT:
 	hlt
 	jmp .loop
 	
+section .text
+extern rust_entry
+extern eputs
+
 section .rodata
 
 strings:
