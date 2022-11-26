@@ -103,11 +103,12 @@ check-rustc:
 
 ## The linker script applied to each output file in $(OBJECT_FILES_BUILD_DIR).
 partial_relinking_script := cfg/partial_linking_combine_sections.ld
-## The directory where the nano_core source files are
-NANO_CORE_SRC_DIR := $(ROOT_DIR)/kernel/nano_core/src
+## This is the default output path defined by cargo.
+nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 ## The output directory of where the nano_core binary should go
 nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
-
+## The linker script for linking the nano_core_binary to the assembly files
+linker_script := $(ROOT_DIR)/kernel/nano_core/linker.ld
 
 ## Specify which crates should be considered as application-level libraries. 
 ## These crates can be instantiated multiply (per-task, per-namespace) rather than once (system-wide);
@@ -280,12 +281,17 @@ endif
 
 ## This target invokes the actual Rust build process via `cargo`.
 cargo: check-rustc 
+	@mkdir -p $(BUILD_DIR)
+	@mkdir -p $(NANO_CORE_BUILD_DIR)
+	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
+	@mkdir -p $(DEPS_BUILD_DIR)
+
 	@echo -e "\n=================== BUILDING ALL CRATES ==================="
 	@echo -e "\t TARGET: \"$(TARGET)\""
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) $(BUILD_STD_CARGOFLAGS) --target $(TARGET)
+	THESEUS_NANO_CORE_BUILD_DIR=$(NANO_CORE_BUILD_DIR) RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) $(BUILD_STD_CARGOFLAGS) --target $(TARGET)
 
 ## We tried using the "cargo rustc" command here instead of "cargo build" to avoid cargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of cargo rebuilding everything).
@@ -314,12 +320,7 @@ cargo: check-rustc
 
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
 $(nano_core_binary): cargo
-	@mkdir -p $(BUILD_DIR)
-	@mkdir -p $(NANO_CORE_BUILD_DIR)
-	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
-	@mkdir -p $(DEPS_BUILD_DIR)
-
-	cp $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/nano_core $(nano_core_binary)
+	@$(CROSS)ld -T $(linker_script) -o $(nano_core_binary) $(NANO_CORE_BUILD_DIR)/compiled_asm/*.o $(nano_core_static_lib)
 ## Dump readelf output for verification. See pull request #542 for more details:
 ##	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 ##		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \

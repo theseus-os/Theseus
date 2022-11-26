@@ -1,5 +1,5 @@
-use crate::{ElfSection, MemoryArea, MemoryAreaType, PhysicalAddressRange};
-use core::{cmp, iter::Iterator};
+use crate::{ElfSection, ElfSectionFlags, MemoryArea, MemoryAreaType, Module};
+use core::{cmp, iter::Iterator, ops::Range};
 use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{PhysicalAddress, VirtualAddress};
 
@@ -8,8 +8,8 @@ impl<'a> MemoryArea for &'a multiboot2::MemoryArea {
         self.start_address() as usize
     }
 
-    fn end(&self) -> usize {
-        self.end_address() as usize
+    fn size(&self) -> usize {
+        multiboot2::MemoryArea::size(self) as usize
     }
 
     fn ty(&self) -> MemoryAreaType {
@@ -18,6 +18,20 @@ impl<'a> MemoryArea for &'a multiboot2::MemoryArea {
             // FIXME
             _ => MemoryAreaType::Reserved,
         }
+    }
+}
+
+type MemoryAreaIterator<'a> = impl Iterator<Item = &'a multiboot2::MemoryArea>;
+
+pub struct MemoryAreas<'a> {
+    inner: MemoryAreaIterator<'a>,
+}
+
+impl<'a> Iterator for MemoryAreas<'a> {
+    type Item = &'a multiboot2::MemoryArea;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
     }
 }
 
@@ -37,19 +51,23 @@ impl ElfSection for multiboot2::ElfSection {
     fn size(&self) -> usize {
         self.size() as usize
     }
+
+    fn flags(&self) -> ElfSectionFlags {
+        unsafe { ElfSectionFlags::from_bits_unchecked(multiboot2::ElfSection::flags(self).bits()) }
+    }
 }
 
-type MemoryAreaIterator<'a> = impl Iterator<Item = &'a multiboot2::MemoryArea>;
+impl<'a> Module for &'a multiboot2::ModuleTag {
+    fn name(&self) -> Result<&str, &'static str> {
+        self.cmdline().map_err(|_| "multiboot2 module cmdline was an invalid UTF-8 sequence")
+    }
 
-pub struct MemoryAreas<'a> {
-    inner: MemoryAreaIterator<'a>,
-}
+    fn start(&self) -> usize {
+        self.start_address() as usize
+    }
 
-impl<'a> Iterator for MemoryAreas<'a> {
-    type Item = &'a multiboot2::MemoryArea;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
+    fn end(&self) -> usize {
+        self.end_address() as usize
     }
 }
 
@@ -59,12 +77,15 @@ impl crate::BootInformation for multiboot2::BootInformation {
 
     type ElfSection<'a> = multiboot2::ElfSection;
     type ElfSections<'a> = multiboot2::ElfSectionIter;
+    
+    type Module<'a> = &'a multiboot2::ModuleTag;
+    type Modules<'a> = multiboot2::ModuleIter<'a>;
 
     fn size(&self) -> usize {
         self.total_size()
     }
 
-    fn kernel_mapping(&self) -> Result<PhysicalAddressRange, &'static str> {
+    fn kernel_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str> {
         // Our linker script specifies that the kernel will have the .init section
         // starting at 1MB and ending at 1MB + .init size and all other kernel sections
         // will start at (KERNEL_OFFSET + 1MB) and end at (KERNEL_OFFSET + 1MB + size).
@@ -93,22 +114,18 @@ impl crate::BootInformation for multiboot2::BootInformation {
         let physical_end = PhysicalAddress::new(virtual_end.value() - KERNEL_OFFSET)
             .ok_or("kernel physical end address was invalid")?;
 
-        Ok(PhysicalAddressRange {
-            start,
-            end: physical_end,
-        })
+        Ok(start..physical_end)
     }
 
-    fn bootloader_info_mapping(&self) -> Result<PhysicalAddressRange, &'static str> {
-        Ok(PhysicalAddressRange {
-            start: PhysicalAddress::new(self.start_address() - KERNEL_OFFSET)
-                .ok_or("invalid bootloader info start address")?,
-            end: PhysicalAddress::new(self.end_address() - KERNEL_OFFSET)
-                .ok_or("invalid bootloader info end address")?,
-        })
+    fn bootloader_info_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str> {
+        let start = PhysicalAddress::new(self.start_address() - KERNEL_OFFSET)
+            .ok_or("invalid bootloader info start address")?;
+        let end = PhysicalAddress::new(self.end_address() - KERNEL_OFFSET)
+            .ok_or("invalid bootloader info end address")?;
+        Ok(start..end)
     }
 
-    fn modules_mapping(&self) -> Result<PhysicalAddressRange, &'static str> {
+    fn modules_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str> {
         let mut min = usize::MAX;
         let mut max = 0;
 
@@ -116,11 +133,11 @@ impl crate::BootInformation for multiboot2::BootInformation {
             min = cmp::min(min, module.start_address() as usize);
             max = cmp::max(max, module.end_address() as usize);
         }
+        
+        log::info!("THINGY: {min:0x?}");
+        log::info!("AHINGY: {max:0x?}");
 
-        Ok(PhysicalAddressRange {
-            start: PhysicalAddress::new_canonical(min),
-            end: PhysicalAddress::new_canonical(max),
-        })
+        Ok(PhysicalAddress::new_canonical(min)..PhysicalAddress::new_canonical(max))
     }
 
     fn memory_areas(&self) -> Result<Self::MemoryAreas<'_>, &'static str> {
@@ -138,4 +155,10 @@ impl crate::BootInformation for multiboot2::BootInformation {
             .ok_or("no elf sections tag")?
             .sections())
     }
+
+    fn modules(&self) -> Self::Modules<'_> {
+        log::info!("START ADDRESS: {:0x?}", self.start_address());
+        self.module_tags()
+    }
+    
 }

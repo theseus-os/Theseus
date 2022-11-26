@@ -4,7 +4,6 @@
 
 #[macro_use] extern crate bitflags;
 #[macro_use] extern crate static_assertions;
-extern crate multiboot2;
 extern crate xmas_elf;
 
 
@@ -125,26 +124,6 @@ impl EntryFlags {
         EntryFlags::from_bits_truncate(
             self.bits() | EntryFlags::EXCLUSIVE.bits()
         )
-    }
-
-    /// Gets flags according to the properties of a section from multiboot2.
-    pub fn from_multiboot2_section_flags(section: &multiboot2::ElfSection) -> EntryFlags {
-        use multiboot2::ElfSectionFlags;
-
-        let mut flags = EntryFlags::empty();
-
-        if section.flags().contains(ElfSectionFlags::ALLOCATED) {
-            // section is loaded to memory
-            flags |= EntryFlags::PRESENT;
-        }
-        if section.flags().contains(ElfSectionFlags::WRITABLE) {
-            flags |= EntryFlags::WRITABLE;
-        }
-        if !section.flags().contains(ElfSectionFlags::EXECUTABLE) {
-            flags |= EntryFlags::NO_EXECUTE;
-        }
-
-        flags
     }
 
     /// Gets flags according to the properties of a section from elf flags.

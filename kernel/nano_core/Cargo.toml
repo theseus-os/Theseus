@@ -9,6 +9,7 @@ edition = "2021"
 [dependencies]
 # v0.11
 bootloader_api = { git = "https://github.com/rust-osdev/bootloader", optional = true }
+boot_info = { path = "../boot_info" }
 multiboot2 = "0.14.0"
 libm = "0.2.1"
 cfg-if = "1.0"
@@ -62,3 +63,8 @@ path = "../memory_initialization"
 [features]
 bios = ["dep:vga_buffer"]
 uefi = ["dep:bootloader_api"]
+
+[lib]
+# staticlib is required to build a self-contained, fully-linked .a file 
+# that we can jump to from the bootloader.
+crate-type = ["staticlib"]  

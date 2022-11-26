@@ -205,8 +205,8 @@ pub fn get_current_p4() -> Frame {
 ///  8. the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 ///
 /// Otherwise, it returns a str error message. 
-pub fn init(
-    boot_info: &multiboot2::BootInformation,
+pub fn init<T>(
+    boot_info: &T,
     into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames,
 ) -> Result<(
         PageTable,
@@ -218,6 +218,8 @@ pub fn init(
         [Option<NoDrop<MappedPages>>; 32],
         [Option<NoDrop<MappedPages>>; 32],
     ), &'static str>
+where
+    T: boot_info::BootInformation
 {
     // Store the callback from `frame_allocator::init()` that allows the `Mapper` to convert
     // `page_table_entry::UnmappedFrames` back into `AllocatedFrames`.
@@ -230,10 +232,10 @@ pub fn init(
     let current_active_p4 = frame_allocator::allocate_frames_at(aggregated_section_memory_bounds.page_table.start.1, 1)?;
     let mut page_table = PageTable::from_current(current_active_p4)?;
     debug!("Bootstrapped initial {:?}", page_table);
-
-    let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address()).ok_or("boot_info start virtual address was invalid")?;
+    
+    let boot_info_start_vaddr = VirtualAddress::new(boot_info.bootloader_info_memory_range()?.start.value()).ok_or("boot_info start virtual address was invalid")?;
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
-    let boot_info_size = boot_info.total_size();
+    let boot_info_size = boot_info.size();
     debug!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}\n", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
 
     let new_p4_frame = frame_allocator::allocate_frames(1).ok_or("couldn't allocate frame for new page table")?; 

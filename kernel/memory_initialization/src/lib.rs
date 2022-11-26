@@ -7,12 +7,11 @@ extern crate kernel_config;
 extern crate memory;
 extern crate stack;
 extern crate no_drop;
-extern crate multiboot2;
 extern crate bootloader_modules;
+extern crate boot_info;
 
 use memory::{MmiRef, MappedPages, VirtualAddress, PhysicalAddress};
 use kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
-use multiboot2::BootInformation;
 use alloc::{
     string::String, 
     vec::Vec,
@@ -21,6 +20,7 @@ use heap::HEAP_FLAGS;
 use stack::Stack;
 use no_drop::NoDrop;
 use bootloader_modules::BootloaderModule;
+use boot_info::Module;
 
 
 /// Initializes the virtual memory management system and returns a MemoryManagementInfo instance,
@@ -39,8 +39,8 @@ use bootloader_modules::BootloaderModule;
 ///  7. the kernel's list of identity-mapped [`MappedPages`],
 ///     which must not be dropped until all AP (additional CPUs) are fully booted,
 ///     but *should* be dropped before starting the first user application.
-pub fn init_memory_management(
-    boot_info: BootInformation
+pub fn init_memory_management<T>(
+    boot_info: T,
 ) -> Result<(
         MmiRef,
         NoDrop<MappedPages>,
@@ -50,6 +50,8 @@ pub fn init_memory_management(
         Vec<BootloaderModule>,
         NoDrop<Vec<MappedPages>>,
     ), &'static str>
+where
+    T: boot_info::BootInformation,
 {
     // Initialize memory management: paging (create a new page table), essential kernel mappings
     let (
@@ -102,24 +104,39 @@ pub fn init_memory_management(
         identity_mapped_pages,
         heap_mapped_pages,
     );
+    
+    log::trace!("hello 1");
+    // let x = alloc::vec![0u64; 10000];
+    // log::trace!("{:?}", x);
+    log::trace!("hello 2");
 
     // Because bootloader modules may overlap with the actual boot information, 
     // we need to preserve those records here in a separate list,
     // such that we can unmap the boot info pages & frames here but still access that info in the future.
-    let bootloader_modules: Vec<BootloaderModule> = boot_info.module_tags()
-        .map(|m| m.cmdline().map(|module_name| 
-            BootloaderModule::new(
-                PhysicalAddress::new_canonical(m.start_address() as usize),
-                PhysicalAddress::new_canonical(m.end_address()   as usize),
+    let mut m = boot_info.modules();
+    
+    log::trace!("hello 11");
+    let _ = m.next();
+    log::trace!("hello 12");
+
+    let bootloader_modules: Vec<BootloaderModule> = m
+        .map(|m| m.name().map(|module_name| {
+            log::trace!("start: {module_name}");
+            let u = BootloaderModule::new(
+                PhysicalAddress::new_canonical(m.start() as usize),
+                PhysicalAddress::new_canonical(m.end()   as usize),
                 String::from(module_name),
-            )
-        ))
+            );
+            log::trace!("end: {module_name}");
+            u
+        }))
         .collect::<Result<Vec<_>, _>>() // collect the `Vec<Result<...>>` into `Result<Vec<...>>`
         .map_err(|_e| "BUG: Bootloader module had invalid non-UTF8 name (cmdline) string")?;
-
+    log::trace!("hello 3");
     // Now that we've recorded the rest of the necessary boot info, we can drop the boot_info_mapped_pages.
     // This frees up those frames such that future code can exclusively map and access those pages/frames.
     drop(boot_info_mapped_pages);
+    log::trace!("hello 4");
 
     Ok((
         kernel_mmi_ref,

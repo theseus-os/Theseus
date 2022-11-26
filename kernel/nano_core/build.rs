@@ -1,13 +1,26 @@
+// We put the feature checks here because the build script will give unhelpful
+// errors if it's built with the wrong combination of features.
+
+#[cfg(all(feature = "bios", feature = "uefi"))]
+compile_error!("either the bios or uefi features must be enabled, not both");
+
+#[cfg(all(not(feature = "bios"), not(feature = "uefi")))]
+compile_error!("either the bios or uefi features must be enabled");
+
 use std::{env, path::PathBuf, process::Command};
 
 fn main() {
     compile_asm();
-
-    let linker_file = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("linker.ld");
-    println!("cargo:rustc-link-arg=-T{}", linker_file.display());
 }
 
 fn compile_asm() {
+    let out_dir =
+        PathBuf::from(env::var("THESEUS_NANO_CORE_BUILD_DIR").unwrap()).join("compiled_asm");
+    if let Err(e) = std::fs::create_dir(&out_dir) {
+        if e.kind() != std::io::ErrorKind::AlreadyExists {
+            panic!("failed to create compiled_asm directory");
+        }
+    }
     let include_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
         .join("src")
         .join("asm");
@@ -24,7 +37,6 @@ fn compile_asm() {
     {
         let file = file.expect("failed to read asm file");
         if file.file_type().expect("couldn't get file type").is_file() {
-            let out_dir: PathBuf = env::var("OUT_DIR").unwrap().into();
             assert_eq!(file.path().extension(), Some("asm".as_ref()));
 
             let mut output_path = out_dir.join(file.path().file_name().unwrap());
@@ -40,8 +52,6 @@ fn compile_asm() {
                 .status()
                 .expect("failed to acquire nasm output status")
                 .success());
-
-            println!("cargo:rustc-link-arg={}", output_path.display());
         }
     }
 }

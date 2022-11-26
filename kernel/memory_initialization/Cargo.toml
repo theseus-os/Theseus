@@ -6,10 +6,12 @@ version = "0.1.0"
 
 [dependencies]
 log = "0.4.8"
-multiboot2 = "0.14.0"
 
 [dependencies.memory]
 path = "../memory"
+
+[dependencies.boot_info]
+path = "../boot_info"
 
 [dependencies.stack]
 path = "../stack"

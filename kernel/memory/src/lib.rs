@@ -26,6 +26,7 @@ extern crate page_allocator;
 extern crate frame_allocator;
 extern crate zerocopy;
 extern crate no_drop;
+extern crate boot_info;
 
 
 #[cfg(not(mapper_spillful))]
@@ -47,8 +48,7 @@ pub use frame_allocator::{AllocatedFrames, MemoryRegionType, PhysicalMemoryRegio
     allocate_frames_by_bytes_at, allocate_frames_by_bytes, allocate_frames_at};
 
 #[cfg(target_arch = "x86_64")]
-use memory_x86_64::{BootInformation, get_kernel_address, get_boot_info_mem_area, find_section_memory_bounds,
-    get_vga_mem_addr, get_modules_address, tlb_flush_virt_addr, tlb_flush_all, get_p4};
+use memory_x86_64::{find_section_memory_bounds, get_vga_mem_addr, tlb_flush_virt_addr, tlb_flush_all, get_p4};
 
 #[cfg(target_arch = "x86_64")]
 pub use memory_x86_64::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
@@ -59,6 +59,7 @@ use alloc::vec::Vec;
 use alloc::sync::Arc;
 use no_drop::NoDrop;
 use kernel_config::memory::KERNEL_OFFSET;
+use boot_info::MemoryArea;
 pub use kernel_config::memory::PAGE_SIZE;
 
 /// The memory management info and address space of the kernel
@@ -143,8 +144,8 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
 ///  6. the `MappedPages` holding the bootloader info,
 ///  7. the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
 ///  8. the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
-pub fn init(
-    boot_info: &BootInformation
+pub fn init<T>(
+    boot_info: &T,
 ) -> Result<(
     PageTable,
     NoDrop<MappedPages>,
@@ -154,24 +155,27 @@ pub fn init(
     MappedPages,
     [Option<NoDrop<MappedPages>>; 32],
     [Option<NoDrop<MappedPages>>; 32],
-), &'static str> {
-    // Get the start and end addresses of the kernel, boot info, boot modules, etc.
-    let (kernel_phys_start, kernel_phys_end, kernel_virt_end) = get_kernel_address(&boot_info)?;
-    let (boot_info_paddr_start, boot_info_paddr_end) = get_boot_info_mem_area(&boot_info)?;
-    let (modules_start_paddr, modules_end_paddr) = get_modules_address(&boot_info);
+), &'static str>
+where
+    T: boot_info::BootInformation,
+{
+    // Get the physical address ranges of the kernel, boot info, and boot modules.
+    let kernel_memory = boot_info.kernel_memory_range()?;
+    let boot_info_memory = boot_info.bootloader_info_memory_range()?;
+    let modules_memory  = boot_info.modules_memory_range()?;
     debug!("bootloader info memory: p{:#X} to p{:#X}, bootloader modules: p{:#X} to p{:#X}", 
-        boot_info_paddr_start, boot_info_paddr_end, modules_start_paddr, modules_end_paddr,
+        boot_info_memory.start, boot_info_memory.end, modules_memory.start, modules_memory.end,
     );
-    debug!("kernel_phys_start: p{:#X}, kernel_phys_end: p{:#X} kernel_virt_end = v{:#x}",
-        kernel_phys_start, kernel_phys_end, kernel_virt_end
+    debug!("kernel_phys_start: p{:#X}, kernel_phys_end: p{:#X}",
+        kernel_memory.start, kernel_memory.end
     );
 
     // In addition to the information about the hardware's physical memory map provided by the bootloader,
     // Theseus chooses to reserve the following regions of physical memory for specific use.
     let low_memory_frames   = FrameRange::from_phys_addr(PhysicalAddress::zero(), 0x10_0000); // suggested by most OS developers
-    let kernel_frames       = FrameRange::from_phys_addr(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value());
-    let boot_modules_frames = FrameRange::from_phys_addr(modules_start_paddr, modules_end_paddr.value() - modules_start_paddr.value());
-    let boot_info_frames    = FrameRange::from_phys_addr(boot_info_paddr_start, boot_info_paddr_end.value() - boot_info_paddr_start.value());
+    let kernel_frames       = FrameRange::from_phys_addr(kernel_memory.start, kernel_memory.end.value() - kernel_memory.start.value());
+    let boot_modules_frames = FrameRange::from_phys_addr(modules_memory.start, modules_memory.end.value() - modules_memory.start.value());
+    let boot_info_frames    = FrameRange::from_phys_addr(boot_info_memory.start, boot_info_memory.end.value() - boot_info_memory.start.value());
     
     // Add the VGA display's memory region to the list of reserved physical memory areas.
     // Currently this is covered by the first 1MiB region, but it's okay to duplicate it here.
@@ -195,12 +199,9 @@ pub fn init(
     reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(vga_display_frames, MemoryRegionType::Reserved));
     reserved_index += 1;
 
-    for area in boot_info.memory_map_tag()
-        .ok_or("Multiboot2 boot information has no physical memory map information")?
-        .all_memory_areas()
-    {
-        let frames = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(area.start_address() as usize), area.size() as usize);
-        if area.typ() == multiboot2::MemoryAreaType::Available {
+    for area in boot_info.memory_areas()? {
+        let frames = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(area.start() as usize), area.size() as usize);
+        if area.ty() == boot_info::MemoryAreaType::Available {
             free_regions[free_index] = Some(PhysicalMemoryRegion::new(frames, MemoryRegionType::Free));
             free_index += 1;
         } else {
@@ -213,7 +214,7 @@ pub fn init(
     debug!("Initialized new frame allocator!");
     frame_allocator::dump_frame_allocator_state();
 
-    page_allocator::init(VirtualAddress::new_canonical(kernel_phys_end.value()))?;
+    page_allocator::init(VirtualAddress::new_canonical(kernel_memory.end.value()))?;
     debug!("Initialized new page allocator!");
     page_allocator::dump_page_allocator_state();
 

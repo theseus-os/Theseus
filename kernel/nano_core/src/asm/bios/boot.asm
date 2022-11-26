@@ -30,7 +30,7 @@ _start:
 	; to the multiboot2 information structure in the `ebx` register. Here we
 	; mov it to `edi` so that rust can take it as a register. Because of this
 	; we cannot clobber the edi register in any code before nano_core_start
-	; mov edi, ebx
+	mov edi, ebx
 
 	call check_multiboot
 	call check_cpuid

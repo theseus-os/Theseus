@@ -26,6 +26,9 @@ git = "https://github.com/theseus-os/irq_safety"
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
 
+[dependencies.boot_info]
+path = "../boot_info"
+
 [dependencies.kernel_config]
 path = "../kernel_config"
 
