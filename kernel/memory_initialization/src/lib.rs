@@ -104,39 +104,23 @@ where
         identity_mapped_pages,
         heap_mapped_pages,
     );
-    
-    log::trace!("hello 1");
-    // let x = alloc::vec![0u64; 10000];
-    // log::trace!("{:?}", x);
-    log::trace!("hello 2");
 
     // Because bootloader modules may overlap with the actual boot information, 
     // we need to preserve those records here in a separate list,
     // such that we can unmap the boot info pages & frames here but still access that info in the future.
-    let mut m = boot_info.modules();
-    
-    log::trace!("hello 11");
-    let _ = m.next();
-    log::trace!("hello 12");
-
-    let bootloader_modules: Vec<BootloaderModule> = m
+    let bootloader_modules: Vec<BootloaderModule> = boot_info.modules()
         .map(|m| m.name().map(|module_name| {
-            log::trace!("start: {module_name}");
-            let u = BootloaderModule::new(
+            BootloaderModule::new(
                 PhysicalAddress::new_canonical(m.start() as usize),
                 PhysicalAddress::new_canonical(m.end()   as usize),
                 String::from(module_name),
-            );
-            log::trace!("end: {module_name}");
-            u
+            )
         }))
         .collect::<Result<Vec<_>, _>>() // collect the `Vec<Result<...>>` into `Result<Vec<...>>`
         .map_err(|_e| "BUG: Bootloader module had invalid non-UTF8 name (cmdline) string")?;
-    log::trace!("hello 3");
     // Now that we've recorded the rest of the necessary boot info, we can drop the boot_info_mapped_pages.
     // This frees up those frames such that future code can exclusively map and access those pages/frames.
     drop(boot_info_mapped_pages);
-    log::trace!("hello 4");
 
     Ok((
         kernel_mmi_ref,
