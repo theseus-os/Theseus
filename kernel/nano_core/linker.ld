@@ -50,7 +50,8 @@ SECTIONS {
 		*(.tdata .tdata.* )
 	}
 
-	.tbss ALIGN(4K) : AT(ADDR(.tbss) - KERNEL_OFFSET)
+	/* FIXME: Alignment */
+	.tbss : AT(ADDR(.tbss) - KERNEL_OFFSET)
 	{
 		*(.tbss .tbss.*)
 	}
