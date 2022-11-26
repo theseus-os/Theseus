@@ -2,7 +2,7 @@
 
 use log::{debug, warn};
 use ps2::{write_command, flush_output_buffer, read_config, write_config, read_controller_test_result, read_port_test_result, PortTestResult, HostToControllerCommand::*, reset_keyboard, reset_mouse};
-
+use fadt::Fadt;
 
 // see https://wiki.osdev.org/%228042%22_PS/2_Controller#Initialising_the_PS.2F2_Controller
 /// initialize the first and second (if it exists) PS/2 port
@@ -12,12 +12,12 @@ pub fn init() -> Result<(), &'static str> {
 
     // Step 2: Determine if the PS/2 Controller Exists
     let acpi_tables = acpi::get_acpi_tables().lock();
-    if let Some(fadt) = fadt::Fadt::get(&acpi_tables) {
+    // if ACPI and therefore FADT is unsupported, PS/2 controller is assumed to exist
+    if let Some(fadt) = Fadt::get(&acpi_tables) {
         // if earlier than ACPI v2, PS/2 controller is assumed to exist
         if fadt.header.revision > 1 {
             let has_controller = fadt.iapc_boot_architecture_flags & 0b10 == 0b10;
             if !has_controller {
-                //TODO: sounds more like this should be done before calling this function
                 return Err("no PS/2 Controller present");
             }
         }
@@ -36,16 +36,17 @@ pub fn init() -> Result<(), &'static str> {
     config.set_port2_interrupt_enabled(false);
     config.set_port1_translation_enabled(false);
     let has_mouse = config.port2_clock_disabled();
-    write_config(config.clone());
+    write_config(config);
 
     // Step 6: Perform Controller Self Test
     write_command(TestController);
     read_controller_test_result()?;
     debug!("passed PS/2 controller test");
     // as this can reset the controller on some hardware, we restore the config
-    write_config(config.clone());
+    write_config(config);
 
-    // Step 7 not needed, already done above
+    // Step 7: Determine If There Are 2 Channels
+    // not needed, already done above
 
     // Step 8: Perform Interface Tests
     write_command(TestPort1);

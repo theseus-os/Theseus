@@ -206,7 +206,7 @@ fn write_data(value: WritableData) {
 // wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Configuration_Byte
 /// Used for [HostToControllerCommand::ReadFromInternalRAMByte0] and [HostToControllerCommand::WriteToInternalRAMByte0]
 #[bitfield(bits = 8)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ControllerConfigurationByte {
     /// interrupt on [ControllerToHostStatus] `output_buffer_full`
     pub port1_interrupt_enabled: bool,
