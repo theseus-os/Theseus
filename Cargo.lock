@@ -2635,6 +2635,32 @@ name = "port_io"
 version = "0.2.1"
 
 [[package]]
+name = "porthole"
+version = "0.1.0"
+dependencies = [
+ "core2",
+ "device_manager",
+ "event_types",
+ "font",
+ "hpet",
+ "keycodes_ascii",
+ "log",
+ "memory",
+ "memory_structs",
+ "mouse",
+ "mouse_data",
+ "mpmc",
+ "multicore_bringup",
+ "page_attribute_table",
+ "scheduler",
+ "spawn",
+ "spin 0.9.4",
+ "stdio",
+ "task",
+ "zerocopy",
+]
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
