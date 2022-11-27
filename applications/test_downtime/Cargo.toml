@@ -34,20 +34,12 @@ path = "../../kernel/async_channel"
 
 # for WM
 
-[dependencies.window]
-path = "../../kernel/window"
 
 [dependencies.shapes]
 path = "../../kernel/shapes"
 
 [dependencies.color]
 path = "../../kernel/color"
-
-[dependencies.framebuffer]
-path = "../../kernel/framebuffer"
-
-[dependencies.framebuffer_drawer]
-path = "../../kernel/framebuffer_drawer"
 
 [dependencies.runqueue]
 path = "../../kernel/runqueue"

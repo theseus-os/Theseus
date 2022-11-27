@@ -21,8 +21,8 @@ path = "../kernel_config"
 [dependencies.logger_x86_64]
 path = "../logger_x86_64"
 
-[dependencies.window_manager]
-path = "../window_manager"
+[dependencies.porthole]
+path = "../porthole"
 
 [dependencies.first_application]
 path = "../first_application"

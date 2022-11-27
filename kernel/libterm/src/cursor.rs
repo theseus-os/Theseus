@@ -1,3 +1,4 @@
+
 use super::*;
 
 /// The cursor structure used in the terminal.
@@ -69,51 +70,31 @@ impl Cursor {
     /// * `framebuffer`: the framebuffer to display the cursor in.
     ///
     /// Returns a bounding box which wraps the cursor.
-    pub fn display<P: Pixel>(
+    pub fn display(
         &mut self,
-        coordinate: Coord,
+        relative_pos: RelativePos,
         column: usize,
         line: usize,
-        framebuffer: &mut Framebuffer<P>,
-    ) -> Result<Rectangle, &'static str> where Color: Into<P> {
+        window: &mut Window,
+    ) -> Result<(), &'static str> {
         if self.blink() {
+            let mut relative_pos = relative_pos;
+            relative_pos.x += (column * CHARACTER_WIDTH) as u32;
+            relative_pos.y += (line * CHARACTER_HEIGHT) as u32;
             if self.show() {
-                framebuffer_drawer::fill_rectangle(
-                    framebuffer,
-                    coordinate
-                        + (
-                            (column * CHARACTER_WIDTH) as isize,
-                            (line * CHARACTER_HEIGHT) as isize,
-                        )
-                        + (0, 1),
-                    CHARACTER_WIDTH,
-                    CHARACTER_HEIGHT - 2,
-                    self.color.into(),
-                );
+                let mut rect =
+                    Rect::new(CHARACTER_WIDTH, CHARACTER_HEIGHT - 1, relative_pos.x as isize, relative_pos.y as isize);
+                window.fill_rectangle(&mut rect, 0xF4F333);
             } else {
-                framebuffer_printer::print_ascii_character(
-                    framebuffer,
-                    self.underlying_char,
-                    FONT_FOREGROUND_COLOR.into(),
-                    FONT_BACKGROUND_COLOR.into(),
-                    coordinate,
-                    column,
-                    line,
-                )
+                window.print_string_line(
+                    &relative_pos,
+                    (self.underlying_char as char).to_string().as_str(),
+                    0xFBF1C7,
+                    0x3C3836,
+                )?;
             }
         }
-
-        let top_left = coordinate
-            + (
-                (column * CHARACTER_WIDTH) as isize,
-                (line * CHARACTER_HEIGHT) as isize,
-            );
-        let bounding_box = Rectangle {
-            top_left,
-            bottom_right: top_left + (CHARACTER_WIDTH as isize, CHARACTER_HEIGHT as isize),
-        };
-
-        Ok(bounding_box)
+        Ok(())
     }
 
     /// Sets the position of the cursor relative to the end of the command
@@ -137,7 +118,7 @@ impl Cursor {
     }
 }
 
-impl Default for Cursor  {
+impl Default for Cursor {
     fn default() -> Self {
         Cursor {
             enabled: true,
@@ -150,4 +131,3 @@ impl Default for Cursor  {
         }
     }
 }
-
