@@ -60,7 +60,7 @@ where
     for section in elf_sections_tag {
         // skip sections that don't need to be loaded into memory
         if section.size() == 0
-            || !section.is_allocated()
+            || !section.flags().contains(boot_info::ElfSectionFlags::ALLOCATED)
             || section.name().starts_with(".debug")
         {
             continue;

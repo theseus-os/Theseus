@@ -116,10 +116,10 @@ macro_rules! implement_address {
                     *self = $TypeName::new_canonical(self.0.saturating_sub(rhs));
                 }
             }
-            impl Into<usize> for $TypeName {
+            impl From<$TypeName> for usize {
                 #[inline]
-                fn into(self) -> usize {
-                    self.0
+                fn from(addr: $TypeName) -> Self {
+                    addr.value()
                 }
             }
         }

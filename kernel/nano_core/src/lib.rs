@@ -13,7 +13,6 @@ mod util;
 use core::ops::DerefMut;
 use kernel_config::memory::KERNEL_OFFSET;
 use memory::VirtualAddress;
-use util::shutdown;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "uefi")] {
@@ -23,17 +22,19 @@ cfg_if::cfg_if! {
         pub extern "C" fn rust_entry(_boot_info: &'static mut bootloader_api::BootInfo, stack: usize) {
             bootloader_api::__force_use(&__BOOTLOADER_CONFIG);
             try_exit!(early_setup(stack));
-            log::info!("why doesn't this work");
-            loop {}
             try_exit!(nano_core(_boot_info as &'static bootloader_api::BootInfo));
         }
 
         #[link_section = ".bootloader-config"]
         pub static __BOOTLOADER_CONFIG: [u8; BootloaderConfig::SERIALIZED_LEN] = {
             // FIXME: Is the default config ok?
-            BootloaderConfig::new_default().serialize()
+            let mut config = BootloaderConfig::new_default();
+            config.mappings.physical_memory = Some(bootloader_api::config::Mapping::Dynamic);
+            config.serialize()
         };
     } else if #[cfg(feature = "bios")] {
+        use util::shutdown;
+
         #[no_mangle]
         pub extern "C" fn rust_entry(boot_info: usize, stack: usize) {
             try_exit!(early_setup(stack));
@@ -54,11 +55,12 @@ cfg_if::cfg_if! {
 fn early_setup(stack: usize) -> Result<(), &'static str> {
     irq_safety::disable_interrupts();
 
-    let mut logger_ports = [serial_port_basic::take_serial_port(
+    let logger_ports = [serial_port_basic::take_serial_port(
         serial_port_basic::SerialPortAddress::COM1,
     )];
     logger::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
         .map_err(|_| "failed to initialise early logging")?;
+    log::info!("initialised early logging");
 
     exceptions_early::init(Some(VirtualAddress::new_canonical(stack)));
 

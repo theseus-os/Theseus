@@ -9,12 +9,14 @@ edition = "2021"
 # v0.11
 bitflags = "1.3"
 bootloader_api = { git = "https://github.com/rust-osdev/bootloader", optional = true }
+# bootloader_api = { path = "../../../bootloader/api", optional = true }
 kernel_config = { path = "../kernel_config" }
 memory_structs = { path = "../memory_structs" }
 multiboot2 = { version = "0.14", optional = true }
 log = "*"
+xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git", optional = true }
 
 [features]
 default = ["uefi"]
-uefi = ["dep:bootloader_api"]
+uefi = ["dep:bootloader_api", "dep:xmas-elf"]
 multiboot2 = ["dep:multiboot2"]

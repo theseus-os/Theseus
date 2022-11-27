@@ -37,11 +37,7 @@ impl<'a> Iterator for MemoryAreas<'a> {
 
 impl ElfSection for multiboot2::ElfSection {
     fn name(&self) -> &str {
-        self.name()
-    }
-
-    fn is_allocated(&self) -> bool {
-        self.is_allocated()
+        multiboot2::ElfSection::name(self)
     }
 
     fn start(&self) -> usize {
@@ -49,11 +45,11 @@ impl ElfSection for multiboot2::ElfSection {
     }
 
     fn size(&self) -> usize {
-        self.size() as usize
+        multiboot2::ElfSection::size(self) as usize
     }
 
     fn flags(&self) -> ElfSectionFlags {
-        unsafe { ElfSectionFlags::from_bits_unchecked(multiboot2::ElfSection::flags(self).bits()) }
+        ElfSectionFlags::from_bits_truncate(multiboot2::ElfSection::flags(self).bits())
     }
 }
 

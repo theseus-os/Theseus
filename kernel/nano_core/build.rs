@@ -7,6 +7,11 @@ compile_error!("either the bios or uefi features must be enabled, not both");
 #[cfg(all(not(feature = "bios"), not(feature = "uefi")))]
 compile_error!("either the bios or uefi features must be enabled");
 
+#[cfg(feature = "uefi")]
+const SPECIFICATION: &str = "uefi";
+#[cfg(feature = "bios")]
+const SPECIFICATION: &str = "bios";
+
 use std::{env, path::PathBuf, process::Command};
 
 fn main() {
@@ -15,10 +20,10 @@ fn main() {
 
 fn compile_asm() {
     let out_dir =
-        PathBuf::from(env::var("THESEUS_NANO_CORE_BUILD_DIR").unwrap()).join("compiled_asm");
-    if let Err(e) = std::fs::create_dir(&out_dir) {
+        PathBuf::from(env::var("THESEUS_NANO_CORE_BUILD_DIR").unwrap()).join("compiled_asm").join(SPECIFICATION);
+    if let Err(e) = std::fs::create_dir_all(&out_dir) {
         if e.kind() != std::io::ErrorKind::AlreadyExists {
-            panic!("failed to create compiled_asm directory");
+            panic!("failed to create compiled_asm directory: {e}");
         }
     }
     let include_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
@@ -27,12 +32,11 @@ fn compile_asm() {
 
     println!("cargo:rerun-if-changed={}", include_path.display());
     // TODO: This recompiles the assembly files every time.
-    println!("cargo:out_dir={}", include_path.display());
+    println!("cargo:rerun-if-changed={}", out_dir.display());
 
-    #[cfg(feature = "uefi")]
-    let asm_path = include_path.join("uefi");
-    #[cfg(feature = "bios")]
-    let asm_path = include_path.join("bios");
+    let asm_path = include_path.join(SPECIFICATION);
+
+    let cflags = env::var("THESEUS_CFLAGS").unwrap_or(String::new());
 
     for file in include_path
         .read_dir()
@@ -53,6 +57,7 @@ fn compile_asm() {
                 .arg("-o")
                 .arg(&output_path)
                 .arg(file.path())
+                .args(cflags.split(' '))
                 .status()
                 .expect("failed to acquire nasm output status")
                 .success());

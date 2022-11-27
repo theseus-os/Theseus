@@ -25,7 +25,6 @@ pub enum MemoryAreaType {
 
 pub trait ElfSection {
     fn name(&self) -> &str;
-    fn is_allocated(&self) -> bool;
     fn start(&self) -> usize;
     fn size(&self) -> usize;
     fn flags(&self) -> ElfSectionFlags;

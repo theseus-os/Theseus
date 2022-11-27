@@ -291,6 +291,7 @@ dependencies = [
  "log",
  "memory_structs",
  "multiboot2",
+ "xmas-elf",
 ]
 
 [[package]]
