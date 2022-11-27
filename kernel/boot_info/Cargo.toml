@@ -15,6 +15,6 @@ multiboot2 = { version = "0.14", optional = true }
 log = "*"
 
 [features]
-default = ["multiboot2"]
+default = ["uefi"]
 uefi = ["dep:bootloader_api"]
 multiboot2 = ["dep:multiboot2"]

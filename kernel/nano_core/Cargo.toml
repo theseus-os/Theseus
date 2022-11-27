@@ -61,8 +61,8 @@ optional = true
 path = "../memory_initialization"
 
 [features]
-bios = ["dep:vga_buffer"]
-uefi = ["dep:bootloader_api"]
+uefi = ["dep:bootloader_api", "boot_info/uefi"]
+bios = ["dep:vga_buffer", "boot_info/multiboot2" ]
 
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 

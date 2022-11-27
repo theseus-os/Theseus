@@ -23,8 +23,9 @@ cfg_if::cfg_if! {
         pub extern "C" fn rust_entry(_boot_info: &'static mut bootloader_api::BootInfo, stack: usize) {
             bootloader_api::__force_use(&__BOOTLOADER_CONFIG);
             try_exit!(early_setup(stack));
-            // try_exit!(nano_core(boot_info));
+            log::info!("why doesn't this work");
             loop {}
+            try_exit!(nano_core(_boot_info as &'static bootloader_api::BootInfo));
         }
 
         #[link_section = ".bootloader-config"]
@@ -53,7 +54,7 @@ cfg_if::cfg_if! {
 fn early_setup(stack: usize) -> Result<(), &'static str> {
     irq_safety::disable_interrupts();
 
-    let logger_ports = [serial_port_basic::take_serial_port(
+    let mut logger_ports = [serial_port_basic::take_serial_port(
         serial_port_basic::SerialPortAddress::COM1,
     )];
     logger::early_init(None, IntoIterator::into_iter(logger_ports).flatten())

@@ -18,8 +18,12 @@ include cfg/Config.mk
 debug ?= none
 net ?= none
 merge_sections ?= yes
-bootloader ?= grub
 uefi ?= yes
+ifeq ($(uefi), yes)
+	bootloader ?= none
+else
+	bootloader ?= grub
+endif
 
 ## test for Windows Subsystem for Linux (Linux on Windows)
 IS_WSL = $(shell grep -is 'microsoft' /proc/version)
@@ -30,7 +34,11 @@ IS_WSL = $(shell grep -is 'microsoft' /proc/version)
 ###################################################################################################
 BUILD_DIR               := $(ROOT_DIR)/build
 NANO_CORE_BUILD_DIR     := $(BUILD_DIR)/nano_core
-iso                     := $(BUILD_DIR)/theseus-$(ARCH).iso
+ifeq ($(uefi), yes)
+	image               := $(BUILD_DIR)/theseus-$(ARCH).efi
+else
+	image               := $(BUILD_DIR)/theseus-$(ARCH).iso
+endif
 ISOFILES                := $(BUILD_DIR)/isofiles
 OBJECT_FILES_BUILD_DIR  := $(ISOFILES)/modules
 DEBUG_SYMBOLS_DIR       := $(BUILD_DIR)/debug_symbols
@@ -77,6 +85,10 @@ else ifeq ($(bootloader),limine)
 	else
 $(error Error: missing '$(LIMINE_DIR)' directory! Please follow the limine instructions in the README)
 	endif
+else ifeq ($(bootloader),none)
+	ifneq ($(uefi), yes)
+$(error Error: bootloader must be specified in non-UEFI mode. Options are 'grub' or 'limine')
+	endif
 else
 $(error Error: unsupported option "bootloader=$(bootloader)". Options are 'grub' or 'limine')
 endif
@@ -102,14 +114,15 @@ check-rustc:
 ### This section contains targets to actually build Theseus components and create an iso file.
 ###################################################################################################
 
+## The linker script for linking the nano_core_binary to the assembly files
+linker_script := $(ROOT_DIR)/kernel/nano_core/linker.ld
 ## The linker script applied to each output file in $(OBJECT_FILES_BUILD_DIR).
 partial_relinking_script := cfg/partial_linking_combine_sections.ld
 ## This is the default output path defined by cargo.
 nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 ## The output directory of where the nano_core binary should go
 nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
-## The linker script for linking the nano_core_binary to the assembly files
-linker_script := $(ROOT_DIR)/kernel/nano_core/linker.ld
+efi_firmware := $(BUILD_DIR)/ovmf.fd
 
 ## Specify which crates should be considered as application-level libraries. 
 ## These crates can be instantiated multiply (per-task, per-namespace) rather than once (system-wide);
@@ -137,7 +150,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 .PHONY: all full \
 		check-rustc check-usb \
 		clean clean-doc clean-old-build \
-		run run_pause iso build cargo copy_kernel $(bootloader) extra_files \
+		run run_pause image build cargo copy_kernel $(bootloader) extra_files \
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
@@ -174,14 +187,17 @@ full : export override FEATURES += --all-features
 ifeq (,$(findstring --workspace,$(FEATURES)))
 full : export override FEATURES += --workspace
 endif
-full: iso
+full: image
 
 
-### Convenience target for building the ISO using the below $(iso) target
-iso: $(iso)
+### Convenience target for building the ISO using the below $(image) target
+image: $(image)
 
 ### This target builds an .iso OS image from all of the compiled crates.
-$(iso): clean-old-build build extra_files copy_kernel $(bootloader)
+$(image) $(efi_firmware): clean-old-build build extra_files copy_kernel $(bootloader)
+ifeq ($(uefi), yes)
+	cargo r --release -Z bindeps --manifest-path $(ROOT_DIR)/tools/uefi_builder/Cargo.toml -- $(nano_core_binary) $(image) $(efi_firmware)
+endif
 
 ## Copy the kernel boot image into the proper ISOFILES directory.
 ## Should be invoked after building all Theseus kernel/application crates.
@@ -370,7 +386,7 @@ endif
 grub:
 	@mkdir -p $(ISOFILES)/boot/grub
 	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(ISOFILES)/modules/ -o $(ISOFILES)/boot/grub/grub.cfg
-	@$(GRUB_MKRESCUE) -o $(iso) $(ISOFILES)  2> /dev/null
+	@$(GRUB_MKRESCUE) -o $(image) $(ISOFILES)  2> /dev/null
 
 
 ### This target uses limine to build a bootable ISO.
@@ -380,14 +396,14 @@ limine:
 	@RUSTFLAGS="" cargo run -r --manifest-path $(ROOT_DIR)/tools/limine_compress_modules/Cargo.toml -- -i $(ISOFILES)/modules.cpio -o $(ISOFILES)/modules.cpio.lz4
 	@rm $(ISOFILES)/modules.cpio
 	@cp cfg/limine.cfg $(LIMINE_DIR)/limine-cd.bin $(LIMINE_DIR)/limine-cd-efi.bin $(LIMINE_DIR)/limine.sys $(ISOFILES)/
-	@rm -f $(iso)
+	@rm -f $(image)
 	@xorriso -as mkisofs \
 		-b limine-cd.bin -no-emul-boot -boot-load-size 4 \
 		-boot-info-table --efi-boot limine-cd-efi.bin \
 		-efi-boot-part --efi-boot-image --protective-msdos-label \
-		$(ISOFILES)/ -o $(iso)
+		$(ISOFILES)/ -o $(image)
 	@$(MAKE) -C $(LIMINE_DIR)
-	@$(LIMINE_DIR)/limine-deploy $(iso)
+	@$(LIMINE_DIR)/limine-deploy $(image)
 
 
 ### This target copies all extra files into the `ISOFILES` directory,
@@ -787,11 +803,17 @@ ifdef IOMMU
 endif
 
 ## Boot from the cd-rom drive
-QEMU_FLAGS += -cdrom $(iso) -boot d
+ifeq ($(uefi),yes)
+	QEMU_FLAGS += -bios $(efi_firmware)
+	QEMU_FLAGS += -drive format=raw,file=$(image)
+else
+	QEMU_FLAGS += -cdrom $(image) -boot d
+endif
 ## Don't reboot or shutdown upon failure or a triple reset
 QEMU_FLAGS += -no-reboot -no-shutdown
 ## Enable a GDB stub so we can connect GDB to the QEMU instance 
 QEMU_FLAGS += -s
+QEMU_FLAGS += -monitor telnet:localhost:1235,server,nowait
 
 ## Enable the first serial port (the default log) to be redirected to the host terminal's stdio.
 ## Optionally, use the below `mon:` prefix to have the host terminal forward escape/control sequences to this serial port.
@@ -901,16 +923,13 @@ wasmtime: run
 
 
 ### builds and runs Theseus in QEMU
-run: $(iso) 
-ifeq ($(uefi),yes)
-	cargo r --release -Z bindeps --manifest-path $(ROOT_DIR)/tools/uefi_runner/Cargo.toml -- $(nano_core_binary) $(NANO_CORE_BUILD_DIR)/nano_core.efi
-else
+run: $(image) 
 	qemu-system-x86_64 $(QEMU_FLAGS)
-endif
+
 
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
-run_pause: $(iso)
+run_pause: $(image)
 	qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
@@ -925,7 +944,7 @@ gdb:
 
 ### builds and runs Theseus in Bochs
 bochs : export override THESEUS_CONFIG += apic_timer_fixed
-bochs: $(iso) 
+bochs: $(image) 
 	bochs -f bochsrc.txt -q
 
 
@@ -950,28 +969,28 @@ endif  ## end of checking for WSL
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
 usb : export override THESEUS_CONFIG += mirror_log_to_vga
-usb: check-usb $(iso)
+usb: check-usb $(image)
 ifneq ($(IS_WSL), )
 ## building on WSL
 	@echo -e "\n\033[1;32mThe build finished successfully\033[0m, but WSL is unable to access raw USB devices. Instead, you must burn the ISO to a USB drive yourself."
-	@echo -e "The ISO file is available at \"$(iso)\"."
+	@echo -e "The ISO file is available at \"$(image)\"."
 else
 ## building on Linux or macOS
 	@$(UNMOUNT) /dev/$(drive)* 2> /dev/null  |  true  ## force it to return true
-	@sudo dd bs=4194304 if=$(iso) of=/dev/$(drive)    ## use 4194304 instead of 4M because macOS doesn't support 4M
+	@sudo dd bs=4194304 if=$(image) of=/dev/$(drive)    ## use 4194304 instead of 4M because macOS doesn't support 4M
 	@sync
 endif
 	
 
 ### this builds an ISO and copies it into the theseus tftpboot folder as described in the REAEDME 
 pxe : export override THESEUS_CONFIG += mirror_log_to_vga
-pxe: $(iso)
+pxe: $(image)
 ifdef $(netdev)
 ifdef $(ip)
 	@sudo ifconfig $(netdev) $(ip)
 endif
 	@sudo sudo ifconfig $(netdev) 192.168.1.105
 endif
-	@sudo cp -vf $(iso) /var/lib/tftpboot/theseus/
+	@sudo cp -vf $(image) /var/lib/tftpboot/theseus/
 	@sudo systemctl restart isc-dhcp-server 
 	@sudo systemctl restart tftpd-hpa

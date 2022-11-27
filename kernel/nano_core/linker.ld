@@ -51,6 +51,7 @@ SECTIONS {
 	}
 
 	/* FIXME: Alignment for UEFI */
+	/* Sometimes triggers: Invalid combination of virtual_addr, offset, and align */
 	.tbss : AT(ADDR(.tbss) - KERNEL_OFFSET)
 	{
 		*(.tbss .tbss.*)

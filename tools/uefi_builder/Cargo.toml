@@ -3,14 +3,15 @@
 # compile with -Z bindeps
 
 [package]
-name = "uefi_runner"
+name = "uefi_builder"
 version = "0.1.0"
 edition = "2021"
 authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
 
 [dependencies]
 # v0.11
-bootloader = { git = "https://github.com/rust-osdev/bootloader" }
+# bootloader = { git = "https://github.com/rust-osdev/bootloader" }
+bootloader = { path = "../../../bootloader" }
 ovmf-prebuilt = "0.1.0-alpha.1"
 
 [patch.crates-io]

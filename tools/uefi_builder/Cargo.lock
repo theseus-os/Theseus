@@ -53,7 +53,6 @@ dependencies = [
 [[package]]
 name = "bootloader"
 version = "0.11.0-alpha"
-source = "git+https://github.com/rust-osdev/bootloader#4e2b8d7e4b4fad3c7aefd7f8174f86ec2119ecc7"
 dependencies = [
  "anyhow",
  "fatfs",
@@ -481,7 +480,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "uefi_runner"
+name = "uefi_builder"
 version = "0.1.0"
 dependencies = [
  "bootloader",
