@@ -21,3 +21,12 @@ pub(crate) fn shutdown(msg: core::fmt::Arguments) -> ! {
     // TODO: handle shutdowns properly with ACPI commands
     panic!("{}", msg);
 }
+
+// FIXME: This shouldn't be necessary
+#[macro_export]
+macro_rules! println_raw {
+    ($($tail:tt)*) => {
+        #[cfg(feature = "bios")]
+        vga_buffer::println_raw!($($tail)*);
+    }
+}

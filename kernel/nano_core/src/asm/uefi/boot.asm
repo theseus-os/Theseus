@@ -2,6 +2,8 @@
 
 global _start
 
+section .init.text progbits alloc exec nowrite
+
 _start:
 	; First argument: reference to the boot info (passed by bootloader)
 	; Second argument: the top of the initial double fault stack

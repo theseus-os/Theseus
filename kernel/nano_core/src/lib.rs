@@ -14,14 +14,13 @@ use core::ops::DerefMut;
 use kernel_config::memory::KERNEL_OFFSET;
 use memory::VirtualAddress;
 use util::shutdown;
-use vga_buffer::println_raw;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "uefi")] {
         use bootloader_api::BootloaderConfig;
 
         #[no_mangle]
-        pub extern "C" fn rust_entry(boot_info: &'static mut bootloader_api::BootInfo, stack: usize) {
+        pub extern "C" fn rust_entry(_boot_info: &'static mut bootloader_api::BootInfo, stack: usize) {
             bootloader_api::__force_use(&__BOOTLOADER_CONFIG);
             try_exit!(early_setup(stack));
             // try_exit!(nano_core(boot_info));

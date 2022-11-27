@@ -50,7 +50,7 @@ SECTIONS {
 		*(.tdata .tdata.* )
 	}
 
-	/* FIXME: Alignment */
+	/* FIXME: Alignment for UEFI */
 	.tbss : AT(ADDR(.tbss) - KERNEL_OFFSET)
 	{
 		*(.tbss .tbss.*)

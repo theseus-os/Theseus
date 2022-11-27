@@ -25,6 +25,10 @@ fn compile_asm() {
         .join("src")
         .join("asm");
 
+    println!("cargo:rerun-if-changed={}", include_path.display());
+    // TODO: This recompiles the assembly files every time.
+    println!("cargo:out_dir={}", include_path.display());
+
     #[cfg(feature = "uefi")]
     let asm_path = include_path.join("uefi");
     #[cfg(feature = "bios")]

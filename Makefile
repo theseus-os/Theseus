@@ -19,6 +19,7 @@ debug ?= none
 net ?= none
 merge_sections ?= yes
 bootloader ?= grub
+uefi ?= yes
 
 ## test for Windows Subsystem for Linux (Linux on Windows)
 IS_WSL = $(shell grep -is 'microsoft' /proc/version)
@@ -159,6 +160,11 @@ endif
 ###       because those should be built as normal for the host OS environment.
 export override RUSTFLAGS += $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 
+ifeq ($(uefi),yes)
+	export override FEATURES += --features nano_core/uefi
+else
+	export override FEATURES += --features nano_core/bios
+endif
 
 ### Convenience targets for building the entire Theseus workspace
 ### with all optional features enabled. 
@@ -896,7 +902,11 @@ wasmtime: run
 
 ### builds and runs Theseus in QEMU
 run: $(iso) 
+ifeq ($(uefi),yes)
+	cargo r --release -Z bindeps --manifest-path $(ROOT_DIR)/tools/uefi_runner/Cargo.toml -- $(nano_core_binary) $(NANO_CORE_BUILD_DIR)/nano_core.efi
+else
 	qemu-system-x86_64 $(QEMU_FLAGS)
+endif
 
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
@@ -965,10 +975,3 @@ endif
 	@sudo cp -vf $(iso) /var/lib/tftpboot/theseus/
 	@sudo systemctl restart isc-dhcp-server 
 	@sudo systemctl restart tftpd-hpa
-
-# TODO: What is this !?
-.PHONY: uefi
-
-uefi: export override FEATURES += --features nano_core/uefi
-uefi: $(nano_core_binary)
-	cargo r --release -Z bindeps --manifest-path $(ROOT_DIR)/tools/uefi_runner/Cargo.toml -- $(nano_core_binary) $(NANO_CORE_BUILD_DIR)/nano_core.efi
