@@ -60,7 +60,7 @@ path = "../panic_entry"
 path = "../vga_buffer"
 
 [dependencies.memory_initialization]
-path = "../memory_initialization"
+path = "../memory/memory_initialization"
 
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 

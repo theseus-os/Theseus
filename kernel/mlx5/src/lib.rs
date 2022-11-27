@@ -20,7 +20,6 @@ extern crate pci;
 extern crate nic_initialization;
 extern crate mlx_ethernet;
 extern crate kernel_config;
-extern crate memory_structs;
 extern crate nic_buffers;
 extern crate mpmc;
 #[macro_use] extern crate lazy_static;
@@ -29,7 +28,7 @@ extern crate mpmc;
 use spin::Once; 
 use alloc::vec::Vec;
 use irq_safety::MutexIrqSafe;
-use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedMappedPages, Mutable};
+use memory::{Page, PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedMappedPages, Mutable};
 use pci::PciDevice;
 use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory, init_rx_buf_pool};
 use mlx_ethernet::{
@@ -469,7 +468,7 @@ impl ConnectX5Nic {
         // Allocate pages for RQ and SQ, they have to be contiguous      
         let (q_mp, q_pa) = create_contiguous_mapping(rq_size_in_bytes + sq_size_in_bytes, NIC_MAPPING_FLAGS)?;
         let vaddr = q_mp.start_address();
-        let (rq_mp, sq_mp) = q_mp.split(memory_structs::Page::containing_address(vaddr + rq_size_in_bytes))
+        let (rq_mp, sq_mp) = q_mp.split(Page::containing_address(vaddr + rq_size_in_bytes))
             .map_err(|_e| "Could not split MappedPages")?;
         let sq_pa = q_pa + rq_size_in_bytes;
         debug!("RQ paddr: {:?}, SQ paddr: {:?}, RQ vaddr: {:?}, SQ vaddr: {:?}", q_pa, sq_pa, rq_mp.start_address(), sq_mp.start_address());

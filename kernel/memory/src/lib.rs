@@ -24,6 +24,7 @@ extern crate memory_structs;
 extern crate page_table_entry;
 extern crate page_allocator;
 extern crate frame_allocator;
+extern crate block_allocator;
 extern crate zerocopy;
 extern crate no_drop;
 
@@ -39,9 +40,11 @@ pub use self::paging::{
     MappedPages, BorrowedMappedPages, BorrowedSliceMappedPages,
 };
 
+pub use block_allocator::FixedSizeBlockAllocator;
 pub use memory_structs::{Frame, Page, FrameRange, PageRange, VirtualAddress, PhysicalAddress};
 pub use page_allocator::{AllocatedPages, allocate_pages, allocate_pages_at,
-    allocate_pages_by_bytes, allocate_pages_by_bytes_at};
+    allocate_pages_by_bytes, allocate_pages_by_bytes_at,
+    allocate_pages_by_bytes_deferred, DeferredAllocAction};
 
 pub use frame_allocator::{AllocatedFrames, MemoryRegionType, PhysicalMemoryRegion,
     allocate_frames_by_bytes_at, allocate_frames_by_bytes, allocate_frames_at};

@@ -10,15 +10,13 @@ extern crate irq_safety;
 extern crate spin;
 extern crate memory;
 extern crate kernel_config;
-extern crate block_allocator;
 
 use alloc::alloc::{GlobalAlloc, Layout};
-use memory::EntryFlags;
+use memory::{EntryFlags, FixedSizeBlockAllocator};
 use kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
 use irq_safety::MutexIrqSafe;
 use spin::Once;
 use alloc::boxed::Box;
-use block_allocator::FixedSizeBlockAllocator;
 
 
 #[global_allocator]
@@ -58,7 +56,7 @@ pub fn set_allocator(allocator: Box<dyn GlobalAlloc + Send + Sync>) {
 /// It starts off with one basic fixed size allocator, the `initial allocator`. 
 /// When a more complex heap is created and set as the `DEFAULT_ALLOCATOR`, then it is used.
 pub struct Heap {
-    initial_allocator: MutexIrqSafe<block_allocator::FixedSizeBlockAllocator>, 
+    initial_allocator: MutexIrqSafe<FixedSizeBlockAllocator>, 
 }
 
 

@@ -13,12 +13,6 @@ version = "0.4.8"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.memory_structs]
-path = "../memory_structs"
-
-[dependencies.page_allocator]
-path = "../page_allocator"
-
 [dependencies.memory]
 path = "../memory"
 

@@ -9,22 +9,22 @@ log = "0.4.8"
 multiboot2 = "0.14.0"
 
 [dependencies.memory]
-path = "../memory"
+path = ".."
 
 [dependencies.stack]
-path = "../stack"
+path = "../../stack"
 
 [dependencies.no_drop]
-path = "../no_drop"
+path = "../../no_drop"
 
 [dependencies.kernel_config]
-path = "../kernel_config"
+path = "../../kernel_config"
 
 [dependencies.bootloader_modules]
-path = "../bootloader_modules"
+path = "../../bootloader_modules"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
 
 [dependencies.heap]
-path = "../heap"
+path = "../../heap"

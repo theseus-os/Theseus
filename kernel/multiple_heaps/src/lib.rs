@@ -25,7 +25,6 @@
 extern crate irq_safety; 
 #[macro_use] extern crate log;
 extern crate memory;
-extern crate page_allocator;
 extern crate kernel_config;
 extern crate apic;
 extern crate heap;
@@ -45,13 +44,15 @@ use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
 use alloc::boxed::Box;
 use hashbrown::HashMap;
-use memory::{MappedPages, VirtualAddress, get_kernel_mmi_ref, create_mapping};
+use memory::{
+    MappedPages, VirtualAddress, get_kernel_mmi_ref, create_mapping,
+    DeferredAllocAction, allocate_pages_by_bytes_deferred,
+};
 use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
 use core::ops::Deref;
 use core::ptr;
 use heap::HEAP_FLAGS;
 use irq_safety::MutexIrqSafe;
-use page_allocator::{DeferredAllocAction, allocate_pages_by_bytes_deferred};
 
 #[cfg(all(not(unsafe_heap), not(safe_heap)))]
 use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage, MappedPages8k};

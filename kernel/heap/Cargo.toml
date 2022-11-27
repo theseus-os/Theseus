@@ -18,6 +18,3 @@ path = "../memory"
 
 [dependencies.kernel_config]
 path = "../kernel_config"
-
-[dependencies.block_allocator]
-path = "../block_allocator"

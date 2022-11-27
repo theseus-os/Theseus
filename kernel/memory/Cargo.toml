@@ -30,19 +30,22 @@ path = "../../libs/atomic_linked_list"
 path = "../kernel_config"
 
 [dependencies.memory_x86_64]
-path = "../memory_x86_64"
+path = "./memory_x86_64"
 
 [dependencies.memory_structs]
-path = "../memory_structs"
+path = "./memory_structs"
 
 [dependencies.page_table_entry]
-path = "../page_table_entry"
+path = "./page_table_entry"
 
 [dependencies.page_allocator]
-path = "../page_allocator"
+path = "./page_allocator"
 
 [dependencies.frame_allocator]
-path = "../frame_allocator"
+path = "./frame_allocator"
+
+[dependencies.block_allocator]
+path = "./block_allocator"
 
 [dependencies.no_drop]
 path = "../no_drop"

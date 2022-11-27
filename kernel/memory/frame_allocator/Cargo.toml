@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "page_allocator"
-description = "The allocator for virtual memory pages."
+name = "frame_allocator"
+description = "The allocator for physical memory frames."
 version = "0.1.0"
 
 [dependencies]
@@ -13,7 +13,7 @@ static_assertions = "1.1.0"
 version = "0.4.8"
 
 [dependencies.kernel_config]
-path = "../kernel_config"
+path = "../../kernel_config"
 
 [dependencies.memory_structs]
 path = "../memory_structs"

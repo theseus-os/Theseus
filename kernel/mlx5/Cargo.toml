@@ -30,9 +30,6 @@ path = "../mlx_ethernet"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.memory_structs]
-path = "../memory_structs"
-
 [dependencies.nic_buffers]
 path = "../nic_buffers"
 
