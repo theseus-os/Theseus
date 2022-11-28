@@ -52,7 +52,7 @@ pub fn init() -> Result<(), &'static str> {
     write_command(TestPort1);
     use PortTestResult::*;
     let port_1_result = match read_port_test_result()? {
-        Passed => Ok("passed PS/2 port 1 test"),
+        Passed => Ok(()),
         ClockLineStuckLow => Err("failed PS/2 port 1 test, clock line stuck low"),
         ClockLineStuckHigh => Err("failed PS/2 port 1 test, clock line stuck high"),
         DataLineStuckLow => Err("failed PS/2 port 1 test, data line stuck low"),
@@ -61,7 +61,7 @@ pub fn init() -> Result<(), &'static str> {
     let port_2_result = if has_mouse {
         write_command(TestPort2);
         match read_port_test_result()? {
-            Passed => Ok("passed PS/2 port 2 test"),
+            Passed => Ok(()),
             ClockLineStuckLow => Err("failed PS/2 port 2 test, clock line stuck low"),
             ClockLineStuckHigh => Err("failed PS/2 port 2 test, clock line stuck high"),
             DataLineStuckLow => Err("failed PS/2 port 2 test, data line stuck low"),
@@ -77,14 +77,16 @@ pub fn init() -> Result<(), &'static str> {
 
     // Step 9: Enable Devices
     match port_1_result {
-        Ok(_) => {
+        Ok(()) => {
+            debug!("passed PS/2 port 1 test");
             write_command(EnablePort1);
             config.set_port1_interrupt_enabled(true);
         }
         Err(e) => warn!("{e}"),
     }
     match port_2_result {
-        Ok(_) => {
+        Ok(()) => {
+            debug!("passed PS/2 port 2 test");
             write_command(EnablePort2);
             config.set_port2_interrupt_enabled(true);
         }
@@ -96,5 +98,9 @@ pub fn init() -> Result<(), &'static str> {
     // Step 10: Reset Devices
     reset_keyboard()?;
     reset_mouse()?;
+
+    // for debugging purposes
+    let config = read_config();
+    debug!("{config:?}");
     Ok(())
 }
