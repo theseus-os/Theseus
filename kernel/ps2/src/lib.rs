@@ -221,8 +221,7 @@ pub struct ControllerConfigurationByte {
     #[allow(dead_code)]
     should_be_zero: B1,
     /// disables the keyboard
-    #[allow(dead_code)]
-    port1_clock_disabled: bool,
+    pub port1_clock_disabled: bool,
     /// disables the auxilary device (mouse)
     /// 
     /// Note: only if 2 PS/2 ports supported

@@ -80,6 +80,7 @@ pub fn init() -> Result<(), &'static str> {
         Ok(()) => {
             debug!("passed PS/2 port 1 test");
             write_command(EnablePort1);
+            config.set_port1_clock_disabled(false);
             config.set_port1_interrupt_enabled(true);
         }
         Err(e) => warn!("{e}"),
@@ -88,6 +89,7 @@ pub fn init() -> Result<(), &'static str> {
         Ok(()) => {
             debug!("passed PS/2 port 2 test");
             write_command(EnablePort2);
+            config.set_port2_clock_disabled(false);
             config.set_port2_interrupt_enabled(true);
         }
         Err(e) => warn!("{e}"),
