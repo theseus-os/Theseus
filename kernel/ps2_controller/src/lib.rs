@@ -94,7 +94,6 @@ pub fn init() -> Result<(), &'static str> {
         }
         Err(e) => warn!("{e}"),
     }
-    debug!("{config:?}");
     write_config(config);
 
     // Step 10: Reset Devices
@@ -102,7 +101,6 @@ pub fn init() -> Result<(), &'static str> {
     reset_mouse()?;
 
     // for debugging purposes
-    let config = read_config();
-    debug!("{config:?}");
+    debug!("Final PS/2 {:?}", read_config());
     Ok(())
 }
