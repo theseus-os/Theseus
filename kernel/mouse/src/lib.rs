@@ -9,7 +9,7 @@ use mpmc::Queue;
 use event_types::Event;
 use x86_64::structures::idt::InterruptStackFrame;
 use mouse_data::{MouseButtons, MouseEvent, MouseMovementRelative};
-use ps2::{mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2, read_mouse_packet, MouseId, MousePacket, status_register};
+use ps2::{mouse_id, set_mouse_id, read_mouse_packet, MouseId, MousePacket, status_register};
 
 /// The first PS/2 port for the mouse is connected directly to IRQ 0xC.
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.
@@ -24,11 +24,6 @@ static MOUSE_ID: Once<MouseId> = Once::new();
 /// * `mouse_queue_producer`: the queue onto which the mouse interrupt handler
 ///    will push new mouse events when a mouse action occurs.
 pub fn init(mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
-    // Init the second PS/2 port, which is used for the mouse.
-    init_ps2_port2();
-    // Test the second port.
-    test_ps2_port2()?;
-
     //TODO: set to 3, failed? id = 0, otherwise set to 4, failed? id = 3, otherwise id = 4
     //the current code beneath just tries to set id = 4, so is not final
     // Set Mouse ID to 4.
