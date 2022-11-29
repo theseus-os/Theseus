@@ -201,11 +201,6 @@
 <span id="201">201</span>
 <span id="202">202</span>
 <span id="203">203</span>
-<span id="204">204</span>
-<span id="205">205</span>
-<span id="206">206</span>
-<span id="207">207</span>
-<span id="208">208</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A basic driver for a keyboard connected to the legacy PS/2 port.
 
 </span><span class="attr">#![no_std]
@@ -218,7 +213,7 @@
 <span class="kw">use </span>spin::Once;
 <span class="kw">use </span>mpmc::Queue;
 <span class="kw">use </span>event_types::Event;
-<span class="kw">use </span>ps2::{init_ps2_port1, test_ps2_port1, keyboard_detect, KeyboardType, read_scancode, LEDState};
+<span class="kw">use </span>ps2::{keyboard_detect, KeyboardType, read_scancode, LEDState, keyboard_scancode_set, ScancodeSet};
 <span class="kw">use </span>x86_64::structures::idt::InterruptStackFrame;
 
 <span class="doccomment">/// The first PS/2 port for the keyboard is connected directly to IRQ 1.
@@ -236,11 +231,6 @@
 /// * `keyboard_queue_producer`: the queue onto which the keyboard interrupt handler
 ///    will push new keyboard events when a key action occurs.
 </span><span class="kw">pub fn </span>init(keyboard_queue_producer: Queue&lt;Event&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="comment">// Init the first PS/2 port, which is used for the keyboard.
-    </span>init_ps2_port1();
-    <span class="comment">// Test the first port.
-    </span>test_ps2_port1()<span class="question-mark">?</span>;
-
     <span class="comment">// Detect which kind of keyboard is connected.
     // TODO: actually do something with the keyboard type.
     </span><span class="kw">match </span>keyboard_detect() {
@@ -253,10 +243,10 @@
         }
     }
 
-    <span class="comment">// TODO: figure out what we should do
-    // keyboard_scancode_set(ScancodeSet::Set2)?;
+    <span class="comment">// TODO: figure out what we should do, for now using set 1
+    </span>keyboard_scancode_set(ScancodeSet::Set1)<span class="question-mark">?</span>;
 
-    // Register the interrupt handler
+    <span class="comment">// Register the interrupt handler
     </span>interrupts::register_interrupt(PS2_KEYBOARD_IRQ, ps2_keyboard_handler).map_err(|e| {
         <span class="macro">error!</span>(<span class="string">&quot;PS/2 keyboard IRQ {PS2_KEYBOARD_IRQ:#X} was already in use by handler {e:#X}! Sharing IRQs is currently unsupported.&quot;</span>);
         <span class="string">&quot;PS/2 keyboard IRQ was already in use! Sharing IRQs is currently unsupported.&quot;

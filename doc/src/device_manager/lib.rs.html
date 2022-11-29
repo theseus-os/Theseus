@@ -299,6 +299,7 @@
 <span id="299">299</span>
 <span id="300">300</span>
 <span id="301">301</span>
+<span id="302">302</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 #![feature(trait_alias)]
 
@@ -397,6 +398,7 @@
     init_serial_port(SerialPortAddress::COM1);
     init_serial_port(SerialPortAddress::COM2);
 
+    ps2_controller::init()<span class="question-mark">?</span>;
     keyboard::init(key_producer)<span class="question-mark">?</span>;
     mouse::init(mouse_producer)<span class="question-mark">?</span>;
 

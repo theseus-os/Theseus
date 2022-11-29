@@ -810,123 +810,9 @@
 <span id="810">810</span>
 <span id="811">811</span>
 <span id="812">812</span>
-<span id="813">813</span>
-<span id="814">814</span>
-<span id="815">815</span>
-<span id="816">816</span>
-<span id="817">817</span>
-<span id="818">818</span>
-<span id="819">819</span>
-<span id="820">820</span>
-<span id="821">821</span>
-<span id="822">822</span>
-<span id="823">823</span>
-<span id="824">824</span>
-<span id="825">825</span>
-<span id="826">826</span>
-<span id="827">827</span>
-<span id="828">828</span>
-<span id="829">829</span>
-<span id="830">830</span>
-<span id="831">831</span>
-<span id="832">832</span>
-<span id="833">833</span>
-<span id="834">834</span>
-<span id="835">835</span>
-<span id="836">836</span>
-<span id="837">837</span>
-<span id="838">838</span>
-<span id="839">839</span>
-<span id="840">840</span>
-<span id="841">841</span>
-<span id="842">842</span>
-<span id="843">843</span>
-<span id="844">844</span>
-<span id="845">845</span>
-<span id="846">846</span>
-<span id="847">847</span>
-<span id="848">848</span>
-<span id="849">849</span>
-<span id="850">850</span>
-<span id="851">851</span>
-<span id="852">852</span>
-<span id="853">853</span>
-<span id="854">854</span>
-<span id="855">855</span>
-<span id="856">856</span>
-<span id="857">857</span>
-<span id="858">858</span>
-<span id="859">859</span>
-<span id="860">860</span>
-<span id="861">861</span>
-<span id="862">862</span>
-<span id="863">863</span>
-<span id="864">864</span>
-<span id="865">865</span>
-<span id="866">866</span>
-<span id="867">867</span>
-<span id="868">868</span>
-<span id="869">869</span>
-<span id="870">870</span>
-<span id="871">871</span>
-<span id="872">872</span>
-<span id="873">873</span>
-<span id="874">874</span>
-<span id="875">875</span>
-<span id="876">876</span>
-<span id="877">877</span>
-<span id="878">878</span>
-<span id="879">879</span>
-<span id="880">880</span>
-<span id="881">881</span>
-<span id="882">882</span>
-<span id="883">883</span>
-<span id="884">884</span>
-<span id="885">885</span>
-<span id="886">886</span>
-<span id="887">887</span>
-<span id="888">888</span>
-<span id="889">889</span>
-<span id="890">890</span>
-<span id="891">891</span>
-<span id="892">892</span>
-<span id="893">893</span>
-<span id="894">894</span>
-<span id="895">895</span>
-<span id="896">896</span>
-<span id="897">897</span>
-<span id="898">898</span>
-<span id="899">899</span>
-<span id="900">900</span>
-<span id="901">901</span>
-<span id="902">902</span>
-<span id="903">903</span>
-<span id="904">904</span>
-<span id="905">905</span>
-<span id="906">906</span>
-<span id="907">907</span>
-<span id="908">908</span>
-<span id="909">909</span>
-<span id="910">910</span>
-<span id="911">911</span>
-<span id="912">912</span>
-<span id="913">913</span>
-<span id="914">914</span>
-<span id="915">915</span>
-<span id="916">916</span>
-<span id="917">917</span>
-<span id="918">918</span>
-<span id="919">919</span>
-<span id="920">920</span>
-<span id="921">921</span>
-<span id="922">922</span>
-<span id="923">923</span>
-<span id="924">924</span>
-<span id="925">925</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
-</span><span class="kw">use </span>log::debug;
-<span class="kw">use </span>num_enum::TryFromPrimitive;
+</span><span class="kw">use </span>num_enum::TryFromPrimitive;
 <span class="kw">use </span>port_io::Port;
 <span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>modular_bitfield::{specifiers::{B1, B4, B8}, bitfield, BitfieldSpecifier};
@@ -947,7 +833,7 @@
 /// 
 /// Naming perspective: Output means &quot;out of the device into the host&quot;.
 /// e.g. [WriteByteToPort2InputBuffer] means &quot;write byte out of the host into port 2&quot;
-</span><span class="kw">enum </span>HostToControllerCommand {
+</span><span class="kw">pub enum </span>HostToControllerCommand {
     <span class="doccomment">/// returns [ControllerConfigurationByte]
     </span>ReadFromInternalRAMByte0 = <span class="number">0x20</span>,
     
@@ -1035,7 +921,7 @@
 /// 
 /// Note: Devices attached to the controller should be disabled
 /// before sending commands that return data, otherwise the output buffer could get overwritten
-</span><span class="kw">fn </span>write_command(value: HostToControllerCommand) {
+</span><span class="kw">pub fn </span>write_command(value: HostToControllerCommand) {
     <span class="kw">unsafe </span>{
         PS2_COMMAND_AND_STATUS_PORT.lock().write(value <span class="kw">as </span>u8);
     }
@@ -1132,14 +1018,14 @@
 <span class="comment">// wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Configuration_Byte
 </span><span class="doccomment">/// Used for [HostToControllerCommand::ReadFromInternalRAMByte0] and [HostToControllerCommand::WriteToInternalRAMByte0]
 </span><span class="attr">#[bitfield(bits = <span class="number">8</span>)]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 </span><span class="kw">pub struct </span>ControllerConfigurationByte {
     <span class="doccomment">/// interrupt on [ControllerToHostStatus] `output_buffer_full`
-    </span>port1_interrupt_enabled: bool,
+    </span><span class="kw">pub </span>port1_interrupt_enabled: bool,
     <span class="doccomment">/// interrupt on [ControllerToHostStatus] `mouse_output_buffer_full`
     /// 
     /// Note: only if 2 PS/2 ports supported
-    </span>port2_interrupt_enabled: bool,
+    </span><span class="kw">pub </span>port2_interrupt_enabled: bool,
     <span class="doccomment">/// Cleared on reset; set when the system passed Power-on self-test
     </span><span class="attr">#[allow(dead_code)]
     </span>system_passed_self_test: bool,
@@ -1147,153 +1033,37 @@
     </span><span class="attr">#[allow(dead_code)]
     </span>should_be_zero: B1,
     <span class="doccomment">/// disables the keyboard
-    </span>port1_clock_disabled: bool,
+    </span><span class="kw">pub </span>port1_clock_disabled: bool,
     <span class="doccomment">/// disables the auxilary device (mouse)
     /// 
     /// Note: only if 2 PS/2 ports supported
-    </span>port2_clock_disabled: bool,
+    </span><span class="kw">pub </span>port2_clock_disabled: bool,
     <span class="doccomment">/// whether IBM scancode translation is enabled (0=AT, 1=PC)
-    </span><span class="attr">#[allow(dead_code)]
-    </span>port1_translation_enabled: bool,
+    </span><span class="kw">pub </span>port1_translation_enabled: bool,
     <span class="attr">#[allow(dead_code)]
     </span>must_be_zero: B1,
 }
 
 <span class="doccomment">/// read the config of the PS/2 port
-</span><span class="kw">fn </span>read_config() -&gt; ControllerConfigurationByte {
+</span><span class="kw">pub fn </span>read_config() -&gt; ControllerConfigurationByte {
     write_command(ReadFromInternalRAMByte0);
     ControllerConfigurationByte::from_bytes([read_data()])
 }
 
 <span class="doccomment">/// write the new config to the PS/2 command port (0x64)
-</span><span class="kw">fn </span>write_config(value: ControllerConfigurationByte) {
+</span><span class="kw">pub fn </span>write_config(value: ControllerConfigurationByte) {
     write_command(WriteToInternalRAMByte0);
     write_data(WritableData::Configuration(value));
 }
 
-<span class="doccomment">/// initialize the first PS/2 data port
-</span><span class="kw">pub fn </span>init_ps2_port1() {
-    init_ps2_port(PS2Port::One);
-}
-
-<span class="doccomment">/// initialize the second PS/2 data port
-</span><span class="kw">pub fn </span>init_ps2_port2() {
-    init_ps2_port(PS2Port::Two);
-}
-
-<span class="attr">#[derive(Clone, Copy)]
-</span><span class="kw">enum </span>PS2Port {
-    One,
-    Two,
-}
-
-<span class="comment">// see https://wiki.osdev.org/%228042%22_PS/2_Controller#Initialising_the_PS.2F2_Controller
-</span><span class="kw">fn </span>init_ps2_port(port: PS2Port) {
-    <span class="comment">// Step 1: Initialise USB Controllers
-    // no USB support yet
-
-    // Step 2: Determine if the PS/2 Controller Exists
-    // TODO: we support the FADT, so we can check this
-
-    // Step 3: Disable Devices
-    </span>write_command(DisablePort2);
-    write_command(DisablePort1);
-
-    <span class="comment">// Step 4: Flush The Output Buffer
-    </span>flush_output_buffer();
-
-    <span class="comment">// Step 5: Set the Controller Configuration Byte
-    </span><span class="kw">let </span><span class="kw-2">mut </span>config = read_config();
-    <span class="kw">match </span>port {
-        PS2Port::One =&gt; {
-            config.set_port1_clock_disabled(<span class="bool-val">false</span>);
-            config.set_port1_interrupt_enabled(<span class="bool-val">true</span>);
-        }
-        PS2Port::Two =&gt; {
-            config.set_port2_clock_disabled(<span class="bool-val">false</span>);
-            config.set_port2_interrupt_enabled(<span class="bool-val">true</span>);
-        }
-    }
-    write_config(config);
-
-    <span class="comment">// Step 6/7/8 are inside [test_ps2_port]
-
-    // Step 9: Enable Devices
-    </span>write_command(EnablePort1);
-    <span class="comment">// NOTE: we might not need to do this conditionally
-    </span><span class="kw">match </span>port {
-        PS2Port::Two =&gt; write_command(EnablePort2),
-        PS2Port::One =&gt; (),
-    };
-}
-
 <span class="doccomment">/// Clean the [PS2_DATA_PORT] output buffer, skipping the [ControllerToHostStatus] `output_buffer_full` check
-</span><span class="kw">fn </span>flush_output_buffer() {
+</span><span class="kw">pub fn </span>flush_output_buffer() {
     read_data();
-}
-
-<span class="doccomment">/// test the first PS/2 data port
-</span><span class="kw">pub fn </span>test_ps2_port1() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    test_ps2_port(PS2Port::One)
-}
-
-<span class="comment">// test the second PS/2 data port
-</span><span class="kw">pub fn </span>test_ps2_port2() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    test_ps2_port(PS2Port::Two)
-}
-
-<span class="comment">// see https://wiki.osdev.org/%228042%22_PS/2_Controller#Initialising_the_PS.2F2_Controller
-</span><span class="kw">fn </span>test_ps2_port(port: PS2Port) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="comment">// Step 1-5 are inside [init_ps2_port]
-
-    // Step 6: Perform Controller Self Test
-    </span>write_command(TestController);
-    read_controller_test_result()<span class="question-mark">?</span>;
-    <span class="macro">debug!</span>(<span class="string">&quot;passed PS/2 controller test&quot;</span>);
-
-    <span class="comment">// TODO: Step 7, but not here, maybe init and test both devices at once in a new PS/2 controller driver crate
-
-    // Step 8: Perform Interface Tests
-    </span><span class="kw">match </span>port {
-        PS2Port::One =&gt; write_command(TestPort1),
-        PS2Port::Two =&gt; write_command(TestPort2),
-    }
-    <span class="kw">use </span>PortTestResult::<span class="kw-2">*</span>;
-    <span class="kw">match </span>read_port_test_result()<span class="question-mark">? </span>{
-        Passed =&gt; <span class="macro">debug!</span>(<span class="string">&quot;passed PS/2 port {} test&quot;</span>, port <span class="kw">as </span>u8 + <span class="number">1</span>),
-        ClockLineStuckLow =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;failed PS/2 port test, clock line stuck low&quot;</span>)<span class="question-mark">?</span>,
-        ClockLineStuckHigh =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;failed PS/2 port test, clock line stuck high&quot;</span>)<span class="question-mark">?</span>,
-        DataLineStuckLow =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;failed PS/2 port test, data line stuck low&quot;</span>)<span class="question-mark">?</span>,
-        DataLineStuckHigh =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;failed PS/2 port test, clock line stuck high&quot;</span>)<span class="question-mark">?</span>,
-    }
-
-    <span class="comment">// print the config (?) see TODO above
-    </span><span class="kw">let </span>config = read_config();
-    <span class="kw">let </span>port_interrupt_enabled = <span class="kw">match </span>port {
-        PS2Port::One =&gt; config.port1_interrupt_enabled(),
-        PS2Port::Two =&gt; config.port2_interrupt_enabled(),
-    };
-    <span class="kw">let </span>clock_enabled = <span class="kw">match </span>port {
-        PS2Port::One =&gt; !config.port1_clock_disabled(),
-        PS2Port::Two =&gt; !config.port2_clock_disabled(),
-    };
-
-    <span class="kw">if </span>port_interrupt_enabled {
-        <span class="macro">debug!</span>(<span class="string">&quot;PS/2 port {} interrupt enabled&quot;</span>, port <span class="kw">as </span>u8 + <span class="number">1</span>)
-    } <span class="kw">else </span>{
-        <span class="prelude-val">Err</span>(<span class="string">&quot;PS/2 port test config&#39;s interrupt disabled&quot;</span>)<span class="question-mark">?
-    </span>}
-    <span class="kw">if </span>clock_enabled {
-        <span class="macro">debug!</span>(<span class="string">&quot;PS/2 port {} clock enabled&quot;</span>, port <span class="kw">as </span>u8 + <span class="number">1</span>)
-    } <span class="kw">else </span>{
-        <span class="prelude-val">Err</span>(<span class="string">&quot;PS/2 port test config&#39;s clock disabled&quot;</span>)<span class="question-mark">?
-    </span>}
-    <span class="prelude-val">Ok</span>(())
 }
 
 <span class="doccomment">/// must only be called after writing the [TestController] command
 /// otherwise would read bogus data
-</span><span class="kw">fn </span>read_controller_test_result() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+</span><span class="kw">pub fn </span>read_controller_test_result() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">const </span>CONTROLLER_TEST_PASSED: u8 = <span class="number">0x55</span>;
     <span class="kw">if </span>read_data() != CONTROLLER_TEST_PASSED {
         <span class="prelude-val">Err</span>(<span class="string">&quot;failed PS/2 controller test&quot;</span>)
@@ -1304,7 +1074,7 @@
 
 <span class="attr">#[derive(TryFromPrimitive)]
 #[repr(u8)]
-</span><span class="kw">enum </span>PortTestResult {
+</span><span class="kw">pub enum </span>PortTestResult {
     Passed = <span class="number">0x00</span>,
     ClockLineStuckLow = <span class="number">0x01</span>,
     ClockLineStuckHigh = <span class="number">0x02</span>,
@@ -1314,7 +1084,7 @@
 
 <span class="doccomment">/// must only be called after writing the [TestPort1] or [TestPort2] command
 /// otherwise would read bogus data
-</span><span class="kw">fn </span>read_port_test_result() -&gt; <span class="prelude-ty">Result</span>&lt;PortTestResult, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+</span><span class="kw">pub fn </span>read_port_test_result() -&gt; <span class="prelude-ty">Result</span>&lt;PortTestResult, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     read_data().try_into().map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to read port test result&quot;</span>)
 }
 
@@ -1423,8 +1193,8 @@
 
 <span class="attr">#[derive(Clone)]
 </span><span class="kw">pub enum </span>ScancodeSet {
-    GetCurrentSet = <span class="number">0</span>,
-    Set1 = <span class="number">1</span>,
+    <span class="comment">// GetCurrentSet = 0, //TODO, if needed
+    </span>Set1 = <span class="number">1</span>,
     Set2 = <span class="number">2</span>,
     Set3 = <span class="number">3</span>,
 }
@@ -1502,11 +1272,11 @@
     <span class="kw">pub </span>y_overflow: bool,
     <span class="comment">//2. byte
     </span><span class="doccomment">/// only a part of x_movement, needs to be combined with [x_9th_bit]
-    </span>x_1st_to_8th_bit: B8, <span class="comment">//u8 with #[bits = 8] attribute didn&#39;t work
-    //3. byte
+    </span>x_1st_to_8th_bit: B8,
+    <span class="comment">//3. byte
     </span><span class="doccomment">/// only a part of y_movement, needs to be combined with [y_9th_bit]
-    </span>y_1st_to_8th_bit: B8, <span class="comment">//u8 with #[bits = 8] attribute didn&#39;t work
-</span>}
+    </span>y_1st_to_8th_bit: B8,
+}
 
 <span class="kw">impl </span>MousePacketGeneric {
     <span class="doccomment">/// `x_1st_to_8th_bit` and `x_9th_bit` should not be accessed directly, because they&#39;re part of one signed 9-bit number
@@ -1746,18 +1516,22 @@
 }
 
 <span class="doccomment">/// reset the mouse
-</span><span class="attr">#[allow(dead_code)]
-</span><span class="kw">fn </span>reset_mouse() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+</span><span class="kw">pub fn </span>reset_mouse() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     command_to_mouse(HostToMouseCommandOrData::MouseCommand(Reset))<span class="question-mark">?</span>; 
-    <span class="kw">for _ in </span><span class="number">0</span>..<span class="number">14 </span>{
-        <span class="comment">//BAT = Basic Assurance Test
-        </span><span class="kw">let </span>bat_code = read_data();
-        <span class="kw">if </span>bat_code == <span class="number">0xAA </span>{
-            <span class="comment">// command reset mouse succeeded
-            </span><span class="kw">return </span><span class="prelude-val">Ok</span>(());
-        }
+    <span class="kw">if let </span><span class="prelude-val">Ok</span>(SelfTestPassed) = read_data().try_into() {
+        <span class="comment">//returns mouse id 0
+        </span>read_data();
+        <span class="kw">return </span><span class="prelude-val">Ok</span>(());
     }
     <span class="prelude-val">Err</span>(<span class="string">&quot;failed to reset mouse&quot;</span>)
+}
+<span class="doccomment">/// reset the keyboard
+</span><span class="kw">pub fn </span>reset_keyboard() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(ResetAndStartSelfTest))<span class="question-mark">?</span>; 
+    <span class="kw">if let </span><span class="prelude-val">Ok</span>(SelfTestPassed) = read_data().try_into() {
+        <span class="kw">return </span><span class="prelude-val">Ok</span>(())
+    }
+    <span class="prelude-val">Err</span>(<span class="string">&quot;failed to reset keyboard&quot;</span>)
 }
 
 <span class="doccomment">/// resend the most recent packet again

@@ -131,11 +131,6 @@
 <span id="131">131</span>
 <span id="132">132</span>
 <span id="133">133</span>
-<span id="134">134</span>
-<span id="135">135</span>
-<span id="136">136</span>
-<span id="137">137</span>
-<span id="138">138</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A basic driver for a mouse connected to the legacy PS/2 port.
 
 </span><span class="attr">#![no_std]
@@ -147,7 +142,7 @@
 <span class="kw">use </span>event_types::Event;
 <span class="kw">use </span>x86_64::structures::idt::InterruptStackFrame;
 <span class="kw">use </span>mouse_data::{MouseButtons, MouseEvent, MouseMovementRelative};
-<span class="kw">use </span>ps2::{mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2, read_mouse_packet, MouseId, MousePacket, status_register};
+<span class="kw">use </span>ps2::{mouse_id, set_mouse_id, read_mouse_packet, MouseId, MousePacket, status_register};
 
 <span class="doccomment">/// The first PS/2 port for the mouse is connected directly to IRQ 0xC.
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.
@@ -162,11 +157,6 @@
 /// * `mouse_queue_producer`: the queue onto which the mouse interrupt handler
 ///    will push new mouse events when a mouse action occurs.
 </span><span class="kw">pub fn </span>init(mouse_queue_producer: Queue&lt;Event&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="comment">// Init the second PS/2 port, which is used for the mouse.
-    </span>init_ps2_port2();
-    <span class="comment">// Test the second port.
-    </span>test_ps2_port2()<span class="question-mark">?</span>;
-
     <span class="comment">//TODO: set to 3, failed? id = 0, otherwise set to 4, failed? id = 3, otherwise id = 4
     //the current code beneath just tries to set id = 4, so is not final
     // Set Mouse ID to 4.

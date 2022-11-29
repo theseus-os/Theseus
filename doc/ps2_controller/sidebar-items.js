@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["init","initialize the first and second (if it exists) PS/2 port"]]};
