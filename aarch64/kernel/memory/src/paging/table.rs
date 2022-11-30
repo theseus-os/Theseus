@@ -9,6 +9,7 @@
 
 use super::PageTableEntry;
 use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
+use memory_structs::PAGE_TABLE_ENTRY_FRAME_MASK;
 use super::super::{VirtualAddress, PteFlags};
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
@@ -49,12 +50,26 @@ impl<L: HierarchicalLevel> Table<L> {
     /// Returns the virtual address of the next lowest page table:
     /// if `self` is a P4-level `Table`, then this returns a P3-level `Table`,
     /// and so on for P3 -> P3 and P2 -> P1.
-    fn next_table_address(&self, index: usize) -> Option<VirtualAddress> {
+    /// 
+    /// With `active` set to true, you indicate that the
+    /// modified table is currently used by the CPU, in which case
+    /// it will be accessed using the recursive paging special entry.
+    /// Otherwise, the code assumes we are in identity-mapping, and
+    /// the physical addresses in a table are used as virtual addresses.
+    fn next_table_address(&self, index: usize, active: bool) -> Option<VirtualAddress> {
         let entry_flags = self[index].flags();
         // commenting until we understand how huge pages work on aarch64
         if entry_flags.contains(PteFlags::VALID) /*&& !entry_flags.is_huge()*/ {
             let table_address = self as *const _ as usize;
-            let next_table_vaddr: usize = (table_address << 9) | (index << PAGE_SHIFT);
+            let next_table_vaddr: usize = match active {
+
+                // use the recursive entry
+                true => (table_address << 9) | (index << PAGE_SHIFT),
+
+                // use the identity mapping
+                false => (self[index].value() & PAGE_TABLE_ENTRY_FRAME_MASK) as usize,
+
+            };
             Some(VirtualAddress::new_canonical(next_table_vaddr))
         } else {
             None
@@ -64,39 +79,59 @@ impl<L: HierarchicalLevel> Table<L> {
     /// Returns a reference to the next lowest-level page table.
     /// 
     /// A convenience wrapper around `next_table_address()`; see that method for more.
-    pub fn next_table(&self, index: usize) -> Option<&Table<L::NextLevel>> {
+    /// 
+    /// With `active` set to true, you indicate that the
+    /// modified table is currently used by the CPU, in which case
+    /// it will be accessed using the recursive paging special entry.
+    /// Otherwise, the code assumes we are in identity-mapping, and
+    /// the physical addresses in a table are used as virtual addresses.
+    pub fn next_table(&self, index: usize, active: bool) -> Option<&Table<L::NextLevel>> {
         // convert the next table address from a raw pointer back to a Table type
-        self.next_table_address(index).map(|vaddr| unsafe { &*(vaddr.value() as *const _) })
+        self.next_table_address(index, active).map(|vaddr| unsafe { &*(vaddr.value() as *const _) })
     }
 
     /// Returns a mutable reference to the next lowest-level page table.
     /// 
     /// A convenience wrapper around `next_table_address()`; see that method for more.
-    pub fn next_table_mut(&mut self, index: usize) -> Option<&mut Table<L::NextLevel>> {
-        self.next_table_address(index).map(|vaddr| unsafe { &mut *(vaddr.value() as *mut _) })
+    /// 
+    /// With `active` set to true, you indicate that the
+    /// modified table is currently used by the CPU, in which case
+    /// it will be accessed using the recursive paging special entry.
+    /// Otherwise, the code assumes we are in identity-mapping, and
+    /// the physical addresses in a table are used as virtual addresses.
+    pub fn next_table_mut(&mut self, index: usize, active: bool) -> Option<&mut Table<L::NextLevel>> {
+        self.next_table_address(index, active).map(|vaddr| unsafe { &mut *(vaddr.value() as *mut _) })
     }
 
     /// Returns a mutable reference to the next lowest-level page table, 
     /// creating and initializing a new one if it doesn't already exist.
     /// 
     /// A convenience wrapper around `next_table_address()`; see that method for more.
+    /// 
+    /// With `active` set to true, you indicate that the
+    /// modified table is currently used by the CPU, in which case
+    /// it will be accessed using the recursive paging special entry.
+    /// Otherwise, the code assumes we are in identity-mapping, and
+    /// the physical addresses in a table are used as virtual addresses.
     ///
     /// TODO: return a `Result` here instead of panicking.
     pub fn next_table_create(
         &mut self,
         index: usize,
         flags: PteFlags,
-    ) -> &mut Table<L::NextLevel> {
-        if self.next_table(index).is_none() {
+        active: bool,
+    ) -> Result<&mut Table<L::NextLevel>, &'static str> {
+        if self.next_table(index, active).is_none() {
             // commenting until we understand how huge pages work on aarch64
             // assert!(!self[index].flags().is_huge(), "mapping code does not support huge pages");
 
-            let af = frame_allocator::allocate_frames(1).expect("next_table_create(): no frames available");
+            let af = frame_allocator::allocate_frames(1).ok_or("next_table_create(): no frames available")?;
             self[index].set_entry(af.as_allocated_frame(), flags.writable(true).valid(true));
-            self.next_table_mut(index).unwrap().zero();
+            let table = self.next_table_mut(index, active).unwrap();
+            table.zero();
             core::mem::forget(af); // we currently forget frames allocated as page table frames since we don't yet have a way to track them.
         }
-        self.next_table_mut(index).unwrap()
+        Ok(self.next_table_mut(index, active).unwrap())
     }
 }
 

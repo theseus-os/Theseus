@@ -21,6 +21,8 @@ use memory_structs::{PhysicalAddress, VirtualAddress};
 
 use core::arch::asm;
 
+const THESEUS_ASID: u16 = 0;
+
 /// Flushes the specific virtual address in TLB.
 ///
 /// TLBI => tlb invalidate instruction
@@ -31,13 +33,13 @@ pub fn tlb_flush_virt_addr(vaddr: VirtualAddress) {
     unsafe { asm!("tlbi vae1, {}", in(reg) vaddr.value()) };
 }
 
-/// Flushes the whole TLB.
+/// Flushes all TLB entries with Theseus' ASID (=0).
 ///
 /// TLBI => tlb invalidate instruction
-/// "all" => all translations at execution level
+/// "asid" => all entries with specific ASID
 /// "e1" => execution level
-pub fn tlb_flush_all() {
-    unsafe { asm!("tlbi alle1") };
+pub fn tlb_flush_by_theseus_asid() {
+    unsafe { asm!("tlbi aside1, {:x}", in(reg) THESEUS_ASID) };
 }
 
 /// Returns the current top-level page table address.
@@ -51,10 +53,34 @@ pub fn get_p4() -> PhysicalAddress {
     )
 }
 
+/// Disable the MMU using aarch64 registers
+///
+/// This uses the `SCTLR_EL1` register.
+///
+/// When the MMU is disabled, the CPU acts as
+/// if a full-address-space identity mapping
+/// was active.
+pub fn disable_mmu() {
+    SCTLR_EL1.modify(SCTLR_EL1::M::Disable);
+    unsafe { barrier::isb(barrier::SY) };
+}
+
+/// Enable the MMU using aarch64 registers
+///
+/// This uses the `SCTLR_EL1` register.
+///
+/// When the MMU is disabled, the CPU acts as
+/// if a full-address-space identity mapping
+/// was active. When it's enabled, the TTB0_EL1
+/// register is expected to point to a valid
+/// page table (using its physical address).
+pub fn enable_mmu() {
+    SCTLR_EL1.modify(SCTLR_EL1::M::Enable);
+    unsafe { barrier::isb(barrier::SY) };
+}
+
 /// Configures paging for Theseus.
-///
-///
-pub fn set_page_table_up(page_table: PhysicalAddress) {
+pub fn configure_translation_registers() {
     unsafe {
         // The MAIR register holds up to 8 memory profiles;
         // each profile describes cacheability of the memory.
@@ -86,12 +112,12 @@ pub fn set_page_table_up(page_table: PhysicalAddress) {
             // or to use them in the page table walk ("Used").
             // With our four-level paging, however, the top-byte
             // is not used for page table walks anyway.
-            //   TCR_EL1::TBI0::Used
+              TCR_EL1::TBI0::Used
             // | TCR_EL1::TBI1::Used
 
             // Translation Granule Size = Page Size
             // => four kilobytes
-              TCR_EL1::TG0::KiB_4
+            + TCR_EL1::TG0::KiB_4
             // + TCR_EL1::TG1::KiB_4
 
             // These fields could only be used if we had access
@@ -122,8 +148,7 @@ pub fn set_page_table_up(page_table: PhysicalAddress) {
 
             // From which TTBR to read the ASID, when comparing the
             // current address space with the one from an address.
-            // Theseus only has one address space so this is irrelevant.
-            // + TCR_EL1::A1::TTBR0
+            + TCR_EL1::A1::TTBR0
 
             // Controls the size of the memory region addressed
             // by page table walks. We have to write 64 - (max
@@ -142,11 +167,19 @@ pub fn set_page_table_up(page_table: PhysicalAddress) {
 
             // Allow the MMU to update the DIRTY flag.
             + TCR_EL1::HD::Enable
-
         );
 
-        TTBR0_EL1.set_baddr(page_table.value() as u64);
-        // TTBR1_EL1.set_baddr(page_table.value() as u64);
+        barrier::isb(barrier::SY);
+    }
+}
+
+pub fn set_page_table_addr(page_table: PhysicalAddress) {
+    unsafe {
+        let page_table_addr = page_table.value() as u64;
+        TTBR0_EL1.write(
+              TTBR0_EL1::ASID.val(THESEUS_ASID as u64)
+            + TTBR0_EL1::BADDR.val(page_table_addr >> 1)
+        );
 
         barrier::isb(barrier::SY);
     }

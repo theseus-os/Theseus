@@ -14,13 +14,14 @@
 
 use core::ops::Deref;
 use memory_structs::{Frame, FrameRange, PAGE_TABLE_ENTRY_FRAME_MASK, PteFlags, PteFlagsArch, PhysicalAddress};
-use bit_field::BitField;
-use kernel_config::memory::PAGE_SHIFT;
 use zerocopy::FromBytes;
 use frame_allocator::AllocatedFrame;
 
 #[cfg(target_arch = "aarch64")]
 use memory_structs::pte_flags::PteFlagsAarch64;
+
+#[cfg(target_arch = "x86_64")]
+use {bit_field::BitField, kernel_config::memory::PAGE_SHIFT};
 
 /// A page table entry, which is a `u64` value under the hood.
 ///
@@ -94,9 +95,19 @@ impl PageTableEntry {
 
     /// Extracts the value of the frame referred to by this page table entry.
     fn frame_value(&self) -> Frame {
-        let mut frame_paddr = self.0 as usize;
-        frame_paddr.set_bits(0 .. (PAGE_SHIFT as u8), 0);
-        Frame::containing_address(PhysicalAddress::new_canonical(frame_paddr))
+        #[cfg(target_arch = "x86_64")]
+        {
+            let mut frame_paddr = self.0 as usize;
+            frame_paddr.set_bits(0 .. (PAGE_SHIFT as u8), 0);
+            Frame::containing_address(PhysicalAddress::new_canonical(frame_paddr))
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        {
+            let mut frame_paddr = self.0 as usize;
+            frame_paddr &= PAGE_TABLE_ENTRY_FRAME_MASK as usize;
+            Frame::containing_address(PhysicalAddress::new_canonical(frame_paddr))
+        }
     }
 
     /// Sets this `PageTableEntry` to map the given `frame` with the given `flags`.

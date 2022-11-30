@@ -40,14 +40,16 @@ pub use page_allocator::{AllocatedPages, allocate_pages, allocate_pages_at,
     allocate_pages_by_bytes, allocate_pages_by_bytes_at};
 
 pub use frame_allocator::{AllocatedFrames, MemoryRegionType, PhysicalMemoryRegion,
-    allocate_frames_by_bytes_at, allocate_frames_by_bytes, allocate_frames_at};
+    allocate_frames_by_bytes_at, allocate_frames_by_bytes, allocate_frames, allocate_frames_at};
 
 #[cfg(target_arch = "x86_64")]
 use memory_x86_64::{BootInformation, get_kernel_address, get_boot_info_mem_area, find_section_memory_bounds,
     get_vga_mem_addr, get_modules_address, tlb_flush_virt_addr, tlb_flush_all, get_p4};
 
 #[cfg(target_arch = "aarch64")]
-use memory_aarch64::{tlb_flush_virt_addr, tlb_flush_all, get_p4, set_page_table_up};
+use memory_aarch64::{tlb_flush_virt_addr, tlb_flush_by_theseus_asid,
+    get_p4, configure_translation_registers, disable_mmu, enable_mmu,
+    set_page_table_addr};
 
 use spin::Once;
 use irq_safety::MutexIrqSafe;
@@ -95,7 +97,7 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: PteFlags) -> Resul
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous pages!")?;
     let allocated_frames = allocate_frames_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous frames!")?;
     let starting_phys_addr = allocated_frames.start_address();
-    let mp = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags)?;
+    let mp = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags, true)?;
     Ok((mp, starting_phys_addr))
 }
 
@@ -130,22 +132,23 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
 pub fn init(
     free_regions: &[Option<PhysicalMemoryRegion>; 32],
     reserved_regions: &[Option<PhysicalMemoryRegion>; 32],
+    layout: impl Iterator<Item = (PhysicalAddress, usize, PteFlags)>,
 ) -> Result<PageTable, &'static str> {
     let into_alloc_frames_fn = frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())?;
     debug!("Initialized new frame allocator!");
-    frame_allocator::dump_frame_allocator_state();
+    // frame_allocator::dump_frame_allocator_state();
 
-    // On x86_64 `page_allocator` is initialized with a value
-    // obtained from the ELF layout.
-    // Here I'm choosing a value which is probably valid (uneducated guess);
-    // once we have an ELF aarch64 kernel we'll be able to use the original
-    // limit defined with KERNEL_OFFSET and the ELF layout.
+    // On x86_64 `page_allocator` is initialized with a value obtained
+    // from the ELF layout. Here I'm choosing a value which is probably
+    // valid (uneducated guess); once we have an ELF aarch64 kernel
+    // we'll be able to use the original limit defined with KERNEL_OFFSET
+    // and the ELF layout.
     page_allocator::init(VirtualAddress::new_canonical(0x100_000_000))?;
     debug!("Initialized new page allocator!");
-    page_allocator::dump_page_allocator_state();
+    // page_allocator::dump_page_allocator_state();
 
     // Initialize paging, which only bootstraps the current page table at the moment.
-    paging::init(into_alloc_frames_fn)
+    paging::init(into_alloc_frames_fn, layout)
         .inspect(|page_table| debug!("Done with paging::init(). page table: {:?}", page_table))
 }
 

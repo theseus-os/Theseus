@@ -58,6 +58,7 @@ impl TemporaryPage {
             page.ok_or("Couldn't allocate a new Page for the temporary P4 table frame")?,
             frame,
             PteFlags::WRITABLE,
+            true,
         )?;
         Ok(TemporaryPage {
             mapped_page,

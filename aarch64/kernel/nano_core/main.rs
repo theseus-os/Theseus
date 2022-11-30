@@ -12,13 +12,16 @@ extern crate memory;
 
 use alloc::vec;
 use core::arch::asm;
+use alloc::vec::Vec;
 
 use uefi::{prelude::entry, Status, Handle, table::{SystemTable, Boot, boot::MemoryType}};
 
 use frame_allocator::{PhysicalMemoryRegion, MemoryRegionType};
-use memory_structs::{PAGE_SIZE, PhysicalAddress, Frame, FrameRange};
+use memory_structs::{PAGE_SIZE, PteFlags, PhysicalAddress, Frame, FrameRange};
 
 use log::{info, error};
+
+mod uefi_conv;
 
 #[inline(never)]
 extern "C" fn inf_loop_0xbeef() -> ! {
@@ -41,8 +44,23 @@ fn main(
 
     let safety = 16;
 
+    let dummy = [ 0xdeadbeefu32 ];
+
+    info!("dummy address: {:?}", dummy.as_ptr());
+
     let mmap_size = boot_svc.memory_map_size();
     let mut mmap = vec![0; mmap_size.map_size + safety * mmap_size.entry_size];
+
+    let mut mapped_regions = 0;
+    {
+        let (_, layout) = boot_svc.memory_map(&mut mmap).unwrap();
+        for descriptor in layout {
+            if descriptor.ty != MemoryType::CONVENTIONAL {
+                mapped_regions += 1;
+            }
+        }
+    }
+    let mut mapped_regions = Vec::with_capacity(mapped_regions + safety);
 
     let (_runtime_svc, mem_iter) = system_table.exit_boot_services(handle, &mut mmap)
         .map_err(|_| "nano_core::main - couldn't exit uefi boot services")?;
@@ -54,11 +72,14 @@ fn main(
     let mut reserved_index = 0;
 
     for descriptor in mem_iter {
-        let size = descriptor.page_count as usize * PAGE_SIZE;
+        let page_count = descriptor.page_count as usize;
+        let size = page_count * PAGE_SIZE;
         if size > 0 {
-            let (dst, index, region_type) = match descriptor.ty {
-                MemoryType::CONVENTIONAL => (&mut free_regions, &mut free_index, MemoryRegionType::Free),
-                _ => (&mut reserved_regions, &mut reserved_index, MemoryRegionType::Reserved),
+            let region_type = uefi_conv::convert_mem(descriptor.ty);
+            let (dst, index) = match region_type {
+                MemoryRegionType::Free => (&mut free_regions, &mut free_index),
+                MemoryRegionType::Reserved => (&mut reserved_regions, &mut reserved_index),
+                MemoryRegionType::Unknown => (&mut reserved_regions, &mut reserved_index),
             };
 
             let start_addr = descriptor.phys_start as usize;
@@ -69,15 +90,26 @@ fn main(
             let last_frame = Frame::containing_address(end_addr - 1);
 
             let range = FrameRange::new(first_frame, last_frame);
-            let region = PhysicalMemoryRegion::new(range, region_type);
 
-            dst[*index] = Some(region);
-            *index += 1;
+            if let Some(flags) = uefi_conv::get_mem_flags(descriptor.ty) {
+                // info!("{:?} ({}) -> {:?} -> {:?}", start_addr, page_count, flags, descriptor.ty);
+                mapped_regions.push((start_addr, page_count, flags));
+            }
+
+            if region_type != MemoryRegionType::Unknown {
+                let region = PhysicalMemoryRegion::new(range, region_type);
+                dst[*index] = Some(region);
+                *index += 1;
+            }
         }
     }
 
+    let uart_phys_addr = PhysicalAddress::new(0x0900_0000).unwrap();
+    mapped_regions.push((uart_phys_addr, 1, PteFlags::DEVICE_MEMORY | PteFlags::NOT_EXECUTABLE | PteFlags::WRITABLE));
+
     info!("Calling memory::init();");
-    let page_table = memory::init(&free_regions, &reserved_regions)?;
+    let iter = mapped_regions.drain(..);
+    info!("page table: {:?}", memory::init(&free_regions, &reserved_regions, iter));
 
     info!("Going to infinite loop now.");
     inf_loop_0xbeef();

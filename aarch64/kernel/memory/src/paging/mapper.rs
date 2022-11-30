@@ -67,24 +67,38 @@ impl Mapper {
         }
     }
 
-    pub(crate) fn p4(&self) -> &Table<Level4> {
-        unsafe { self.p4.as_ref() }
+    /// With `active` set to true, you indicate that the
+    /// modified table is currently used by the CPU, in which case
+    /// it will be accessed using the recursive paging special entry.
+    /// Otherwise, the code assumes we are in identity-mapping, and
+    /// the physical addresses in a table are used as virtual addresses.
+    unsafe fn p4_ptr(&self, active: bool) -> *mut Table<Level4> {
+        match active {
+            true => self.p4.as_ptr(),
+            false => self.target_p4.start_address().value() as *mut _
+        }
     }
 
-    pub(crate) fn p4_mut(&mut self) -> &mut Table<Level4> {
-        unsafe { self.p4.as_mut() }
+    pub(crate) fn p4(&self, active: bool) -> &Table<Level4> {
+        unsafe { self.p4_ptr(active).as_ref().unwrap() }
+    }
+
+    pub(crate) fn p4_mut(&mut self, active: bool) -> &mut Table<Level4> {
+        unsafe { self.p4_ptr(active).as_mut().unwrap() }
     }
 
     /// Dumps all page table entries at all four page table levels for the given `VirtualAddress`, 
     /// and also shows their `PteFlags`.
     /// 
     /// The page table details are written to the the given `writer`.
+    ///
+    /// This method assumes that the modified page is active
     pub fn dump_pte<W: Write>(&self, writer: &mut W, virtual_address: VirtualAddress) -> fmt::Result {
         let page = Page::containing_address(virtual_address);
-        let p4  = self.p4();
-        let p3  = p4.next_table(page.p4_index());
-        let p2  = p3.and_then(|p3| p3.next_table(page.p3_index()));
-        let p1  = p2.and_then(|p2| p2.next_table(page.p2_index()));
+        let p4  = self.p4(true);
+        let p3  = p4.next_table(page.p4_index(), true);
+        let p2  = p3.and_then(|p3| p3.next_table(page.p3_index(), true));
+        let p1  = p2.and_then(|p2| p2.next_table(page.p2_index(), true));
         write!(
             writer,
             "VirtualAddress: {:#X}:
@@ -105,6 +119,8 @@ impl Mapper {
     }
 
     /// Translates a `VirtualAddress` to a `PhysicalAddress` by walking the page tables.
+    ///
+    /// This method assumes that the modified page is active
     pub fn translate(&self, virtual_address: VirtualAddress) -> Option<PhysicalAddress> {
         // get the frame number of the page containing the given virtual address,
         // and then the corresponding physical address is that page frame number * page size + offset
@@ -113,8 +129,10 @@ impl Mapper {
     }
 
     /// Translates a virtual memory `Page` to a physical memory `Frame` by walking the page tables.
+    ///
+    /// This method assumes that the modified page is active
     pub fn translate_page(&self, page: Page) -> Option<Frame> {
-        let p3 = self.p4().next_table(page.p4_index());
+        let p3 = self.p4(true).next_table(page.p4_index(), true);
 
         // Temporarily removing these checks while we
         // Learn how to create huge pages on aarch64.
@@ -132,7 +150,7 @@ impl Mapper {
                         )));
                     }
                 }
-                if let Some(p2) = p3.next_table(page.p3_index()) {
+                if let Some(p2) = p3.next_table(page.p3_index(), true) {
                     let p2_entry = &p2[page.p2_index()];
                     // 2MiB page?
                     if let Some(start_frame) = p2_entry.pointed_frame() {
@@ -150,8 +168,8 @@ impl Mapper {
         };
         */
 
-        p3.and_then(|p3| p3.next_table(page.p3_index()))
-            .and_then(|p2| p2.next_table(page.p2_index()))
+        p3.and_then(|p3| p3.next_table(page.p3_index(), true))
+            .and_then(|p2| p2.next_table(page.p2_index(), true))
             .and_then(|p1| p1[page.p1_index()].pointed_frame())
             // .or_else(huge_page)
     }
@@ -162,11 +180,18 @@ impl Mapper {
     /// 
     /// Returns a tuple of the new `MappedPages` object containing the allocated `pages`
     /// and the allocated `frames` object.
+    /// 
+    /// With `active` set to true, you indicate that the
+    /// modified table is currently used by the CPU, in which case
+    /// it will be accessed using the recursive paging special entry.
+    /// Otherwise, the code assumes we are in identity-mapping, and
+    /// the physical addresses in a table are used as virtual addresses.
     pub(super) fn internal_map_to(
         &mut self,
         pages: AllocatedPages,
         frames: AllocatedFrames,
         flags: PteFlags,
+        active: bool,
     ) -> Result<(MappedPages, AllocatedFrames), &'static str> {
         let mut top_level_flags = flags.clone() | PteFlags::VALID;
         // P4, P3, and P2 entries should never set NOT_EXECUTABLE, only the lowest-level P1 entry should. 
@@ -189,9 +214,9 @@ impl Mapper {
 
         // iterate over pages and frames in lockstep
         for (page, frame) in pages.deref().clone().into_iter().zip(frames.into_iter()) {
-            let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags);
-            let p2 = p3.next_table_create(page.p3_index(), top_level_flags);
-            let p1 = p2.next_table_create(page.p2_index(), top_level_flags);
+            let p3 = self.p4_mut(active).next_table_create(page.p4_index(), top_level_flags, active)?;
+            let p2 = p3.next_table_create(page.p3_index(), top_level_flags, active)?;
+            let p1 = p2.next_table_create(page.p2_index(), top_level_flags, active)?;
 
             if !p1[page.p1_index()].is_unused() {
                 error!("map_allocated_pages_to(): page {:#X} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
@@ -215,13 +240,20 @@ impl Mapper {
     /// Maps the given virtual `AllocatedPages` to the given physical `AllocatedFrames`.
     /// 
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
+    /// 
+    /// With `active` set to true, you indicate that the
+    /// modified table is currently used by the CPU, in which case
+    /// it will be accessed using the recursive paging special entry.
+    /// Otherwise, the code assumes we are in identity-mapping, and
+    /// the physical addresses in a table are used as virtual addresses.
     pub fn map_allocated_pages_to(
         &mut self,
         pages: AllocatedPages,
         frames: AllocatedFrames,
         flags: PteFlags,
+        active: bool,
     ) -> Result<MappedPages, &'static str> {
-        let (mapped_pages, frames) = self.internal_map_to(pages, frames, flags)?;
+        let (mapped_pages, frames) = self.internal_map_to(pages, frames, flags, active)?;
         
         // Currently we forget the actual `AllocatedFrames` object because
         // there is no easy/efficient way to store a dynamic list of non-contiguous frames (would require Vec).
@@ -236,6 +268,8 @@ impl Mapper {
     /// Maps the given `AllocatedPages` to randomly chosen (allocated) physical frames.
     /// 
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
+    ///
+    /// This method assumes that the modified page is active
     pub fn map_allocated_pages(&mut self, pages: AllocatedPages, flags: PteFlags)
         -> Result<MappedPages, &'static str>
     {
@@ -252,9 +286,9 @@ impl Mapper {
         for page in pages.deref().clone() {
             let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
 
-            let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags);
-            let p2 = p3.next_table_create(page.p3_index(), top_level_flags);
-            let p1 = p2.next_table_create(page.p2_index(), top_level_flags);
+            let p3 = self.p4_mut(true).next_table_create(page.p4_index(), top_level_flags, true)?;
+            let p2 = p3.next_table_create(page.p3_index(), top_level_flags, true)?;
+            let p1 = p2.next_table_create(page.p2_index(), top_level_flags, true)?;
 
             if !p1[page.p1_index()].is_unused() {
                 error!("map_allocated_pages(): page {:#X} -> frame {:#X}, page was already in use!",
@@ -289,6 +323,8 @@ impl Mapper {
     /// As such, the pages mapped here will be marked as non-`EXCLUSIVE`, regardless of the `flags` passed in.
     /// 
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
+    ///
+    /// This method assumes that the modified page is active
     #[doc(hidden)]
     pub unsafe fn map_to_non_exclusive(mapper: &mut Self, pages: AllocatedPages, frames: &AllocatedFrames, flags: PteFlags)
         -> Result<MappedPages, &'static str>
@@ -317,9 +353,9 @@ impl Mapper {
 
         // iterate over pages and frames in lockstep
         for (page, frame) in pages.deref().clone().into_iter().zip(frames.into_iter()) {
-            let p3 = mapper.p4_mut().next_table_create(page.p4_index(), top_level_flags);
-            let p2 = p3.next_table_create(page.p3_index(), top_level_flags);
-            let p1 = p2.next_table_create(page.p2_index(), top_level_flags);
+            let p3 = mapper.p4_mut(true).next_table_create(page.p4_index(), top_level_flags, true)?;
+            let p2 = p3.next_table_create(page.p3_index(), top_level_flags, true)?;
+            let p1 = p2.next_table_create(page.p2_index(), top_level_flags, true)?;
 
             if !p1[page.p1_index()].is_unused() {
                 error!("map_to_non_exclusive(): page {:#X} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
@@ -512,6 +548,8 @@ impl MappedPages {
     ///
     /// Note that attempting to change certain "reserved" flags will have no effect. 
     /// For example, arbitrarily setting the `EXCLUSIVE` bit would cause unsafety, so it cannot be changed.
+    ///
+    /// This method assumes that the modified page is active
     pub fn remap(&mut self, active_table_mapper: &mut Mapper, new_flags: PteFlags) -> Result<(), &'static str> {
         if self.size_in_pages() == 0 { return Ok(()); }
 
@@ -525,10 +563,10 @@ impl MappedPages {
         }
 
         for page in self.pages.clone() {
-            let p1 = active_table_mapper.p4_mut()
-                .next_table_mut(page.p4_index())
-                .and_then(|p3| p3.next_table_mut(page.p3_index()))
-                .and_then(|p2| p2.next_table_mut(page.p2_index()))
+            let p1 = active_table_mapper.p4_mut(true)
+                .next_table_mut(page.p4_index(), true)
+                .and_then(|p3| p3.next_table_mut(page.p3_index(), true))
+                .and_then(|p2| p2.next_table_mut(page.p2_index(), true))
                 .ok_or("mapping code does not support huge pages")?;
             
             p1[page.p1_index()].set_flags(new_flags | PteFlags::VALID);
@@ -583,6 +621,7 @@ impl MappedPages {
     ///       We could then use `mem::replace(&mut self, MappedPages::empty())` in the drop handler 
     ///       to obtain ownership of `self`, which would allow us to transfer ownership of the dropped `MappedPages` here.
     ///
+    /// This method assumes that the modified page is active
     fn unmap(&mut self, active_table_mapper: &mut Mapper) -> Result<Option<AllocatedFrames>, &'static str> {
         if self.size_in_pages() == 0 { return Ok(None); }
 
@@ -601,10 +640,10 @@ impl MappedPages {
         let mut current_frame_range: Option<AllocatedFrames> = None;
 
         for page in self.pages.clone() {            
-            let p1 = active_table_mapper.p4_mut()
-                .next_table_mut(page.p4_index())
-                .and_then(|p3| p3.next_table_mut(page.p3_index()))
-                .and_then(|p2| p2.next_table_mut(page.p2_index()))
+            let p1 = active_table_mapper.p4_mut(true)
+                .next_table_mut(page.p4_index(), true)
+                .and_then(|p3| p3.next_table_mut(page.p3_index(), true))
+                .and_then(|p2| p2.next_table_mut(page.p2_index(), true))
                 .ok_or("mapping code does not support huge pages")?;
             let pte = &mut p1[page.p1_index()];
             if pte.is_unused() {

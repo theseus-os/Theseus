@@ -22,6 +22,7 @@ pub use self::{
         Mapper, MappedPages, BorrowedMappedPages, BorrowedSliceMappedPages,
         Mutability, Mutable, Immutable,
     },
+    table::{Table, Level4},
 };
 
 use core::{
@@ -30,7 +31,10 @@ use core::{
 };
 use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
     AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
-    tlb_flush_all, tlb_flush_virt_addr, get_p4, set_page_table_up};
+    allocate_frames_at, allocate_frames, allocate_pages_at,
+    tlb_flush_by_theseus_asid, tlb_flush_virt_addr, get_p4,
+    configure_translation_registers, disable_mmu, enable_mmu,
+    set_page_table_addr};
 use no_drop::NoDrop;
 use kernel_config::memory::{RECURSIVE_P4_INDEX};
 // use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
@@ -92,24 +96,18 @@ impl PageTable {
     /// Note that this new page table has no current mappings beyond the recursive P4 mapping,
     /// so you will need to create or copy over any relevant mappings 
     /// before using (switching) to this new page table in order to ensure the system keeps running.
-    pub fn new_table(
-        current_page_table: &mut PageTable,
-        new_p4_frame: AllocatedFrames,
-        page: Option<AllocatedPages>,
-    ) -> Result<PageTable, &'static str> {
-        let p4_frame = *new_p4_frame.start();
+    pub fn new_table(new_p4_frame: AllocatedFrames) -> Result<PageTable, &'static str> {
+        let p4_frame = new_p4_frame.start_address().value();
+        // assumes that we are in identity-mapping
+        let table = unsafe { (p4_frame as *mut Table<Level4>).as_mut() }.ok_or("damn")?;
+        table.zero();
 
-        let mut temporary_page = TemporaryPage::create_and_map_table_frame(page, new_p4_frame, current_page_table)?;
-        temporary_page.with_table_and_frame(|table, frame| {
-            table.zero();
-            table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), PteFlags::VALID | PteFlags::WRITABLE);
-        })?;
-
-        let (_temp_page, inited_new_p4_frame) = temporary_page.unmap_into_parts(current_page_table)?;
+        let flags = PteFlags::VALID | PteFlags::NOT_EXECUTABLE | PteFlags::WRITABLE;
+        table[RECURSIVE_P4_INDEX].set_entry(new_p4_frame.as_allocated_frame(), flags);
 
         Ok(PageTable {
-            mapper: Mapper::with_p4_frame(p4_frame),
-            p4_table: inited_new_p4_frame.ok_or("BUG: PageTable::new_table(): failed to take back unmapped Frame for p4_table")?,
+            mapper: Mapper::with_p4_frame(*new_p4_frame.as_allocated_frame()),
+            p4_table: new_p4_frame,
         })
     }
 
@@ -138,8 +136,8 @@ impl PageTable {
 
         // overwrite recursive mapping
         let p4_flags = PteFlags::VALID | PteFlags::WRITABLE | PteFlags::ACCESSED;
-        self.p4_mut()[RECURSIVE_P4_INDEX].set_entry(other_table.p4_table.as_allocated_frame(), p4_flags); 
-        tlb_flush_all();
+        self.p4_mut(true)[RECURSIVE_P4_INDEX].set_entry(other_table.p4_table.as_allocated_frame(), p4_flags); 
+        tlb_flush_by_theseus_asid();
 
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
         self.mapper.target_p4 = *other_table.p4_table.start();
@@ -154,7 +152,7 @@ impl PageTable {
         temporary_page.with_table_and_frame(|p4_table, frame| {
             p4_table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), PteFlags::VALID | PteFlags::WRITABLE);
         })?;
-        tlb_flush_all();
+        tlb_flush_by_theseus_asid();
 
         // Here, recover the current page table's p4 frame and restore it into this current page table,
         // since we removed it earlier at the top of this function and gave it to the temporary page. 
@@ -181,7 +179,7 @@ impl PageTable {
         };
 
         #[cfg(target_arch = "aarch64")]
-        set_page_table_up(new_table.physical_address());
+        set_page_table_addr(new_table.physical_address());
     }
 
 
@@ -200,18 +198,66 @@ pub fn get_current_p4() -> Frame {
 /// Initializes a new page table and sets up all necessary mappings for the kernel to continue running. 
 /// Returns the kernel's current PageTable, if successful.
 /// Otherwise, it returns a str error message. 
-pub fn init(into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames) -> Result<PageTable, &'static str> {
+pub fn init(
+    into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames,
+    layout: impl Iterator<Item = (PhysicalAddress, usize, PteFlags)>,
+) -> Result<PageTable, &'static str> {
     // Store the callback from `frame_allocator::init()` that allows the `Mapper` to convert
     // `page_table_entry::UnmappedFrames` back into `AllocatedFrames`.
     mapper::INTO_ALLOCATED_FRAMES_FUNC.call_once(|| into_alloc_frames_fn);
 
+    // Modifying the established page table could lead to
+    // unwanted faults because we don't know if it uses
+    // 4 levels and it could contain block mappings, which
+    // we don't support. UEFI makes our code run in an
+    // identity-mapped AS anyway, so by disabling the MMU
+    // we don't have to map frames temporarily while building
+    // the new theseus-made page table.
+    disable_mmu();
+
     // bootstrap a PageTable from the currently-loaded page table
     let current_p4 = get_current_p4().start_address();
-    let current_active_p4 = frame_allocator::allocate_frames_at(current_p4, 1)?;
-    let current_page_table = PageTable::from_current(current_active_p4)?;
-    debug!("Bootstrapped initial {:?}", current_page_table);
+    let current_active_p4 = allocate_frames_at(current_p4, 1)?;
+    let mut page_table = PageTable::from_current(current_active_p4)?;
+    debug!("Bootstrapped initial {:?}", page_table);
 
-    // todo: build new page table and switch to it
+    let new_p4_frame = allocate_frames(1).ok_or("couldn't allocate frame for new page table")?;
+    debug!("new_p4_frame {:?}", new_p4_frame);
 
-    Ok(current_page_table)
+    let mut new_table = PageTable::new_table(new_p4_frame)?;
+    debug!("Created new table {:?}", new_table);
+
+    let mut map_region = |phys_addr: PhysicalAddress, num_frames, flags| -> Result<(), &'static str> {
+        let virt_addr = VirtualAddress::new(phys_addr.value())
+            .ok_or("VirtualAddress::new failed - paging/mod.rs")?;
+
+        let frames = allocate_frames_at(phys_addr, num_frames)?;
+        let pages = allocate_pages_at(virt_addr, num_frames)?;
+
+        NoDrop::new(new_table.map_allocated_pages_to(pages, frames, flags, false)?);
+
+        Ok(())
+    };
+
+    // uefi = identity mapped so virt_addr = phys_addr
+    for (phys_addr, num_frames, flags) in layout {
+        if let Err(error_msg) = map_region(phys_addr, num_frames, flags) {
+            warn!("Early remapping: {}; addr={:?} n={} flags={:?}",
+                error_msg, phys_addr, num_frames, flags);
+        }
+    }
+
+    debug!("Switching to the new page table");
+    page_table.switch(&new_table);
+
+    debug!("Configuring translation registers");
+    configure_translation_registers();
+
+    debug!("Re-enabling the MMU");
+    enable_mmu();
+
+    debug!("Flushing the TLB");
+    tlb_flush_by_theseus_asid();
+
+    Ok(new_table)
 }
