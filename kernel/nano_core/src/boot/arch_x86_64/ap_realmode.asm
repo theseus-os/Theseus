@@ -4,10 +4,10 @@ ABSOLUTE 0x5000
 VBECardInfo:
 	.signature             resb 4
 	.version               resw 1
-	.oemstring             resd 1
+	.oemstringptr          resd 1
 	.capabilities          resd 1
 	.videomodeptr          resd 1
-	.totalmemory           resw 1
+	.totalmemory64KiB      resw 1
 	.oemsoftwarerev        resw 1
 	.oemvendornameptr      resd 1
 	.oemproductnameptr     resd 1
@@ -18,14 +18,14 @@ VBECardInfo:
 ABSOLUTE 0x5200
 VBEModeInfo:
 	.attributes            resw 1
-	.winA                  resb 1
-	.winB                  resb 1
-	.granularity           resw 1
+	.winAattr              resb 1
+	.winBattr              resb 1
+	.wingranularity        resw 1
 	.winsize               resw 1
-	.segmentA              resw 1
-	.segmentB              resw 1
+	.winAsegment           resw 1
+	.winBsegment           resw 1
 	.winfuncptr            resd 1
-	.pitch                 resw 1
+	.bytesperscanline      resw 1
 	.width                 resw 1
 	.height                resw 1
 	.xcharsize             resb 1
@@ -34,9 +34,9 @@ VBEModeInfo:
 	.bitsperpixel          resb 1
 	.numberofbanks         resb 1
 	.memorymodel           resb 1
-	.banksize              resb 1
+	.banksizeKiB           resb 1
 	.numberofimagepages    resb 1
-	.unused                resb 1
+	.reserved0             resb 1
 	.redmasksize           resb 1
 	.redfieldposition      resb 1
 	.greenmasksize         resb 1
@@ -47,9 +47,10 @@ VBEModeInfo:
 	.rsvdfieldposition     resb 1
 	.directcolormodeinfo   resb 1
 	.physbaseptr           resd 1
-	.offscreenmemoryoffset resd 1
-	.offscreenmemsize      resw 1
-	.reserved              resb 206
+	.reserved1             resd 1
+	.reserved2             resw 1
+    .reserved_vbe3         resb 13
+	.reserved3             resb 189
 
 ABSOLUTE 0x5400
 current:
@@ -61,7 +62,8 @@ best_mode:
     .width                 resw 1
     .height                resw 1
     .physaddr              resd 1
-
+	.attributes            resw 1
+	.totalmemory64KiB      resw 1
 
 section .init.realmodetext16 progbits alloc exec nowrite
 bits 16 ; we're in real mode, that's how APs boot up
@@ -114,11 +116,14 @@ ap_start_realmode:
 
 ; This is the start of the graphics mode code. 
 ; First, initialize both our "best" mode info and the Rust-visible GraphicInfo to all zeros.
-    mov word [best_mode.mode],       0
-    mov word [best_mode.width],      0
-    mov word [best_mode.height],     0
-    mov word [best_mode.physaddr],   0
-    mov word [best_mode.physaddr+2], 0
+    mov word [best_mode.mode],             0
+    mov word [best_mode.width],            0
+    mov word [best_mode.height],           0
+    mov word [best_mode.physaddr],         0
+    mov word [best_mode.physaddr+2],       0
+    mov word [best_mode.attributes],       0
+    mov word [best_mode.totalmemory64KiB], 0
+    
     ; WARNING: the below code must be kept in sync with the `GraphicInfo` struct 
     ;          in the `multicore_bringup` crate. 
     push di
@@ -207,6 +212,10 @@ get_vbe_card_info:
     mov word [best_mode.physaddr], ax
     mov word ax, [VBEModeInfo.physbaseptr+2]
     mov word [best_mode.physaddr+2], ax
+    mov word ax, [VBEModeInfo.attributes]
+    mov word [best_mode.attributes], ax
+    mov word ax, [VBECardInfo.totalmemory64KiB]
+    mov word [best_mode.totalmemory64KiB], ax
     jmp .next_mode    ; we may find better modes later, so keep iterating!
 
 ; Once we have iterated over all available graphic modes, we jump here to
@@ -222,22 +231,23 @@ mode_iter_done:
     ; copy the best mode's width to [0:F100]
     mov word ax, [best_mode.width]
     mov word [es:di+0], ax
-    mov word [es:di+2], 0
-    mov word [es:di+4], 0
-    mov word [es:di+6], 0
-    ; copy the best mode's height to [0:F108]
+    ; copy the best mode's height to [0:F102]
     mov word ax, [best_mode.height]
-    mov word [es:di+ 8], ax
-    mov word [es:di+10], 0
-    mov word [es:di+12], 0
-    mov word [es:di+14], 0
-    ; move the best mode's 32-bit physical address to [0:F110]
+    mov word [es:di+2], ax
+    ; move the best mode's 32-bit physical address to [0:F104]
     mov word ax, [best_mode.physaddr]
-    mov word [es:di+16], ax
+    mov word [es:di+4], ax
     mov word ax, [best_mode.physaddr+2]
-    mov word [es:di+18], ax
-    mov word [es:di+20], 0
-    mov word [es:di+22], 0
+    mov word [es:di+6], ax
+    ; move the best mode's mode value to [0:F108]
+    mov word ax, [best_mode.mode]
+    mov word [es:di+8], ax
+    ; move the best mode's attributes value to [0:F10A]
+    mov word ax, [best_mode.attributes]
+    mov word [es:di+10], ax
+    ; move the best mode's totalmemory64KiB value to [0:F10C]
+    mov word ax, [best_mode.totalmemory64KiB]
+    mov word [es:di+12], ax
     pop di
 
 ; Finally, once we have saved the info of the best graphical mode,
