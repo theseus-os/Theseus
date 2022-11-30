@@ -28,14 +28,18 @@ pub fn init<P: Pixel>() -> Result<Framebuffer<P>, &'static str> {
     let buffer_height: usize;
     {
         let graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
-        info!("Using graphical framebuffer, {} x {}, at paddr {:#X}", graphic_info.width, graphic_info.height, graphic_info.physical_address);
-        if graphic_info.physical_address == 0 {
+        info!("Graphical framebuffer info: {} x {}, at paddr {:#X}",
+            graphic_info.width(),
+            graphic_info.height(),
+            graphic_info.physical_address(),
+        );
+        if graphic_info.physical_address() == 0 {
             return Err("Failed to get graphic mode information!");
         }
-        vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address as usize)
+        vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address() as usize)
             .ok_or("Graphic mode physical address was invalid")?;
-        buffer_width = graphic_info.width as usize;
-        buffer_height = graphic_info.height as usize;
+        buffer_width = graphic_info.width() as usize;
+        buffer_height = graphic_info.height() as usize;
     };
 
     // create and return the final framebuffer
