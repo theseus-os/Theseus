@@ -186,6 +186,10 @@
 <span id="186">186</span>
 <span id="187">187</span>
 <span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate defines a `Framebuffer` structure, which is effectively a region of memory
 //! that is interpreted as a 2-D array of pixels.
 
@@ -216,14 +220,18 @@
     <span class="kw">let </span>buffer_height: usize;
     {
         <span class="kw">let </span>graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
-        <span class="macro">info!</span>(<span class="string">&quot;Using graphical framebuffer, {} x {}, at paddr {:#X}&quot;</span>, graphic_info.width, graphic_info.height, graphic_info.physical_address);
-        <span class="kw">if </span>graphic_info.physical_address == <span class="number">0 </span>{
+        <span class="macro">info!</span>(<span class="string">&quot;Graphical framebuffer info: {} x {}, at paddr {:#X}&quot;</span>,
+            graphic_info.width(),
+            graphic_info.height(),
+            graphic_info.physical_address(),
+        );
+        <span class="kw">if </span>graphic_info.physical_address() == <span class="number">0 </span>{
             <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Failed to get graphic mode information!&quot;</span>);
         }
-        vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address <span class="kw">as </span>usize)
+        vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address() <span class="kw">as </span>usize)
             .ok_or(<span class="string">&quot;Graphic mode physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
-        buffer_width = graphic_info.width <span class="kw">as </span>usize;
-        buffer_height = graphic_info.height <span class="kw">as </span>usize;
+        buffer_width = graphic_info.width() <span class="kw">as </span>usize;
+        buffer_height = graphic_info.height() <span class="kw">as </span>usize;
     };
 
     <span class="comment">// create and return the final framebuffer

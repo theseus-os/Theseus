@@ -363,6 +363,53 @@
 <span id="363">363</span>
 <span id="364">364</span>
 <span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Functions for initializing and bringing up other CPU cores. 
 //! 
 //! These functions are intended to be invoked from the main core
@@ -413,11 +460,7 @@
 </span><span class="kw">const </span>GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE: usize = <span class="number">0x100</span>;
 
 <span class="doccomment">/// Graphic mode information that will be updated after `handle_ap_cores()` is invoked. 
-</span><span class="kw">pub static </span>GRAPHIC_INFO: Mutex&lt;GraphicInfo&gt; = Mutex::new(GraphicInfo {
-    width: <span class="number">0</span>,
-    height: <span class="number">0</span>,
-    physical_address: <span class="number">0</span>,
-});
+</span><span class="kw">pub static </span>GRAPHIC_INFO: Mutex&lt;GraphicInfo&gt; = Mutex::new(GraphicInfo::new());
 
 <span class="doccomment">/// A structure to access information about the graphical framebuffer mode
 /// that was discovered and chosen in the AP&#39;s real-mode initialization sequence.
@@ -425,11 +468,62 @@
 /// # Struct format
 /// The layout of fields in this struct must be kept in sync with the code in 
 /// `ap_realmode.asm` that writes to this structure.
-</span><span class="attr">#[derive(FromBytes, Clone, Debug)]
+</span><span class="attr">#[derive(FromBytes, Clone, Copy, Debug)]
+#[repr(packed)]
 </span><span class="kw">pub struct </span>GraphicInfo {
-    <span class="kw">pub </span>width: u64,
-    <span class="kw">pub </span>height: u64,
-    <span class="kw">pub </span>physical_address: u64,
+    <span class="doccomment">/// The visible width of the screen, in pixels.
+    </span>width: u16,
+    <span class="doccomment">/// The visible height of the screen, in pixels.
+    </span>height: u16,
+    <span class="doccomment">/// The physical address of the primary framebuffer memory.
+    </span>physical_address: u32,
+    <span class="doccomment">/// The `mode` that the VGA is currently operating in.
+    ///
+    /// This is a bitfield that Theseus doesn&#39;t currently use.
+    </span>_mode: u16,
+    <span class="doccomment">/// The attribute bitfield that describes the VGA mode&#39;s capabilities.
+    ///
+    /// This is a bitfield that Theseus doesn&#39;t currently use.
+    </span>_attributes: u16,
+    <span class="doccomment">/// The total size of the graphic VGA memory in 64 KiB chunks.
+    </span>total_memory_size_64_kib_chunks: u16,
+}
+
+<span class="kw">impl </span>GraphicInfo {
+    <span class="kw">const fn </span>new() -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            width: <span class="number">0</span>,
+            height: <span class="number">0</span>,
+            physical_address: <span class="number">0</span>,
+            _mode: <span class="number">0</span>,
+            _attributes: <span class="number">0</span>,
+            total_memory_size_64_kib_chunks: <span class="number">0</span>,
+        }
+    }
+
+    <span class="doccomment">/// Returns the visible width of the screen, in pixels.
+    </span><span class="kw">pub fn </span>width(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u16 {
+        <span class="self">self</span>.width
+    }
+
+    <span class="doccomment">/// Returns the height width of the screen, in pixels.
+    </span><span class="kw">pub fn </span>height(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u16 {
+        <span class="self">self</span>.height
+    }
+
+    <span class="doccomment">/// Returns the physical address of the primary framebuffer memory.
+    </span><span class="kw">pub fn </span>physical_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
+        <span class="self">self</span>.physical_address
+    }
+
+    <span class="doccomment">/// Returns the total size in bytes of the VGA graphics memory.
+    ///
+    /// This memory contains the framebuffer as well as any extra visible
+    /// displayable memory, which can be used for any graphics purposes,
+    /// e.g., a backbuffer for double buffering (aka page flipping).
+    </span><span class="kw">pub fn </span>total_memory_size_in_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
+        (<span class="self">self</span>.total_memory_size_64_kib_chunks <span class="kw">as </span>u32) &lt;&lt; <span class="number">16
+    </span>}
 }
 
 <span class="doccomment">/// Starts up and sets up AP cores based on system information from ACPI
