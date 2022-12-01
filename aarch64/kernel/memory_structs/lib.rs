@@ -5,7 +5,6 @@
 
 #[macro_use] extern crate derive_more;
 extern crate bit_field;
-pub extern crate pte_flags;
 extern crate kernel_config;
 extern crate zerocopy;
 extern crate paste;
@@ -21,11 +20,6 @@ use zerocopy::FromBytes;
 use paste::paste;
 
 pub use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER};
-
-pub use pte_flags::{PteFlags, PteFlagsArch};
-
-// should be in pte_flags, putting it here temporarily
-pub const PAGE_TABLE_ENTRY_FRAME_MASK: u64 = 0x000_0FFFFFFFFF_000;
 
 /// A macro for defining `VirtualAddress` and `PhysicalAddress` structs
 /// and implementing their common traits, which are generally identical.

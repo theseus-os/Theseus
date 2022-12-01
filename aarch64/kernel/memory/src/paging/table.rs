@@ -9,7 +9,7 @@
 
 use super::PageTableEntry;
 use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
-use memory_structs::PAGE_TABLE_ENTRY_FRAME_MASK;
+use pte_flags::PTE_FRAME_MASK;
 use super::super::{VirtualAddress, PteFlags};
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
@@ -67,7 +67,7 @@ impl<L: HierarchicalLevel> Table<L> {
                 true => (table_address << 9) | (index << PAGE_SHIFT),
 
                 // use the identity mapping
-                false => (self[index].value() & PAGE_TABLE_ENTRY_FRAME_MASK) as usize,
+                false => (self[index].value() & PTE_FRAME_MASK) as usize,
 
             };
             Some(VirtualAddress::new_canonical(next_table_vaddr))

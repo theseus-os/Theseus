@@ -1,6 +1,6 @@
 use frame_allocator::MemoryRegionType::{self, *};
 use uefi::table::boot::MemoryType;
-use memory_structs::PteFlags;
+use pte_flags::PteFlags;
 
 pub fn convert_mem(uefi: MemoryType) -> MemoryRegionType {
     match uefi {

@@ -20,6 +20,7 @@ memory_structs = { path = "../memory_structs" }
 page_allocator = { path = "../page_allocator" }
 frame_allocator = { path = "../frame_allocator" }
 page_table_entry = { path = "../page_table_entry" }
+pte_flags = { path = "../../../kernel/pte_flags" }
 no_drop = { path = "../no_drop" }
 
 memory_aarch64 = { path = "../memory_aarch64" }
