@@ -212,7 +212,7 @@ impl From<PteFlags> for PteFlagsAarch64 {
     /// * `OUTER_SHAREABLE` will be set.
     fn from(general: PteFlags) -> Self {
         let mut specific = Self::from_bits_truncate(general.bits());
-        specific.toggle(super::WRITABLE_BIT | super::GLOBAL_BIT);
+        specific.toggle(super::WRITABLE_BIT | super::GLOBAL_BIT | super::DEVICE_MEM_BIT);
         specific &= !Self::OVERWRITTEN_BITS_FOR_CONVERSION; // clear the masked bits
         specific |= Self::OUTER_SHAREABLE; // set the masked bits to their default
         specific
@@ -221,7 +221,7 @@ impl From<PteFlags> for PteFlagsAarch64 {
 
 impl From<PteFlagsAarch64> for PteFlags {
     fn from(mut specific: PteFlagsAarch64) -> Self {
-        specific.toggle(super::WRITABLE_BIT | super::GLOBAL_BIT);
+        specific.toggle(super::WRITABLE_BIT | super::GLOBAL_BIT | super::DEVICE_MEM_BIT);
         Self::from_bits_truncate(specific.bits())
     }
 }

@@ -89,9 +89,9 @@ bitflags! {
         /// * If set, this page maps device memory, which is non-cacheable.
         /// * If not set, this page maps normal memory, which is cacheable by default.
         //
-        // This does not require a conversion between architectures.
-        const DEVICE_MEMORY  = PteFlagsArch::DEVICE_MEMORY.bits();
-        
+        // This DOES require a conversion for aarch64, but not for x86_64.
+        const DEVICE_MEMORY = DEVICE_MEM_BIT.bits();
+
         /// * The hardware will set this bit when the page is accessed.
         /// * The OS can then clear this bit once it has acknowledged that the page was accessed,
         ///   if it cares at all about this information.
@@ -145,11 +145,13 @@ bitflags! {
 // The bits defined below have different semantics on x86_64 vs aarch64.
 // These are the ones that require special handling during From/Into conversions.
 cfg_if!{ if #[cfg(target_arch = "x86_64")] {
-    const WRITABLE_BIT: PteFlagsX86_64 = PteFlagsX86_64::WRITABLE;
-    const GLOBAL_BIT:   PteFlagsX86_64 = PteFlagsX86_64::_GLOBAL;
+    const DEVICE_MEM_BIT: PteFlagsX86_64 = PteFlagsX86_64::DEVICE_MEMORY;
+    const WRITABLE_BIT:   PteFlagsX86_64 = PteFlagsX86_64::WRITABLE;
+    const GLOBAL_BIT:     PteFlagsX86_64 = PteFlagsX86_64::_GLOBAL;
 } else if #[cfg(target_arch = "aarch64")] {
-    const WRITABLE_BIT: PteFlagsAarch64 = PteFlagsAarch64::READ_ONLY;
-    const GLOBAL_BIT:   PteFlagsAarch64 = PteFlagsAarch64::_NOT_GLOBAL;
+    const DEVICE_MEM_BIT: PteFlagsAarch64 = PteFlagsAarch64::NORMAL_MEMORY;
+    const WRITABLE_BIT:   PteFlagsAarch64 = PteFlagsAarch64::READ_ONLY;
+    const GLOBAL_BIT:     PteFlagsAarch64 = PteFlagsAarch64::_NOT_GLOBAL;
 }}
 
 /// See [`PteFlags::new()`] for what bits are set by default.
