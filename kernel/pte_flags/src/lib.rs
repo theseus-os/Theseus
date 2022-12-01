@@ -28,6 +28,7 @@
 
 use cfg_if::cfg_if;
 use bitflags::bitflags;
+use static_assertions::const_assert_ne;
 
 cfg_if!{ if #[cfg(any(target_arch = "x86_64", doc))] {
     mod pte_flags_x86_64;
@@ -90,7 +91,7 @@ bitflags! {
         /// * If not set, this page maps normal memory, which is cacheable by default.
         //
         // This DOES require a conversion for aarch64, but not for x86_64.
-        const DEVICE_MEMORY = DEVICE_MEM_BIT.bits();
+        const DEVICE_MEMORY = DEVICE_MEMORY_BITS.bits();
 
         /// * The hardware will set this bit when the page is accessed.
         /// * The OS can then clear this bit once it has acknowledged that the page was accessed,
@@ -145,14 +146,21 @@ bitflags! {
 // The bits defined below have different semantics on x86_64 vs aarch64.
 // These are the ones that require special handling during From/Into conversions.
 cfg_if!{ if #[cfg(target_arch = "x86_64")] {
-    const DEVICE_MEM_BIT: PteFlagsX86_64 = PteFlagsX86_64::DEVICE_MEMORY;
-    const WRITABLE_BIT:   PteFlagsX86_64 = PteFlagsX86_64::WRITABLE;
-    const GLOBAL_BIT:     PteFlagsX86_64 = PteFlagsX86_64::_GLOBAL;
+    const DEVICE_MEMORY_BITS: PteFlagsX86_64 = PteFlagsX86_64::DEVICE_MEMORY;
+    const WRITABLE_BIT:       PteFlagsX86_64 = PteFlagsX86_64::WRITABLE;
+    const GLOBAL_BIT:         PteFlagsX86_64 = PteFlagsX86_64::_GLOBAL;
 } else if #[cfg(target_arch = "aarch64")] {
-    const DEVICE_MEM_BIT: PteFlagsAarch64 = PteFlagsAarch64::NORMAL_MEMORY;
-    const WRITABLE_BIT:   PteFlagsAarch64 = PteFlagsAarch64::READ_ONLY;
-    const GLOBAL_BIT:     PteFlagsAarch64 = PteFlagsAarch64::_NOT_GLOBAL;
+    const DEVICE_MEMORY_BITS: PteFlagsAarch64 = PteFlagsAarch64::DEVICE_MEMORY;
+    const WRITABLE_BIT:       PteFlagsAarch64 = PteFlagsAarch64::READ_ONLY;
+    const GLOBAL_BIT:         PteFlagsAarch64 = PteFlagsAarch64::_NOT_GLOBAL;
 }}
+
+// Due to the way that the `bitflags` crate works, we can only use
+// non-zero bit flag values for the above definitions.
+const_assert_ne!(DEVICE_MEMORY_BITS.bits(), 0);
+const_assert_ne!(WRITABLE_BIT.bits(), 0);
+const_assert_ne!(GLOBAL_BIT.bits(), 0);
+
 
 /// See [`PteFlags::new()`] for what bits are set by default.
 impl Default for PteFlags {

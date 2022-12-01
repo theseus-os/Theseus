@@ -30,8 +30,8 @@ bitflags! {
     /// * The system has been configured to use 48-bit physical addresses
     ///   (aka "OA"s: Output Addresses).
     /// * The system has been configured to use only a single translation stage, Stage 1.
-    /// * The [MAIR] index 0 has a "DEVICE nGnRE" entry,
-    ///   and [MAIR] index 1 has a Normal + Outer Shareable entry.
+    /// * The [MAIR] index 0 has a Normal + Outer Shareable entry.
+    /// * The [MAIR] index 1 has a "DEVICE nGnRE" entry.
     ///
     /// [MAIR]: https://docs.rs/cortex-a/latest/cortex_a/registers/MAIR_EL1/index.html
     #[doc(cfg(target_arch = "aarch64"))]
@@ -48,33 +48,43 @@ bitflags! {
         const PAGE_DESCRIPTOR    = 1 << 1;
 
         /// Indicates the page's cacheability is described by MAIR Index 0.
+        ///
         /// Theseus uses this index for "normal" memory.
-        const MAIR_INDEX_0       = 0 << 2;
-        /// This page maps device memory, i.e., memory-mapped I/O registers.
-        /// Theseus uses `MAIR_INDEX_0` for this type of memory.
-        const DEVICE_MEMORY      = Self::MAIR_INDEX_0.bits;
-        /// Indicates the page's cacheability is described by MAIR Index 1.
-        /// Theseus uses this index for "device" memory.
-        const MAIR_INDEX_1       = 1 << 2;
+        const _MAIR_INDEX_0      = 0 << 2;
         /// This page maps "normal" memory, i.e., non-device memory.
+        ///
+        /// Theseus uses `MAIR_INDEX_0` for this type of memory.
+        const NORMAL_MEMORY      = Self::_MAIR_INDEX_0.bits;
+        /// Indicates the page's cacheability is described by MAIR Index 1.
+        ///
+        /// Theseus uses this index for "device" memory.
+        const _MAIR_INDEX_1      = 1 << 2;
+        /// This page maps device memory, i.e., memory-mapped I/O registers.
+        ///
         /// Theseus uses `MAIR_INDEX_1` for this type of memory.
-        const NORMAL_MEMORY      = Self::MAIR_INDEX_1.bits;
+        const DEVICE_MEMORY      = Self::_MAIR_INDEX_1.bits;
         /// Indicates the page's cacheability is described by MAIR Index 2.
+        ///
         /// This is unused in Theseus.
         const _MAIR_INDEX_2      = 2 << 2;
         /// Indicates the page's cacheability is described by MAIR Index 3.
+        ///
         /// This is unused in Theseus.
         const _MAIR_INDEX_3      = 3 << 2;
         /// Indicates the page's cacheability is described by MAIR Index 4.
+        ///
         /// This is unused in Theseus.
         const _MAIR_INDEX_4      = 4 << 2;
         /// Indicates the page's cacheability is described by MAIR Index 5.
+        ///
         /// This is unused in Theseus.
         const _MAIR_INDEX_5      = 5 << 2;
         /// Indicates the page's cacheability is described by MAIR Index 6.
+        ///
         /// This is unused in Theseus.
         const _MAIR_INDEX_6      = 6 << 2;
         /// Indicates the page's cacheability is described by MAIR Index 7.
+        ///
         /// This is unused in Theseus.
         const _MAIR_INDEX_7      = 7 << 2;
 
@@ -86,6 +96,8 @@ bitflags! {
 
         /// * If set, userspace (unprivileged mode) can access this page.
         /// * If not set, only kernelspace (privileged mode) can access this page.
+        ///
+        /// This is unused in Theseus because it is a single privilege level OS.
         const _USER_ACCESSIBLE   = 1 << 6;
 
         /// * If set, this page is read-only.
@@ -93,15 +105,20 @@ bitflags! {
         const READ_ONLY          = 1 << 7;
 
         /// Indicates that only a single CPU core may access this page.
+        ///
+        /// This is not used and not supported by Theseus; use [`Self::OUTER_SHAREABLE`].
         const _NON_SHAREABLE     = 0 << 8;
         // Shareable `0b01` is reserved.
         // const SHAREABLE_RSVD  = 1 << 8;
         /// Indicates that multiple CPUs from multiple clusters may access this page.
+        ///
         /// This is the default and the the only value used in Theseus (and most systems).
         const OUTER_SHAREABLE    = 2 << 8;
         /// Multiple cores from the same
         /// cluster can access this page.
         /// Indicates that multiple CPUs from only a single cluster may access this page.
+        ///
+        /// This is not used and not supported by Theseus; use [`Self::OUTER_SHAREABLE`].
         const _INNER_SHAREABLE   = 3 << 8;
 
         /// * The hardware will set this bit when the page is accessed.
@@ -112,6 +129,8 @@ bitflags! {
         /// when this page is first accessed and is trying to be cached in the TLB.
         /// This fault can only occur when the Access Flag bit is `0` and the flag is being
         /// managed by software.
+        ///
+        /// Thus, Theseus currently *always* sets this bit by default.
         const ACCESSED           = 1 << 10;
         /// * If set, this page is mapped into only one or less than all address spaces,
         ///   or is mapped differently across different address spaces,
@@ -129,6 +148,7 @@ bitflags! {
         /// 
         /// This is only available if `FEAT_BTI` is implemented;
         /// otherwise it is reserved as 0.
+        ///
         /// This is currently not used in Theseus.
         const _GUARDED_PAGE      = 1 << 50;
         /// * The hardware will set this bit when the page has been written to.
@@ -148,11 +168,17 @@ bitflags! {
 
         /// * If set, this page is not executable by privileged levels (kernel).
         /// * If not set, this page is executable by privileged levels (kernel).
-        const PRIV_EXEC_NEVER    = 1 << 53;
+        ///
+        /// In Theseus, use [`Self::NOT_EXECUTABLE`] instead.
+        const _PRIV_EXEC_NEVER   = 1 << 53;
         /// * If set, this page is not executable by unprivileged levels (user).
         /// * If not set, this page is executable by unprivileged levels (user).
-        const USER_EXEC_NEVER    = 1 << 54;
-        const NOT_EXECUTABLE     = Self::PRIV_EXEC_NEVER.bits | Self::USER_EXEC_NEVER.bits;
+        ///
+        /// In Theseus, use [`Self::NOT_EXECUTABLE`] instead.
+        const _USER_EXEC_NEVER   = 1 << 54;
+        /// * If set, this page is not executable.
+        /// * If not set, this page is executable.
+        const NOT_EXECUTABLE     = Self::_PRIV_EXEC_NEVER.bits | Self::_USER_EXEC_NEVER.bits;
 
         /// See [PteFlags::EXCLUSIVE].
         ///  We use bit 55 because it is available for custom OS usage on both x86_64 and aarch64.
@@ -168,13 +194,15 @@ impl Default for PteFlagsAarch64 {
 }
 
 impl PteFlagsAarch64 {
-    /// The mask of bits that should be overwritten with default values
-    /// when converting a generic `PteFlags` into a specific `PteFlagsAarch64`.
+    /// The mask of bit ranges that cannot be handled by toggling,
+    /// as they are not single bit values, but multi-bit selectors/indices.
+    ///
     /// Currently this includes:
+    /// * The three bits `[2:4]` for MAIR index values.
     /// * The two bits `[8:9]` for shareability.
-    pub const OVERWRITTEN_BITS_FOR_CONVERSION: PteFlagsAarch64 =
-        PteFlagsAarch64::_INNER_SHAREABLE;
-
+    pub const MASKED_BITS_FOR_CONVERSION: PteFlagsAarch64 = PteFlagsAarch64::from_bits_truncate(
+        PteFlagsAarch64::_INNER_SHAREABLE.bits | PteFlagsAarch64::_MAIR_INDEX_7.bits
+    );
 
     /// Returns a new `PteFlagsAarch64` with the default value, in which:
     /// * `NORMAL_MEMORY` (not `DEVICE_MEMORY`) is set.
@@ -204,24 +232,39 @@ impl PteFlagsAarch64 {
 }
 
 impl From<PteFlags> for PteFlagsAarch64 {
-    /// When converting from `PteFlags` to `PteFlagsAarch64`, the bits given by
-    /// [`PteFlagsAarch64::OVERWRITTEN_BITS_FOR_CONVERSION`] will be overwritten
-    /// with a default value.
+    /// When converting from `PteFlags` to `PteFlagsAarch64`,
+    /// some ranges of bits must be given a default value.
     /// 
     /// Currently, this includes:
     /// * `OUTER_SHAREABLE` will be set.
     fn from(general: PteFlags) -> Self {
         let mut specific = Self::from_bits_truncate(general.bits());
-        specific.toggle(super::WRITABLE_BIT | super::GLOBAL_BIT | super::DEVICE_MEM_BIT);
-        specific &= !Self::OVERWRITTEN_BITS_FOR_CONVERSION; // clear the masked bits
-        specific |= Self::OUTER_SHAREABLE; // set the masked bits to their default
+        // The writable and global bit values have inverse meanings on aarch64.
+        specific.toggle(super::WRITABLE_BIT | super::GLOBAL_BIT);
+        // Mask out the ranges of bits that can't simply be toggled; we must manually set them.
+        specific &= !Self::MASKED_BITS_FOR_CONVERSION;
+        specific |= Self::OUTER_SHAREABLE; // OUTER_SHAREABLE is the default value
+        if general.contains(PteFlags::DEVICE_MEMORY) {
+            specific |= Self::DEVICE_MEMORY;
+        } else {
+            specific |= Self::NORMAL_MEMORY;
+        }
         specific
     }
 }
 
 impl From<PteFlagsAarch64> for PteFlags {
     fn from(mut specific: PteFlagsAarch64) -> Self {
-        specific.toggle(super::WRITABLE_BIT | super::GLOBAL_BIT | super::DEVICE_MEM_BIT);
-        Self::from_bits_truncate(specific.bits())
+        // The writable and global bit values have inverse meanings on aarch64.
+        specific.toggle(super::WRITABLE_BIT | super::GLOBAL_BIT);
+        let mut general = Self::from_bits_truncate(specific.bits());
+        // Ensure that we are strict about which MAIR index is used by explicitly masking it.
+        // Otherwise, `DEVICE_MEMORY` may accidentally be misinterpreted as enabled
+        // if another MAIR index that had overlapping bits (bit 2) was specified,
+        // e.g., _MAIR_INDEX_3, _MAIR_INDEX_5, or _MAIR_INDEX_7.
+        if specific & PteFlagsAarch64::_MAIR_INDEX_7 == PteFlagsAarch64::DEVICE_MEMORY {
+            general |= Self::DEVICE_MEMORY;
+        }
+        general
     }
 }

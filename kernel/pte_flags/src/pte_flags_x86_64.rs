@@ -35,6 +35,8 @@ bitflags! {
         const WRITABLE           = 1 << 1;
         /// * If set, userspace (ring 3) can access this page.
         /// * If not set, only kernelspace (ring 0) can access this page.
+        ///
+        /// This is unused in Theseus because it is a single privilege level OS.
         const _USER_ACCESSIBLE    = 1 << 2;
         /// * If set, writes to this page go directly to memory.
         /// * It not set, writes are first written to the CPU cache, and then written to memory.
@@ -43,7 +45,7 @@ bitflags! {
         /// * If set, this page's content is never cached, neither for read nor writes. 
         /// * If not set, this page's content is cached as normal, both for read nor writes. 
         const NO_CACHE           = 1 << 4;
-        /// An alias for `NO_CACHE` in order to ease compatibility with aarch64.
+        /// An alias for [`Self::NO_CACHE`] in order to ease compatibility with aarch64.
         const DEVICE_MEMORY      = Self::NO_CACHE.bits;
         /// * The hardware will set this bit when the page is accessed.
         /// * The OS can then clear this bit once it has acknowledged that the page was accessed,
