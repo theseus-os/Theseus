@@ -754,6 +754,7 @@ dependencies = [
  "mpmc",
  "network_manager",
  "pci",
+ "ps2_controller",
  "serial_port",
  "spin 0.9.0",
  "storage_manager",
@@ -2439,12 +2440,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "ps2_controller"
+version = "0.1.0"
+dependencies = [
+ "acpi",
+ "fadt",
+ "log",
+ "ps2",
+]
+
+[[package]]
 name = "psm"
 version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "871372391786ccec00d3c5d3d6608905b3d4db263639cfe075d3b60a736d115a"
 dependencies = [
  "cc",
+]
+
+[[package]]
+name = "pte_flags"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "cfg-if 1.0.0",
+ "static_assertions",
 ]
 
 [[package]]

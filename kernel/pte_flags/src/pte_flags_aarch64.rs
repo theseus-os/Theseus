@@ -1,12 +1,15 @@
 //! The aarch64-specific definitions of PTE flags.
-//!
-//! The definition of these flags assumed that the [MAIR] index 0
-//! has a "DEVICE nGnRE" entry, and [MAIR] index 1 has a Normal + Outer Shareable entry.
-//!
-//! [MAIR]: https://docs.rs/cortex-a/latest/cortex_a/registers/MAIR_EL1/index.html
 
 use crate::PteFlags;
 use bitflags::bitflags;
+use static_assertions::const_assert_eq;
+
+/// A mask for the bits of a page table entry that contain the physical frame address.
+pub const PTE_FRAME_MASK: u64 = 0x0000_FFFF_FFFF_F000;
+
+// Ensure that we never expose reserved bits [12:47] as part of the ` interface.
+const_assert_eq!(PteFlagsAarch64::all().bits() & PTE_FRAME_MASK, 0);
+
 
 bitflags! {
     /// Page table entry (PTE) flags on aarch64.
@@ -16,10 +19,21 @@ bitflags! {
     /// The designation of bits in each `PageTableEntry` is as such:
     /// * Bits `[0:11]` (inclusive) are reserved by hardware for access flags, cacheability flags,
     ///   shareability flags, and TLB storage flags.
-    /// * Bits `[12:50]` (inclusive) are reserved by hardware to hold the physical frame address.
-    /// * Bits `[51:54]` (inclusive) are reserved by hardware for more access flags.
+    /// * Bits `[12:47]` (inclusive) are reserved by hardware to hold the physical frame address.
+    /// * Bits `[48:49]` (inclusive) are reserved as zero.
+    /// * Bits `[50:54]` (inclusive) are reserved by hardware for more access flags.
     /// * Bits `[55:58]` (inclusive) are available for custom OS usage.
     /// * Bits `[59:63]` (inclusive) are reserved by hardware for extended access flags.
+    ///
+    ///
+    /// ## Assumed System Configuration
+    /// * The system has been configured to use 48-bit physical addresses
+    ///   (aka "OA"s: Output Addresses).
+    /// * The system has been configured to use only a single translation stage, Stage 1.
+    /// * The [MAIR] index 0 has a "DEVICE nGnRE" entry,
+    ///   and [MAIR] index 1 has a Normal + Outer Shareable entry.
+    ///
+    /// [MAIR]: https://docs.rs/cortex-a/latest/cortex_a/registers/MAIR_EL1/index.html
     #[doc(cfg(target_arch = "aarch64"))]
     pub struct PteFlagsAarch64: u64 {
         /// * If set, this page is currently "present" in memory. 
@@ -107,17 +121,30 @@ bitflags! {
         ///   when switching to another address space (page table).
         ///
         /// Note: Theseus is a single address space system, so this flag makes no difference.
-        const _NOT_GLOBAL         = 1 << 11;
+        const _NOT_GLOBAL        = 1 << 11;
 
+        /// * If set, this page is considered a "Guarded Page",
+        ///   which can be used to protect against executing instructions
+        ///   that aren't the intended target of a branch (e.g., with `BTI` instruction).
+        /// 
+        /// This is only available if `FEAT_BTI` is implemented;
+        /// otherwise it is reserved as 0.
+        /// This is currently not used in Theseus.
+        const _GUARDED_PAGE      = 1 << 50;
         /// * The hardware will set this bit when the page has been written to.
         /// * The OS can then clear this bit once it has acknowledged that the page was written to,
         ///   which is primarily useful for paging/swapping to disk.
         const DIRTY              = 1 << 51;
-        /// * If set, this translation table is contiguous with the previous one in memory.
-        /// * If not set, this translation table is not contiguous with the previous one in memory.
-        /// 
+        /// * If set, this translation table entry is part of a set that is contiguous in memory
+        ///   with adjacent entries that also have this bit set.
+        /// * If not set, this translation table entry is not contiguous in memory
+        ///   with entries that are adjancent to it.
+        ///
+        /// This is useful for reducing TLB pressure because the TLB entries for
+        /// multiple contiguous adjacent entries can be combined into one TLB entry.
+        ///
         /// This is currently not used in Theseus.
-        const _CONTIGUOUS         = 1 << 52;
+        const _CONTIGUOUS        = 1 << 52;
 
         /// * If set, this page is not executable by privileged levels (kernel).
         /// * If not set, this page is executable by privileged levels (kernel).
