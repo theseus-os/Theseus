@@ -225,6 +225,49 @@
 <span id="225">225</span>
 <span id="226">226</span>
 <span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The aarch64-specific definitions of PTE flags.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::PteFlags;
@@ -257,8 +300,8 @@
     /// * The system has been configured to use 48-bit physical addresses
     ///   (aka &quot;OA&quot;s: Output Addresses).
     /// * The system has been configured to use only a single translation stage, Stage 1.
-    /// * The [MAIR] index 0 has a &quot;DEVICE nGnRE&quot; entry,
-    ///   and [MAIR] index 1 has a Normal + Outer Shareable entry.
+    /// * The [MAIR] index 0 has a Normal + Outer Shareable entry.
+    /// * The [MAIR] index 1 has a &quot;DEVICE nGnRE&quot; entry.
     ///
     /// [MAIR]: https://docs.rs/cortex-a/latest/cortex_a/registers/MAIR_EL1/index.html
     </span><span class="attr">#[doc(cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>))]
@@ -275,33 +318,43 @@
         </span><span class="kw">const </span>PAGE_DESCRIPTOR    = <span class="number">1 </span>&lt;&lt; <span class="number">1</span>;
 
         <span class="doccomment">/// Indicates the page&#39;s cacheability is described by MAIR Index 0.
+        ///
         /// Theseus uses this index for &quot;normal&quot; memory.
-        </span><span class="kw">const </span>MAIR_INDEX_0       = <span class="number">0 </span>&lt;&lt; <span class="number">2</span>;
-        <span class="doccomment">/// This page maps device memory, i.e., memory-mapped I/O registers.
-        /// Theseus uses `MAIR_INDEX_0` for this type of memory.
-        </span><span class="kw">const </span>DEVICE_MEMORY      = <span class="self">Self</span>::MAIR_INDEX_0.bits;
-        <span class="doccomment">/// Indicates the page&#39;s cacheability is described by MAIR Index 1.
-        /// Theseus uses this index for &quot;device&quot; memory.
-        </span><span class="kw">const </span>MAIR_INDEX_1       = <span class="number">1 </span>&lt;&lt; <span class="number">2</span>;
+        </span><span class="kw">const </span>_MAIR_INDEX_0      = <span class="number">0 </span>&lt;&lt; <span class="number">2</span>;
         <span class="doccomment">/// This page maps &quot;normal&quot; memory, i.e., non-device memory.
+        ///
+        /// Theseus uses `MAIR_INDEX_0` for this type of memory.
+        </span><span class="kw">const </span>NORMAL_MEMORY      = <span class="self">Self</span>::_MAIR_INDEX_0.bits;
+        <span class="doccomment">/// Indicates the page&#39;s cacheability is described by MAIR Index 1.
+        ///
+        /// Theseus uses this index for &quot;device&quot; memory.
+        </span><span class="kw">const </span>_MAIR_INDEX_1      = <span class="number">1 </span>&lt;&lt; <span class="number">2</span>;
+        <span class="doccomment">/// This page maps device memory, i.e., memory-mapped I/O registers.
+        ///
         /// Theseus uses `MAIR_INDEX_1` for this type of memory.
-        </span><span class="kw">const </span>NORMAL_MEMORY      = <span class="self">Self</span>::MAIR_INDEX_1.bits;
+        </span><span class="kw">const </span>DEVICE_MEMORY      = <span class="self">Self</span>::_MAIR_INDEX_1.bits;
         <span class="doccomment">/// Indicates the page&#39;s cacheability is described by MAIR Index 2.
+        ///
         /// This is unused in Theseus.
         </span><span class="kw">const </span>_MAIR_INDEX_2      = <span class="number">2 </span>&lt;&lt; <span class="number">2</span>;
         <span class="doccomment">/// Indicates the page&#39;s cacheability is described by MAIR Index 3.
+        ///
         /// This is unused in Theseus.
         </span><span class="kw">const </span>_MAIR_INDEX_3      = <span class="number">3 </span>&lt;&lt; <span class="number">2</span>;
         <span class="doccomment">/// Indicates the page&#39;s cacheability is described by MAIR Index 4.
+        ///
         /// This is unused in Theseus.
         </span><span class="kw">const </span>_MAIR_INDEX_4      = <span class="number">4 </span>&lt;&lt; <span class="number">2</span>;
         <span class="doccomment">/// Indicates the page&#39;s cacheability is described by MAIR Index 5.
+        ///
         /// This is unused in Theseus.
         </span><span class="kw">const </span>_MAIR_INDEX_5      = <span class="number">5 </span>&lt;&lt; <span class="number">2</span>;
         <span class="doccomment">/// Indicates the page&#39;s cacheability is described by MAIR Index 6.
+        ///
         /// This is unused in Theseus.
         </span><span class="kw">const </span>_MAIR_INDEX_6      = <span class="number">6 </span>&lt;&lt; <span class="number">2</span>;
         <span class="doccomment">/// Indicates the page&#39;s cacheability is described by MAIR Index 7.
+        ///
         /// This is unused in Theseus.
         </span><span class="kw">const </span>_MAIR_INDEX_7      = <span class="number">7 </span>&lt;&lt; <span class="number">2</span>;
 
@@ -313,6 +366,8 @@
 
         <span class="doccomment">/// * If set, userspace (unprivileged mode) can access this page.
         /// * If not set, only kernelspace (privileged mode) can access this page.
+        ///
+        /// This is unused in Theseus because it is a single privilege level OS.
         </span><span class="kw">const </span>_USER_ACCESSIBLE   = <span class="number">1 </span>&lt;&lt; <span class="number">6</span>;
 
         <span class="doccomment">/// * If set, this page is read-only.
@@ -320,15 +375,20 @@
         </span><span class="kw">const </span>READ_ONLY          = <span class="number">1 </span>&lt;&lt; <span class="number">7</span>;
 
         <span class="doccomment">/// Indicates that only a single CPU core may access this page.
+        ///
+        /// This is not used and not supported by Theseus; use [`Self::OUTER_SHAREABLE`].
         </span><span class="kw">const </span>_NON_SHAREABLE     = <span class="number">0 </span>&lt;&lt; <span class="number">8</span>;
         <span class="comment">// Shareable `0b01` is reserved.
         // const SHAREABLE_RSVD  = 1 &lt;&lt; 8;
         </span><span class="doccomment">/// Indicates that multiple CPUs from multiple clusters may access this page.
+        ///
         /// This is the default and the the only value used in Theseus (and most systems).
         </span><span class="kw">const </span>OUTER_SHAREABLE    = <span class="number">2 </span>&lt;&lt; <span class="number">8</span>;
         <span class="doccomment">/// Multiple cores from the same
         /// cluster can access this page.
         /// Indicates that multiple CPUs from only a single cluster may access this page.
+        ///
+        /// This is not used and not supported by Theseus; use [`Self::OUTER_SHAREABLE`].
         </span><span class="kw">const </span>_INNER_SHAREABLE   = <span class="number">3 </span>&lt;&lt; <span class="number">8</span>;
 
         <span class="doccomment">/// * The hardware will set this bit when the page is accessed.
@@ -339,6 +399,8 @@
         /// when this page is first accessed and is trying to be cached in the TLB.
         /// This fault can only occur when the Access Flag bit is `0` and the flag is being
         /// managed by software.
+        ///
+        /// Thus, Theseus currently *always* sets this bit by default.
         </span><span class="kw">const </span>ACCESSED           = <span class="number">1 </span>&lt;&lt; <span class="number">10</span>;
         <span class="doccomment">/// * If set, this page is mapped into only one or less than all address spaces,
         ///   or is mapped differently across different address spaces,
@@ -356,6 +418,7 @@
         /// 
         /// This is only available if `FEAT_BTI` is implemented;
         /// otherwise it is reserved as 0.
+        ///
         /// This is currently not used in Theseus.
         </span><span class="kw">const </span>_GUARDED_PAGE      = <span class="number">1 </span>&lt;&lt; <span class="number">50</span>;
         <span class="doccomment">/// * The hardware will set this bit when the page has been written to.
@@ -375,11 +438,17 @@
 
         <span class="doccomment">/// * If set, this page is not executable by privileged levels (kernel).
         /// * If not set, this page is executable by privileged levels (kernel).
-        </span><span class="kw">const </span>PRIV_EXEC_NEVER    = <span class="number">1 </span>&lt;&lt; <span class="number">53</span>;
+        ///
+        /// In Theseus, use [`Self::NOT_EXECUTABLE`] instead.
+        </span><span class="kw">const </span>_PRIV_EXEC_NEVER   = <span class="number">1 </span>&lt;&lt; <span class="number">53</span>;
         <span class="doccomment">/// * If set, this page is not executable by unprivileged levels (user).
         /// * If not set, this page is executable by unprivileged levels (user).
-        </span><span class="kw">const </span>USER_EXEC_NEVER    = <span class="number">1 </span>&lt;&lt; <span class="number">54</span>;
-        <span class="kw">const </span>NOT_EXECUTABLE     = <span class="self">Self</span>::PRIV_EXEC_NEVER.bits | <span class="self">Self</span>::USER_EXEC_NEVER.bits;
+        ///
+        /// In Theseus, use [`Self::NOT_EXECUTABLE`] instead.
+        </span><span class="kw">const </span>_USER_EXEC_NEVER   = <span class="number">1 </span>&lt;&lt; <span class="number">54</span>;
+        <span class="doccomment">/// * If set, this page is not executable.
+        /// * If not set, this page is executable.
+        </span><span class="kw">const </span>NOT_EXECUTABLE     = <span class="self">Self</span>::_PRIV_EXEC_NEVER.bits | <span class="self">Self</span>::_USER_EXEC_NEVER.bits;
 
         <span class="doccomment">/// See [PteFlags::EXCLUSIVE].
         ///  We use bit 55 because it is available for custom OS usage on both x86_64 and aarch64.
@@ -395,13 +464,15 @@
 }
 
 <span class="kw">impl </span>PteFlagsAarch64 {
-    <span class="doccomment">/// The mask of bits that should be overwritten with default values
-    /// when converting a generic `PteFlags` into a specific `PteFlagsAarch64`.
+    <span class="doccomment">/// The mask of bit ranges that cannot be handled by toggling,
+    /// as they are not single bit values, but multi-bit selectors/indices.
+    ///
     /// Currently this includes:
+    /// * The three bits `[2:4]` for MAIR index values.
     /// * The two bits `[8:9]` for shareability.
-    </span><span class="kw">pub const </span>OVERWRITTEN_BITS_FOR_CONVERSION: PteFlagsAarch64 =
-        PteFlagsAarch64::_INNER_SHAREABLE;
-
+    </span><span class="kw">pub const </span>MASKED_BITS_FOR_CONVERSION: PteFlagsAarch64 = PteFlagsAarch64::from_bits_truncate(
+        PteFlagsAarch64::_INNER_SHAREABLE.bits | PteFlagsAarch64::_MAIR_INDEX_7.bits
+    );
 
     <span class="doccomment">/// Returns a new `PteFlagsAarch64` with the default value, in which:
     /// * `NORMAL_MEMORY` (not `DEVICE_MEMORY`) is set.
@@ -431,25 +502,40 @@
 }
 
 <span class="kw">impl </span>From&lt;PteFlags&gt; <span class="kw">for </span>PteFlagsAarch64 {
-    <span class="doccomment">/// When converting from `PteFlags` to `PteFlagsAarch64`, the bits given by
-    /// [`PteFlagsAarch64::OVERWRITTEN_BITS_FOR_CONVERSION`] will be overwritten
-    /// with a default value.
+    <span class="doccomment">/// When converting from `PteFlags` to `PteFlagsAarch64`,
+    /// some ranges of bits must be given a default value.
     /// 
     /// Currently, this includes:
     /// * `OUTER_SHAREABLE` will be set.
     </span><span class="kw">fn </span>from(general: PteFlags) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span><span class="kw-2">mut </span>specific = <span class="self">Self</span>::from_bits_truncate(general.bits());
-        specific.toggle(<span class="kw">super</span>::WRITABLE_BIT | <span class="kw">super</span>::GLOBAL_BIT);
-        specific &amp;= !<span class="self">Self</span>::OVERWRITTEN_BITS_FOR_CONVERSION; <span class="comment">// clear the masked bits
-        </span>specific |= <span class="self">Self</span>::OUTER_SHAREABLE; <span class="comment">// set the masked bits to their default
-        </span>specific
+        <span class="comment">// The writable and global bit values have inverse meanings on aarch64.
+        </span>specific.toggle(<span class="kw">super</span>::WRITABLE_BIT | <span class="kw">super</span>::GLOBAL_BIT);
+        <span class="comment">// Mask out the ranges of bits that can&#39;t simply be toggled; we must manually set them.
+        </span>specific &amp;= !<span class="self">Self</span>::MASKED_BITS_FOR_CONVERSION;
+        specific |= <span class="self">Self</span>::OUTER_SHAREABLE; <span class="comment">// OUTER_SHAREABLE is the default value
+        </span><span class="kw">if </span>general.contains(PteFlags::DEVICE_MEMORY) {
+            specific |= <span class="self">Self</span>::DEVICE_MEMORY;
+        } <span class="kw">else </span>{
+            specific |= <span class="self">Self</span>::NORMAL_MEMORY;
+        }
+        specific
     }
 }
 
 <span class="kw">impl </span>From&lt;PteFlagsAarch64&gt; <span class="kw">for </span>PteFlags {
     <span class="kw">fn </span>from(<span class="kw-2">mut </span>specific: PteFlagsAarch64) -&gt; <span class="self">Self </span>{
-        specific.toggle(<span class="kw">super</span>::WRITABLE_BIT | <span class="kw">super</span>::GLOBAL_BIT);
-        <span class="self">Self</span>::from_bits_truncate(specific.bits())
+        <span class="comment">// The writable and global bit values have inverse meanings on aarch64.
+        </span>specific.toggle(<span class="kw">super</span>::WRITABLE_BIT | <span class="kw">super</span>::GLOBAL_BIT);
+        <span class="kw">let </span><span class="kw-2">mut </span>general = <span class="self">Self</span>::from_bits_truncate(specific.bits());
+        <span class="comment">// Ensure that we are strict about which MAIR index is used by explicitly masking it.
+        // Otherwise, `DEVICE_MEMORY` may accidentally be misinterpreted as enabled
+        // if another MAIR index that had overlapping bits (bit 2) was specified,
+        // e.g., _MAIR_INDEX_3, _MAIR_INDEX_5, or _MAIR_INDEX_7.
+        </span><span class="kw">if </span>specific &amp; PteFlagsAarch64::_MAIR_INDEX_7 == PteFlagsAarch64::DEVICE_MEMORY {
+            general |= <span class="self">Self</span>::DEVICE_MEMORY;
+        }
+        general
     }
 }
 </code></pre></div>

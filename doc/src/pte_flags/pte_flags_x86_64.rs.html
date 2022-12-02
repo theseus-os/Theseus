@@ -107,6 +107,8 @@
 <span id="107">107</span>
 <span id="108">108</span>
 <span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The x86_64-specific definitions of PTE flags.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::PteFlags;
@@ -144,6 +146,8 @@
         </span><span class="kw">const </span>WRITABLE           = <span class="number">1 </span>&lt;&lt; <span class="number">1</span>;
         <span class="doccomment">/// * If set, userspace (ring 3) can access this page.
         /// * If not set, only kernelspace (ring 0) can access this page.
+        ///
+        /// This is unused in Theseus because it is a single privilege level OS.
         </span><span class="kw">const </span>_USER_ACCESSIBLE    = <span class="number">1 </span>&lt;&lt; <span class="number">2</span>;
         <span class="doccomment">/// * If set, writes to this page go directly to memory.
         /// * It not set, writes are first written to the CPU cache, and then written to memory.
@@ -152,7 +156,7 @@
         <span class="doccomment">/// * If set, this page&#39;s content is never cached, neither for read nor writes. 
         /// * If not set, this page&#39;s content is cached as normal, both for read nor writes. 
         </span><span class="kw">const </span>NO_CACHE           = <span class="number">1 </span>&lt;&lt; <span class="number">4</span>;
-        <span class="doccomment">/// An alias for `NO_CACHE` in order to ease compatibility with aarch64.
+        <span class="doccomment">/// An alias for [`Self::NO_CACHE`] in order to ease compatibility with aarch64.
         </span><span class="kw">const </span>DEVICE_MEMORY      = <span class="self">Self</span>::NO_CACHE.bits;
         <span class="doccomment">/// * The hardware will set this bit when the page is accessed.
         /// * The OS can then clear this bit once it has acknowledged that the page was accessed,

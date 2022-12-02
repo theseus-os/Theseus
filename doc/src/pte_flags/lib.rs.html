@@ -297,6 +297,16 @@
 <span id="297">297</span>
 <span id="298">298</span>
 <span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate defines the structure of page table entry (PTE) flags on x86_64 and aarch64.
 //! 
 //! This crate offers two main types:
@@ -327,6 +337,7 @@
 
 </span><span class="kw">use </span>cfg_if::cfg_if;
 <span class="kw">use </span>bitflags::bitflags;
+<span class="kw">use </span>static_assertions::const_assert_ne;
 
 <span class="macro">cfg_if!</span>{ <span class="kw">if </span><span class="attr">#[cfg(any(target_arch = <span class="string">&quot;x86_64&quot;</span>, doc))] </span>{
     <span class="kw">mod </span>pte_flags_x86_64;
@@ -388,9 +399,9 @@
         <span class="doccomment">/// * If set, this page maps device memory, which is non-cacheable.
         /// * If not set, this page maps normal memory, which is cacheable by default.
         </span><span class="comment">//
-        // This does not require a conversion between architectures.
-        </span><span class="kw">const </span>DEVICE_MEMORY  = PteFlagsArch::DEVICE_MEMORY.bits();
-        
+        // This DOES require a conversion for aarch64, but not for x86_64.
+        </span><span class="kw">const </span>DEVICE_MEMORY = DEVICE_MEMORY_BITS.bits();
+
         <span class="doccomment">/// * The hardware will set this bit when the page is accessed.
         /// * The OS can then clear this bit once it has acknowledged that the page was accessed,
         ///   if it cares at all about this information.
@@ -444,12 +455,21 @@
 <span class="comment">// The bits defined below have different semantics on x86_64 vs aarch64.
 // These are the ones that require special handling during From/Into conversions.
 </span><span class="macro">cfg_if!</span>{ <span class="kw">if </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
-    <span class="kw">const </span>WRITABLE_BIT: PteFlagsX86_64 = PteFlagsX86_64::WRITABLE;
-    <span class="kw">const </span>GLOBAL_BIT:   PteFlagsX86_64 = PteFlagsX86_64::_GLOBAL;
+    <span class="kw">const </span>DEVICE_MEMORY_BITS: PteFlagsX86_64 = PteFlagsX86_64::DEVICE_MEMORY;
+    <span class="kw">const </span>WRITABLE_BIT:       PteFlagsX86_64 = PteFlagsX86_64::WRITABLE;
+    <span class="kw">const </span>GLOBAL_BIT:         PteFlagsX86_64 = PteFlagsX86_64::_GLOBAL;
 } <span class="kw">else if </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
-    <span class="kw">const </span>WRITABLE_BIT: PteFlagsAarch64 = PteFlagsAarch64::READ_ONLY;
-    <span class="kw">const </span>GLOBAL_BIT:   PteFlagsAarch64 = PteFlagsAarch64::_NOT_GLOBAL;
+    <span class="kw">const </span>DEVICE_MEMORY_BITS: PteFlagsAarch64 = PteFlagsAarch64::DEVICE_MEMORY;
+    <span class="kw">const </span>WRITABLE_BIT:       PteFlagsAarch64 = PteFlagsAarch64::READ_ONLY;
+    <span class="kw">const </span>GLOBAL_BIT:         PteFlagsAarch64 = PteFlagsAarch64::_NOT_GLOBAL;
 }}
+
+<span class="comment">// Due to the way that the `bitflags` crate works, we can only use
+// non-zero bit flag values for the above definitions.
+</span><span class="macro">const_assert_ne!</span>(DEVICE_MEMORY_BITS.bits(), <span class="number">0</span>);
+<span class="macro">const_assert_ne!</span>(WRITABLE_BIT.bits(), <span class="number">0</span>);
+<span class="macro">const_assert_ne!</span>(GLOBAL_BIT.bits(), <span class="number">0</span>);
+
 
 <span class="doccomment">/// See [`PteFlags::new()`] for what bits are set by default.
 </span><span class="kw">impl </span>Default <span class="kw">for </span>PteFlags {
