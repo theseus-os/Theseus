@@ -1719,11 +1719,8 @@ version = "0.1.0"
 dependencies = [
  "bit_field 0.7.0",
  "derive_more",
- "entryflags_x86_64",
  "kernel_config",
- "multiboot2",
  "paste",
- "xmas-elf",
  "zerocopy",
 ]
 
@@ -2202,6 +2199,7 @@ dependencies = [
  "frame_allocator",
  "kernel_config",
  "memory_structs",
+ "memory_x86_64",
  "zerocopy",
 ]
 
