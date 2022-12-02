@@ -19,9 +19,7 @@ pub use multiboot2::BootInformation;
 pub use entryflags_x86_64::{EntryFlags, PAGE_TABLE_ENTRY_FRAME_MASK};
 
 use kernel_config::memory::KERNEL_OFFSET;
-use memory_structs::{
-    PhysicalAddress, VirtualAddress, SectionMemoryBounds, AggregatedSectionMemoryBounds,
-};
+use memory_structs::{PhysicalAddress, VirtualAddress};
 use x86_64::{registers::control::Cr3, instructions::tlb};
 
 
@@ -90,6 +88,42 @@ pub fn get_boot_info_mem_area(
         PhysicalAddress::new(boot_info.end_address() - KERNEL_OFFSET)
             .ok_or("boot info end physical address was invalid")?,
     ))
+}
+
+
+/// The address bounds and mapping flags of a section's memory region.
+#[derive(Debug)]
+pub struct SectionMemoryBounds {
+    /// The starting virtual address and physical address.
+    pub start: (VirtualAddress, PhysicalAddress),
+    /// The ending virtual address and physical address.
+    pub end: (VirtualAddress, PhysicalAddress),
+    /// The page table entry flags that should be used for mapping this section.
+    pub flags: EntryFlags,
+}
+
+/// The address bounds and flags of the initial kernel sections that need mapping. 
+/// 
+/// Individual sections in the kernel's ELF image are combined here according to their flags,
+/// as described below, but some are kept separate for the sake of correctness or ease of use.
+/// 
+/// It contains three main items, in which each item includes all sections that have identical flags:
+/// * The `text` section bounds cover all sections that are executable.
+/// * The `rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).
+///   * The `rodata` section also includes thread-local storage (TLS) areas (.tdata, .tbss) if they exist,
+///     because they can be mapped using the same page table flags.
+/// * The `data` section bounds cover those that are writable (.data, .bss).
+/// 
+/// It also contains:
+/// * The `page_table` section bounds cover the initial page table's top-level (root) P4 frame. 
+/// * The `stack` section bounds cover the initial stack, which are maintained separately.
+#[derive(Debug)]
+pub struct AggregatedSectionMemoryBounds {
+   pub text:        SectionMemoryBounds,
+   pub rodata:      SectionMemoryBounds,
+   pub data:        SectionMemoryBounds,
+   pub page_table:  SectionMemoryBounds,
+   pub stack:       SectionMemoryBounds,
 }
 
 
