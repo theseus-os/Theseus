@@ -432,51 +432,19 @@
 <span id="432">432</span>
 <span id="433">433</span>
 <span id="434">434</span>
-<span id="435">435</span>
-<span id="436">436</span>
-<span id="437">437</span>
-<span id="438">438</span>
-<span id="439">439</span>
-<span id="440">440</span>
-<span id="441">441</span>
-<span id="442">442</span>
-<span id="443">443</span>
-<span id="444">444</span>
-<span id="445">445</span>
-<span id="446">446</span>
-<span id="447">447</span>
-<span id="448">448</span>
-<span id="449">449</span>
-<span id="450">450</span>
-<span id="451">451</span>
-<span id="452">452</span>
-<span id="453">453</span>
-<span id="454">454</span>
-<span id="455">455</span>
-<span id="456">456</span>
-<span id="457">457</span>
-<span id="458">458</span>
-<span id="459">459</span>
-<span id="460">460</span>
-<span id="461">461</span>
-<span id="462">462</span>
-<span id="463">463</span>
-<span id="464">464</span>
-<span id="465">465</span>
-<span id="466">466</span>
-<span id="467">467</span>
-</pre><pre class="rust"><code><span class="doccomment">//! This crate contains common types used for memory mapping. 
+</pre><pre class="rust"><code><span class="doccomment">//! This crate contains basic types used for memory management.
+//!
+//! The types of interest are divided into three categories:
+//! 1. addresses: `VirtualAddress` and `PhysicalAddress`.
+//! 2. &quot;chunk&quot; types: `Page` and `Frame`.
+//! 3. ranges of chunks: `PageRange` and `FrameRange`.  
 
 </span><span class="attr">#![no_std]
 #![feature(step_trait)]
 
 </span><span class="kw">extern crate </span>kernel_config;
-<span class="kw">extern crate </span>multiboot2;
-<span class="kw">extern crate </span>xmas_elf;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>derive_more;
 <span class="kw">extern crate </span>bit_field;
-<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-</span><span class="kw">extern crate </span>entryflags_x86_64;
 <span class="kw">extern crate </span>zerocopy;
 <span class="kw">extern crate </span>paste;
 
@@ -489,8 +457,6 @@
     ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
 };
 <span class="kw">use </span>kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
-<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-</span><span class="kw">pub use </span>entryflags_x86_64::{EntryFlags, PAGE_TABLE_ENTRY_FRAME_MASK};
 <span class="kw">use </span>zerocopy::FromBytes;
 <span class="kw">use </span>paste::paste;
 
@@ -593,7 +559,8 @@
     };
 }
 
-<span class="attr">#[inline]
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+#[inline]
 </span><span class="kw">fn </span>is_canonical_virtual_address(virt_addr: usize) -&gt; bool {
     <span class="kw">match </span>virt_addr.get_bits(<span class="number">47</span>..<span class="number">64</span>) {
         <span class="number">0 </span>| <span class="number">0b1_1111_1111_1111_1111 </span>=&gt; <span class="bool-val">true</span>,
@@ -601,7 +568,8 @@
     }
 }
 
-<span class="attr">#[inline]
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+#[inline]
 </span><span class="kw">const fn </span>canonicalize_virtual_address(virt_addr: usize) -&gt; usize {
     <span class="comment">// match virt_addr.get_bit(47) {
     //     false =&gt; virt_addr.set_bits(48..64, 0),
@@ -612,7 +580,8 @@
     </span>((virt_addr &lt;&lt; <span class="number">16</span>) <span class="kw">as </span>isize &gt;&gt; <span class="number">16</span>) <span class="kw">as </span>usize
 }
 
-<span class="attr">#[inline]
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+#[inline]
 </span><span class="kw">fn </span>is_canonical_physical_address(phys_addr: usize) -&gt; bool {
     <span class="kw">match </span>phys_addr.get_bits(<span class="number">52</span>..<span class="number">64</span>) {
         <span class="number">0 </span>=&gt; <span class="bool-val">true</span>,
@@ -620,7 +589,8 @@
     }
 }
 
-<span class="attr">#[inline]
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+#[inline]
 </span><span class="kw">const fn </span>canonicalize_physical_address(phys_addr: usize) -&gt; usize {
     phys_addr &amp; <span class="number">0x000F_FFFF_FFFF_FFFF
 </span>}
@@ -896,41 +866,5 @@
 
 <span class="macro">implement_page_frame_range!</span>(PageRange, <span class="string">&quot;virtual&quot;</span>, virt, Page, VirtualAddress);
 <span class="macro">implement_page_frame_range!</span>(FrameRange, <span class="string">&quot;physical&quot;</span>, phys, Frame, PhysicalAddress);
-
-
-<span class="doccomment">/// The address bounds and mapping flags of a section&#39;s memory region.
-</span><span class="attr">#[derive(Debug)]
-</span><span class="kw">pub struct </span>SectionMemoryBounds {
-    <span class="doccomment">/// The starting virtual address and physical address.
-    </span><span class="kw">pub </span>start: (VirtualAddress, PhysicalAddress),
-    <span class="doccomment">/// The ending virtual address and physical address.
-    </span><span class="kw">pub </span>end: (VirtualAddress, PhysicalAddress),
-    <span class="doccomment">/// The page table entry flags that should be used for mapping this section.
-    </span><span class="kw">pub </span>flags: EntryFlags,
-}
-
-<span class="doccomment">/// The address bounds and flags of the initial kernel sections that need mapping. 
-/// 
-/// Individual sections in the kernel&#39;s ELF image are combined here according to their flags,
-/// as described below, but some are kept separate for the sake of correctness or ease of use.
-/// 
-/// It contains three main items, in which each item includes all sections that have identical flags:
-/// * The `text` section bounds cover all sections that are executable.
-/// * The `rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).
-///   * The `rodata` section also includes thread-local storage (TLS) areas (.tdata, .tbss) if they exist,
-///     because they can be mapped using the same page table flags.
-/// * The `data` section bounds cover those that are writable (.data, .bss).
-/// 
-/// It also contains:
-/// * The `page_table` section bounds cover the initial page table&#39;s top-level (root) P4 frame. 
-/// * The `stack` section bounds cover the initial stack, which are maintained separately.
-</span><span class="attr">#[derive(Debug)]
-</span><span class="kw">pub struct </span>AggregatedSectionMemoryBounds {
-   <span class="kw">pub </span>text:        SectionMemoryBounds,
-   <span class="kw">pub </span>rodata:      SectionMemoryBounds,
-   <span class="kw">pub </span>data:        SectionMemoryBounds,
-   <span class="kw">pub </span>page_table:  SectionMemoryBounds,
-   <span class="kw">pub </span>stack:       SectionMemoryBounds,
-}
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="memory_structs" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

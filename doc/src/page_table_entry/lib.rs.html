@@ -135,6 +135,8 @@
 <span id="135">135</span>
 <span id="136">136</span>
 <span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines the structure of Page Table Entries (PTEs) on x86_64.
 //!
 //! This crate is also useful for frame deallocation, because it can determine
@@ -150,7 +152,9 @@
 </span><span class="attr">#![no_std]
 
 </span><span class="kw">use </span>core::ops::Deref;
-<span class="kw">use </span>memory_structs::{Frame, FrameRange, PAGE_TABLE_ENTRY_FRAME_MASK, EntryFlags, PhysicalAddress};
+<span class="kw">use </span>memory_structs::{Frame, FrameRange, PhysicalAddress};
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+</span><span class="kw">use </span>memory_x86_64::{ PAGE_TABLE_ENTRY_FRAME_MASK, EntryFlags};
 <span class="kw">use </span>bit_field::BitField;
 <span class="kw">use </span>kernel_config::memory::PAGE_SHIFT;
 <span class="kw">use </span>zerocopy::FromBytes;

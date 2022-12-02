@@ -336,6 +336,40 @@
 <span id="336">336</span>
 <span id="337">337</span>
 <span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
 //! `memory` uses this crate to get the memory layout and do other arch-specific operations on x86_64.  
 //! 
@@ -357,9 +391,7 @@
 <span class="kw">pub use </span>entryflags_x86_64::{EntryFlags, PAGE_TABLE_ENTRY_FRAME_MASK};
 
 <span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
-<span class="kw">use </span>memory_structs::{
-    PhysicalAddress, VirtualAddress, SectionMemoryBounds, AggregatedSectionMemoryBounds,
-};
+<span class="kw">use </span>memory_structs::{PhysicalAddress, VirtualAddress};
 <span class="kw">use </span>x86_64::{registers::control::Cr3, instructions::tlb};
 
 
@@ -428,6 +460,42 @@
         PhysicalAddress::new(boot_info.end_address() - KERNEL_OFFSET)
             .ok_or(<span class="string">&quot;boot info end physical address was invalid&quot;</span>)<span class="question-mark">?</span>,
     ))
+}
+
+
+<span class="doccomment">/// The address bounds and mapping flags of a section&#39;s memory region.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>SectionMemoryBounds {
+    <span class="doccomment">/// The starting virtual address and physical address.
+    </span><span class="kw">pub </span>start: (VirtualAddress, PhysicalAddress),
+    <span class="doccomment">/// The ending virtual address and physical address.
+    </span><span class="kw">pub </span>end: (VirtualAddress, PhysicalAddress),
+    <span class="doccomment">/// The page table entry flags that should be used for mapping this section.
+    </span><span class="kw">pub </span>flags: EntryFlags,
+}
+
+<span class="doccomment">/// The address bounds and flags of the initial kernel sections that need mapping. 
+/// 
+/// Individual sections in the kernel&#39;s ELF image are combined here according to their flags,
+/// as described below, but some are kept separate for the sake of correctness or ease of use.
+/// 
+/// It contains three main items, in which each item includes all sections that have identical flags:
+/// * The `text` section bounds cover all sections that are executable.
+/// * The `rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).
+///   * The `rodata` section also includes thread-local storage (TLS) areas (.tdata, .tbss) if they exist,
+///     because they can be mapped using the same page table flags.
+/// * The `data` section bounds cover those that are writable (.data, .bss).
+/// 
+/// It also contains:
+/// * The `page_table` section bounds cover the initial page table&#39;s top-level (root) P4 frame. 
+/// * The `stack` section bounds cover the initial stack, which are maintained separately.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>AggregatedSectionMemoryBounds {
+   <span class="kw">pub </span>text:        SectionMemoryBounds,
+   <span class="kw">pub </span>rodata:      SectionMemoryBounds,
+   <span class="kw">pub </span>data:        SectionMemoryBounds,
+   <span class="kw">pub </span>page_table:  SectionMemoryBounds,
+   <span class="kw">pub </span>stack:       SectionMemoryBounds,
 }
 
 
