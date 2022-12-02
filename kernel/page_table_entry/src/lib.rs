@@ -13,7 +13,9 @@
 #![no_std]
 
 use core::ops::Deref;
-use memory_structs::{Frame, FrameRange, PAGE_TABLE_ENTRY_FRAME_MASK, EntryFlags, PhysicalAddress};
+use memory_structs::{Frame, FrameRange, PhysicalAddress};
+#[cfg(target_arch = "x86_64")]
+use memory_x86_64::{ PAGE_TABLE_ENTRY_FRAME_MASK, EntryFlags};
 use bit_field::BitField;
 use kernel_config::memory::PAGE_SHIFT;
 use zerocopy::FromBytes;
