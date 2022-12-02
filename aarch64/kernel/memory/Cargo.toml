@@ -15,12 +15,12 @@ irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 
 atomic_linked_list = { path = "../../../libs/atomic_linked_list" }
 
-kernel_config = { path = "../kernel_config" }
-memory_structs = { path = "../memory_structs" }
-page_allocator = { path = "../page_allocator" }
-frame_allocator = { path = "../frame_allocator" }
+frame_allocator = { path = "../../../kernel/frame_allocator" }
+page_allocator = { path = "../../../kernel/page_allocator" }
+memory_structs = { path = "../../../kernel/memory_structs" }
+kernel_config = { path = "../../../kernel/kernel_config" }
 page_table_entry = { path = "../page_table_entry" }
 pte_flags = { path = "../../../kernel/pte_flags" }
-no_drop = { path = "../no_drop" }
+no_drop = { path = "../../../kernel/no_drop" }
 
 memory_aarch64 = { path = "../memory_aarch64" }

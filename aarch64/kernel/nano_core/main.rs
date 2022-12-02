@@ -9,6 +9,7 @@ extern crate frame_allocator;
 extern crate page_allocator;
 extern crate memory_structs;
 extern crate memory;
+extern crate kernel_config;
 
 use alloc::vec;
 use core::arch::asm;
@@ -17,7 +18,8 @@ use alloc::vec::Vec;
 use uefi::{prelude::entry, Status, Handle, table::{SystemTable, Boot, boot::MemoryType}};
 
 use frame_allocator::{PhysicalMemoryRegion, MemoryRegionType};
-use memory_structs::{PAGE_SIZE, PhysicalAddress, Frame, FrameRange};
+use memory_structs::{PhysicalAddress, Frame, FrameRange};
+use kernel_config::memory::PAGE_SIZE;
 use pte_flags::PteFlags;
 
 use log::{info, error};
@@ -44,10 +46,6 @@ fn main(
     let boot_svc = system_table.boot_services();
 
     let safety = 16;
-
-    let dummy = [ 0xdeadbeefu32 ];
-
-    info!("dummy address: {:?}", dummy.as_ptr());
 
     let mmap_size = boot_svc.memory_map_size();
     let mut mmap = vec![0; mmap_size.map_size + safety * mmap_size.entry_size];

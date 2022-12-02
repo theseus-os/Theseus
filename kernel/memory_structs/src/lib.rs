@@ -14,7 +14,7 @@ extern crate bit_field;
 extern crate zerocopy;
 extern crate paste;
 
-
+#[cfg(target_arch = "x86_64")]
 use bit_field::BitField;
 use core::{
     cmp::{min, max},
@@ -159,6 +159,38 @@ fn is_canonical_physical_address(phys_addr: usize) -> bool {
 #[inline]
 const fn canonicalize_physical_address(phys_addr: usize) -> usize {
     phys_addr & 0x000F_FFFF_FFFF_FFFF
+}
+
+// aarch64 doesn't have a concept of canonical VA
+// so this always returns true
+#[cfg(target_arch = "aarch64")]
+#[inline]
+fn is_canonical_virtual_address(_virt_addr: usize) -> bool {
+    true
+}
+
+// aarch64 doesn't have a concept of canonical VA
+// so this returns the address as-is
+#[cfg(target_arch = "aarch64")]
+#[inline]
+const fn canonicalize_virtual_address(virt_addr: usize) -> usize {
+    virt_addr
+}
+
+// aarch64 doesn't have a concept of canonical PA
+// so this always returns true
+#[cfg(target_arch = "aarch64")]
+#[inline]
+fn is_canonical_physical_address(_phys_addr: usize) -> bool {
+    true
+}
+
+// aarch64 doesn't have a concept of canonical PA
+// so this returns the address as-is
+#[cfg(target_arch = "aarch64")]
+#[inline]
+const fn canonicalize_physical_address(phys_addr: usize) -> usize {
+    phys_addr
 }
 
 implement_address!(
