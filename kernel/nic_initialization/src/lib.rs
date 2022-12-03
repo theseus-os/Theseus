@@ -25,7 +25,7 @@ use nic_queues::{RxQueueRegisters, TxQueueRegisters};
 pub const NIC_MAPPING_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(
     EntryFlags::PRESENT.bits() |
     EntryFlags::WRITABLE.bits() |
-    EntryFlags::NO_CACHE.bits() |
+    EntryFlags::CACHE_DISABLE.bits() |
     EntryFlags::NO_EXECUTE.bits()
 );
 

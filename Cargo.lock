@@ -833,16 +833,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3be565ca5c557d7f59e7cfcf1844f9e3033650c929c6566f511e8005f205c1d0"
 
 [[package]]
-name = "entryflags_x86_64"
-version = "0.1.0"
-dependencies = [
- "bitflags",
- "multiboot2",
- "static_assertions",
- "xmas-elf",
-]
-
-[[package]]
 name = "environment"
 version = "0.1.0"
 dependencies = [
@@ -1692,6 +1682,7 @@ dependencies = [
  "no_drop",
  "page_allocator",
  "page_table_entry",
+ "pte_flags",
  "spin 0.9.0",
  "x86_64",
  "xmas-elf",
@@ -1734,11 +1725,11 @@ checksum = "71d96e3f3c0b6325d8ccd83c33b28acb183edcb6c67938ba104ec546854b0882"
 name = "memory_x86_64"
 version = "0.1.0"
 dependencies = [
- "entryflags_x86_64",
  "kernel_config",
  "log",
  "memory_structs",
  "multiboot2",
+ "pte_flags",
  "x86_64",
 ]
 
@@ -2199,7 +2190,7 @@ dependencies = [
  "frame_allocator",
  "kernel_config",
  "memory_structs",
- "memory_x86_64",
+ "pte_flags",
  "zerocopy",
 ]
 

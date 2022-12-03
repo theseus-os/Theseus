@@ -1,8 +1,9 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "memory"
-description = "The virtual memory subsystem."
+description = "The memory management subsystem"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
 spin = "0.9.0"
@@ -10,8 +11,11 @@ bitflags = "1.1.0"
 multiboot2 = "0.14.0"
 xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
 bit_field = "0.7.0"
-x86_64 = "0.14.8"
 zerocopy = "0.5.0"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+x86_64 = "0.14.8"
+memory_x86_64 = { path = "../memory_x86_64" }
 
 [dependencies.log]
 version = "0.4.8"
@@ -29,14 +33,14 @@ path = "../../libs/atomic_linked_list"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.memory_x86_64]
-path = "../memory_x86_64"
-
 [dependencies.memory_structs]
 path = "../memory_structs"
 
 [dependencies.page_table_entry]
 path = "../page_table_entry"
+
+[dependencies.pte_flags]
+path = "../pte_flags"
 
 [dependencies.page_allocator]
 path = "../page_allocator"

@@ -176,7 +176,7 @@ impl HpetAcpiTable {
         let hpet_mp = page_table.map_allocated_pages_to(
             pages,
             frames, 
-            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
+            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::CACHE_DISABLE | EntryFlags::NO_EXECUTE,
         )?;
 
         let mut hpet = hpet_mp.into_borrowed_mut::<Hpet>(phys_addr.frame_offset())

@@ -26,7 +26,7 @@ use paging::{
 };
 use spin::Once;
 use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
-use super::{EntryFlags, tlb_flush_virt_addr};
+use super::{PteFlags, tlb_flush_virt_addr};
 use zerocopy::FromBytes;
 use page_table_entry::UnmapResult;
 
@@ -211,11 +211,11 @@ impl Mapper {
     /// Maps the given virtual `AllocatedPages` to the given physical `AllocatedFrames`.
     /// 
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
-    pub fn map_allocated_pages_to(
+    pub fn map_allocated_pages_to<F: Into<PteFlagsArch>>(
         &mut self,
         pages: AllocatedPages,
         frames: AllocatedFrames,
-        flags: EntryFlags,
+        flags: F,
     ) -> Result<MappedPages, &'static str> {
         let (mapped_pages, frames) = self.internal_map_to(pages, frames, flags)?;
         
@@ -232,7 +232,7 @@ impl Mapper {
     /// Maps the given `AllocatedPages` to randomly chosen (allocated) physical frames.
     /// 
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
-    pub fn map_allocated_pages(&mut self, pages: AllocatedPages, flags: EntryFlags)
+    pub fn map_allocated_pages<F: Into<PteFlagsArch>>(&mut self, pages: AllocatedPages, flags: F)
         -> Result<MappedPages, &'static str>
     {
         let mut top_level_flags = flags.clone() | EntryFlags::PRESENT;
@@ -286,21 +286,25 @@ impl Mapper {
     /// 
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
     #[doc(hidden)]
-    pub unsafe fn map_to_non_exclusive(mapper: &mut Self, pages: AllocatedPages, frames: &AllocatedFrames, flags: EntryFlags)
-        -> Result<MappedPages, &'static str>
-    {
-        let mut top_level_flags = flags.clone() | EntryFlags::PRESENT;
-        // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
-        // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
-        top_level_flags.set(EntryFlags::NO_EXECUTE, false);
-        // Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
-        // because another page table frame may re-use (create another alias for) it without us knowing here.
-        top_level_flags.set(EntryFlags::EXCLUSIVE, false);
-        // In fact, in this function, none of the frames can be mapped as exclusive
-        // because we're not accepting the `AllocatedFrames` type. 
-        let mut actual_flags = flags | EntryFlags::PRESENT;
-        actual_flags.set(EntryFlags::EXCLUSIVE, false);
+    pub unsafe fn map_to_non_exclusive<F: Into<PteFlagsArch>>(
+        mapper: &mut Self,
+        pages: AllocatedPages,
+        frames: &AllocatedFrames,
+        flags: F,
+    ) -> Result<MappedPages, &'static str> {
+        let flags = flags.into();
+        let top_level_flags = flags.valid(true)
+            // P4, P3, and P2 entries should never set NOT_EXECUTABLE; only the lowest-level P1 entry should.
+            .executable(true)
+            // Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
+            // because another page table frame may re-use (create another alias for) it without us knowing here.
+            .exclusive(false);
         
+        // In fact, in this function, none of the frames can be mapped as exclusive
+        // because we're accepting a *reference* to an `AllocatedFrames`, not consuming it.
+        let actual_flags = flags
+            .exclusive(false)
+            .valid(true);
 
         let pages_count = pages.size_in_pages();
         let frames_count = frames.size_in_frames();
@@ -348,8 +352,8 @@ pub struct MappedPages {
     page_table_p4: Frame,
     /// The range of allocated virtual pages contained by this mapping.
     pages: AllocatedPages,
-    // The EntryFlags that define the page permissions of this mapping
-    flags: EntryFlags,
+    // The PTE flags that define the page permissions of this mapping.
+    flags: PteFlagsArch,
 }
 impl Deref for MappedPages {
     type Target = PageRange;
@@ -365,12 +369,12 @@ impl MappedPages {
         MappedPages {
             page_table_p4: Frame::containing_address(PhysicalAddress::zero()),
             pages: AllocatedPages::empty(),
-            flags: EntryFlags::zero(),
+            flags: PteFlagsArch::new(),
         }
     }
 
     /// Returns the flags that describe this `MappedPages` page table permissions.
-    pub fn flags(&self) -> EntryFlags {
+    pub fn flags(&self) -> PteFlagsArch {
         self.flags
     }
 
@@ -472,7 +476,11 @@ impl MappedPages {
     /// 
     /// Returns a new `MappedPages` object with the same in-memory contents
     /// as this object, but at a completely new memory region.
-    pub fn deep_copy(&self, new_flags: Option<EntryFlags>, active_table_mapper: &mut Mapper) -> Result<MappedPages, &'static str> {
+    pub fn deep_copy<F: Into<PteFlagsArch>>(
+        &self,
+        active_table_mapper: &mut Mapper,
+        new_flags: Option<F>,
+    ) -> Result<MappedPages, &'static str> {
         warn!("MappedPages::deep_copy() has not been adequately tested yet.");
         let size_in_pages = self.size_in_pages();
 
@@ -480,11 +488,11 @@ impl MappedPages {
         let new_pages = allocate_pages(size_in_pages).ok_or_else(|| "Couldn't allocate_pages()")?;
 
         // we must temporarily map the new pages as Writable, since we're about to copy data into them
-        let new_flags = new_flags.unwrap_or(self.flags);
+        let new_flags = new_flags.map_or(self.flags, Into::into);
         let needs_remapping = !new_flags.is_writable(); 
         let mut new_mapped_pages = active_table_mapper.map_allocated_pages(
             new_pages, 
-            new_flags | EntryFlags::WRITABLE, // force writable
+            new_flags.writable(true), // force writable
         )?;
 
         // perform the actual copy of in-memory content
@@ -508,7 +516,11 @@ impl MappedPages {
     ///
     /// Note that attempting to change certain "reserved" flags will have no effect. 
     /// For example, arbitrarily setting the `EXCLUSIVE` bit would cause unsafety, so it cannot be changed.
-    pub fn remap(&mut self, active_table_mapper: &mut Mapper, new_flags: EntryFlags) -> Result<(), &'static str> {
+    pub fn remap<F: Into<PteFlagsArch>>(
+        &mut self,
+        active_table_mapper: &mut Mapper,
+        new_flags: F,
+    ) -> Result<(), &'static str> {
         if self.size_in_pages() == 0 { return Ok(()); }
 
         // Use the existing value of the `EXCLUSIVE` flag rather than whatever value was passed in.

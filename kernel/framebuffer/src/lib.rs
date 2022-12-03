@@ -78,7 +78,7 @@ impl<P: Pixel> Framebuffer<P> {
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
 
         let vesa_display_flags: EntryFlags =
-            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
+            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::CACHE_DISABLE;
 
         let size = width * height * core::mem::size_of::<P>();
         let pages = memory::allocate_pages_by_bytes(size).ok_or("could not allocate pages for a new framebuffer")?;

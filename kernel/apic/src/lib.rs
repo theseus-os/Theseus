@@ -158,7 +158,7 @@ fn map_apic(page_table: &mut PageTable) -> Result<MappedPages, &'static str> {
             page_table,
             new_page,
             frame,
-            EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
+            EntryFlags::WRITABLE | EntryFlags::CACHE_DISABLE | EntryFlags::NO_EXECUTE,
         )
     }
 }

@@ -4,6 +4,8 @@
 //! * [`PteFlags`]: the set of bit flags that apply to all architectures.
 //! * [`PteFlagsX86_64`] or [`PteFlagsAarch64`]: the arch-specific set of bit flags
 //!   that apply to only the given platform.
+//! * This crate also exports `PteFlagsArch`, an alias for the currently-active
+//!   arch-specific type above (either `PteFlagsX86_64` or `PteFlagsAarch64`).
 //! 
 //! ## Type conversions
 //! *Notably*, you can convert to and from these architecture-specific types
@@ -40,10 +42,10 @@ cfg_if!{ if #[cfg(any(target_arch = "aarch64", doc))] {
 }}
 
 cfg_if! { if #[cfg(target_arch = "x86_64")] {
-    use pte_flags_x86_64::PteFlagsX86_64 as PteFlagsArch;
+    pub use pte_flags_x86_64::PteFlagsX86_64 as PteFlagsArch;
     pub use pte_flags_x86_64::PTE_FRAME_MASK;
 } else if #[cfg(target_arch = "aarch64")] {
-    use pte_flags_aarch64::PteFlagsAarch64 as PteFlagsArch;
+    pub use pte_flags_aarch64::PteFlagsAarch64 as PteFlagsArch;
     pub use pte_flags_aarch64::PTE_FRAME_MASK;
 }}
 
@@ -170,7 +172,7 @@ impl Default for PteFlags {
 }
 
 impl PteFlags {
-    /// Returns a new `PteFlagsX86_64` with the default value, in which:
+    /// Returns a new `PteFlags` with the default value, in which:
     /// * `ACCESSED` is set.
     /// * the `NOT_EXECUTABLE` bit is set.
     /// 
@@ -185,6 +187,20 @@ impl PteFlags {
         Self::from_bits_truncate(
             Self::ACCESSED.bits
             | Self::NOT_EXECUTABLE.bits
+        )
+    }
+
+    /// A convenience function that returns a new `PteFlags` with only the
+    /// default flags and the [`PteFlags::WRITABLE`] bit set.
+    ///
+    /// This is identical to:
+    /// ```rust
+    /// PteFlags::new().writable(true)
+    /// ```
+    pub const fn new_writable() -> Self {
+        Self::from_bits_truncate(
+            Self::new().bits
+            | Self::WRITABLE.bits
         )
     }
 

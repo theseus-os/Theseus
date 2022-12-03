@@ -76,7 +76,7 @@ impl IoApic {
         let ioapic_mapped_page = page_table.map_allocated_pages_to(
             new_page,
             frame, 
-            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
+            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::CACHE_DISABLE | EntryFlags::NO_EXECUTE, 
         )?;
 
         let ioapic_regs = ioapic_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;

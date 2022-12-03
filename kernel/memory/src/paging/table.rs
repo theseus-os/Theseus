@@ -9,7 +9,7 @@
 
 use super::PageTableEntry;
 use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
-use super::super::{VirtualAddress, EntryFlags};
+use super::super::{VirtualAddress, PteFlags};
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
 use zerocopy::FromBytes;
@@ -50,7 +50,7 @@ impl<L: HierarchicalLevel> Table<L> {
     /// if `self` is a P4-level `Table`, then this returns a P3-level `Table`,
     /// and so on for P3 -> P3 and P2 -> P1.
     fn next_table_address(&self, index: usize) -> Option<VirtualAddress> {
-        let entry_flags = self[index].flags();
+        let pte_flags = self[index].flags();
         if entry_flags.contains(EntryFlags::PRESENT) && !entry_flags.is_huge() {
             let table_address = self as *const _ as usize;
             let next_table_vaddr: usize = (table_address << 9) | (index << PAGE_SHIFT);

@@ -58,7 +58,7 @@ pub fn init(host_address_width: u8,
     let mp = {
         let frames = allocate_frames_at(register_base_address, 1)?;
         let pages = allocate_pages(1).ok_or("Unable to find virtual page!")?;
-        let flags = EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
+        let flags = EntryFlags::WRITABLE | EntryFlags::CACHE_DISABLE | EntryFlags::NO_EXECUTE;
         page_table.map_allocated_pages_to(pages, frames, flags)?
     };
 

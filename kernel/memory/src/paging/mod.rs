@@ -29,7 +29,7 @@ use core::{
     fmt,
 };
 use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
-    AllocatedPages, allocate_pages, AllocatedFrames, EntryFlags,
+    AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
     tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
     get_vga_mem_addr, KERNEL_OFFSET};
 use no_drop::NoDrop;
@@ -101,7 +101,7 @@ impl PageTable {
         let mut temporary_page = TemporaryPage::create_and_map_table_frame(page, new_p4_frame, current_page_table)?;
         temporary_page.with_table_and_frame(|table, frame| {
             table.zero();
-            table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), PteFlags::new_writable());
         })?;
 
         let (_temp_page, inited_new_p4_frame) = temporary_page.unmap_into_parts(current_page_table)?;
@@ -136,7 +136,7 @@ impl PageTable {
         let mut temporary_page = TemporaryPage::create_and_map_table_frame(None, this_p4, self)?;
 
         // overwrite recursive mapping
-        self.p4_mut()[RECURSIVE_P4_INDEX].set_entry(other_table.p4_table.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
+        self.p4_mut()[RECURSIVE_P4_INDEX].set_entry(other_table.p4_table.as_allocated_frame(), PteFlags::new_writable());
         tlb_flush_all();
 
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
@@ -150,7 +150,7 @@ impl PageTable {
 
         // restore recursive mapping to original p4 table
         temporary_page.with_table_and_frame(|p4_table, frame| {
-            p4_table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            p4_table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), PteFlags::new_writable());
         })?;
         tlb_flush_all();
 
@@ -343,7 +343,7 @@ pub fn init(
         boot_info_mapped_pages = Some(mapper.map_allocated_pages_to(
             boot_info_pages,
             boot_info_frames,
-            EntryFlags::PRESENT,
+            PteFlags::new(),
         )?);
 
         debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[..index]);

@@ -7,7 +7,7 @@ use static_assertions::const_assert_eq;
 /// A mask for the bits of a page table entry that contain the physical frame address.
 pub const PTE_FRAME_MASK: u64 = 0x0000_FFFF_FFFF_F000;
 
-// Ensure that we never expose reserved bits [12:47] as part of the ` interface.
+// Ensure that we never expose reserved bits [12:47] as part of the `PteFlagsAarch64` interface.
 const_assert_eq!(PteFlagsAarch64::all().bits() & PTE_FRAME_MASK, 0);
 
 
@@ -132,6 +132,7 @@ bitflags! {
         ///
         /// Thus, Theseus currently *always* sets this bit by default.
         const ACCESSED           = 1 << 10;
+
         /// * If set, this page is mapped into only one or less than all address spaces,
         ///   or is mapped differently across different address spaces,
         ///   and thus be flushed out of the TLB when switching address spaces (page tables).
@@ -151,10 +152,12 @@ bitflags! {
         ///
         /// This is currently not used in Theseus.
         const _GUARDED_PAGE      = 1 << 50;
+
         /// * The hardware will set this bit when the page has been written to.
         /// * The OS can then clear this bit once it has acknowledged that the page was written to,
         ///   which is primarily useful for paging/swapping to disk.
         const DIRTY              = 1 << 51;
+
         /// * If set, this translation table entry is part of a set that is contiguous in memory
         ///   with adjacent entries that also have this bit set.
         /// * If not set, this translation table entry is not contiguous in memory
@@ -186,6 +189,9 @@ bitflags! {
     }
 }
 
+const SHAREABLE_BITS_MASK: PteFlagsAarch64 = PteFlagsAarch64::_INNER_SHAREABLE;
+const MAIR_BITS_MASK:      PteFlagsAarch64 = PteFlagsAarch64::_MAIR_INDEX_7;
+
 /// See [`PteFlagsAarch64::new()`] for what bits are set by default.
 impl Default for PteFlagsAarch64 {
     fn default() -> Self {
@@ -201,7 +207,7 @@ impl PteFlagsAarch64 {
     /// * The three bits `[2:4]` for MAIR index values.
     /// * The two bits `[8:9]` for shareability.
     pub const MASKED_BITS_FOR_CONVERSION: PteFlagsAarch64 = PteFlagsAarch64::from_bits_truncate(
-        PteFlagsAarch64::_INNER_SHAREABLE.bits | PteFlagsAarch64::_MAIR_INDEX_7.bits
+        SHAREABLE_BITS_MASK.bits | MAIR_BITS_MASK.bits
     );
 
     /// Returns a new `PteFlagsAarch64` with the default value, in which:
@@ -228,6 +234,144 @@ impl PteFlagsAarch64 {
             | Self::_NOT_GLOBAL.bits
             | Self::NOT_EXECUTABLE.bits
         )
+    }
+
+    /// A convenience function that returns a new `PteFlagsAarch64` with only the
+    /// default flags set and the [`PteFlagsAarch64::READ_ONLY`] bit not set (meaning "writable").
+    ///
+    /// This is identical to:
+    /// ```rust
+    /// PteFlagsAarch64::new().writable(true)
+    /// ```
+    pub const fn new_writable() -> Self {
+        Self::from_bits_truncate(
+            Self::new().bits
+            & !Self::READ_ONLY.bits
+        )
+    }
+
+    /// Returns a copy of this `PteFlagsAarch64` with the `VALID` bit set or cleared.
+    ///
+    /// * If `enable` is `true`, this PTE will be considered "present" and "valid",
+    ///   meaning that the mapping from this page to a physical frame is valid
+    ///   and that the translation of a virtual address in this page should succeed.
+    /// * If `enable` is `false`, this PTE will be considered "invalid",
+    ///   and any attempt to access it for translation purposes will cause a page fault.
+    #[must_use]
+    #[doc(alias("present"))]
+    pub fn valid(mut self, enable: bool) -> Self {
+        self.set(Self::VALID, enable);
+        self
+    }
+
+    /// Returns a copy of this `PteFlagsAarch64` with the `WRITABLE` bit set or cleared.
+    ///
+    /// * If `enable` is `true`, this will be writable.
+    /// * If `enable` is `false`, this will be read-only.
+    #[must_use]
+    #[doc(alias("read_only"))]
+    pub fn writable(mut self, enable: bool) -> Self {
+        self.set(Self::READ_ONLY, !enable);
+        self
+    }
+
+    /// Returns a copy of this `PteFlagsAarch64` with the `NOT_EXECUTABLE` bit cleared or set.
+    ///
+    /// * If `enable` is `true`, this page will be executable (`NOT_EXECUTABLE` will be cleared).
+    /// * If `enable` is `false`, this page will be non-executable, which is the default
+    ///   (`NOT_EXECUTABLE` will be set).
+    #[must_use]
+    #[doc(alias("no_exec"))]
+    pub fn executable(mut self, enable: bool) -> Self {
+        self.set(Self::NOT_EXECUTABLE, !enable);
+        self
+    }
+
+    /// Returns a copy of this `PteFlagsAarch64` with the `DEVICE_MEMORY` bit set or cleared.
+    ///
+    /// * If `enable` is `true`, this will be non-cacheable device memory.
+    /// * If `enable` is `false`, this will be "normal" memory, the default.
+    #[must_use]
+    #[doc(alias("cache", "cacheable", "non-cacheable"))]
+    pub fn device_memory(mut self, enable: bool) -> Self {
+        self.remove(PteFlagsAarch64::_MAIR_INDEX_7);
+        if enable {
+            self.insert(PteFlagsAarch64::DEVICE_MEMORY);
+        } else {
+            self.insert(PteFlagsAarch64::NORMAL_MEMORY);
+        }
+        self
+    }
+
+    /// Returns a copy of this `PteFlagsAarch64` with the `EXCLUSIVE` bit set or cleared.
+    ///
+    /// * If `enable` is `true`, this page will exclusively map its frame.
+    /// * If `enable` is `false`, this page will NOT exclusively map its frame.
+    #[must_use]
+    pub fn exclusive(mut self, enable: bool) -> Self {
+        self.set(Self::EXCLUSIVE, enable);
+        self
+    }
+
+    /// Returns a copy of this `PteFlagsAarch64` with the `ACCESSED` bit set or cleared.
+    ///
+    /// Typically this is used to clear the `ACCESSED` bit, in order to indicate
+    /// that the OS has "acknowledged" the fact that this page was accessed
+    /// since the last time it checked.
+    ///
+    /// * If `enable` is `true`, this page will be marked as accessed.
+    /// * If `enable` is `false`, this page will be marked as not accessed.
+    #[must_use]
+    pub fn accessed(mut self, enable: bool) -> Self {
+        self.set(Self::ACCESSED, enable);
+        self
+    }
+
+    /// Returns a copy of this `PteFlagsAarch64` with the `DIRTY` bit set or cleared.
+    ///
+    /// Typically this is used to clear the `DIRTY` bit, in order to indicate
+    /// that the OS has "acknowledged" the fact that this page was written to
+    /// since the last time it checked. 
+    /// This bit is typically set by the hardware.
+    ///
+    /// * If `enable` is `true`, this page will be marked as dirty.
+    /// * If `enable` is `false`, this page will be marked as clean.
+    #[must_use]
+    pub fn dirty(mut self, enable: bool) -> Self {
+        self.set(Self::DIRTY, enable);
+        self
+    }
+
+    #[doc(alias("present"))]
+    pub fn is_valid(&self) -> bool {
+        self.contains(Self::VALID)
+    }
+
+    #[doc(alias("read_only"))]
+    pub fn is_writable(&self) -> bool {
+        !self.contains(Self::READ_ONLY)
+    }
+
+    #[doc(alias("no_exec"))]
+    pub fn is_executable(&self) -> bool {
+        !self.contains(Self::NOT_EXECUTABLE)
+    }
+
+    #[doc(alias("cache", "cacheable", "non-cacheable"))]
+    pub fn is_device_memory(&self) -> bool {
+        self.contains(Self::DEVICE_MEMORY)
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        self.contains(Self::DIRTY)
+    }
+
+    pub fn is_accessed(&self) -> bool {
+        self.contains(Self::ACCESSED)
+    }
+
+    pub fn is_exclusive(&self) -> bool {
+        self.contains(Self::EXCLUSIVE)
     }
 }
 
@@ -262,7 +406,7 @@ impl From<PteFlagsAarch64> for PteFlags {
         // Otherwise, `DEVICE_MEMORY` may accidentally be misinterpreted as enabled
         // if another MAIR index that had overlapping bits (bit 2) was specified,
         // e.g., _MAIR_INDEX_3, _MAIR_INDEX_5, or _MAIR_INDEX_7.
-        if specific & PteFlagsAarch64::_MAIR_INDEX_7 == PteFlagsAarch64::DEVICE_MEMORY {
+        if specific & MAIR_BITS_MASK == PteFlagsAarch64::DEVICE_MEMORY {
             general |= Self::DEVICE_MEMORY;
         }
         general

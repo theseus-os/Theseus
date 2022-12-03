@@ -26,7 +26,7 @@ impl TransmitBuffer {
     pub fn new(size_in_bytes: u16) -> Result<TransmitBuffer, &'static str> {
         let (mp, starting_phys_addr) = create_contiguous_mapping(
             size_in_bytes as usize,
-            EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
+            EntryFlags::WRITABLE | EntryFlags::CACHE_DISABLE | EntryFlags::NO_EXECUTE,
         )?;
         Ok(TransmitBuffer {
             mp: mp,

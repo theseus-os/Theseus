@@ -1,32 +1,19 @@
-//! This crate implements the virtual memory subsystem for Theseus,
-//! which is fairly robust and provides a unification between 
-//! arbitrarily mapped sections of memory and Rust's lifetime system. 
-//! Originally based on Phil Opp's blog_os. 
+//! This crate implements the main memory management subsystem for Theseus.
+//!
+//! The primary type of interest is [`MappedPages`], which offers a robust
+//! interface that unifies the usage of arbitrary memory regions
+//! with that of Rust's safe type system and lifetimes.
+//!
+//! ## Acknowledgments
+//! Some of the internal page table management code was based on
+//! Philipp Oppermann's [blog_os], but has since changed significantly.
+//! 
+//! [blog_os]: https://github.com/phil-opp/blog_os
 
 #![no_std]
 #![feature(ptr_internals)]
 #![feature(unboxed_closures)]
 #![feature(result_option_inspect)]
-
-extern crate spin;
-extern crate multiboot2;
-extern crate alloc;
-#[macro_use] extern crate log;
-extern crate irq_safety;
-extern crate kernel_config;
-extern crate atomic_linked_list;
-extern crate xmas_elf;
-extern crate bit_field;
-#[cfg(target_arch = "x86_64")]
-extern crate memory_x86_64;
-extern crate x86_64;
-extern crate memory_structs;
-extern crate page_table_entry;
-extern crate page_allocator;
-extern crate frame_allocator;
-extern crate zerocopy;
-extern crate no_drop;
-
 
 #[cfg(not(mapper_spillful))]
 mod paging;
@@ -43,15 +30,18 @@ pub use memory_structs::{Frame, Page, FrameRange, PageRange, VirtualAddress, Phy
 pub use page_allocator::{AllocatedPages, allocate_pages, allocate_pages_at,
     allocate_pages_by_bytes, allocate_pages_by_bytes_at};
 
-pub use frame_allocator::{AllocatedFrames, MemoryRegionType, PhysicalMemoryRegion,
-    allocate_frames_by_bytes_at, allocate_frames_by_bytes, allocate_frames_at};
+pub use frame_allocator::{
+    AllocatedFrames, MemoryRegionType, PhysicalMemoryRegion,
+    allocate_frames_by_bytes_at, allocate_frames_by_bytes, allocate_frames_at,
+};
 
 #[cfg(target_arch = "x86_64")]
-use memory_x86_64::{BootInformation, get_kernel_address, get_boot_info_mem_area, find_section_memory_bounds,
-    get_vga_mem_addr, get_modules_address, tlb_flush_virt_addr, tlb_flush_all, get_p4};
+use memory_x86_64::{
+    BootInformation, get_kernel_address, get_boot_info_mem_area, find_section_memory_bounds,
+    get_vga_mem_addr, get_modules_address, tlb_flush_virt_addr, tlb_flush_all, get_p4,
+};
 
-#[cfg(target_arch = "x86_64")]
-pub use memory_x86_64::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
+pub use pte_flags::*;
 
 use spin::Once;
 use irq_safety::MutexIrqSafe;
@@ -95,7 +85,7 @@ pub struct MemoryManagementInfo {
 /// # Locking / Deadlock
 /// Currently, this function acquires the lock on the frame allocator and the kernel's `MemoryManagementInfo` instance.
 /// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
-pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<(MappedPages, PhysicalAddress), &'static str> {
+pub fn create_contiguous_mapping(size_in_bytes: usize, flags: PteFlags) -> Result<(MappedPages, PhysicalAddress), &'static str> {
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous pages!")?;
     let allocated_frames = allocate_frames_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous frames!")?;
@@ -113,7 +103,7 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
 /// # Locking / Deadlock
 /// Currently, this function acquires the lock on the kernel's `MemoryManagementInfo` instance.
 /// Thus, the caller should ensure that lock is not held when invoking this function.
-pub fn create_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<MappedPages, &'static str> {
+pub fn create_mapping(size_in_bytes: usize, flags: PteFlags) -> Result<MappedPages, &'static str> {
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_mapping(): couldn't allocate pages!")?;
     kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags)
