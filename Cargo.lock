@@ -2189,6 +2189,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "page_attribute_table"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "memory",
+ "msr",
+ "raw-cpuid",
+ "x86_64",
+]
+
+[[package]]
 name = "page_table_entry"
 version = "0.1.0"
 dependencies = [

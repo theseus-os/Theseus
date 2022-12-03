@@ -1,0 +1,22 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "page_attribute_table"
+description = "Support for x86 Page Attribute Table (PAT) for controlling memory type cacheability"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+log = "0.4.8"
+x86_64 = "0.14.8"
+
+[dependencies.msr]
+path = "../../libs/msr"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.raw-cpuid]
+version = "10.6.0"
+
+[lib]
+crate-type = ["rlib"]
