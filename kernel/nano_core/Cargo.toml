@@ -61,7 +61,7 @@ optional = true
 path = "../memory_initialization"
 
 [features]
-uefi = ["dep:bootloader_api", "boot_info/uefi"]
+uefi = ["dep:bootloader_api", "boot_info/uefi", "captain/uefi"]
 bios = ["dep:vga_buffer", "boot_info/multiboot2" ]
 
 [lib]

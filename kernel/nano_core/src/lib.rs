@@ -1,4 +1,4 @@
-///! The aptly-named tiny crate containing the first OS code to run.
+//! The aptly-named tiny crate containing the first OS code to run.
 //! 
 //! The `nano_core` is very simple, and only does the following things:
 //! 
