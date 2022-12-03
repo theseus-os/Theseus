@@ -194,7 +194,7 @@ fn parse_bootloader_modules_into_files(
                     let bytes = entry.file();
                     let size = bytes.len();
                     let mut mp = {
-                        let flags = EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE | EntryFlags::PRESENT;
+                        let flags = PteFlags::new().valid(true).writable(true);
                         let allocated_pages = allocate_pages_by_bytes(size).ok_or("couldn't allocate pages")?;
                         kernel_mmi.page_table.map_allocated_pages(allocated_pages, flags)?
                     };
