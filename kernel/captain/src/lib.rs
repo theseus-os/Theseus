@@ -86,6 +86,7 @@ pub fn init(
     bsp_initial_stack: NoDrop<Stack>,
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
+    rsdp: Option<usize>,
 ) -> Result<(), &'static str> {
     #[cfg(mirror_log_to_vga)]
     {
@@ -99,7 +100,7 @@ pub fn init(
     // info!("TSC frequency calculated: {}", _tsc_freq);
 
     // now we initialize early driver stuff, like APIC/ACPI
-    device_manager::early_init(kernel_mmi_ref.lock().deref_mut())?;
+    device_manager::early_init(rsdp, kernel_mmi_ref.lock().deref_mut())?;
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
     let (double_fault_stack, privilege_stack) = {

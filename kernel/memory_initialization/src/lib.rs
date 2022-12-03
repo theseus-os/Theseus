@@ -117,7 +117,7 @@ where
             )
         }))
         .collect::<Result<Vec<_>, _>>() // collect the `Vec<Result<...>>` into `Result<Vec<...>>`
-        .map_err(|_e| "BUG: Bootloader module had invalid non-UTF8 name (cmdline) string")?;
+        ?;
     // Now that we've recorded the rest of the necessary boot info, we can drop the boot_info_mapped_pages.
     // This frees up those frames such that future code can exclusively map and access those pages/frames.
     drop(boot_info_mapped_pages);

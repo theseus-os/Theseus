@@ -8,7 +8,8 @@ edition = "2021"
 
 [dependencies]
 # v0.11
-bootloader_api = { git = "https://github.com/rust-osdev/bootloader", optional = true }
+# bootloader_api = { git = "https://github.com/rust-osdev/bootloader", optional = true }
+bootloader_api = { path = "../../../bootloader/api", optional = true }
 boot_info = { path = "../boot_info" }
 multiboot2 = "0.14.0"
 libm = "0.2.1"

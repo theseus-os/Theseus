@@ -43,7 +43,7 @@ use static_array_rb_tree::*;
 ///
 /// Any virtual addresses **less than or equal** to this address are considered "designated".
 /// This lower part of the address range that's designated covers from 0x0 to this address.
-static DESIGNATED_PAGES_LOW_END: Once<Page> = Once::new();
+pub static DESIGNATED_PAGES_LOW_END: Once<Page> = Once::new();
 
 /// Defines the upper part of the address space that's designated, similar to `DESIGNATED_PAGES_LOW_END`. 
 /// Any virtual addresses **greater than or equal to** this address is considered "designated".

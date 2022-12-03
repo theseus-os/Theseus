@@ -55,7 +55,8 @@ impl ElfSection for multiboot2::ElfSection {
 
 impl<'a> Module for &'a multiboot2::ModuleTag {
     fn name(&self) -> Result<&str, &'static str> {
-        self.cmdline().map_err(|_| "multiboot2 module cmdline was an invalid UTF-8 sequence")
+        self.cmdline()
+            .map_err(|_| "multiboot2 module cmdline was an invalid UTF-8 sequence")
     }
 
     fn start(&self) -> usize {
@@ -73,7 +74,7 @@ impl crate::BootInformation for multiboot2::BootInformation {
 
     type ElfSection<'a> = multiboot2::ElfSection;
     type ElfSections<'a> = multiboot2::ElfSectionIter;
-    
+
     type Module<'a> = &'a multiboot2::ModuleTag;
     type Modules<'a> = multiboot2::ModuleIter<'a>;
 
@@ -129,7 +130,7 @@ impl crate::BootInformation for multiboot2::BootInformation {
             min = cmp::min(min, module.start_address() as usize);
             max = cmp::max(max, module.end_address() as usize);
         }
-        
+
         log::info!("THINGY: {min:0x?}");
         log::info!("AHINGY: {max:0x?}");
 
@@ -156,5 +157,12 @@ impl crate::BootInformation for multiboot2::BootInformation {
         log::info!("START ADDRESS: {:0x?}", self.start_address());
         self.module_tags()
     }
-    
+
+    fn stack_mapping(
+        &self,
+    ) -> Result<(Range<PhysicalAddress>, Range<VirtualAddress>), &'static str> {
+        // physical = stack section - KERNEL_OFFSET
+        // virtual = stack section
+        todo!();
+    }
 }

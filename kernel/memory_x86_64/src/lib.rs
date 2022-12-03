@@ -175,9 +175,14 @@ where
                 "initial page_table"
             }
             ".stack" => {
-                stack_start = Some((start_virt_addr, start_phys_addr));
-                stack_end   = Some((end_virt_addr, end_phys_addr));
-                "initial stack"
+                // stack_start = Some((start_virt_addr, start_phys_addr));
+                // stack_end   = Some((end_virt_addr, end_phys_addr));
+                // "initial stack"
+                continue;
+            }
+            ".bootloader-config" => {
+                // TODO: Ideally we'd mark bootloader-config as not allocated
+                continue;
             }
             _ =>  {
                 error!("Section {} at {:#X}, size {:#X} was not an expected section", 
@@ -201,11 +206,15 @@ where
     let rodata_start       = rodata_start     .ok_or("Couldn't find start of .rodata section")?;
     let rodata_end         = rodata_end       .ok_or("Couldn't find end of .rodata section")?;
     let data_start         = data_start       .ok_or("Couldn't find start of .data section")?;
-    let data_end           = data_end         .ok_or("Couldn't find start of .data section")?;
-    let page_table_start   = page_table_start .ok_or("Couldn't find start of .page_table section")?;
-    let page_table_end     = page_table_end   .ok_or("Couldn't find start of .page_table section")?;
-    let stack_start        = stack_start      .ok_or("Couldn't find start of .stack section")?;
-    let stack_end          = stack_end        .ok_or("Couldn't find start of .stack section")?;
+    let data_end           = data_end         .ok_or("Couldn't find end of .data section")?;
+    // let page_table_start   = page_table_start .ok_or("Couldn't find start of .page_table section")?;
+    // let page_table_end     = page_table_end   .ok_or("Couldn't find end of .page_table section")?;
+    // let stack_start        = stack_start      .ok_or("Couldn't find start of .stack section")?;
+    // let stack_end          = stack_end        .ok_or("Couldn't find end of .stack section")?;
+    let (stack_start, stack_end) = {
+        let virtual_range = boot_info.stack_range();
+        ((virtual_range.start, PhysicalAddress::zero()), (virtual_range.end, PhysicalAddress::zero()))
+    };
      
     let text_flags    = text_flags  .ok_or("Couldn't find .text section flags")?;
     let rodata_flags  = rodata_flags.ok_or("Couldn't find .rodata section flags")?;
@@ -226,11 +235,11 @@ where
         end: data_end,
         flags: data_flags,
     };
-    let page_table = SectionMemoryBounds {
-        start: page_table_start,
-        end: page_table_end,
-        flags: data_flags, // same flags as data sections
-    };
+    // let page_table = SectionMemoryBounds {
+    //     start: page_table_start,
+    //     end: page_table_end,
+    //     flags: data_flags, // same flags as data sections
+    // };
     let stack = SectionMemoryBounds {
         start: stack_start,
         end: stack_end,
@@ -241,7 +250,7 @@ where
         text,
         rodata,
         data,
-        page_table,
+        // page_table,
         stack,
     };
     Ok((aggregated_sections_memory_bounds, sections_memory_bounds))

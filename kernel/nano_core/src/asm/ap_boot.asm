@@ -3,10 +3,10 @@
 section .init.text32ap progbits alloc exec nowrite
 bits 32 ;We are still in protected mode
 
-extern set_up_SSE
+; extern set_up_SSE
 
 %ifdef ENABLE_AVX
-extern set_up_AVX
+; extern set_up_AVX
 %endif
 
 global ap_start_protected_mode
@@ -23,25 +23,8 @@ ap_start_protected_mode:
     
 	call set_up_paging_ap
 	
-
-    ; each character is reversed in the dword cuz of little endianness
-	; prints PGTBL
-	mov dword [0xb8018], 0x4f2E4f2E ; ".."
-    mov dword [0xb801c], 0x4f504f2E ; ".P"
-	mov dword [0xb8020], 0x4f544f47 ; "GT"
-	mov dword [0xb8024], 0x4f4C4f42 ; "BL"
-
 	; Load the 64-bit GDT
 	lgdt [GDT_AP.ptr_low - KERNEL_OFFSET]
-
-
-	; prints GDT
-	mov dword [0xb8028], 0x4f2E4f2E ; ".."
-    mov dword [0xb802c], 0x4f474f2E ; ".G"
-	mov dword [0xb8030], 0x4f544f44 ; "DT"
-	mov eax, 0x4f004f00
-	or eax, GDT_AP.code + 0x30 ; convert GDT_AP.code value to ASCII char
-	mov dword [0xb8034], eax ; prints GDT_AP.code value
 
 
 	; Load the code selector via a far jmp
@@ -89,7 +72,65 @@ set_up_paging_ap:
 
     ret
 
+; Check for SSE and enable it. Prints error 'a' if unsupported
+global set_up_SSE
+set_up_SSE:
+	mov eax, 0x1
+	cpuid
+	test edx, 1 << 25
+	jz .no_SSE
 
+	; enable SSE
+	mov eax, cr0
+	and ax, 0xFFFB         ; clear coprocessor emulation CRO.EM
+	or ax, 0x2             ; set coprocessor monitoring CR0.MP
+	mov cr0, eax
+
+	mov eax, cr4
+	or ax, 3 << 9          ; set CR4.OSFXSR and CR4.OSXMMEXCPT at the same time
+	mov cr4, eax
+
+	ret
+.no_SSE:
+	mov al, "a"
+	jmp _error
+
+
+; Check for AVX and enable it. Prints error 'b' if unsupported
+%ifdef ENABLE_AVX
+global set_up_AVX
+set_up_AVX:
+	; check architectural support
+	mov eax, 0x1
+	cpuid
+	test ecx, 1 << 26	; is XSAVE supported?
+	jz .no_AVX
+	test ecx, 1 << 28	; is AVX supported?
+	jz .no_AVX
+
+	; enable OSXSAVE
+	mov eax, cr4
+	or eax, 1 << 18		; enable OSXSAVE
+	mov cr4, eax
+
+	; enable AVX
+	mov ecx, 0
+	xgetbv
+	or eax, 110b		; enable SSE and AVX
+	mov ecx, 0
+	xsetbv
+
+	ret
+.no_AVX:
+	mov al, "b"
+	jmp _error
+%endif
+
+; Prints `ERR: ` and the given error code to screen and hangs.
+; parameter: error code (in ascii) in al
+global _error
+_error:
+	hlt
 
 ; ---------------------------------------- Long Mode ----------------------------------------
 bits 64
@@ -112,11 +153,6 @@ long_mode_start_ap:
 
 	; mov rsp, 0xFC00
 	
-
-	; each character is reversed in the dword cuz of little endianness
-	mov dword [0xFFFFFFFF800b8038], 0x4f2E4f2E ; ".."
-    mov dword [0xFFFFFFFF800b803c], 0x4f4f4f4c ; "LO"
-	mov dword [0xFFFFFFFF800b8040], 0x4f474f4e ; "NG"
 
 	; Long jump to the higher half. Because `jmp` does not take
 	; a 64 bit address (which we need because we are practically
@@ -159,12 +195,6 @@ start_high_ap:
 	mov ecx, 0xc0000102   ; GS KERNEL BASE MSR
 	wrmsr
 	
-	; each character is reversed in the dword cuz of little endianness
-	mov dword [0xb8048 + KERNEL_OFFSET], 0x4f2E4f2E ; ".."
-    mov dword [0xb804c + KERNEL_OFFSET], 0x4f494f48 ; "HI"
-	mov dword [0xb8050 + KERNEL_OFFSET], 0x4f484f47 ; "GH"
-	mov dword [0xb8054 + KERNEL_OFFSET], 0x4f524f45 ; "ER"
-
 	; move to the new stack that was alloc'd for this AP
 	mov rcx, [AP_STACK_END]
 	lea rsp, [rcx - 256]

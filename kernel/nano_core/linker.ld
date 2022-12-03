@@ -34,7 +34,7 @@ SECTIONS {
 	{
 		*(.rodata .rodata.*)
 	}
-
+	
 	.eh_frame ALIGN(4K) : AT(ADDR(.eh_frame) - KERNEL_OFFSET)
 	{
 		*(.eh_frame)
@@ -87,11 +87,11 @@ SECTIONS {
 	}
 
 	/* .got (Global Offset Table) section and its relocation types are currently unsupported */
+	/*
 	.got (NOLOAD) :
 	{
     	KEEP(*(.got .got.*))
   	}
-	/*
 	.got ALIGN(4K) : AT(ADDR(.got) - KERNEL_OFFSET)
 	{
 		*(.got)

@@ -9,7 +9,7 @@ pub mod multiboot2;
 pub mod uefi;
 
 use core::{iter::Iterator, ops::Range};
-use memory_structs::PhysicalAddress;
+use memory_structs::{Frame, Page, PhysicalAddress, VirtualAddress};
 
 pub trait MemoryArea {
     fn start(&self) -> usize;
@@ -50,6 +50,11 @@ pub trait Module {
     fn end(&self) -> usize;
 }
 
+pub trait Mapping {
+    fn page(&self) -> Page;
+    fn frame(&self) -> Frame;
+}
+
 pub trait BootInformation: 'static {
     type MemoryArea<'a>: MemoryArea;
     type MemoryAreas<'a>: Iterator<Item = Self::MemoryArea<'a>>;
@@ -60,6 +65,10 @@ pub trait BootInformation: 'static {
     type Module<'a>: Module;
     type Modules<'a>: Iterator<Item = Self::Module<'a>>;
 
+    // type Mapping<'a>: Mapping;
+    // type Mappings<'a>: Iterator<Item = Self::Mapping<'a>>;
+
+    fn address(&self) -> VirtualAddress;
     fn size(&self) -> usize;
     fn kernel_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str>;
     fn bootloader_info_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str>;
@@ -67,4 +76,6 @@ pub trait BootInformation: 'static {
     fn memory_areas(&self) -> Result<Self::MemoryAreas<'_>, &'static str>;
     fn elf_sections(&self) -> Result<Self::ElfSections<'_>, &'static str>;
     fn modules(&self) -> Self::Modules<'_>;
+    fn stack_range(&self) -> Range<VirtualAddress>;
+    fn rsdp(&self) -> Option<usize>;
 }

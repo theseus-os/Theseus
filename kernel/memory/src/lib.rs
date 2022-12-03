@@ -174,7 +174,8 @@ where
     // Theseus chooses to reserve the following regions of physical memory for specific use.
     let low_memory_frames   = FrameRange::from_phys_addr(PhysicalAddress::zero(), 0x10_0000); // suggested by most OS developers
     let kernel_frames       = FrameRange::from_phys_addr(kernel_memory.start, kernel_memory.end.value() - kernel_memory.start.value());
-    let boot_modules_frames = FrameRange::from_phys_addr(modules_memory.start, modules_memory.end.value() - modules_memory.start.value());
+    // let boot_modules_frames = FrameRange::from_phys_addr(modules_memory.start, modules_memory.end.value() - modules_memory.start.value());
+    let boot_modules_frames = FrameRange::empty();
     let boot_info_frames    = FrameRange::from_phys_addr(boot_info_memory.start, boot_info_memory.end.value() - boot_info_memory.start.value());
     
     // Add the VGA display's memory region to the list of reserved physical memory areas.

@@ -11,25 +11,27 @@ extern crate panic_entry;
 mod util;
 
 use core::ops::DerefMut;
-use kernel_config::memory::KERNEL_OFFSET;
+use kernel_config::memory::{KERNEL_OFFSET, KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
 use memory::VirtualAddress;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "uefi")] {
-        use bootloader_api::BootloaderConfig;
+        use bootloader_api::{config::Mapping, BootloaderConfig};
 
         #[no_mangle]
         pub extern "C" fn rust_entry(_boot_info: &'static mut bootloader_api::BootInfo, stack: usize) {
-            bootloader_api::__force_use(&__BOOTLOADER_CONFIG);
             try_exit!(early_setup(stack));
             try_exit!(nano_core(_boot_info as &'static bootloader_api::BootInfo));
         }
 
         #[link_section = ".bootloader-config"]
+        #[used]
         pub static __BOOTLOADER_CONFIG: [u8; BootloaderConfig::SERIALIZED_LEN] = {
             // FIXME: Is the default config ok?
             let mut config = BootloaderConfig::new_default();
-            config.mappings.physical_memory = Some(bootloader_api::config::Mapping::Dynamic);
+            config.mappings.physical_memory = Some(Mapping::Dynamic);
+            config.mappings.page_table_recursive = Some(Mapping::FixedAddress(0o177777_776_000_000_000_0000));
+            config.kernel_stack_size = ((KERNEL_STACK_SIZE_IN_PAGES + 2) * PAGE_SIZE) as u64;
             config.serialize()
         };
     } else if #[cfg(feature = "bios")] {
@@ -38,7 +40,6 @@ cfg_if::cfg_if! {
         #[no_mangle]
         pub extern "C" fn rust_entry(boot_info: usize, stack: usize) {
             try_exit!(early_setup(stack));
-
             if VirtualAddress::new(boot_info).is_none() {
                 shutdown(format_args!("multiboot2 info address invalid"));
             }
@@ -71,6 +72,7 @@ fn nano_core<T>(boot_info: T) -> Result<(), &'static str>
 where
     T: boot_info::BootInformation,
 {
+    let rsdp = boot_info.rsdp();
     // init memory management: set up stack with guard page, heap, kernel text/data
     // mappings, etc
     let (
@@ -176,6 +178,7 @@ where
             stack,
             ap_realmode_begin,
             ap_realmode_end,
+            rsdp,
         )?;
     }
     #[cfg(loadable)]
@@ -199,6 +202,7 @@ where
             NoDrop<stack::Stack>,
             VirtualAddress,
             VirtualAddress,
+            Option<usize>,
         ) -> Result<(), &'static str>;
         let func: &CaptainInitFunc = unsafe { section.as_func() }?;
 
@@ -208,6 +212,7 @@ where
             stack,
             ap_realmode_begin,
             ap_realmode_end,
+            rsdp,
         )
     }
 

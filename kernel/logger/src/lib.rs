@@ -30,7 +30,7 @@ pub const DEFAULT_LOG_LEVEL: Level = Level::Trace;
 pub const LOG_MAX_WRITERS: usize = 2;
 
 /// The early logger used before dynamic heap allocation is available.
-static EARLY_LOGGER: MutexIrqSafe<EarlyLogger<LOG_MAX_WRITERS>> = MutexIrqSafe::new(
+pub static EARLY_LOGGER: MutexIrqSafe<EarlyLogger<LOG_MAX_WRITERS>> = MutexIrqSafe::new(
     EarlyLogger([None, None])
 );
 
@@ -43,7 +43,7 @@ static LOGGER: MutexIrqSafe<Option<Logger>> = MutexIrqSafe::new(None);
 
 /// An early logger that can only write to a fixed number of [`SerialPort`]s,
 /// intended for basic use before dynamic heap allocation is available.
-struct EarlyLogger<const N: usize>([Option<SerialPort>; N]);
+pub struct EarlyLogger<const N: usize>([Option<SerialPort>; N]);
 
 /// The fully-featured logger that can be dynamically initialized with arbitrary output streams.
 /// 
@@ -83,12 +83,16 @@ impl DummyLogger {
     /// This function writes to the real (fully-featured) [`LOGGER`] if it has been initialized;
     /// otherwise, it falls back to writing to the [`EARLY_LOGGER`] instead.
     fn write_fmt(&self, arguments: fmt::Arguments) -> fmt::Result {
+        unsafe { core::arch::asm!("mov r8, 0xb") };
         if let Some(logger) = &*LOGGER.lock() {
+            unsafe { core::arch::asm!("mov r8, 0xc") };
             for writer in logger.writers.iter() {
                 let _result = writer.deref().borrow().lock().write_fmt(arguments);
             }
         } else {
+            unsafe { core::arch::asm!("mov r8, 0xd") };
             for serial_port in EARLY_LOGGER.lock().0.iter_mut().flatten() {
+                unsafe { core::arch::asm!("mov r8, 0xe") };
                 let _result = serial_port.write_fmt(arguments);
             }
         }
@@ -105,6 +109,7 @@ impl Log for DummyLogger {
     }
 
     fn log(&self, record: &Record) {
+        unsafe { core::arch::asm!("mov r8, 0xf") };
         if !self.enabled(record.metadata()) {
             return;
         }

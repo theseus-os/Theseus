@@ -288,7 +288,7 @@ fn bring_up_ap(
     info!("Bringing up AP, proc: {} apic_id: {}", new_lapic.processor, new_lapic.apic_id);
     let new_apic_id = new_lapic.apic_id; 
     
-    bsp_lapic.clear_error();
+    // bsp_lapic.clear_error();
     let esr = bsp_lapic.error();
     debug!(" initial esr = {:#X}", esr);
 
@@ -324,7 +324,7 @@ fn bring_up_ap(
     //     bsp_lapic.set_icr(icr);
     // }
 
-    bsp_lapic.clear_error();
+    // bsp_lapic.clear_error();
     let esr = bsp_lapic.error();
     debug!(" pre-SIPI esr = {:#X}", esr);
 
@@ -347,7 +347,7 @@ fn bring_up_ap(
     pit_clock_basic::pit_wait(300).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to pit_wait 300 us. Error {:?}", _e); });
     pit_clock_basic::pit_wait(200).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to pit_wait 200 us. Error {:?}", _e); });
 
-    bsp_lapic.clear_error();
+    // bsp_lapic.clear_error();
     let esr = bsp_lapic.error();
     debug!(" post-SIPI esr = {:#X}", esr);
     // TODO: we may need to send a second START IPI on real hardware???

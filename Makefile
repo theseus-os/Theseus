@@ -201,7 +201,12 @@ image: $(image)
 ### This target builds an .iso OS image from all of the compiled crates.
 $(image) $(efi_firmware): clean-old-build build extra_files copy_kernel $(bootloader)
 ifeq ($(uefi), yes)
-	cargo r --release -Z bindeps --manifest-path $(ROOT_DIR)/tools/uefi_builder/Cargo.toml -- $(nano_core_binary) $(image) $(efi_firmware)
+	cargo r \
+		--release \
+		-Z bindeps \
+		--manifest-path \
+		$(ROOT_DIR)/tools/uefi_builder/Cargo.toml -- \
+		$(nano_core_binary) $(OBJECT_FILES_BUILD_DIR) $(image) $(efi_firmware)
 endif
 
 ## Copy the kernel boot image into the proper ISOFILES directory.
@@ -322,7 +327,7 @@ endif
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
-	THESEUS_CFLAGS='$(CFLAGS)' THESEUS_NANO_CORE_BUILD_DIR='$(NANO_CORE_BUILD_DIR)' RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) $(BUILD_STD_CARGOFLAGS) --target $(TARGET)
+	THESEUS_CFLAGS='$(CFLAGS)' THESEUS_NANO_CORE_BUILD_DIR='$(NANO_CORE_BUILD_DIR)' RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) $(BUILD_STD_CARGOFLAGS) --target $(TARGET) -Zbindeps
 
 ## We tried using the "cargo rustc" command here instead of "cargo build" to avoid cargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of cargo rebuilding everything).
@@ -405,7 +410,7 @@ limine:
 extra_files:
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
 	@for f in $(shell cd $(EXTRA_FILES) && find * -type f); do \
-		ln -f  $(EXTRA_FILES)/$${f}  $(OBJECT_FILES_BUILD_DIR)/`echo -n $${f} | sed 's/\//?/g'`  & \
+		ln -f  $(EXTRA_FILES)/$${f}  $(OBJECT_FILES_BUILD_DIR)/`echo -n $${f} | sed 's/\//;/g'`  & \
 	done; wait
 
 
@@ -466,7 +471,7 @@ theseus_cargo: $(wildcard $(THESEUS_CARGO)/Cargo.*)  $(wildcard$(THESEUS_CARGO)/
 ### Removes the build directory and all compiled Rust objects.
 clean:
 	@rm -rf $(BUILD_DIR)
-	cargo clean
+	cargo clean -Zbindeps
 	
 
 ### Removes only the old files that were copied into the build directory from a previous build.

@@ -51,9 +51,11 @@ impl <T: Ord> Wrapper<T> {
 /// and then abstract over both that and the inner `RBTree` when using it. 
 /// 
 /// TODO: use const generics to allow this to be of any arbitrary size beyond 32 elements.
+#[derive(Debug)]
 pub struct StaticArrayRBTree<T: Ord>(pub(crate) Inner<T>);
 
 /// The inner enum, hidden for visibility reasons because Rust lacks private enum variants.
+#[derive(Debug)]
 pub(crate) enum Inner<T: Ord> {
 	Array([Option<T>; 32]),
 	RBTree(RBTree<WrapperAdapter<T>>),

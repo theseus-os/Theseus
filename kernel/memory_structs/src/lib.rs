@@ -462,6 +462,6 @@ pub struct AggregatedSectionMemoryBounds {
    pub text:        SectionMemoryBounds,
    pub rodata:      SectionMemoryBounds,
    pub data:        SectionMemoryBounds,
-   pub page_table:  SectionMemoryBounds,
+   // pub page_table:  SectionMemoryBounds,
    pub stack:       SectionMemoryBounds,
 }

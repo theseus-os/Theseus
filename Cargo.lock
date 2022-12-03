@@ -291,13 +291,13 @@ dependencies = [
  "log",
  "memory_structs",
  "multiboot2",
+ "uefi",
  "xmas-elf",
 ]
 
 [[package]]
 name = "bootloader_api"
 version = "0.1.0-alpha.0"
-source = "git+https://github.com/rust-osdev/bootloader#4e2b8d7e4b4fad3c7aefd7f8174f86ec2119ecc7"
 
 [[package]]
 name = "bootloader_modules"
@@ -1703,12 +1703,15 @@ dependencies = [
  "kernel_config",
  "lazy_static",
  "log",
+ "logger",
  "memory_structs",
  "memory_x86_64",
  "multiboot2",
  "no_drop",
  "page_allocator",
  "page_table_entry",
+ "port_io",
+ "serial_port_basic",
  "spin 0.9.0",
  "x86_64",
  "xmas-elf",
@@ -2488,9 +2491,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.7"
+version = "1.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa563d17ecb180e500da1cfd2b028310ac758de548efdd203e18f283af693f37"
+checksum = "bbe448f377a7d6961e30f5955f9b8d106c3f5e449d493ee1b125c1d43c2b5179"
 dependencies = [
  "proc-macro2",
 ]
@@ -3652,6 +3655,38 @@ name = "typenum"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
+
+[[package]]
+name = "ucs2"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bad643914094137d475641b6bab89462505316ec2ce70907ad20102d28a79ab8"
+dependencies = [
+ "bit_field 0.10.1",
+]
+
+[[package]]
+name = "uefi"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e69e94934e3a8fb9d652408385a1ce5199bbe31df2baba1973bcd1ba2c973fd"
+dependencies = [
+ "bitflags",
+ "log",
+ "ucs2",
+ "uefi-macros",
+]
+
+[[package]]
+name = "uefi-macros"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f618e22256b6ecc841fe2f24b5978fa47221b5006712da01236b5407c8474866"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "unicode-ident"
