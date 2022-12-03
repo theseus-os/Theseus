@@ -365,6 +365,7 @@ where
         stack_page_group = Some((stack_guard_page, NoDrop::new(stack_mapped_pages.unwrap())));
 
         log::trace!("allocating vga pages");
+        // TODO: UEFI?
         // Map the VGA display memory as writable.
         // We do an identity mapping for the VGA display too, because the AP cores may access it while booting.
         let (vga_phys_addr, vga_size_in_bytes, vga_flags) = get_vga_mem_addr()?;

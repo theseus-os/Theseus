@@ -214,9 +214,15 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
     }
 
     fn modules_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str> {
-        // The memory subsystem uses this to reserve the modules' memory. However, the
-        // bootloader already does this for us.
-        Ok(PhysicalAddress::zero()..PhysicalAddress::zero())
+        let area = self
+            .memory_regions
+            .iter()
+            .filter(|region| region.kind == info::MemoryRegionKind::UnknownUefi(0x80000000))
+            .next()
+            .ok_or("no modules memory region")?;
+        let start = PhysicalAddress::new_canonical(area.start as usize);
+        let end = PhysicalAddress::new_canonical(area.end as usize);
+        Ok(start..end)
     }
 
     fn stack_memory_range(&self) -> Range<VirtualAddress> {

@@ -32,7 +32,7 @@ pub const NAMESPACES_DIRECTORY_NAME: &'static str = "namespaces";
 
 /// The name of the directory that contains all other "extra_files" contents.
 pub const EXTRA_FILES_DIRECTORY_NAME: &'static str = "extra_files";
-const EXTRA_FILES_DIRECTORY_DELIMITER: char = '?';
+const EXTRA_FILES_DIRECTORY_DELIMITER: char = '$';
 
 /// The initial `CrateNamespace` that all kernel crates are added to by default.
 static INITIAL_KERNEL_NAMESPACE: Once<Arc<CrateNamespace>> = Once::new();
