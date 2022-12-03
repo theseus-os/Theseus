@@ -146,6 +146,7 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
 ///  8. the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 pub fn init<T>(
     boot_info: &T,
+    kernel_stack_start: VirtualAddress,
 ) -> Result<(
     PageTable,
     NoDrop<MappedPages>,
@@ -219,7 +220,7 @@ where
     page_allocator::dump_page_allocator_state();
 
     // Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
-    paging::init(boot_info, into_alloc_frames_fn)
+    paging::init(boot_info, kernel_stack_start, into_alloc_frames_fn)
         .inspect(|(new_page_table, ..)| {
             debug!("Done with paging::init(). new page table: {:?}", new_page_table);
         })

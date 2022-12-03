@@ -69,11 +69,12 @@ pub trait BootInformation: 'static {
     fn kernel_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str>;
     fn bootloader_info_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str>;
     fn modules_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str>;
-    fn stack_memory_range(&self) -> Range<VirtualAddress>;
 
     fn memory_areas(&self) -> Result<Self::MemoryAreas<'_>, &'static str>;
     fn elf_sections(&self) -> Result<Self::ElfSections<'_>, &'static str>;
     fn modules(&self) -> Self::Modules<'_>;
 
     fn rsdp(&self) -> Option<PhysicalAddress>;
+
+    fn stack_size(&self) -> usize;
 }

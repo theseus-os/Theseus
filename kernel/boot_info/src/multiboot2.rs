@@ -147,21 +147,6 @@ impl crate::BootInformation for multiboot2::BootInformation {
         })
     }
 
-    fn stack_memory_range(&self) -> Range<VirtualAddress> {
-        // physical = stack section - KERNEL_OFFSET
-        // virtual = stack section
-        self.elf_sections()
-            .expect("couldn't get elf sections")
-            .filter(|section| section.name() == ".stack")
-            .map(|section| {
-                let start = VirtualAddress::new_canonical(section.start());
-                let end = start + section.size() as usize;
-                start..end
-            })
-            .next()
-            .expect("no stack section")
-    }
-
     fn elf_sections(&self) -> Result<Self::ElfSections<'static>, &'static str> {
         Ok(self
             .elf_sections_tag()
@@ -175,5 +160,18 @@ impl crate::BootInformation for multiboot2::BootInformation {
 
     fn rsdp(&self) -> Option<PhysicalAddress> {
         None
+    }
+
+    fn stack_size(&self) -> usize {
+        self.elf_sections()
+            .expect("couldn't get elf sections")
+            .filter(|section| section.name() == ".stack")
+            .map(|section| {
+                let start = section.start();
+                let end = start + section.size() as usize;
+                end - start
+            })
+            .next()
+            .expect("no stack section")
     }
 }

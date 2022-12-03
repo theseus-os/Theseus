@@ -4,9 +4,13 @@ use core::{
     iter::{Iterator, Peekable},
     ops::Range,
 };
-use kernel_config::memory::KERNEL_OFFSET;
-use memory_structs::{Frame, Page, PhysicalAddress, VirtualAddress};
-use xmas_elf::ElfFile;
+use kernel_config::memory::{KERNEL_OFFSET, KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
+use memory_structs::{PhysicalAddress, VirtualAddress};
+
+// TODO: Ideally this would be defined in nano_core.
+/// The total stack size including the guard page, and additional page for the
+/// double fault handler stack.
+pub const STACK_SIZE: usize = (KERNEL_STACK_SIZE_IN_PAGES + 2) * PAGE_SIZE;
 
 pub struct MemoryArea {
     start: usize,
@@ -187,8 +191,6 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
         let physical_end = PhysicalAddress::new(virtual_end.value() - KERNEL_OFFSET)
             .ok_or("kernel physical end address was invalid")?;
 
-        log::info!("start: {start:0x?}, end: {physical_end:0x?}");
-
         Ok(start..physical_end)
     }
 
@@ -225,12 +227,6 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
         Ok(start..end)
     }
 
-    fn stack_memory_range(&self) -> Range<VirtualAddress> {
-        let start = VirtualAddress::new(self.stack_start).unwrap();
-        let end = VirtualAddress::new(self.stack_end).unwrap();
-        start..end
-    }
-
     fn memory_areas(&self) -> Result<Self::MemoryAreas<'_>, &'static str> {
         Ok(MemoryAreas {
             inner: self.memory_regions.iter().peekable(),
@@ -253,5 +249,9 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
         self.rsdp_addr
             .into_option()
             .map(|address| PhysicalAddress::new_canonical(address as usize))
+    }
+
+    fn stack_size(&self) -> usize {
+        STACK_SIZE
     }
 }

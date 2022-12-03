@@ -1,18 +1,22 @@
 //! The aptly-named tiny crate containing the first OS code to run.
-//! 
-//! The `nano_core` is very simple, and only does the following things:
-//! 
-//! 1. Bootstraps the OS after the bootloader is finished, and initializes simple things like logging.
-//! 2. Establishes a simple virtual memory subsystem so that other modules can be loaded.
-//! 3. Loads the core library module, the `captain` module, and then calls [`captain::init()`](../captain/fn.init.html) as a final step.
-//! 4. That's it! Once `nano_core` gives complete control to the `captain`, it takes no other actions.
 //!
-//! In general, you shouldn't ever need to change `nano_core`. 
-//! That's because `nano_core` doesn't contain any specific program logic, 
+//! The `nano_core` is very simple, and only does the following things:
+//!
+//! 1. Bootstraps the OS after the bootloader is finished, and initializes
+//! simple things like logging. 2. Establishes a simple virtual memory subsystem
+//! so that other modules can be loaded. 3. Loads the core library module, the
+//! `captain` module, and then calls
+//! [`captain::init()`](../captain/fn.init.html) as a final step. 4. That's it!
+//! Once `nano_core` gives complete control to the `captain`, it takes no other
+//! actions.
+//!
+//! In general, you shouldn't ever need to change `nano_core`.
+//! That's because `nano_core` doesn't contain any specific program logic,
 //! it just sets up an initial environment so that other subsystems can run.
-//! 
-//! If you want to change how the OS starts up and which systems it initializes, 
-//! you should change the code in the [`captain`](../captain/index.html) crate instead.
+//!
+//! If you want to change how the OS starts up and which systems it initializes,
+//! you should change the code in the [`captain`](../captain/index.html) crate
+//! instead.
 
 #![no_std]
 #![no_main]
@@ -46,7 +50,7 @@ fn early_setup(double_fault_stack: usize) -> Result<(), &'static str> {
     Ok(())
 }
 
-fn nano_core<T>(boot_info: T) -> Result<(), &'static str>
+fn nano_core<T>(boot_info: T, kernel_stack_start: VirtualAddress) -> Result<(), &'static str>
 where
     T: boot_info::BootInformation,
 {
@@ -61,7 +65,7 @@ where
         stack,
         bootloader_modules,
         identity_mapped_pages,
-    ) = memory_initialization::init_memory_management(boot_info)?;
+    ) = memory_initialization::init_memory_management(boot_info, kernel_stack_start)?;
     println_raw!("nano_core_start(): initialized memory subsystem.");
 
     state_store::init();

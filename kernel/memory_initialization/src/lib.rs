@@ -41,6 +41,7 @@ use boot_info::Module;
 ///     but *should* be dropped before starting the first user application.
 pub fn init_memory_management<T>(
     boot_info: T,
+    kernel_stack_start: VirtualAddress,
 ) -> Result<(
         MmiRef,
         NoDrop<MappedPages>,
@@ -63,7 +64,7 @@ where
         boot_info_mapped_pages,
         higher_half_mapped_pages, 
         identity_mapped_pages
-    ) = memory::init(&boot_info)?;
+    ) = memory::init(&boot_info, kernel_stack_start)?;
     // After this point, at which `memory::init()` has returned new objects that represent
     // the currently-executing code/data/stack, we must ensure they aren't dropped if an error occurs,
     // because that will cause them to be auto-unmapped.

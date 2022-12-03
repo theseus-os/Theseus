@@ -207,6 +207,7 @@ pub fn get_current_p4() -> Frame {
 /// Otherwise, it returns a str error message. 
 pub fn init<T>(
     boot_info: &T,
+    stack_start_virt: VirtualAddress,
     into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames,
 ) -> Result<(
         PageTable,
@@ -261,15 +262,13 @@ where
     let rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
     let data_flags    = aggregated_section_memory_bounds.data.flags;
 
-    let (stack_start_virt, stack_end_virt) = {
-        let range = boot_info.stack_memory_range();
-        (range.start, range.end)
-    };
+    let stack_end_virt = stack_start_virt + boot_info.stack_size();
 
     // Stack frames are not guaranteed to be contiguous.
     let mut stack_mappings = [None; 20];
     // + 1 accounts for the guard page which does not have a corresponding frame.
     for (i, page) in ((Page::containing_address(stack_start_virt) + 1)..=Page::containing_address(stack_end_virt - 1)).enumerate() {
+        log::info!("translating page: {page:#?}");
         let frame = page_table.translate_page(page).expect("couldn't translate stack page");
         stack_mappings[i] = Some((page, frame));
     }
@@ -277,7 +276,7 @@ where
     // Boot info frames are not guaranteed to be contiguous.
     let mut boot_info_mappings = [None; 10];
     for (i, page) in (Page::containing_address(boot_info_start_vaddr)..=Page::containing_address(boot_info_start_vaddr + boot_info_size - 1)).enumerate() {
-        let frame = page_table.translate_page(page).expect("couldn't translate stack page");
+        let frame = page_table.translate_page(page).expect("couldn't translate boot info page");
         boot_info_mappings[i] = Some((page, frame));
     }
 
