@@ -96,8 +96,8 @@ impl crate::BootInformation for multiboot2::BootInformation {
         let start = PhysicalAddress::new(
             self.elf_sections()?
                 .into_iter()
-                .filter(|s| s.is_allocated())
-                .map(|s| s.start_address())
+                .filter(|section| section.is_allocated())
+                .map(|section| section.start_address())
                 .min()
                 .ok_or("couldn't find kernel start address")? as usize,
         )
@@ -150,7 +150,16 @@ impl crate::BootInformation for multiboot2::BootInformation {
     fn stack_memory_range(&self) -> Range<VirtualAddress> {
         // physical = stack section - KERNEL_OFFSET
         // virtual = stack section
-        todo!();
+        self.elf_sections()
+            .expect("couldn't get elf sections")
+            .filter(|section| section.name() == ".stack")
+            .map(|section| {
+                let start = VirtualAddress::new_canonical(section.start());
+                let end = start + section.size() as usize;
+                start..end
+            })
+            .next()
+            .expect("no stack section")
     }
 
     fn elf_sections(&self) -> Result<Self::ElfSections<'static>, &'static str> {
@@ -161,10 +170,9 @@ impl crate::BootInformation for multiboot2::BootInformation {
     }
 
     fn modules(&self) -> Self::Modules<'_> {
-        log::info!("START ADDRESS: {:0x?}", self.start_address());
         self.module_tags()
     }
-    
+
     fn rsdp(&self) -> Option<PhysicalAddress> {
         None
     }

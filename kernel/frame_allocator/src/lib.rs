@@ -857,7 +857,6 @@ fn add_reserved_region(
     list: &mut StaticArrayRBTree<Chunk>,
     frames: FrameRange,
 ) -> Result<FrameRange, &'static str> {
-
     // Check whether the reserved region overlaps any existing regions.
     match &mut list.0 {
         Inner::Array(ref mut arr) => {

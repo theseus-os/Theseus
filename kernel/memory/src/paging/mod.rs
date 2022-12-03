@@ -280,7 +280,7 @@ where
     /// Stack frames are not guaranteed to be contiguous.
     let mut stack_mappings = [None; 20];
     // + 1 accounts for the guard page.
-    for (i, page) in ((Page::containing_address(stack_start_virt) + 1)..=Page::containing_address(stack_end_virt)).enumerate() {
+    for (i, page) in ((Page::containing_address(stack_start_virt) + 1)..=Page::containing_address(stack_end_virt - 1)).enumerate() {
         let frame = page_table.translate_page(page).expect("couldn't translate stack page");
         stack_mappings[i] = Some((page, frame));
     }
@@ -352,7 +352,7 @@ where
         let mut stack_mapped_pages: Option<MappedPages> = None;
         let mut iter = stack_mappings.iter();
         while let Some(Some((page, frame))) = iter.next() {
-            log::info!("mapping stack page: {page:0x?} {frame:0x?}");
+            // log::info!("mapping stack page: {page:0x?} {frame:0x?}");
             let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1).unwrap();
             let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1).unwrap();
             let mapped_pages = mapper.map_allocated_pages_to(allocated_page, allocated_frame, data_flags)?;
@@ -362,22 +362,21 @@ where
                 stack_mapped_pages = Some(mapped_pages);
             }
         }
-        
         stack_page_group = Some((stack_guard_page, NoDrop::new(stack_mapped_pages.unwrap())));
 
-        // log::trace!("allocating vga pages");
-        // // Map the VGA display memory as writable. 
-        // // We do an identity mapping for the VGA display too, because the AP cores may access it while booting.
-        // let (vga_phys_addr, vga_size_in_bytes, vga_flags) = get_vga_mem_addr()?;
-        // let vga_virt_addr_identity = VirtualAddress::new_canonical(vga_phys_addr.value());
-        // let vga_display_pages = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity + KERNEL_OFFSET, vga_size_in_bytes)?;
-        // let vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)?;
-        // let vga_display_pages_identity = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity, vga_size_in_bytes)?;
-        // identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
-        //     Mapper::map_to_non_exclusive(mapper, vga_display_pages_identity, &vga_display_frames, vga_flags)?
-        // }));
-        // higher_half_mapped_pages[index] = Some(NoDrop::new(mapper.map_allocated_pages_to(vga_display_pages, vga_display_frames, vga_flags)?));
-        // index += 1;
+        log::trace!("allocating vga pages");
+        // Map the VGA display memory as writable.
+        // We do an identity mapping for the VGA display too, because the AP cores may access it while booting.
+        let (vga_phys_addr, vga_size_in_bytes, vga_flags) = get_vga_mem_addr()?;
+        let vga_virt_addr_identity = VirtualAddress::new_canonical(vga_phys_addr.value());
+        let vga_display_pages = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity + KERNEL_OFFSET, vga_size_in_bytes)?;
+        let vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)?;
+        let vga_display_pages_identity = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity, vga_size_in_bytes)?;
+        identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
+            Mapper::map_to_non_exclusive(mapper, vga_display_pages_identity, &vga_display_frames, vga_flags)?
+        }));
+        higher_half_mapped_pages[index] = Some(NoDrop::new(mapper.map_allocated_pages_to(vga_display_pages, vga_display_frames, vga_flags)?));
+        index += 1;
 
 
         let mut iter = boot_info_mappings.iter();

@@ -1,4 +1,5 @@
-use util::shutdown;
+use crate::{early_setup, nano_core, try_exit, util::shutdown};
+use memory::VirtualAddress;
 
 #[no_mangle]
 pub extern "C" fn rust_entry(boot_info: usize, stack: usize) {

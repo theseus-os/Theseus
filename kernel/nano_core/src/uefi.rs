@@ -10,7 +10,8 @@ pub static __BOOTLOADER_CONFIG: [u8; BootloaderConfig::SERIALIZED_LEN] = {
     config.mappings.physical_memory = Some(Mapping::Dynamic);
     config.mappings.page_table_recursive =
         Some(Mapping::FixedAddress(0o177777_776_000_000_000_0000));
-    // + 1 accounts for initial_double_fault_stack_top
+    // + 1 accounts for the initial double fault stack. See comment below for more
+    // detail.
     config.kernel_stack_size = ((KERNEL_STACK_SIZE_IN_PAGES + 1) * PAGE_SIZE) as u64;
     config.serialize()
 };
