@@ -34,7 +34,7 @@ SECTIONS {
 	{
 		*(.rodata .rodata.*)
 	}
-	
+
 	.eh_frame ALIGN(4K) : AT(ADDR(.eh_frame) - KERNEL_OFFSET)
 	{
 		*(.eh_frame)
@@ -50,8 +50,6 @@ SECTIONS {
 		*(.tdata .tdata.* )
 	}
 
-	/* FIXME: Alignment for UEFI */
-	/* Sometimes triggers: Invalid combination of virtual_addr, offset, and align */
 	.tbss : AT(ADDR(.tbss) - KERNEL_OFFSET)
 	{
 		*(.tbss .tbss.*)
@@ -92,6 +90,7 @@ SECTIONS {
 	{
     	KEEP(*(.got .got.*))
   	}
+
 	.got ALIGN(4K) : AT(ADDR(.got) - KERNEL_OFFSET)
 	{
 		*(.got)

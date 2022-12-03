@@ -166,9 +166,7 @@ impl PageTable {
     /// Switches from the currently-active page table (this `PageTable`, i.e., `self`) to the given `new_table`.
     /// After this function, the given `new_table` will be the currently-active `PageTable`.
     pub fn switch(&mut self, new_table: &PageTable) {
-        // use core::fmt::Write;
-        debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
-        // let mut port = serial_port_basic::SerialPort::new(0x3f8);
+        // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
         // perform the actual page table switch
         unsafe { 
@@ -178,12 +176,6 @@ impl PageTable {
                 Cr3Flags::empty(),
             )
         };
-        // let u = logger::take_early_log_writers();
-        // write!(port, "logger after: {:?}", u).unwrap();
-        debug!("won't work");
-        
-        // let addr = new_table.p4_table.start_address().value() as u64;
-        // unsafe { core::arch::asm!("mov r10, 0xdeadc0de") };
     }
 
 
@@ -237,17 +229,11 @@ where
     debug!("{:X?}\n{:X?}", aggregated_section_memory_bounds, _sections_memory_bounds);
     
     // bootstrap a PageTable from the currently-loaded page table
-    // aggregated_section_memory_bounds.page_table.start.1
-    let page_table_start: usize;
-    unsafe { core::arch::asm!("mov {}, cr3", out(reg) page_table_start) };
-    let current_active_p4 = frame_allocator::allocate_frames_at(PhysicalAddress::new(page_table_start).unwrap(), 1)?;
+    let (current_active_p4, _) = x86_64::registers::control::Cr3::read();
+    let current_active_p4 = frame_allocator::allocate_frames_at(PhysicalAddress::new_canonical(current_active_p4.start_address().as_u64() as usize), 1)?;
     let mut page_table = PageTable::from_current(current_active_p4)?;
     debug!("Bootstrapped initial {:?}", page_table);
 
-    // FIXME: Niceify
-    // let boot_info_start_vaddr = VirtualAddress::new(boot_info.bootloader_info_memory_range()?.start.value() + KERNEL_OFFSET).ok_or("boot_info start virtual address was invalid")?;
-    // let boot_info_start_vaddr = VirtualAddress::new(boot_info.bootloader_info_memory_range()?.start.value()).ok_or("boot_info start virtual address was invalid")?;
-    // let boot_info_start_vaddr = VirtualAddress::new(boot_info as *const _ as usize).unwrap();
     let boot_info_start_vaddr = boot_info.start();
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
     let boot_info_size = boot_info.size();
@@ -270,22 +256,25 @@ where
     let (rodata_end_virt,    rodata_end_phys)    = aggregated_section_memory_bounds.rodata.end;
     let (data_start_virt,    data_start_phys)    = aggregated_section_memory_bounds.data.start;
     let (data_end_virt,      data_end_phys)      = aggregated_section_memory_bounds.data.end;
-    let (stack_start_virt,   stack_start_phys)   = aggregated_section_memory_bounds.stack.start;
-    let (stack_end_virt,     _stack_end_phys)    = aggregated_section_memory_bounds.stack.end;
 
     let text_flags    = aggregated_section_memory_bounds.text.flags;
     let rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
     let data_flags    = aggregated_section_memory_bounds.data.flags;
 
-    /// Stack frames are not guaranteed to be contiguous.
+    let (stack_start_virt, stack_end_virt) = {
+        let range = boot_info.stack_memory_range();
+        (range.start, range.end)
+    };
+
+    // Stack frames are not guaranteed to be contiguous.
     let mut stack_mappings = [None; 20];
-    // + 1 accounts for the guard page.
+    // + 1 accounts for the guard page which does not have a corresponding frame.
     for (i, page) in ((Page::containing_address(stack_start_virt) + 1)..=Page::containing_address(stack_end_virt - 1)).enumerate() {
         let frame = page_table.translate_page(page).expect("couldn't translate stack page");
         stack_mappings[i] = Some((page, frame));
     }
     
-    /// Boot info frames are not guaranteed to be contiguous.
+    // Boot info frames are not guaranteed to be contiguous.
     let mut boot_info_mappings = [None; 10];
     for (i, page) in (Page::containing_address(boot_info_start_vaddr)..=Page::containing_address(boot_info_start_vaddr + boot_info_size - 1)).enumerate() {
         let frame = page_table.translate_page(page).expect("couldn't translate stack page");
@@ -309,9 +298,6 @@ where
         debug!("{:X?}", aggregated_section_memory_bounds);
         let mut index = 0;
 
-        log::trace!("text virt {:0x?} {:0x?}", text_start_virt.value(), text_end_virt.value());
-        log::trace!("text phys {:0x?} {:0x?}", text_start_phys.value(), text_end_phys.value());
-
         let text_pages = page_allocator::allocate_pages_by_bytes_at(text_start_virt, text_end_virt.value() - text_start_virt.value())?;
         let text_frames = frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())?;
         let text_pages_identity = page_allocator::allocate_pages_by_bytes_at(text_start_virt - KERNEL_OFFSET, text_end_virt.value() - text_start_virt.value())?;
@@ -321,7 +307,6 @@ where
         text_mapped_pages = Some(NoDrop::new(mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)?));
         index += 1;
 
-        log::trace!("allocating rodata pages");
         let rodata_pages = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())?;
         let rodata_frames = frame_allocator::allocate_frames_by_bytes_at(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value())?;
         let rodata_pages_identity = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt - KERNEL_OFFSET, rodata_end_virt.value() - rodata_start_virt.value())?;
@@ -331,7 +316,6 @@ where
         rodata_mapped_pages = Some(NoDrop::new(mapper.map_allocated_pages_to(rodata_pages, rodata_frames, rodata_flags)?));
         index += 1;
 
-        log::trace!("allocating data pages");
         let data_pages = page_allocator::allocate_pages_by_bytes_at(data_start_virt, data_end_virt.value() - data_start_virt.value())?;
         let data_frames = frame_allocator::allocate_frames_by_bytes_at(data_start_phys, data_end_phys.value() - data_start_phys.value())?;
         let data_pages_identity = page_allocator::allocate_pages_by_bytes_at(data_start_virt - KERNEL_OFFSET, data_end_virt.value() - data_start_virt.value())?;
@@ -345,14 +329,12 @@ where
         // which was initially set up and created by the bootstrap assembly code. 
         // It was used to bootstrap the initial page table at the beginning of this function. 
 
-        log::trace!("allocating stack pages");
         // Handle the stack (a separate data section), which consists of one guard page followed by the real stack pages.
         // It does not need to be identity mapped because each AP core will have its own stack.
         let stack_guard_page = page_allocator::allocate_pages_at(stack_start_virt, 1).unwrap();
         let mut stack_mapped_pages: Option<MappedPages> = None;
         let mut iter = stack_mappings.iter();
         while let Some(Some((page, frame))) = iter.next() {
-            // log::info!("mapping stack page: {page:0x?} {frame:0x?}");
             let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1).unwrap();
             let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1).unwrap();
             let mapped_pages = mapper.map_allocated_pages_to(allocated_page, allocated_frame, data_flags)?;
@@ -364,7 +346,6 @@ where
         }
         stack_page_group = Some((stack_guard_page, NoDrop::new(stack_mapped_pages.unwrap())));
 
-        log::trace!("allocating vga pages");
         // TODO: UEFI?
         // Map the VGA display memory as writable.
         // We do an identity mapping for the VGA display too, because the AP cores may access it while booting.
@@ -407,25 +388,10 @@ where
     let stack_page_group        = stack_page_group      .ok_or("Couldn't map .stack section")?;
 
     debug!("switching from old page table {:?} to new page table {:?}", page_table, new_table);
-    let rip = &logger::EARLY_LOGGER as *const _ as usize;
-    debug!("rip: {rip:0x?}");
-    // let rip: usize;
-    // unsafe { core::arch::asm!("mov {}, rsp", out(reg) rip) };
-    // let rip = 0xffffffff802682b0;
-    // let rip = port_io::Port::<u8>::new as usize;
-    let old_phys = page_table.translate(VirtualAddress::new(rip).unwrap()).unwrap();
-    let new_phys = new_table.translate(VirtualAddress::new(rip).unwrap()).unwrap();
-    debug!("old_phys: {old_phys:p}");
-    debug!("new_phys: {new_phys:p}");
-    // debug!("early: {:#?}", EARLY_LOGGER);
     page_table.switch(&new_table); 
-    // unsafe { core::arch::asm!("mov r8, 0xa") };
     debug!("switched to new page table {:?}.", new_table); 
-    // unsafe { core::arch::asm!("mov r9, 0xaaa") };
-    // let mut port = serial_port_basic::SerialPort::new(0x3f8);
-    // port.write_fmt(format_args!("i'm here {:#?}", EARLY_LOGGER));
     // The old page_table set up during bootstrap will be dropped here. It's no longer being used.
-    
+
     // Return the new page table because that's the one that should be used by the kernel in future mappings. 
     Ok((
         new_table,

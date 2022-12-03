@@ -45,10 +45,6 @@ where
     let mut rodata_end:        Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut data_start:        Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut data_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut stack_start:       Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut stack_end:         Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut page_table_start:  Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut page_table_end:    Option<(VirtualAddress, PhysicalAddress)> = None;
 
     let mut text_flags:        Option<EntryFlags> = None;
     let mut rodata_flags:      Option<EntryFlags> = None;
@@ -169,19 +165,14 @@ where
                 data_flags = Some(flags);
                 "nano_core .bss"
             }
-            ".page_table" => {
-                page_table_start = Some((start_virt_addr, start_phys_addr));
-                page_table_end   = Some((end_virt_addr, end_phys_addr));
-                "initial page_table"
-            }
-            ".stack" => {
-                // stack_start = Some((start_virt_addr, start_phys_addr));
-                // stack_end   = Some((end_virt_addr, end_phys_addr));
-                // "initial stack"
+            // This appears when compiling for BIOS.
+            ".page_table" | ".stack" => {
                 continue;
             }
+            // This appears when compiling for UEFI.
             ".bootloader-config" => {
                 // TODO: Ideally we'd mark bootloader-config as not allocated
+                // so the bootloader doesn't load it.
                 continue;
             }
             _ =>  {
@@ -207,14 +198,6 @@ where
     let rodata_end         = rodata_end       .ok_or("Couldn't find end of .rodata section")?;
     let data_start         = data_start       .ok_or("Couldn't find start of .data section")?;
     let data_end           = data_end         .ok_or("Couldn't find end of .data section")?;
-    // let page_table_start   = page_table_start .ok_or("Couldn't find start of .page_table section")?;
-    // let page_table_end     = page_table_end   .ok_or("Couldn't find end of .page_table section")?;
-    // let stack_start        = stack_start      .ok_or("Couldn't find start of .stack section")?;
-    // let stack_end          = stack_end        .ok_or("Couldn't find end of .stack section")?;
-    let (stack_start, stack_end) = {
-        let virtual_range = boot_info.stack_memory_range();
-        ((virtual_range.start, PhysicalAddress::zero()), (virtual_range.end, PhysicalAddress::zero()))
-    };
      
     let text_flags    = text_flags  .ok_or("Couldn't find .text section flags")?;
     let rodata_flags  = rodata_flags.ok_or("Couldn't find .rodata section flags")?;
@@ -235,23 +218,11 @@ where
         end: data_end,
         flags: data_flags,
     };
-    // let page_table = SectionMemoryBounds {
-    //     start: page_table_start,
-    //     end: page_table_end,
-    //     flags: data_flags, // same flags as data sections
-    // };
-    let stack = SectionMemoryBounds {
-        start: stack_start,
-        end: stack_end,
-        flags: data_flags, // same flags as data sections
-    };
 
     let aggregated_sections_memory_bounds = AggregatedSectionMemoryBounds {
         text,
         rodata,
         data,
-        // page_table,
-        stack,
     };
     Ok((aggregated_sections_memory_bounds, sections_memory_bounds))
 }

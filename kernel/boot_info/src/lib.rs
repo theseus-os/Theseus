@@ -1,8 +1,6 @@
 #![feature(type_alias_impl_trait)]
 #![no_std]
 
-// FIXME: usize casts
-
 #[cfg(feature = "multiboot2")]
 pub mod multiboot2;
 #[cfg(feature = "uefi")]

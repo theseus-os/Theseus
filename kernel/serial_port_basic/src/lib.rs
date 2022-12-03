@@ -142,17 +142,16 @@ pub fn take_serial_port(
 /// A serial port and its various data and control registers.
 ///
 /// TODO: use PortReadOnly and PortWriteOnly to set permissions for each register.
-#[derive(Debug)]
 pub struct SerialPort {
     /// The data port, for receiving and transmitting data.
-    pub data:                       Port<u8>,
-    pub interrupt_enable:           Port<u8>,
-    pub interrupt_id_fifo_control:  Port<u8>,
-    pub line_control:               Port<u8>,
-    pub modem_control:              Port<u8>,
-    pub line_status:                Port<u8>,
-    pub _modem_status:              Port<u8>,
-    pub _scratch:                   Port<u8>,
+    data:                       Port<u8>,
+    interrupt_enable:           Port<u8>,
+    interrupt_id_fifo_control:  Port<u8>,
+    line_control:               Port<u8>,
+    modem_control:              Port<u8>,
+    line_status:                Port<u8>,
+    _modem_status:              Port<u8>,
+    _scratch:                   Port<u8>,
 }
 
 impl Drop for SerialPort {

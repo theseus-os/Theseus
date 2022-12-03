@@ -72,6 +72,8 @@ set_up_paging_ap:
 
     ret
 
+
+
 ; ---------------------------------------- Long Mode ----------------------------------------
 bits 64
 section .init.text.highap

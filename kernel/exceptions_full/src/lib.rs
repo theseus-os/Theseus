@@ -22,7 +22,7 @@ use fault_log::log_exception;
 /// This only sets the exception `Entry`s in the `IDT`, i.e.,
 /// entries from `0` to `31` (inclusive).
 /// Entries from `32` to `255` (inclusive) are not modified, 
-/// as those are for custom OS-specfici interrupt handlers.
+/// as those are for custom OS-specfic interrupt handlers.
 pub fn init(idt_ref: &'static LockedIdt) {
     { 
         let mut idt = idt_ref.lock(); // withholds interrupts

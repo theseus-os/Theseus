@@ -1,7 +1,7 @@
 use crate::{early_setup, nano_core, try_exit};
 use bootloader_api::{config::Mapping, BootloaderConfig};
 use core::arch::asm;
-use kernel_config::memory::{KERNEL_OFFSET, KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
+use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
 
 #[used]
 #[link_section = ".bootloader-config"]
@@ -34,11 +34,11 @@ pub unsafe extern "C" fn _start(boot_info: &'static mut bootloader_api::BootInfo
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rust_entry(
+unsafe extern "C" fn rust_entry(
     boot_info: &'static mut bootloader_api::BootInfo,
-    stack: usize,
+    double_fault_stack: usize,
 ) {
-    try_exit!(early_setup(stack));
+    try_exit!(early_setup(double_fault_stack));
     try_exit!(nano_core(boot_info as &'static bootloader_api::BootInfo));
 }
 

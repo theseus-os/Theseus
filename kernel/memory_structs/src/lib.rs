@@ -447,21 +447,15 @@ pub struct SectionMemoryBounds {
 /// Individual sections in the kernel's ELF image are combined here according to their flags,
 /// as described below, but some are kept separate for the sake of correctness or ease of use.
 /// 
-/// It contains three main items, in which each item includes all sections that have identical flags:
+/// It contains three items, in which each item includes all sections that have identical flags:
 /// * The `text` section bounds cover all sections that are executable.
 /// * The `rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).
 ///   * The `rodata` section also includes thread-local storage (TLS) areas (.tdata, .tbss) if they exist,
 ///     because they can be mapped using the same page table flags.
 /// * The `data` section bounds cover those that are writable (.data, .bss).
-/// 
-/// It also contains:
-/// * The `page_table` section bounds cover the initial page table's top-level (root) P4 frame. 
-/// * The `stack` section bounds cover the initial stack, which are maintained separately.
 #[derive(Debug)]
 pub struct AggregatedSectionMemoryBounds {
    pub text:        SectionMemoryBounds,
    pub rodata:      SectionMemoryBounds,
    pub data:        SectionMemoryBounds,
-   // pub page_table:  SectionMemoryBounds,
-   pub stack:       SectionMemoryBounds,
 }

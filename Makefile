@@ -404,7 +404,7 @@ limine:
 
 
 ### This target copies all extra files into the `ISOFILES` directory,
-### collapsing their directory structure into a single file name with `?` as the directory delimiter.
+### collapsing their directory structure into a single file name with `$` as the directory delimiter.
 ### The contents of the EXTRA_FILES directory will be available at runtime within Theseus's root fs, too.
 ### See the `README.md` in the `extra_files` directory for more info.
 extra_files:

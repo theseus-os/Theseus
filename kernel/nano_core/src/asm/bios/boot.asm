@@ -371,5 +371,4 @@ initial_bsp_stack_bottom:
 global initial_bsp_stack_top
 initial_bsp_stack_top:
 	resb 4096
-global initial_double_fault_stack_top
 initial_double_fault_stack_top:

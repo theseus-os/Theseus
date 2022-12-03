@@ -1,4 +1,18 @@
-// FIXME: Redocument
+///! The aptly-named tiny crate containing the first OS code to run.
+//! 
+//! The `nano_core` is very simple, and only does the following things:
+//! 
+//! 1. Bootstraps the OS after the bootloader is finished, and initializes simple things like logging.
+//! 2. Establishes a simple virtual memory subsystem so that other modules can be loaded.
+//! 3. Loads the core library module, the `captain` module, and then calls [`captain::init()`](../captain/fn.init.html) as a final step.
+//! 4. That's it! Once `nano_core` gives complete control to the `captain`, it takes no other actions.
+//!
+//! In general, you shouldn't ever need to change `nano_core`. 
+//! That's because `nano_core` doesn't contain any specific program logic, 
+//! it just sets up an initial environment so that other subsystems can run.
+//! 
+//! If you want to change how the OS starts up and which systems it initializes, 
+//! you should change the code in the [`captain`](../captain/index.html) crate instead.
 
 #![no_std]
 #![no_main]
@@ -17,7 +31,7 @@ mod uefi;
 #[cfg(feature = "bios")]
 mod bios;
 
-fn early_setup(stack: usize) -> Result<(), &'static str> {
+fn early_setup(double_fault_stack: usize) -> Result<(), &'static str> {
     irq_safety::disable_interrupts();
 
     let logger_ports = [serial_port_basic::take_serial_port(
@@ -27,7 +41,7 @@ fn early_setup(stack: usize) -> Result<(), &'static str> {
         .map_err(|_| "failed to initialise early logging")?;
     log::info!("initialised early logging");
 
-    exceptions_early::init(Some(VirtualAddress::new_canonical(stack)));
+    exceptions_early::init(Some(VirtualAddress::new_canonical(double_fault_stack)));
 
     Ok(())
 }
@@ -151,10 +165,10 @@ where
         use memory::{MappedPages, MmiRef};
         use no_drop::NoDrop;
 
-        let section = try_exit!(default_namespace
+        let section = default_namespace
             .get_symbol_starting_with("captain::init::")
             .upgrade()
-            .ok_or("no single symbol matching \"captain::init\""));
+            .ok_or("no single symbol matching \"captain::init\"")?;
         info!(
             "The nano_core (in loadable mode) is invoking the captain init function: {:?}",
             section.name

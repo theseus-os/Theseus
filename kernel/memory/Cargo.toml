@@ -12,11 +12,6 @@ xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.gi
 bit_field = "0.7.0"
 x86_64 = "0.14.8"
 zerocopy = "0.5.0"
-# FIXME
-serial_port_basic = { path = "../serial_port_basic" }
-logger = { path = "../logger" }
-[dependencies.port_io]
-path = "../../libs/port_io"
 
 [dependencies.log]
 version = "0.4.8"
