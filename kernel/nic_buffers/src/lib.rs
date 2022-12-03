@@ -9,7 +9,7 @@ extern crate mpmc;
 
 use core::ops::{Deref, DerefMut};
 use alloc::vec::Vec;
-use memory::{PhysicalAddress, MappedPages, EntryFlags, create_contiguous_mapping};
+use memory::{PhysicalAddress, MappedPages, PteFlags, create_contiguous_mapping};
 
 
 /// A buffer that stores a packet to be transmitted through the NIC
@@ -26,7 +26,7 @@ impl TransmitBuffer {
     pub fn new(size_in_bytes: u16) -> Result<TransmitBuffer, &'static str> {
         let (mp, starting_phys_addr) = create_contiguous_mapping(
             size_in_bytes as usize,
-            EntryFlags::WRITABLE | EntryFlags::CACHE_DISABLE | EntryFlags::NO_EXECUTE,
+            PteFlags::new().writable(true).device_memory(true),
         )?;
         Ok(TransmitBuffer {
             mp: mp,

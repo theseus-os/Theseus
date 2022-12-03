@@ -6,7 +6,7 @@ use log::debug;
 use volatile::{Volatile, ReadOnly};
 use zerocopy::FromBytes;
 use spin::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use memory::{allocate_pages, allocate_frames_by_bytes_at, PageTable, PhysicalAddress, EntryFlags, BorrowedMappedPages, Mutable};
+use memory::{allocate_pages, allocate_frames_by_bytes_at, PageTable, PhysicalAddress, PteFlags, BorrowedMappedPages, Mutable};
 use sdt::{Sdt, GenericAddressStructure};
 use acpi_table::{AcpiTables, AcpiSignature};
 use static_assertions::const_assert_eq;
@@ -175,8 +175,8 @@ impl HpetAcpiTable {
             .ok_or("Couldn't allocate pages for HPET")?;
         let hpet_mp = page_table.map_allocated_pages_to(
             pages,
-            frames, 
-            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::CACHE_DISABLE | EntryFlags::NO_EXECUTE,
+            frames,
+            PteFlags::new().valid(true).writable(true).device_memory(true),
         )?;
 
         let mut hpet = hpet_mp.into_borrowed_mut::<Hpet>(phys_addr.frame_offset())

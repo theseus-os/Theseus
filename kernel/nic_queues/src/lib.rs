@@ -18,16 +18,15 @@ use alloc::{
     vec::Vec,
     collections::VecDeque
 };
-use memory::{create_contiguous_mapping, EntryFlags, BorrowedSliceMappedPages, Mutable};
+use memory::{create_contiguous_mapping, PteFlags, BorrowedSliceMappedPages, Mutable};
 use intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 use nic_buffers::{ReceiveBuffer, ReceivedFrame, TransmitBuffer};
 
 /// The mapping flags used for pages that the NIC will map.
-pub const NIC_MAPPING_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(
-    EntryFlags::PRESENT.bits() |
-    EntryFlags::WRITABLE.bits() |
-    EntryFlags::CACHE_DISABLE.bits() |
-    EntryFlags::NO_EXECUTE.bits()
+pub const NIC_MAPPING_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    PteFlags::new().bits()
+    | PteFlags::VALID.bits()
+    | PteFlags::DEVICE_MEMORY.bits()
 );
 
 /// The register trait that gives access to only those registers required for receiving a packet.

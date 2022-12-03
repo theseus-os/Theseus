@@ -10,7 +10,7 @@ extern crate atomic_linked_list;
 use spin::{Mutex, MutexGuard};
 use volatile::{Volatile, WriteOnly};
 use zerocopy::FromBytes;
-use memory::{PageTable, PhysicalAddress, EntryFlags, allocate_pages, allocate_frames_at, BorrowedMappedPages, Mutable};
+use memory::{PageTable, PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at, BorrowedMappedPages, Mutable};
 use atomic_linked_list::atomic_map::AtomicMap;
 
 
@@ -76,7 +76,7 @@ impl IoApic {
         let ioapic_mapped_page = page_table.map_allocated_pages_to(
             new_page,
             frame, 
-            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::CACHE_DISABLE | EntryFlags::NO_EXECUTE, 
+            PteFlags::new().valid(true).writable(true).device_memory(true),
         )?;
 
         let ioapic_regs = ioapic_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;

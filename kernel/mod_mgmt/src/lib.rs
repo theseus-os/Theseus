@@ -9,7 +9,7 @@ use alloc::{boxed::Box, collections::{BTreeMap, btree_map, BTreeSet}, string::{S
 use spin::{Mutex, Once};
 use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}, symbol_table::{Binding, Type}};
 use util::round_up_power_of_two;
-use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
+use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, PteFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
 use bootloader_modules::BootloaderModule;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
@@ -168,7 +168,7 @@ fn parse_bootloader_modules_into_files(
             pages,
             frames,
             // we never need to write to bootloader-provided modules
-            EntryFlags::PRESENT | EntryFlags::NO_EXECUTE,
+            PteFlags::new().valid(true),
         )?;
 
         let name = m.name();
@@ -978,7 +978,7 @@ impl CrateNamespace {
                 let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
                 let target_sec_initial_flags = target_sec_mapped_pages.flags();
                 if !target_sec_initial_flags.is_writable() {
-                    target_sec_mapped_pages.remap(&mut kernel_mmi_ref.lock().page_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
+                    target_sec_mapped_pages.remap(&mut kernel_mmi_ref.lock().page_table, target_sec_initial_flags.writable(true))?;
                 }
 
                 write_relocation(
@@ -2968,13 +2968,23 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
 }
 
 
-/// A convenience function for allocating contiguous virtual memory pages and mapping them to random physical frames. 
+/// A convenience function for allocating virtual pages and mapping them to random physical frames. 
 /// 
-/// The returned `MappedPages` will be at least as large as `size_in_bytes`, rounded up to the nearest `Page` size, 
-/// and is mapped as writable along with the other specified `flags` to ensure we can copy content into it.
-fn allocate_and_map_as_writable(size_in_bytes: usize, flags: EntryFlags, kernel_mmi_ref: &MmiRef) -> Result<MappedPages, &'static str> {
-    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space")?;
-    kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE)
+/// The returned `MappedPages` will be at least as large as `size_in_bytes`,
+/// rounded up to the nearest `Page` size, 
+/// and is mapped as writable along with the other specified `flags`
+/// to ensure we can copy content into it.
+fn allocate_and_map_as_writable(
+    size_in_bytes: usize,
+    flags: PteFlags,
+    kernel_mmi_ref: &MmiRef,
+) -> Result<MappedPages, &'static str> {
+    let allocated_pages = allocate_pages_by_bytes(size_in_bytes)
+        .ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space")?;
+    kernel_mmi_ref.lock().page_table.map_allocated_pages(
+        allocated_pages,
+        flags.valid(true).writable(true)
+    )
 }
 
 

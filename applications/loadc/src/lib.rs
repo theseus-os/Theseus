@@ -24,7 +24,7 @@ use core::{
 };
 use alloc::{collections::BTreeSet, string::{String, ToString}, sync::Arc, vec::Vec};
 use getopts::{Matches, Options};
-use memory::{Page, MappedPages, VirtualAddress, PteFlags};
+use memory::{Page, MappedPages, VirtualAddress, PteFlagsArch, PteFlags};
 use mod_mgmt::{CrateNamespace, StrongDependency, find_symbol_table, RelocationEntry, write_relocation};
 use rustc_demangle::demangle;
 use path::Path;
@@ -140,7 +140,7 @@ pub struct LoadedSegment {
     /// (may be a subset)
     bounds: Range<VirtualAddress>,
     /// The proper flags for this segment specified by the ELF file.
-    flags: PteFlags,
+    flags: PteFlagsArch,
     /// The indices of the sections in the ELF file 
     /// that were grouped ("mapped") into this segment by the linker.
     section_ndxs: BTreeSet<usize>,
@@ -318,7 +318,7 @@ fn parse_and_load_elf_executable<'f>(
         mapped_segments.push(LoadedSegment {
             mp,
             bounds: segment_bounds,
-            flags: initial_flags,
+            flags: initial_flags.into(),
             section_ndxs,
             sections_i_depend_on: Vec::new(), // this is populated later in `overwrite_relocations()`
         });

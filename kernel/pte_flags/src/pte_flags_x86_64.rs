@@ -223,38 +223,38 @@ impl PteFlagsX86_64 {
     }
 
     #[doc(alias("present"))]
-    pub fn is_valid(&self) -> bool {
+    pub const fn is_valid(&self) -> bool {
         self.contains(Self::VALID)
     }
 
     #[doc(alias("read_only"))]
-    pub fn is_writable(&self) -> bool {
+    pub const fn is_writable(&self) -> bool {
         self.contains(Self::WRITABLE)
     }
 
     #[doc(alias("no_exec"))]
-    pub fn is_executable(&self) -> bool {
+    pub const fn is_executable(&self) -> bool {
         !self.contains(Self::NOT_EXECUTABLE)
     }
 
     #[doc(alias("cache", "cacheable", "non-cacheable"))]
-    pub fn is_device_memory(&self) -> bool {
+    pub const fn is_device_memory(&self) -> bool {
         self.contains(Self::DEVICE_MEMORY)
     }
 
-    pub fn is_dirty(&self) -> bool {
+    pub const fn is_dirty(&self) -> bool {
         self.contains(Self::DIRTY)
     }
 
-    pub fn is_accessed(&self) -> bool {
+    pub const fn is_accessed(&self) -> bool {
         self.contains(Self::ACCESSED)
     }
 
-    pub fn is_huge(&self) -> bool {
+    pub const fn is_huge(&self) -> bool {
         self.contains(Self::HUGE_PAGE)
     }
 
-    pub fn is_exclusive(&self) -> bool {
+    pub const fn is_exclusive(&self) -> bool {
         self.contains(Self::EXCLUSIVE)
     }
 }

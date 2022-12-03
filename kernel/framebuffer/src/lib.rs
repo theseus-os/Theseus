@@ -13,7 +13,7 @@ extern crate zerocopy;
 pub mod pixel;
 use core::{ops::{DerefMut, Deref}, hash::{Hash, Hasher}};
 
-use memory::{EntryFlags, PhysicalAddress, Mutable, BorrowedSliceMappedPages};
+use memory::{PteFlags, PhysicalAddress, Mutable, BorrowedSliceMappedPages};
 use shapes::Coord;
 pub use pixel::*;
 
@@ -77,8 +77,10 @@ impl<P: Pixel> Framebuffer<P> {
         // get a reference to the kernel's memory mapping information
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
 
-        let vesa_display_flags: EntryFlags =
-            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::CACHE_DISABLE;
+        let vesa_display_flags: PteFlags = PteFlags::new()
+            .valid(true)
+            .writable(true)
+            .device_memory(true); // TODO: use PAT write-combining instead of disabling caching
 
         let size = width * height * core::mem::size_of::<P>();
         let pages = memory::allocate_pages_by_bytes(size).ok_or("could not allocate pages for a new framebuffer")?;

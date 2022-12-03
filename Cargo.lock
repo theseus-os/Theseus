@@ -561,6 +561,7 @@ dependencies = [
  "qp-trie",
  "serde",
  "spin 0.9.0",
+ "static_assertions",
  "str_ref",
  "xmas-elf",
 ]
