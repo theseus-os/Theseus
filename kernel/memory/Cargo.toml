@@ -51,5 +51,9 @@ path = "../frame_allocator"
 [dependencies.no_drop]
 path = "../no_drop"
 
+[dependencies.owned_borrowed_trait]
+path = "../../libs/owned_borrowed_trait"
+
+
 [lib]
 crate-type = ["rlib"]

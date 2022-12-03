@@ -15,6 +15,8 @@
 #![feature(unboxed_closures)]
 #![feature(result_option_inspect)]
 
+extern crate alloc;
+
 #[cfg(not(mapper_spillful))]
 mod paging;
 
@@ -43,6 +45,7 @@ use memory_x86_64::{
 
 pub use pte_flags::*;
 
+use log::debug;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;

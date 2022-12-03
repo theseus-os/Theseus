@@ -190,20 +190,6 @@ impl PteFlags {
         )
     }
 
-    /// A convenience function that returns a new `PteFlags` with only the
-    /// default flags and the [`PteFlags::WRITABLE`] bit set.
-    ///
-    /// This is identical to:
-    /// ```rust
-    /// PteFlags::new().writable(true)
-    /// ```
-    pub const fn new_writable() -> Self {
-        Self::from_bits_truncate(
-            Self::new().bits
-            | Self::WRITABLE.bits
-        )
-    }
-
     /// Returns a copy of this `PteFlags` with the `VALID` bit set or cleared.
     ///
     /// * If `enable` is `true`, this PTE will be considered "present" and "valid",

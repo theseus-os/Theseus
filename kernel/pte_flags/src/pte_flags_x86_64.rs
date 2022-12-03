@@ -135,20 +135,6 @@ impl PteFlagsX86_64 {
         Self::NOT_EXECUTABLE
     }
 
-    /// A convenience function that returns a new `PteFlagsX86_64` with only the
-    /// default flags and the [`PteFlagsX86_64::WRITABLE`] bit set.
-    ///
-    /// This is identical to:
-    /// ```rust
-    /// PteFlagsX86_64::new().writable(true)
-    /// ```
-    pub const fn new_writable() -> Self {
-        Self::from_bits_truncate(
-            Self::new().bits
-            | Self::WRITABLE.bits
-        )
-    }
-
     /// Returns a copy of this `PteFlagsX86_64` with the `VALID` bit set or cleared.
     ///
     /// * If `enable` is `true`, this PTE will be considered "present" and "valid",
@@ -262,6 +248,10 @@ impl PteFlagsX86_64 {
 
     pub fn is_accessed(&self) -> bool {
         self.contains(Self::ACCESSED)
+    }
+
+    pub fn is_huge(&self) -> bool {
+        self.contains(Self::HUGE_PAGE)
     }
 
     pub fn is_exclusive(&self) -> bool {

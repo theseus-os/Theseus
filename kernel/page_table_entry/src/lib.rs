@@ -14,7 +14,7 @@
 
 use core::ops::Deref;
 use memory_structs::{Frame, FrameRange, PhysicalAddress};
-use pte_flags::{PteFlagsArch, PTE_FRAME_MASK, PteFlags};
+use pte_flags::{PteFlagsArch, PTE_FRAME_MASK};
 use bit_field::BitField;
 use kernel_config::memory::PAGE_SHIFT;
 use zerocopy::FromBytes;
@@ -100,8 +100,8 @@ impl PageTableEntry {
     ///
     /// This does not modify the frame part of the page table entry.
     pub fn set_flags(&mut self, new_flags: PteFlagsArch) {
-        let sanitized_flag_bits = new_flags.bits() & !PTE_FRAME_MASK;
-        self.0 = (self.0 & PTE_FRAME_MASK) | sanitized_flag_bits;
+        let only_flag_bits = new_flags.bits() & !PTE_FRAME_MASK;
+        self.0 = (self.0 & PTE_FRAME_MASK) | only_flag_bits;
     }
 
     pub fn value(&self) -> u64 {

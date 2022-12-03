@@ -7,11 +7,12 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::PageTableEntry;
-use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
-use super::super::{VirtualAddress, PteFlags};
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
+use super::PageTableEntry;
+use crate::VirtualAddress;
+use pte_flags::PteFlagsArch;
+use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
 use zerocopy::FromBytes;
 
 
@@ -51,7 +52,7 @@ impl<L: HierarchicalLevel> Table<L> {
     /// and so on for P3 -> P3 and P2 -> P1.
     fn next_table_address(&self, index: usize) -> Option<VirtualAddress> {
         let pte_flags = self[index].flags();
-        if entry_flags.contains(EntryFlags::PRESENT) && !entry_flags.is_huge() {
+        if pte_flags.is_valid() && !pte_flags.is_huge() {
             let table_address = self as *const _ as usize;
             let next_table_vaddr: usize = (table_address << 9) | (index << PAGE_SHIFT);
             Some(VirtualAddress::new_canonical(next_table_vaddr))
@@ -84,12 +85,15 @@ impl<L: HierarchicalLevel> Table<L> {
     pub fn next_table_create(
         &mut self,
         index: usize,
-        flags: EntryFlags,
+        flags: PteFlagsArch,
     ) -> &mut Table<L::NextLevel> {
         if self.next_table(index).is_none() {
             assert!(!self[index].flags().is_huge(), "mapping code does not support huge pages");
             let af = frame_allocator::allocate_frames(1).expect("next_table_create(): no frames available");
-            self[index].set_entry(af.as_allocated_frame(), flags.into_writable() | EntryFlags::PRESENT); // must be PRESENT | WRITABLE for x86_64
+            self[index].set_entry(
+                af.as_allocated_frame(),
+                flags.valid(true).writable(true), // must be valid and writable on x86_64
+            );
             self.next_table_mut(index).unwrap().zero();
             core::mem::forget(af); // we currently forget frames allocated as page table frames since we don't yet have a way to track them.
         }

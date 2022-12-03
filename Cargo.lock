@@ -1680,6 +1680,7 @@ dependencies = [
  "memory_x86_64",
  "multiboot2",
  "no_drop",
+ "owned_borrowed_trait",
  "page_allocator",
  "page_table_entry",
  "pte_flags",
@@ -2160,6 +2161,10 @@ dependencies = [
  "spawn",
  "task",
 ]
+
+[[package]]
+name = "owned_borrowed_trait"
+version = "0.1.0"
 
 [[package]]
 name = "owning_ref"

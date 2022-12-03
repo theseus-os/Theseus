@@ -236,20 +236,6 @@ impl PteFlagsAarch64 {
         )
     }
 
-    /// A convenience function that returns a new `PteFlagsAarch64` with only the
-    /// default flags set and the [`PteFlagsAarch64::READ_ONLY`] bit not set (meaning "writable").
-    ///
-    /// This is identical to:
-    /// ```rust
-    /// PteFlagsAarch64::new().writable(true)
-    /// ```
-    pub const fn new_writable() -> Self {
-        Self::from_bits_truncate(
-            Self::new().bits
-            & !Self::READ_ONLY.bits
-        )
-    }
-
     /// Returns a copy of this `PteFlagsAarch64` with the `VALID` bit set or cleared.
     ///
     /// * If `enable` is `true`, this PTE will be considered "present" and "valid",
