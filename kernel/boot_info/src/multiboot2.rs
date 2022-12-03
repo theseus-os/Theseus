@@ -78,6 +78,10 @@ impl crate::BootInformation for multiboot2::BootInformation {
     type Module<'a> = &'a multiboot2::ModuleTag;
     type Modules<'a> = multiboot2::ModuleIter<'a>;
 
+    fn start(&self) -> VirtualAddress {
+        VirtualAddress::new_canonical(self.start_address())
+    }
+
     fn size(&self) -> usize {
         self.total_size()
     }
@@ -131,9 +135,6 @@ impl crate::BootInformation for multiboot2::BootInformation {
             max = cmp::max(max, module.end_address() as usize);
         }
 
-        log::info!("THINGY: {min:0x?}");
-        log::info!("AHINGY: {max:0x?}");
-
         Ok(PhysicalAddress::new_canonical(min)..PhysicalAddress::new_canonical(max))
     }
 
@@ -144,6 +145,12 @@ impl crate::BootInformation for multiboot2::BootInformation {
                 .ok_or("no memory map tag")?
                 .memory_areas(),
         })
+    }
+
+    fn stack_memory_range(&self) -> Range<VirtualAddress> {
+        // physical = stack section - KERNEL_OFFSET
+        // virtual = stack section
+        todo!();
     }
 
     fn elf_sections(&self) -> Result<Self::ElfSections<'static>, &'static str> {
@@ -157,12 +164,8 @@ impl crate::BootInformation for multiboot2::BootInformation {
         log::info!("START ADDRESS: {:0x?}", self.start_address());
         self.module_tags()
     }
-
-    fn stack_mapping(
-        &self,
-    ) -> Result<(Range<PhysicalAddress>, Range<VirtualAddress>), &'static str> {
-        // physical = stack section - KERNEL_OFFSET
-        // virtual = stack section
-        todo!();
+    
+    fn rsdp(&self) -> Option<PhysicalAddress> {
+        None
     }
 }

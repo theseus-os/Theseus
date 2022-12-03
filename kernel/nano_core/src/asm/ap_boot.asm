@@ -3,10 +3,10 @@
 section .init.text32ap progbits alloc exec nowrite
 bits 32 ;We are still in protected mode
 
-; extern set_up_SSE
+extern set_up_SSE
 
 %ifdef ENABLE_AVX
-; extern set_up_AVX
+extern set_up_AVX
 %endif
 
 global ap_start_protected_mode
@@ -71,66 +71,6 @@ set_up_paging_ap:
 	mov cr0, eax
 
     ret
-
-; Check for SSE and enable it. Prints error 'a' if unsupported
-global set_up_SSE
-set_up_SSE:
-	mov eax, 0x1
-	cpuid
-	test edx, 1 << 25
-	jz .no_SSE
-
-	; enable SSE
-	mov eax, cr0
-	and ax, 0xFFFB         ; clear coprocessor emulation CRO.EM
-	or ax, 0x2             ; set coprocessor monitoring CR0.MP
-	mov cr0, eax
-
-	mov eax, cr4
-	or ax, 3 << 9          ; set CR4.OSFXSR and CR4.OSXMMEXCPT at the same time
-	mov cr4, eax
-
-	ret
-.no_SSE:
-	mov al, "a"
-	jmp _error
-
-
-; Check for AVX and enable it. Prints error 'b' if unsupported
-%ifdef ENABLE_AVX
-global set_up_AVX
-set_up_AVX:
-	; check architectural support
-	mov eax, 0x1
-	cpuid
-	test ecx, 1 << 26	; is XSAVE supported?
-	jz .no_AVX
-	test ecx, 1 << 28	; is AVX supported?
-	jz .no_AVX
-
-	; enable OSXSAVE
-	mov eax, cr4
-	or eax, 1 << 18		; enable OSXSAVE
-	mov cr4, eax
-
-	; enable AVX
-	mov ecx, 0
-	xgetbv
-	or eax, 110b		; enable SSE and AVX
-	mov ecx, 0
-	xsetbv
-
-	ret
-.no_AVX:
-	mov al, "b"
-	jmp _error
-%endif
-
-; Prints `ERR: ` and the given error code to screen and hangs.
-; parameter: error code (in ascii) in al
-global _error
-_error:
-	hlt
 
 ; ---------------------------------------- Long Mode ----------------------------------------
 bits 64

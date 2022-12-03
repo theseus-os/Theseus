@@ -75,12 +75,12 @@ impl Rsdp {
     }
 
     pub fn from_address(
-        address: usize,
+        address: PhysicalAddress,
         page_table: &mut PageTable,
     ) -> Result<BorrowedMappedPages<Rsdp>, &'static str> {
         let size = mem::size_of::<Rsdp>();
         let pages = allocate_pages_by_bytes(size).ok_or("couldn't allocate pages")?;
-        let frames = allocate_frames_by_bytes_at(PhysicalAddress::new_canonical(address), size)
+        let frames = allocate_frames_by_bytes_at(address, size)
             .map_err(|_e| "couldn't allocate physical frames for RSDP")?;
         let mapped_pages = page_table.map_allocated_pages_to(pages, frames, EntryFlags::PRESENT)?;
         mapped_pages.into_borrowed(0).map_err(|(_, e)| e)

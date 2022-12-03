@@ -13,7 +13,6 @@ bootloader_api = { path = "../../../bootloader/api", optional = true }
 boot_info = { path = "../boot_info" }
 multiboot2 = "0.14.0"
 libm = "0.2.1"
-cfg-if = "1.0"
 
 [dependencies.log]
 version = "0.4.8"

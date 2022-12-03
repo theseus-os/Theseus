@@ -37,7 +37,7 @@ pub fn get_acpi_tables() -> &'static Mutex<AcpiTables> {
 }
 
 /// Parses the system's ACPI tables 
-pub fn init(rsdp: Option<usize>, page_table: &mut PageTable) -> Result<(), &'static str> {
+pub fn init(rsdp: Option<PhysicalAddress>, page_table: &mut PageTable) -> Result<(), &'static str> {
     // The first step is to search for the RSDP (Root System Descriptor Pointer),
     // which contains the physical address of the RSDT/XSDG (Root/Extended System Descriptor Table).
     let rsdp = match rsdp {

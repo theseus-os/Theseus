@@ -77,5 +77,5 @@ pub trait BootInformation: 'static {
     fn elf_sections(&self) -> Result<Self::ElfSections<'_>, &'static str>;
     fn modules(&self) -> Self::Modules<'_>;
 
-    fn rsdp(&self) -> Option<usize>;
+    fn rsdp(&self) -> Option<PhysicalAddress>;
 }

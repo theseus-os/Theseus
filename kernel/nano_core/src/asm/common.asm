@@ -7,9 +7,68 @@
 ; This file may not be copied, modified, or distributed
 ; except according to those terms.
 
+
+section .init.text32ap progbits alloc exec nowrite
+bits 32 ;We are still in protected mode
+extern _error
+
+; Check for SSE and enable it. Prints error 'a' if unsupported
+global set_up_SSE
+set_up_SSE:
+	mov eax, 0x1
+	cpuid
+	test edx, 1 << 25
+	jz .no_SSE
+
+	; enable SSE
+	mov eax, cr0
+	and ax, 0xFFFB         ; clear coprocessor emulation CRO.EM
+	or ax, 0x2             ; set coprocessor monitoring CR0.MP
+	mov cr0, eax
+
+	mov eax, cr4
+	or ax, 3 << 9          ; set CR4.OSFXSR and CR4.OSXMMEXCPT at the same time
+	mov cr4, eax
+
+	ret
+.no_SSE:
+	mov al, "a"
+	jmp _error
+
+
+; Check for AVX and enable it. Prints error 'b' if unsupported
+%ifdef ENABLE_AVX
+global set_up_AVX
+set_up_AVX:
+	; check architectural support
+	mov eax, 0x1
+	cpuid
+	test ecx, 1 << 26	; is XSAVE supported?
+	jz .no_AVX
+	test ecx, 1 << 28	; is AVX supported?
+	jz .no_AVX
+
+	; enable OSXSAVE
+	mov eax, cr4
+	or eax, 1 << 18		; enable OSXSAVE
+	mov cr4, eax
+
+	; enable AVX
+	mov ecx, 0
+	xgetbv
+	or eax, 110b		; enable SSE and AVX
+	mov ecx, 0
+	xsetbv
+
+	ret
+.no_AVX:
+	mov al, "b"
+	jmp _error
+%endif
+
 section .text
 bits 64
-extern KEXIT
+
 ; We follow the System V calling conventions, which rust uses, in order to
 ; get and return arguments. In general, all calling arguments are passed in
 ; rdi, rsi, rdx, rcx( or r10?), r8 and r9 or varients thereof (the first 32
@@ -56,3 +115,30 @@ puts:
 	jmp .loop
 .end:
 	ret
+
+global KEXIT
+KEXIT:
+	; rust main returned, print `OS returned!`
+	mov rdi, strings.os_return
+	call eputs
+
+	; If the system has nothing more to do, put the computer into an
+	; infinite loop. To do that:
+	; 1) Disable interrupts with cli (clear interrupt enable in eflags).
+	;    They are already disabled by the bootloader, so this is not needed.
+	;    Mind that you might later enable interrupts and return from
+	;    kernel_main (which is sort of nonsensical to do).
+	; 2) Wait for the next interrupt to arrive with hlt (halt instruction).
+	;    Since they are disabled, this will lock up the computer.
+	; 3) Jump to the hlt instruction if it ever wakes up due to a
+	;    non-maskable interrupt occurring or due to system management mode.
+
+	cli
+.loop:
+	hlt
+	jmp .loop
+	
+section .rodata
+strings:
+.os_return:
+	db 'OS returned',0

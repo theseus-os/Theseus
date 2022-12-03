@@ -29,7 +29,7 @@ extern crate mlx5;
 use core::convert::TryFrom;
 use mpmc::Queue;
 use event_types::Event;
-use memory::MemoryManagementInfo;
+use memory::{MemoryManagementInfo, PhysicalAddress};
 use ethernet_smoltcp_device::EthernetNetworkInterface;
 use network_manager::add_to_network_interfaces;
 use alloc::vec::Vec;
@@ -50,7 +50,7 @@ const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slir
 /// This includes:
 /// * local APICs ([`apic`]),
 /// * [`acpi`] tables for system configuration info, including the IOAPIC.
-pub fn early_init(rsdp: Option<usize>, kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
+pub fn early_init(rsdp: Option<PhysicalAddress>, kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
     // First, initialize the local APIC hardware such that we can populate
     // and initialize each LocalAPIC discovered in the ACPI table initialization routine below.
     apic::init();

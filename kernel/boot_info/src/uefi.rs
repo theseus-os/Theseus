@@ -243,7 +243,9 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
         }
     }
 
-    fn rsdp(&self) -> Option<usize> {
-        self.rsdp_addr.into_option().map(|address| address as usize)
+    fn rsdp(&self) -> Option<PhysicalAddress> {
+        self.rsdp_addr
+            .into_option()
+            .map(|address| PhysicalAddress::new_canonical(address as usize))
     }
 }

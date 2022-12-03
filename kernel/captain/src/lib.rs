@@ -52,7 +52,7 @@ extern crate console;
 
 use alloc::vec::Vec;
 use core::ops::DerefMut;
-use memory::{VirtualAddress, MappedPages, MmiRef};
+use memory::{VirtualAddress, MappedPages, MmiRef, PhysicalAddress};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::enable_interrupts;
 use stack::Stack;
@@ -86,7 +86,7 @@ pub fn init(
     bsp_initial_stack: NoDrop<Stack>,
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
-    rsdp: Option<usize>,
+    rsdp: Option<PhysicalAddress>,
 ) -> Result<(), &'static str> {
     #[cfg(mirror_log_to_vga)]
     {

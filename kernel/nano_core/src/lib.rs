@@ -2,56 +2,20 @@
 
 #![no_std]
 #![no_main]
+#![feature(naked_functions)]
 
-// TODO: Remove captain extern crate after implementing nano_core. Currently it
-// provides the global allocator.
-extern crate captain;
 extern crate panic_entry;
 
 mod util;
 
 use core::ops::DerefMut;
-use kernel_config::memory::{KERNEL_OFFSET, KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
+use kernel_config::memory::KERNEL_OFFSET;
 use memory::VirtualAddress;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "uefi")] {
-        use bootloader_api::{config::Mapping, BootloaderConfig};
-
-        #[no_mangle]
-        pub extern "C" fn rust_entry(_boot_info: &'static mut bootloader_api::BootInfo, stack: usize) {
-            try_exit!(early_setup(stack));
-            try_exit!(nano_core(_boot_info as &'static bootloader_api::BootInfo));
-        }
-
-        #[link_section = ".bootloader-config"]
-        #[used]
-        pub static __BOOTLOADER_CONFIG: [u8; BootloaderConfig::SERIALIZED_LEN] = {
-            // FIXME: Is the default config ok?
-            let mut config = BootloaderConfig::new_default();
-            config.mappings.physical_memory = Some(Mapping::Dynamic);
-            config.mappings.page_table_recursive = Some(Mapping::FixedAddress(0o177777_776_000_000_000_0000));
-            config.kernel_stack_size = ((KERNEL_STACK_SIZE_IN_PAGES + 2) * PAGE_SIZE) as u64;
-            config.serialize()
-        };
-    } else if #[cfg(feature = "bios")] {
-        use util::shutdown;
-
-        #[no_mangle]
-        pub extern "C" fn rust_entry(boot_info: usize, stack: usize) {
-            try_exit!(early_setup(stack));
-            if VirtualAddress::new(boot_info).is_none() {
-                shutdown(format_args!("multiboot2 info address invalid"));
-            }
-            let boot_info = match unsafe { multiboot2::load(boot_info) } {
-                Ok(i) => i,
-                Err(e) => shutdown(format_args!("failed to load multiboot 2 info: {e:?}")),
-            };
-
-            try_exit!(nano_core(boot_info));
-        }
-    }
-}
+#[cfg(feature = "uefi")]
+mod uefi;
+#[cfg(feature = "bios")]
+mod bios;
 
 fn early_setup(stack: usize) -> Result<(), &'static str> {
     irq_safety::disable_interrupts();
@@ -202,7 +166,7 @@ where
             NoDrop<stack::Stack>,
             VirtualAddress,
             VirtualAddress,
-            Option<usize>,
+            Option<PhysicalAddress>,
         ) -> Result<(), &'static str>;
         let func: &CaptainInitFunc = unsafe { section.as_func() }?;
 
