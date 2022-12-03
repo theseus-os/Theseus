@@ -18,7 +18,7 @@ include cfg/Config.mk
 debug ?= none
 net ?= none
 merge_sections ?= yes
-uefi ?= yes
+uefi ?= no
 ifeq ($(uefi), yes)
 	bootloader ?= none
 else

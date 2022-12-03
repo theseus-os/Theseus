@@ -212,7 +212,7 @@ where
     // let stack_start        = stack_start      .ok_or("Couldn't find start of .stack section")?;
     // let stack_end          = stack_end        .ok_or("Couldn't find end of .stack section")?;
     let (stack_start, stack_end) = {
-        let virtual_range = boot_info.stack_range();
+        let virtual_range = boot_info.stack_memory_range();
         ((virtual_range.start, PhysicalAddress::zero()), (virtual_range.end, PhysicalAddress::zero()))
     };
      

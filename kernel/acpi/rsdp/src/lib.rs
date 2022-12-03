@@ -4,8 +4,7 @@
 
 extern crate memory;
 extern crate zerocopy;
-#[macro_use]
-extern crate static_assertions;
+#[macro_use] extern crate static_assertions;
 
 use core::mem;
 use memory::{
@@ -14,11 +13,9 @@ use memory::{
 };
 use zerocopy::FromBytes;
 
-/// The starting physical address of the region of memory where the RSDP table
-/// exists.
+/// The starting physical address of the region of memory where the RSDP table exists.
 const RSDP_SEARCH_START: usize = 0xE_0000;
-/// The ending physical address of the region of memory where the RSDP table
-/// exists.
+/// The ending physical address of the region of memory where the RSDP table exists.
 const RSDP_SEARCH_END: usize = 0xF_FFFF;
 /// The byte-string signature of the RSDP in memory.
 const RSDP_SIGNATURE: &'static [u8; 8] = b"RSD PTR ";
@@ -51,16 +48,13 @@ impl Rsdp {
     pub fn get_rsdp(page_table: &mut PageTable) -> Result<BorrowedMappedPages<Rsdp>, &'static str> {
         let size: usize = RSDP_SEARCH_END - RSDP_SEARCH_START;
         let pages = allocate_pages_by_bytes(size).ok_or("couldn't allocate pages")?;
-        let frames_to_search =
-            allocate_frames_by_bytes_at(PhysicalAddress::new_canonical(RSDP_SEARCH_START), size)
-                .map_err(|_e| "Couldn't allocate physical frames when searching for RSDP")?;
-        let mapped_pages =
-            page_table.map_allocated_pages_to(pages, frames_to_search, EntryFlags::PRESENT)?;
+        let frames_to_search = allocate_frames_by_bytes_at(PhysicalAddress::new_canonical(RSDP_SEARCH_START), size)
+            .map_err(|_e| "Couldn't allocate physical frames when searching for RSDP")?;
+        let mapped_pages = page_table.map_allocated_pages_to(pages, frames_to_search, EntryFlags::PRESENT)?;
         Rsdp::search(mapped_pages)
     }
 
-    /// Searches a region of memory for the RSDP, which is identified by the
-    /// "RSD PTR " signature.
+    /// Searches a region of memory for the RSDP, which is identified by the "RSD PTR " signature.
     fn search(region: MappedPages) -> Result<BorrowedMappedPages<Rsdp>, &'static str> {
         let size = region.size_in_bytes() - mem::size_of::<Rsdp>();
         let signature_length = mem::size_of_val(RSDP_SIGNATURE);

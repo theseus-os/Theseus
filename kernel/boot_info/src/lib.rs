@@ -31,14 +31,12 @@ pub trait ElfSection {
 }
 
 bitflags::bitflags! {
-    /// ELF Section bitflags.
+    /// ELF section flags.
     pub struct ElfSectionFlags: u64 {
         /// The section contains data that should be writable during program execution.
         const WRITABLE = 0x1;
-
         /// The section occupies memory during the process execution.
         const ALLOCATED = 0x2;
-
         /// The section contains executable machine instructions.
         const EXECUTABLE = 0x4;
     }
@@ -65,17 +63,19 @@ pub trait BootInformation: 'static {
     type Module<'a>: Module;
     type Modules<'a>: Iterator<Item = Self::Module<'a>>;
 
-    // type Mapping<'a>: Mapping;
-    // type Mappings<'a>: Iterator<Item = Self::Mapping<'a>>;
-
-    fn address(&self) -> VirtualAddress;
+    /// Returns the start of the boot information struct.
+    fn start(&self) -> VirtualAddress;
+    /// Returns the size of the boot information struct.
     fn size(&self) -> usize;
+
     fn kernel_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str>;
     fn bootloader_info_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str>;
     fn modules_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str>;
+    fn stack_memory_range(&self) -> Range<VirtualAddress>;
+
     fn memory_areas(&self) -> Result<Self::MemoryAreas<'_>, &'static str>;
     fn elf_sections(&self) -> Result<Self::ElfSections<'_>, &'static str>;
     fn modules(&self) -> Self::Modules<'_>;
-    fn stack_range(&self) -> Range<VirtualAddress>;
+
     fn rsdp(&self) -> Option<usize>;
 }

@@ -248,12 +248,10 @@ where
     // let boot_info_start_vaddr = VirtualAddress::new(boot_info.bootloader_info_memory_range()?.start.value() + KERNEL_OFFSET).ok_or("boot_info start virtual address was invalid")?;
     // let boot_info_start_vaddr = VirtualAddress::new(boot_info.bootloader_info_memory_range()?.start.value()).ok_or("boot_info start virtual address was invalid")?;
     // let boot_info_start_vaddr = VirtualAddress::new(boot_info as *const _ as usize).unwrap();
-    let boot_info_start_vaddr = boot_info.address();
-    debug!("about to get fucked");
+    let boot_info_start_vaddr = boot_info.start();
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
-    debug!("or here");
     let boot_info_size = boot_info.size();
-    debug!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}\n", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
+    debug!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
 
     let new_p4_frame = frame_allocator::allocate_frames(1).ok_or("couldn't allocate frame for new page table")?; 
     let mut new_table = PageTable::new_table(&mut page_table, new_p4_frame, None)?;
@@ -279,12 +277,15 @@ where
     let rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
     let data_flags    = aggregated_section_memory_bounds.data.flags;
 
+    /// Stack frames are not guaranteed to be contiguous.
     let mut stack_mappings = [None; 20];
+    // + 1 accounts for the guard page.
     for (i, page) in ((Page::containing_address(stack_start_virt) + 1)..=Page::containing_address(stack_end_virt)).enumerate() {
         let frame = page_table.translate_page(page).expect("couldn't translate stack page");
         stack_mappings[i] = Some((page, frame));
     }
     
+    /// Boot info frames are not guaranteed to be contiguous.
     let mut boot_info_mappings = [None; 10];
     for (i, page) in (Page::containing_address(boot_info_start_vaddr)..=Page::containing_address(boot_info_start_vaddr + boot_info_size - 1)).enumerate() {
         let frame = page_table.translate_page(page).expect("couldn't translate stack page");
@@ -347,12 +348,7 @@ where
         log::trace!("allocating stack pages");
         // Handle the stack (a separate data section), which consists of one guard page followed by the real stack pages.
         // It does not need to be identity mapped because each AP core will have its own stack.
-        // let stack_pages = page_allocator::allocate_pages_by_bytes_at(stack_start_virt, (stack_end_virt - stack_start_virt).value())?;
-        // let start_of_stack_pages = *stack_pages.start() + 1; 
-        // let (stack_guard_page, mut stack_allocated_pages) = stack_pages.split(start_of_stack_pages)
-        //     .map_err(|_ap| "BUG: initial stack's allocated pages were not split correctly after guard page")?;
         let stack_guard_page = page_allocator::allocate_pages_at(stack_start_virt, 1).unwrap();
-        
         let mut stack_mapped_pages: Option<MappedPages> = None;
         let mut iter = stack_mappings.iter();
         while let Some(Some((page, frame))) = iter.next() {
@@ -384,20 +380,8 @@ where
         // index += 1;
 
 
-        log::trace!("allocating boot info pages: {boot_info_start_vaddr:p}");
-        log::trace!("allocating boot info pages: {boot_info_start_paddr:p}");
-        log::trace!("allocating boot info pages: {boot_info_size:0x?}");
-        // Map the multiboot boot_info at the same address it is currently at, so we can continue to validly access `boot_info`
-        // let boot_info_pages = page_allocator::allocate_pages_by_bytes_at(boot_info_start_vaddr, boot_info_size)?;
-        // let boot_info_frames = frame_allocator::allocate_frames_by_bytes_at(boot_info_start_paddr, boot_info_size)?;
-        // boot_info_mapped_pages = Some(mapper.map_allocated_pages_to(
-        //     boot_info_pages,
-        //     boot_info_frames,
-        //     EntryFlags::PRESENT,
-        // )?);
         let mut iter = boot_info_mappings.iter();
         while let Some(Some((page, frame))) = iter.next() {
-            log::info!("mapping boot page: {page:0x?} {frame:0x?}");
             let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1).unwrap();
             let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1).unwrap();
             let mapped_pages = mapper.map_allocated_pages_to(allocated_page, allocated_frame, data_flags)?;
