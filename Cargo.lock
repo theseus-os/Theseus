@@ -559,7 +559,7 @@ name = "cow_arc"
 version = "0.1.0"
 dependencies = [
  "dereffer",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1437,7 +1437,7 @@ dependencies = [
  "atomic_linked_list",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -1450,7 +1450,7 @@ dependencies = [
  "irq_safety",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
  "static_assertions",
  "volatile 0.2.7",
  "zerocopy",
@@ -2083,7 +2083,7 @@ version = "0.1.0"
 dependencies = [
  "lockable",
  "preemption",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -2092,7 +2092,7 @@ version = "0.1.0"
 dependencies = [
  "lockable",
  "log",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
  "wait_queue",
 ]
@@ -2161,8 +2161,8 @@ version = "0.1.0"
 dependencies = [
  "e1000",
  "log",
- "smoltcp",
- "spin 0.9.0",
+ "smoltcp 0.5.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -3382,7 +3382,7 @@ dependencies = [
  "io",
  "lazy_static",
  "log",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]

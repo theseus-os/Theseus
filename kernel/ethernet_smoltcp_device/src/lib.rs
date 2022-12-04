@@ -261,12 +261,6 @@ impl smoltcp::phy::RxToken for RxToken {
             smoltcp::Error::Exhausted
         })?;
 
-        let first_buf_len = first_buf.length as usize;
-        let slice_mut: &mut [u8] = first_buf.mp.as_slice_mut(0, first_buf_len).map_err(|e| {
-            error!("EthernetDevice::receive(): couldn't convert receive buffer of length {} into byte slice, error {:?}", first_buf_len, e);
-            smoltcp::Error::Exhausted
-        })?;
-
-        f(slice_mut)
+        f(&mut *first_buf)
     }
 }
