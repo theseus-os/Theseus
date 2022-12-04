@@ -71,12 +71,7 @@ impl Iterator for MemoryAreas {
 
 impl<'a> crate::ElfSection for &'a info::ElfSection {
     fn name(&self) -> &str {
-        let end = self
-            .name
-            .iter()
-            .position(|byte| *byte == 0)
-            .expect("no null byte in elf section name");
-        core::str::from_utf8(&self.name[..end]).expect("invalid bytes in module name")
+        info::ElfSection::name(self)
     }
 
     fn start(&self) -> usize {
@@ -99,13 +94,7 @@ pub struct Module {
 
 impl crate::Module for Module {
     fn name(&self) -> Result<&str, &'static str> {
-        let end = self
-            .inner
-            .name
-            .iter()
-            .position(|byte| *byte == 0)
-            .ok_or("no null byte in module name")?;
-        core::str::from_utf8(&self.inner.name[..end]).map_err(|_| "invalid bytes in module name")
+        Ok(info::Module::name(&self.inner))
     }
 
     fn start(&self) -> usize {
@@ -113,7 +102,7 @@ impl crate::Module for Module {
             .iter()
             .filter(|region| region.kind == info::MemoryRegionKind::UnknownUefi(0x80000000))
             .next()
-            .unwrap()
+            .expect("no modules region")
             .start as usize
             + self.inner.offset
     }

@@ -9,11 +9,5 @@ edition = "2021"
 authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
 
 [dependencies]
-# v0.11
-# bootloader = { git = "https://github.com/rust-osdev/bootloader" }
-bootloader = { path = "../../../bootloader" }
+bootloader = { git = "https://github.com/theseus-os/bootloader", branch = "theseus" }
 ovmf-prebuilt = "0.1.0-alpha.1"
-
-[patch.crates-io]
-# https://github.com/ferrilab/funty/issues/7
-funty = { git = "https://github.com/bitvecto-rs/funty/", rev = "7ef0d890fbcd8b3def1635ac1a877fc298488446" }

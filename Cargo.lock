@@ -288,7 +288,6 @@ dependencies = [
  "bitflags",
  "bootloader_api",
  "kernel_config",
- "log",
  "memory_structs",
  "multiboot2",
  "uefi",
@@ -297,7 +296,8 @@ dependencies = [
 
 [[package]]
 name = "bootloader_api"
-version = "0.1.0-alpha.0"
+version = "0.11.0"
+source = "git+https://github.com/theseus-os/bootloader?branch=theseus#a94b27e1d971c39c415c792ff25870dbe196627a"
 
 [[package]]
 name = "bootloader_modules"
