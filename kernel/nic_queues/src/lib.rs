@@ -22,11 +22,12 @@ use memory::{create_contiguous_mapping, PteFlags, BorrowedSliceMappedPages, Muta
 use intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 use nic_buffers::{ReceiveBuffer, ReceivedFrame, TransmitBuffer};
 
-/// The mapping flags used for pages that the NIC will map.
+/// The mapping flags used to map NIC device memory, e.g., MMIO registers.
 pub const NIC_MAPPING_FLAGS: PteFlags = PteFlags::from_bits_truncate(
     PteFlags::new().bits()
     | PteFlags::VALID.bits()
     | PteFlags::DEVICE_MEMORY.bits()
+    | PteFlags::WRITABLE.bits()
 );
 
 /// The register trait that gives access to only those registers required for receiving a packet.

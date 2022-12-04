@@ -95,14 +95,12 @@ pub const TEXT_SECTION_FLAGS: PteFlags = PteFlags::from_bits_truncate(
 );
 /// `.rodata` sections are read-only and non-executable.
 pub const RODATA_SECTION_FLAGS: PteFlags = PteFlags::from_bits_truncate(
-    PteFlags::new().bits()
-    | PteFlags::VALID.bits()
+    (PteFlags::new().bits() | PteFlags::VALID.bits())
     & !PteFlags::WRITABLE.bits()
 );
 /// `.data` and `.bss` sections are read-write and non-executable.
 pub const DATA_BSS_SECTION_FLAGS: PteFlags = PteFlags::from_bits_truncate(
-    PteFlags::new().bits()
-    | PteFlags::VALID.bits()
+    (PteFlags::new().bits() | PteFlags::VALID.bits())
     | PteFlags::WRITABLE.bits()
 );
 

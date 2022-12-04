@@ -7,7 +7,7 @@
 //! ## Acknowledgments
 //! Some of the internal page table management code was based on
 //! Philipp Oppermann's [blog_os], but has since changed significantly.
-//! 
+//!
 //! [blog_os]: https://github.com/phil-opp/blog_os
 
 #![no_std]
