@@ -1,15 +1,16 @@
-//! This crate contains common types used for memory mapping. 
+//! This crate contains basic types used for memory management.
+//!
+//! The types of interest are divided into three categories:
+//! 1. addresses: `VirtualAddress` and `PhysicalAddress`.
+//! 2. "chunk" types: `Page` and `Frame`.
+//! 3. ranges of chunks: `PageRange` and `FrameRange`.  
 
 #![no_std]
 #![feature(step_trait)]
 
 extern crate kernel_config;
-extern crate multiboot2;
-extern crate xmas_elf;
 #[macro_use] extern crate derive_more;
 extern crate bit_field;
-#[cfg(target_arch = "x86_64")]
-extern crate entryflags_x86_64;
 extern crate zerocopy;
 extern crate paste;
 
@@ -22,8 +23,6 @@ use core::{
     ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
-#[cfg(target_arch = "x86_64")]
-pub use entryflags_x86_64::{EntryFlags, PAGE_TABLE_ENTRY_FRAME_MASK};
 use zerocopy::FromBytes;
 use paste::paste;
 
@@ -126,6 +125,7 @@ macro_rules! implement_address {
     };
 }
 
+#[cfg(target_arch = "x86_64")]
 #[inline]
 fn is_canonical_virtual_address(virt_addr: usize) -> bool {
     match virt_addr.get_bits(47..64) {
@@ -134,6 +134,7 @@ fn is_canonical_virtual_address(virt_addr: usize) -> bool {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 #[inline]
 const fn canonicalize_virtual_address(virt_addr: usize) -> usize {
     // match virt_addr.get_bit(47) {
@@ -145,6 +146,7 @@ const fn canonicalize_virtual_address(virt_addr: usize) -> usize {
     ((virt_addr << 16) as isize >> 16) as usize
 }
 
+#[cfg(target_arch = "x86_64")]
 #[inline]
 fn is_canonical_physical_address(phys_addr: usize) -> bool {
     match phys_addr.get_bits(52..64) {
@@ -153,6 +155,7 @@ fn is_canonical_physical_address(phys_addr: usize) -> bool {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 #[inline]
 const fn canonicalize_physical_address(phys_addr: usize) -> usize {
     phys_addr & 0x000F_FFFF_FFFF_FFFF
@@ -429,33 +432,3 @@ macro_rules! implement_page_frame_range {
 
 implement_page_frame_range!(PageRange, "virtual", virt, Page, VirtualAddress);
 implement_page_frame_range!(FrameRange, "physical", phys, Frame, PhysicalAddress);
-
-
-/// The address bounds and mapping flags of a section's memory region.
-#[derive(Debug)]
-pub struct SectionMemoryBounds {
-    /// The starting virtual address and physical address.
-    pub start: (VirtualAddress, PhysicalAddress),
-    /// The ending virtual address and physical address.
-    pub end: (VirtualAddress, PhysicalAddress),
-    /// The page table entry flags that should be used for mapping this section.
-    pub flags: EntryFlags,
-}
-
-/// The address bounds and flags of the initial kernel sections that need mapping. 
-/// 
-/// Individual sections in the kernel's ELF image are combined here according to their flags,
-/// as described below, but some are kept separate for the sake of correctness or ease of use.
-/// 
-/// It contains three items, in which each item includes all sections that have identical flags:
-/// * The `text` section bounds cover all sections that are executable.
-/// * The `rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).
-///   * The `rodata` section also includes thread-local storage (TLS) areas (.tdata, .tbss) if they exist,
-///     because they can be mapped using the same page table flags.
-/// * The `data` section bounds cover those that are writable (.data, .bss).
-#[derive(Debug)]
-pub struct AggregatedSectionMemoryBounds {
-   pub text:        SectionMemoryBounds,
-   pub rodata:      SectionMemoryBounds,
-   pub data:        SectionMemoryBounds,
-}

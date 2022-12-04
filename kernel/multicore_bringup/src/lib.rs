@@ -48,11 +48,7 @@ const TRAMPOLINE: usize = AP_STARTUP - PAGE_SIZE;
 const GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE: usize = 0x100;
 
 /// Graphic mode information that will be updated after `handle_ap_cores()` is invoked. 
-pub static GRAPHIC_INFO: Mutex<GraphicInfo> = Mutex::new(GraphicInfo {
-    width: 0,
-    height: 0,
-    physical_address: 0,
-});
+pub static GRAPHIC_INFO: Mutex<GraphicInfo> = Mutex::new(GraphicInfo::new());
 
 /// A structure to access information about the graphical framebuffer mode
 /// that was discovered and chosen in the AP's real-mode initialization sequence.
@@ -60,11 +56,62 @@ pub static GRAPHIC_INFO: Mutex<GraphicInfo> = Mutex::new(GraphicInfo {
 /// # Struct format
 /// The layout of fields in this struct must be kept in sync with the code in 
 /// `ap_realmode.asm` that writes to this structure.
-#[derive(FromBytes, Clone, Debug)]
+#[derive(FromBytes, Clone, Copy, Debug)]
+#[repr(packed)]
 pub struct GraphicInfo {
-    pub width: u64,
-    pub height: u64,
-    pub physical_address: u64,
+    /// The visible width of the screen, in pixels.
+    width: u16,
+    /// The visible height of the screen, in pixels.
+    height: u16,
+    /// The physical address of the primary framebuffer memory.
+    physical_address: u32,
+    /// The `mode` that the VGA is currently operating in.
+    ///
+    /// This is a bitfield that Theseus doesn't currently use.
+    _mode: u16,
+    /// The attribute bitfield that describes the VGA mode's capabilities.
+    ///
+    /// This is a bitfield that Theseus doesn't currently use.
+    _attributes: u16,
+    /// The total size of the graphic VGA memory in 64 KiB chunks.
+    total_memory_size_64_kib_chunks: u16,
+}
+
+impl GraphicInfo {
+    const fn new() -> Self {
+        Self {
+            width: 0,
+            height: 0,
+            physical_address: 0,
+            _mode: 0,
+            _attributes: 0,
+            total_memory_size_64_kib_chunks: 0,
+        }
+    }
+
+    /// Returns the visible width of the screen, in pixels.
+    pub fn width(&self) -> u16 {
+        self.width
+    }
+
+    /// Returns the height width of the screen, in pixels.
+    pub fn height(&self) -> u16 {
+        self.height
+    }
+
+    /// Returns the physical address of the primary framebuffer memory.
+    pub fn physical_address(&self) -> u32 {
+        self.physical_address
+    }
+
+    /// Returns the total size in bytes of the VGA graphics memory.
+    ///
+    /// This memory contains the framebuffer as well as any extra visible
+    /// displayable memory, which can be used for any graphics purposes,
+    /// e.g., a backbuffer for double buffering (aka page flipping).
+    pub fn total_memory_size_in_bytes(&self) -> u32 {
+        (self.total_memory_size_64_kib_chunks as u32) << 16
+    }
 }
 
 /// Starts up and sets up AP cores based on system information from ACPI
