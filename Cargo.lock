@@ -297,7 +297,7 @@ dependencies = [
 [[package]]
 name = "bootloader_api"
 version = "0.11.0"
-source = "git+https://github.com/theseus-os/bootloader?branch=theseus#e1c825fae8875c36a0a93e8574136dab09d70e6d"
+source = "git+https://github.com/theseus-os/bootloader?branch=theseus#6a5aeec32e56c10bae258268bad8c0aaea4e154f"
 
 [[package]]
 name = "bootloader_modules"
