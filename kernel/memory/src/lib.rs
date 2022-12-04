@@ -29,12 +29,14 @@ pub use self::paging::{
 };
 
 pub use memory_structs::{Frame, Page, FrameRange, PageRange, VirtualAddress, PhysicalAddress};
-pub use page_allocator::{AllocatedPages, allocate_pages, allocate_pages_at,
-    allocate_pages_by_bytes, allocate_pages_by_bytes_at};
+pub use page_allocator::{
+    AllocatedPages, allocate_pages, allocate_pages_at,
+    allocate_pages_by_bytes, allocate_pages_by_bytes_at,
+};
 
 pub use frame_allocator::{
     AllocatedFrames, MemoryRegionType, PhysicalMemoryRegion,
-    allocate_frames_by_bytes_at, allocate_frames_by_bytes, allocate_frames_at,
+    allocate_frames, allocate_frames_at, allocate_frames_by_bytes_at, allocate_frames_by_bytes,
 };
 
 #[cfg(target_arch = "x86_64")]
