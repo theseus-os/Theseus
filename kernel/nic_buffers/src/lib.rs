@@ -11,6 +11,14 @@ use core::ops::{Deref, DerefMut};
 use alloc::vec::Vec;
 use memory::{PhysicalAddress, MappedPages, PteFlags, create_contiguous_mapping};
 
+/// The mapping flags used to map NIC device memory,
+/// e.g., MMIO registers, buffers, queues, etc.
+pub const NIC_MAPPING_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    PteFlags::new().bits()
+    | PteFlags::VALID.bits()
+    | PteFlags::WRITABLE.bits()
+    | PteFlags::DEVICE_MEMORY.bits()
+);
 
 /// A buffer that stores a packet to be transmitted through the NIC
 /// and is guaranteed to be contiguous in physical memory. 
