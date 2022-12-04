@@ -10,7 +10,7 @@ extern crate no_drop;
 extern crate bootloader_modules;
 extern crate boot_info;
 
-use memory::{MmiRef, MappedPages, VirtualAddress, PhysicalAddress};
+use memory::{MmiRef, MappedPages, VirtualAddress};
 use kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
 use alloc::{
     string::String, 
@@ -112,8 +112,8 @@ where
     let bootloader_modules: Vec<BootloaderModule> = boot_info.modules()
         .map(|m| m.name().map(|module_name| {
             BootloaderModule::new(
-                PhysicalAddress::new_canonical(m.start() as usize),
-                PhysicalAddress::new_canonical(m.end()   as usize),
+                m.start(),
+                m.start() + m.len(),
                 String::from(module_name),
             )
         }))

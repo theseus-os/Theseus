@@ -59,7 +59,7 @@ use alloc::vec::Vec;
 use alloc::sync::Arc;
 use no_drop::NoDrop;
 use kernel_config::memory::KERNEL_OFFSET;
-use boot_info::MemoryArea;
+use boot_info::MemoryRegion;
 pub use kernel_config::memory::PAGE_SIZE;
 
 /// The memory management info and address space of the kernel
@@ -200,9 +200,9 @@ where
     reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(vga_display_frames, MemoryRegionType::Reserved));
     reserved_index += 1;
 
-    for area in boot_info.memory_areas()? {
-        let frames = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(area.start() as usize), area.size() as usize);
-        if area.ty() == boot_info::MemoryAreaType::Available {
+    for area in boot_info.memory_regions()? {
+        let frames = FrameRange::from_phys_addr(area.start(), area.len());
+        if area.is_usable() {
             free_regions[free_index] = Some(PhysicalMemoryRegion::new(frames, MemoryRegionType::Free));
             free_index += 1;
         } else {

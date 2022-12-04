@@ -1,4 +1,4 @@
-use crate::{ElfSectionFlags, MemoryAreaType};
+use crate::ElfSectionFlags;
 use bootloader_api::info;
 use core::{
     iter::{Iterator, Peekable},
@@ -12,57 +12,55 @@ use memory_structs::{PhysicalAddress, VirtualAddress};
 /// double fault handler stack.
 pub const STACK_SIZE: usize = (KERNEL_STACK_SIZE_IN_PAGES + 2) * PAGE_SIZE;
 
-pub struct MemoryArea {
-    start: usize,
-    end: usize,
-    ty: MemoryAreaType,
+pub struct MemoryRegion {
+    start: PhysicalAddress,
+    len: usize,
+    is_usable: bool,
 }
 
-impl From<info::MemoryRegion> for MemoryArea {
+impl From<info::MemoryRegion> for MemoryRegion {
     fn from(info::MemoryRegion { start, end, kind }: info::MemoryRegion) -> Self {
         Self {
-            start: start as usize,
-            end: end as usize,
-            ty: match kind {
-                info::MemoryRegionKind::Usable => MemoryAreaType::Available,
-                _ => MemoryAreaType::Reserved,
-            },
+            start: PhysicalAddress::new_canonical(start as usize),
+            len: (end - start) as usize,
+            is_usable: matches!(kind, info::MemoryRegionKind::Usable),
         }
     }
 }
 
-impl crate::MemoryArea for MemoryArea {
-    fn start(&self) -> usize {
+impl crate::MemoryRegion for MemoryRegion {
+    fn start(&self) -> PhysicalAddress {
         self.start
     }
 
-    fn size(&self) -> usize {
-        self.end - self.start
+    fn len(&self) -> usize {
+        self.len
     }
 
-    fn ty(&self) -> MemoryAreaType {
-        self.ty
+    fn is_usable(&self) -> bool {
+        self.is_usable
     }
 }
 
-pub struct MemoryAreas {
+pub struct MemoryRegions {
     inner: Peekable<core::slice::Iter<'static, info::MemoryRegion>>,
 }
 
-impl Iterator for MemoryAreas {
-    type Item = MemoryArea;
+impl Iterator for MemoryRegions {
+    type Item = MemoryRegion;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut area: MemoryArea = (*self.inner.next()?).into();
+        let mut area: MemoryRegion = (*self.inner.next()?).into();
 
         // UEFI often separates contiguous memory into separate memory regions. We
         // consolidate them to minimise the number of entries in the frame allocator's
         // reserved and available lists.
         while let Some(next) = self.inner.next_if(|next| {
-            let next = MemoryArea::from(**next);
-            area.ty == next.ty && area.end == next.start
+            let next = MemoryRegion::from(**next);
+            area.is_usable == next.is_usable && (area.start + area.len) == next.start
         }) {
-            area.end = next.end as usize;
+            let next = MemoryRegion::from(*next);
+            area.len += next.len;
         }
 
         Some(area)
@@ -74,11 +72,11 @@ impl<'a> crate::ElfSection for &'a info::ElfSection {
         info::ElfSection::name(self)
     }
 
-    fn start(&self) -> usize {
-        self.start
+    fn start(&self) -> VirtualAddress {
+        VirtualAddress::new_canonical(self.start)
     }
 
-    fn size(&self) -> usize {
+    fn len(&self) -> usize {
         self.size
     }
 
@@ -97,18 +95,20 @@ impl crate::Module for Module {
         Ok(info::Module::name(&self.inner))
     }
 
-    fn start(&self) -> usize {
-        self.regions
-            .iter()
-            .filter(|region| region.kind == info::MemoryRegionKind::UnknownUefi(0x80000000))
-            .next()
-            .expect("no modules region")
-            .start as usize
-            + self.inner.offset
+    fn start(&self) -> PhysicalAddress {
+        PhysicalAddress::new_canonical(
+            self.regions
+                .iter()
+                .filter(|region| region.kind == info::MemoryRegionKind::UnknownUefi(0x80000000))
+                .next()
+                .expect("no modules region")
+                .start as usize
+                + self.inner.offset,
+        )
     }
 
-    fn end(&self) -> usize {
-        self.start() + self.inner.len
+    fn len(&self) -> usize {
+        self.inner.len
     }
 }
 
@@ -133,8 +133,8 @@ impl Iterator for Modules {
 }
 
 impl crate::BootInformation for &'static bootloader_api::BootInfo {
-    type MemoryArea<'a> = MemoryArea;
-    type MemoryAreas<'a> = MemoryAreas;
+    type MemoryRegion<'a> = MemoryRegion;
+    type MemoryRegions<'a> = MemoryRegions;
 
     type ElfSection<'a> = &'a info::ElfSection;
     type ElfSections<'a> = core::slice::Iter<'a, info::ElfSection>;
@@ -146,7 +146,7 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
         VirtualAddress::new(*self as *const _ as usize).expect("invalid boot info virtual address")
     }
 
-    fn size(&self) -> usize {
+    fn len(&self) -> usize {
         self.size
     }
 
@@ -164,19 +164,17 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
                 .filter(|s| s.flags().contains(ElfSectionFlags::ALLOCATED))
                 .map(|s| s.start())
                 .min()
-                .ok_or("couldn't find kernel start address")? as usize,
+                .ok_or("couldn't find kernel start address")?
+                .value(),
         )
         .ok_or("kernel physical start address was invalid")?;
-
-        let virtual_end = VirtualAddress::new(
-            self.elf_sections()?
-                .into_iter()
-                .filter(|s| s.flags().contains(ElfSectionFlags::ALLOCATED))
-                .map(|s| s.start() + s.size())
-                .max()
-                .ok_or("couldn't find kernel end address")? as usize,
-        )
-        .ok_or("kernel virtual end address was invalid")?;
+        let virtual_end = self
+            .elf_sections()?
+            .into_iter()
+            .filter(|s| s.flags().contains(ElfSectionFlags::ALLOCATED))
+            .map(|s| s.start() + s.len())
+            .max()
+            .ok_or("couldn't find kernel end address")?;
         let physical_end = PhysicalAddress::new(virtual_end.value() - KERNEL_OFFSET)
             .ok_or("kernel physical end address was invalid")?;
 
@@ -216,8 +214,8 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
         Ok(start..end)
     }
 
-    fn memory_areas(&self) -> Result<Self::MemoryAreas<'_>, &'static str> {
-        Ok(MemoryAreas {
+    fn memory_regions(&self) -> Result<Self::MemoryRegions<'_>, &'static str> {
+        Ok(MemoryRegions {
             inner: self.memory_regions.iter().peekable(),
         })
     }

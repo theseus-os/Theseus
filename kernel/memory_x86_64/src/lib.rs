@@ -55,14 +55,14 @@ where
     // map the allocated kernel text sections
     for section in elf_sections_tag {
         // skip sections that don't need to be loaded into memory
-        if section.size() == 0
+        if section.len() == 0
             || !section.flags().contains(boot_info::ElfSectionFlags::ALLOCATED)
             || section.name().starts_with(".debug")
         {
             continue;
         }
 
-        debug!("Looking at loaded section {} at {:#X}, size {:#X}", section.name(), section.start(), section.size());
+        debug!("Looking at loaded section {} at {:#X}, size {:#X}", section.name(), section.start(), section.len());
 
         let mut flags = EntryFlags::GLOBAL;
         if section.flags().contains(ElfSectionFlags::ALLOCATED) {
@@ -80,13 +80,13 @@ where
         // they are still loaded at a lower physical address, in which phys_addr = virt_addr - KERNEL_OFFSET.
         // thus, we must map the zeroeth kernel section from its low address to a higher-half address,
         // and we must map all the other sections from their higher given virtual address to the proper lower phys addr
-        let mut start_phys_addr = section.start() as usize;
+        let mut start_phys_addr = section.start().value();
         if start_phys_addr >= KERNEL_OFFSET {
             // true for all sections but the first section (inittext)
             start_phys_addr -= KERNEL_OFFSET;
         }
 
-        let mut start_virt_addr = section.start() as usize;
+        let mut start_virt_addr = section.start().value();
         if start_virt_addr < KERNEL_OFFSET {
             // special case to handle the first section only
             start_virt_addr += KERNEL_OFFSET;
@@ -94,8 +94,8 @@ where
 
         let start_phys_addr = PhysicalAddress::new(start_phys_addr).ok_or("section had invalid starting physical address")?;
         let start_virt_addr = VirtualAddress::new(start_virt_addr).ok_or("section had invalid ending physical address")?;
-        let end_virt_addr = start_virt_addr + (section.size() as usize);
-        let end_phys_addr = start_phys_addr + (section.size() as usize);
+        let end_virt_addr = start_virt_addr + section.len();
+        let end_phys_addr = start_phys_addr + section.len();
 
         // The linker script (linker_higher_half.ld) defines the following order of sections:
         // |------|-------------------|-------------------------------|
@@ -177,11 +177,11 @@ where
             }
             _ =>  {
                 error!("Section {} at {:#X}, size {:#X} was not an expected section", 
-                        section.name(), section.start(), section.size());
+                        section.name(), section.start(), section.len());
                 return Err("Kernel ELF Section had an unexpected name");
             }
         };
-        debug!("     will map kernel section {:?} as {:?} at vaddr: {:#X}, size {:#X} bytes", section.name(), static_str_name, start_virt_addr, section.size());
+        debug!("     will map kernel section {:?} as {:?} at vaddr: {:#X}, size {:#X} bytes", section.name(), static_str_name, start_virt_addr, section.len());
 
         sections_memory_bounds[index] = Some(SectionMemoryBounds {
             start: (start_virt_addr, start_phys_addr),

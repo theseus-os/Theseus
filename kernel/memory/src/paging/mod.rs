@@ -237,7 +237,7 @@ where
 
     let boot_info_start_vaddr = boot_info.start();
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
-    let boot_info_size = boot_info.size();
+    let boot_info_size = boot_info.len();
     debug!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
 
     let new_p4_frame = frame_allocator::allocate_frames(1).ok_or("couldn't allocate frame for new page table")?; 

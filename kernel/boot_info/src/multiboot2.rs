@@ -1,33 +1,29 @@
-use crate::{ElfSection, ElfSectionFlags, MemoryArea, MemoryAreaType, Module};
+use crate::ElfSectionFlags;
 use core::{cmp, iter::Iterator, ops::Range};
 use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{PhysicalAddress, VirtualAddress};
 
-impl<'a> MemoryArea for &'a multiboot2::MemoryArea {
-    fn start(&self) -> usize {
-        self.start_address() as usize
+impl<'a> crate::MemoryRegion for &'a multiboot2::MemoryArea {
+    fn start(&self) -> PhysicalAddress {
+        PhysicalAddress::new_canonical(self.start_address() as usize)
     }
 
-    fn size(&self) -> usize {
+    fn len(&self) -> usize {
         multiboot2::MemoryArea::size(self) as usize
     }
 
-    fn ty(&self) -> MemoryAreaType {
-        match self.typ() {
-            multiboot2::MemoryAreaType::Available => MemoryAreaType::Available,
-            // FIXME
-            _ => MemoryAreaType::Reserved,
-        }
+    fn is_usable(&self) -> bool {
+        matches!(self.typ(), multiboot2::MemoryAreaType::Available)
     }
 }
 
-type MemoryAreaIterator<'a> = impl Iterator<Item = &'a multiboot2::MemoryArea>;
+type MemoryRegionIterator<'a> = impl Iterator<Item = &'a multiboot2::MemoryArea>;
 
-pub struct MemoryAreas<'a> {
-    inner: MemoryAreaIterator<'a>,
+pub struct MemoryRegions<'a> {
+    inner: MemoryRegionIterator<'a>,
 }
 
-impl<'a> Iterator for MemoryAreas<'a> {
+impl<'a> Iterator for MemoryRegions<'a> {
     type Item = &'a multiboot2::MemoryArea;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -35,16 +31,16 @@ impl<'a> Iterator for MemoryAreas<'a> {
     }
 }
 
-impl ElfSection for multiboot2::ElfSection {
+impl crate::ElfSection for multiboot2::ElfSection {
     fn name(&self) -> &str {
         multiboot2::ElfSection::name(self)
     }
 
-    fn start(&self) -> usize {
-        self.start_address() as usize
+    fn start(&self) -> VirtualAddress {
+        VirtualAddress::new_canonical(self.start_address() as usize)
     }
 
-    fn size(&self) -> usize {
+    fn len(&self) -> usize {
         multiboot2::ElfSection::size(self) as usize
     }
 
@@ -53,24 +49,24 @@ impl ElfSection for multiboot2::ElfSection {
     }
 }
 
-impl<'a> Module for &'a multiboot2::ModuleTag {
+impl<'a> crate::Module for &'a multiboot2::ModuleTag {
     fn name(&self) -> Result<&str, &'static str> {
         self.cmdline()
             .map_err(|_| "multiboot2 module cmdline was an invalid UTF-8 sequence")
     }
 
-    fn start(&self) -> usize {
-        self.start_address() as usize
+    fn start(&self) -> PhysicalAddress {
+        PhysicalAddress::new_canonical(self.start_address() as usize)
     }
 
-    fn end(&self) -> usize {
-        self.end_address() as usize
+    fn len(&self) -> usize {
+        (self.end_address() - self.start_address()) as usize
     }
 }
 
 impl crate::BootInformation for multiboot2::BootInformation {
-    type MemoryArea<'a> = &'a multiboot2::MemoryArea;
-    type MemoryAreas<'a> = MemoryAreas<'a>;
+    type MemoryRegion<'a> = &'a multiboot2::MemoryArea;
+    type MemoryRegions<'a> = MemoryRegions<'a>;
 
     type ElfSection<'a> = multiboot2::ElfSection;
     type ElfSections<'a> = multiboot2::ElfSectionIter;
@@ -82,7 +78,7 @@ impl crate::BootInformation for multiboot2::BootInformation {
         VirtualAddress::new_canonical(self.start_address())
     }
 
-    fn size(&self) -> usize {
+    fn len(&self) -> usize {
         self.total_size()
     }
 
@@ -138,8 +134,8 @@ impl crate::BootInformation for multiboot2::BootInformation {
         Ok(PhysicalAddress::new_canonical(min)..PhysicalAddress::new_canonical(max))
     }
 
-    fn memory_areas(&self) -> Result<Self::MemoryAreas<'_>, &'static str> {
-        Ok(MemoryAreas {
+    fn memory_regions(&self) -> Result<Self::MemoryRegions<'_>, &'static str> {
+        Ok(MemoryRegions {
             inner: self
                 .memory_map_tag()
                 .ok_or("no memory map tag")?
@@ -163,13 +159,15 @@ impl crate::BootInformation for multiboot2::BootInformation {
     }
 
     fn stack_size(&self) -> usize {
+        use crate::ElfSection;
+
         self.elf_sections()
             .expect("couldn't get elf sections")
             .filter(|section| section.name() == ".stack")
             .map(|section| {
                 let start = section.start();
-                let end = start + section.size() as usize;
-                end - start
+                let end = start + section.len();
+                (end - start).value()
             })
             .next()
             .expect("no stack section")
