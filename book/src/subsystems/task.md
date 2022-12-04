@@ -101,12 +101,12 @@ Thus, context switching (with preemption) allows for multiple untrusted and unco
 The implementation for context switching in Theseus is split across several crates, with each crate corresponding to a particular subset of SIMD instructions being enabled.
 The top-level [`context_switch`] crate automatically selects the correct version based on which subset of SIMD functionality is chosen by the target hardware platform's specification.
 For example, if SSE2 was enabled, `#[cfg(target_feature = "sse2")]` would be true and the `context_switch_sse2` crate would be used as the context switching implementation.
-Currently, one can select this target by using the `x86_64-theseus-sse` target while building Theseus:
+Currently, one can select this target by using the `x86_64-unknown-theseus-sse` target while building Theseus:
 ```sh
-make run TARGET=x86_64-theseus-sse
+make run TARGET=x86_64-unknown-theseus-sse
 ```
 
-Theseus supports both SSE2 and AVX, but its default target `x86_64-theseus` disables both.
+Theseus supports both SSE2 and AVX, but its default target `x86_64-unknown-theseus` disables both.
 This tells the compiler to generate soft floating-point instructions instead of SIMD instructions, meaning that the SIMD register set is not used at all.
 Thus, disabling SIMD results in the simplest and fastest version of context switching, as only the basic set of general-purpose CPU registers must be saved and restored; all SIMD registers can be ignored.
 

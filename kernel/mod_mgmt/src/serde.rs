@@ -18,6 +18,12 @@ pub(crate) fn into_loaded_crate(
     verbose_log: bool,
 ) -> Result<(StrongCrateRef, BTreeMap<String, usize>, usize), &'static str> {
     let crate_name: StrRef = serialized_crate.crate_name.as_str().into();
+
+    let total_tls_size: usize = serialized_crate.tls_sections
+        .iter()
+        .filter_map(|shndx| serialized_crate.sections.get(shndx))
+        .map(|tls_sec| tls_sec.size)
+        .sum();
     
     // The sections need a weak reference back to the loaded_crate, and so we first create
     // the loaded_crate so we have something to reference when loading the sections.
@@ -46,6 +52,7 @@ pub(crate) fn into_loaded_crate(
                 text_pages,
                 rodata_pages,
                 data_pages,
+                total_tls_size,
             )?,
         );
     }
@@ -65,7 +72,7 @@ pub(crate) fn into_loaded_crate(
     // // Dump loaded sections for verification. See pull request #542/#559 for more details:
     // let loaded_crate_ref = loaded_crate.lock_as_ref();
     // for (_, section) in loaded_crate_ref.sections.iter() {
-    //     trace!("{:016x} {} {}", section.address_range.start.value(), section.name, section.mapped_pages_offset);
+    //     trace!("{:016x} {} {}", section.virt_addr.value(), section.name, section.mapped_pages_offset);
     // }
     // drop(loaded_crate_ref);
 
@@ -76,11 +83,12 @@ pub(crate) fn into_loaded_crate(
 /// Convert the given [`SerializedSection`] into a [`LoadedSection`].
 fn into_loaded_section(
     serialized_section: SerializedSection,
-    parent_crate: WeakCrateRef,
-    namespace: &Arc<CrateNamespace>,
-    text_pages: &Arc<Mutex<MappedPages>>,
-    rodata_pages: &Arc<Mutex<MappedPages>>,
-    data_pages: &Arc<Mutex<MappedPages>>,
+    parent_crate:       WeakCrateRef,
+    namespace:          &Arc<CrateNamespace>,
+    text_pages:         &Arc<Mutex<MappedPages>>,
+    rodata_pages:       &Arc<Mutex<MappedPages>>,
+    data_pages:         &Arc<Mutex<MappedPages>>,
+    total_tls_size:     usize,
 ) -> Result<Arc<LoadedSection>, &'static str> {
     let mapped_pages = match serialized_section.ty {
         SectionType::Text => Arc::clone(text_pages),
@@ -89,12 +97,13 @@ fn into_loaded_section(
         | SectionType::TlsBss
         | SectionType::GccExceptTable
         | SectionType::EhFrame => Arc::clone(rodata_pages),
-        SectionType::Data | SectionType::Bss => Arc::clone(data_pages),
+        SectionType::Data
+        | SectionType::Bss => Arc::clone(data_pages),
     };
     let virtual_address = VirtualAddress::new(serialized_section.virtual_address)
         .ok_or("SerializedSection::into_loaded_section(): invalid virtual address")?;
 
-    let loaded_section = Arc::new(LoadedSection {
+    let loaded_section = LoadedSection {
         name: match serialized_section.ty {
             SectionType::EhFrame
             | SectionType::GccExceptTable => crate::section_name_str_ref(&serialized_section.ty),
@@ -104,20 +113,21 @@ fn into_loaded_section(
         global: serialized_section.global,
         mapped_pages_offset: serialized_section.offset,
         mapped_pages,
-        address_range: virtual_address..(virtual_address + serialized_section.size),
+        virt_addr: virtual_address,
+        size: serialized_section.size,
         parent_crate,
         inner: Default::default(),
-    });
+    };
 
     if let SectionType::TlsData | SectionType::TlsBss = serialized_section.ty {
         namespace.tls_initializer.lock().add_existing_static_tls_section(
+            loaded_section,
             // TLS sections encode their TLS offset in the virtual address field,
             // which is necessary to properly calculate relocation entries that depend upon them.
             serialized_section.virtual_address,
-            Arc::clone(&loaded_section),
-        )
-        .unwrap();
+            total_tls_size,
+        ).map_err(|_| "BUG: failed to add deserialized static TLS section to the TLS area")
+    } else {
+        Ok(Arc::new(loaded_section))
     }
-
-    Ok(loaded_section)
 }

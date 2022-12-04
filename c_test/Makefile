@@ -26,17 +26,17 @@ export override LDFLAGS += -static-libgcc
 PIE := -fpic -fPIC -fpie -fPIE -pie
 
 TLIBC_DIR := ../tlibc
-TLIBC_A := $(TLIBC_DIR)/target/x86_64-theseus/release/libtlibc.a
-TLIBC_O := $(TLIBC_DIR)/target/x86_64-theseus/release/tlibc.o
+TLIBC_A := $(TLIBC_DIR)/target/x86_64-unknown-theseus/release/libtlibc.a
+TLIBC_O := $(TLIBC_DIR)/target/x86_64-unknown-theseus/release/tlibc.o
 
 GLIBC_DIR := $(HOME)/opt/cross/lib/gcc/x86_64-elf/10.2.0/no-red-zone
 STARTFILES := $(GLIBC_DIR)/crtbegin.o
 ENDFILES := $(GLIBC_DIR)/crtend.o
 
-# LIBGROUP := -Wl,--start-group ../tlibc/target/x86_64-theseus/release/deps/*.o -lgcc -Wl,--end-group
+# LIBGROUP := -Wl,--start-group ../tlibc/target/x86_64-unknown-theseus/release/deps/*.o -lgcc -Wl,--end-group
 LIBGROUP := -Wl,--start-group $(TLIBC_A) -lgcc -Wl,--end-group
 # LIBGROUP := -Wl,--start-group $(TLIBC_O) -lgcc -Wl,--end-group
-# LIBGROUP := -L$(TLIBC_DIR)/target/x86_64-theseus/release  -ltlibc
+# LIBGROUP := -L$(TLIBC_DIR)/target/x86_64-unknown-theseus/release  -ltlibc
 
 # PARTIAL_LINK := -Wl,--relocatable
 
@@ -73,7 +73,7 @@ export override LDFLAGS += -nostdlib -nostartfiles
 		$(TLIBC_A) \
 		$(ENDFILES)
 
-		# ../target/x86_64-theseus/release/libnano_core.a \
+		# ../target/x86_64-unknown-theseus/release/libnano_core.a \
 
 		# -static \
 	
@@ -103,7 +103,7 @@ dummy_pie:
 		$(PARTIAL_LINK) \
 		dummy.c \
 		$(TLIBC_A) \
-		../target/x86_64-theseus/release/libnano_core.a
+		../target/x86_64-unknown-theseus/release/libnano_core.a
 
 
 		# -static \

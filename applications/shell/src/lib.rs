@@ -107,7 +107,9 @@ pub fn main(_args: Vec<String>) -> isize {
     }
 
     // block this task, because it never needs to actually run again
-    task::get_my_current_task().unwrap().block().unwrap();
+    task::with_current_task(|t| t.block())
+        .expect("shell::main(): failed to get current task")
+        .expect("shell:main(): failed to block the main shell task");
     scheduler::schedule();
 
     loop {
@@ -654,9 +656,9 @@ impl Shell {
     fn create_single_task(&mut self, cmd: String, args: Vec<String>) -> Result<JoinableTaskRef, AppErr> {
 
         // Check that the application actually exists
-        let namespace_dir = task::get_my_current_task()
-            .map(|t| t.get_namespace().dir().clone())
-            .ok_or(AppErr::NamespaceErr)?;
+        let namespace_dir = task::with_current_task(|t|
+            t.get_namespace().dir().clone()
+        ).map_err(|_| AppErr::NamespaceErr)?;
         let cmd_crate_name = format!("{}-", cmd);
         let mut matching_apps = namespace_dir.get_files_starting_with(&cmd_crate_name).into_iter();
         let app_file = matching_apps.next();
@@ -836,14 +838,10 @@ impl Shell {
     /// Try to match the incomplete command against all applications in the same namespace.
     /// Returns a vector that contains all matching results.
     fn find_app_name_match(&mut self, incomplete_cmd: &String) -> Result<Vec<String>, &'static str> {
-        let namespace_dir = match task::get_my_current_task()
-            .map(|t| t.get_namespace().dir().clone())
-            .ok_or(AppErr::NamespaceErr) {
-            Ok(dir) => dir,
-            Err(_) => {
-                return Err("Failed to get namespace_dir while completing cmdline.");
-            }
-        };
+        let namespace_dir = task::with_current_task(|t|
+            t.get_namespace().dir().clone()
+        ).map_err(|_| "Failed to get namespace_dir while completing cmdline.")?;
+
         let mut names = namespace_dir.get_file_and_dir_names_starting_with(&incomplete_cmd);
 
         // Drop the extension name and hash value.
@@ -869,14 +867,12 @@ impl Shell {
 
         // Stores all possible matches.
         let mut match_list = Vec::new();
-
-        let taskref = match task::get_my_current_task() {
-            Some(t) => t,
-            None => return Err("Failed to get task reference while completing cmdline.")
-        };
-
         // Get current working dir.
-        let mut curr_wd = Arc::clone(&taskref.get_env().lock().working_dir);
+        let Ok(mut curr_wd) = task::with_current_task(|t|
+            t.get_env().lock().working_dir.clone()
+        ) else {
+            return Err("failed to get current task while completing cmdline");
+        };
 
         // Check if the last character is a slash.
         let slash_ending = match incomplete_cmd.chars().last() {

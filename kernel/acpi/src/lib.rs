@@ -71,7 +71,7 @@ pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
         let acpi_tables = ACPI_TABLES.lock();
         let _fadt = fadt::Fadt::get(&acpi_tables).ok_or("The required FADT APIC table wasn't found (signature 'FACP')")?;
         // here: do something with the DSDT here, when needed.
-        // debug!("DSDT physical address: {:#X}", fadt.dsdt);
+        // debug!("DSDT physical address: {:#X}", {_fadt.dsdt});
     }
     
     // HPET is optional, but usually present.

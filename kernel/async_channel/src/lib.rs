@@ -219,16 +219,11 @@ impl <T: Send> Sender<T> {
             let value = hpet::get_hpet().as_ref().unwrap().get_counter();
             // debug!("Value {} {}", value, value % 1024);
 
-            match task::get_my_current_task() {
-                Some(curr_task) => {
-
-                    // We restrict the fault to a specific task to make measurements consistent
-                    if (value % 4096) == 0  && curr_task.is_restartable() {
-                        // debug!("Fake error {}", value);
-                        unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
-                    }
-                },
-                _ => (),
+            let is_restartable = task::with_current_task(|t| t.is_restartable()).unwrap_or(false);
+            // We restrict the fault to a specific task to make measurements consistent
+            if (value % 4096) == 0  && is_restartable {
+                // debug!("Fake error {}", value);
+                unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
             }
         }
 

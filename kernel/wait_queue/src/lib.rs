@@ -25,9 +25,7 @@ impl WaitGuard {
     ///  more details.
     pub fn new(task: TaskRef) -> Result<WaitGuard, RunState> {
         task.block()?;
-        Ok(WaitGuard {
-            task,
-        })
+        Ok(WaitGuard { task })
     }
 
     /// Blocks the task guarded by this waitguard,
@@ -115,8 +113,6 @@ impl WaitQueue {
     // /// The `condition` closure is invoked with one argument, an immutable reference to the waitqueue, 
     // /// to allow the closure to examine the condition of the waitqueue if necessary. 
     pub fn wait_until<R>(&self, condition: &dyn Fn(/* &VecDeque<TaskRef> */) -> Option<R>) -> Result<R, WaitError> {
-        let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
-
         // Do the following atomically:
         // (1) Obtain the waitqueue lock
         // (2) Add the current task to the waitqueue
@@ -128,14 +124,16 @@ impl WaitQueue {
                 if let Some(ret) = condition(/* &wq_locked */) {
                     return Ok(ret);
                 }
-                // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
-                if !wq_locked.contains(curr_task) {
-                    wq_locked.push_back(curr_task.clone());
-                } else {
-                    warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
-                }
-                // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
-                curr_task.block().map_err(|_| WaitError::CantBlockCurrentTask)?;
+                task::with_current_task(|curr_task| {
+                    // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
+                    if !wq_locked.contains(curr_task) {
+                        wq_locked.push_back(curr_task.clone());
+                    } else {
+                        warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
+                    }
+                    // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
+                    curr_task.block().map_err(|_| WaitError::CantBlockCurrentTask)
+                }).map_err(|_| WaitError::NoCurrentTask)??;
             }
             scheduler::schedule();
 
@@ -147,8 +145,6 @@ impl WaitQueue {
     /// Similar to [`wait_until`](#method.wait_until), but this function accepts a `condition` closure
     /// that can mutate its environment (a `FnMut`).
     pub fn wait_until_mut<R>(&self, condition: &mut dyn FnMut(/* &VecDeque<TaskRef> */) -> Option<R>) -> Result<R, WaitError> {
-        let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
-
         // Do the following atomically:
         // (1) Obtain the waitqueue lock
         // (2) Add the current task to the waitqueue
@@ -160,14 +156,16 @@ impl WaitQueue {
                 if let Some(ret) = condition(/* &wq_locked */) {
                     return Ok(ret);
                 }
-                // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
-                if !wq_locked.contains(curr_task) {
-                    wq_locked.push_back(curr_task.clone());
-                } else {
-                    warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
-                }
-                // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
-                curr_task.block().map_err(|_| WaitError::CantBlockCurrentTask)?;
+                task::with_current_task(|curr_task| {
+                    // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
+                    if !wq_locked.contains(curr_task) {
+                        wq_locked.push_back(curr_task.clone());
+                    } else {
+                        warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
+                    }
+                    // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
+                    curr_task.block().map_err(|_| WaitError::CantBlockCurrentTask)
+                }).map_err(|_| WaitError::NoCurrentTask)??;
             }
             scheduler::schedule();
 
