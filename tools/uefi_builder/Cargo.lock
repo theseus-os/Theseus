@@ -53,7 +53,7 @@ dependencies = [
 [[package]]
 name = "bootloader"
 version = "0.11.0"
-source = "git+https://github.com/theseus-os/bootloader?branch=theseus#a94b27e1d971c39c415c792ff25870dbe196627a"
+source = "git+https://github.com/theseus-os/bootloader?branch=theseus#e1c825fae8875c36a0a93e8574136dab09d70e6d"
 dependencies = [
  "anyhow",
  "fatfs",
