@@ -7,6 +7,8 @@ jobs:
     name: Build and deploy
     runs-on: ubuntu-latest
     steps:
+    - name: Install nasm
+      run: sudo apt install nasm
     - name: Checkout repository and submodules
       uses: actions/checkout@v2
       with:
