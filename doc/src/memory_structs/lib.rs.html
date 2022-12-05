@@ -432,6 +432,45 @@
 <span id="432">432</span>
 <span id="433">433</span>
 <span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains basic types used for memory management.
 //!
 //! The types of interest are divided into three categories:
@@ -448,8 +487,6 @@
 <span class="kw">extern crate </span>zerocopy;
 <span class="kw">extern crate </span>paste;
 
-
-<span class="kw">use </span>bit_field::BitField;
 <span class="kw">use </span>core::{
     cmp::{min, max},
     fmt,
@@ -560,40 +597,81 @@
 }
 
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-#[inline]
-</span><span class="kw">fn </span>is_canonical_virtual_address(virt_addr: usize) -&gt; bool {
-    <span class="kw">match </span>virt_addr.get_bits(<span class="number">47</span>..<span class="number">64</span>) {
-        <span class="number">0 </span>| <span class="number">0b1_1111_1111_1111_1111 </span>=&gt; <span class="bool-val">true</span>,
-        <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
+</span><span class="kw">mod </span>canonical_address {
+    <span class="kw">use </span>bit_field::BitField;
+
+    <span class="attr">#[inline]
+    </span><span class="kw">pub fn </span>is_canonical_virtual_address(virt_addr: usize) -&gt; bool {
+        <span class="kw">match </span>virt_addr.get_bits(<span class="number">47</span>..<span class="number">64</span>) {
+            <span class="number">0 </span>| <span class="number">0b1_1111_1111_1111_1111 </span>=&gt; <span class="bool-val">true</span>,
+            <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
+        }
     }
-}
 
-<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-#[inline]
-</span><span class="kw">const fn </span>canonicalize_virtual_address(virt_addr: usize) -&gt; usize {
-    <span class="comment">// match virt_addr.get_bit(47) {
-    //     false =&gt; virt_addr.set_bits(48..64, 0),
-    //     true =&gt;  virt_addr.set_bits(48..64, 0xffff),
-    // };
+    <span class="attr">#[inline]
+    </span><span class="kw">pub const fn </span>canonicalize_virtual_address(virt_addr: usize) -&gt; usize {
+        <span class="comment">// match virt_addr.get_bit(47) {
+        //     false =&gt; virt_addr.set_bits(48..64, 0),
+        //     true =&gt;  virt_addr.set_bits(48..64, 0xffff),
+        // };
 
-    // The below code is semantically equivalent to the above, but it works in const functions.
-    </span>((virt_addr &lt;&lt; <span class="number">16</span>) <span class="kw">as </span>isize &gt;&gt; <span class="number">16</span>) <span class="kw">as </span>usize
-}
-
-<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-#[inline]
-</span><span class="kw">fn </span>is_canonical_physical_address(phys_addr: usize) -&gt; bool {
-    <span class="kw">match </span>phys_addr.get_bits(<span class="number">52</span>..<span class="number">64</span>) {
-        <span class="number">0 </span>=&gt; <span class="bool-val">true</span>,
-        <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
+        // The below code is semantically equivalent to the above, but it works in const functions.
+        </span>((virt_addr &lt;&lt; <span class="number">16</span>) <span class="kw">as </span>isize &gt;&gt; <span class="number">16</span>) <span class="kw">as </span>usize
     }
+
+    <span class="attr">#[inline]
+    </span><span class="kw">pub fn </span>is_canonical_physical_address(phys_addr: usize) -&gt; bool {
+        <span class="kw">match </span>phys_addr.get_bits(<span class="number">52</span>..<span class="number">64</span>) {
+            <span class="number">0 </span>=&gt; <span class="bool-val">true</span>,
+            <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
+        }
+    }
+
+    <span class="attr">#[inline]
+    </span><span class="kw">pub const fn </span>canonicalize_physical_address(phys_addr: usize) -&gt; usize {
+        phys_addr &amp; <span class="number">0x000F_FFFF_FFFF_FFFF
+    </span>}
 }
 
-<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-#[inline]
-</span><span class="kw">const fn </span>canonicalize_physical_address(phys_addr: usize) -&gt; usize {
-    phys_addr &amp; <span class="number">0x000F_FFFF_FFFF_FFFF
-</span>}
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+</span><span class="kw">mod </span>canonical_address {
+    <span class="kw">use </span>bit_field::BitField;
+
+    <span class="comment">// aarch64 doesn&#39;t have a concept of canonical VA
+    // so this always returns true
+    </span><span class="attr">#[inline]
+    </span><span class="kw">pub fn </span>is_canonical_virtual_address(_virt_addr: usize) -&gt; bool {
+        <span class="bool-val">true
+    </span>}
+    
+    <span class="comment">// aarch64 doesn&#39;t have a concept of canonical VA
+    // so this returns the address as-is
+    </span><span class="attr">#[inline]
+    </span><span class="kw">pub const fn </span>canonicalize_virtual_address(virt_addr: usize) -&gt; usize {
+        virt_addr
+    }
+    
+    <span class="doccomment">/// On aarch64, we configure the MMU to use 48-bit
+    /// physical addresses; &quot;canonical&quot; physical addresses
+    /// have the 16 most significant bits cleared.
+    </span><span class="attr">#[inline]
+    </span><span class="kw">pub fn </span>is_canonical_physical_address(phys_addr: usize) -&gt; bool {
+        <span class="kw">match </span>phys_addr.get_bits(<span class="number">48</span>..<span class="number">64</span>) {
+            <span class="number">0 </span>=&gt; <span class="bool-val">true</span>,
+            <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
+        }
+    }
+    
+    <span class="doccomment">/// On aarch64, we configure the MMU to use 48-bit
+    /// physical addresses; &quot;canonical&quot; physical addresses
+    /// have the 16 most significant bits cleared.
+    </span><span class="attr">#[inline]
+    </span><span class="kw">pub const fn </span>canonicalize_physical_address(phys_addr: usize) -&gt; usize {
+        phys_addr &amp; <span class="number">0x0000_FFFF_FFFF_FFFF
+    </span>}
+}
+
+<span class="kw">use </span>canonical_address::<span class="kw-2">*</span>;
 
 <span class="macro">implement_address!</span>(
     VirtualAddress,
