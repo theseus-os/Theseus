@@ -14,8 +14,6 @@ extern crate bit_field;
 extern crate zerocopy;
 extern crate paste;
 
-
-use bit_field::BitField;
 use core::{
     cmp::{min, max},
     fmt,
@@ -126,40 +124,81 @@ macro_rules! implement_address {
 }
 
 #[cfg(target_arch = "x86_64")]
-#[inline]
-fn is_canonical_virtual_address(virt_addr: usize) -> bool {
-    match virt_addr.get_bits(47..64) {
-        0 | 0b1_1111_1111_1111_1111 => true,
-        _ => false,
+mod canonical_address {
+    use bit_field::BitField;
+
+    #[inline]
+    pub fn is_canonical_virtual_address(virt_addr: usize) -> bool {
+        match virt_addr.get_bits(47..64) {
+            0 | 0b1_1111_1111_1111_1111 => true,
+            _ => false,
+        }
+    }
+
+    #[inline]
+    pub const fn canonicalize_virtual_address(virt_addr: usize) -> usize {
+        // match virt_addr.get_bit(47) {
+        //     false => virt_addr.set_bits(48..64, 0),
+        //     true =>  virt_addr.set_bits(48..64, 0xffff),
+        // };
+
+        // The below code is semantically equivalent to the above, but it works in const functions.
+        ((virt_addr << 16) as isize >> 16) as usize
+    }
+
+    #[inline]
+    pub fn is_canonical_physical_address(phys_addr: usize) -> bool {
+        match phys_addr.get_bits(52..64) {
+            0 => true,
+            _ => false,
+        }
+    }
+
+    #[inline]
+    pub const fn canonicalize_physical_address(phys_addr: usize) -> usize {
+        phys_addr & 0x000F_FFFF_FFFF_FFFF
     }
 }
 
-#[cfg(target_arch = "x86_64")]
-#[inline]
-const fn canonicalize_virtual_address(virt_addr: usize) -> usize {
-    // match virt_addr.get_bit(47) {
-    //     false => virt_addr.set_bits(48..64, 0),
-    //     true =>  virt_addr.set_bits(48..64, 0xffff),
-    // };
+#[cfg(target_arch = "aarch64")]
+mod canonical_address {
+    use bit_field::BitField;
 
-    // The below code is semantically equivalent to the above, but it works in const functions.
-    ((virt_addr << 16) as isize >> 16) as usize
-}
-
-#[cfg(target_arch = "x86_64")]
-#[inline]
-fn is_canonical_physical_address(phys_addr: usize) -> bool {
-    match phys_addr.get_bits(52..64) {
-        0 => true,
-        _ => false,
+    // aarch64 doesn't have a concept of canonical VA
+    // so this always returns true
+    #[inline]
+    pub fn is_canonical_virtual_address(_virt_addr: usize) -> bool {
+        true
+    }
+    
+    // aarch64 doesn't have a concept of canonical VA
+    // so this returns the address as-is
+    #[inline]
+    pub const fn canonicalize_virtual_address(virt_addr: usize) -> usize {
+        virt_addr
+    }
+    
+    /// On aarch64, we configure the MMU to use 48-bit
+    /// physical addresses; "canonical" physical addresses
+    /// have the 16 most significant bits cleared.
+    #[inline]
+    pub fn is_canonical_physical_address(phys_addr: usize) -> bool {
+        match phys_addr.get_bits(48..64) {
+            0 => true,
+            _ => false,
+        }
+    }
+    
+    /// On aarch64, we configure the MMU to use 48-bit
+    /// physical addresses; "canonical" physical addresses
+    /// have the 16 most significant bits cleared.
+    #[inline]
+    pub const fn canonicalize_physical_address(phys_addr: usize) -> usize {
+        phys_addr & 0x0000_FFFF_FFFF_FFFF
     }
 }
 
-#[cfg(target_arch = "x86_64")]
-#[inline]
-const fn canonicalize_physical_address(phys_addr: usize) -> usize {
-    phys_addr & 0x000F_FFFF_FFFF_FFFF
-}
+use canonical_address::*;
 
 implement_address!(
     VirtualAddress,
