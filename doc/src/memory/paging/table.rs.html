@@ -140,6 +140,10 @@
 <span id="140">140</span>
 <span id="141">141</span>
 <span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -149,11 +153,12 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-</span><span class="kw">use </span><span class="kw">super</span>::PageTableEntry;
-<span class="kw">use </span>kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
-<span class="kw">use </span><span class="kw">super</span>::<span class="kw">super</span>::{VirtualAddress, EntryFlags};
-<span class="kw">use </span>core::ops::{Index, IndexMut};
+</span><span class="kw">use </span>core::ops::{Index, IndexMut};
 <span class="kw">use </span>core::marker::PhantomData;
+<span class="kw">use </span><span class="kw">super</span>::PageTableEntry;
+<span class="kw">use </span><span class="kw">crate</span>::VirtualAddress;
+<span class="kw">use </span>pte_flags::PteFlagsArch;
+<span class="kw">use </span>kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
 <span class="kw">use </span>zerocopy::FromBytes;
 
 
@@ -192,8 +197,8 @@
     /// if `self` is a P4-level `Table`, then this returns a P3-level `Table`,
     /// and so on for P3 -&gt; P3 and P2 -&gt; P1.
     </span><span class="kw">fn </span>next_table_address(<span class="kw-2">&amp;</span><span class="self">self</span>, index: usize) -&gt; <span class="prelude-ty">Option</span>&lt;VirtualAddress&gt; {
-        <span class="kw">let </span>entry_flags = <span class="self">self</span>[index].flags();
-        <span class="kw">if </span>entry_flags.contains(EntryFlags::PRESENT) &amp;&amp; !entry_flags.is_huge() {
+        <span class="kw">let </span>pte_flags = <span class="self">self</span>[index].flags();
+        <span class="kw">if </span>pte_flags.is_valid() &amp;&amp; !pte_flags.is_huge() {
             <span class="kw">let </span>table_address = <span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span>usize;
             <span class="kw">let </span>next_table_vaddr: usize = (table_address &lt;&lt; <span class="number">9</span>) | (index &lt;&lt; PAGE_SHIFT);
             <span class="prelude-val">Some</span>(VirtualAddress::new_canonical(next_table_vaddr))
@@ -226,13 +231,16 @@
     </span><span class="kw">pub fn </span>next_table_create(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         index: usize,
-        flags: EntryFlags,
+        flags: PteFlagsArch,
     ) -&gt; <span class="kw-2">&amp;mut </span>Table&lt;L::NextLevel&gt; {
         <span class="kw">if </span><span class="self">self</span>.next_table(index).is_none() {
             <span class="macro">assert!</span>(!<span class="self">self</span>[index].flags().is_huge(), <span class="string">&quot;mapping code does not support huge pages&quot;</span>);
             <span class="kw">let </span>af = frame_allocator::allocate_frames(<span class="number">1</span>).expect(<span class="string">&quot;next_table_create(): no frames available&quot;</span>);
-            <span class="self">self</span>[index].set_entry(af.as_allocated_frame(), flags.into_writable() | EntryFlags::PRESENT); <span class="comment">// must be PRESENT | WRITABLE for x86_64
-            </span><span class="self">self</span>.next_table_mut(index).unwrap().zero();
+            <span class="self">self</span>[index].set_entry(
+                af.as_allocated_frame(),
+                flags.valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>), <span class="comment">// must be valid and writable on x86_64
+            </span>);
+            <span class="self">self</span>.next_table_mut(index).unwrap().zero();
             core::mem::forget(af); <span class="comment">// we currently forget frames allocated as page table frames since we don&#39;t yet have a way to track them.
         </span>}
         <span class="self">self</span>.next_table_mut(index).unwrap()

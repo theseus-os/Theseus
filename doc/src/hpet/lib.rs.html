@@ -200,7 +200,7 @@
 <span class="kw">use </span>volatile::{Volatile, ReadOnly};
 <span class="kw">use </span>zerocopy::FromBytes;
 <span class="kw">use </span>spin::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
-<span class="kw">use </span>memory::{allocate_pages, allocate_frames_by_bytes_at, PageTable, PhysicalAddress, EntryFlags, BorrowedMappedPages, Mutable};
+<span class="kw">use </span>memory::{allocate_pages, allocate_frames_by_bytes_at, PageTable, PhysicalAddress, PteFlags, BorrowedMappedPages, Mutable};
 <span class="kw">use </span>sdt::{Sdt, GenericAddressStructure};
 <span class="kw">use </span>acpi_table::{AcpiTables, AcpiSignature};
 <span class="kw">use </span>static_assertions::const_assert_eq;
@@ -369,8 +369,8 @@
             .ok_or(<span class="string">&quot;Couldn&#39;t allocate pages for HPET&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let </span>hpet_mp = page_table.map_allocated_pages_to(
             pages,
-            frames, 
-            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
+            frames,
+            PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>).device_memory(<span class="bool-val">true</span>),
         )<span class="question-mark">?</span>;
 
         <span class="kw">let </span><span class="kw-2">mut </span>hpet = hpet_mp.into_borrowed_mut::&lt;Hpet&gt;(phys_addr.frame_offset())

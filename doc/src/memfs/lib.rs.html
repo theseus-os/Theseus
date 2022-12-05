@@ -177,7 +177,7 @@
 
 <span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>fs_node::{DirRef, WeakDirRef, File, FsNode};
-<span class="kw">use </span>memory::{MappedPages, get_kernel_mmi_ref, allocate_pages_by_bytes, EntryFlags};
+<span class="kw">use </span>memory::{MappedPages, get_kernel_mmi_ref, allocate_pages_by_bytes, PteFlags};
 <span class="kw">use </span>alloc::sync::Arc;
 <span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>fs_node::{FileOrDir, FileRef};
@@ -256,7 +256,7 @@
         </span><span class="kw">else </span>{
             <span class="comment">// If the mapped pages are empty (this is the first allocation), we make them writable
             </span><span class="kw">let </span>prev_flags = <span class="kw">if </span><span class="self">self</span>.mp.size_in_bytes() == <span class="number">0 </span>{
-                EntryFlags::WRITABLE
+                PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>).into()
             } 
             <span class="comment">// Otherwise, use the existing mapped pages flags
             </span><span class="kw">else </span>{

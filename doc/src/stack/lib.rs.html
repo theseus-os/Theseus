@@ -136,10 +136,6 @@
 <span id="136">136</span>
 <span id="137">137</span>
 <span id="138">138</span>
-<span id="139">139</span>
-<span id="140">140</span>
-<span id="141">141</span>
-<span id="142">142</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Provides the `Stack` type that represents a Task&#39;s stack 
 //! and functions for allocating new stacks. 
 
@@ -155,7 +151,7 @@
 <span class="kw">use </span>core::ops::{Deref, DerefMut};
 <span class="kw">use </span>kernel_config::memory::PAGE_SIZE;
 <span class="kw">use </span>memory_structs::VirtualAddress;
-<span class="kw">use </span>memory::{EntryFlags, MappedPages, Mapper};
+<span class="kw">use </span>memory::{PteFlags, MappedPages, Mapper};
 <span class="kw">use </span>page_allocator::AllocatedPages;
 
 
@@ -186,14 +182,10 @@
     <span class="kw">let </span>(guard_page, stack_pages) = pages.split(start_of_stack_pages).ok()<span class="question-mark">?</span>;
 
     <span class="comment">// For stack memory, the minimum required flag is WRITABLE.
-    </span><span class="kw">let </span>flags = EntryFlags::WRITABLE; 
-    <span class="comment">// if usermode { flags |= EntryFlags::USER_ACCESSIBLE; }
+    </span><span class="kw">let </span>flags = PteFlags::new().writable(<span class="bool-val">true</span>);
 
-    // Map stack pages to physical frames, leave the guard page unmapped.
-    </span><span class="kw">let </span>pages = <span class="kw">match </span>page_table.map_allocated_pages(
-        stack_pages, 
-        flags, 
-    ) {
+    <span class="comment">// Map stack pages to physical frames, leave the guard page unmapped.
+    </span><span class="kw">let </span>pages = <span class="kw">match </span>page_table.map_allocated_pages(stack_pages, flags) {
         <span class="prelude-val">Ok</span>(pages) =&gt; pages,
         <span class="prelude-val">Err</span>(e) =&gt; {
             <span class="macro">error!</span>(<span class="string">&quot;alloc_stack(): couldn&#39;t map pages for the new Stack, error: {}&quot;</span>, e);

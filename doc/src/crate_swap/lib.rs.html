@@ -1128,7 +1128,6 @@
     fmt,
     ops::Deref,
 };
-<span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>alloc::{
     borrow::Cow,
     collections::BTreeSet,
@@ -1136,8 +1135,9 @@
     sync::Arc,
     vec::Vec,
 };
+<span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>hashbrown::HashMap;
-<span class="kw">use </span>memory::{EntryFlags, MmiRef};
+<span class="kw">use </span>memory::MmiRef;
 <span class="kw">use </span>fs_node::{FsNode, FileOrDir, FileRef, DirRef};
 <span class="kw">use </span>mod_mgmt::{
     CrateNamespace,
@@ -1533,7 +1533,7 @@
                         <span class="kw">let </span><span class="kw-2">mut </span>target_sec_mapped_pages = target_sec.mapped_pages.lock();
                         <span class="kw">let </span>target_sec_initial_flags = target_sec_mapped_pages.flags();
                         <span class="kw">if </span>!target_sec_initial_flags.is_writable() {
-                            target_sec_mapped_pages.remap(<span class="kw-2">&amp;mut </span>kernel_mmi_ref.lock().page_table, target_sec_initial_flags | EntryFlags::WRITABLE)<span class="question-mark">?</span>;
+                            target_sec_mapped_pages.remap(<span class="kw-2">&amp;mut </span>kernel_mmi_ref.lock().page_table, target_sec_initial_flags.writable(<span class="bool-val">true</span>))<span class="question-mark">?</span>;
                         }
 
                         write_relocation(

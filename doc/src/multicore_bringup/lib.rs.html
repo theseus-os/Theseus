@@ -410,6 +410,7 @@
 <span id="410">410</span>
 <span id="411">411</span>
 <span id="412">412</span>
+<span id="413">413</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Functions for initializing and bringing up other CPU cores. 
 //! 
 //! These functions are intended to be invoked from the main core
@@ -440,7 +441,7 @@
 <span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>volatile::Volatile;
 <span class="kw">use </span>zerocopy::FromBytes;
-<span class="kw">use </span>memory::{VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, MmiRef};
+<span class="kw">use </span>memory::{VirtualAddress, PhysicalAddress, MappedPages, PteFlags, MmiRef};
 <span class="kw">use </span>kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
 <span class="kw">use </span>apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id, cpu_count};
 <span class="kw">use </span>ap_start::{kstart_ap, AP_READY_FLAG};
@@ -565,15 +566,16 @@
         <span class="kw">let </span>ap_startup_pages  = memory::allocate_pages_at(VirtualAddress::new_canonical(AP_STARTUP), ap_startup_frames.size_in_frames())
             .map_err(|_e| <span class="string">&quot;handle_ap_cores(): failed to allocate AP startup pages&quot;</span>)<span class="question-mark">?</span>;
         
+        <span class="kw">let </span>flags = PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>);
         trampoline_mapped_pages = page_table.map_allocated_pages_to(
             trampoline_page, 
             trampoline_frame, 
-            EntryFlags::PRESENT | EntryFlags::WRITABLE, 
+            flags,
         )<span class="question-mark">?</span>;
         ap_startup_mapped_pages = page_table.map_allocated_pages_to(
             ap_startup_pages,
             ap_startup_frames,
-            EntryFlags::PRESENT | EntryFlags::WRITABLE,
+            flags,
         )<span class="question-mark">?</span>;
         page_table_phys_addr = page_table.physical_address();
     }

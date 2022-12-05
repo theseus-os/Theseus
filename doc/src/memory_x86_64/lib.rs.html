@@ -370,11 +370,19 @@
 <span id="370">370</span>
 <span id="371">371</span>
 <span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
-//! `memory` uses this crate to get the memory layout and do other arch-specific operations on x86_64.  
-//! 
-//! This is the top-level arch-specific memory crate. 
-//! All arch-specific definitions for memory system are exported from this crate.
+//!
+//! The `memory` crate uses this crate to obtain the multiboot2-provided memory layout
+//! of the base kernel image (nano_core), and to do other arch-specific operations on x86_64.
 
 </span><span class="attr">#![no_std]
 #![feature(ptr_internals)]
@@ -384,11 +392,11 @@
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
 <span class="kw">extern crate </span>kernel_config;
 <span class="kw">extern crate </span>memory_structs;
-<span class="kw">extern crate </span>entryflags_x86_64;
+<span class="kw">extern crate </span>pte_flags;
 <span class="kw">extern crate </span>x86_64;
 
 <span class="kw">pub use </span>multiboot2::BootInformation;
-<span class="kw">pub use </span>entryflags_x86_64::{EntryFlags, PAGE_TABLE_ENTRY_FRAME_MASK};
+<span class="kw">use </span>pte_flags::PteFlags;
 
 <span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
 <span class="kw">use </span>memory_structs::{PhysicalAddress, VirtualAddress};
@@ -471,7 +479,7 @@
     <span class="doccomment">/// The ending virtual address and physical address.
     </span><span class="kw">pub </span>end: (VirtualAddress, PhysicalAddress),
     <span class="doccomment">/// The page table entry flags that should be used for mapping this section.
-    </span><span class="kw">pub </span>flags: EntryFlags,
+    </span><span class="kw">pub </span>flags: PteFlags,
 }
 
 <span class="doccomment">/// The address bounds and flags of the initial kernel sections that need mapping. 
@@ -521,9 +529,9 @@
     <span class="kw">let </span><span class="kw-2">mut </span>page_table_start:  <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>page_table_end:    <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
 
-    <span class="kw">let </span><span class="kw-2">mut </span>text_flags:        <span class="prelude-ty">Option</span>&lt;EntryFlags&gt; = <span class="prelude-val">None</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>rodata_flags:      <span class="prelude-ty">Option</span>&lt;EntryFlags&gt; = <span class="prelude-val">None</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>data_flags:        <span class="prelude-ty">Option</span>&lt;EntryFlags&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>text_flags:        <span class="prelude-ty">Option</span>&lt;PteFlags&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>rodata_flags:      <span class="prelude-ty">Option</span>&lt;PteFlags&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>data_flags:        <span class="prelude-ty">Option</span>&lt;PteFlags&gt; = <span class="prelude-val">None</span>;
 
     <span class="kw">let </span><span class="kw-2">mut </span>sections_memory_bounds: [<span class="prelude-ty">Option</span>&lt;SectionMemoryBounds&gt;; <span class="number">32</span>] = Default::default();
 
@@ -538,7 +546,7 @@
         }
 
         <span class="macro">debug!</span>(<span class="string">&quot;Looking at loaded section {} at {:#X}, size {:#X}&quot;</span>, section.name(), section.start_address(), section.size());
-        <span class="kw">let </span>flags = EntryFlags::from_multiboot2_section_flags(<span class="kw-2">&amp;</span>section) | EntryFlags::GLOBAL;
+        <span class="kw">let </span>flags = convert_to_pte_flags(<span class="kw-2">&amp;</span>section);
 
         <span class="comment">// even though the linker stipulates that the kernel sections have a higher-half virtual address,
         // they are still loaded at a lower physical address, in which phys_addr = virt_addr - KERNEL_OFFSET.
@@ -710,16 +718,17 @@
 
 <span class="doccomment">/// Gets the physical memory occupied by vga.
 /// 
-/// Returns (start_physical_address, size, entryflags). 
+/// Returns (start_physical_address, size, PteFlags). 
 </span><span class="kw">pub fn </span>get_vga_mem_addr(
-) -&gt; <span class="prelude-ty">Result</span>&lt;(PhysicalAddress, usize, EntryFlags), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;(PhysicalAddress, usize, PteFlags), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">const </span>VGA_DISPLAY_PHYS_START: usize = <span class="number">0xA_0000</span>;
     <span class="kw">const </span>VGA_DISPLAY_PHYS_END: usize = <span class="number">0xC_0000</span>;
     <span class="kw">let </span>vga_size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
-    <span class="kw">let </span>vga_display_flags =
-        EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
-
-    <span class="prelude-val">Ok</span>((
+    <span class="kw">let </span>vga_display_flags = PteFlags::new()
+        .valid(<span class="bool-val">true</span>)
+        .writable(<span class="bool-val">true</span>)
+        .device_memory(<span class="bool-val">true</span>); <span class="comment">// TODO: set as write-combining (WC)
+    </span><span class="prelude-val">Ok</span>((
         PhysicalAddress::new(VGA_DISPLAY_PHYS_START).ok_or(<span class="string">&quot;invalid VGA starting physical address&quot;</span>)<span class="question-mark">?</span>,
         vga_size_in_bytes,
         vga_display_flags,
@@ -741,6 +750,15 @@
     PhysicalAddress::new_canonical(
         Cr3::read_raw().<span class="number">0</span>.start_address().as_u64() <span class="kw">as </span>usize
     )
+}
+
+<span class="doccomment">/// Converts the given multiboot2 section&#39;s flags into `PteFlags`.
+</span><span class="kw">fn </span>convert_to_pte_flags(section: <span class="kw-2">&amp;</span>multiboot2::ElfSection) -&gt; PteFlags {
+    <span class="kw">use </span>multiboot2::ElfSectionFlags;
+    PteFlags::new()
+        .valid(section.flags().contains(ElfSectionFlags::ALLOCATED))
+        .writable(section.flags().contains(ElfSectionFlags::WRITABLE))
+        .executable(section.flags().contains(ElfSectionFlags::EXECUTABLE))
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="memory_x86_64" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

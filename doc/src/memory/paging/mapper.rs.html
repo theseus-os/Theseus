@@ -1251,6 +1251,8 @@
 <span id="1251">1251</span>
 <span id="1252">1252</span>
 <span id="1253">1253</span>
+<span id="1254">1254</span>
+<span id="1255">1255</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -1271,17 +1273,20 @@
     ptr::{NonNull, Unique},
     slice,
 };
-<span class="kw">use </span>{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames}; 
-<span class="kw">use </span>paging::{
+<span class="kw">use </span>log::{error, warn, debug, trace};
+<span class="kw">use crate</span>::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames}; 
+<span class="kw">use </span><span class="kw">crate</span>::paging::{
     get_current_p4,
     PageRange,
     table::{P4, Table, Level4},
 };
+<span class="kw">use </span>pte_flags::PteFlagsArch;
 <span class="kw">use </span>spin::Once;
 <span class="kw">use </span>kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
-<span class="kw">use super</span>::{EntryFlags, tlb_flush_virt_addr};
+<span class="kw">use </span><span class="kw">super</span>::tlb_flush_virt_addr;
 <span class="kw">use </span>zerocopy::FromBytes;
 <span class="kw">use </span>page_table_entry::UnmapResult;
+<span class="kw">use </span>owned_borrowed_trait::{OwnedOrBorrowed, Owned, Borrowed};
 
 <span class="doccomment">/// This is a private callback used to convert `UnmappedFrames` into `AllocatedFrames`.
 /// 
@@ -1329,7 +1334,7 @@
     }
 
     <span class="doccomment">/// Dumps all page table entries at all four page table levels for the given `VirtualAddress`, 
-    /// and also shows their `EntryFlags`.
+    /// and also shows their `PteFlags`.
     /// 
     /// The page table details are written to the the given `writer`.
     </span><span class="kw">pub fn </span>dump_pte&lt;W: Write&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, writer: <span class="kw-2">&amp;mut </span>W, virtual_address: VirtualAddress) -&gt; fmt::Result {
@@ -1369,7 +1374,8 @@
     </span><span class="kw">pub fn </span>translate_page(<span class="kw-2">&amp;</span><span class="self">self</span>, page: Page) -&gt; <span class="prelude-ty">Option</span>&lt;Frame&gt; {
         <span class="kw">let </span>p3 = <span class="self">self</span>.p4().next_table(page.p4_index());
 
-        <span class="kw">let </span>huge_page = || {
+        <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+        </span><span class="kw">let </span>huge_page = || {
             p3.and_then(|p3| {
                 <span class="kw">let </span>p3_entry = <span class="kw-2">&amp;</span>p3[page.p3_index()];
                 <span class="comment">// 1GiB page?
@@ -1398,6 +1404,8 @@
                 <span class="prelude-val">None
             </span>})
         };
+        <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+        </span><span class="kw">let </span>huge_page = || { <span class="macro">todo!</span>(<span class="string">&quot;huge page (block descriptor) translation for aarch64&quot;</span>) };
 
         p3.and_then(|p3| p3.next_table(page.p3_index()))
             .and_then(|p2| p2.next_table(page.p2_index()))
@@ -1411,33 +1419,42 @@
     /// 
     /// Returns a tuple of the new `MappedPages` object containing the allocated `pages`
     /// and the allocated `frames` object.
-    </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>internal_map_to(
+    </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>internal_map_to&lt;Frames, Flags&gt;(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         pages: AllocatedPages,
-        frames: AllocatedFrames,
-        flags: EntryFlags,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;(MappedPages, AllocatedFrames), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>top_level_flags = flags.clone() | EntryFlags::PRESENT;
-        <span class="comment">// P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
-        // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
-        </span>top_level_flags.set(EntryFlags::NO_EXECUTE, <span class="bool-val">false</span>);
-        <span class="comment">// Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
-        // because another page table frame may re-use (create another alias for) it without us knowing here.
-        // Only the lowest-level P1 entry can be considered exclusive, only if it&#39;s mapped truly exclusively using this function.
-        </span>top_level_flags.set(EntryFlags::EXCLUSIVE, <span class="bool-val">false</span>);
-        <span class="kw">let </span>actual_flags = flags | EntryFlags::EXCLUSIVE | EntryFlags::PRESENT;
+        frames: Frames,
+        flags: Flags,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(MappedPages, Frames::Inner), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; 
+    <span class="kw">where
+        </span>Frames: OwnedOrBorrowed&lt;AllocatedFrames&gt;,
+        Flags: Into&lt;PteFlagsArch&gt;,
+    {
+        <span class="kw">let </span>frames = frames.into_inner();
+        <span class="kw">let </span>flags = flags.into();
+        <span class="kw">let </span>top_level_flags = flags.valid(<span class="bool-val">true</span>)
+            <span class="comment">// P4, P3, and P2 entries should never set NOT_EXECUTABLE; only the lowest-level P1 entry should.
+            </span>.executable(<span class="bool-val">true</span>)
+            <span class="comment">// Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
+            // because another page table frame may re-use (create another alias for) it without us knowing here.
+            </span>.exclusive(<span class="bool-val">false</span>);
+
+        <span class="comment">// Only the lowest-level P1 entry can be considered exclusive, and only when
+        // we are mapping it exclusively (i.e., owned `AllocatedFrames` are passed in).
+        </span><span class="kw">let </span>actual_flags = flags
+            .valid(<span class="bool-val">true</span>)
+            .exclusive(Frames::OWNED);
 
         <span class="kw">let </span>pages_count = pages.size_in_pages();
-        <span class="kw">let </span>frames_count = frames.size_in_frames();
+        <span class="kw">let </span>frames_count = frames.borrow().size_in_frames();
         <span class="kw">if </span>pages_count != frames_count {
             <span class="macro">error!</span>(<span class="string">&quot;map_allocated_pages_to(): pages {:?} count {} must equal frames {:?} count {}!&quot;</span>, 
-                pages, pages_count, frames, frames_count
+                pages, pages_count, frames.borrow(), frames_count
             );
             <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;map_allocated_pages_to(): page count must equal frame count&quot;</span>);
         }
 
         <span class="comment">// iterate over pages and frames in lockstep
-        </span><span class="kw">for </span>(page, frame) <span class="kw">in </span>pages.deref().clone().into_iter().zip(frames.into_iter()) {
+        </span><span class="kw">for </span>(page, frame) <span class="kw">in </span>pages.deref().clone().into_iter().zip(frames.borrow().into_iter()) {
             <span class="kw">let </span>p3 = <span class="self">self</span>.p4_mut().next_table_create(page.p4_index(), top_level_flags);
             <span class="kw">let </span>p2 = p3.next_table_create(page.p3_index(), top_level_flags);
             <span class="kw">let </span>p1 = p2.next_table_create(page.p2_index(), top_level_flags);
@@ -1464,13 +1481,13 @@
     <span class="doccomment">/// Maps the given virtual `AllocatedPages` to the given physical `AllocatedFrames`.
     /// 
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
-    </span><span class="kw">pub fn </span>map_allocated_pages_to(
+    </span><span class="kw">pub fn </span>map_allocated_pages_to&lt;F: Into&lt;PteFlagsArch&gt;&gt;(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         pages: AllocatedPages,
         frames: AllocatedFrames,
-        flags: EntryFlags,
+        flags: F,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="kw">let </span>(mapped_pages, frames) = <span class="self">self</span>.internal_map_to(pages, frames, flags)<span class="question-mark">?</span>;
+        <span class="kw">let </span>(mapped_pages, frames) = <span class="self">self</span>.internal_map_to(pages, Owned(frames), flags)<span class="question-mark">?</span>;
         
         <span class="comment">// Currently we forget the actual `AllocatedFrames` object because
         // there is no easy/efficient way to store a dynamic list of non-contiguous frames (would require Vec).
@@ -1485,18 +1502,25 @@
     <span class="doccomment">/// Maps the given `AllocatedPages` to randomly chosen (allocated) physical frames.
     /// 
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
-    </span><span class="kw">pub fn </span>map_allocated_pages(<span class="kw-2">&amp;mut </span><span class="self">self</span>, pages: AllocatedPages, flags: EntryFlags)
-        -&gt; <span class="prelude-ty">Result</span>&lt;MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
-    {
-        <span class="kw">let </span><span class="kw-2">mut </span>top_level_flags = flags.clone() | EntryFlags::PRESENT;
-        <span class="comment">// P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
-        // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
-        </span>top_level_flags.set(EntryFlags::NO_EXECUTE, <span class="bool-val">false</span>);
-        <span class="comment">// Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
-        // because another page table frame may re-use (create another alias for) it without us knowing here.
-        // Only the lowest-level P1 entry can be considered exclusive, only if it&#39;s mapped truly exclusively using this function.
-        </span>top_level_flags.set(EntryFlags::EXCLUSIVE, <span class="bool-val">false</span>);
-        <span class="kw">let </span>actual_flags = flags | EntryFlags::EXCLUSIVE | EntryFlags::PRESENT;
+    </span><span class="kw">pub fn </span>map_allocated_pages&lt;F: Into&lt;PteFlagsArch&gt;&gt;(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        pages: AllocatedPages,
+        flags: F,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>flags = flags.into();
+        <span class="kw">let </span>top_level_flags = flags
+        <span class="comment">// P4, P3, and P2 entries should never set NOT_EXECUTABLE; only the lowest-level P1 entry should.
+            </span>.executable(<span class="bool-val">true</span>)
+            <span class="comment">// Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
+            // because another page table frame may re-use (create another alias for) it without us knowing here.
+            </span>.exclusive(<span class="bool-val">false</span>)
+            .valid(<span class="bool-val">true</span>);
+
+        <span class="comment">// Only the lowest-level P1 entry can be considered exclusive, and only when
+        // we are mapping it exclusively (i.e., owned `AllocatedFrames` are passed in).
+        </span><span class="kw">let </span>actual_flags = flags
+            .exclusive(<span class="bool-val">true</span>)
+            .valid(<span class="bool-val">true</span>);
 
         <span class="kw">for </span>page <span class="kw">in </span>pages.deref().clone() {
             <span class="kw">let </span>af = frame_allocator::allocate_frames(<span class="number">1</span>).ok_or(<span class="string">&quot;map_allocated_pages(): couldn&#39;t allocate new frame, out of memory&quot;</span>)<span class="question-mark">?</span>;
@@ -1535,54 +1559,23 @@
     /// in which only one virtual page can map to a given physical frame,
     /// which preserves Rust&#39;s knowledge of language-level aliasing and thus its safety checks.
     ///
-    /// As such, the pages mapped here will be marked as non-`EXCLUSIVE`, regardless of the `flags` passed in.
+    /// As such, the pages mapped here will be marked as non-exclusive,
+    /// regardless of the `flags` passed in.
+    /// This means that the `frames` they map will NOT be deallocated upon unmapping.
     /// 
-    /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
+    /// Consumes the given `AllocatedPages` and returns a `MappedPages` object
+    /// which contains those `AllocatedPages`.
     </span><span class="attr">#[doc(hidden)]
-    </span><span class="kw">pub unsafe fn </span>map_to_non_exclusive(mapper: <span class="kw-2">&amp;mut </span><span class="self">Self</span>, pages: AllocatedPages, frames: <span class="kw-2">&amp;</span>AllocatedFrames, flags: EntryFlags)
-        -&gt; <span class="prelude-ty">Result</span>&lt;MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
-    {
-        <span class="kw">let </span><span class="kw-2">mut </span>top_level_flags = flags.clone() | EntryFlags::PRESENT;
-        <span class="comment">// P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
-        // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
-        </span>top_level_flags.set(EntryFlags::NO_EXECUTE, <span class="bool-val">false</span>);
-        <span class="comment">// Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
-        // because another page table frame may re-use (create another alias for) it without us knowing here.
-        </span>top_level_flags.set(EntryFlags::EXCLUSIVE, <span class="bool-val">false</span>);
-        <span class="comment">// In fact, in this function, none of the frames can be mapped as exclusive
-        // because we&#39;re not accepting the `AllocatedFrames` type. 
-        </span><span class="kw">let </span><span class="kw-2">mut </span>actual_flags = flags | EntryFlags::PRESENT;
-        actual_flags.set(EntryFlags::EXCLUSIVE, <span class="bool-val">false</span>);
-        
-
-        <span class="kw">let </span>pages_count = pages.size_in_pages();
-        <span class="kw">let </span>frames_count = frames.size_in_frames();
-        <span class="kw">if </span>pages_count != frames_count {
-            <span class="macro">error!</span>(<span class="string">&quot;map_to_non_exclusive(): pages {:?} count {} must equal frames {:?} count {}!&quot;</span>, 
-                pages, pages_count, frames, frames_count
-            );
-            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;map_to_non_exclusive(): page count must equal frame count&quot;</span>);
-        }
-
-        <span class="comment">// iterate over pages and frames in lockstep
-        </span><span class="kw">for </span>(page, frame) <span class="kw">in </span>pages.deref().clone().into_iter().zip(frames.into_iter()) {
-            <span class="kw">let </span>p3 = mapper.p4_mut().next_table_create(page.p4_index(), top_level_flags);
-            <span class="kw">let </span>p2 = p3.next_table_create(page.p3_index(), top_level_flags);
-            <span class="kw">let </span>p1 = p2.next_table_create(page.p2_index(), top_level_flags);
-
-            <span class="kw">if </span>!p1[page.p1_index()].is_unused() {
-                <span class="macro">error!</span>(<span class="string">&quot;map_to_non_exclusive(): page {:#X} -&gt; frame {:#X}, page was already in use!&quot;</span>, page.start_address(), frame.start_address());
-                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;map_to_non_exclusive(): page was already in use&quot;</span>);
-            } 
-
-            p1[page.p1_index()].set_entry(frame, actual_flags);
-        }
-
-        <span class="prelude-val">Ok</span>(MappedPages {
-            page_table_p4: mapper.target_p4.clone(),
-            pages,
-            flags: actual_flags,
-        })
+    </span><span class="kw">pub unsafe fn </span>map_to_non_exclusive&lt;F: Into&lt;PteFlagsArch&gt;&gt;(
+        mapper: <span class="kw-2">&amp;mut </span><span class="self">Self</span>,
+        pages: AllocatedPages,
+        frames: <span class="kw-2">&amp;</span>AllocatedFrames,
+        flags: F,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="comment">// In this function, none of the frames can be mapped as exclusive
+        // because we&#39;re accepting a *reference* to an `AllocatedFrames`, not consuming it.
+        </span>mapper.internal_map_to(pages, Borrowed(frames), flags)
+            .map(|(mp, _af)| mp)
     }
 }
 
@@ -1601,8 +1594,8 @@
     </span>page_table_p4: Frame,
     <span class="doccomment">/// The range of allocated virtual pages contained by this mapping.
     </span>pages: AllocatedPages,
-    <span class="comment">// The EntryFlags that define the page permissions of this mapping
-    </span>flags: EntryFlags,
+    <span class="comment">// The PTE flags that define the page permissions of this mapping.
+    </span>flags: PteFlagsArch,
 }
 <span class="kw">impl </span>Deref <span class="kw">for </span>MappedPages {
     <span class="kw">type </span>Target = PageRange;
@@ -1618,12 +1611,12 @@
         MappedPages {
             page_table_p4: Frame::containing_address(PhysicalAddress::zero()),
             pages: AllocatedPages::empty(),
-            flags: EntryFlags::zero(),
+            flags: PteFlagsArch::new(),
         }
     }
 
     <span class="doccomment">/// Returns the flags that describe this `MappedPages` page table permissions.
-    </span><span class="kw">pub fn </span>flags(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; EntryFlags {
+    </span><span class="kw">pub fn </span>flags(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PteFlagsArch {
         <span class="self">self</span>.flags
     }
 
@@ -1725,19 +1718,23 @@
     /// 
     /// Returns a new `MappedPages` object with the same in-memory contents
     /// as this object, but at a completely new memory region.
-    </span><span class="kw">pub fn </span>deep_copy(<span class="kw-2">&amp;</span><span class="self">self</span>, new_flags: <span class="prelude-ty">Option</span>&lt;EntryFlags&gt;, active_table_mapper: <span class="kw-2">&amp;mut </span>Mapper) -&gt; <span class="prelude-ty">Result</span>&lt;MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    </span><span class="kw">pub fn </span>deep_copy&lt;F: Into&lt;PteFlagsArch&gt;&gt;(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        active_table_mapper: <span class="kw-2">&amp;mut </span>Mapper,
+        new_flags: <span class="prelude-ty">Option</span>&lt;F&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="macro">warn!</span>(<span class="string">&quot;MappedPages::deep_copy() has not been adequately tested yet.&quot;</span>);
         <span class="kw">let </span>size_in_pages = <span class="self">self</span>.size_in_pages();
 
-        <span class="kw">use </span>paging::allocate_pages;
+        <span class="kw">use </span><span class="kw">crate</span>::paging::allocate_pages;
         <span class="kw">let </span>new_pages = allocate_pages(size_in_pages).ok_or_else(|| <span class="string">&quot;Couldn&#39;t allocate_pages()&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// we must temporarily map the new pages as Writable, since we&#39;re about to copy data into them
-        </span><span class="kw">let </span>new_flags = new_flags.unwrap_or(<span class="self">self</span>.flags);
+        </span><span class="kw">let </span>new_flags = new_flags.map_or(<span class="self">self</span>.flags, Into::into);
         <span class="kw">let </span>needs_remapping = !new_flags.is_writable(); 
         <span class="kw">let </span><span class="kw-2">mut </span>new_mapped_pages = active_table_mapper.map_allocated_pages(
             new_pages, 
-            new_flags | EntryFlags::WRITABLE, <span class="comment">// force writable
+            new_flags.writable(<span class="bool-val">true</span>), <span class="comment">// force writable
         </span>)<span class="question-mark">?</span>;
 
         <span class="comment">// perform the actual copy of in-memory content
@@ -1757,16 +1754,23 @@
     }
 
     
-    <span class="doccomment">/// Change the permissions (`new_flags`) of this `MappedPages`&#39;s page table entries.
+    <span class="doccomment">/// Change the mapping flags of this `MappedPages`&#39;s page table entries.
     ///
     /// Note that attempting to change certain &quot;reserved&quot; flags will have no effect. 
-    /// For example, arbitrarily setting the `EXCLUSIVE` bit would cause unsafety, so it cannot be changed.
-    </span><span class="kw">pub fn </span>remap(<span class="kw-2">&amp;mut </span><span class="self">self</span>, active_table_mapper: <span class="kw-2">&amp;mut </span>Mapper, new_flags: EntryFlags) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    /// For example, the `EXCLUSIVE` flag cannot be changed beause arbitrarily setting it
+    /// would violate safety.
+    </span><span class="kw">pub fn </span>remap&lt;F: Into&lt;PteFlagsArch&gt;&gt;(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        active_table_mapper: <span class="kw-2">&amp;mut </span>Mapper,
+        new_flags: F,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">if </span><span class="self">self</span>.size_in_pages() == <span class="number">0 </span>{ <span class="kw">return </span><span class="prelude-val">Ok</span>(()); }
 
-        <span class="comment">// Use the existing value of the `EXCLUSIVE` flag rather than whatever value was passed in.
-        </span><span class="kw">let </span><span class="kw-2">mut </span>new_flags = new_flags;
-        new_flags.set(EntryFlags::EXCLUSIVE, <span class="self">self</span>.flags.is_exclusive());
+        <span class="comment">// Use the existing value of the `EXCLUSIVE` flag, ignoring whatever value was passed in.
+        // Also ensure these flags are PRESENT (valid), since they are currently being mapped.
+        </span><span class="kw">let </span>new_flags = new_flags.into()
+            .exclusive(<span class="self">self</span>.flags.is_exclusive())
+            .valid(<span class="bool-val">true</span>);
 
         <span class="kw">if </span>new_flags == <span class="self">self</span>.flags {
             <span class="macro">trace!</span>(<span class="string">&quot;remap(): new_flags were the same as existing flags, doing nothing.&quot;</span>);
@@ -1780,7 +1784,7 @@
                 .and_then(|p2| p2.next_table_mut(page.p2_index()))
                 .ok_or(<span class="string">&quot;mapping code does not support huge pages&quot;</span>)<span class="question-mark">?</span>;
             
-            p1[page.p1_index()].set_flags(new_flags | EntryFlags::PRESENT);
+            p1[page.p1_index()].set_flags(new_flags);
 
             tlb_flush_virt_addr(page.start_address());
         }

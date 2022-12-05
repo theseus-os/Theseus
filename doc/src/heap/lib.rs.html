@@ -96,6 +96,10 @@
 <span id="96">96</span>
 <span id="97">97</span>
 <span id="98">98</span>
+<span id="99">99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global allocator for the system. 
 //! It starts off as a single fixed size allocator.
 //! When a more complex heap is set up, it is set as the default allocator.
@@ -111,7 +115,7 @@
 <span class="kw">extern crate </span>block_allocator;
 
 <span class="kw">use </span>alloc::alloc::{GlobalAlloc, Layout};
-<span class="kw">use </span>memory::EntryFlags;
+<span class="kw">use </span>memory::PteFlags;
 <span class="kw">use </span>kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
 <span class="kw">use </span>spin::Once;
@@ -133,8 +137,12 @@
 /// Currently it is initialized with an instance of `MultipleHeaps`.
 </span><span class="kw">static </span>DEFAULT_ALLOCATOR: Once&lt;Box&lt;<span class="kw">dyn </span>GlobalAlloc + Send + Sync&gt;&gt; = Once::new();
 
-<span class="doccomment">/// The heap mapped pages should be writable
-</span><span class="kw">pub const </span>HEAP_FLAGS: EntryFlags = EntryFlags::WRITABLE;
+<span class="doccomment">/// The heap mapped pages should be writable and non-executable.
+</span><span class="kw">pub const </span>HEAP_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    PteFlags::new().bits()
+    | PteFlags::VALID.bits()
+    | PteFlags::WRITABLE.bits()
+);
 
 <span class="doccomment">/// The ending address of the initial heap. It is used to determine which heap should be used during deallocation.
 </span><span class="kw">const </span>INITIAL_HEAP_END_ADDR: usize = KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE;

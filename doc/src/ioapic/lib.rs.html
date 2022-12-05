@@ -177,7 +177,7 @@
 <span class="kw">use </span>spin::{Mutex, MutexGuard};
 <span class="kw">use </span>volatile::{Volatile, WriteOnly};
 <span class="kw">use </span>zerocopy::FromBytes;
-<span class="kw">use </span>memory::{PageTable, PhysicalAddress, EntryFlags, allocate_pages, allocate_frames_at, BorrowedMappedPages, Mutable};
+<span class="kw">use </span>memory::{PageTable, PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at, BorrowedMappedPages, Mutable};
 <span class="kw">use </span>atomic_linked_list::atomic_map::AtomicMap;
 
 
@@ -243,7 +243,7 @@
         <span class="kw">let </span>ioapic_mapped_page = page_table.map_allocated_pages_to(
             new_page,
             frame, 
-            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
+            PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>).device_memory(<span class="bool-val">true</span>),
         )<span class="question-mark">?</span>;
 
         <span class="kw">let </span>ioapic_regs = ioapic_mapped_page.into_borrowed_mut(<span class="number">0</span>).map_err(|(_mp, err)| err)<span class="question-mark">?</span>;

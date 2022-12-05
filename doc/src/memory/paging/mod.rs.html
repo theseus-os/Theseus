@@ -377,6 +377,17 @@
 <span id="377">377</span>
 <span id="378">378</span>
 <span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -407,10 +418,12 @@
     ops::{Deref, DerefMut},
     fmt,
 };
+<span class="kw">use </span>log::debug;
 <span class="kw">use super</span>::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
-    AllocatedPages, allocate_pages, AllocatedFrames, EntryFlags,
+    AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
     tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
     get_vga_mem_addr, KERNEL_OFFSET};
+<span class="kw">use </span>pte_flags::PteFlagsArch;
 <span class="kw">use </span>no_drop::NoDrop;
 <span class="kw">use </span>kernel_config::memory::{RECURSIVE_P4_INDEX};
 <span class="comment">// use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
@@ -480,7 +493,10 @@
         <span class="kw">let </span><span class="kw-2">mut </span>temporary_page = TemporaryPage::create_and_map_table_frame(page, new_p4_frame, current_page_table)<span class="question-mark">?</span>;
         temporary_page.with_table_and_frame(|table, frame| {
             table.zero();
-            table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            table[RECURSIVE_P4_INDEX].set_entry(
+                frame.as_allocated_frame(),
+                PteFlagsArch::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>),
+            );
         })<span class="question-mark">?</span>;
 
         <span class="kw">let </span>(_temp_page, inited_new_p4_frame) = temporary_page.unmap_into_parts(current_page_table)<span class="question-mark">?</span>;
@@ -515,7 +531,10 @@
         <span class="kw">let </span><span class="kw-2">mut </span>temporary_page = TemporaryPage::create_and_map_table_frame(<span class="prelude-val">None</span>, this_p4, <span class="self">self</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// overwrite recursive mapping
-        </span><span class="self">self</span>.p4_mut()[RECURSIVE_P4_INDEX].set_entry(other_table.p4_table.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
+        </span><span class="self">self</span>.p4_mut()[RECURSIVE_P4_INDEX].set_entry(
+            other_table.p4_table.as_allocated_frame(),
+            PteFlagsArch::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>),
+        );
         tlb_flush_all();
 
         <span class="comment">// set mapper&#39;s target frame to reflect that future mappings will be mapped into the other_table
@@ -529,7 +548,10 @@
 
         <span class="comment">// restore recursive mapping to original p4 table
         </span>temporary_page.with_table_and_frame(|p4_table, frame| {
-            p4_table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            p4_table[RECURSIVE_P4_INDEX].set_entry(
+                frame.as_allocated_frame(),
+                PteFlagsArch::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>),
+            );
         })<span class="question-mark">?</span>;
         tlb_flush_all();
 
@@ -722,7 +744,7 @@
         boot_info_mapped_pages = <span class="prelude-val">Some</span>(mapper.map_allocated_pages_to(
             boot_info_pages,
             boot_info_frames,
-            EntryFlags::PRESENT,
+            PteFlags::new(),
         )<span class="question-mark">?</span>);
 
         <span class="macro">debug!</span>(<span class="string">&quot;identity_mapped_pages: {:?}&quot;</span>, <span class="kw-2">&amp;</span>identity_mapped_pages[..index]);

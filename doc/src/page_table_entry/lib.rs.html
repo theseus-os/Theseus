@@ -153,8 +153,7 @@
 
 </span><span class="kw">use </span>core::ops::Deref;
 <span class="kw">use </span>memory_structs::{Frame, FrameRange, PhysicalAddress};
-<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-</span><span class="kw">use </span>memory_x86_64::{ PAGE_TABLE_ENTRY_FRAME_MASK, EntryFlags};
+<span class="kw">use </span>pte_flags::{PteFlagsArch, PTE_FRAME_MASK};
 <span class="kw">use </span>bit_field::BitField;
 <span class="kw">use </span>kernel_config::memory::PAGE_SHIFT;
 <span class="kw">use </span>zerocopy::FromBytes;
@@ -163,7 +162,7 @@
 <span class="doccomment">/// A page table entry, which is a `u64` value under the hood.
 ///
 /// It contains a the physical address of the `Frame` being mapped by this entry
-/// and the access bits (encoded `EntryFlags`) that describes how it&#39;s mapped,
+/// and the access bits (encoded `PteFlags`) that describes how it&#39;s mapped,
 /// e.g., readable, writable, no exec, etc.
 ///
 /// There isn&#39;t and shouldn&#39;t be any way to create/instantiate a new `PageTableEntry` directly.
@@ -206,14 +205,14 @@
     }
 
     <span class="doccomment">/// Returns this `PageTableEntry`&#39;s flags.
-    </span><span class="kw">pub fn </span>flags(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; EntryFlags {
-        EntryFlags::from_bits_truncate(<span class="self">self</span>.<span class="number">0</span>)
+    </span><span class="kw">pub fn </span>flags(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PteFlagsArch {
+        PteFlagsArch::from_bits_truncate(<span class="self">self</span>.<span class="number">0</span>)
     }
 
     <span class="doccomment">/// Returns the physical `Frame` pointed to (mapped by) this `PageTableEntry`.
     /// If this page table entry is not `PRESENT`, this returns `None`.
     </span><span class="kw">pub fn </span>pointed_frame(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Frame&gt; {
-        <span class="kw">if </span><span class="self">self</span>.flags().intersects(EntryFlags::PRESENT) {
+        <span class="kw">if </span><span class="self">self</span>.flags().is_valid() {
             <span class="prelude-val">Some</span>(<span class="self">self</span>.frame_value())
         } <span class="kw">else </span>{
             <span class="prelude-val">None
@@ -232,15 +231,16 @@
     /// This is the actual mapping action that informs the MMU of a new mapping.
     ///
     /// Note: this performs no checks about the current value of this page table entry.
-    </span><span class="kw">pub fn </span>set_entry(<span class="kw-2">&amp;mut </span><span class="self">self</span>, frame: AllocatedFrame, flags: EntryFlags) {
+    </span><span class="kw">pub fn </span>set_entry(<span class="kw-2">&amp;mut </span><span class="self">self</span>, frame: AllocatedFrame, flags: PteFlagsArch) {
         <span class="self">self</span>.<span class="number">0 </span>= (frame.start_address().value() <span class="kw">as </span>u64) | flags.bits();
     }
 
     <span class="doccomment">/// Sets the flags components of this `PageTableEntry` to `new_flags`.
     ///
     /// This does not modify the frame part of the page table entry.
-    </span><span class="kw">pub fn </span>set_flags(<span class="kw-2">&amp;mut </span><span class="self">self</span>, new_flags: EntryFlags) {
-        <span class="self">self</span>.<span class="number">0 </span>= <span class="self">self</span>.<span class="number">0 </span>&amp; PAGE_TABLE_ENTRY_FRAME_MASK | new_flags.bits();
+    </span><span class="kw">pub fn </span>set_flags(<span class="kw-2">&amp;mut </span><span class="self">self</span>, new_flags: PteFlagsArch) {
+        <span class="kw">let </span>only_flag_bits = new_flags.bits() &amp; !PTE_FRAME_MASK;
+        <span class="self">self</span>.<span class="number">0 </span>= (<span class="self">self</span>.<span class="number">0 </span>&amp; PTE_FRAME_MASK) | only_flag_bits;
     }
 
     <span class="kw">pub fn </span>value(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64 {

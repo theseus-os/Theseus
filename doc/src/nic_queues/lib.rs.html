@@ -173,13 +173,6 @@
 <span id="173">173</span>
 <span id="174">174</span>
 <span id="175">175</span>
-<span id="176">176</span>
-<span id="177">177</span>
-<span id="178">178</span>
-<span id="179">179</span>
-<span id="180">180</span>
-<span id="181">181</span>
-<span id="182">182</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines the receive and transmit queues that store a ring of DMA descriptors and related information.
 //! 
 //! Receive and transmit queues are used across all NICs to keep track of incoming and outgoing packets.
@@ -200,17 +193,10 @@
     vec::Vec,
     collections::VecDeque
 };
-<span class="kw">use </span>memory::{create_contiguous_mapping, EntryFlags, BorrowedSliceMappedPages, Mutable};
+<span class="kw">use </span>memory::{create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
 <span class="kw">use </span>intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 <span class="kw">use </span>nic_buffers::{ReceiveBuffer, ReceivedFrame, TransmitBuffer};
-
-<span class="doccomment">/// The mapping flags used for pages that the NIC will map.
-</span><span class="kw">pub const </span>NIC_MAPPING_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(
-    EntryFlags::PRESENT.bits() |
-    EntryFlags::WRITABLE.bits() |
-    EntryFlags::NO_CACHE.bits() |
-    EntryFlags::NO_EXECUTE.bits()
-);
+<span class="kw">pub use </span>nic_buffers::NIC_MAPPING_FLAGS;
 
 <span class="doccomment">/// The register trait that gives access to only those registers required for receiving a packet.
 /// The Rx queue control registers can only be accessed by the physical NIC.

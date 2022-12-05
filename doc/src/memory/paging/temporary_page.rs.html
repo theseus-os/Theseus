@@ -91,6 +91,9 @@
 <span id="91">91</span>
 <span id="92">92</span>
 <span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -101,11 +104,14 @@
 // except according to those terms.
 
 </span><span class="kw">use </span>core::mem::ManuallyDrop;
+<span class="kw">use </span>log::error;
 <span class="kw">use super</span>::{
     AllocatedPages, AllocatedFrames, PageTable, MappedPages, VirtualAddress,
     table::{Table, Level1},
 };
+<span class="kw">use </span>pte_flags::PteFlagsArch;
 <span class="kw">use </span>kernel_config::memory::{TEMPORARY_PAGE_VIRT_ADDR, PAGE_SIZE};
+<span class="kw">use </span>owned_borrowed_trait::Owned;
 
 
 <span class="doccomment">/// A page that can be temporarily mapped to the recursive page table frame,
@@ -149,8 +155,8 @@
         }
         <span class="kw">let </span>(mapped_page, frame) = page_table.internal_map_to(
             page.ok_or(<span class="string">&quot;Couldn&#39;t allocate a new Page for the temporary P4 table frame&quot;</span>)<span class="question-mark">?</span>,
-            frame,
-            <span class="kw">super</span>::EntryFlags::WRITABLE,
+            Owned(frame),
+            PteFlagsArch::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>),
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(TemporaryPage {
             mapped_page,

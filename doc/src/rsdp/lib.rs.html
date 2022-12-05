@@ -92,7 +92,7 @@
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
 
 <span class="kw">use </span>core::mem;
-<span class="kw">use </span>memory::{PageTable, MappedPages, PhysicalAddress, allocate_pages_by_bytes, allocate_frames_by_bytes_at, EntryFlags, BorrowedMappedPages};
+<span class="kw">use </span>memory::{PageTable, MappedPages, PhysicalAddress, allocate_pages_by_bytes, allocate_frames_by_bytes_at, PteFlags, BorrowedMappedPages};
 <span class="kw">use </span>zerocopy::FromBytes;
 
 <span class="doccomment">/// The starting physical address of the region of memory where the RSDP table exists.
@@ -133,7 +133,7 @@
         <span class="kw">let </span>pages = allocate_pages_by_bytes(size).ok_or(<span class="string">&quot;couldn&#39;t allocate pages&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let </span>frames_to_search = allocate_frames_by_bytes_at(PhysicalAddress::new_canonical(RSDP_SEARCH_START), size)
             .map_err(|_e| <span class="string">&quot;Couldn&#39;t allocate physical frames when searching for RSDP&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let </span>mapped_pages = page_table.map_allocated_pages_to(pages, frames_to_search, EntryFlags::PRESENT)<span class="question-mark">?</span>;
+        <span class="kw">let </span>mapped_pages = page_table.map_allocated_pages_to(pages, frames_to_search, PteFlags::new().valid(<span class="bool-val">true</span>))<span class="question-mark">?</span>;
         Rsdp::search(mapped_pages)
     }
 

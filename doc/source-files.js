@@ -35,7 +35,6 @@ var sourcesIndex = JSON.parse('{\
 "displayable":["",[],["lib.rs"]],\
 "dmar":["",[],["device_scope.rs","drhd.rs","lib.rs"]],\
 "e1000":["",[],["lib.rs","regs.rs","test_e1000_driver.rs"]],\
-"entryflags_x86_64":["",[],["lib.rs"]],\
 "environment":["",[],["lib.rs"]],\
 "ethernet_smoltcp_device":["",[],["lib.rs"]],\
 "event_types":["",[],["lib.rs"]],\

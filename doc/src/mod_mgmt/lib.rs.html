@@ -3327,6 +3327,16 @@
 <span id="3327">3327</span>
 <span id="3328">3328</span>
 <span id="3329">3329</span>
+<span id="3330">3330</span>
+<span id="3331">3331</span>
+<span id="3332">3332</span>
+<span id="3333">3333</span>
+<span id="3334">3334</span>
+<span id="3335">3335</span>
+<span id="3336">3336</span>
+<span id="3337">3337</span>
+<span id="3338">3338</span>
+<span id="3339">3339</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 #![feature(let_chains)]
 
@@ -3338,7 +3348,7 @@
 <span class="kw">use </span>spin::{Mutex, Once};
 <span class="kw">use </span>xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}, symbol_table::{Binding, Type}};
 <span class="kw">use </span>util::round_up_power_of_two;
-<span class="kw">use </span>memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
+<span class="kw">use </span>memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, PteFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
 <span class="kw">use </span>bootloader_modules::BootloaderModule;
 <span class="kw">use </span>cow_arc::CowArc;
 <span class="kw">use </span>rustc_demangle::demangle;
@@ -3497,7 +3507,7 @@
             pages,
             frames,
             <span class="comment">// we never need to write to bootloader-provided modules
-            </span>EntryFlags::PRESENT | EntryFlags::NO_EXECUTE,
+            </span>PteFlags::new().valid(<span class="bool-val">true</span>),
         )<span class="question-mark">?</span>;
 
         <span class="kw">let </span>name = m.name();
@@ -3523,7 +3533,7 @@
                     <span class="kw">let </span>bytes = entry.file();
                     <span class="kw">let </span>size = bytes.len();
                     <span class="kw">let </span><span class="kw-2">mut </span>mp = {
-                        <span class="kw">let </span>flags = EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE | EntryFlags::PRESENT;
+                        <span class="kw">let </span>flags = PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>);
                         <span class="kw">let </span>allocated_pages = allocate_pages_by_bytes(size).ok_or(<span class="string">&quot;couldn&#39;t allocate pages&quot;</span>)<span class="question-mark">?</span>;
                         kernel_mmi.page_table.map_allocated_pages(allocated_pages, flags)<span class="question-mark">?
                     </span>};
@@ -4307,7 +4317,7 @@
                 <span class="kw">let </span><span class="kw-2">mut </span>target_sec_mapped_pages = target_sec.mapped_pages.lock();
                 <span class="kw">let </span>target_sec_initial_flags = target_sec_mapped_pages.flags();
                 <span class="kw">if </span>!target_sec_initial_flags.is_writable() {
-                    target_sec_mapped_pages.remap(<span class="kw-2">&amp;mut </span>kernel_mmi_ref.lock().page_table, target_sec_initial_flags | EntryFlags::WRITABLE)<span class="question-mark">?</span>;
+                    target_sec_mapped_pages.remap(<span class="kw-2">&amp;mut </span>kernel_mmi_ref.lock().page_table, target_sec_initial_flags.writable(<span class="bool-val">true</span>))<span class="question-mark">?</span>;
                 }
 
                 write_relocation(
@@ -6297,13 +6307,23 @@
 }
 
 
-<span class="doccomment">/// A convenience function for allocating contiguous virtual memory pages and mapping them to random physical frames. 
+<span class="doccomment">/// A convenience function for allocating virtual pages and mapping them to random physical frames. 
 /// 
-/// The returned `MappedPages` will be at least as large as `size_in_bytes`, rounded up to the nearest `Page` size, 
-/// and is mapped as writable along with the other specified `flags` to ensure we can copy content into it.
-</span><span class="kw">fn </span>allocate_and_map_as_writable(size_in_bytes: usize, flags: EntryFlags, kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef) -&gt; <span class="prelude-ty">Result</span>&lt;MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or(<span class="string">&quot;Couldn&#39;t allocate_pages_by_bytes, out of virtual address space&quot;</span>)<span class="question-mark">?</span>;
-    kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE)
+/// The returned `MappedPages` will be at least as large as `size_in_bytes`,
+/// rounded up to the nearest `Page` size, 
+/// and is mapped as writable along with the other specified `flags`
+/// to ensure we can copy content into it.
+</span><span class="kw">fn </span>allocate_and_map_as_writable(
+    size_in_bytes: usize,
+    flags: PteFlags,
+    kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef,
+) -&gt; <span class="prelude-ty">Result</span>&lt;MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>allocated_pages = allocate_pages_by_bytes(size_in_bytes)
+        .ok_or(<span class="string">&quot;Couldn&#39;t allocate_pages_by_bytes, out of virtual address space&quot;</span>)<span class="question-mark">?</span>;
+    kernel_mmi_ref.lock().page_table.map_allocated_pages(
+        allocated_pages,
+        flags.valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>)
+    )
 }
 
 

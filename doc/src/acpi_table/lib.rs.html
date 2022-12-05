@@ -265,7 +265,7 @@
 <span class="kw">extern crate </span>zerocopy;
 
 <span class="kw">use </span>alloc::collections::BTreeMap;
-<span class="kw">use </span>memory::{MappedPages, allocate_pages, allocate_frames_at, PageTable, EntryFlags, PhysicalAddress, Frame, FrameRange};
+<span class="kw">use </span>memory::{MappedPages, allocate_pages, allocate_frames_at, PageTable, PteFlags, PhysicalAddress, Frame, FrameRange};
 <span class="kw">use </span>sdt::Sdt;
 <span class="kw">use </span>core::ops::Add;
 <span class="kw">use </span>zerocopy::FromBytes;
@@ -340,7 +340,7 @@
             <span class="kw">let </span>new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 
                 af,
-                EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE,
+                PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>),
             )<span class="question-mark">?</span>;
 
             <span class="self">self</span>.adjust_mapping_offsets(new_frames, new_mapped_pages);
@@ -365,7 +365,7 @@
             <span class="kw">let </span>new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 
                 af,
-                EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE,
+                PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>),
             )<span class="question-mark">?</span>;
 
             <span class="self">self</span>.adjust_mapping_offsets(new_frames, new_mapped_pages);
@@ -393,7 +393,7 @@
             <span class="kw">let </span>new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 
                 af,
-                EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE,
+                PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>),
             )<span class="question-mark">?</span>;
             <span class="comment">// No real need to adjust mapping offsets here, since we&#39;ve only appended frames (not prepended);
             // we call this just to set the new frames and new mapped pages

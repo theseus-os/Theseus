@@ -173,13 +173,6 @@
 <span id="173">173</span>
 <span id="174">174</span>
 <span id="175">175</span>
-<span id="176">176</span>
-<span id="177">177</span>
-<span id="178">178</span>
-<span id="179">179</span>
-<span id="180">180</span>
-<span id="181">181</span>
-<span id="182">182</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Functions that are used in a NIC initialization procedure.
 //! 
 //! They include allocating memory space for the device&#39;s registers, and initializing its receive and transmit queues.
@@ -196,21 +189,14 @@
 <span class="kw">extern crate </span>volatile;
 <span class="kw">extern crate </span>nic_queues;
 
-<span class="kw">use </span>memory::{EntryFlags, PhysicalAddress, allocate_pages_by_bytes, allocate_frames_by_bytes_at, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping, Mutable, BorrowedSliceMappedPages};
+<span class="kw">use </span>memory::{PhysicalAddress, allocate_pages_by_bytes, allocate_frames_by_bytes_at, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping, Mutable, BorrowedSliceMappedPages};
 <span class="kw">use </span>pci::PciDevice;
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 <span class="kw">use </span>nic_buffers::ReceiveBuffer;
 <span class="kw">use </span>nic_queues::{RxQueueRegisters, TxQueueRegisters};
 
-<span class="doccomment">/// The mapping flags used for pages that the NIC will map.
-</span><span class="kw">pub const </span>NIC_MAPPING_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(
-    EntryFlags::PRESENT.bits() |
-    EntryFlags::WRITABLE.bits() |
-    EntryFlags::NO_CACHE.bits() |
-    EntryFlags::NO_EXECUTE.bits()
-);
-
+<span class="kw">pub use </span>nic_queues::NIC_MAPPING_FLAGS;
 
 <span class="doccomment">/// Allocates memory for the NIC registers
 /// 

@@ -161,7 +161,7 @@
 
 <span class="kw">use </span>spin::Once;
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
-<span class="kw">use </span>memory::{PageTable, EntryFlags, PhysicalAddress, allocate_frames_at, allocate_pages, BorrowedMappedPages, Mutable};
+<span class="kw">use </span>memory::{PageTable, PteFlags, PhysicalAddress, allocate_frames_at, allocate_pages, BorrowedMappedPages, Mutable};
 
 <span class="kw">mod </span>regs;
 <span class="kw">use </span>regs::<span class="kw-2">*</span>;
@@ -203,7 +203,7 @@
     </span><span class="kw">let </span>mp = {
         <span class="kw">let </span>frames = allocate_frames_at(register_base_address, <span class="number">1</span>)<span class="question-mark">?</span>;
         <span class="kw">let </span>pages = allocate_pages(<span class="number">1</span>).ok_or(<span class="string">&quot;Unable to find virtual page!&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let </span>flags = EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
+        <span class="kw">let </span>flags = PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>).device_memory(<span class="bool-val">true</span>);
         page_table.map_allocated_pages_to(pages, frames, flags)<span class="question-mark">?
     </span>};
 

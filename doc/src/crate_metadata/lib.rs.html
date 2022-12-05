@@ -1092,6 +1092,19 @@
 <span id="1092">1092</span>
 <span id="1093">1093</span>
 <span id="1094">1094</span>
+<span id="1095">1095</span>
+<span id="1096">1096</span>
+<span id="1097">1097</span>
+<span id="1098">1098</span>
+<span id="1099">1099</span>
+<span id="1100">1100</span>
+<span id="1101">1101</span>
+<span id="1102">1102</span>
+<span id="1103">1103</span>
+<span id="1104">1104</span>
+<span id="1105">1105</span>
+<span id="1106">1106</span>
+<span id="1107">1107</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines types that contain metadata about crates loaded in Theseus and their dependencies.
 //! 
 //! ## Representing dependencies between sections
@@ -1151,13 +1164,12 @@
     sync::{Arc, Weak},
     vec::Vec,
 };
-<span class="kw">use </span>memory::{MappedPages, VirtualAddress, EntryFlags};
-<span class="attr">#[cfg(internal_deps)]
-</span><span class="kw">use </span>memory::PageTable;
+<span class="kw">use </span>memory::{MappedPages, VirtualAddress, PteFlags};
 <span class="kw">use </span>cow_arc::{CowArc, CowWeak};
 <span class="kw">use </span>fs_node::{FileRef, WeakFileRef};
 <span class="kw">use </span>hashbrown::HashMap;
 <span class="kw">use </span>goblin::elf::reloc::<span class="kw-2">*</span>;
+<span class="kw">use </span>static_assertions::const_assert;
 
 <span class="kw">pub use </span>str_ref::StrRef;
 <span class="kw">pub use </span>crate_metadata_serde::{
@@ -1184,11 +1196,25 @@
 </span><span class="kw">pub type </span>WeakSectionRef = Weak&lt;LoadedSection&gt;;
 
 <span class="doccomment">/// `.text` sections are read-only and executable.
-</span><span class="kw">pub const </span>TEXT_SECTION_FLAGS:     EntryFlags = EntryFlags::PRESENT;
+</span><span class="kw">pub const </span>TEXT_SECTION_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    (PteFlags::new().bits() | PteFlags::VALID.bits())
+    &amp; !PteFlags::NOT_EXECUTABLE.bits() <span class="comment">// clear the no-exec bits
+</span>);
 <span class="doccomment">/// `.rodata` sections are read-only and non-executable.
-</span><span class="kw">pub const </span>RODATA_SECTION_FLAGS:   EntryFlags = EntryFlags::from_bits_truncate(EntryFlags::PRESENT.bits() | EntryFlags::NO_EXECUTE.bits());
+</span><span class="kw">pub const </span>RODATA_SECTION_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    (PteFlags::new().bits() | PteFlags::VALID.bits())
+    &amp; !PteFlags::WRITABLE.bits()
+);
 <span class="doccomment">/// `.data` and `.bss` sections are read-write and non-executable.
-</span><span class="kw">pub const </span>DATA_BSS_SECTION_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(EntryFlags::PRESENT.bits() | EntryFlags::NO_EXECUTE.bits() | EntryFlags::WRITABLE.bits());
+</span><span class="kw">pub const </span>DATA_BSS_SECTION_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    (PteFlags::new().bits() | PteFlags::VALID.bits())
+    | PteFlags::WRITABLE.bits()
+);
+
+<span class="comment">// Double-check section flags were defined correctly.
+</span><span class="macro">const_assert!</span>(TEXT_SECTION_FLAGS.is_executable() &amp;&amp; !TEXT_SECTION_FLAGS.is_writable());
+<span class="macro">const_assert!</span>(!RODATA_SECTION_FLAGS.is_writable() &amp;&amp; !RODATA_SECTION_FLAGS.is_executable());
+<span class="macro">const_assert!</span>(DATA_BSS_SECTION_FLAGS.is_writable() &amp;&amp; !DATA_BSS_SECTION_FLAGS.is_executable());
 
 
 <span class="doccomment">/// The Theseus Makefile appends prefixes onto bootloader module names,
@@ -1473,19 +1499,19 @@
     </span><span class="attr">#[cfg(internal_deps)]
     </span><span class="kw">pub fn </span>deep_copy(
         <span class="kw-2">&amp;</span><span class="self">self</span>, 
-        page_table: <span class="kw-2">&amp;mut </span>PageTable, 
+        page_table: <span class="kw-2">&amp;mut </span>memory::PageTable, 
     ) -&gt; <span class="prelude-ty">Result</span>&lt;StrongCrateRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 
         <span class="comment">// This closure deep copies the given mapped_pages (mapping them as WRITABLE)
         // and recalculates the the range of addresses covered by the new mapping.
-        </span><span class="kw">let </span><span class="kw-2">mut </span>deep_copy_mp = |old_mp_range: <span class="kw-2">&amp;</span>(Arc&lt;Mutex&lt;MappedPages&gt;&gt;, Range&lt;VirtualAddress&gt;), flags: EntryFlags|
+        </span><span class="kw">let </span><span class="kw-2">mut </span>deep_copy_mp = |old_mp_range: <span class="kw-2">&amp;</span>(Arc&lt;Mutex&lt;MappedPages&gt;&gt;, Range&lt;VirtualAddress&gt;), flags: PteFlags|
             -&gt; <span class="prelude-ty">Result</span>&lt;(Arc&lt;Mutex&lt;MappedPages&gt;&gt;, Range&lt;VirtualAddress&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; 
         {
             <span class="kw">let </span>old_mp_locked = old_mp_range.<span class="number">0</span>.lock();
             <span class="kw">let </span>old_start_address = old_mp_range.<span class="number">1</span>.start.value();
             <span class="kw">let </span>size = old_mp_range.<span class="number">1</span>.end.value() - old_start_address;
             <span class="kw">let </span>offset = old_start_address - old_mp_locked.start_address().value();
-            <span class="kw">let </span>new_mp = old_mp_range.<span class="number">0</span>.lock().deep_copy(<span class="prelude-val">Some</span>(flags | EntryFlags::WRITABLE), page_table)<span class="question-mark">?</span>;
+            <span class="kw">let </span>new_mp = old_mp_range.<span class="number">0</span>.lock().deep_copy(page_table, <span class="prelude-val">Some</span>(flags.writable(<span class="bool-val">true</span>)))<span class="question-mark">?</span>;
             <span class="kw">let </span>new_start_address = new_mp.start_address() + offset;
             <span class="prelude-val">Ok</span>((Arc::new(Mutex::new(new_mp)), new_start_address .. (new_start_address + size)))
         };
@@ -1617,7 +1643,7 @@
                         strong_dep.relocation, 
                         new_sec_slice, 
                         new_sec_mapped_pages_offset,
-                        source_sec.start_address(),
+                        source_sec.virt_addr,
                         <span class="bool-val">true
                     </span>)<span class="question-mark">?</span>;
 
@@ -1643,10 +1669,10 @@
                 // to ensure that we don&#39;t cause deadlock by trying to lock the same section twice.
                 </span><span class="kw">let </span>source_sec_vaddr = <span class="kw">if </span>Arc::ptr_eq(source_sec, new_sec) {
                     <span class="comment">// here: the source_sec and new_sec are the same, so just use the already-locked new_sec
-                    </span>new_sec.start_address()
+                    </span>new_sec.virt_addr
                 } <span class="kw">else </span>{
                     <span class="comment">// here: the source_sec and new_sec are different, so we can go ahead and safely lock the source_sec
-                    </span>source_sec.start_address()
+                    </span>source_sec.virt_addr
                 };
                 write_relocation(
                     internal_dep.relocation, 

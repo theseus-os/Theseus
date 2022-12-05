@@ -112,6 +112,14 @@
 <span id="112">112</span>
 <span id="113">113</span>
 <span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines buffers that are used to send and receive packets.
 
 </span><span class="attr">#![no_std]
@@ -123,8 +131,16 @@
 
 <span class="kw">use </span>core::ops::{Deref, DerefMut};
 <span class="kw">use </span>alloc::vec::Vec;
-<span class="kw">use </span>memory::{PhysicalAddress, MappedPages, EntryFlags, create_contiguous_mapping};
+<span class="kw">use </span>memory::{PhysicalAddress, MappedPages, PteFlags, create_contiguous_mapping};
 
+<span class="doccomment">/// The mapping flags used to map NIC device memory,
+/// e.g., MMIO registers, buffers, queues, etc.
+</span><span class="kw">pub const </span>NIC_MAPPING_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    PteFlags::new().bits()
+    | PteFlags::VALID.bits()
+    | PteFlags::WRITABLE.bits()
+    | PteFlags::DEVICE_MEMORY.bits()
+);
 
 <span class="doccomment">/// A buffer that stores a packet to be transmitted through the NIC
 /// and is guaranteed to be contiguous in physical memory. 
@@ -140,7 +156,7 @@
     </span><span class="kw">pub fn </span>new(size_in_bytes: u16) -&gt; <span class="prelude-ty">Result</span>&lt;TransmitBuffer, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>(mp, starting_phys_addr) = create_contiguous_mapping(
             size_in_bytes <span class="kw">as </span>usize,
-            EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
+            PteFlags::new().writable(<span class="bool-val">true</span>).device_memory(<span class="bool-val">true</span>),
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(TransmitBuffer {
             mp: mp,

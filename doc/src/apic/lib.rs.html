@@ -825,7 +825,7 @@
 <span class="kw">use </span>raw_cpuid::CpuId;
 <span class="kw">use </span>msr::<span class="kw-2">*</span>;
 <span class="kw">use </span>irq_safety::RwLockIrqSafe;
-<span class="kw">use </span>memory::{PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages, allocate_frames_at, AllocatedFrames, BorrowedMappedPages, Mutable};
+<span class="kw">use </span>memory::{PageTable, PhysicalAddress, PteFlags, MappedPages, allocate_pages, allocate_frames_at, AllocatedFrames, BorrowedMappedPages, Mutable};
 <span class="kw">use </span>kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 <span class="kw">use </span>atomic_linked_list::atomic_map::AtomicMap;
 <span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
@@ -975,7 +975,7 @@
             page_table,
             new_page,
             frame,
-            EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
+            PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>).device_memory(<span class="bool-val">true</span>),
         )
     }
 }

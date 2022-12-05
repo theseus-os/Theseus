@@ -190,6 +190,8 @@
 <span id="190">190</span>
 <span id="191">191</span>
 <span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate defines a `Framebuffer` structure, which is effectively a region of memory
 //! that is interpreted as a 2-D array of pixels.
 
@@ -205,7 +207,7 @@
 <span class="kw">pub mod </span>pixel;
 <span class="kw">use </span>core::{ops::{DerefMut, Deref}, hash::{Hash, Hasher}};
 
-<span class="kw">use </span>memory::{EntryFlags, PhysicalAddress, Mutable, BorrowedSliceMappedPages};
+<span class="kw">use </span>memory::{PteFlags, PhysicalAddress, Mutable, BorrowedSliceMappedPages};
 <span class="kw">use </span>shapes::Coord;
 <span class="kw">pub use </span>pixel::<span class="kw-2">*</span>;
 
@@ -269,10 +271,12 @@
         <span class="comment">// get a reference to the kernel&#39;s memory mapping information
         </span><span class="kw">let </span>kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or(<span class="string">&quot;KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>vesa_display_flags: EntryFlags =
-            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
+        <span class="kw">let </span>vesa_display_flags = PteFlags::new()
+            .valid(<span class="bool-val">true</span>)
+            .writable(<span class="bool-val">true</span>)
+            .device_memory(<span class="bool-val">true</span>); <span class="comment">// TODO: use PAT write-combining instead of disabling caching
 
-        <span class="kw">let </span>size = width * height * core::mem::size_of::&lt;P&gt;();
+        </span><span class="kw">let </span>size = width * height * core::mem::size_of::&lt;P&gt;();
         <span class="kw">let </span>pages = memory::allocate_pages_by_bytes(size).ok_or(<span class="string">&quot;could not allocate pages for a new framebuffer&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="kw">let </span>mapped_framebuffer = <span class="kw">if let </span><span class="prelude-val">Some</span>(address) = physical_address {

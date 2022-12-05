@@ -963,6 +963,13 @@
 <span id="963">963</span>
 <span id="964">964</span>
 <span id="965">965</span>
+<span id="966">966</span>
+<span id="967">967</span>
+<span id="968">968</span>
+<span id="969">969</span>
+<span id="970">970</span>
+<span id="971">971</span>
+<span id="972">972</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for DWARF debug information from ELF files.
 //! 
 //! This is a good intro to the DWARF format:
@@ -995,7 +1002,7 @@
 };
 <span class="kw">use </span>fs_node::WeakFileRef;
 <span class="kw">use </span>owning_ref::ArcRef;
-<span class="kw">use </span>memory::{MappedPages, VirtualAddress, MmiRef, allocate_pages_by_bytes, EntryFlags};
+<span class="kw">use </span>memory::{MappedPages, VirtualAddress, MmiRef, allocate_pages_by_bytes, PteFlags};
 <span class="kw">use </span>xmas_elf::{
     ElfFile,
     sections::{SectionData, SectionData::Rela64, ShType},
@@ -1764,7 +1771,10 @@
 
         // The .debug sections were initially mapped as writable so we could modify them,
         // but they should actually just be read-only as specified by the ELF file flags.
-        </span>debug_sections_mp.remap(<span class="kw-2">&amp;mut </span>kernel_mmi_ref.lock().page_table, EntryFlags::PRESENT)<span class="question-mark">?</span>; 
+        </span>debug_sections_mp.remap(
+            <span class="kw-2">&amp;mut </span>kernel_mmi_ref.lock().page_table,
+            PteFlags::new().valid(<span class="bool-val">true</span>),
+        )<span class="question-mark">?</span>; 
         <span class="kw">let </span>debug_sections_mp = Arc::new(debug_sections_mp);
 
         <span class="kw">let </span>create_debug_section_slice = |debug_sec: DebugSection| -&gt; <span class="prelude-ty">Result</span>&lt;DebugSectionSlice, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
@@ -1844,8 +1854,12 @@
         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;no .debug sections found&quot;</span>);
     }
 
-    <span class="kw">let </span>allocated_pages = allocate_pages_by_bytes(ro_bytes).ok_or(<span class="string">&quot;Couldn&#39;t allocate_pages_by_bytes, out of virtual address space&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>mp = kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, EntryFlags::PRESENT | EntryFlags::WRITABLE)<span class="question-mark">?</span>;
+    <span class="kw">let </span>allocated_pages = allocate_pages_by_bytes(ro_bytes)
+        .ok_or(<span class="string">&quot;Couldn&#39;t allocate_pages_by_bytes, out of virtual address space&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>mp = kernel_mmi_ref.lock().page_table.map_allocated_pages(
+        allocated_pages,
+        PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>),
+    )<span class="question-mark">?</span>;
     <span class="kw">let </span>start_address = mp.start_address();
     <span class="kw">let </span>range = start_address .. (start_address + ro_bytes);
     <span class="prelude-val">Ok</span>((mp, range))
