@@ -93,7 +93,7 @@ impl Shell {
     }
 
     fn execute(&mut self, line: &str) -> Result<()> {
-        // TODO | and &
+        // TODO: | and &
 
         let (cmd, args) = if let Some((cmd, args_str)) = line.split_once(' ') {
             let args = args_str.split(' ').collect::<Vec<_>>();
@@ -235,7 +235,6 @@ impl Shell {
         let id = task.id;
         // TODO: Double arc :(
         app_io::insert_child_streams(id, app_io::streams().unwrap());
-        // TODO: set environment
 
         Ok(Job {
             parts: vec![JobPart {
