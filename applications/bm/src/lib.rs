@@ -38,7 +38,7 @@ use heapfile::HeapFile;
 use path::Path;
 use fs_node::{DirRef, FileOrDir, FileRef};
 use libtest::*;
-use memory::{create_mapping, EntryFlags};
+use memory::{create_mapping, PteFlags};
 use getopts::Options;
 use mod_mgmt::crate_name_from_path;
 
@@ -514,7 +514,7 @@ fn do_memory_map_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'
 	start_hpet = hpet.get_counter();
 
 	for _ in 0..ITERATIONS{
-		let mapping = create_mapping(MAPPING_SIZE, EntryFlags::WRITABLE)?;
+		let mapping = create_mapping(MAPPING_SIZE, PteFlags::new().writable(true))?;
 		// write 0xFF to the first byte as lmbench does
 		unsafe{ *(mapping.start_address().value() as *mut u8)  = 0xFF; }
 		drop(mapping);

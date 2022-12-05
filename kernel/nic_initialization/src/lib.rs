@@ -14,21 +14,14 @@ extern crate nic_buffers;
 extern crate volatile;
 extern crate nic_queues;
 
-use memory::{EntryFlags, PhysicalAddress, allocate_pages_by_bytes, allocate_frames_by_bytes_at, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping, Mutable, BorrowedSliceMappedPages};
+use memory::{PhysicalAddress, allocate_pages_by_bytes, allocate_frames_by_bytes_at, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping, Mutable, BorrowedSliceMappedPages};
 use pci::PciDevice;
 use alloc::vec::Vec;
 use intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 use nic_buffers::ReceiveBuffer;
 use nic_queues::{RxQueueRegisters, TxQueueRegisters};
 
-/// The mapping flags used for pages that the NIC will map.
-pub const NIC_MAPPING_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(
-    EntryFlags::PRESENT.bits() |
-    EntryFlags::WRITABLE.bits() |
-    EntryFlags::NO_CACHE.bits() |
-    EntryFlags::NO_EXECUTE.bits()
-);
-
+pub use nic_queues::NIC_MAPPING_FLAGS;
 
 /// Allocates memory for the NIC registers
 /// 

@@ -1,8 +1,7 @@
 //! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
-//! `memory` uses this crate to get the memory layout and do other arch-specific operations on x86_64.  
-//! 
-//! This is the top-level arch-specific memory crate. 
-//! All arch-specific definitions for memory system are exported from this crate.
+//!
+//! The `memory` crate uses this crate to obtain the multiboot2-provided memory layout
+//! of the base kernel image (nano_core), and to do other arch-specific operations on x86_64.
 
 #![no_std]
 #![feature(ptr_internals)]
@@ -11,15 +10,14 @@
 #[macro_use] extern crate log;
 extern crate kernel_config;
 extern crate memory_structs;
-extern crate entryflags_x86_64;
+extern crate pte_flags;
 extern crate x86_64;
 extern crate boot_info;
-
-pub use entryflags_x86_64::{EntryFlags, PAGE_TABLE_ENTRY_FRAME_MASK};
 
 use boot_info::{ElfSection, ElfSectionFlags};
 use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{PhysicalAddress, VirtualAddress};
+use pte_flags::PteFlags;
 use x86_64::{registers::control::Cr3, instructions::tlb};
 
 
@@ -31,7 +29,7 @@ pub struct SectionMemoryBounds {
     /// The ending virtual address and physical address.
     pub end: (VirtualAddress, PhysicalAddress),
     /// The page table entry flags that should be used for mapping this section.
-    pub flags: EntryFlags,
+    pub flags: PteFlags,
 }
 
 /// The address bounds and flags of the initial kernel sections that need mapping. 
@@ -74,9 +72,9 @@ where
     let mut data_start:        Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut data_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
 
-    let mut text_flags:        Option<EntryFlags> = None;
-    let mut rodata_flags:      Option<EntryFlags> = None;
-    let mut data_flags:        Option<EntryFlags> = None;
+    let mut text_flags:        Option<PteFlags> = None;
+    let mut rodata_flags:      Option<PteFlags> = None;
+    let mut data_flags:        Option<PteFlags> = None;
 
     let mut sections_memory_bounds: [Option<SectionMemoryBounds>; 32] = Default::default();
 
@@ -91,18 +89,7 @@ where
         }
 
         debug!("Looking at loaded section {} at {:#X}, size {:#X}", section.name(), section.start(), section.len());
-
-        let mut flags = EntryFlags::GLOBAL;
-        if section.flags().contains(ElfSectionFlags::ALLOCATED) {
-            // Section is loaded to memory
-            flags |= EntryFlags::PRESENT;
-        }
-        if section.flags().contains(ElfSectionFlags::WRITABLE) {
-            flags |= EntryFlags::WRITABLE;
-        }
-        if !section.flags().contains(ElfSectionFlags::EXECUTABLE) {
-            flags |= EntryFlags::NO_EXECUTE;
-        }
+        let flags = convert_to_pte_flags(&section);
 
         // even though the linker stipulates that the kernel sections have a higher-half virtual address,
         // they are still loaded at a lower physical address, in which phys_addr = virt_addr - KERNEL_OFFSET.
@@ -258,15 +245,16 @@ where
 
 /// Gets the physical memory occupied by vga.
 /// 
-/// Returns (start_physical_address, size, entryflags). 
+/// Returns (start_physical_address, size, PteFlags). 
 pub fn get_vga_mem_addr(
-) -> Result<(PhysicalAddress, usize, EntryFlags), &'static str> {
+) -> Result<(PhysicalAddress, usize, PteFlags), &'static str> {
     const VGA_DISPLAY_PHYS_START: usize = 0xA_0000;
     const VGA_DISPLAY_PHYS_END: usize = 0xC_0000;
     let vga_size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
-    let vga_display_flags =
-        EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
-
+    let vga_display_flags = PteFlags::new()
+        .valid(true)
+        .writable(true)
+        .device_memory(true); // TODO: set as write-combining (WC)
     Ok((
         PhysicalAddress::new(VGA_DISPLAY_PHYS_START).ok_or("invalid VGA starting physical address")?,
         vga_size_in_bytes,
@@ -289,4 +277,15 @@ pub fn get_p4() -> PhysicalAddress {
     PhysicalAddress::new_canonical(
         Cr3::read_raw().0.start_address().as_u64() as usize
     )
+}
+
+/// Converts the given multiboot2 section's flags into `PteFlags`.
+fn convert_to_pte_flags<T>(section: &T) -> PteFlags
+where
+    T: boot_info::ElfSection
+{
+    PteFlags::new()
+        .valid(section.flags().contains(ElfSectionFlags::ALLOCATED))
+        .writable(section.flags().contains(ElfSectionFlags::WRITABLE))
+        .executable(section.flags().contains(ElfSectionFlags::EXECUTABLE))
 }

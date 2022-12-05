@@ -579,6 +579,7 @@ dependencies = [
  "qp-trie",
  "serde",
  "spin 0.9.0",
+ "static_assertions",
  "str_ref",
  "xmas-elf",
 ]
@@ -1708,8 +1709,10 @@ dependencies = [
  "memory_x86_64",
  "multiboot2",
  "no_drop",
+ "owned_borrowed_trait",
  "page_allocator",
  "page_table_entry",
+ "pte_flags",
  "spin 0.9.0",
  "x86_64",
  "xmas-elf",
@@ -1753,10 +1756,10 @@ name = "memory_x86_64"
 version = "0.1.0"
 dependencies = [
  "boot_info",
- "entryflags_x86_64",
  "kernel_config",
  "log",
  "memory_structs",
+ "pte_flags",
  "x86_64",
 ]
 
@@ -2191,6 +2194,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "owned_borrowed_trait"
+version = "0.1.0"
+
+[[package]]
 name = "owning_ref"
 version = "0.4.1"
 source = "git+https://github.com/theseus-os/owning-ref-rs#0d2dcdcffd75b80157d0e72fb82593a8696a9c49"
@@ -2219,7 +2226,7 @@ dependencies = [
  "frame_allocator",
  "kernel_config",
  "memory_structs",
- "memory_x86_64",
+ "pte_flags",
  "zerocopy",
 ]
 

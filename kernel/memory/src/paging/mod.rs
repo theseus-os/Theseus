@@ -28,10 +28,12 @@ use core::{
     ops::{Deref, DerefMut},
     fmt,
 };
+use log::debug;
 use super::{Frame, FrameRange, Page, PageRange, VirtualAddress, PhysicalAddress,
-    AllocatedPages, allocate_pages, AllocatedFrames, EntryFlags,
+    AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
     tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
     get_vga_mem_addr, KERNEL_OFFSET};
+use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;
 use kernel_config::memory::{RECURSIVE_P4_INDEX};
 // use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
@@ -101,7 +103,10 @@ impl PageTable {
         let mut temporary_page = TemporaryPage::create_and_map_table_frame(page, new_p4_frame, current_page_table)?;
         temporary_page.with_table_and_frame(|table, frame| {
             table.zero();
-            table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            table[RECURSIVE_P4_INDEX].set_entry(
+                frame.as_allocated_frame(),
+                PteFlagsArch::new().valid(true).writable(true),
+            );
         })?;
 
         let (_temp_page, inited_new_p4_frame) = temporary_page.unmap_into_parts(current_page_table)?;
@@ -136,7 +141,10 @@ impl PageTable {
         let mut temporary_page = TemporaryPage::create_and_map_table_frame(None, this_p4, self)?;
 
         // overwrite recursive mapping
-        self.p4_mut()[RECURSIVE_P4_INDEX].set_entry(other_table.p4_table.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
+        self.p4_mut()[RECURSIVE_P4_INDEX].set_entry(
+            other_table.p4_table.as_allocated_frame(),
+            PteFlagsArch::new().valid(true).writable(true),
+        );
         tlb_flush_all();
 
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
@@ -150,7 +158,10 @@ impl PageTable {
 
         // restore recursive mapping to original p4 table
         temporary_page.with_table_and_frame(|p4_table, frame| {
-            p4_table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            p4_table[RECURSIVE_P4_INDEX].set_entry(
+                frame.as_allocated_frame(),
+                PteFlagsArch::new().valid(true).writable(true),
+            );
         })?;
         tlb_flush_all();
 
@@ -358,12 +369,11 @@ where
         higher_half_mapped_pages[index] = Some(NoDrop::new(mapper.map_allocated_pages_to(vga_display_pages, vga_display_frames, vga_flags)?));
         index += 1;
 
-
         let mut iter = boot_info_mappings.iter();
         while let Some(Some((page, frame))) = iter.next() {
             let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1)?;
             let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1)?;
-            let mapped_pages = mapper.map_allocated_pages_to(allocated_page, allocated_frame, data_flags)?;
+            let mapped_pages = mapper.map_allocated_pages_to(allocated_page, allocated_frame, PteFlags::new())?;
             if let Some(ref mut boot_info_mapped_pages) = boot_info_mapped_pages {
                 boot_info_mapped_pages.merge(mapped_pages).map_err(|_| "failed to merge boot info pages")?;
             } else {
