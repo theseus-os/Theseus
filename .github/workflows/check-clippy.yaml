@@ -1,7 +1,7 @@
 name: Clippy Checks
 on:
   pull_request:
-    types: [edited, synchronize, opened, reopened]
+    types: [synchronize, opened, reopened]
 jobs:
   run-clippy:
     runs-on: ubuntu-latest
