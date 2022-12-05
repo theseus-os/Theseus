@@ -220,12 +220,12 @@ pub trait ClockSource {
 
     /// Converts a [`Duration`] into a [`ClockType::Unit`].
     ///
-    /// Monotonic clocks should just return the [`Duration`].
+    /// WallTime clocks should just return the [`Duration`].
     fn duration_to_unit(duration: Duration) -> <Self::ClockType as ClockType>::Unit;
 }
 
 /// A hardware clock that can sleep without relying on interrupts.
-pub trait EarlySleeper: ClockSource<ClockType = Monotonic> {
+pub trait EarlySleeper: ClockSource<ClockType = Monotonic> { 
     /// Wait for the given `duration`.
     ///
     /// This function spins the current task rather than sleeping it and so,
