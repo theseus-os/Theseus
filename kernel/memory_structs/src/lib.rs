@@ -177,20 +177,25 @@ const fn canonicalize_virtual_address(virt_addr: usize) -> usize {
     virt_addr
 }
 
-// aarch64 doesn't have a concept of canonical PA
-// so this always returns true
+/// On aarch64, we configure the MMU to use 48-bit
+/// physical addresses; "canonical" physical addresses
+/// have the 16 most significant bits cleared.
 #[cfg(target_arch = "aarch64")]
 #[inline]
-fn is_canonical_physical_address(_phys_addr: usize) -> bool {
-    true
+fn is_canonical_physical_address(phys_addr: usize) -> bool {
+    match phys_addr.get_bits(48..64) {
+        0 => true,
+        _ => false,
+    }
 }
 
-// aarch64 doesn't have a concept of canonical PA
-// so this returns the address as-is
+/// On aarch64, we configure the MMU to use 48-bit
+/// physical addresses; "canonical" physical addresses
+/// have the 16 most significant bits cleared.
 #[cfg(target_arch = "aarch64")]
 #[inline]
 const fn canonicalize_physical_address(phys_addr: usize) -> usize {
-    phys_addr
+    phys_addr & 0x0000_FFFF_FFFF_FFFF
 }
 
 implement_address!(
