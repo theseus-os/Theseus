@@ -27,10 +27,7 @@ extern crate mpmc;
 
 
 use spin::Once; 
-use alloc::{
-    vec::Vec,
-    boxed::Box,
-};
+use alloc::vec::Vec;
 use irq_safety::MutexIrqSafe;
 use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedMappedPages, Mutable};
 use pci::PciDevice;

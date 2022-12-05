@@ -37,10 +37,9 @@ fn rmain() -> Result<(), &'static str> {
     let num_packets = 8192;
     
     let buffer = create_raw_packet(&[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF], &mac_address, &[1;46])?;
-    let buffer_slice = buffer.as_slice();
 
     for _ in 0..num_packets {
-        nic.send_fastpath(buffer.phys_addr, buffer_slice);
+        nic.send_fastpath(buffer.phys_addr(), &buffer);
     }
     Ok(())
 }

@@ -261,6 +261,6 @@ impl smoltcp::phy::RxToken for RxToken {
             smoltcp::Error::Exhausted
         })?;
 
-        f(&mut *first_buf)
+        f(first_buf)
     }
 }
