@@ -77,7 +77,7 @@ impl<P: Pixel> Framebuffer<P> {
         // get a reference to the kernel's memory mapping information
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
 
-        let vesa_display_flags: PteFlags = PteFlags::new()
+        let vesa_display_flags = PteFlags::new()
             .valid(true)
             .writable(true)
             .device_memory(true); // TODO: use PAT write-combining instead of disabling caching

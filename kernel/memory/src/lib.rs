@@ -90,7 +90,10 @@ pub struct MemoryManagementInfo {
 /// # Locking / Deadlock
 /// Currently, this function acquires the lock on the frame allocator and the kernel's `MemoryManagementInfo` instance.
 /// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
-pub fn create_contiguous_mapping(size_in_bytes: usize, flags: PteFlags) -> Result<(MappedPages, PhysicalAddress), &'static str> {
+pub fn create_contiguous_mapping<F: Into<PteFlagsArch>>(
+    size_in_bytes: usize,
+    flags: F,
+) -> Result<(MappedPages, PhysicalAddress), &'static str> {
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous pages!")?;
     let allocated_frames = allocate_frames_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous frames!")?;
@@ -108,7 +111,10 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: PteFlags) -> Resul
 /// # Locking / Deadlock
 /// Currently, this function acquires the lock on the kernel's `MemoryManagementInfo` instance.
 /// Thus, the caller should ensure that lock is not held when invoking this function.
-pub fn create_mapping(size_in_bytes: usize, flags: PteFlags) -> Result<MappedPages, &'static str> {
+pub fn create_mapping<F: Into<PteFlagsArch>>(
+    size_in_bytes: usize,
+    flags: F,
+) -> Result<MappedPages, &'static str> {
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_mapping(): couldn't allocate pages!")?;
     kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags)
