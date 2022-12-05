@@ -22,9 +22,13 @@ fn main() {
 }
 
 fn compile_asm() {
-    let out_dir = PathBuf::from(env::var("THESEUS_NANO_CORE_BUILD_DIR").unwrap())
-        .join("compiled_asm")
-        .join(SPECIFICATION);
+    let out_dir = match env::var("THESEUS_NANO_CORE_BUILD_DIR") {
+        Ok(out_dir) => PathBuf::from(out_dir),
+        // nano core is being compiled for docs or clippy
+        Err(_) => std::env::temp_dir(),
+    }
+    .join("compiled_asm")
+    .join(SPECIFICATION);
     if let Err(e) = std::fs::create_dir_all(&out_dir) {
         if e.kind() != std::io::ErrorKind::AlreadyExists {
             panic!("failed to create compiled_asm directory: {e}");
@@ -40,7 +44,7 @@ fn compile_asm() {
 
     let asm_path = include_path.join(SPECIFICATION);
 
-    let cflags = env::var("THESEUS_CFLAGS").unwrap_or(String::new());
+    let cflags = env::var("THESEUS_CFLAGS").unwrap_or_default();
 
     for file in include_path
         .read_dir()
