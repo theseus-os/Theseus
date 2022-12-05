@@ -28,7 +28,7 @@ use core::{
 use spin::Mutex;
 use volatile::Volatile;
 use zerocopy::FromBytes;
-use memory::{VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, MmiRef};
+use memory::{VirtualAddress, PhysicalAddress, MappedPages, PteFlags, MmiRef};
 use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
 use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id, cpu_count};
 use ap_start::{kstart_ap, AP_READY_FLAG};
@@ -153,15 +153,16 @@ pub fn handle_ap_cores(
         let ap_startup_pages  = memory::allocate_pages_at(VirtualAddress::new_canonical(AP_STARTUP), ap_startup_frames.size_in_frames())
             .map_err(|_e| "handle_ap_cores(): failed to allocate AP startup pages")?;
         
+        let flags = PteFlags::new().valid(true).writable(true);
         trampoline_mapped_pages = page_table.map_allocated_pages_to(
             trampoline_page, 
             trampoline_frame, 
-            EntryFlags::PRESENT | EntryFlags::WRITABLE, 
+            flags,
         )?;
         ap_startup_mapped_pages = page_table.map_allocated_pages_to(
             ap_startup_pages,
             ap_startup_frames,
-            EntryFlags::PRESENT | EntryFlags::WRITABLE,
+            flags,
         )?;
         page_table_phys_addr = page_table.physical_address();
     }

@@ -30,7 +30,7 @@ use alloc::{
 };
 use fs_node::WeakFileRef;
 use owning_ref::ArcRef;
-use memory::{MappedPages, VirtualAddress, MmiRef, allocate_pages_by_bytes, EntryFlags};
+use memory::{MappedPages, VirtualAddress, MmiRef, allocate_pages_by_bytes, PteFlags};
 use xmas_elf::{
     ElfFile,
     sections::{SectionData, SectionData::Rela64, ShType},
@@ -799,7 +799,10 @@ impl DebugSymbols {
 
         // The .debug sections were initially mapped as writable so we could modify them,
         // but they should actually just be read-only as specified by the ELF file flags.
-        debug_sections_mp.remap(&mut kernel_mmi_ref.lock().page_table, EntryFlags::PRESENT)?; 
+        debug_sections_mp.remap(
+            &mut kernel_mmi_ref.lock().page_table,
+            PteFlags::new().valid(true),
+        )?; 
         let debug_sections_mp = Arc::new(debug_sections_mp);
 
         let create_debug_section_slice = |debug_sec: DebugSection| -> Result<DebugSectionSlice, &'static str> {
@@ -879,8 +882,12 @@ fn allocate_debug_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> 
         return Err("no .debug sections found");
     }
 
-    let allocated_pages = allocate_pages_by_bytes(ro_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space")?;
-    let mp = kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, EntryFlags::PRESENT | EntryFlags::WRITABLE)?;
+    let allocated_pages = allocate_pages_by_bytes(ro_bytes)
+        .ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space")?;
+    let mp = kernel_mmi_ref.lock().page_table.map_allocated_pages(
+        allocated_pages,
+        PteFlags::new().valid(true).writable(true),
+    )?;
     let start_address = mp.start_address();
     let range = start_address .. (start_address + ro_bytes);
     Ok((mp, range))
