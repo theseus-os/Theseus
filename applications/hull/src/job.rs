@@ -22,20 +22,18 @@ impl Job {
         }
         Ok(())
     }
-    pub(crate) fn suspend(&mut self) -> Result<()> {
+    pub(crate) fn suspend(&mut self) {
         for mut part in self.parts.iter_mut() {
-            part.task.suspend().map_err(Error::SuspendFailed)?;
+            part.task.suspend();
             part.state = State::Suspended;
         }
-        Ok(())
     }
 
-    pub(crate) fn unsuspend(&mut self) -> Result<()> {
+    pub(crate) fn unsuspend(&mut self) {
         for mut part in self.parts.iter_mut() {
-            part.task.unsuspend().map_err(Error::UnsuspendFailed)?;
+            part.task.unsuspend();
             part.state = State::Running;
         }
-        Ok(())
     }
 
     pub(crate) fn unblock(&mut self) -> Result<()> {
@@ -50,7 +48,6 @@ impl Job {
         for mut part in self.parts.iter_mut() {
             if part.state == State::Running {
                 match part.task.runstate() {
-                    RunState::Suspended => todo!(),
                     RunState::Exited => {
                         let exit_value = match part.task.take_exit_value().unwrap() {
                             ExitValue::Completed(status) => {

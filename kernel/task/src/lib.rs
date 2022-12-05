@@ -209,10 +209,6 @@ pub enum RunState {
     Runnable,
     /// blocked on something, like I/O or a wait event
     Blocked,
-    /// The `Task` has been suspended from proceding further.
-    ///
-    /// Currently, this is only triggered by a Ctrl + Z in the terminal.
-    Suspended,
     /// The `Task` has exited and can no longer be run,
     /// either by running to completion or being killed. 
     Exited,
@@ -352,6 +348,12 @@ pub struct Task {
     ///
     /// This is not public because it permits interior mutability.
     runstate: AtomicCell<RunState>,
+    /// Whether the task is suspended.
+    ///
+    /// This is only triggered by a Ctrl + Z in the terminal.
+    ///
+    /// This is not public because it permits interior mutability.
+    suspended: AtomicBool,
     /// Whether this Task is joinable.
     /// * If `true`, another task holds the [`JoinableTaskRef`] object that was created
     ///   by [`TaskRef::new()`], which indicates that that other task is able to
@@ -506,6 +508,7 @@ impl Task {
             name: format!("task_{}", task_id),
             running_on_cpu: AtomicCell::new(None.into()),
             runstate: AtomicCell::new(RunState::Initing),
+            suspended: AtomicBool::new(false),
             // Tasks are not considered "joinable" until passed to `TaskRef::new()`
             joinable: AtomicBool::new(false),
             mmi,
@@ -749,34 +752,6 @@ impl Task {
         }
     }
     
-    /// Suspends this `Task` by setting its runstate to [`RunState::Suspended`].
-    ///
-    /// Returns the previous runstate on success, and the current runstate on
-    /// error. Will only succed if the task is blocked or runnable.
-    pub fn suspend(&self) -> Result<RunState, RunState> {
-        use RunState::{Blocked, Runnable, Suspended};
-
-        if self.runstate.compare_exchange(Runnable, Suspended).is_ok() {
-            Ok(Runnable)
-        } else if self.runstate.compare_exchange(Blocked, Suspended).is_ok() {
-            Ok(Blocked)
-        } else {
-            Err(self.runstate.load())
-        }
-    }
-    
-    /// Unsuspends this `Task` by setting its runstate to [`RunState::Runnable`].
-    ///
-    /// Returns the previous runstate (i.e. `RunState::Suspended`) on success,
-    /// or the current runstate on error.
-    pub fn unsuspend(&self) -> Result<RunState, RunState> {
-        if self.runstate.compare_exchange(RunState::Suspended, RunState::Runnable).is_ok() {
-            Ok(RunState::Suspended)
-        } else {
-            Err(self.runstate.load())
-        }
-    }
-
     /// Makes this `Task` `Runnable` if it is a newly-spawned and fully initialized task.
     ///
     /// This is a special case only to be used when spawning a new task that
@@ -790,6 +765,21 @@ impl Task {
         } else {
             Err(self.runstate.load())
         }
+    }
+
+    /// Suspends this `Task`.
+    pub fn suspend(&self) {
+        self.suspended.store(true, Ordering::Release);
+    }
+
+    /// Unsuspends this `Task`.
+    pub fn unsuspend(&self) {
+        self.suspended.store(false, Ordering::Release);
+    }
+
+    /// Returns whether this `Task` is suspended.
+    pub fn is_suspended(&self) -> bool {
+        self.suspended.load(Ordering::Acquire)
     }
 
     /// Sets this `Task` as this CPU's current task.

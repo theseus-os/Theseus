@@ -142,14 +142,6 @@ impl Shell {
                 println!("failed to kill task");
                 Ok(())
             }
-            Err(Error::SuspendFailed(state)) => {
-                println!("failed to suspend task with state {:?}", state);
-                Ok(())
-            }
-            Err(Error::UnsuspendFailed(state)) => {
-                println!("failed to unsuspend task with state {:?}", state);
-                Ok(())
-            }
             Err(Error::UnblockFailed(state)) => {
                 println!("failed to unblock task with state {:?}", state);
                 Ok(())
@@ -188,7 +180,7 @@ impl Shell {
                     }
                     Event::CtrlD => todo!(),
                     Event::CtrlZ => {
-                        job.suspend()?;
+                        job.suspend();
                         todo!();
                     }
                 };

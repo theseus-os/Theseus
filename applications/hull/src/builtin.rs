@@ -24,7 +24,7 @@ impl Shell {
                     }
                 };
                 if let Some(task) = self.jobs.get_mut(&num) {
-                    task.unsuspend()?;
+                    task.unsuspend();
                     // TODO: Print
                     return Ok(());
                 }
@@ -49,7 +49,7 @@ impl Shell {
                             return Err(Error::Command(1));
                         }
                     };
-                    task.unsuspend()?;
+                    task.unsuspend();
                     // TODO: Print
                     continue;
                 }

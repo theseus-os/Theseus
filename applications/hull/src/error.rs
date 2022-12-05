@@ -23,14 +23,6 @@ pub enum Error {
     KillFailed,
     /// Failed to spawn a task.
     SpawnFailed,
-    /// Failed to suspend a task.
-    ///
-    /// The current runstate is stored in the field.
-    SuspendFailed(RunState),
-    /// Failed to unsuspend a task.
-    ///
-    /// The current runstate is stored in the field.
-    UnsuspendFailed(RunState),
     /// Failed to unblock a task.
     ///
     /// The current runstate is stored in the field.

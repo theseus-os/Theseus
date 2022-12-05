@@ -123,8 +123,8 @@ impl LineDiscipline {
         }
     }
 
-    fn clear_input_buf(&self) {
-        if let Some(ref mut input_buf) = *self.canonical.lock().unwrap() {
+    fn clear_input_buf(&self, canonical: Option<&mut Vec<u8>>) {
+        if let Some(input_buf) = canonical {
             input_buf.clear();
         }
     }
@@ -155,12 +155,12 @@ impl LineDiscipline {
         match byte {
             INTERRUPT => {
                 let _ = self.manager.send(Event::CtrlC);
-                self.clear_input_buf();
+                self.clear_input_buf(canonical);
                 return Ok(());
             }
             SUSPEND => {
                 let _ = self.manager.send(Event::CtrlZ);
-                self.clear_input_buf();
+                self.clear_input_buf(canonical);
                 return Ok(());
             }
             _ => {}
