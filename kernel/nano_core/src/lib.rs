@@ -30,10 +30,15 @@ use core::ops::DerefMut;
 use kernel_config::memory::KERNEL_OFFSET;
 use memory::VirtualAddress;
 
-#[cfg(feature = "bios")]
-mod bios;
-#[cfg(feature = "uefi")]
-mod uefi;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "bios")] {
+        mod bios;
+    } else if #[cfg(feature = "uefi")] {
+        mod uefi;
+    }
+    // If neither is enabled, and build script wolud have already emitted an
+    // error.
+}
 
 fn early_setup(double_fault_stack: usize) -> Result<(), &'static str> {
     irq_safety::disable_interrupts();

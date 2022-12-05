@@ -1,26 +1,30 @@
+use std::{env, path::PathBuf, process::Command};
+
 // We put the feature checks here because the build script will give unhelpful
 // errors if it's built with the wrong combination of features.
+//
+// We prefer BIOS over UEFI to avoid mutually exclusive features as they mess up
+// building with --all-features.
+// https://doc.rust-lang.org/cargo/reference/features.html#mutually-exclusive-features
 
-#[cfg(all(feature = "bios", feature = "uefi"))]
-compile_error!("either the bios or uefi features must be enabled, not both");
-
-#[cfg(all(not(feature = "bios"), not(feature = "uefi")))]
-compile_error!("either the bios or uefi features must be enabled");
-
-#[cfg(feature = "uefi")]
-const SPECIFICATION: &str = "uefi";
-#[cfg(feature = "bios")]
-const SPECIFICATION: &str = "bios";
-
-use std::{env, path::PathBuf, process::Command};
+cfg_if::cfg_if! {
+    if #[cfg(feature = "bios")] {
+        const SPECIFICATION: &str = "bios";
+    } else if #[cfg(feature = "uefi")] {
+        const SPECIFICATION: &str = "uefi";
+    } else {
+        compile_error!("either the bios or uefi features must be enabled");
+    }
+}
 
 fn main() {
     compile_asm();
 }
 
 fn compile_asm() {
-    let out_dir =
-        PathBuf::from(env::var("THESEUS_NANO_CORE_BUILD_DIR").unwrap()).join("compiled_asm").join(SPECIFICATION);
+    let out_dir = PathBuf::from(env::var("THESEUS_NANO_CORE_BUILD_DIR").unwrap())
+        .join("compiled_asm")
+        .join(SPECIFICATION);
     if let Err(e) = std::fs::create_dir_all(&out_dir) {
         if e.kind() != std::io::ErrorKind::AlreadyExists {
             panic!("failed to create compiled_asm directory: {e}");

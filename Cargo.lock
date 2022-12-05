@@ -2006,6 +2006,7 @@ dependencies = [
  "boot_info",
  "bootloader_api",
  "captain",
+ "cfg-if 1.0.0",
  "exceptions_early",
  "irq_safety",
  "kernel_config",

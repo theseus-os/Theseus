@@ -7,6 +7,7 @@ edition = "2021"
 
 
 [dependencies]
+cfg-if = "1.0.0"
 multiboot2 = "0.14.0"
 libm = "0.2.1"
 
@@ -63,6 +64,9 @@ optional = true
 
 [dependencies.memory_initialization]
 path = "../memory_initialization"
+
+[build-dependencies]
+cfg-if = "1.0.0"
 
 [features]
 uefi = ["dep:bootloader_api", "boot_info/uefi", "captain/uefi"]
