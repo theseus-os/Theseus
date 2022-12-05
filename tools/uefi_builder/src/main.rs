@@ -10,7 +10,7 @@ fn main() {
         .into();
     let efi_firmware: PathBuf = args
         .next()
-        .expect("uefi firmware output path not provided")
+        .expect("efi firmware output path not provided")
         .into();
 
     let mut bootloader = bootloader::UefiBoot::new(&kernel);

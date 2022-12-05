@@ -30,10 +30,10 @@ use core::ops::DerefMut;
 use kernel_config::memory::KERNEL_OFFSET;
 use memory::VirtualAddress;
 
-#[cfg(feature = "uefi")]
-mod uefi;
 #[cfg(feature = "bios")]
 mod bios;
+#[cfg(feature = "uefi")]
+mod uefi;
 
 fn early_setup(double_fault_stack: usize) -> Result<(), &'static str> {
     irq_safety::disable_interrupts();

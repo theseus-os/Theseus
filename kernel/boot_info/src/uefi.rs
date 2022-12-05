@@ -99,8 +99,7 @@ impl crate::Module for Module {
         PhysicalAddress::new_canonical(
             self.regions
                 .iter()
-                .filter(|region| region.kind == info::MemoryRegionKind::UnknownUefi(0x80000000))
-                .next()
+                .find(|region| region.kind == info::MemoryRegionKind::UnknownUefi(0x80000000))
                 .expect("no modules region")
                 .start as usize
                 + self.inner.offset,
@@ -206,8 +205,7 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
         let area = self
             .memory_regions
             .iter()
-            .filter(|region| region.kind == info::MemoryRegionKind::UnknownUefi(0x80000000))
-            .next()
+            .find(|region| region.kind == info::MemoryRegionKind::UnknownUefi(0x80000000))
             .ok_or("no modules memory region")?;
         let start = PhysicalAddress::new_canonical(area.start as usize);
         let end = PhysicalAddress::new_canonical(area.end as usize);

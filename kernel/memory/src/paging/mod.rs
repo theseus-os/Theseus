@@ -268,15 +268,14 @@ where
     let mut stack_mappings = [None; 20];
     // + 1 accounts for the guard page which does not have a corresponding frame.
     for (i, page) in ((Page::containing_address(stack_start_virt) + 1)..=Page::containing_address(stack_end_virt - 1)).enumerate() {
-        log::info!("translating page: {page:#?}");
-        let frame = page_table.translate_page(page).expect("couldn't translate stack page");
+        let frame = page_table.translate_page(page).ok_or("couldn't translate stack page")?;
         stack_mappings[i] = Some((page, frame));
     }
     
     // Boot info frames are not guaranteed to be contiguous.
     let mut boot_info_mappings = [None; 10];
     for (i, page) in (Page::containing_address(boot_info_start_vaddr)..=Page::containing_address(boot_info_start_vaddr + boot_info_size - 1)).enumerate() {
-        let frame = page_table.translate_page(page).expect("couldn't translate boot info page");
+        let frame = page_table.translate_page(page).ok_or("couldn't translate boot info page")?;
         boot_info_mappings[i] = Some((page, frame));
     }
 
@@ -330,20 +329,20 @@ where
 
         // Handle the stack (a separate data section), which consists of one guard page followed by the real stack pages.
         // It does not need to be identity mapped because each AP core will have its own stack.
-        let stack_guard_page = page_allocator::allocate_pages_at(stack_start_virt, 1).unwrap();
+        let stack_guard_page = page_allocator::allocate_pages_at(stack_start_virt, 1)?;
         let mut stack_mapped_pages: Option<MappedPages> = None;
         let mut iter = stack_mappings.iter();
         while let Some(Some((page, frame))) = iter.next() {
-            let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1).unwrap();
-            let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1).unwrap();
+            let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1)?;
+            let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1)?;
             let mapped_pages = mapper.map_allocated_pages_to(allocated_page, allocated_frame, data_flags)?;
             if let Some(ref mut stack_mapped_pages) = stack_mapped_pages {
-                stack_mapped_pages.merge(mapped_pages).unwrap();
+                stack_mapped_pages.merge(mapped_pages).map_err(|_| "failed to merge stack mapped pages")?;
             } else {
                 stack_mapped_pages = Some(mapped_pages);
             }
         }
-        stack_page_group = Some((stack_guard_page, NoDrop::new(stack_mapped_pages.unwrap())));
+        stack_page_group = Some((stack_guard_page, NoDrop::new(stack_mapped_pages.ok_or("no pages were allocated for the stack")?)));
 
         // TODO: UEFI?
         // Map the VGA display memory as writable.
@@ -362,11 +361,11 @@ where
 
         let mut iter = boot_info_mappings.iter();
         while let Some(Some((page, frame))) = iter.next() {
-            let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1).unwrap();
-            let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1).unwrap();
+            let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1)?;
+            let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1)?;
             let mapped_pages = mapper.map_allocated_pages_to(allocated_page, allocated_frame, data_flags)?;
             if let Some(ref mut boot_info_mapped_pages) = boot_info_mapped_pages {
-                boot_info_mapped_pages.merge(mapped_pages).unwrap();
+                boot_info_mapped_pages.merge(mapped_pages).map_err(|_| "failed to merge boot info pages")?;
             } else {
                 boot_info_mapped_pages = Some(mapped_pages);
             }
