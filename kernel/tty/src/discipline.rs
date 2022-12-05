@@ -176,7 +176,7 @@ impl LineDiscipline {
                 }
                 (ERASE, Some(input_buf)) => {
                     if !input_buf.is_empty() {
-                        master.send_buf([0x8, b' ', 0x8])?
+                        master.send_all([0x8, b' ', 0x8])?
                     }
                 }
                 (WERASE, Some(input_buf)) => {
@@ -185,12 +185,12 @@ impl LineDiscipline {
                         // and once if canonical mode is enabled.
                         let offset = werase(input_buf);
                         for _ in 0..offset {
-                            master.send_buf([0x8, b' ', 0x8])?;
+                            master.send_all([0x8, b' ', 0x8])?;
                         }
                     }
                 }
                 (0..=0x1f, _) => {
-                    master.send_buf([b'^', byte + 0x40])?;
+                    master.send_all([b'^', byte + 0x40])?;
                 }
                 _ => {
                     master.send(byte)?;
@@ -201,7 +201,7 @@ impl LineDiscipline {
         if let Some(input_buf) = canonical {
             match byte {
                 b'\r' | b'\n' => {
-                    slave.send_buf(core::mem::take(input_buf))?;
+                    slave.send_all(core::mem::take(input_buf))?;
                     slave.send(b'\n')?;
                 }
                 ERASE => {
@@ -235,7 +235,7 @@ impl LineDiscipline {
 
     pub(crate) fn process_output_byte(&self, byte: u8, master: &Channel) -> Result<()> {
         if byte == b'\n' {
-            master.send_buf(&[b'\r', b'\n'])
+            master.send_all(&[b'\r', b'\n'])
         } else {
             master.send(byte)
         }

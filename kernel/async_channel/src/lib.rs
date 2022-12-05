@@ -212,6 +212,38 @@ impl <T: Send> Sender<T> {
         res
     }
 
+    /// Sends a slice of objects through the channel, returning how many objects were sent.
+    ///
+    /// This method only blocks on the first object being sent.
+    pub fn send_buf(&self, buf: &[T]) -> Result<usize, Error>
+    where
+        T: Copy
+    {
+        for (idx, item) in buf.iter().enumerate() {
+            if idx == 0 {
+                self.send(*item)?;
+            } else {
+                match self.try_send(*item) {
+                    Ok(_) => {},
+                    Err((_, Error::WouldBlock)) => return Ok(idx),
+                    Err((_, e)) => return Err(e),
+                }
+            }
+        }
+        Ok(buf.len())
+    }
+
+    /// Attempts to send an entire slice of objects through the channel.
+    pub fn send_all(&self, buf: &[T]) -> Result<(), Error>
+    where
+        T: Copy
+    {
+        for item in buf.iter() {
+            self.send(*item)?;
+        }
+        Ok(())
+    }
+
     /// Tries to send the message, only succeeding if buffer space is available.
     /// 
     /// If no buffer space is available, it returns the `msg`  with `Error` back to the caller without blocking. 
@@ -251,6 +283,27 @@ impl <T: Send> Sender<T> {
             // queue was full, return message back to caller
             Err(returned_msg) => Err((returned_msg, Error::WouldBlock)),
         }
+    }
+
+    /// Sends a slice of objects through the channel, returning how many objects were sent.
+    ///
+    /// This method does not block.
+    pub fn try_send_buf(&self, buf: &[T]) -> Result<usize, Error>
+    where
+        T: Copy
+    {
+        for (idx, item) in buf.iter().enumerate() {
+            if idx == 0 {
+                self.try_send(*item).map_err(|(_, e)| e)?;
+            } else {
+                match self.try_send(*item) {
+                    Ok(_) => {},
+                    Err((_, Error::WouldBlock)) => return Ok(idx),
+                    Err((_, e)) => return Err(e),
+                }
+            }
+        }
+        Ok(buf.len())
     }
 
     /// Returns true if the channel is disconnected.
@@ -334,6 +387,33 @@ impl <T: Send> Receiver<T> {
         res
     }
 
+    /// Receives objects placing them in a buffer and returning the number of objects received.
+    ///
+    /// This method only blocks on the first object being received.
+    pub fn receive_buf(&self, buf: &mut [T]) -> Result<usize, Error> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+
+        let mut byte = self.receive()?;
+        let mut read = 0;
+
+        loop {
+            buf[read] = byte;
+            read += 1;
+
+            if read == buf.len() {
+                return Ok(read);
+            }
+
+            byte = match self.try_receive() {
+                Ok(b) => b,
+                Err(Error::WouldBlock) => return Ok(read),
+                Err(e) => return Err(e),
+            };
+        }
+    }
+
     /// Tries to receive a message, only succeeding if a message is already available in the buffer.
     /// 
     /// If receive succeeds returns `Some(Ok(T))`. 
@@ -359,6 +439,20 @@ impl <T: Send> Receiver<T> {
                 },
             }
         }
+    }
+
+    /// Receives objects placing them in a buffer and returning the number of objects received.
+    ///
+    /// This method does not block.
+    pub fn try_receive_buf(&self, buf: &mut [T]) -> Result<usize, Error> {
+        for (idx, item) in buf.iter_mut().enumerate() {
+            *item = match self.try_receive() {
+                Ok(byte) => byte,
+                Err(Error::WouldBlock) => return Ok(idx + 1),
+                Err(e) => return Err(e),
+            };
+        }
+        Ok(buf.len())
     }
 
     /// Returns true if the channel is disconnected.
