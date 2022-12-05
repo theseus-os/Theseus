@@ -4,6 +4,8 @@
 //! * [`PteFlags`]: the set of bit flags that apply to all architectures.
 //! * [`PteFlagsX86_64`] or [`PteFlagsAarch64`]: the arch-specific set of bit flags
 //!   that apply to only the given platform.
+//! * This crate also exports `PteFlagsArch`, an alias for the currently-active
+//!   arch-specific type above (either `PteFlagsX86_64` or `PteFlagsAarch64`).
 //! 
 //! ## Type conversions
 //! *Notably*, you can convert to and from these architecture-specific types
@@ -40,10 +42,10 @@ cfg_if!{ if #[cfg(any(target_arch = "aarch64", doc))] {
 }}
 
 cfg_if! { if #[cfg(target_arch = "x86_64")] {
-    use pte_flags_x86_64::PteFlagsX86_64 as PteFlagsArch;
+    pub use pte_flags_x86_64::PteFlagsX86_64 as PteFlagsArch;
     pub use pte_flags_x86_64::PTE_FRAME_MASK;
 } else if #[cfg(target_arch = "aarch64")] {
-    use pte_flags_aarch64::PteFlagsAarch64 as PteFlagsArch;
+    pub use pte_flags_aarch64::PteFlagsAarch64 as PteFlagsArch;
     pub use pte_flags_aarch64::PTE_FRAME_MASK;
 }}
 
@@ -170,7 +172,7 @@ impl Default for PteFlags {
 }
 
 impl PteFlags {
-    /// Returns a new `PteFlagsX86_64` with the default value, in which:
+    /// Returns a new `PteFlags` with the default value, in which:
     /// * `ACCESSED` is set.
     /// * the `NOT_EXECUTABLE` bit is set.
     /// 
@@ -276,34 +278,34 @@ impl PteFlags {
     }
 
     #[doc(alias("present"))]
-    pub fn is_valid(&self) -> bool {
+    pub const fn is_valid(&self) -> bool {
         self.contains(Self::VALID)
     }
 
     #[doc(alias("read_only"))]
-    pub fn is_writable(&self) -> bool {
+    pub const fn is_writable(&self) -> bool {
         self.contains(Self::WRITABLE)
     }
 
     #[doc(alias("no_exec"))]
-    pub fn is_executable(&self) -> bool {
+    pub const fn is_executable(&self) -> bool {
         !self.contains(Self::NOT_EXECUTABLE)
     }
 
     #[doc(alias("cache", "cacheable", "non-cacheable"))]
-    pub fn is_device_memory(&self) -> bool {
+    pub const fn is_device_memory(&self) -> bool {
         self.contains(Self::DEVICE_MEMORY)
     }
 
-    pub fn is_dirty(&self) -> bool {
+    pub const fn is_dirty(&self) -> bool {
         self.contains(Self::DIRTY)
     }
 
-    pub fn is_accessed(&self) -> bool {
+    pub const fn is_accessed(&self) -> bool {
         self.contains(Self::ACCESSED)
     }
 
-    pub fn is_exclusive(&self) -> bool {
+    pub const fn is_exclusive(&self) -> bool {
         self.contains(Self::EXCLUSIVE)
     }
 }
