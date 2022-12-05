@@ -535,12 +535,12 @@
 
     <span class="doccomment">/// Converts a [`ClockType::Unit`] into a [`Duration`].
     ///
-    /// Monotonic clocks should just return the [`ClockType::Unit`].
+    /// Wall time clocks should just return the [`ClockType::Unit`].
     </span><span class="kw">fn </span>unit_to_duration(unit: &lt;<span class="self">Self</span>::ClockType <span class="kw">as </span>ClockType&gt;::Unit) -&gt; Duration;
 
     <span class="doccomment">/// Converts a [`Duration`] into a [`ClockType::Unit`].
     ///
-    /// Monotonic clocks should just return the [`Duration`].
+    /// Wall time clocks should just return the [`Duration`].
     </span><span class="kw">fn </span>duration_to_unit(duration: Duration) -&gt; &lt;<span class="self">Self</span>::ClockType <span class="kw">as </span>ClockType&gt;::Unit;
 }
 
