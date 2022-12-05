@@ -83,12 +83,7 @@ fn main(
 
             let start_addr = descriptor.phys_start as usize;
             let start_addr = PhysicalAddress::new_canonical(start_addr);
-            let end_addr = start_addr + size;
-
-            let first_frame = Frame::containing_address(start_addr);
-            let last_frame = Frame::containing_address(end_addr - 1);
-
-            let range = FrameRange::new(first_frame, last_frame);
+            let range = FrameRange::from_phys_addr(start_addr, size);
 
             if let Some(flags) = uefi_conv::get_mem_flags(descriptor.ty) {
                 // info!("{:?} ({}) -> {:?} -> {:?}", start_addr, page_count, flags, descriptor.ty);
