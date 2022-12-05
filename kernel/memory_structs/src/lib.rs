@@ -14,7 +14,6 @@ extern crate bit_field;
 extern crate zerocopy;
 extern crate paste;
 
-#[cfg(target_arch = "x86_64")]
 use bit_field::BitField;
 use core::{
     cmp::{min, max},
