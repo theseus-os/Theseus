@@ -268,6 +268,136 @@
 <span id="268">268</span>
 <span id="269">269</span>
 <span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The aarch64-specific definitions of PTE flags.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::PteFlags;
@@ -277,7 +407,7 @@
 <span class="doccomment">/// A mask for the bits of a page table entry that contain the physical frame address.
 </span><span class="kw">pub const </span>PTE_FRAME_MASK: u64 = <span class="number">0x0000_FFFF_FFFF_F000</span>;
 
-<span class="comment">// Ensure that we never expose reserved bits [12:47] as part of the ` interface.
+<span class="comment">// Ensure that we never expose reserved bits [12:47] as part of the `PteFlagsAarch64` interface.
 </span><span class="macro">const_assert_eq!</span>(PteFlagsAarch64::all().bits() &amp; PTE_FRAME_MASK, <span class="number">0</span>);
 
 
@@ -402,6 +532,7 @@
         ///
         /// Thus, Theseus currently *always* sets this bit by default.
         </span><span class="kw">const </span>ACCESSED           = <span class="number">1 </span>&lt;&lt; <span class="number">10</span>;
+
         <span class="doccomment">/// * If set, this page is mapped into only one or less than all address spaces,
         ///   or is mapped differently across different address spaces,
         ///   and thus be flushed out of the TLB when switching address spaces (page tables).
@@ -421,10 +552,12 @@
         ///
         /// This is currently not used in Theseus.
         </span><span class="kw">const </span>_GUARDED_PAGE      = <span class="number">1 </span>&lt;&lt; <span class="number">50</span>;
+
         <span class="doccomment">/// * The hardware will set this bit when the page has been written to.
         /// * The OS can then clear this bit once it has acknowledged that the page was written to,
         ///   which is primarily useful for paging/swapping to disk.
         </span><span class="kw">const </span>DIRTY              = <span class="number">1 </span>&lt;&lt; <span class="number">51</span>;
+
         <span class="doccomment">/// * If set, this translation table entry is part of a set that is contiguous in memory
         ///   with adjacent entries that also have this bit set.
         /// * If not set, this translation table entry is not contiguous in memory
@@ -456,6 +589,9 @@
     }
 }
 
+<span class="kw">const </span>SHAREABLE_BITS_MASK: PteFlagsAarch64 = PteFlagsAarch64::_INNER_SHAREABLE;
+<span class="kw">const </span>MAIR_BITS_MASK:      PteFlagsAarch64 = PteFlagsAarch64::_MAIR_INDEX_7;
+
 <span class="doccomment">/// See [`PteFlagsAarch64::new()`] for what bits are set by default.
 </span><span class="kw">impl </span>Default <span class="kw">for </span>PteFlagsAarch64 {
     <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
@@ -471,7 +607,7 @@
     /// * The three bits `[2:4]` for MAIR index values.
     /// * The two bits `[8:9]` for shareability.
     </span><span class="kw">pub const </span>MASKED_BITS_FOR_CONVERSION: PteFlagsAarch64 = PteFlagsAarch64::from_bits_truncate(
-        PteFlagsAarch64::_INNER_SHAREABLE.bits | PteFlagsAarch64::_MAIR_INDEX_7.bits
+        SHAREABLE_BITS_MASK.bits | MAIR_BITS_MASK.bits
     );
 
     <span class="doccomment">/// Returns a new `PteFlagsAarch64` with the default value, in which:
@@ -498,6 +634,130 @@
             | <span class="self">Self</span>::_NOT_GLOBAL.bits
             | <span class="self">Self</span>::NOT_EXECUTABLE.bits
         )
+    }
+
+    <span class="doccomment">/// Returns a copy of this `PteFlagsAarch64` with the `VALID` bit set or cleared.
+    ///
+    /// * If `enable` is `true`, this PTE will be considered &quot;present&quot; and &quot;valid&quot;,
+    ///   meaning that the mapping from this page to a physical frame is valid
+    ///   and that the translation of a virtual address in this page should succeed.
+    /// * If `enable` is `false`, this PTE will be considered &quot;invalid&quot;,
+    ///   and any attempt to access it for translation purposes will cause a page fault.
+    </span><span class="attr">#[must_use]
+    #[doc(alias(<span class="string">&quot;present&quot;</span>))]
+    </span><span class="kw">pub fn </span>valid(<span class="kw-2">mut </span><span class="self">self</span>, enable: bool) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.set(<span class="self">Self</span>::VALID, enable);
+        <span class="self">self
+    </span>}
+
+    <span class="doccomment">/// Returns a copy of this `PteFlagsAarch64` with the `WRITABLE` bit set or cleared.
+    ///
+    /// * If `enable` is `true`, this will be writable.
+    /// * If `enable` is `false`, this will be read-only.
+    </span><span class="attr">#[must_use]
+    #[doc(alias(<span class="string">&quot;read_only&quot;</span>))]
+    </span><span class="kw">pub fn </span>writable(<span class="kw-2">mut </span><span class="self">self</span>, enable: bool) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.set(<span class="self">Self</span>::READ_ONLY, !enable);
+        <span class="self">self
+    </span>}
+
+    <span class="doccomment">/// Returns a copy of this `PteFlagsAarch64` with the `NOT_EXECUTABLE` bit cleared or set.
+    ///
+    /// * If `enable` is `true`, this page will be executable (`NOT_EXECUTABLE` will be cleared).
+    /// * If `enable` is `false`, this page will be non-executable, which is the default
+    ///   (`NOT_EXECUTABLE` will be set).
+    </span><span class="attr">#[must_use]
+    #[doc(alias(<span class="string">&quot;no_exec&quot;</span>))]
+    </span><span class="kw">pub fn </span>executable(<span class="kw-2">mut </span><span class="self">self</span>, enable: bool) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.set(<span class="self">Self</span>::NOT_EXECUTABLE, !enable);
+        <span class="self">self
+    </span>}
+
+    <span class="doccomment">/// Returns a copy of this `PteFlagsAarch64` with the `DEVICE_MEMORY` bit set or cleared.
+    ///
+    /// * If `enable` is `true`, this will be non-cacheable device memory.
+    /// * If `enable` is `false`, this will be &quot;normal&quot; memory, the default.
+    </span><span class="attr">#[must_use]
+    #[doc(alias(<span class="string">&quot;cache&quot;</span>, <span class="string">&quot;cacheable&quot;</span>, <span class="string">&quot;non-cacheable&quot;</span>))]
+    </span><span class="kw">pub fn </span>device_memory(<span class="kw-2">mut </span><span class="self">self</span>, enable: bool) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.remove(PteFlagsAarch64::_MAIR_INDEX_7);
+        <span class="kw">if </span>enable {
+            <span class="self">self</span>.insert(PteFlagsAarch64::DEVICE_MEMORY);
+        } <span class="kw">else </span>{
+            <span class="self">self</span>.insert(PteFlagsAarch64::NORMAL_MEMORY);
+        }
+        <span class="self">self
+    </span>}
+
+    <span class="doccomment">/// Returns a copy of this `PteFlagsAarch64` with the `EXCLUSIVE` bit set or cleared.
+    ///
+    /// * If `enable` is `true`, this page will exclusively map its frame.
+    /// * If `enable` is `false`, this page will NOT exclusively map its frame.
+    </span><span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>exclusive(<span class="kw-2">mut </span><span class="self">self</span>, enable: bool) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.set(<span class="self">Self</span>::EXCLUSIVE, enable);
+        <span class="self">self
+    </span>}
+
+    <span class="doccomment">/// Returns a copy of this `PteFlagsAarch64` with the `ACCESSED` bit set or cleared.
+    ///
+    /// Typically this is used to clear the `ACCESSED` bit, in order to indicate
+    /// that the OS has &quot;acknowledged&quot; the fact that this page was accessed
+    /// since the last time it checked.
+    ///
+    /// * If `enable` is `true`, this page will be marked as accessed.
+    /// * If `enable` is `false`, this page will be marked as not accessed.
+    </span><span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>accessed(<span class="kw-2">mut </span><span class="self">self</span>, enable: bool) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.set(<span class="self">Self</span>::ACCESSED, enable);
+        <span class="self">self
+    </span>}
+
+    <span class="doccomment">/// Returns a copy of this `PteFlagsAarch64` with the `DIRTY` bit set or cleared.
+    ///
+    /// Typically this is used to clear the `DIRTY` bit, in order to indicate
+    /// that the OS has &quot;acknowledged&quot; the fact that this page was written to
+    /// since the last time it checked. 
+    /// This bit is typically set by the hardware.
+    ///
+    /// * If `enable` is `true`, this page will be marked as dirty.
+    /// * If `enable` is `false`, this page will be marked as clean.
+    </span><span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>dirty(<span class="kw-2">mut </span><span class="self">self</span>, enable: bool) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.set(<span class="self">Self</span>::DIRTY, enable);
+        <span class="self">self
+    </span>}
+
+    <span class="attr">#[doc(alias(<span class="string">&quot;present&quot;</span>))]
+    </span><span class="kw">pub const fn </span>is_valid(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.contains(<span class="self">Self</span>::VALID)
+    }
+
+    <span class="attr">#[doc(alias(<span class="string">&quot;read_only&quot;</span>))]
+    </span><span class="kw">pub const fn </span>is_writable(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        !<span class="self">self</span>.contains(<span class="self">Self</span>::READ_ONLY)
+    }
+
+    <span class="attr">#[doc(alias(<span class="string">&quot;no_exec&quot;</span>))]
+    </span><span class="kw">pub const fn </span>is_executable(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        !<span class="self">self</span>.contains(<span class="self">Self</span>::NOT_EXECUTABLE)
+    }
+
+    <span class="attr">#[doc(alias(<span class="string">&quot;cache&quot;</span>, <span class="string">&quot;cacheable&quot;</span>, <span class="string">&quot;non-cacheable&quot;</span>))]
+    </span><span class="kw">pub const fn </span>is_device_memory(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.contains(<span class="self">Self</span>::DEVICE_MEMORY)
+    }
+
+    <span class="kw">pub const fn </span>is_dirty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.contains(<span class="self">Self</span>::DIRTY)
+    }
+
+    <span class="kw">pub const fn </span>is_accessed(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.contains(<span class="self">Self</span>::ACCESSED)
+    }
+
+    <span class="kw">pub const fn </span>is_exclusive(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.contains(<span class="self">Self</span>::EXCLUSIVE)
     }
 }
 
@@ -532,7 +792,7 @@
         // Otherwise, `DEVICE_MEMORY` may accidentally be misinterpreted as enabled
         // if another MAIR index that had overlapping bits (bit 2) was specified,
         // e.g., _MAIR_INDEX_3, _MAIR_INDEX_5, or _MAIR_INDEX_7.
-        </span><span class="kw">if </span>specific &amp; PteFlagsAarch64::_MAIR_INDEX_7 == PteFlagsAarch64::DEVICE_MEMORY {
+        </span><span class="kw">if </span>specific &amp; MAIR_BITS_MASK == PteFlagsAarch64::DEVICE_MEMORY {
             general |= <span class="self">Self</span>::DEVICE_MEMORY;
         }
         general

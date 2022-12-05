@@ -307,12 +307,16 @@
 <span id="307">307</span>
 <span id="308">308</span>
 <span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate defines the structure of page table entry (PTE) flags on x86_64 and aarch64.
 //! 
 //! This crate offers two main types:
 //! * [`PteFlags`]: the set of bit flags that apply to all architectures.
 //! * [`PteFlagsX86_64`] or [`PteFlagsAarch64`]: the arch-specific set of bit flags
 //!   that apply to only the given platform.
+//! * This crate also exports `PteFlagsArch`, an alias for the currently-active
+//!   arch-specific type above (either `PteFlagsX86_64` or `PteFlagsAarch64`).
 //! 
 //! ## Type conversions
 //! *Notably*, you can convert to and from these architecture-specific types
@@ -349,10 +353,10 @@
 }}
 
 <span class="macro">cfg_if! </span>{ <span class="kw">if </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
-    <span class="kw">use </span>pte_flags_x86_64::PteFlagsX86_64 <span class="kw">as </span>PteFlagsArch;
+    <span class="kw">pub use </span>pte_flags_x86_64::PteFlagsX86_64 <span class="kw">as </span>PteFlagsArch;
     <span class="kw">pub use </span>pte_flags_x86_64::PTE_FRAME_MASK;
 } <span class="kw">else if </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
-    <span class="kw">use </span>pte_flags_aarch64::PteFlagsAarch64 <span class="kw">as </span>PteFlagsArch;
+    <span class="kw">pub use </span>pte_flags_aarch64::PteFlagsAarch64 <span class="kw">as </span>PteFlagsArch;
     <span class="kw">pub use </span>pte_flags_aarch64::PTE_FRAME_MASK;
 }}
 
@@ -479,7 +483,7 @@
 }
 
 <span class="kw">impl </span>PteFlags {
-    <span class="doccomment">/// Returns a new `PteFlagsX86_64` with the default value, in which:
+    <span class="doccomment">/// Returns a new `PteFlags` with the default value, in which:
     /// * `ACCESSED` is set.
     /// * the `NOT_EXECUTABLE` bit is set.
     /// 
@@ -585,34 +589,34 @@
     </span>}
 
     <span class="attr">#[doc(alias(<span class="string">&quot;present&quot;</span>))]
-    </span><span class="kw">pub fn </span>is_valid(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    </span><span class="kw">pub const fn </span>is_valid(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.contains(<span class="self">Self</span>::VALID)
     }
 
     <span class="attr">#[doc(alias(<span class="string">&quot;read_only&quot;</span>))]
-    </span><span class="kw">pub fn </span>is_writable(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    </span><span class="kw">pub const fn </span>is_writable(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.contains(<span class="self">Self</span>::WRITABLE)
     }
 
     <span class="attr">#[doc(alias(<span class="string">&quot;no_exec&quot;</span>))]
-    </span><span class="kw">pub fn </span>is_executable(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    </span><span class="kw">pub const fn </span>is_executable(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         !<span class="self">self</span>.contains(<span class="self">Self</span>::NOT_EXECUTABLE)
     }
 
     <span class="attr">#[doc(alias(<span class="string">&quot;cache&quot;</span>, <span class="string">&quot;cacheable&quot;</span>, <span class="string">&quot;non-cacheable&quot;</span>))]
-    </span><span class="kw">pub fn </span>is_device_memory(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    </span><span class="kw">pub const fn </span>is_device_memory(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.contains(<span class="self">Self</span>::DEVICE_MEMORY)
     }
 
-    <span class="kw">pub fn </span>is_dirty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    <span class="kw">pub const fn </span>is_dirty(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.contains(<span class="self">Self</span>::DIRTY)
     }
 
-    <span class="kw">pub fn </span>is_accessed(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    <span class="kw">pub const fn </span>is_accessed(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.contains(<span class="self">Self</span>::ACCESSED)
     }
 
-    <span class="kw">pub fn </span>is_exclusive(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+    <span class="kw">pub const fn </span>is_exclusive(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.contains(<span class="self">Self</span>::EXCLUSIVE)
     }
 }
