@@ -1,6 +1,7 @@
-use crate::{device::DeviceWrapper, NetworkDevice, Result};
+use crate::{device::DeviceWrapper, Error, NetworkDevice, Result};
 use alloc::{collections::BTreeMap, sync::Arc};
 use irq_safety::MutexIrqSafe;
+use mutex_sleep::MutexSleep;
 use smoltcp::{iface, phy::DeviceCapabilities, wire};
 
 pub use smoltcp::iface::SocketSet;
@@ -13,7 +14,7 @@ pub use wire::{IpAddress, IpCidr};
 #[derive(Clone)]
 pub struct NetworkInterface {
     // FIXME: Can this be a regular mutex?
-    inner: Arc<MutexIrqSafe<iface::Interface<'static>>>,
+    inner: Arc<MutexSleep<iface::Interface<'static>>>,
     device: &'static MutexIrqSafe<dyn crate::NetworkDevice>,
 }
 
@@ -35,7 +36,7 @@ impl NetworkInterface {
         let mut wrapper = DeviceWrapper {
             inner: &mut *device.lock(),
         };
-        let inner = Arc::new(MutexIrqSafe::new(
+        let inner = Arc::new(MutexSleep::new(
             iface::InterfaceBuilder::new()
                 .random_seed(random::next_u64())
                 .hardware_addr(hardware_addr)
@@ -60,6 +61,7 @@ impl NetworkInterface {
         // FIXME: Timestamp
         self.inner
             .lock()
+            .map_err(|_| Error::Unknown)?
             .poll(smoltcp::time::Instant::ZERO, &mut wrapper, sockets)
             .map_err(|e| e.into())
     }

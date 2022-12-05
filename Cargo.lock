@@ -2160,6 +2160,7 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "log",
+ "mutex_sleep",
  "nic_buffers",
  "random",
  "smoltcp 0.8.0",
