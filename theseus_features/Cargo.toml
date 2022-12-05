@@ -19,7 +19,6 @@ date = { path = "../applications/date", optional = true }
 deps = { path = "../applications/deps", optional = true }
 hull = { path = "../applications/hull", optional = true }
 kill = { path = "../applications/kill", optional = true }
-less = { path = "../applications/less", optional = true }
 loadc = { path = "../applications/loadc", optional = true }
 ls = { path = "../applications/ls", optional = true }
 mkdir = { path = "../applications/mkdir", optional = true }
@@ -47,8 +46,6 @@ unified_channel = { path = "../kernel/unified_channel", optional = true }
 example = { path = "../applications/example", optional = true }
 hello = { path = "../applications/hello", optional = true }
 raw_mode = { path = "../applications/raw_mode", optional = true }
-input_echo = { path = "../applications/input_echo", optional = true }
-keyboard_echo = { path = "../applications/keyboard_echo", optional = true }
 print_fault_log = { path = "../applications/print_fault_log", optional = true }
 test_backtrace = { path = "../applications/test_backtrace", optional = true }
 test_block_io = { path = "../applications/test_block_io", optional = true }
@@ -102,7 +99,6 @@ theseus_apps = [
     "deps",
     "hull",
     "kill",
-    "less",
     "loadc",
     "ls",
     "mkdir",
@@ -134,8 +130,6 @@ theseus_tests = [
     "example",
     "hello",
     "raw_mode",
-    "input_echo",
-    "keyboard_echo",
     "test_backtrace",
     "test_block_io",
     "test_channel",

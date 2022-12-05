@@ -1253,15 +1253,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "input_echo"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "core2",
- "log",
-]
-
-[[package]]
 name = "intel_ethernet"
 version = "0.1.0"
 dependencies = [
@@ -1415,17 +1406,6 @@ dependencies = [
  "ps2",
  "spin 0.9.0",
  "x86_64",
-]
-
-[[package]]
-name = "keyboard_echo"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "core2",
- "keycodes_ascii",
- "log",
- "scheduler",
 ]
 
 [[package]]
@@ -3513,10 +3493,7 @@ dependencies = [
  "heap_eval",
  "hello",
  "hull",
- "input_echo",
- "keyboard_echo",
  "kill",
- "less",
  "libtest",
  "loadc",
  "ls",
