@@ -4,6 +4,8 @@
 //! * [`PteFlags`]: the set of bit flags that apply to all architectures.
 //! * [`PteFlagsX86_64`] or [`PteFlagsAarch64`]: the arch-specific set of bit flags
 //!   that apply to only the given platform.
+//! * This crate also exports `PteFlagsArch`, an alias for the currently-active
+//!   arch-specific type above (either `PteFlagsX86_64` or `PteFlagsAarch64`).
 //! 
 //! ## Type conversions
 //! *Notably*, you can convert to and from these architecture-specific types
@@ -28,6 +30,7 @@
 
 use cfg_if::cfg_if;
 use bitflags::bitflags;
+use static_assertions::const_assert_ne;
 
 cfg_if!{ if #[cfg(any(target_arch = "x86_64", doc))] {
     mod pte_flags_x86_64;
@@ -39,10 +42,10 @@ cfg_if!{ if #[cfg(any(target_arch = "aarch64", doc))] {
 }}
 
 cfg_if! { if #[cfg(target_arch = "x86_64")] {
-    use pte_flags_x86_64::PteFlagsX86_64 as PteFlagsArch;
+    pub use pte_flags_x86_64::PteFlagsX86_64 as PteFlagsArch;
     pub use pte_flags_x86_64::PTE_FRAME_MASK;
 } else if #[cfg(target_arch = "aarch64")] {
-    use pte_flags_aarch64::PteFlagsAarch64 as PteFlagsArch;
+    pub use pte_flags_aarch64::PteFlagsAarch64 as PteFlagsArch;
     pub use pte_flags_aarch64::PTE_FRAME_MASK;
 }}
 
@@ -89,9 +92,9 @@ bitflags! {
         /// * If set, this page maps device memory, which is non-cacheable.
         /// * If not set, this page maps normal memory, which is cacheable by default.
         //
-        // This does not require a conversion between architectures.
-        const DEVICE_MEMORY  = PteFlagsArch::DEVICE_MEMORY.bits();
-        
+        // This DOES require a conversion for aarch64, but not for x86_64.
+        const DEVICE_MEMORY = DEVICE_MEMORY_BITS.bits();
+
         /// * The hardware will set this bit when the page is accessed.
         /// * The OS can then clear this bit once it has acknowledged that the page was accessed,
         ///   if it cares at all about this information.
@@ -145,12 +148,21 @@ bitflags! {
 // The bits defined below have different semantics on x86_64 vs aarch64.
 // These are the ones that require special handling during From/Into conversions.
 cfg_if!{ if #[cfg(target_arch = "x86_64")] {
-    const WRITABLE_BIT: PteFlagsX86_64 = PteFlagsX86_64::WRITABLE;
-    const GLOBAL_BIT:   PteFlagsX86_64 = PteFlagsX86_64::_GLOBAL;
+    const DEVICE_MEMORY_BITS: PteFlagsX86_64 = PteFlagsX86_64::DEVICE_MEMORY;
+    const WRITABLE_BIT:       PteFlagsX86_64 = PteFlagsX86_64::WRITABLE;
+    const GLOBAL_BIT:         PteFlagsX86_64 = PteFlagsX86_64::_GLOBAL;
 } else if #[cfg(target_arch = "aarch64")] {
-    const WRITABLE_BIT: PteFlagsAarch64 = PteFlagsAarch64::READ_ONLY;
-    const GLOBAL_BIT:   PteFlagsAarch64 = PteFlagsAarch64::_NOT_GLOBAL;
+    const DEVICE_MEMORY_BITS: PteFlagsAarch64 = PteFlagsAarch64::DEVICE_MEMORY;
+    const WRITABLE_BIT:       PteFlagsAarch64 = PteFlagsAarch64::READ_ONLY;
+    const GLOBAL_BIT:         PteFlagsAarch64 = PteFlagsAarch64::_NOT_GLOBAL;
 }}
+
+// Due to the way that the `bitflags` crate works, we can only use
+// non-zero bit flag values for the above definitions.
+const_assert_ne!(DEVICE_MEMORY_BITS.bits(), 0);
+const_assert_ne!(WRITABLE_BIT.bits(), 0);
+const_assert_ne!(GLOBAL_BIT.bits(), 0);
+
 
 /// See [`PteFlags::new()`] for what bits are set by default.
 impl Default for PteFlags {
@@ -160,7 +172,7 @@ impl Default for PteFlags {
 }
 
 impl PteFlags {
-    /// Returns a new `PteFlagsX86_64` with the default value, in which:
+    /// Returns a new `PteFlags` with the default value, in which:
     /// * `ACCESSED` is set.
     /// * the `NOT_EXECUTABLE` bit is set.
     /// 
@@ -266,34 +278,34 @@ impl PteFlags {
     }
 
     #[doc(alias("present"))]
-    pub fn is_valid(&self) -> bool {
+    pub const fn is_valid(&self) -> bool {
         self.contains(Self::VALID)
     }
 
     #[doc(alias("read_only"))]
-    pub fn is_writable(&self) -> bool {
+    pub const fn is_writable(&self) -> bool {
         self.contains(Self::WRITABLE)
     }
 
     #[doc(alias("no_exec"))]
-    pub fn is_executable(&self) -> bool {
+    pub const fn is_executable(&self) -> bool {
         !self.contains(Self::NOT_EXECUTABLE)
     }
 
     #[doc(alias("cache", "cacheable", "non-cacheable"))]
-    pub fn is_device_memory(&self) -> bool {
+    pub const fn is_device_memory(&self) -> bool {
         self.contains(Self::DEVICE_MEMORY)
     }
 
-    pub fn is_dirty(&self) -> bool {
+    pub const fn is_dirty(&self) -> bool {
         self.contains(Self::DIRTY)
     }
 
-    pub fn is_accessed(&self) -> bool {
+    pub const fn is_accessed(&self) -> bool {
         self.contains(Self::ACCESSED)
     }
 
-    pub fn is_exclusive(&self) -> bool {
+    pub const fn is_exclusive(&self) -> bool {
         self.contains(Self::EXCLUSIVE)
     }
 }

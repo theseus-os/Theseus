@@ -7,7 +7,7 @@ use static_assertions::const_assert_eq;
 /// A mask for the bits of a page table entry that contain the physical frame address.
 pub const PTE_FRAME_MASK: u64 = 0x000_FFFFFFFFFF_000;
 
-// Ensure that we never expose reserved bits [12:51] as part of the ` interface.
+// Ensure that we never expose reserved bits [12:51] as part of the `PteFlagsX86_64` interface.
 const_assert_eq!(PteFlagsX86_64::all().bits() & PTE_FRAME_MASK, 0);
 
 
@@ -30,37 +30,66 @@ bitflags! {
         ///   * The page has been temporarily paged/swapped to disk
         ///   * The page is waiting to be mapped, i.e., for demand paging.
         const VALID              = 1 << 0;
+
         /// * If set, this page is writable.
         /// * If not set, this page is read-only.
         const WRITABLE           = 1 << 1;
+
         /// * If set, userspace (ring 3) can access this page.
         /// * If not set, only kernelspace (ring 0) can access this page.
-        const _USER_ACCESSIBLE    = 1 << 2;
+        ///
+        /// This is unused in Theseus because it is a single privilege level OS.
+        const _USER_ACCESSIBLE   = 1 << 2;
+
         /// * If set, writes to this page go directly to memory.
         /// * It not set, writes are first written to the CPU cache, and then written to memory.
         ///   This is also known as "write-back".
-        const _WRITE_THROUGH      = 1 << 3;
+        ///
+        /// If the Page Attribute Table (PAT) feature is enabled, this represents
+        /// the least-significant bit of the 3-bit index into the Page Attribute Table;
+        /// that index is used to determine the PAT entry that holds the
+        /// memory caching type that is applied to this page.
+        const _WRITE_THROUGH     = 1 << 3;
+
         /// * If set, this page's content is never cached, neither for read nor writes. 
         /// * If not set, this page's content is cached as normal, both for read nor writes. 
-        const NO_CACHE           = 1 << 4;
-        /// An alias for `NO_CACHE` in order to ease compatibility with aarch64.
-        const DEVICE_MEMORY      = Self::NO_CACHE.bits;
+        ///
+        /// If the Page Attribute Table (PAT) feature is enabled, this represents
+        /// the middle bit of the 3-bit index into the Page Attribute Table;
+        /// that index is used to determine the PAT entry that holds the
+        /// memory caching type that is applied to this page.
+        const CACHE_DISABLE      = 1 << 4;
+        /// An alias for [`Self::CACHE_DISABLE`] in order to ease compatibility with aarch64.
+        const DEVICE_MEMORY      = Self::CACHE_DISABLE.bits;
+
         /// * The hardware will set this bit when the page is accessed.
         /// * The OS can then clear this bit once it has acknowledged that the page was accessed,
         ///   if it cares at all about this information.
         const ACCESSED           = 1 << 5;
+
         /// * The hardware will set this bit when the page has been written to.
         /// * The OS can then clear this bit once it has acknowledged that the page was written to,
         ///   which is primarily useful for paging/swapping to disk.
         const DIRTY              = 1 << 6;
+
         /// * If set, this page table entry represents a "huge" page. 
         ///   This bit may be used as follows:
         ///   * For a P4-level PTE, it must be not set. 
         ///   * If set for a P3-level PTE, it means this PTE maps a 1GiB huge page.
         ///   * If set for a P2-level PTE, it means this PTE maps a 1MiB huge page.
-        ///   * For a P1-level PTE, it must be not set. 
+        ///   * A P1-level PTE cannot map a huge page, so this bit is interpreted
+        ///     as [`Self::PAT_FOR_P1`] instead.
         /// * If not set, this is a normal 4KiB page mapping.
         const HUGE_PAGE          = 1 << 7;
+        /// (For P1-level (lowest level) page tables ONLY):
+        /// If the Page Attribute Table (PAT) feature is enabled, this represents
+        /// the most-significant bit of the 3-bit index into the Page Attribute Table;
+        /// that index is used to determine the PAT entry that holds the
+        /// memory caching type that is applied to this page.
+        /// 
+        /// This *cannot* be used for PAT index bits in a mid-level (P2 or P3) entry.
+        const PAT_FOR_P1         = 1 <<  7;
+
         /// * If set, this page is mapped identically across all address spaces
         ///   (all root page tables) and doesn't need to be flushed out of the TLB
         ///   when switching to another address space (page table).
@@ -69,7 +98,18 @@ bitflags! {
         ///   and thus be flushed out of the TLB when switching address spaces (page tables).
         ///
         /// Note: Theseus is a single address space system, so this flag makes no difference.
-        const _GLOBAL             = 1 << 8;
+        const _GLOBAL            = 1 <<  8;
+
+        // Note: Theseus currently only supports setting PAT bits for P1-level PTEs.
+        //
+        // /// (For P2- and P3- level (mid-level) page tables ONLY):
+        // /// If the Page Attribute Table (PAT) feature is enabled, this represents
+        // /// the most-significant bit of the 3-bit index into the Page Attribute Table;
+        // /// that index is used to determine the PAT entry that holds the
+        // /// memory caching type that is applied to this page.
+        // /// 
+        // /// This *cannot* be used for PAT index bits in a lowest-level (P1) PTE.
+        // const PAT_FOR_P2_P3      = 1 << 12;
 
         /// See [PteFlags::EXCLUSIVE].
         ///  We use bit 55 because it is available for custom OS usage on both x86_64 and aarch64.
@@ -93,6 +133,129 @@ impl PteFlagsX86_64 {
     /// only the `NOT_EXECUTABLE` bit is set.
     pub const fn new() -> Self {
         Self::NOT_EXECUTABLE
+    }
+
+    /// Returns a copy of this `PteFlagsX86_64` with the `VALID` bit set or cleared.
+    ///
+    /// * If `enable` is `true`, this PTE will be considered "present" and "valid",
+    ///   meaning that the mapping from this page to a physical frame is valid
+    ///   and that the translation of a virtual address in this page should succeed.
+    /// * If `enable` is `false`, this PTE will be considered "invalid",
+    ///   and any attempt to access it for translation purposes will cause a page fault.
+    #[must_use]
+    #[doc(alias("present"))]
+    pub fn valid(mut self, enable: bool) -> Self {
+        self.set(Self::VALID, enable);
+        self
+    }
+
+    /// Returns a copy of this `PteFlagsX86_64` with the `WRITABLE` bit set or cleared.
+    ///
+    /// * If `enable` is `true`, this will be writable.
+    /// * If `enable` is `false`, this will be read-only.
+    #[must_use]
+    #[doc(alias("read_only"))]
+    pub fn writable(mut self, enable: bool) -> Self {
+        self.set(Self::WRITABLE, enable);
+        self
+    }
+
+    /// Returns a copy of this `PteFlagsX86_64` with the `NOT_EXECUTABLE` bit cleared or set.
+    ///
+    /// * If `enable` is `true`, this page will be executable (`NOT_EXECUTABLE` will be cleared).
+    /// * If `enable` is `false`, this page will be non-executable, which is the default
+    ///   (`NOT_EXECUTABLE` will be set).
+    #[must_use]
+    #[doc(alias("no_exec"))]
+    pub fn executable(mut self, enable: bool) -> Self {
+        self.set(Self::NOT_EXECUTABLE, !enable);
+        self
+    }
+
+    /// Returns a copy of this `PteFlagsX86_64` with the `DEVICE_MEMORY` bit set or cleared.
+    ///
+    /// * If `enable` is `true`, this will be non-cacheable device memory.
+    /// * If `enable` is `false`, this will be "normal" memory, the default.
+    #[must_use]
+    #[doc(alias("cache", "cacheable", "non-cacheable"))]
+    pub fn device_memory(mut self, enable: bool) -> Self {
+        self.set(Self::DEVICE_MEMORY, enable);
+        self
+    }
+
+    /// Returns a copy of this `PteFlagsX86_64` with the `EXCLUSIVE` bit set or cleared.
+    ///
+    /// * If `enable` is `true`, this page will exclusively map its frame.
+    /// * If `enable` is `false`, this page will NOT exclusively map its frame.
+    #[must_use]
+    pub fn exclusive(mut self, enable: bool) -> Self {
+        self.set(Self::EXCLUSIVE, enable);
+        self
+    }
+
+    /// Returns a copy of this `PteFlagsX86_64` with the `ACCESSED` bit set or cleared.
+    ///
+    /// Typically this is used to clear the `ACCESSED` bit, in order to indicate
+    /// that the OS has "acknowledged" the fact that this page was accessed
+    /// since the last time it checked.
+    ///
+    /// * If `enable` is `true`, this page will be marked as accessed.
+    /// * If `enable` is `false`, this page will be marked as not accessed.
+    #[must_use]
+    pub fn accessed(mut self, enable: bool) -> Self {
+        self.set(Self::ACCESSED, enable);
+        self
+    }
+
+    /// Returns a copy of this `PteFlagsX86_64` with the `DIRTY` bit set or cleared.
+    ///
+    /// Typically this is used to clear the `DIRTY` bit, in order to indicate
+    /// that the OS has "acknowledged" the fact that this page was written to
+    /// since the last time it checked. 
+    /// This bit is typically set by the hardware.
+    ///
+    /// * If `enable` is `true`, this page will be marked as dirty.
+    /// * If `enable` is `false`, this page will be marked as clean.
+    #[must_use]
+    pub fn dirty(mut self, enable: bool) -> Self {
+        self.set(Self::DIRTY, enable);
+        self
+    }
+
+    #[doc(alias("present"))]
+    pub const fn is_valid(&self) -> bool {
+        self.contains(Self::VALID)
+    }
+
+    #[doc(alias("read_only"))]
+    pub const fn is_writable(&self) -> bool {
+        self.contains(Self::WRITABLE)
+    }
+
+    #[doc(alias("no_exec"))]
+    pub const fn is_executable(&self) -> bool {
+        !self.contains(Self::NOT_EXECUTABLE)
+    }
+
+    #[doc(alias("cache", "cacheable", "non-cacheable"))]
+    pub const fn is_device_memory(&self) -> bool {
+        self.contains(Self::DEVICE_MEMORY)
+    }
+
+    pub const fn is_dirty(&self) -> bool {
+        self.contains(Self::DIRTY)
+    }
+
+    pub const fn is_accessed(&self) -> bool {
+        self.contains(Self::ACCESSED)
+    }
+
+    pub const fn is_huge(&self) -> bool {
+        self.contains(Self::HUGE_PAGE)
+    }
+
+    pub const fn is_exclusive(&self) -> bool {
+        self.contains(Self::EXCLUSIVE)
     }
 }
 

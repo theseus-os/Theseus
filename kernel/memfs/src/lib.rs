@@ -15,7 +15,7 @@ extern crate io;
 
 use alloc::string::String;
 use fs_node::{DirRef, WeakDirRef, File, FsNode};
-use memory::{MappedPages, get_kernel_mmi_ref, allocate_pages_by_bytes, EntryFlags};
+use memory::{MappedPages, get_kernel_mmi_ref, allocate_pages_by_bytes, PteFlags};
 use alloc::sync::Arc;
 use spin::Mutex;
 use fs_node::{FileOrDir, FileRef};
@@ -94,7 +94,7 @@ impl ByteWriter for MemFile {
         else {
             // If the mapped pages are empty (this is the first allocation), we make them writable
             let prev_flags = if self.mp.size_in_bytes() == 0 {
-                EntryFlags::WRITABLE
+                PteFlags::new().valid(true).writable(true).into()
             } 
             // Otherwise, use the existing mapped pages flags
             else {

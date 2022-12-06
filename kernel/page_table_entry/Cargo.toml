@@ -18,8 +18,8 @@ path = "../memory_structs"
 [dependencies.frame_allocator]
 path = "../frame_allocator"
 
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-memory_x86_64 = { path = "../memory_x86_64" }
+[dependencies.pte_flags]
+path = "../pte_flags"
 
 [lib]
 crate-type = ["rlib"]
