@@ -1,6 +1,8 @@
 [package]
 name = "test_async"
 version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "A test application for the asynchronous executor"
 edition = "2021"
 
 [dependencies]
