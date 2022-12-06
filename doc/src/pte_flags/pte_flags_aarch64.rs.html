@@ -398,6 +398,46 @@
 <span id="398">398</span>
 <span id="399">399</span>
 <span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The aarch64-specific definitions of PTE flags.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::PteFlags;
@@ -599,17 +639,8 @@
     }
 }
 
-<span class="kw">impl </span>PteFlagsAarch64 {
-    <span class="doccomment">/// The mask of bit ranges that cannot be handled by toggling,
-    /// as they are not single bit values, but multi-bit selectors/indices.
-    ///
-    /// Currently this includes:
-    /// * The three bits `[2:4]` for MAIR index values.
-    /// * The two bits `[8:9]` for shareability.
-    </span><span class="kw">pub const </span>MASKED_BITS_FOR_CONVERSION: PteFlagsAarch64 = PteFlagsAarch64::from_bits_truncate(
-        SHAREABLE_BITS_MASK.bits | MAIR_BITS_MASK.bits
-    );
-
+<span class="doccomment">/// Functions common to PTE flags on all architectures.
+</span><span class="kw">impl </span>PteFlagsAarch64 {
     <span class="doccomment">/// Returns a new `PteFlagsAarch64` with the default value, in which:
     /// * `NORMAL_MEMORY` (not `DEVICE_MEMORY`) is set.
     /// * `OUTER_SHAREABLE` is set.
@@ -758,6 +789,55 @@
 
     <span class="kw">pub const fn </span>is_exclusive(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.contains(<span class="self">Self</span>::EXCLUSIVE)
+    }
+}
+
+<span class="doccomment">/// Functions specific to aarch64 PTE flags only.
+</span><span class="kw">impl </span>PteFlagsAarch64 {
+    <span class="doccomment">/// The mask of bit ranges that cannot be handled by toggling,
+    /// as they are not single bit values, but multi-bit selectors/indices.
+    ///
+    /// Currently this includes:
+    /// * The three bits `[2:4]` for MAIR index values.
+    /// * The two bits `[8:9]` for shareability.
+    </span><span class="kw">pub const </span>MASKED_BITS_FOR_CONVERSION: PteFlagsAarch64 = PteFlagsAarch64::from_bits_truncate(
+        SHAREABLE_BITS_MASK.bits | MAIR_BITS_MASK.bits
+    );
+
+    <span class="doccomment">/// Returns a copy of this `PteFlagsAarch64` with its flags adjusted
+    /// for use in a higher-level page table entry, e.g., P4, P3, P2.
+    ///
+    /// Currently, on aarch64, this does the following:
+    /// * Clears the `NOT_EXECUTABLE` bit.  
+    ///   * P4, P3, and P2 entries should never set `NOT_EXECUTABLE`,
+    ///     only the lowest-level P1 entry should.
+    /// * Clears the `EXCLUSIVE` bit.
+    ///   * Currently, we do not use the `EXCLUSIVE` bit for P4, P3, or P2 entries,
+    ///     because another page table frame may re-use it (create another alias to it)
+    ///     without our page table implementation knowing about it.
+    ///   * Only P1-level PTEs can map a frame exclusively.
+    /// * Sets the `VALID` bit, as every P4, P3, and P2 entry must be valid.
+    </span><span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>adjust_for_higher_level_pte(<span class="self">self</span>) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.executable(<span class="bool-val">true</span>)
+            .exclusive(<span class="bool-val">false</span>)
+            .valid(<span class="bool-val">true</span>)
+    }
+
+    <span class="doccomment">/// Returns a copy of this `PteFlagsAarch64` with the `PAGE_DESCRIPTOR` bit set or cleared.
+    ///
+    /// * If `enable` is `true`, this will represent a page descriptor.
+    /// * If `enable` is `false`, this will represent a block descriptor.
+    </span><span class="attr">#[must_use]
+    #[doc(alias(<span class="string">&quot;block&quot;</span>, <span class="string">&quot;block descriptor&quot;</span>))]
+    </span><span class="kw">pub fn </span>page_descriptor(<span class="kw-2">mut </span><span class="self">self</span>, enable: bool) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.set(<span class="self">Self</span>::PAGE_DESCRIPTOR, enable);
+        <span class="self">self
+    </span>}
+
+    <span class="attr">#[doc(alias(<span class="string">&quot;block&quot;</span>, <span class="string">&quot;block descriptor&quot;</span>))]
+    </span><span class="kw">pub const fn </span>is_page_descriptor(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.contains(<span class="self">Self</span>::PAGE_DESCRIPTOR)
     }
 }
 

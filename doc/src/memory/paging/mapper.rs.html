@@ -1242,17 +1242,6 @@
 <span id="1242">1242</span>
 <span id="1243">1243</span>
 <span id="1244">1244</span>
-<span id="1245">1245</span>
-<span id="1246">1246</span>
-<span id="1247">1247</span>
-<span id="1248">1248</span>
-<span id="1249">1249</span>
-<span id="1250">1250</span>
-<span id="1251">1251</span>
-<span id="1252">1252</span>
-<span id="1253">1253</span>
-<span id="1254">1254</span>
-<span id="1255">1255</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -1431,12 +1420,7 @@
     {
         <span class="kw">let </span>frames = frames.into_inner();
         <span class="kw">let </span>flags = flags.into();
-        <span class="kw">let </span>top_level_flags = flags.valid(<span class="bool-val">true</span>)
-            <span class="comment">// P4, P3, and P2 entries should never set NOT_EXECUTABLE; only the lowest-level P1 entry should.
-            </span>.executable(<span class="bool-val">true</span>)
-            <span class="comment">// Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
-            // because another page table frame may re-use (create another alias for) it without us knowing here.
-            </span>.exclusive(<span class="bool-val">false</span>);
+        <span class="kw">let </span>higher_level_flags = flags.adjust_for_higher_level_pte();
 
         <span class="comment">// Only the lowest-level P1 entry can be considered exclusive, and only when
         // we are mapping it exclusively (i.e., owned `AllocatedFrames` are passed in).
@@ -1455,9 +1439,9 @@
 
         <span class="comment">// iterate over pages and frames in lockstep
         </span><span class="kw">for </span>(page, frame) <span class="kw">in </span>pages.deref().clone().into_iter().zip(frames.borrow().into_iter()) {
-            <span class="kw">let </span>p3 = <span class="self">self</span>.p4_mut().next_table_create(page.p4_index(), top_level_flags);
-            <span class="kw">let </span>p2 = p3.next_table_create(page.p3_index(), top_level_flags);
-            <span class="kw">let </span>p1 = p2.next_table_create(page.p2_index(), top_level_flags);
+            <span class="kw">let </span>p3 = <span class="self">self</span>.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
+            <span class="kw">let </span>p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
+            <span class="kw">let </span>p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
 
             <span class="kw">if </span>!p1[page.p1_index()].is_unused() {
                 <span class="macro">error!</span>(<span class="string">&quot;map_allocated_pages_to(): page {:#X} -&gt; frame {:#X}, page was already in use!&quot;</span>, page.start_address(), frame.start_address());
@@ -1508,16 +1492,10 @@
         flags: F,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>flags = flags.into();
-        <span class="kw">let </span>top_level_flags = flags
-        <span class="comment">// P4, P3, and P2 entries should never set NOT_EXECUTABLE; only the lowest-level P1 entry should.
-            </span>.executable(<span class="bool-val">true</span>)
-            <span class="comment">// Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
-            // because another page table frame may re-use (create another alias for) it without us knowing here.
-            </span>.exclusive(<span class="bool-val">false</span>)
-            .valid(<span class="bool-val">true</span>);
+        <span class="kw">let </span>higher_level_flags = flags.adjust_for_higher_level_pte();
 
-        <span class="comment">// Only the lowest-level P1 entry can be considered exclusive, and only when
-        // we are mapping it exclusively (i.e., owned `AllocatedFrames` are passed in).
+        <span class="comment">// Only the lowest-level P1 entry can be considered exclusive, and only because
+        // we are mapping it exclusively (to owned `AllocatedFrames`).
         </span><span class="kw">let </span>actual_flags = flags
             .exclusive(<span class="bool-val">true</span>)
             .valid(<span class="bool-val">true</span>);
@@ -1525,9 +1503,9 @@
         <span class="kw">for </span>page <span class="kw">in </span>pages.deref().clone() {
             <span class="kw">let </span>af = frame_allocator::allocate_frames(<span class="number">1</span>).ok_or(<span class="string">&quot;map_allocated_pages(): couldn&#39;t allocate new frame, out of memory&quot;</span>)<span class="question-mark">?</span>;
 
-            <span class="kw">let </span>p3 = <span class="self">self</span>.p4_mut().next_table_create(page.p4_index(), top_level_flags);
-            <span class="kw">let </span>p2 = p3.next_table_create(page.p3_index(), top_level_flags);
-            <span class="kw">let </span>p1 = p2.next_table_create(page.p2_index(), top_level_flags);
+            <span class="kw">let </span>p3 = <span class="self">self</span>.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
+            <span class="kw">let </span>p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
+            <span class="kw">let </span>p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
 
             <span class="kw">if </span>!p1[page.p1_index()].is_unused() {
                 <span class="macro">error!</span>(<span class="string">&quot;map_allocated_pages(): page {:#X} -&gt; frame {:#X}, page was already in use!&quot;</span>,

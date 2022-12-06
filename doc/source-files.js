@@ -94,6 +94,7 @@ var sourcesIndex = JSON.parse('{\
 "no_drop":["",[],["lib.rs"]],\
 "ota_update_client":["",[],["lib.rs"]],\
 "page_allocator":["",[],["lib.rs","static_array_rb_tree.rs"]],\
+"page_attribute_table":["",[],["lib.rs"]],\
 "page_table_entry":["",[],["lib.rs"]],\
 "panic_entry":["",[],["lib.rs"]],\
 "panic_wrapper":["",[],["lib.rs"]],\

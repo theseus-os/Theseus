@@ -192,22 +192,30 @@
 <span id="192">192</span>
 <span id="193">193</span>
 <span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate defines a `Framebuffer` structure, which is effectively a region of memory
 //! that is interpreted as a 2-D array of pixels.
 
 </span><span class="attr">#![no_std]
 
-#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>memory;
-<span class="kw">extern crate </span>multicore_bringup;
-<span class="kw">extern crate </span>shapes;
-<span class="kw">extern crate </span>color;
-<span class="kw">extern crate </span>zerocopy;
-
-<span class="kw">pub mod </span>pixel;
+</span><span class="kw">pub mod </span>pixel;
 <span class="kw">use </span>core::{ops::{DerefMut, Deref}, hash::{Hash, Hasher}};
-
-<span class="kw">use </span>memory::{PteFlags, PhysicalAddress, Mutable, BorrowedSliceMappedPages};
+<span class="kw">use </span>log::{info, debug};
+<span class="kw">use </span>memory::{PteFlags, PteFlagsArch, PhysicalAddress, Mutable, BorrowedSliceMappedPages};
 <span class="kw">use </span>shapes::Coord;
 <span class="kw">pub use </span>pixel::<span class="kw-2">*</span>;
 
@@ -259,49 +267,71 @@
 <span class="kw">impl</span>&lt;P: Pixel&gt; Framebuffer&lt;P&gt; {
     <span class="doccomment">/// Creates a new framebuffer with rectangular dimensions of `width * height`, 
     /// specified in number of pixels.
-    /// If the `physical_address` is provided, the returned framebuffer will be **final**,
-    /// i.e., mapped to the physical memory at that address, which is typically a hardware graphics device&#39;s memory.
-    /// If the `physical_address` is `None`, the returned framebuffer is a &quot;virtual&quot; one 
+    ///
+    /// If `physical_address` is `Some`, the returned framebuffer will be a real physical one,
+    /// i.e., mapped to the physical memory at that address, which is typically hardware graphics memory.
+    /// In this case, we attempt to map the memory as &quot;write-combining&quot;, which only works
+    /// on x86 if the Page Attribute Table feature is enabled.
+    /// Otherwise, we map the real physical framebuffer memory with all caching disabled.
+    ///
+    /// If `physical_address` is `None`, the returned framebuffer is a &quot;virtual&quot; one 
     /// that renders to a randomly-allocated chunk of memory.
     </span><span class="kw">pub fn </span>new(
         width: usize,
         height: usize,
         physical_address: <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Framebuffer&lt;P&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="comment">// get a reference to the kernel&#39;s memory mapping information
-        </span><span class="kw">let </span>kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or(<span class="string">&quot;KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
-
-        <span class="kw">let </span>vesa_display_flags = PteFlags::new()
-            .valid(<span class="bool-val">true</span>)
-            .writable(<span class="bool-val">true</span>)
-            .device_memory(<span class="bool-val">true</span>); <span class="comment">// TODO: use PAT write-combining instead of disabling caching
-
-        </span><span class="kw">let </span>size = width * height * core::mem::size_of::&lt;P&gt;();
-        <span class="kw">let </span>pages = memory::allocate_pages_by_bytes(size).ok_or(<span class="string">&quot;could not allocate pages for a new framebuffer&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or(<span class="string">&quot;KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;            
+        <span class="kw">let </span>size = width * height * core::mem::size_of::&lt;P&gt;();
+        <span class="kw">let </span>pages = memory::allocate_pages_by_bytes(size)
+            .ok_or(<span class="string">&quot;could not allocate pages for a new framebuffer&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="kw">let </span>mapped_framebuffer = <span class="kw">if let </span><span class="prelude-val">Some</span>(address) = physical_address {
+            <span class="comment">// For best performance, we map the real physical framebuffer memory
+            // as write-combining using the PAT (on x86 only).
+            // If PAT isn&#39;t available, fall back to disabling caching altogether.
+            </span><span class="kw">let </span><span class="kw-2">mut </span>flags: PteFlagsArch = PteFlags::new()
+                .valid(<span class="bool-val">true</span>)
+                .writable(<span class="bool-val">true</span>)
+                .into();
+
+            <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
+                <span class="kw">let </span>use_pat = page_attribute_table::init().is_ok();
+                <span class="kw">if </span>use_pat {
+                    flags = flags.pat_index(
+                        page_attribute_table::MemoryCachingType::WriteCombining.pat_slot_index()
+                    );
+                    <span class="macro">info!</span>(<span class="string">&quot;Using PAT write-combining mapping for real physical framebuffer memory&quot;</span>);
+                } <span class="kw">else </span>{
+                    flags = flags.device_memory(<span class="bool-val">true</span>);
+                    <span class="macro">info!</span>(<span class="string">&quot;Falling back to cache-disable mapping for real physical framebuffer memory&quot;</span>);
+                }
+            }
+            <span class="attr">#[cfg(not(target_arch = <span class="string">&quot;x86_64&quot;</span>))] </span>{
+                flags = flags.device_memory(<span class="bool-val">true</span>);
+            }
+
             <span class="kw">let </span>frames = memory::allocate_frames_by_bytes_at(address, size)
                 .map_err(|_e| <span class="string">&quot;Couldn&#39;t allocate frames for the final framebuffer&quot;</span>)<span class="question-mark">?</span>;
-            kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
+            <span class="kw">let </span>fb_mp = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
                 pages,
                 frames,
-                vesa_display_flags,
-            )<span class="question-mark">?
-        </span>} <span class="kw">else </span>{
+                flags,
+            )<span class="question-mark">?</span>;
+            <span class="macro">debug!</span>(<span class="string">&quot;Mapped real physical framebuffer: {fb_mp:?}&quot;</span>);
+            fb_mp
+        } <span class="kw">else </span>{
             kernel_mmi_ref.lock().page_table.map_allocated_pages(
                 pages,
-                vesa_display_flags,
+                PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>),
             )<span class="question-mark">?
         </span>};
-
-        <span class="comment">// obtain a slice reference to the framebuffer&#39;s memory
-        </span><span class="kw">let </span>buffer = mapped_framebuffer.into_borrowed_slice_mut(<span class="number">0</span>, width * height)
-            .map_err(|(|_mp, s)| s)<span class="question-mark">?</span>;
 
         <span class="prelude-val">Ok</span>(Framebuffer {
             width,
             height,
-            buffer,
+            buffer: mapped_framebuffer.into_borrowed_slice_mut(<span class="number">0</span>, width * height)
+                .map_err(|(|_mp, s)| s)<span class="question-mark">?</span>,
         })
     }
 
