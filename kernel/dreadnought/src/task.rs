@@ -9,7 +9,7 @@ pub struct Task {
     pub(super) future: core::cell::SyncUnsafeCell<Pin<Box<dyn Future<Output = ()> + 'static + Send>>>,
     // pub(super) future: spin::Mutex<Pin<Box<dyn Future<Output = ()> + 'static + Send>>>,
     // TODO: Use an mpsc rather than an mpmc.
-    pub(super) run_queue: async_channel::Sender<Arc<Task>>,
+    pub(super) run_queue: async_channel::Sender<Task>,
 }
 
 impl Wake for Task {

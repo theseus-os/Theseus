@@ -8,6 +8,11 @@ async_channel = { path = "../async_channel" }
 # TODO: MutexSleep
 spin = "*"
 
+[dependencies.crossbeam_queue]
+version = "0.3"
+default-features = false
+features = ["alloc"]
+
 [dependencies.futures]
 version = "0.3"
 default-features = false

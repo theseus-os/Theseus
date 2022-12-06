@@ -1,6 +1,6 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 #![feature(sync_unsafe_cell)]
-// #![no_std]
+#![no_std]
 
 extern crate alloc;
 
@@ -18,12 +18,10 @@ use core::{
 use futures::FutureExt;
 use join::JoinHandle;
 use spin::Mutex;
+use crossbeam_queue::SegQueue;
 
 pub struct Executor {
-    // TODO: Construct sender from receiver rather than storing it.
-    sender: std::sync::mpsc::Sender<Arc<Task>>,
-    // TODO: We can use an mpsc rather than an mpmc.
-    receiver: std::sync::mpsc::Receiver<Arc<Task>>,
+    queue: SegQueue,
 }
 
 impl Executor {
