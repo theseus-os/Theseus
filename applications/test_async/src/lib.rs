@@ -4,14 +4,14 @@ extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
 use app_io::println;
-use dreadnought::{execute, FutureExt};
+use dreadnought::{block_on, FutureExt};
 
 pub fn main(_: Vec<String>) -> isize {
-    execute(async {
+    block_on(async {
         println!("Hello, asynchronous world!");
     });
 
-    execute(async {
+    block_on(async {
         let result = dreadnought::select_biased! {
             result = dreadnought::future::pending() => result,
             result = foo().fuse() => result,
