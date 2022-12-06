@@ -1011,6 +1011,7 @@ dependencies = [
  "log",
  "memory",
  "multicore_bringup",
+ "page_attribute_table",
  "shapes",
  "zerocopy",
 ]
@@ -2186,6 +2187,18 @@ dependencies = [
  "memory_structs",
  "spin 0.9.0",
  "static_assertions",
+]
+
+[[package]]
+name = "page_attribute_table"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "memory",
+ "modular-bitfield",
+ "msr",
+ "raw-cpuid",
+ "x86_64",
 ]
 
 [[package]]
