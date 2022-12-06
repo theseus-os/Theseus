@@ -8,6 +8,7 @@ edition = "2018"
 [dependencies]
 log = "0.4.8"
 x86_64 = "0.14.8"
+modular-bitfield = "0.11.2"
 
 [dependencies.msr]
 path = "../../libs/msr"

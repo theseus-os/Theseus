@@ -2194,6 +2194,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "memory",
+ "modular-bitfield",
  "msr",
  "raw-cpuid",
  "x86_64",
