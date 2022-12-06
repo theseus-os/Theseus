@@ -126,7 +126,13 @@ impl PageTableEntry {
         #[cfg(target_arch = "aarch64")]
         {
             let mut arch_flags: PteFlagsAarch64 = flags.into();
-            arch_flags.insert(PteFlagsAarch64::PAGE_DESCRIPTOR | PteFlagsAarch64::ACCESSED);
+
+            // telling the MMU that this is not a Block Descriptor
+            arch_flags.insert(PteFlagsAarch64::PAGE_DESCRIPTOR);
+
+            // we currently insert ACCESSED to avoid Access Faults
+            arch_flags.insert(PteFlagsAarch64::ACCESSED);
+
             self.0 = (frame.start_address().value() as u64) | arch_flags.bits();
         }
     }
@@ -144,7 +150,13 @@ impl PageTableEntry {
         #[cfg(target_arch = "aarch64")]
         {
             let mut arch_flags: PteFlagsAarch64 = new_flags.into();
-            arch_flags.insert(PteFlagsAarch64::PAGE_DESCRIPTOR | PteFlagsAarch64::ACCESSED);
+
+            // telling the MMU that this is not a Block Descriptor
+            arch_flags.insert(PteFlagsAarch64::PAGE_DESCRIPTOR);
+
+            // we currently insert ACCESSED to avoid Access Faults
+            arch_flags.insert(PteFlagsAarch64::ACCESSED);
+
             self.0 = self.0 & PTE_FRAME_MASK | arch_flags.bits();
         }
     }

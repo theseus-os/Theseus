@@ -1,4 +1,6 @@
 [package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Nathan Royer <nathan.royer.pro@gmail.com>"]
+description = "The code executed by a bootloader once it wants to start Theseus"
 name = "nano_core"
 version = "0.1.0"
 edition = "2021"

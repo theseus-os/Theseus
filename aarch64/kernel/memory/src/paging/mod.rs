@@ -87,7 +87,6 @@ impl PageTable {
     }
 
     /// Initializes a new top-level P4 `PageTable` whose root is located in the given `new_p4_frame`.
-    /// It requires using the given `current_active_table` to set up its initial mapping contents.
     /// 
     /// A single allocated page can optionally be provided for use as part of a new `TemporaryPage`
     /// for the recursive mapping.
@@ -102,8 +101,8 @@ impl PageTable {
         let table = unsafe { (p4_frame as *mut Table<Level4>).as_mut() }.ok_or("damn")?;
         table.zero();
 
-        let flags = PteFlags::VALID | PteFlags::NOT_EXECUTABLE | PteFlags::WRITABLE;
-        table[RECURSIVE_P4_INDEX].set_entry(new_p4_frame.as_allocated_frame(), flags);
+        let rec_top_level_flags = PteFlags::VALID | PteFlags::NOT_EXECUTABLE | PteFlags::WRITABLE;
+        table[RECURSIVE_P4_INDEX].set_entry(new_p4_frame.as_allocated_frame(), rec_top_level_flags);
 
         Ok(PageTable {
             mapper: Mapper::with_p4_frame(*new_p4_frame.as_allocated_frame()),
@@ -239,7 +238,8 @@ pub fn init(
         Ok(())
     };
 
-    // uefi = identity mapped so virt_addr = phys_addr
+    // As a UEFI app we are in an identity mapped AS so virt_addr = phys_addr
+    // either that or the MMU is disabled, which works the same
     for (phys_addr, num_frames, flags) in layout {
         if let Err(error_msg) = map_region(phys_addr, num_frames, flags) {
             warn!("Early remapping: {}; addr={:?} n={} flags={:?}",

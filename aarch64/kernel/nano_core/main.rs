@@ -18,7 +18,7 @@ use alloc::vec::Vec;
 use uefi::{prelude::entry, Status, Handle, table::{SystemTable, Boot, boot::MemoryType}};
 
 use frame_allocator::{PhysicalMemoryRegion, MemoryRegionType};
-use memory_structs::{PhysicalAddress, Frame, FrameRange};
+use memory_structs::{PhysicalAddress, FrameRange};
 use kernel_config::memory::PAGE_SIZE;
 use pte_flags::PteFlags;
 

@@ -9,7 +9,6 @@
 
 use super::PageTableEntry;
 use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
-use pte_flags::PTE_FRAME_MASK;
 use super::super::{VirtualAddress, PteFlags};
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
@@ -67,7 +66,7 @@ impl<L: HierarchicalLevel> Table<L> {
                 true => (table_address << 9) | (index << PAGE_SHIFT),
 
                 // use the identity mapping
-                false => (self[index].value() & PTE_FRAME_MASK) as usize,
+                false => self[index].pointed_frame().unwrap().start_address().value(),
 
             };
             Some(VirtualAddress::new_canonical(next_table_vaddr))
@@ -113,8 +112,6 @@ impl<L: HierarchicalLevel> Table<L> {
     /// it will be accessed using the recursive paging special entry.
     /// Otherwise, the code assumes we are in identity-mapping, and
     /// the physical addresses in a table are used as virtual addresses.
-    ///
-    /// TODO: return a `Result` here instead of panicking.
     pub fn next_table_create(
         &mut self,
         index: usize,

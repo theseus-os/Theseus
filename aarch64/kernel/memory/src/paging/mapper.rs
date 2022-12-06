@@ -193,14 +193,8 @@ impl Mapper {
         flags: PteFlags,
         active: bool,
     ) -> Result<(MappedPages, AllocatedFrames), &'static str> {
-        let mut top_level_flags = flags.clone() | PteFlags::VALID;
-        // P4, P3, and P2 entries should never set NOT_EXECUTABLE, only the lowest-level P1 entry should. 
-        // top_level_flags.set(PteFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
-        top_level_flags.set(PteFlags::NOT_EXECUTABLE, false);
-        // Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
-        // because another page table frame may re-use (create another alias for) it without us knowing here.
-        // Only the lowest-level P1 entry can be considered exclusive, only if it's mapped truly exclusively using this function.
-        top_level_flags.set(PteFlags::EXCLUSIVE, false);
+        // On aarch64, P4/P3/P2 should only contain valid
+        let top_level_flags = PteFlags::VALID;
         let actual_flags = flags | PteFlags::EXCLUSIVE | PteFlags::VALID;
 
         let pages_count = pages.size_in_pages();
@@ -273,14 +267,8 @@ impl Mapper {
     pub fn map_allocated_pages(&mut self, pages: AllocatedPages, flags: PteFlags)
         -> Result<MappedPages, &'static str>
     {
-        let mut top_level_flags = flags.clone() | PteFlags::VALID;
-        // P4, P3, and P2 entries should never set NOT_EXECUTABLE, only the lowest-level P1 entry should. 
-        // top_level_flags.set(PteFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
-        top_level_flags.set(PteFlags::NOT_EXECUTABLE, false);
-        // Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
-        // because another page table frame may re-use (create another alias for) it without us knowing here.
-        // Only the lowest-level P1 entry can be considered exclusive, only if it's mapped truly exclusively using this function.
-        top_level_flags.set(PteFlags::EXCLUSIVE, false);
+        // On aarch64, P4/P3/P2 should only contain valid
+        let top_level_flags = PteFlags::VALID;
         let actual_flags = flags | PteFlags::EXCLUSIVE | PteFlags::VALID;
 
         for page in pages.deref().clone() {
@@ -329,13 +317,9 @@ impl Mapper {
     pub unsafe fn map_to_non_exclusive(mapper: &mut Self, pages: AllocatedPages, frames: &AllocatedFrames, flags: PteFlags)
         -> Result<MappedPages, &'static str>
     {
-        let mut top_level_flags = flags.clone() | PteFlags::VALID;
-        // P4, P3, and P2 entries should never set NOT_EXECUTABLE, only the lowest-level P1 entry should. 
-        // top_level_flags.set(PteFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
-        top_level_flags.set(PteFlags::NOT_EXECUTABLE, false);
-        // Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
-        // because another page table frame may re-use (create another alias for) it without us knowing here.
-        top_level_flags.set(PteFlags::EXCLUSIVE, false);
+        // On aarch64, P4/P3/P2 should only contain valid
+        let top_level_flags = PteFlags::VALID;
+
         // In fact, in this function, none of the frames can be mapped as exclusive
         // because we're not accepting the `AllocatedFrames` type. 
         let mut actual_flags = flags | PteFlags::VALID;

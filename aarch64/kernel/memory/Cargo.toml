@@ -1,5 +1,5 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Nathan Royer <nathan.royer.pro@gmail.com>"]
 name = "memory"
 description = "The virtual memory subsystem."
 version = "0.1.0"

@@ -156,7 +156,7 @@ pub fn configure_translation_registers() {
             + TCR_EL1::T0SZ.val(16)
             // + TCR_EL1::T1SZ.val(16)
 
-            // I don't understand when these flags are used at the moment
+            // I (Nathan) don't understand when these flags are used at the moment
             // + TCR_EL1::ORGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable
             // + TCR_EL1::ORGN1::NonCacheable
             // + TCR_EL1::IRGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable
@@ -173,6 +173,7 @@ pub fn configure_translation_registers() {
     }
 }
 
+/// Installs a page table in the TTBR CPU register
 pub fn set_page_table_addr(page_table: PhysicalAddress) {
     unsafe {
         let page_table_addr = page_table.value() as u64;
