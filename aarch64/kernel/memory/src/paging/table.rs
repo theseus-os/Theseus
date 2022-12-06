@@ -56,9 +56,9 @@ impl<L: HierarchicalLevel> Table<L> {
     /// Otherwise, the code assumes we are in identity-mapping, and
     /// the physical addresses in a table are used as virtual addresses.
     fn next_table_address(&self, index: usize, active: bool) -> Option<VirtualAddress> {
-        let entry_flags = self[index].flags();
+        let entry_flags: PteFlags = self[index].flags().into();
         // commenting until we understand how huge pages work on aarch64
-        if entry_flags.contains(PteFlags::VALID) /*&& !entry_flags.is_huge()*/ {
+        if entry_flags.is_valid() /*&& !entry_flags.is_huge()*/ {
             let table_address = self as *const _ as usize;
             let next_table_vaddr: usize = match active {
 
@@ -123,7 +123,7 @@ impl<L: HierarchicalLevel> Table<L> {
             // assert!(!self[index].flags().is_huge(), "mapping code does not support huge pages");
 
             let af = frame_allocator::allocate_frames(1).ok_or("next_table_create(): no frames available")?;
-            self[index].set_entry(af.as_allocated_frame(), flags.writable(true).valid(true));
+            self[index].set_entry(af.as_allocated_frame(), flags.writable(true).valid(true).into());
             let table = self.next_table_mut(index, active).unwrap();
             table.zero();
             core::mem::forget(af); // we currently forget frames allocated as page table frames since we don't yet have a way to track them.

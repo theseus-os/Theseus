@@ -102,7 +102,7 @@ impl PageTable {
         table.zero();
 
         let rec_top_level_flags = PteFlags::VALID | PteFlags::NOT_EXECUTABLE | PteFlags::WRITABLE;
-        table[RECURSIVE_P4_INDEX].set_entry(new_p4_frame.as_allocated_frame(), rec_top_level_flags);
+        table[RECURSIVE_P4_INDEX].set_entry(new_p4_frame.as_allocated_frame(), rec_top_level_flags.into());
 
         Ok(PageTable {
             mapper: Mapper::with_p4_frame(*new_p4_frame.as_allocated_frame()),
@@ -135,7 +135,7 @@ impl PageTable {
 
         // overwrite recursive mapping
         let p4_flags = PteFlags::VALID | PteFlags::WRITABLE | PteFlags::ACCESSED;
-        self.p4_mut(true)[RECURSIVE_P4_INDEX].set_entry(other_table.p4_table.as_allocated_frame(), p4_flags); 
+        self.p4_mut(true)[RECURSIVE_P4_INDEX].set_entry(other_table.p4_table.as_allocated_frame(), p4_flags.into()); 
         tlb_flush_by_theseus_asid();
 
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
@@ -149,7 +149,8 @@ impl PageTable {
 
         // restore recursive mapping to original p4 table
         temporary_page.with_table_and_frame(|p4_table, frame| {
-            p4_table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), PteFlags::VALID | PteFlags::WRITABLE);
+            let flags = PteFlags::VALID | PteFlags::WRITABLE;
+            p4_table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), flags.into());
         })?;
         tlb_flush_by_theseus_asid();
 

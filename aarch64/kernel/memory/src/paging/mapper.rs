@@ -217,7 +217,7 @@ impl Mapper {
                 return Err("map_allocated_pages_to(): page was already in use");
             } 
 
-            p1[page.p1_index()].set_entry(frame, actual_flags);
+            p1[page.p1_index()].set_entry(frame, actual_flags.into());
         }
 
         Ok((
@@ -285,7 +285,7 @@ impl Mapper {
                 return Err("map_allocated_pages(): page was already in use");
             } 
 
-            p1[page.p1_index()].set_entry(af.as_allocated_frame(), actual_flags);
+            p1[page.p1_index()].set_entry(af.as_allocated_frame(), actual_flags.into());
             core::mem::forget(af); // we currently forget frames allocated here since we don't yet have a way to track them.
         }
 
@@ -346,7 +346,7 @@ impl Mapper {
                 return Err("map_to_non_exclusive(): page was already in use");
             } 
 
-            p1[page.p1_index()].set_entry(frame, actual_flags);
+            p1[page.p1_index()].set_entry(frame, actual_flags.into());
         }
 
         Ok(MappedPages {
@@ -553,7 +553,7 @@ impl MappedPages {
                 .and_then(|p2| p2.next_table_mut(page.p2_index(), true))
                 .ok_or("mapping code does not support huge pages")?;
             
-            p1[page.p1_index()].set_flags(new_flags | PteFlags::VALID);
+            p1[page.p1_index()].set_flags(new_flags.valid(true).into());
 
             tlb_flush_virt_addr(page.start_address());
         }
