@@ -7,9 +7,9 @@ use core::{
     future::Future,
     task::{Context, Poll},
 };
-use spin::Mutex;
+use mutex_sleep::MutexSleep as Mutex;
 
-pub use futures::{future, select_biased, FutureExt};
+pub use futures::{future, pin_mut, select_biased, FutureExt};
 
 /// Executes a future.
 pub fn execute<F, O>(future: F) -> O
@@ -17,9 +17,9 @@ where
     F: Future<Output = O>,
 {
     // Pin the future onto the stack. This works because we don't send it anywhere.
-    futures::pin_mut!(future);
+    pin_mut!(future);
     let activated = Arc::new(Mutex::new(false));
-    let task = task::get_my_current_task().unwrap();
+    let task = task::get_my_current_task().expect("failed to get current task");
     let waker = core::task::Waker::from(Arc::new(Waker {
         activated: activated.clone(),
         task: task.clone(),
@@ -30,7 +30,7 @@ where
         match future.as_mut().poll(&mut context) {
             Poll::Ready(output) => return output,
             Poll::Pending => {
-                let mut activated = activated.lock();
+                let mut activated = activated.lock().expect("failed to lock mutex");
                 if !*activated {
                     let _ = task.block();
                     drop(activated);
@@ -57,7 +57,7 @@ struct Waker {
 
 impl Wake for Waker {
     fn wake(self: Arc<Self>) {
-        let mut activated = self.activated.lock();
+        let mut activated = self.activated.lock().expect("failed to lock mutex");
         *activated = true;
         let _ = self.task.unblock();
         drop(activated);

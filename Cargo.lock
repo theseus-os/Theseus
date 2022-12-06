@@ -808,8 +808,8 @@ name = "dreadnought"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "mutex_sleep",
  "scheduler",
- "spin 0.9.0",
  "task",
 ]
 
