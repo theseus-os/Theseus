@@ -1,62 +1,55 @@
-#![deny(unsafe_op_in_unsafe_fn)]
-#![feature(sync_unsafe_cell)]
 #![no_std]
 
 extern crate alloc;
 
-mod join;
-mod task;
-
-use crate::task::Task;
-use alloc::{boxed::Box, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, sync::Arc, task::Wake};
 use core::{
-    cell::SyncUnsafeCell,
     future::Future,
-    pin::Pin,
-    task::{Context, Waker},
+    task::{Context, Poll},
 };
-use futures::FutureExt;
-use join::JoinHandle;
 use spin::Mutex;
-use crossbeam_queue::SegQueue;
 
-pub struct Executor {
-    queue: SegQueue,
-}
+pub fn execute<F, O>(future: F) -> O
+where
+    F: Future<Output = O>,
+{
+    let mut future = Box::pin(future);
+    let activated = Arc::new(Mutex::new(false));
+    let task = task::get_my_current_task().unwrap();
+    let waker = core::task::Waker::from(Arc::new(Waker {
+        activated: activated.clone(),
+        task: task.clone(),
+    }));
+    let mut context = Context::from_waker(&waker);
 
-impl Executor {
-    pub fn new() -> Self {
-        // let (sender, receiver) = async_channel::new_channel(64);
-        // Self { sender, receiver }
-        todo!();
-    }
-
-    pub fn spawn<F>(&self, future: F) -> ()
-    where
-        F: Future<Output = ()> + 'static + Send,
-    {
-        // let boxed = SyncUnsafeCell::new(Box::pin(future));
-        // let task = Task {
-        //     future: boxed,
-        //     run_queue: self.sender.clone(),
-        // };
-
-        // let waker = Arc::new(task);
-        // // let context = Context::from_waker(&Waker::from(waker));
-        // todo!();
-        // boxed.poll(&mut context);
-    }
-
-    pub fn block_on<F>(&self, _future: F)
-    where
-        F: Future,
-    {
-        todo!();
+    loop {
+        match future.as_mut().poll(&mut context) {
+            Poll::Ready(output) => return output,
+            Poll::Pending => {
+                let mut activated = activated.lock();
+                if !*activated {
+                    let _ = task.block();
+                    drop(activated);
+                    scheduler::schedule();
+                } else {
+                    *activated = false;
+                    drop(activated);
+                }
+            }
+        }
     }
 }
 
-fn temp() {
-    Executor::new().spawn(async {
-        println!("hello world");
-    });
+pub struct Waker {
+    activated: Arc<Mutex<bool>>,
+    task: task::TaskRef,
+}
+
+impl Wake for Waker {
+    fn wake(self: Arc<Self>) {
+        let mut activated = self.activated.lock();
+        *activated = true;
+        let _ = self.task.unblock();
+        drop(activated);
+    }
 }

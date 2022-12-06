@@ -4,14 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-async_channel = { path = "../async_channel" }
-# TODO: MutexSleep
-spin = "*"
-
-[dependencies.crossbeam_queue]
-version = "0.3"
-default-features = false
-features = ["alloc"]
+scheduler = { path = "../scheduler" }
+spin = "0.9"
+task = { path = "../task" }
 
 [dependencies.futures]
 version = "0.3"
