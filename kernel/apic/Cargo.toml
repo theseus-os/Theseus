@@ -36,8 +36,8 @@ path = "../kernel_config"
 [dependencies.raw-cpuid]
 version = "10.6.0"
 
-[features]
-apic_timer_fixed = []
+# [features]
+# apic_timer_fixed = []
 
 
 [lib]

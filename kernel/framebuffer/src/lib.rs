@@ -3,17 +3,10 @@
 
 #![no_std]
 
-#[macro_use] extern crate log;
-extern crate memory;
-extern crate multicore_bringup;
-extern crate shapes;
-extern crate color;
-extern crate zerocopy;
-
 pub mod pixel;
 use core::{ops::{DerefMut, Deref}, hash::{Hash, Hasher}};
-
-use memory::{PteFlags, PhysicalAddress, Mutable, BorrowedSliceMappedPages};
+use log::{info, debug};
+use memory::{PteFlags, PteFlagsArch, PhysicalAddress, Mutable, BorrowedSliceMappedPages};
 use shapes::Coord;
 pub use pixel::*;
 
@@ -65,49 +58,71 @@ impl<P: Pixel> Hash for Framebuffer<P> {
 impl<P: Pixel> Framebuffer<P> {
     /// Creates a new framebuffer with rectangular dimensions of `width * height`, 
     /// specified in number of pixels.
-    /// If the `physical_address` is provided, the returned framebuffer will be **final**,
-    /// i.e., mapped to the physical memory at that address, which is typically a hardware graphics device's memory.
-    /// If the `physical_address` is `None`, the returned framebuffer is a "virtual" one 
+    ///
+    /// If `physical_address` is `Some`, the returned framebuffer will be a real physical one,
+    /// i.e., mapped to the physical memory at that address, which is typically hardware graphics memory.
+    /// In this case, we attempt to map the memory as "write-combining", which only works
+    /// on x86 if the Page Attribute Table feature is enabled.
+    /// Otherwise, we map the real physical framebuffer memory with all caching disabled.
+    ///
+    /// If `physical_address` is `None`, the returned framebuffer is a "virtual" one 
     /// that renders to a randomly-allocated chunk of memory.
     pub fn new(
         width: usize,
         height: usize,
         physical_address: Option<PhysicalAddress>,
     ) -> Result<Framebuffer<P>, &'static str> {
-        // get a reference to the kernel's memory mapping information
-        let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
-
-        let vesa_display_flags = PteFlags::new()
-            .valid(true)
-            .writable(true)
-            .device_memory(true); // TODO: use PAT write-combining instead of disabling caching
-
+        let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;            
         let size = width * height * core::mem::size_of::<P>();
-        let pages = memory::allocate_pages_by_bytes(size).ok_or("could not allocate pages for a new framebuffer")?;
+        let pages = memory::allocate_pages_by_bytes(size)
+            .ok_or("could not allocate pages for a new framebuffer")?;
 
         let mapped_framebuffer = if let Some(address) = physical_address {
+            // For best performance, we map the real physical framebuffer memory
+            // as write-combining using the PAT (on x86 only).
+            // If PAT isn't available, fall back to disabling caching altogether.
+            let mut flags: PteFlagsArch = PteFlags::new()
+                .valid(true)
+                .writable(true)
+                .into();
+
+            #[cfg(target_arch = "x86_64")] {
+                let use_pat = page_attribute_table::init().is_ok();
+                if use_pat {
+                    flags = flags.pat_index(
+                        page_attribute_table::MemoryCachingType::WriteCombining.pat_slot_index()
+                    );
+                    info!("Using PAT write-combining mapping for real physical framebuffer memory");
+                } else {
+                    flags = flags.device_memory(true);
+                    info!("Falling back to cache-disable mapping for real physical framebuffer memory");
+                }
+            }
+            #[cfg(not(target_arch = "x86_64"))] {
+                flags = flags.device_memory(true);
+            }
+
             let frames = memory::allocate_frames_by_bytes_at(address, size)
                 .map_err(|_e| "Couldn't allocate frames for the final framebuffer")?;
-            kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
+            let fb_mp = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
                 pages,
                 frames,
-                vesa_display_flags,
-            )?
+                flags,
+            )?;
+            debug!("Mapped real physical framebuffer: {fb_mp:?}");
+            fb_mp
         } else {
             kernel_mmi_ref.lock().page_table.map_allocated_pages(
                 pages,
-                vesa_display_flags,
+                PteFlags::new().valid(true).writable(true),
             )?
         };
-
-        // obtain a slice reference to the framebuffer's memory
-        let buffer = mapped_framebuffer.into_borrowed_slice_mut(0, width * height)
-            .map_err(|(|_mp, s)| s)?;
 
         Ok(Framebuffer {
             width,
             height,
-            buffer,
+            buffer: mapped_framebuffer.into_borrowed_slice_mut(0, width * height)
+                .map_err(|(|_mp, s)| s)?,
         })
     }
 

@@ -1011,6 +1011,7 @@ dependencies = [
  "log",
  "memory",
  "multicore_bringup",
+ "page_attribute_table",
  "shapes",
  "zerocopy",
 ]
