@@ -11,4 +11,4 @@ task = { path = "../task" }
 [dependencies.futures]
 version = "0.3"
 default-features = false
-features = ["alloc"]
+features = ["alloc", "async-await"]
