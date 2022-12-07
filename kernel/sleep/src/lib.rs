@@ -166,10 +166,12 @@ pub fn sleep_periodic(last_resume_time: &AtomicUsize, period: usize) -> Result<(
     sleep_until(new_resume_time)
 }
 
+/// Asynchronous sleep methods that operate on wakers.
 pub mod future {
     use core::task::Poll;
     use super::*;
 
+    /// Wakes up the waker after the specified duration.
     pub fn sleep(duration: usize, waker: Waker) {
         let current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
         let resume_time = current_tick_count + duration;
@@ -182,11 +184,12 @@ pub mod future {
         );
     }
 
+    /// Wakes up the waker at the specified time.
     pub fn sleep_until(resume_time: usize, waker: &Waker) -> Poll<()> {
         let current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
 
-        if resume_time > current_tick_count {
-            sleep(resume_time - current_tick_count, waker.clone());
+        if let Some(duration) = resume_time.checked_sub(current_tick_count) {
+            sleep(duration, waker.clone());
             Poll::Pending
         } else {
             Poll::Ready(())

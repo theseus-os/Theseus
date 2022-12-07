@@ -1,3 +1,5 @@
+//! Asynchronous operating system tasks.
+
 use alloc::boxed::Box;
 use core::{
     future::Future,
@@ -35,9 +37,9 @@ pub struct JoinHandle<T> {
 impl<T> JoinHandle<T> {
     /// Abort the task associated with the handle.
     ///
-    /// Awaiting a cancelled task might complete as usual if the task was
-    /// already completed at the time it was cancellecd, but most likely it will
-    /// fail with an [`Error::Cancelled`].
+    /// If the cancelled task was already completed at the time it was
+    /// cancelled, it will return the successful result. Otherwise, polling the
+    /// handle will fail with an [`Error::Cancelled`].
     pub fn abort(&self) {
         let _ = self.task.kill(KillReason::Requested);
     }
@@ -57,7 +59,6 @@ where
     fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         self.task.set_waker(context.waker().clone());
         if self.is_finished() {
-            // TODO: Don't unwrap.
             Poll::Ready(match self.task.take_exit_value() {
                 Some(exit_value) => match exit_value {
                     ExitValue::Completed(value) => {
@@ -81,6 +82,7 @@ where
 
 pub type Result<T> = core::result::Result<T, Error>;
 
+/// An error returned from polling a [`JoinHandle`].
 #[derive(Debug)]
 pub enum Error {
     Cancelled,
