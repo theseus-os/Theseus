@@ -6,7 +6,7 @@ authors = ["Bowen Liu <liubowenbob@hotmail.com>, Hecatia Elegua"]
 edition = "2021"
 
 [dependencies]
-spin = "0.9.0"
+spin = "0.9.4"
 modular-bitfield = "0.11.2"
 
 [dependencies.num_enum]

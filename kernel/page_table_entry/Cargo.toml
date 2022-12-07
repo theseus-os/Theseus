@@ -18,5 +18,8 @@ path = "../memory_structs"
 [dependencies.frame_allocator]
 path = "../frame_allocator"
 
+[dependencies.pte_flags]
+path = "../pte_flags"
+
 [lib]
 crate-type = ["rlib"]

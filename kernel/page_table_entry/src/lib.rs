@@ -13,7 +13,8 @@
 #![no_std]
 
 use core::ops::Deref;
-use memory_structs::{Frame, FrameRange, PAGE_TABLE_ENTRY_FRAME_MASK, EntryFlags, PhysicalAddress};
+use memory_structs::{Frame, FrameRange, PhysicalAddress};
+use pte_flags::{PteFlagsArch, PTE_FRAME_MASK};
 use bit_field::BitField;
 use kernel_config::memory::PAGE_SHIFT;
 use zerocopy::FromBytes;
@@ -22,7 +23,7 @@ use frame_allocator::AllocatedFrame;
 /// A page table entry, which is a `u64` value under the hood.
 ///
 /// It contains a the physical address of the `Frame` being mapped by this entry
-/// and the access bits (encoded `EntryFlags`) that describes how it's mapped,
+/// and the access bits (encoded `PteFlags`) that describes how it's mapped,
 /// e.g., readable, writable, no exec, etc.
 ///
 /// There isn't and shouldn't be any way to create/instantiate a new `PageTableEntry` directly.
@@ -65,14 +66,14 @@ impl PageTableEntry {
     }
 
     /// Returns this `PageTableEntry`'s flags.
-    pub fn flags(&self) -> EntryFlags {
-        EntryFlags::from_bits_truncate(self.0)
+    pub fn flags(&self) -> PteFlagsArch {
+        PteFlagsArch::from_bits_truncate(self.0)
     }
 
     /// Returns the physical `Frame` pointed to (mapped by) this `PageTableEntry`.
     /// If this page table entry is not `PRESENT`, this returns `None`.
     pub fn pointed_frame(&self) -> Option<Frame> {
-        if self.flags().intersects(EntryFlags::PRESENT) {
+        if self.flags().is_valid() {
             Some(self.frame_value())
         } else {
             None
@@ -91,15 +92,16 @@ impl PageTableEntry {
     /// This is the actual mapping action that informs the MMU of a new mapping.
     ///
     /// Note: this performs no checks about the current value of this page table entry.
-    pub fn set_entry(&mut self, frame: AllocatedFrame, flags: EntryFlags) {
+    pub fn set_entry(&mut self, frame: AllocatedFrame, flags: PteFlagsArch) {
         self.0 = (frame.start_address().value() as u64) | flags.bits();
     }
 
     /// Sets the flags components of this `PageTableEntry` to `new_flags`.
     ///
     /// This does not modify the frame part of the page table entry.
-    pub fn set_flags(&mut self, new_flags: EntryFlags) {
-        self.0 = self.0 & PAGE_TABLE_ENTRY_FRAME_MASK | new_flags.bits();
+    pub fn set_flags(&mut self, new_flags: PteFlagsArch) {
+        let only_flag_bits = new_flags.bits() & !PTE_FRAME_MASK;
+        self.0 = (self.0 & PTE_FRAME_MASK) | only_flag_bits;
     }
 
     pub fn value(&self) -> u64 {

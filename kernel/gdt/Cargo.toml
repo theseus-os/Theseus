@@ -5,7 +5,7 @@ description = "GDT (Global Descriptor Table) support (x86 only) for Theseus"
 version = "0.1.0"
 
 [dependencies]
-spin = "0.9.0"
+spin = "0.9.4"
 x86_64 = "0.14.8"
 bit_field = "0.7.0"
 bitflags = "1.1.0"

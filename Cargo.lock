@@ -612,6 +612,7 @@ dependencies = [
  "qp-trie",
  "serde",
  "spin 0.9.4",
+ "static_assertions",
  "str_ref",
  "xmas-elf",
 ]
@@ -847,6 +848,7 @@ dependencies = [
  "net",
  "network_manager",
  "pci",
+ "ps2_controller",
  "serial_port",
  "spin 0.9.4",
  "storage_manager",
@@ -933,16 +935,6 @@ checksum = "35949884794ad573cf46071e41c9b60efb0cb311e3ca01f7af807af1debc66ff"
 dependencies = [
  "nb 0.1.3",
  "void",
-]
-
-[[package]]
-name = "entryflags_x86_64"
-version = "0.1.0"
-dependencies = [
- "bitflags",
- "multiboot2",
- "static_assertions",
- "xmas-elf",
 ]
 
 [[package]]
@@ -1123,6 +1115,7 @@ dependencies = [
  "log",
  "memory",
  "multicore_bringup",
+ "page_attribute_table",
  "shapes",
  "zerocopy",
 ]
@@ -1821,8 +1814,10 @@ dependencies = [
  "memory_x86_64",
  "multiboot2",
  "no_drop",
+ "owned_borrowed_trait",
  "page_allocator",
  "page_table_entry",
+ "pte_flags",
  "spin 0.9.4",
  "x86_64",
  "xmas-elf",
@@ -1850,11 +1845,8 @@ version = "0.1.0"
 dependencies = [
  "bit_field 0.7.0",
  "derive_more",
- "entryflags_x86_64",
  "kernel_config",
- "multiboot2",
  "paste",
- "xmas-elf",
  "zerocopy",
 ]
 
@@ -1868,11 +1860,11 @@ checksum = "71d96e3f3c0b6325d8ccd83c33b28acb183edcb6c67938ba104ec546854b0882"
 name = "memory_x86_64"
 version = "0.1.0"
 dependencies = [
- "entryflags_x86_64",
  "kernel_config",
  "log",
  "memory_structs",
  "multiboot2",
+ "pte_flags",
  "x86_64",
 ]
 
@@ -2333,6 +2325,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "owned_borrowed_trait"
+version = "0.1.0"
+
+[[package]]
 name = "owning_ref"
 version = "0.4.1"
 source = "git+https://github.com/theseus-os/owning-ref-rs#0d2dcdcffd75b80157d0e72fb82593a8696a9c49"
@@ -2354,6 +2350,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "page_attribute_table"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "memory",
+ "modular-bitfield",
+ "msr",
+ "raw-cpuid",
+ "x86_64",
+]
+
+[[package]]
 name = "page_table_entry"
 version = "0.1.0"
 dependencies = [
@@ -2361,6 +2369,7 @@ dependencies = [
  "frame_allocator",
  "kernel_config",
  "memory_structs",
+ "pte_flags",
  "zerocopy",
 ]
 
@@ -2632,12 +2641,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "ps2_controller"
+version = "0.1.0"
+dependencies = [
+ "acpi",
+ "fadt",
+ "log",
+ "ps2",
+]
+
+[[package]]
 name = "psm"
 version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "871372391786ccec00d3c5d3d6608905b3d4db263639cfe075d3b60a736d115a"
 dependencies = [
  "cc",
+]
+
+[[package]]
+name = "pte_flags"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "cfg-if 1.0.0",
+ "static_assertions",
 ]
 
 [[package]]

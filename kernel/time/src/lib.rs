@@ -215,12 +215,12 @@ pub trait ClockSource {
 
     /// Converts a [`ClockType::Unit`] into a [`Duration`].
     ///
-    /// Monotonic clocks should just return the [`ClockType::Unit`].
+    /// Wall time clocks should just return the [`ClockType::Unit`].
     fn unit_to_duration(unit: <Self::ClockType as ClockType>::Unit) -> Duration;
 
     /// Converts a [`Duration`] into a [`ClockType::Unit`].
     ///
-    /// Monotonic clocks should just return the [`Duration`].
+    /// Wall time clocks should just return the [`Duration`].
     fn duration_to_unit(duration: Duration) -> <Self::ClockType as ClockType>::Unit;
 }
 

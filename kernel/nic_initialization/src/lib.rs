@@ -18,21 +18,13 @@ use alloc::vec::Vec;
 use intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 use memory::{
     allocate_frames_by_bytes_at, allocate_pages_by_bytes, create_contiguous_mapping,
-    get_kernel_mmi_ref, BorrowedSliceMappedPages, EntryFlags, MappedPages, Mutable,
-    PhysicalAddress,
+    get_kernel_mmi_ref, BorrowedSliceMappedPages, MappedPages, Mutable, PhysicalAddress,
 };
 use nic_buffers::ReceiveBuffer;
 use nic_queues::{RxQueueRegisters, TxQueueRegisters};
 use pci::PciDevice;
 
-/// The mapping flags used for pages that the NIC will map.
-pub const NIC_MAPPING_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(
-    EntryFlags::PRESENT.bits() |
-    EntryFlags::WRITABLE.bits() |
-    EntryFlags::NO_CACHE.bits() |
-    EntryFlags::NO_EXECUTE.bits()
-);
-
+pub use nic_queues::NIC_MAPPING_FLAGS;
 
 /// Allocates memory for the NIC registers
 /// 

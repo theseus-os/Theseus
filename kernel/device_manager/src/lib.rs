@@ -97,6 +97,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
     init_serial_port(SerialPortAddress::COM1);
     init_serial_port(SerialPortAddress::COM2);
 
+    ps2_controller::init()?;
     keyboard::init(key_producer)?;
     mouse::init(mouse_producer)?;
 

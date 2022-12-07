@@ -13,7 +13,7 @@ extern crate page_allocator;
 use core::ops::{Deref, DerefMut};
 use kernel_config::memory::PAGE_SIZE;
 use memory_structs::VirtualAddress;
-use memory::{EntryFlags, MappedPages, Mapper};
+use memory::{PteFlags, MappedPages, Mapper};
 use page_allocator::AllocatedPages;
 
 
@@ -44,14 +44,10 @@ fn inner_alloc_stack(
     let (guard_page, stack_pages) = pages.split(start_of_stack_pages).ok()?;
 
     // For stack memory, the minimum required flag is WRITABLE.
-    let flags = EntryFlags::WRITABLE; 
-    // if usermode { flags |= EntryFlags::USER_ACCESSIBLE; }
+    let flags = PteFlags::new().writable(true);
 
     // Map stack pages to physical frames, leave the guard page unmapped.
-    let pages = match page_table.map_allocated_pages(
-        stack_pages, 
-        flags, 
-    ) {
+    let pages = match page_table.map_allocated_pages(stack_pages, flags) {
         Ok(pages) => pages,
         Err(e) => {
             error!("alloc_stack(): couldn't map pages for the new Stack, error: {}", e);

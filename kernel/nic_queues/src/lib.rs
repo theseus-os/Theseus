@@ -18,17 +18,10 @@ use alloc::{
     vec::Vec,
     collections::VecDeque
 };
-use memory::{create_contiguous_mapping, EntryFlags, BorrowedSliceMappedPages, Mutable};
+use memory::{create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
 use intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 use nic_buffers::{ReceiveBuffer, ReceivedFrame, TransmitBuffer};
-
-/// The mapping flags used for pages that the NIC will map.
-pub const NIC_MAPPING_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(
-    EntryFlags::PRESENT.bits() |
-    EntryFlags::WRITABLE.bits() |
-    EntryFlags::NO_CACHE.bits() |
-    EntryFlags::NO_EXECUTE.bits()
-);
+pub use nic_buffers::NIC_MAPPING_FLAGS;
 
 /// The register trait that gives access to only those registers required for receiving a packet.
 /// The Rx queue control registers can only be accessed by the physical NIC.
