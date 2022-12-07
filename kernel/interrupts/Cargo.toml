@@ -11,9 +11,6 @@ x86_64 = "0.14.8"
 locked_idt = { path = "../../libs/locked_idt" }
 log = "0.4.8"
 
-[dependencies.dreadnought]
-path = "../dreadnought"
-
 [dependencies.memory]
 path = "../memory"
 

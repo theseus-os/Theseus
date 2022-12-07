@@ -18,7 +18,7 @@
 //! [dreadnought]: https://starwars.fandom.com/wiki/Executor-class_Star_Dreadnought
 
 #![no_std]
-#![feature(once_cell)]
+#![feature(box_into_inner, downcast_unchecked)]
 
 extern crate alloc;
 
@@ -31,20 +31,21 @@ use mutex_sleep::MutexSleep as Mutex;
 
 pub use futures::{future, pin_mut, select_biased, FutureExt};
 
+pub mod task;
 pub mod time;
 
 /// Executes a future to completion.
 ///
 /// This runs the given future on the current thread, blocking until it is
 /// complete, and yielding its result.
-pub fn block_on<F, O>(future: F) -> O
+pub fn block_on<F>(future: F) -> F::Output
 where
-    F: Future<Output = O>,
+    F: Future,
 {
     // Pin the future onto the stack. This works because we don't send it anywhere.
     pin_mut!(future);
     let activated = Arc::new(Mutex::new(false));
-    let task = task::get_my_current_task().expect("failed to get current task");
+    let task = ::task::get_my_current_task().expect("failed to get current task");
     let waker = core::task::Waker::from(Arc::new(Waker {
         activated: activated.clone(),
         task: task.clone(),
@@ -56,13 +57,13 @@ where
             Poll::Ready(output) => return output,
             Poll::Pending => {
                 let mut activated = activated.lock().expect("failed to lock mutex");
-                if !*activated {
+                if *activated {
+                    *activated = false;
+                    drop(activated);
+                } else {
                     let _ = task.block();
                     drop(activated);
                     scheduler::schedule();
-                } else {
-                    *activated = false;
-                    drop(activated);
                 }
             }
         }
@@ -78,7 +79,7 @@ struct Waker {
     /// `execute` blocking the task. The field cannot be an atomic as the lock
     /// must be held while blocking or unblocking the task.
     activated: Arc<Mutex<bool>>,
-    task: task::TaskRef,
+    task: ::task::TaskRef,
 }
 
 impl Wake for Waker {
