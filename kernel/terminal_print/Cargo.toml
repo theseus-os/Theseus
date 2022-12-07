@@ -6,7 +6,7 @@ description = "Offers applications the ability to print to the terminal via the 
 
 
 [dependencies]
-spin = "0.9.0"
+spin = "0.9.4"
 
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"

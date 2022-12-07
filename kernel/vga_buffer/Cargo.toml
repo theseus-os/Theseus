@@ -5,7 +5,7 @@ description = "Support for the simple 80x25 text-only VGA display mode"
 version = "0.1.0"
 
 [dependencies]
-spin = "0.9.0"
+spin = "0.9.4"
 
 [dependencies.volatile]
 version = "0.2.7"
