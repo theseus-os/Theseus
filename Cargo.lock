@@ -2543,7 +2543,7 @@ dependencies = [
 [[package]]
 name = "rangemap"
 version = "1.0.3"
-source = "git+https://github.com/jeffparsons/rangemap#0885c58aca1bbe124a03f2b74c3a792fef8611fa"
+source = "git+https://github.com/jeffparsons/rangemap#8b290d474bae680531bfba42e545e4d0121b70fd"
 
 [[package]]
 name = "raw-cpuid"
