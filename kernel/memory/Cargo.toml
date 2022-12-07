@@ -6,7 +6,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-spin = "0.9.0"
+spin = "0.9.4"
 bitflags = "1.1.0"
 multiboot2 = "0.14.0"
 xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }

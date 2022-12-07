@@ -8,5 +8,5 @@ categories = ["no-std", "concurrency"]
 license = "MIT"
 
 [dependencies]
-spin = "0.9.0"
+spin = "0.9.4"
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }

@@ -17,7 +17,7 @@ dependencies = [
  "memory",
  "rsdp",
  "rsdt",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -106,7 +106,7 @@ dependencies = [
  "msr",
  "pit_clock_basic",
  "raw-cpuid",
- "spin 0.9.0",
+ "spin 0.9.4",
  "static_assertions",
  "volatile 0.2.7",
  "x86_64",
@@ -124,7 +124,7 @@ dependencies = [
  "log",
  "logger",
  "print",
- "spin 0.9.0",
+ "spin 0.9.4",
  "stdio",
  "task",
  "window_manager",
@@ -145,7 +145,7 @@ dependencies = [
  "hpet",
  "log",
  "mpmc",
- "spin 0.9.0",
+ "spin 0.9.4",
  "static_assertions",
  "task",
  "wait_queue",
@@ -161,7 +161,7 @@ dependencies = [
  "log",
  "pci",
  "port_io",
- "spin 0.9.0",
+ "spin 0.9.4",
  "storage_device",
  "x86_64",
 ]
@@ -189,7 +189,7 @@ dependencies = [
  "mutex_sleep",
  "object",
  "rustc-demangle",
- "spin 0.9.0",
+ "spin 0.9.4",
  "stack_trace",
  "theseus_std",
  "thread_local_macro",
@@ -445,7 +445,7 @@ dependencies = [
  "mpmc",
  "serial_port",
  "spawn",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
  "text_terminal",
 ]
@@ -526,7 +526,7 @@ name = "cow_arc"
 version = "0.1.0"
 dependencies = [
  "dereffer",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -578,7 +578,7 @@ dependencies = [
  "memory",
  "qp-trie",
  "serde",
- "spin 0.9.0",
+ "spin 0.9.4",
  "static_assertions",
  "str_ref",
  "xmas-elf",
@@ -615,7 +615,7 @@ dependencies = [
  "mod_mgmt",
  "path",
  "qp-trie",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -727,7 +727,7 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
  "terminal_print",
 ]
@@ -775,7 +775,7 @@ dependencies = [
  "pci",
  "ps2_controller",
  "serial_port",
- "spin 0.9.0",
+ "spin 0.9.4",
  "storage_manager",
 ]
 
@@ -800,7 +800,7 @@ dependencies = [
  "color",
  "framebuffer",
  "shapes",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -838,7 +838,7 @@ dependencies = [
  "nic_initialization",
  "nic_queues",
  "pci",
- "spin 0.9.0",
+ "spin 0.9.4",
  "static_assertions",
  "volatile 0.2.7",
  "x86_64",
@@ -909,7 +909,7 @@ dependencies = [
  "locked_idt",
  "memory",
  "mod_mgmt",
- "spin 0.9.0",
+ "spin 0.9.4",
  "tss",
  "vga_buffer",
  "x86_64",
@@ -944,7 +944,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1015,7 +1015,7 @@ dependencies = [
 name = "font"
 version = "0.1.0"
 dependencies = [
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1026,7 +1026,7 @@ dependencies = [
  "kernel_config",
  "log",
  "memory_structs",
- "spin 0.9.0",
+ "spin 0.9.4",
  "static_assertions",
 ]
 
@@ -1038,6 +1038,7 @@ dependencies = [
  "log",
  "memory",
  "multicore_bringup",
+ "page_attribute_table",
  "shapes",
  "zerocopy",
 ]
@@ -1050,7 +1051,7 @@ dependencies = [
  "framebuffer",
  "hashbrown",
  "shapes",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1078,7 +1079,7 @@ dependencies = [
  "lazy_static",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1090,7 +1091,7 @@ dependencies = [
  "bitflags",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
  "tss",
  "x86_64",
 ]
@@ -1159,7 +1160,7 @@ dependencies = [
  "kernel_config",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1188,7 +1189,7 @@ dependencies = [
  "irq_safety",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1208,7 +1209,7 @@ dependencies = [
  "log",
  "memory",
  "sdt",
- "spin 0.9.0",
+ "spin 0.9.4",
  "static_assertions",
  "volatile 0.2.7",
  "zerocopy",
@@ -1287,7 +1288,7 @@ dependencies = [
  "pic",
  "scheduler",
  "sleep",
- "spin 0.9.0",
+ "spin 0.9.4",
  "tss",
  "vga_buffer",
  "x86_64",
@@ -1311,7 +1312,7 @@ dependencies = [
  "lazy_static",
  "lockable",
  "log",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1321,7 +1322,7 @@ dependencies = [
  "atomic_linked_list",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -1334,7 +1335,7 @@ dependencies = [
  "irq_safety",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
  "static_assertions",
  "volatile 0.2.7",
  "zerocopy",
@@ -1346,7 +1347,7 @@ version = "0.1.1"
 source = "git+https://github.com/theseus-os/irq_safety#4908fbb38aca1513572e0b4c7a98884390ef361a"
 dependencies = [
  "owning_ref",
- "spin 0.9.0",
+ "spin 0.9.4",
  "stable_deref_trait",
 ]
 
@@ -1386,7 +1387,7 @@ dependencies = [
  "pit_clock_basic",
  "rand",
  "runqueue",
- "spin 0.9.0",
+ "spin 0.9.4",
  "static_assertions",
  "virtual_nic",
  "volatile 0.2.7",
@@ -1415,7 +1416,7 @@ dependencies = [
  "mpmc",
  "once_cell",
  "ps2",
- "spin 0.9.0",
+ "spin 0.9.4",
  "x86_64",
 ]
 
@@ -1470,7 +1471,7 @@ dependencies = [
  "libterm",
  "log",
  "path",
- "spin 0.9.0",
+ "spin 0.9.4",
  "stdio",
  "task",
 ]
@@ -1522,7 +1523,7 @@ dependencies = [
  "memory",
  "pmu_x86",
  "runqueue",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
 ]
 
@@ -1563,7 +1564,7 @@ name = "lockable"
 version = "0.1.0"
 dependencies = [
  "irq_safety",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1590,7 +1591,7 @@ dependencies = [
  "irq_safety",
  "log",
  "serial_port_basic",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1671,7 +1672,7 @@ dependencies = [
  "irq_safety",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1713,7 +1714,7 @@ dependencies = [
  "page_allocator",
  "page_table_entry",
  "pte_flags",
- "spin 0.9.0",
+ "spin 0.9.4",
  "x86_64",
  "xmas-elf",
  "zerocopy",
@@ -1800,7 +1801,7 @@ dependencies = [
  "nic_buffers",
  "nic_initialization",
  "pci",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1868,7 +1869,7 @@ dependencies = [
  "root",
  "rustc-demangle",
  "serde",
- "spin 0.9.0",
+ "spin 0.9.4",
  "util",
  "vfs_node",
  "xmas-elf",
@@ -1911,7 +1912,7 @@ dependencies = [
  "mouse_data",
  "mpmc",
  "ps2",
- "spin 0.9.0",
+ "spin 0.9.4",
  "x86_64",
 ]
 
@@ -1955,7 +1956,7 @@ dependencies = [
  "mod_mgmt",
  "pause",
  "pit_clock_basic",
- "spin 0.9.0",
+ "spin 0.9.4",
  "stack",
  "volatile 0.2.7",
  "zerocopy",
@@ -1978,7 +1979,7 @@ dependencies = [
  "slabmalloc",
  "slabmalloc_safe",
  "slabmalloc_unsafe",
- "spin 0.9.0",
+ "spin 0.9.4",
  "static_assertions",
 ]
 
@@ -1988,7 +1989,7 @@ version = "0.1.0"
 dependencies = [
  "lockable",
  "preemption",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1997,7 +1998,7 @@ version = "0.1.0"
 dependencies = [
  "lockable",
  "log",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
  "wait_queue",
 ]
@@ -2042,7 +2043,7 @@ dependencies = [
  "e1000",
  "log",
  "smoltcp",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -2202,7 +2203,7 @@ name = "owning_ref"
 version = "0.4.1"
 source = "git+https://github.com/theseus-os/owning-ref-rs#0d2dcdcffd75b80157d0e72fb82593a8696a9c49"
 dependencies = [
- "spin 0.9.0",
+ "spin 0.9.4",
  "stable_deref_trait",
 ]
 
@@ -2214,8 +2215,20 @@ dependencies = [
  "kernel_config",
  "log",
  "memory_structs",
- "spin 0.9.0",
+ "spin 0.9.4",
  "static_assertions",
+]
+
+[[package]]
+name = "page_attribute_table"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "memory",
+ "modular-bitfield",
+ "msr",
+ "raw-cpuid",
+ "x86_64",
 ]
 
 [[package]]
@@ -2277,7 +2290,7 @@ dependencies = [
  "lazy_static",
  "log",
  "root",
- "spin 0.9.0",
+ "spin 0.9.4",
  "vfs_node",
 ]
 
@@ -2293,7 +2306,7 @@ dependencies = [
  "log",
  "memory",
  "port_io",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -2351,7 +2364,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "port_io",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -2394,7 +2407,7 @@ dependencies = [
  "pit_clock",
  "port_io",
  "raw-cpuid",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
  "x86_64",
 ]
@@ -2424,7 +2437,7 @@ dependencies = [
  "dfqueue",
  "event_types",
  "log",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -2461,7 +2474,7 @@ dependencies = [
  "modular-bitfield",
  "num_enum",
  "port_io",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -2553,7 +2566,7 @@ dependencies = [
  "log",
  "rand_chacha",
  "rdrand",
- "spin 0.9.0",
+ "spin 0.9.4",
  "tsc",
 ]
 
@@ -2609,7 +2622,7 @@ dependencies = [
  "irq_safety",
  "log",
  "scheduler",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
  "wait_queue",
 ]
@@ -2634,7 +2647,7 @@ dependencies = [
  "fs_node",
  "lazy_static",
  "log",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -2679,7 +2692,7 @@ dependencies = [
  "lazy_static",
  "log",
  "port_io",
- "spin 0.9.0",
+ "spin 0.9.4",
  "state_store",
  "x86_64",
 ]
@@ -2766,7 +2779,7 @@ dependencies = [
  "scheduler_priority",
  "scheduler_realtime",
  "scheduler_round_robin",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
 ]
 
@@ -2788,7 +2801,7 @@ dependencies = [
  "log",
  "runqueue",
  "runqueue_priority",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
 ]
 
@@ -2808,7 +2821,7 @@ dependencies = [
  "log",
  "runqueue",
  "runqueue_round_robin",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
 ]
 
@@ -2881,7 +2894,7 @@ dependencies = [
  "irq_safety",
  "log",
  "serial_port_basic",
- "spin 0.9.0",
+ "spin 0.9.4",
  "static_assertions",
  "x86_64",
 ]
@@ -2892,7 +2905,7 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "port_io",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -2929,7 +2942,7 @@ dependencies = [
  "runqueue",
  "scheduler",
  "spawn",
- "spin 0.9.0",
+ "spin 0.9.4",
  "stdio",
  "task",
  "terminal_print",
@@ -2943,7 +2956,7 @@ dependencies = [
  "bitflags",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
  "thread_local_macro",
  "x86_64",
@@ -3041,7 +3054,7 @@ dependencies = [
  "log",
  "network_manager",
  "smoltcp",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -3066,7 +3079,7 @@ dependencies = [
  "preemption",
  "runqueue",
  "scheduler",
- "spin 0.9.0",
+ "spin 0.9.4",
  "stack",
  "task",
  "thread_local_macro",
@@ -3087,11 +3100,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "spin"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f6002a767bff9e83f8eeecf883ecb8011875a21ae8da43bffb817a57e78cc09"
+dependencies = [
+ "lock_api",
+]
+
+[[package]]
 name = "stable_deref_trait"
 version = "1.1.1"
 source = "git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin#e006c79280042e27c4f16c7d29633eb2273752ee"
 dependencies = [
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -3103,7 +3125,7 @@ dependencies = [
  "memory",
  "memory_structs",
  "page_allocator",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -3131,7 +3153,7 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "lazy_static",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -3147,7 +3169,7 @@ dependencies = [
  "mod_mgmt",
  "runqueue_priority",
  "runqueue_round_robin",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
 ]
 
@@ -3163,7 +3185,7 @@ version = "0.1.0"
 dependencies = [
  "core2",
  "keycodes_ascii",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -3174,7 +3196,7 @@ dependencies = [
  "io",
  "lazy_static",
  "log",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -3184,7 +3206,7 @@ dependencies = [
  "ata",
  "log",
  "pci",
- "spin 0.9.0",
+ "spin 0.9.4",
  "storage_device",
 ]
 
@@ -3252,7 +3274,7 @@ dependencies = [
  "no_drop",
  "preemption",
  "root",
- "spin 0.9.0",
+ "spin 0.9.4",
  "stack",
  "static_assertions",
  "tss",
@@ -3269,7 +3291,7 @@ dependencies = [
  "memory",
  "path",
  "root",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
 ]
 
@@ -3280,7 +3302,7 @@ dependencies = [
  "dfqueue",
  "event_types",
  "logger",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
 ]
 
@@ -3318,7 +3340,7 @@ dependencies = [
  "rendezvous",
  "scheduler",
  "spawn",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
  "terminal_print",
 ]
@@ -3340,7 +3362,7 @@ dependencies = [
  "scheduler",
  "shapes",
  "spawn",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
  "terminal_print",
  "unified_channel",
@@ -3427,7 +3449,7 @@ dependencies = [
  "getopts",
  "log",
  "spawn",
- "spin 0.9.0",
+ "spin 0.9.4",
  "terminal_print",
 ]
 
@@ -3471,7 +3493,7 @@ dependencies = [
  "log",
  "scheduler",
  "spawn",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
  "terminal_print",
  "wait_condition",
@@ -3500,7 +3522,7 @@ dependencies = [
  "framebuffer",
  "framebuffer_printer",
  "shapes",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -3589,7 +3611,7 @@ dependencies = [
  "lockable",
  "memfs",
  "path",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
 ]
 
@@ -3668,7 +3690,7 @@ dependencies = [
  "atomic_linked_list",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
  "x86_64",
 ]
 
@@ -3785,7 +3807,7 @@ dependencies = [
  "ota_update_client",
  "path",
  "smoltcp",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
  "terminal_print",
  "vfs_node",
@@ -3814,7 +3836,7 @@ dependencies = [
  "fs_node",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -3823,7 +3845,7 @@ version = "0.1.0"
 dependencies = [
  "kernel_config",
  "logger",
- "spin 0.9.0",
+ "spin 0.9.4",
  "volatile 0.2.7",
 ]
 
@@ -4133,7 +4155,7 @@ dependencies = [
  "path",
  "shapes",
  "spawn",
- "spin 0.9.0",
+ "spin 0.9.4",
  "window_inner",
  "window_manager",
 ]
@@ -4169,7 +4191,7 @@ dependencies = [
  "scheduler",
  "shapes",
  "spawn",
- "spin 0.9.0",
+ "spin 0.9.4",
  "window_inner",
 ]
 

@@ -199,17 +199,8 @@ impl Default for PteFlagsAarch64 {
     }
 }
 
+/// Functions common to PTE flags on all architectures.
 impl PteFlagsAarch64 {
-    /// The mask of bit ranges that cannot be handled by toggling,
-    /// as they are not single bit values, but multi-bit selectors/indices.
-    ///
-    /// Currently this includes:
-    /// * The three bits `[2:4]` for MAIR index values.
-    /// * The two bits `[8:9]` for shareability.
-    pub const MASKED_BITS_FOR_CONVERSION: PteFlagsAarch64 = PteFlagsAarch64::from_bits_truncate(
-        SHAREABLE_BITS_MASK.bits | MAIR_BITS_MASK.bits
-    );
-
     /// Returns a new `PteFlagsAarch64` with the default value, in which:
     /// * `NORMAL_MEMORY` (not `DEVICE_MEMORY`) is set.
     /// * `OUTER_SHAREABLE` is set.
@@ -358,6 +349,55 @@ impl PteFlagsAarch64 {
 
     pub const fn is_exclusive(&self) -> bool {
         self.contains(Self::EXCLUSIVE)
+    }
+}
+
+/// Functions specific to aarch64 PTE flags only.
+impl PteFlagsAarch64 {
+    /// The mask of bit ranges that cannot be handled by toggling,
+    /// as they are not single bit values, but multi-bit selectors/indices.
+    ///
+    /// Currently this includes:
+    /// * The three bits `[2:4]` for MAIR index values.
+    /// * The two bits `[8:9]` for shareability.
+    pub const MASKED_BITS_FOR_CONVERSION: PteFlagsAarch64 = PteFlagsAarch64::from_bits_truncate(
+        SHAREABLE_BITS_MASK.bits | MAIR_BITS_MASK.bits
+    );
+
+    /// Returns a copy of this `PteFlagsAarch64` with its flags adjusted
+    /// for use in a higher-level page table entry, e.g., P4, P3, P2.
+    ///
+    /// Currently, on aarch64, this does the following:
+    /// * Clears the `NOT_EXECUTABLE` bit.  
+    ///   * P4, P3, and P2 entries should never set `NOT_EXECUTABLE`,
+    ///     only the lowest-level P1 entry should.
+    /// * Clears the `EXCLUSIVE` bit.
+    ///   * Currently, we do not use the `EXCLUSIVE` bit for P4, P3, or P2 entries,
+    ///     because another page table frame may re-use it (create another alias to it)
+    ///     without our page table implementation knowing about it.
+    ///   * Only P1-level PTEs can map a frame exclusively.
+    /// * Sets the `VALID` bit, as every P4, P3, and P2 entry must be valid.
+    #[must_use]
+    pub fn adjust_for_higher_level_pte(self) -> Self {
+        self.executable(true)
+            .exclusive(false)
+            .valid(true)
+    }
+
+    /// Returns a copy of this `PteFlagsAarch64` with the `PAGE_DESCRIPTOR` bit set or cleared.
+    ///
+    /// * If `enable` is `true`, this will represent a page descriptor.
+    /// * If `enable` is `false`, this will represent a block descriptor.
+    #[must_use]
+    #[doc(alias("block", "block descriptor"))]
+    pub fn page_descriptor(mut self, enable: bool) -> Self {
+        self.set(Self::PAGE_DESCRIPTOR, enable);
+        self
+    }
+
+    #[doc(alias("block", "block descriptor"))]
+    pub const fn is_page_descriptor(&self) -> bool {
+        self.contains(Self::PAGE_DESCRIPTOR)
     }
 }
 
