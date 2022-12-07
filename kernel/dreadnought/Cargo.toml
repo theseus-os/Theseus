@@ -6,6 +6,8 @@ description = "An asynchronous executor"
 edition = "2021"
 
 [dependencies]
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+lazy_static = "1.4"
 mutex_sleep = { path = "../mutex_sleep" }
 scheduler = { path = "../scheduler" }
 task = { path = "../task" }
@@ -14,3 +16,8 @@ task = { path = "../task" }
 version = "0.3"
 default-features = false
 features = ["alloc", "async-await"]
+
+[dependencies.once_cell]
+version = "1.16"
+default-features = false
+features = ["alloc", "critical-section"]

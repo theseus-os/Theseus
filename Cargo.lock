@@ -167,6 +167,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "atomic-polyfill"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d299f547288d6db8d5c3a2916f7b2f66134b15b8c1ac1c4357dd3b8752af7bb2"
+dependencies = [
+ "critical-section",
+]
+
+[[package]]
 name = "atomic_linked_list"
 version = "0.1.0"
 
@@ -610,6 +619,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "critical-section"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6548a0ad5d2549e111e1f6a11a6c2e2d00ce6a3dafe22948d67c2b443f775e52"
+
+[[package]]
 name = "crossbeam-utils"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -808,7 +823,10 @@ name = "dreadnought"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "irq_safety",
+ "lazy_static",
  "mutex_sleep",
+ "once_cell",
  "scheduler",
  "task",
 ]
@@ -1335,6 +1353,7 @@ name = "interrupts"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "dreadnought",
  "exceptions_early",
  "gdt",
  "locked_idt",
@@ -2222,9 +2241,13 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.9.0"
+version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
+checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
+dependencies = [
+ "atomic-polyfill",
+ "critical-section",
+]
 
 [[package]]
 name = "ota_update_client"

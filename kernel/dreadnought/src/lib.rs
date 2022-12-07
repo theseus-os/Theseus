@@ -18,6 +18,7 @@
 //! [dreadnought]: https://starwars.fandom.com/wiki/Executor-class_Star_Dreadnought
 
 #![no_std]
+#![feature(once_cell)]
 
 extern crate alloc;
 
@@ -29,6 +30,8 @@ use core::{
 use mutex_sleep::MutexSleep as Mutex;
 
 pub use futures::{future, pin_mut, select_biased, FutureExt};
+
+pub mod time;
 
 /// Executes a future to completion.
 ///
@@ -67,6 +70,7 @@ where
 }
 
 /// A waker that unblocks the given task when awoken.
+#[derive(Debug)]
 struct Waker {
     /// Whether the waker has been activated.
     ///
