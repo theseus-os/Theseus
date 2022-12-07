@@ -9,11 +9,7 @@
 
 mod temporary_page;
 mod mapper;
-#[cfg(not(mapper_spillful))]
 mod table;
-#[cfg(mapper_spillful)]
-pub mod table;
-
 
 pub use page_table_entry::PageTableEntry;
 pub use self::{

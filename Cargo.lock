@@ -1616,21 +1616,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fdcec5e97041c7f0f1c5b7d93f12e57293c831c646f4cc7a5db59460c7ea8de6"
 
 [[package]]
-name = "mapper_spillful"
-version = "0.1.0"
-dependencies = [
- "cfg-if 0.1.10",
- "irq_safety",
- "kernel_config",
- "lazy_static",
- "log",
- "memory",
- "memory_structs",
- "memory_x86_64",
- "rbtree",
-]
-
-[[package]]
 name = "memchr"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1793,26 +1778,6 @@ dependencies = [
  "static_assertions",
  "volatile 0.2.7",
  "zerocopy",
-]
-
-[[package]]
-name = "mm_eval"
-version = "0.1.0"
-dependencies = [
- "apic",
- "cfg-if 0.1.10",
- "getopts",
- "hpet",
- "kernel_config",
- "libm",
- "libtest",
- "log",
- "mapper_spillful",
- "memory",
- "memory_structs",
- "runqueue",
- "terminal_print",
- "tsc",
 ]
 
 [[package]]
@@ -2552,14 +2517,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6823ea29436221176fe662da99998ad3b4db2c7f31e7b6f5fe43adccd6320bb"
 dependencies = [
  "bitflags",
-]
-
-[[package]]
-name = "rbtree"
-version = "0.1.5"
-source = "git+https://github.com/theseus-os/rbtree-rs.git#45aa9e94f7e7cf08d560498c314efb3e5f4ba198"
-dependencies = [
- "log",
 ]
 
 [[package]]
@@ -3523,9 +3480,7 @@ dependencies = [
  "libtest",
  "loadc",
  "ls",
- "mapper_spillful",
  "mkdir",
- "mm_eval",
  "ns",
  "ping",
  "pmu_sample_start",
