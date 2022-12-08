@@ -23,6 +23,7 @@ extern crate intel_ethernet;
 extern crate nic_buffers;
 extern crate nic_queues;
 extern crate nic_initialization;
+extern crate net;
 
 pub mod test_e1000_driver;
 mod regs;
@@ -264,7 +265,7 @@ impl E1000Nic {
     /// * `mem_base`: the physical address where the NIC's memory starts.
     fn map_e1000_regs(
         _device: &PciDevice, 
-        mem_base: PhysicalAddress
+        mem_base: PhysicalAddress,
     ) -> Result<(
         BorrowedMappedPages<E1000Registers, Mutable>, 
         BorrowedMappedPages<E1000RxRegisters, Mutable>, 
@@ -415,6 +416,27 @@ impl E1000Nic {
         }
         //regs.icr.read(); //clear interrupt
         Ok(())
+    }
+}
+
+impl net::NetworkDevice for E1000Nic {
+    fn send(&mut self, buf: &[u8]) -> net::Result<()> {
+        // TODO: This is just a workaround to make the new API work with the old machinery.
+        let mut transmit_buffer = TransmitBuffer::new(buf.len() as u16).map_err(|_| net::Error::Exhausted)?;
+        let transmit_buffer_mut = &mut transmit_buffer;
+        transmit_buffer_mut.clone_from_slice(buf);
+        // TODO: Return specific error.
+        self.send_packet(transmit_buffer).map_err(|_| net::Error::Unknown)?;
+        Ok(())
+    }
+
+    fn receive(&mut self) -> Option<ReceivedFrame> {
+        self.rx_queue.received_frames.pop_front()
+    }
+
+    /// Returns the MAC address.
+    fn mac_address(&self) -> [u8; 6] {
+        self.mac_spoofed.unwrap_or(self.mac_hardware)
     }
 }
 
