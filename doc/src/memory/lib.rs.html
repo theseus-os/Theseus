@@ -261,11 +261,6 @@
 <span id="261">261</span>
 <span id="262">262</span>
 <span id="263">263</span>
-<span id="264">264</span>
-<span id="265">265</span>
-<span id="266">266</span>
-<span id="267">267</span>
-<span id="268">268</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the main memory management subsystem for Theseus.
 //!
 //! The primary type of interest is [`MappedPages`], which offers a robust
@@ -285,12 +280,7 @@
 
 </span><span class="kw">extern crate </span>alloc;
 
-<span class="attr">#[cfg(not(mapper_spillful))]
-</span><span class="kw">mod </span>paging;
-
-<span class="attr">#[cfg(mapper_spillful)]
-</span><span class="kw">pub mod </span>paging;
-
+<span class="kw">mod </span>paging;
 <span class="kw">pub use </span><span class="self">self</span>::paging::{
     PageTable, Mapper, Mutability, Mutable, Immutable,
     MappedPages, BorrowedMappedPages, BorrowedSliceMappedPages,
