@@ -949,22 +949,6 @@ impl Drop for MappedPages {
 }
 
 
-// Exposing private functions to the spillful mapper for benchmarking purposes.
-#[cfg(mapper_spillful)]
-pub fn mapped_pages_unmap(
-    mapped_pages: &mut MappedPages,
-    mapper: &mut Mapper,
-) -> Result<(), &'static str> {
-    mapped_pages.unmap(mapper)?;
-    Ok(())
-}
-
-#[cfg(mapper_spillful)]
-pub fn mapper_from_current() -> Mapper {
-    Mapper::from_current()
-}
-
-
 /// A borrowed [`MappedPages`] object that derefs to `&T` and optionally also `&mut T`.
 /// 
 /// By default, the `Mutability` type parameter is `Immutable` for ease of use.

@@ -39,7 +39,6 @@ wasm = { path = "../applications/wasm", optional = true }
 ## Kernel crates used for only testing purposes.
 libtest = { path = "../kernel/libtest", optional = true } 
 test_thread_local = { path = "../kernel/test_thread_local", optional = true }
-mapper_spillful = { path = "../kernel/mapper_spillful", optional = true }
 unified_channel = { path = "../kernel/unified_channel", optional = true }
 
 
@@ -74,7 +73,6 @@ unwind_test = { path = "../applications/unwind_test", optional = true }
 bm = { path = "../applications/bm", optional = true }
 channel_eval = { path = "../applications/channel_eval", optional = true }
 heap_eval = { path = "../applications/heap_eval", optional = true }
-mm_eval = { path = "../applications/mm_eval", optional = true }
 rq_eval = { path = "../applications/rq_eval",  optional = true }
 scheduler_eval = { path = "../applications/scheduler_eval",  optional = true }
 
@@ -124,7 +122,6 @@ theseus_benchmarks = [
     "bm",
     "channel_eval",
     "heap_eval",
-    "mm_eval",
     "rq_eval",
     "scheduler_eval",
 ]

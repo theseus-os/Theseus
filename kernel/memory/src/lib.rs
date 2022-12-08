@@ -17,12 +17,7 @@
 
 extern crate alloc;
 
-#[cfg(not(mapper_spillful))]
 mod paging;
-
-#[cfg(mapper_spillful)]
-pub mod paging;
-
 pub use self::paging::{
     PageTable, Mapper, Mutability, Mutable, Immutable,
     MappedPages, BorrowedMappedPages, BorrowedSliceMappedPages,
