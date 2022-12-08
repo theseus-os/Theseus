@@ -74,17 +74,6 @@
 <span id="74">74</span>
 <span id="75">75</span>
 <span id="76">76</span>
-<span id="77">77</span>
-<span id="78">78</span>
-<span id="79">79</span>
-<span id="80">80</span>
-<span id="81">81</span>
-<span id="82">82</span>
-<span id="83">83</span>
-<span id="84">84</span>
-<span id="85">85</span>
-<span id="86">86</span>
-<span id="87">87</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A set of functions to create packets for testing the NIC transmission functionality.
 
 </span><span class="kw">use super</span>::{get_ixgbe_nic, NetworkInterfaceCard, TransmitBuffer};
@@ -124,7 +113,7 @@
     ];
     <span class="kw">let </span><span class="kw-2">mut </span>transmit_buffer = TransmitBuffer::new(packet.len() <span class="kw">as </span>u16)<span class="question-mark">?</span>;
     { 
-        <span class="kw">let </span>buffer: <span class="kw-2">&amp;mut </span>[u8] = transmit_buffer.as_slice_mut(<span class="number">0</span>, <span class="number">314</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>buffer = <span class="kw-2">&amp;mut </span>transmit_buffer;
         buffer.copy_from_slice(<span class="kw-2">&amp;</span>packet);
     }
     <span class="prelude-val">Ok</span>(transmit_buffer)
@@ -153,22 +142,11 @@
     <span class="kw">let </span>ether_type: [u8; ETHER_TYPE_LEN] = [(len &gt;&gt; <span class="number">8</span>) <span class="kw">as </span>u8, len <span class="kw">as </span>u8];
 
     <span class="kw">let </span><span class="kw-2">mut </span>transmit_buffer = TransmitBuffer::new(ETHERNET_HEADER_LEN <span class="kw">as </span>u16 + len)<span class="question-mark">?</span>;
-    { 
-        <span class="kw">let </span>buffer: <span class="kw-2">&amp;mut </span>[u8] = transmit_buffer.as_slice_mut(<span class="number">0</span>, MAC_ADDR_LEN)<span class="question-mark">?</span>;
-        buffer.copy_from_slice(<span class="kw-2">&amp;</span>dest_mac_address);
-    }
-    { 
-        <span class="kw">let </span>buffer: <span class="kw-2">&amp;mut </span>[u8] = transmit_buffer.as_slice_mut(<span class="number">6</span>, MAC_ADDR_LEN)<span class="question-mark">?</span>;
-        buffer.copy_from_slice(<span class="kw-2">&amp;</span>source_mac_address);
-    }
-    { 
-        <span class="kw">let </span>buffer: <span class="kw-2">&amp;mut </span>[u8] = transmit_buffer.as_slice_mut(<span class="number">12</span>, ETHER_TYPE_LEN)<span class="question-mark">?</span>;
-        buffer.copy_from_slice(<span class="kw-2">&amp;</span>ether_type);
-    }
-    { 
-        <span class="kw">let </span>buffer: <span class="kw-2">&amp;mut </span>[u8] = transmit_buffer.as_slice_mut(<span class="number">14</span>, message.len())<span class="question-mark">?</span>;
-        buffer.copy_from_slice(<span class="kw-2">&amp;</span>message);
-    }
+    <span class="kw">let </span>buffer = <span class="kw-2">&amp;mut </span>transmit_buffer;
+    buffer[<span class="number">0</span>..MAC_ADDR_LEN].copy_from_slice(<span class="kw-2">&amp;</span>dest_mac_address);
+    buffer[<span class="number">6</span>..(<span class="number">6 </span>+ MAC_ADDR_LEN)].copy_from_slice(<span class="kw-2">&amp;</span>source_mac_address);
+    buffer[<span class="number">12</span>..(<span class="number">12 </span>+ ETHER_TYPE_LEN)].copy_from_slice(<span class="kw-2">&amp;</span>ether_type);
+    buffer[<span class="number">14</span>..(<span class="number">14 </span>+ message.len())].copy_from_slice(<span class="kw-2">&amp;</span>message);
 
     <span class="prelude-val">Ok</span>(transmit_buffer)
 }

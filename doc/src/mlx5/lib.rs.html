@@ -679,7 +679,6 @@
 <span id="679">679</span>
 <span id="680">680</span>
 <span id="681">681</span>
-<span id="682">682</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A mlx5 driver for a ConnectX-5 100GbE Network Interface Card.
 //! 
 //! Currently the following steps are completed 
@@ -1349,8 +1348,7 @@
 
     <span class="doccomment">/// Adds a packet to be sent to the transmit queue and returns once it is sent.
     </span><span class="kw">pub fn </span>send(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buffer: TransmitBuffer) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="kw">let </span>packet_length = buffer.length;
-        <span class="kw">let </span>wqe_counter = <span class="self">self</span>.send_queue.send(buffer.phys_addr, buffer.as_slice(<span class="number">0</span>, packet_length <span class="kw">as </span>usize)<span class="question-mark">?</span>);
+        <span class="kw">let </span>wqe_counter = <span class="self">self</span>.send_queue.send(buffer.phys_addr(), <span class="kw-2">&amp;</span>buffer);
         <span class="comment">// self.send_completion_queue.wqe_posted(wqe_counter);
         </span><span class="self">self</span>.send_completion_queue.check_packet_transmission(<span class="number">0</span>, wqe_counter);
         <span class="self">self</span>.send_completion_queue.dump();

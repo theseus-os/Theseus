@@ -430,6 +430,28 @@
 <span id="430">430</span>
 <span id="431">431</span>
 <span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
 #![allow(dead_code)] </span><span class="comment">//  to suppress warnings for unused functions/methods
@@ -455,6 +477,7 @@
 <span class="kw">extern crate </span>nic_buffers;
 <span class="kw">extern crate </span>nic_queues;
 <span class="kw">extern crate </span>nic_initialization;
+<span class="kw">extern crate </span>net;
 
 <span class="kw">pub mod </span>test_e1000_driver;
 <span class="kw">mod </span>regs;
@@ -696,7 +719,7 @@
     /// * `mem_base`: the physical address where the NIC&#39;s memory starts.
     </span><span class="kw">fn </span>map_e1000_regs(
         _device: <span class="kw-2">&amp;</span>PciDevice, 
-        mem_base: PhysicalAddress
+        mem_base: PhysicalAddress,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(
         BorrowedMappedPages&lt;E1000Registers, Mutable&gt;, 
         BorrowedMappedPages&lt;E1000RxRegisters, Mutable&gt;, 
@@ -847,6 +870,27 @@
         }
         <span class="comment">//regs.icr.read(); //clear interrupt
         </span><span class="prelude-val">Ok</span>(())
+    }
+}
+
+<span class="kw">impl </span>net::NetworkDevice <span class="kw">for </span>E1000Nic {
+    <span class="kw">fn </span>send(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buf: <span class="kw-2">&amp;</span>[u8]) -&gt; net::Result&lt;()&gt; {
+        <span class="comment">// TODO: This is just a workaround to make the new API work with the old machinery.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>transmit_buffer = TransmitBuffer::new(buf.len() <span class="kw">as </span>u16).map_err(|<span class="kw">_</span>| net::Error::Exhausted)<span class="question-mark">?</span>;
+        <span class="kw">let </span>transmit_buffer_mut = <span class="kw-2">&amp;mut </span>transmit_buffer;
+        transmit_buffer_mut.clone_from_slice(buf);
+        <span class="comment">// TODO: Return specific error.
+        </span><span class="self">self</span>.send_packet(transmit_buffer).map_err(|<span class="kw">_</span>| net::Error::Unknown)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">fn </span>receive(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ReceivedFrame&gt; {
+        <span class="self">self</span>.rx_queue.received_frames.pop_front()
+    }
+
+    <span class="doccomment">/// Returns the MAC address.
+    </span><span class="kw">fn </span>mac_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [u8; <span class="number">6</span>] {
+        <span class="self">self</span>.mac_spoofed.unwrap_or(<span class="self">self</span>.mac_hardware)
     }
 }
 

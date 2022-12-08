@@ -173,6 +173,9 @@
 <span id="173">173</span>
 <span id="174">174</span>
 <span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Functions that are used in a NIC initialization procedure.
 //! 
 //! They include allocating memory space for the device&#39;s registers, and initializing its receive and transmit queues.
@@ -189,12 +192,15 @@
 <span class="kw">extern crate </span>volatile;
 <span class="kw">extern crate </span>nic_queues;
 
-<span class="kw">use </span>memory::{PhysicalAddress, allocate_pages_by_bytes, allocate_frames_by_bytes_at, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping, Mutable, BorrowedSliceMappedPages};
-<span class="kw">use </span>pci::PciDevice;
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
+<span class="kw">use </span>memory::{
+    allocate_frames_by_bytes_at, allocate_pages_by_bytes, create_contiguous_mapping,
+    get_kernel_mmi_ref, BorrowedSliceMappedPages, MappedPages, Mutable, PhysicalAddress,
+};
 <span class="kw">use </span>nic_buffers::ReceiveBuffer;
 <span class="kw">use </span>nic_queues::{RxQueueRegisters, TxQueueRegisters};
+<span class="kw">use </span>pci::PciDevice;
 
 <span class="kw">pub use </span>nic_queues::NIC_MAPPING_FLAGS;
 
@@ -240,7 +246,7 @@
     <span class="kw">let </span>length = buffer_size;
     <span class="kw">for </span>_i <span class="kw">in </span><span class="number">0</span>..num_rx_buffers {
         <span class="kw">let </span>(mp, phys_addr) = create_contiguous_mapping(length <span class="kw">as </span>usize, NIC_MAPPING_FLAGS)<span class="question-mark">?</span>; 
-        <span class="kw">let </span>rx_buf = ReceiveBuffer::new(mp, phys_addr, length, rx_buffer_pool);
+        <span class="kw">let </span>rx_buf = ReceiveBuffer::new(mp, phys_addr, length, rx_buffer_pool)<span class="question-mark">?</span>;
         <span class="kw">if </span>rx_buffer_pool.push(rx_buf).is_err() {
             <span class="comment">// if the queue is full, it returns an Err containing the object trying to be pushed
             </span><span class="macro">error!</span>(<span class="string">&quot;intel_ethernet::init_rx_buf_pool(): rx buffer pool is full, cannot add rx buffer {}!&quot;</span>, _i);
@@ -279,11 +285,11 @@
             .ok_or(<span class="string">&quot;Couldn&#39;t obtain a ReceiveBuffer from the pool&quot;</span>)
             .or_else(|_e| {
                 create_contiguous_mapping(buffer_size, NIC_MAPPING_FLAGS)
-                    .map(|(buf_mapped, buf_paddr)| 
+                    .and_then(|(buf_mapped, buf_paddr)|
                         ReceiveBuffer::new(buf_mapped, buf_paddr, buffer_size <span class="kw">as </span>u16, rx_buffer_pool)
                     )
             })<span class="question-mark">?</span>;
-        <span class="kw">let </span>paddr_buf = rx_buf.phys_addr;
+        <span class="kw">let </span>paddr_buf = rx_buf.phys_addr();
         rx_bufs_in_use.push(rx_buf); 
 
 

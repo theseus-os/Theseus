@@ -275,18 +275,18 @@
                     <span class="comment">// if the pool was empty, then we allocate a new receive buffer
                     </span><span class="kw">let </span>len = <span class="self">self</span>.rx_buffer_size_bytes;
                     <span class="kw">let </span>(mp, phys_addr) = create_contiguous_mapping(len <span class="kw">as </span>usize, NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
-                    ReceiveBuffer::new(mp, phys_addr, len, <span class="self">self</span>.rx_buffer_pool)
-                }
+                    ReceiveBuffer::new(mp, phys_addr, len, <span class="self">self</span>.rx_buffer_pool)<span class="question-mark">?
+                </span>}
             };
 
             <span class="comment">// actually tell the NIC about the new receive buffer, and that it&#39;s ready for use now
-            </span><span class="self">self</span>.rx_descs[cur].set_packet_address(new_receive_buf.phys_addr);
+            </span><span class="self">self</span>.rx_descs[cur].set_packet_address(new_receive_buf.phys_addr());
 
             <span class="comment">// Swap in the new receive buffer at the index corresponding to this current rx_desc&#39;s receive buffer,
             // getting back the receive buffer that is part of the received ethernet frame
             </span><span class="self">self</span>.rx_bufs_in_use.push(new_receive_buf);
             <span class="kw">let </span><span class="kw-2">mut </span>current_rx_buf = <span class="self">self</span>.rx_bufs_in_use.swap_remove(cur); 
-            current_rx_buf.length = length <span class="kw">as </span>u16; <span class="comment">// set the ReceiveBuffer&#39;s length to the size of the actual packet received
+            current_rx_buf.set_length(length <span class="kw">as </span>u16)<span class="question-mark">?</span>; <span class="comment">// set the ReceiveBuffer&#39;s length to the size of the actual packet received
             </span>receive_buffers_in_frame.push(current_rx_buf);
 
             <span class="comment">// move on to the next receive buffer to see if it&#39;s ready for us to take
@@ -336,7 +336,7 @@
     /// # Arguments:
     /// * `transmit_buffer`: buffer containing the packet to be sent
     </span><span class="kw">pub fn </span>send_on_queue(<span class="kw-2">&amp;mut </span><span class="self">self</span>, transmit_buffer: TransmitBuffer) {
-        <span class="self">self</span>.tx_descs[<span class="self">self</span>.tx_cur <span class="kw">as </span>usize].send(transmit_buffer.phys_addr, transmit_buffer.length);  
+        <span class="self">self</span>.tx_descs[<span class="self">self</span>.tx_cur <span class="kw">as </span>usize].send(transmit_buffer.phys_addr(), transmit_buffer.length());
         <span class="comment">// update the tx_cur value to hold the next free descriptor
         </span><span class="kw">let </span>old_cur = <span class="self">self</span>.tx_cur;
         <span class="self">self</span>.tx_cur = (<span class="self">self</span>.tx_cur + <span class="number">1</span>) % <span class="self">self</span>.num_tx_descs;

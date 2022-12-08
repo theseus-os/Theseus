@@ -300,6 +300,10 @@
 <span id="300">300</span>
 <span id="301">301</span>
 <span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 #![feature(trait_alias)]
 
@@ -327,6 +331,7 @@
 <span class="kw">extern crate </span>core2;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>derive_more;
 <span class="kw">extern crate </span>mlx5;
+<span class="kw">extern crate </span>net;
 
 <span class="kw">use </span>core::convert::TryFrom;
 <span class="kw">use </span>mpmc::Queue;
@@ -438,9 +443,12 @@
         </span><span class="kw">if </span>dev.class == <span class="number">0x02 </span>&amp;&amp; dev.subclass == <span class="number">0x00 </span>{
             <span class="kw">if </span>dev.vendor_id == e1000::INTEL_VEND &amp;&amp; dev.device_id == e1000::E1000_DEV {
                 <span class="macro">info!</span>(<span class="string">&quot;e1000 PCI device found at: {:?}&quot;</span>, dev.location);
-                <span class="kw">let </span>e1000_nic_ref = e1000::E1000Nic::init(dev)<span class="question-mark">?</span>;
-                <span class="kw">let </span>e1000_interface = EthernetNetworkInterface::new_ipv4_interface(e1000_nic_ref, DEFAULT_LOCAL_IP, <span class="kw-2">&amp;</span>DEFAULT_GATEWAY_IP)<span class="question-mark">?</span>;
+                <span class="kw">let </span>nic = e1000::E1000Nic::init(dev)<span class="question-mark">?</span>;
+                net::register_device(nic);
+
+                <span class="kw">let </span>e1000_interface = EthernetNetworkInterface::new_ipv4_interface(nic, DEFAULT_LOCAL_IP, <span class="kw-2">&amp;</span>DEFAULT_GATEWAY_IP)<span class="question-mark">?</span>;
                 add_to_network_interfaces(e1000_interface);
+                
                 <span class="kw">continue</span>;
             }
             <span class="kw">if </span>dev.vendor_id == ixgbe::INTEL_VEND &amp;&amp; dev.device_id == ixgbe::INTEL_82599 {

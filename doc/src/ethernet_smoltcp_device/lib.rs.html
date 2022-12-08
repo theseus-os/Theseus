@@ -264,16 +264,6 @@
 <span id="264">264</span>
 <span id="265">265</span>
 <span id="266">266</span>
-<span id="267">267</span>
-<span id="268">268</span>
-<span id="269">269</span>
-<span id="270">270</span>
-<span id="271">271</span>
-<span id="272">272</span>
-<span id="273">273</span>
-<span id="274">274</span>
-<span id="275">275</span>
-<span id="276">276</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements an interface/glue layer between our ethernet drivers
 //! and the smoltcp network stack.
 </span><span class="attr">#![no_std]
@@ -510,11 +500,7 @@
         })<span class="question-mark">?</span>;
 
         <span class="kw">let </span>closure_retval = {
-            <span class="kw">let </span>txbuf_byte_slice = txbuf.as_slice_mut::&lt;u8&gt;(<span class="number">0</span>, len).map_err(|e| {
-                <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::transmit(): couldn&#39;t convert TransmitBuffer of length {} into byte slice, error {:?}&quot;</span>, len, e);
-                smoltcp::Error::Exhausted
-            })<span class="question-mark">?</span>;
-            f(txbuf_byte_slice)<span class="question-mark">?
+            f(<span class="kw-2">&amp;mut </span>txbuf)<span class="question-mark">?
         </span>};
         <span class="self">self</span>.nic_ref.lock()
             .send_packet(txbuf)
@@ -541,13 +527,7 @@
             smoltcp::Error::Exhausted
         })<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>first_buf_len = first_buf.length <span class="kw">as </span>usize;
-        <span class="kw">let </span>slice_mut: <span class="kw-2">&amp;mut </span>[u8] = first_buf.mp.as_slice_mut(<span class="number">0</span>, first_buf_len).map_err(|e| {
-            <span class="macro">error!</span>(<span class="string">&quot;EthernetDevice::receive(): couldn&#39;t convert receive buffer of length {} into byte slice, error {:?}&quot;</span>, first_buf_len, e);
-            smoltcp::Error::Exhausted
-        })<span class="question-mark">?</span>;
-
-        f(slice_mut)
+        f(first_buf)
     }
 }
 </code></pre></div>

@@ -476,11 +476,11 @@
                 .ok_or(<span class="string">&quot;Couldn&#39;t obtain a ReceiveBuffer from the pool&quot;</span>)
                 .or_else(|_e| {
                     create_contiguous_mapping(buffer_size <span class="kw">as </span>usize, NIC_MAPPING_FLAGS)
-                        .map(|(buf_mapped, buf_paddr)| 
+                        .and_then(|(buf_mapped, buf_paddr)|
                             ReceiveBuffer::new(buf_mapped, buf_paddr, buffer_size <span class="kw">as </span>u16, mem_pool)
                         )
                 })<span class="question-mark">?</span>;
-            <span class="kw">let </span>paddr_buf = rx_buf.phys_addr;
+            <span class="kw">let </span>paddr_buf = rx_buf.phys_addr();
             rx_bufs_in_use.push(rx_buf); 
 
             wqe.update_buffer_info(<span class="self">self</span>.lkey.<span class="number">0</span>, paddr_buf, <span class="self">self</span>.buffer_size_bytes); 

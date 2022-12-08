@@ -149,12 +149,12 @@
         <span class="number">0x37</span>, <span class="number">0x04</span>, <span class="number">0x01</span>, <span class="number">0x03</span>, <span class="number">0x06</span>, <span class="number">0x2a</span>, <span class="number">0xff</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>,
     ];
     <span class="kw">let </span><span class="kw-2">mut </span>transmit_buffer = TransmitBuffer::new(packet.len() <span class="kw">as </span>u16)<span class="question-mark">?</span>;
-    { 
-        <span class="kw">let </span>buffer: <span class="kw-2">&amp;mut </span>[u8] = transmit_buffer.as_slice_mut(<span class="number">0</span>, <span class="number">314</span>)<span class="question-mark">?</span>;
+    {
+        <span class="kw">let </span>buffer = <span class="kw-2">&amp;mut </span>transmit_buffer;
         buffer.copy_from_slice(<span class="kw-2">&amp;</span>packet);
     }
-    <span class="kw">let </span><span class="kw-2">mut </span>e1000_nc = E1000_NIC.get().ok_or(<span class="string">&quot;e1000 NIC hasn&#39;t been initialized yet&quot;</span>)<span class="question-mark">?</span>.lock();
-    e1000_nc.send_packet(transmit_buffer)
+    <span class="kw">let </span><span class="kw-2">mut </span>e1000_nic = E1000_NIC.get().ok_or(<span class="string">&quot;e1000 NIC hasn&#39;t been initialized yet&quot;</span>)<span class="question-mark">?</span>.lock();
+    e1000_nic.send_packet(transmit_buffer)
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="e1000" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

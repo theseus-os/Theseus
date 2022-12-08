@@ -1,0 +1,82 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Access to networking hardware."><meta name="keywords" content="rust, rustlang, rust-lang, phy"><title>net::phy - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../net/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../net/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"><a href="#">Module phy</a></h2><div class="sidebar-elems"><section><ul class="block"><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#traits">Traits</a></li></ul></section></div></nav><main><div class="width-limiter"><nav class="sub"><form class="search-form"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav><section id="main-content" class="content"><div class="main-heading"><h1 class="fqn">Module <a href="../index.html">net</a>::<wbr><a class="mod" href="#">phy</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></h1><span class="out-of-band"><button id="toggle-all-docs" title="collapse all docs">[<span>&#x2212;</span>]</button></span></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Access to networking hardware.</p>
+<p>The <code>phy</code> module deals with the <em>network devices</em>. It provides a trait
+for transmitting and receiving frames, <a href="trait.Device.html">Device</a>
+and implementations of it:</p>
+<ul>
+<li>the <a href="struct.Loopback.html"><em>loopback</em></a>, for zero dependency testing;</li>
+<li><em>middleware</em> <a href="struct.Tracer.html">Tracer</a> and
+<a href="struct.FaultInjector.html">FaultInjector</a>, to facilitate debugging;</li>
+<li><em>adapters</em> <a href="struct.RawSocket.html">RawSocket</a> and
+<a href="struct.TunTapInterface.html">TunTapInterface</a>, to transmit and receive frames
+on the host OS.</li>
+</ul>
+<h2 id="examples"><a href="#examples">Examples</a></h2>
+<p>An implementation of the <a href="trait.Device.html">Device</a> trait for a simple hardware
+Ethernet controller could look as follows:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>smoltcp::Result;
+<span class="kw">use </span>smoltcp::phy::{<span class="self">self</span>, DeviceCapabilities, Device, Medium};
+<span class="kw">use </span>smoltcp::time::Instant;
+
+<span class="kw">struct </span>StmPhy {
+    rx_buffer: [u8; <span class="number">1536</span>],
+    tx_buffer: [u8; <span class="number">1536</span>],
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; StmPhy {
+    <span class="kw">fn </span>new() -&gt; StmPhy {
+        StmPhy {
+            rx_buffer: [<span class="number">0</span>; <span class="number">1536</span>],
+            tx_buffer: [<span class="number">0</span>; <span class="number">1536</span>],
+        }
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; phy::Device&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>StmPhy {
+    <span class="kw">type </span>RxToken = StmPhyRxToken&lt;<span class="lifetime">&#39;a</span>&gt;;
+    <span class="kw">type </span>TxToken = StmPhyTxToken&lt;<span class="lifetime">&#39;a</span>&gt;;
+
+    <span class="kw">fn </span>receive(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;(<span class="self">Self</span>::RxToken, <span class="self">Self</span>::TxToken)&gt; {
+        <span class="prelude-val">Some</span>((StmPhyRxToken(<span class="kw-2">&amp;mut </span><span class="self">self</span>.rx_buffer[..]),
+              StmPhyTxToken(<span class="kw-2">&amp;mut </span><span class="self">self</span>.tx_buffer[..])))
+    }
+
+    <span class="kw">fn </span>transmit(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::TxToken&gt; {
+        <span class="prelude-val">Some</span>(StmPhyTxToken(<span class="kw-2">&amp;mut </span><span class="self">self</span>.tx_buffer[..]))
+    }
+
+    <span class="kw">fn </span>capabilities(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DeviceCapabilities {
+        <span class="kw">let </span><span class="kw-2">mut </span>caps = DeviceCapabilities::default();
+        caps.max_transmission_unit = <span class="number">1536</span>;
+        caps.max_burst_size = <span class="prelude-val">Some</span>(<span class="number">1</span>);
+        caps.medium = Medium::Ethernet;
+        caps
+    }
+}
+
+<span class="kw">struct </span>StmPhyRxToken&lt;<span class="lifetime">&#39;a</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>[u8]);
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; phy::RxToken <span class="kw">for </span>StmPhyRxToken&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="kw">fn </span>consume&lt;R, F&gt;(<span class="kw-2">mut </span><span class="self">self</span>, _timestamp: Instant, f: F) -&gt; <span class="prelude-ty">Result</span>&lt;R&gt;
+        <span class="kw">where </span>F: FnOnce(<span class="kw-2">&amp;mut </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;R&gt;
+    {
+        <span class="comment">// TODO: receive packet into buffer
+        </span><span class="kw">let </span>result = f(<span class="kw-2">&amp;mut </span><span class="self">self</span>.<span class="number">0</span>);
+        <span class="macro">println!</span>(<span class="string">&quot;rx called&quot;</span>);
+        result
+    }
+}
+
+<span class="kw">struct </span>StmPhyTxToken&lt;<span class="lifetime">&#39;a</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span>[u8]);
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; phy::TxToken <span class="kw">for </span>StmPhyTxToken&lt;<span class="lifetime">&#39;a</span>&gt; {
+    <span class="kw">fn </span>consume&lt;R, F&gt;(<span class="self">self</span>, _timestamp: Instant, len: usize, f: F) -&gt; <span class="prelude-ty">Result</span>&lt;R&gt;
+        <span class="kw">where </span>F: FnOnce(<span class="kw-2">&amp;mut </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;R&gt;
+    {
+        <span class="kw">let </span>result = f(<span class="kw-2">&amp;mut </span><span class="self">self</span>.<span class="number">0</span>[..len]);
+        <span class="macro">println!</span>(<span class="string">&quot;tx called {}&quot;</span>, len);
+        <span class="comment">// TODO: send packet out
+        </span>result
+    }
+}</code></pre></div>
+</div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.ChecksumCapabilities.html" title="net::phy::ChecksumCapabilities struct">ChecksumCapabilities</a></div><div class="item-right docblock-short">A description of checksum behavior for every supported protocol.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.DeviceCapabilities.html" title="net::phy::DeviceCapabilities struct">DeviceCapabilities</a></div><div class="item-right docblock-short">A description of device capabilities.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.FaultInjector.html" title="net::phy::FaultInjector struct">FaultInjector</a></div><div class="item-right docblock-short">A fault injector device.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.FuzzInjector.html" title="net::phy::FuzzInjector struct">FuzzInjector</a></div><div class="item-right docblock-short">A fuzz injector device.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Loopback.html" title="net::phy::Loopback struct">Loopback</a></div><div class="item-right docblock-short">A loopback device.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.PcapWriter.html" title="net::phy::PcapWriter struct">PcapWriter</a></div><div class="item-right docblock-short">A packet capture writer device.</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.Tracer.html" title="net::phy::Tracer struct">Tracer</a></div><div class="item-right docblock-short">A tracer device.</div></div></div><h2 id="enums" class="small-section-header"><a href="#enums">Enums</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Checksum.html" title="net::phy::Checksum enum">Checksum</a></div><div class="item-right docblock-short">A description of checksum behavior for a particular protocol.</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.Medium.html" title="net::phy::Medium enum">Medium</a></div><div class="item-right docblock-short">Type of medium of a device.</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.PcapLinkType.html" title="net::phy::PcapLinkType enum">PcapLinkType</a></div><div class="item-right docblock-short">Captured packet header type.</div></div><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.PcapMode.html" title="net::phy::PcapMode enum">PcapMode</a></div><div class="item-right docblock-short">Packet capture mode.</div></div></div><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2><div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Device.html" title="net::phy::Device trait">Device</a></div><div class="item-right docblock-short">An interface for sending and receiving raw network frames.</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.Fuzzer.html" title="net::phy::Fuzzer trait">Fuzzer</a></div><div class="item-right docblock-short">Represents a fuzzer. It is expected to replace bytes in the packet with fuzzed data.</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.PcapSink.html" title="net::phy::PcapSink trait">PcapSink</a></div><div class="item-right docblock-short">A packet capture sink.</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.RxToken.html" title="net::phy::RxToken trait">RxToken</a></div><div class="item-right docblock-short">A token to receive a single network packet.</div></div><div class="item-row"><div class="item-left module-item"><a class="trait" href="trait.TxToken.html" title="net::phy::TxToken trait">TxToken</a></div><div class="item-right docblock-short">A token to transmit a single network packet.</div></div></div></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="net" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>
