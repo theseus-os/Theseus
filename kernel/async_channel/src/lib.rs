@@ -28,7 +28,7 @@ use alloc::sync::Arc;
 use mpmc::Queue as MpmcQueue;
 use wait_queue::WaitQueue;
 use crossbeam_utils::atomic::AtomicCell;
-
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 /// Create a new channel that allows senders and receivers to 
 /// asynchronously exchange messages via an internal intermediary buffer.
@@ -49,7 +49,9 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>)
         queue: MpmcQueue::with_capacity(minimum_capacity),
         waiting_senders: WaitQueue::new(),
         waiting_receivers: WaitQueue::new(),
-        channel_status: AtomicCell::new(ChannelStatus::Connected)
+        channel_status: AtomicCell::new(ChannelStatus::Connected),
+        sender_count: AtomicUsize::new(1),
+        receiver_count: AtomicUsize::new(1),
     });
     (
         Sender   { channel: channel.clone() },
@@ -93,7 +95,9 @@ struct Channel<T: Send> {
     queue: MpmcQueue<T>,
     waiting_senders: WaitQueue,
     waiting_receivers: WaitQueue,
-    channel_status: AtomicCell<ChannelStatus>
+    channel_status: AtomicCell<ChannelStatus>,
+    sender_count: AtomicUsize,
+    receiver_count: AtomicUsize,
 }
 
 // Ensure that `AtomicCell<ChannelStatus>` is actually a lock-free atomic.
@@ -118,6 +122,7 @@ impl <T: Send> Channel<T> {
 pub struct Sender<T: Send> {
     channel: Arc<Channel<T>>,
 }
+
 impl <T: Send> Sender<T> {
     /// Send a message, blocking until space in the channel's buffer is available. 
     /// 
@@ -347,20 +352,26 @@ impl <T: Send> Receiver<T> {
 }
 
 
-/// Drop implementation marks the channel state and notifys the `Sender`
+/// When the only remaining `Receiver` is dropped, we mark the channel as disconnected
+/// and notify all of the `Senders`
 impl<T: Send> Drop for Receiver<T> {
     fn drop(&mut self) {
-        // trace!("Dropping the receiver");
-        self.channel.channel_status.store(ChannelStatus::ReceiverDisconnected);
-        self.channel.waiting_senders.notify_one();
+        // trace!("Dropping a receiver");
+        if self.channel.receiver_count.fetch_sub(1, Ordering::SeqCst) == 1 {
+            self.channel.channel_status.store(ChannelStatus::ReceiverDisconnected);
+            self.channel.waiting_senders.notify_all();
+        }
     }
 }
 
-/// Drop implementation marks the channel state and notifys the `Receiver`
+/// When the only remaining `Sender` is dropped, we mark the channel as disconnected
+/// and notify all of the `Receivers`
 impl<T: Send> Drop for Sender<T> {
     fn drop(&mut self) {
-        // trace!("Dropping the sender");
-        self.channel.channel_status.store(ChannelStatus::SenderDisconnected);
-        self.channel.waiting_receivers.notify_one();
+        // trace!("Dropping a sender");
+        if self.channel.sender_count.fetch_sub(1, Ordering::SeqCst) == 1 {
+            self.channel.channel_status.store(ChannelStatus::SenderDisconnected);
+            self.channel.waiting_receivers.notify_all();
+        }
     }
 }

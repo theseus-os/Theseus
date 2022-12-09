@@ -189,6 +189,18 @@ impl WaitQueue {
     pub fn notify_specific(&self, task_to_wakeup: &TaskRef) -> bool {
         self.notify(Some(task_to_wakeup))
     }
+
+    /// Wake up every `Task` that is waiting on this queue.
+    /// # Return 
+    /// * returns `true` if all `Task`s were woken up 
+    /// * busy forever if no `Task`s were waiting
+    pub fn notify_all(&self) -> bool {
+        let mut tasks_remain = true;
+        while tasks_remain {
+            tasks_remain = self.notify(None);
+        }
+        true
+    }
     
     /// The internal routine for notifying / waking up tasks that are blocking on the waitqueue. 
     /// If specified, the given `task_to_wakeup` will be notified, 
