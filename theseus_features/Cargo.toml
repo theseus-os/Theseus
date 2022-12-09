@@ -24,6 +24,7 @@ ls = { path = "../applications/ls", optional = true }
 mkdir = { path = "../applications/mkdir", optional = true }
 ns = { path = "../applications/ns", optional = true }
 ping = { path = "../applications/ping", optional = true }
+ping_2 = { path = "../applications/ping_2", optional = true }
 pmu_sample_start = { path = "../applications/pmu_sample_start", optional = true }
 pmu_sample_stop = { path = "../applications/pmu_sample_stop", optional = true }
 ps = { path = "../applications/ps", optional = true }
@@ -38,7 +39,6 @@ wasm = { path = "../applications/wasm", optional = true }
 ## Kernel crates used for only testing purposes.
 libtest = { path = "../kernel/libtest", optional = true } 
 test_thread_local = { path = "../kernel/test_thread_local", optional = true }
-mapper_spillful = { path = "../kernel/mapper_spillful", optional = true }
 unified_channel = { path = "../kernel/unified_channel", optional = true }
 
 
@@ -73,7 +73,6 @@ unwind_test = { path = "../applications/unwind_test", optional = true }
 bm = { path = "../applications/bm", optional = true }
 channel_eval = { path = "../applications/channel_eval", optional = true }
 heap_eval = { path = "../applications/heap_eval", optional = true }
-mm_eval = { path = "../applications/mm_eval", optional = true }
 rq_eval = { path = "../applications/rq_eval",  optional = true }
 scheduler_eval = { path = "../applications/scheduler_eval",  optional = true }
 
@@ -106,6 +105,7 @@ theseus_apps = [
     "mkdir",
     "ns",
     "ping",
+    "ping_2",
     "pmu_sample_start",
     "pmu_sample_stop",
     "ps",
@@ -122,7 +122,6 @@ theseus_benchmarks = [
     "bm",
     "channel_eval",
     "heap_eval",
-    "mm_eval",
     "rq_eval",
     "scheduler_eval",
 ]
