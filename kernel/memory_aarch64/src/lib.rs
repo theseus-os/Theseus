@@ -19,7 +19,7 @@ use tock_registers::interfaces::ReadWriteable;
 
 use memory_structs::PhysicalAddress;
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", doc))]
 use {
     core::arch::asm,
     memory_structs::VirtualAddress,
