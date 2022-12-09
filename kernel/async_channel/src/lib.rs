@@ -118,9 +118,20 @@ impl <T: Send> Channel<T> {
 }
 
 /// The sender (transmit) side of a channel.
-#[derive(Clone)]
 pub struct Sender<T: Send> {
     channel: Arc<Channel<T>>,
+}
+
+impl<T:Send> Clone for Sender<T> {
+    /// Increment the sender's counter.
+    /// If were are no senders initially, then set channel status to `Connected`.
+    /// Return a newly created sender.
+    fn clone(&self) -> Self {
+        if self.channel.sender_count.fetch_add(1, Ordering::SeqCst) == 0 {
+            self.channel.channel_status.store(ChannelStatus::Connected);
+        }
+        Sender { channel: self.channel.clone() }
+    }
 }
 
 impl <T: Send> Sender<T> {
@@ -251,10 +262,22 @@ impl <T: Send> Sender<T> {
 }
 
 /// The receiver side of a channel.
-#[derive(Clone)]
 pub struct Receiver<T: Send> {
     channel: Arc<Channel<T>>,
 }
+
+impl<T: Send> Receiver<T> {
+    /// Increment the receiver's counter.
+    /// If were are no receivers initially, then set channel status to `Connected`.
+    /// Return a newly created receiver.
+    fn clone(&self) -> Self {
+        if self.channel.receiver_count.fetch_add(1, Ordering::SeqCst) == 0 {
+            self.channel.channel_status.store(ChannelStatus::Connected);
+        }
+        Receiver { channel: self.channel.clone() }
+    }
+}
+
 impl <T: Send> Receiver<T> {
     /// Receive a message, blocking until a message is available in the buffer.
     /// 
