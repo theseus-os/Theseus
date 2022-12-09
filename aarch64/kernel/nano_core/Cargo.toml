@@ -18,7 +18,7 @@ page_allocator = { path = "../../../kernel/page_allocator" }
 memory_structs = { path = "../../../kernel/memory_structs" }
 kernel_config = { path = "../../../kernel/kernel_config" }
 pte_flags = { path = "../../../kernel/pte_flags" }
-memory = { path = "../memory" }
+memory = { path = "../../../kernel/memory" }
 
 uefi = { version = "0.18", default-features = false, features = [ "alloc", "exts" ] }
 uefi-services = { version = "0.15", default-features = false, features = [ "panic_handler" ] }

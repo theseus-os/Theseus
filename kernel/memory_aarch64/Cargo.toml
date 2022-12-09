@@ -8,4 +8,4 @@ version = "0.1.0"
 cortex-a = "7.5.0"
 tock-registers = "0.7.0"
 
-memory_structs = { path = "../../../kernel/memory_structs" }
+memory_structs = { path = "../memory_structs" }

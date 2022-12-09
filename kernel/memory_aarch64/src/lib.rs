@@ -17,12 +17,17 @@ use cortex_a::registers::*;
 use tock_registers::interfaces::Writeable;
 use tock_registers::interfaces::ReadWriteable;
 
-use memory_structs::{PhysicalAddress, VirtualAddress};
+use memory_structs::PhysicalAddress;
 
-use core::arch::asm;
+#[cfg(target_arch = "aarch64")]
+use {
+    core::arch::asm,
+    memory_structs::VirtualAddress,
+};
 
 const THESEUS_ASID: u16 = 0;
 
+#[cfg(any(target_arch = "aarch64", doc))]
 /// Flushes the specific virtual address in TLB.
 ///
 /// TLBI => tlb invalidate instruction
@@ -30,17 +35,23 @@ const THESEUS_ASID: u16 = 0;
 ///         using the supplied address
 /// "e1" => execution level
 pub fn tlb_flush_virt_addr(vaddr: VirtualAddress) {
+    #[cfg(target_arch = "aarch64")]
     unsafe { asm!("tlbi vae1, {}", in(reg) vaddr.value()) };
 }
 
+#[cfg(any(target_arch = "aarch64", doc))]
 /// Flushes all TLB entries with Theseus' ASID (=0).
 ///
 /// TLBI => tlb invalidate instruction
 /// "asid" => all entries with specific ASID
 /// "e1" => execution level
 pub fn tlb_flush_by_theseus_asid() {
+    #[cfg(target_arch = "aarch64")]
     unsafe { asm!("tlbi aside1, {:x}", in(reg) THESEUS_ASID) };
 }
+
+#[cfg(any(target_arch = "aarch64", doc))]
+pub use tlb_flush_by_theseus_asid as tlb_flush_all;
 
 /// Returns the current top-level page table address.
 ///
@@ -174,7 +185,7 @@ pub fn configure_translation_registers() {
 }
 
 /// Installs a page table in the TTBR CPU register
-pub fn set_page_table_addr(page_table: PhysicalAddress) {
+pub fn set_as_active_page_table_root(page_table: PhysicalAddress) {
     unsafe {
         let page_table_addr = page_table.value() as u64;
         TTBR0_EL1.write(

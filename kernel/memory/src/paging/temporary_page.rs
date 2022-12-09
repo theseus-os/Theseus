@@ -11,7 +11,7 @@ use core::mem::ManuallyDrop;
 use log::error;
 use super::{
     AllocatedPages, AllocatedFrames, PageTable, MappedPages, VirtualAddress,
-    table::{Table, Level1},
+    table::{Table, Level1, NextLevelAccess},
 };
 use pte_flags::PteFlagsArch;
 use kernel_config::memory::{TEMPORARY_PAGE_VIRT_ADDR, PAGE_SIZE};
@@ -61,6 +61,7 @@ impl TemporaryPage {
             page.ok_or("Couldn't allocate a new Page for the temporary P4 table frame")?,
             Owned(frame),
             PteFlagsArch::new().valid(true).writable(true),
+            NextLevelAccess::Recursive,
         )?;
         Ok(TemporaryPage {
             mapped_page,

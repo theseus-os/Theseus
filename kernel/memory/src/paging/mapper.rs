@@ -23,15 +23,18 @@ use crate::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page,
 use crate::paging::{
     get_current_p4,
     PageRange,
-    table::{P4, Table, Level4},
+    table::{P4, Table, Level4, NextLevelAccess},
 };
 use pte_flags::PteFlagsArch;
 use spin::Once;
-use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
+use kernel_config::memory::PAGE_SIZE;
 use super::tlb_flush_virt_addr;
 use zerocopy::FromBytes;
 use page_table_entry::UnmapResult;
 use owned_borrowed_trait::{OwnedOrBorrowed, Owned, Borrowed};
+
+#[cfg(target_arch = "x86_64")]
+use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
 
 /// This is a private callback used to convert `UnmappedFrames` into `AllocatedFrames`.
 /// 
@@ -70,12 +73,27 @@ impl Mapper {
         }
     }
 
+    unsafe fn p4_ptr(&self, access: NextLevelAccess) -> *mut Table<Level4> {
+        match access {
+            NextLevelAccess::Recursive => self.p4.as_ptr(),
+            NextLevelAccess::Identity => self.target_p4.start_address().value() as *mut _
+        }
+    }
+
+    pub(crate) fn p4_with_access(&self, access: NextLevelAccess) -> &Table<Level4> {
+        unsafe { self.p4_ptr(access).as_ref().unwrap() }
+    }
+
+    pub(crate) fn p4_mut_with_access(&mut self, access: NextLevelAccess) -> &mut Table<Level4> {
+        unsafe { self.p4_ptr(access).as_mut().unwrap() }
+    }
+
     pub(crate) fn p4(&self) -> &Table<Level4> {
-        unsafe { self.p4.as_ref() }
+        self.p4_with_access(NextLevelAccess::Recursive)
     }
 
     pub(crate) fn p4_mut(&mut self) -> &mut Table<Level4> {
-        unsafe { self.p4.as_mut() }
+        self.p4_mut_with_access(NextLevelAccess::Recursive)
     }
 
     /// Dumps all page table entries at all four page table levels for the given `VirtualAddress`, 
@@ -85,9 +103,9 @@ impl Mapper {
     pub fn dump_pte<W: Write>(&self, writer: &mut W, virtual_address: VirtualAddress) -> fmt::Result {
         let page = Page::containing_address(virtual_address);
         let p4  = self.p4();
-        let p3  = p4.next_table(page.p4_index());
-        let p2  = p3.and_then(|p3| p3.next_table(page.p3_index()));
-        let p1  = p2.and_then(|p2| p2.next_table(page.p2_index()));
+        let p3  = p4.next_table(page.p4_index(), NextLevelAccess::Recursive);
+        let p2  = p3.and_then(|p3| p3.next_table(page.p3_index(), NextLevelAccess::Recursive));
+        let p1  = p2.and_then(|p2| p2.next_table(page.p2_index(), NextLevelAccess::Recursive));
         write!(
             writer,
             "VirtualAddress: {:#X}:
@@ -117,7 +135,7 @@ impl Mapper {
 
     /// Translates a virtual memory `Page` to a physical memory `Frame` by walking the page tables.
     pub fn translate_page(&self, page: Page) -> Option<Frame> {
-        let p3 = self.p4().next_table(page.p4_index());
+        let p3 = self.p4().next_table(page.p4_index(), NextLevelAccess::Recursive);
 
         #[cfg(target_arch = "x86_64")]
         let huge_page = || {
@@ -133,7 +151,7 @@ impl Mapper {
                         )));
                     }
                 }
-                if let Some(p2) = p3.next_table(page.p3_index()) {
+                if let Some(p2) = p3.next_table(page.p3_index(), NextLevelAccess::Recursive) {
                     let p2_entry = &p2[page.p2_index()];
                     // 2MiB page?
                     if let Some(start_frame) = p2_entry.pointed_frame() {
@@ -150,10 +168,13 @@ impl Mapper {
             })
         };
         #[cfg(target_arch = "aarch64")]
-        let huge_page = || { todo!("huge page (block descriptor) translation for aarch64") };
+        let huge_page = || {
+            // TODO: huge page (block descriptor) translation for aarch64
+            None
+        };
 
-        p3.and_then(|p3| p3.next_table(page.p3_index()))
-            .and_then(|p2| p2.next_table(page.p2_index()))
+        p3.and_then(|p3| p3.next_table(page.p3_index(), NextLevelAccess::Recursive))
+            .and_then(|p2| p2.next_table(page.p2_index(), NextLevelAccess::Recursive))
             .and_then(|p1| p1[page.p1_index()].pointed_frame())
             .or_else(huge_page)
     }
@@ -169,6 +190,7 @@ impl Mapper {
         pages: AllocatedPages,
         frames: Frames,
         flags: Flags,
+        access: NextLevelAccess,
     ) -> Result<(MappedPages, Frames::Inner), &'static str> 
     where
         Frames: OwnedOrBorrowed<AllocatedFrames>,
@@ -177,12 +199,12 @@ impl Mapper {
         let frames = frames.into_inner();
         let flags = flags.into();
         let higher_level_flags = flags.adjust_for_higher_level_pte();
-
-        // Only the lowest-level P1 entry can be considered exclusive, and only when
-        // we are mapping it exclusively (i.e., owned `AllocatedFrames` are passed in).
         let actual_flags = flags
             .valid(true)
             .exclusive(Frames::OWNED);
+
+        #[cfg(target_arch = "aarch64")]
+        let actual_flags = actual_flags.accessed(true).page_descriptor(true);
 
         let pages_count = pages.size_in_pages();
         let frames_count = frames.borrow().size_in_frames();
@@ -195,9 +217,10 @@ impl Mapper {
 
         // iterate over pages and frames in lockstep
         for (page, frame) in pages.deref().clone().into_iter().zip(frames.borrow().into_iter()) {
-            let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
-            let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
-            let p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
+            let p4 = self.p4_mut_with_access(access);
+            let p3 = p4.next_table_create(page.p4_index(), higher_level_flags, access)?;
+            let p2 = p3.next_table_create(page.p3_index(), higher_level_flags, access)?;
+            let p1 = p2.next_table_create(page.p2_index(), higher_level_flags, access)?;
 
             if !p1[page.p1_index()].is_unused() {
                 error!("map_allocated_pages_to(): page {:#X} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
@@ -227,7 +250,29 @@ impl Mapper {
         frames: AllocatedFrames,
         flags: F,
     ) -> Result<MappedPages, &'static str> {
-        let (mapped_pages, frames) = self.internal_map_to(pages, Owned(frames), flags)?;
+        let (mapped_pages, frames) = self.internal_map_to(pages, Owned(frames), flags, NextLevelAccess::Recursive)?;
+        
+        // Currently we forget the actual `AllocatedFrames` object because
+        // there is no easy/efficient way to store a dynamic list of non-contiguous frames (would require Vec).
+        // This is okay because we will deallocate each of these frames when this MappedPages object is dropped
+        // and each of the page table entries for its pages are cleared.
+        core::mem::forget(frames);
+
+        Ok(mapped_pages)
+    }
+    
+
+    #[cfg(any(target_arch = "aarch64", doc))]
+    /// Maps the given virtual `AllocatedPages` to the given physical `AllocatedFrames`.
+    /// 
+    /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
+    pub(crate) fn map_allocated_pages_to_frames_identity<F: Into<PteFlagsArch>>(
+        &mut self,
+        pages: AllocatedPages,
+        frames: AllocatedFrames,
+        flags: F,
+    ) -> Result<MappedPages, &'static str> {
+        let (mapped_pages, frames) = self.internal_map_to(pages, Owned(frames), flags, NextLevelAccess::Identity)?;
         
         // Currently we forget the actual `AllocatedFrames` object because
         // there is no easy/efficient way to store a dynamic list of non-contiguous frames (would require Vec).
@@ -256,12 +301,16 @@ impl Mapper {
             .exclusive(true)
             .valid(true);
 
+        #[cfg(target_arch = "aarch64")]
+        let actual_flags = actual_flags.accessed(true).page_descriptor(true);
+
         for page in pages.deref().clone() {
             let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
 
-            let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
-            let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
-            let p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
+            let p4 = self.p4_mut();
+            let p3 = p4.next_table_create(page.p4_index(), higher_level_flags, NextLevelAccess::Recursive)?;
+            let p2 = p3.next_table_create(page.p3_index(), higher_level_flags, NextLevelAccess::Recursive)?;
+            let p1 = p2.next_table_create(page.p2_index(), higher_level_flags, NextLevelAccess::Recursive)?;
 
             if !p1[page.p1_index()].is_unused() {
                 error!("map_allocated_pages(): page {:#X} -> frame {:#X}, page was already in use!",
@@ -308,7 +357,7 @@ impl Mapper {
     ) -> Result<MappedPages, &'static str> {
         // In this function, none of the frames can be mapped as exclusive
         // because we're accepting a *reference* to an `AllocatedFrames`, not consuming it.
-        mapper.internal_map_to(pages, Borrowed(frames), flags)
+        mapper.internal_map_to(pages, Borrowed(frames), flags, NextLevelAccess::Recursive)
             .map(|(mp, _af)| mp)
     }
 }
@@ -513,9 +562,9 @@ impl MappedPages {
 
         for page in self.pages.clone() {
             let p1 = active_table_mapper.p4_mut()
-                .next_table_mut(page.p4_index())
-                .and_then(|p3| p3.next_table_mut(page.p3_index()))
-                .and_then(|p2| p2.next_table_mut(page.p2_index()))
+                .next_table_mut(page.p4_index(), NextLevelAccess::Recursive)
+                .and_then(|p3| p3.next_table_mut(page.p3_index(), NextLevelAccess::Recursive))
+                .and_then(|p2| p2.next_table_mut(page.p2_index(), NextLevelAccess::Recursive))
                 .ok_or("mapping code does not support huge pages")?;
             
             p1[page.p1_index()].set_flags(new_flags);
@@ -589,9 +638,9 @@ impl MappedPages {
 
         for page in self.pages.clone() {            
             let p1 = active_table_mapper.p4_mut()
-                .next_table_mut(page.p4_index())
-                .and_then(|p3| p3.next_table_mut(page.p3_index()))
-                .and_then(|p2| p2.next_table_mut(page.p2_index()))
+                .next_table_mut(page.p4_index(), NextLevelAccess::Recursive)
+                .and_then(|p3| p3.next_table_mut(page.p3_index(), NextLevelAccess::Recursive))
+                .and_then(|p2| p2.next_table_mut(page.p2_index(), NextLevelAccess::Recursive))
                 .ok_or("mapping code does not support huge pages")?;
             let pte = &mut p1[page.p1_index()];
             if pte.is_unused() {

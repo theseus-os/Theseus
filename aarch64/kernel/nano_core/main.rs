@@ -17,7 +17,7 @@ use alloc::vec::Vec;
 
 use uefi::{prelude::entry, Status, Handle, table::{SystemTable, Boot, boot::MemoryType}};
 
-use frame_allocator::{PhysicalMemoryRegion, MemoryRegionType};
+use frame_allocator::MemoryRegionType;
 use memory_structs::{PhysicalAddress, FrameRange};
 use kernel_config::memory::PAGE_SIZE;
 use pte_flags::PteFlags;
@@ -50,60 +50,47 @@ fn main(
     let mmap_size = boot_svc.memory_map_size();
     let mut mmap = vec![0; mmap_size.map_size + safety * mmap_size.entry_size];
 
-    let mut mapped_regions = 0;
+    let mut layout_len = 0;
     {
         let (_, layout) = boot_svc.memory_map(&mut mmap).unwrap();
         for descriptor in layout {
-            if descriptor.ty != MemoryType::CONVENTIONAL {
-                mapped_regions += 1;
+            if descriptor.ty != MemoryType::CONVENTIONAL && descriptor.page_count > 0 {
+                layout_len += 1;
             }
         }
     }
-    let mut mapped_regions = Vec::with_capacity(mapped_regions + safety);
+    let mut layout_vec = Vec::with_capacity(layout_len + safety);
 
     let (_runtime_svc, mem_iter) = system_table.exit_boot_services(handle, &mut mmap)
         .map_err(|_| "nano_core::main - couldn't exit uefi boot services")?;
-
-    // Identifying free and reserved regions so we can initialize the frame allocator.
-    let mut free_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
-    let mut free_index = 0;
-    let mut reserved_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
-    let mut reserved_index = 0;
 
     for descriptor in mem_iter {
         let page_count = descriptor.page_count as usize;
         let size = page_count * PAGE_SIZE;
         if size > 0 {
-            let region_type = uefi_conv::convert_mem(descriptor.ty);
-            let (dst, index) = match region_type {
-                MemoryRegionType::Free => (&mut free_regions, &mut free_index),
-                MemoryRegionType::Reserved => (&mut reserved_regions, &mut reserved_index),
-                MemoryRegionType::Unknown => (&mut reserved_regions, &mut reserved_index),
-            };
+            let mem_type = uefi_conv::convert_mem(descriptor.ty);
+            let flags = uefi_conv::get_mem_flags(descriptor.ty);
 
             let start_addr = descriptor.phys_start as usize;
             let start_addr = PhysicalAddress::new_canonical(start_addr);
             let range = FrameRange::from_phys_addr(start_addr, size);
 
-            if let Some(flags) = uefi_conv::get_mem_flags(descriptor.ty) {
-                // info!("{:?} ({}) -> {:?} -> {:?}", start_addr, page_count, flags, descriptor.ty);
-                mapped_regions.push((start_addr, page_count, flags));
-            }
-
-            if region_type != MemoryRegionType::Unknown {
-                let region = PhysicalMemoryRegion::new(range, region_type);
-                dst[*index] = Some(region);
-                *index += 1;
-            }
+            layout_vec.push((range, mem_type, flags));
         }
     }
 
-    let uart_phys_addr = PhysicalAddress::new(0x0900_0000).unwrap();
-    mapped_regions.push((uart_phys_addr, 1, PteFlags::DEVICE_MEMORY | PteFlags::NOT_EXECUTABLE | PteFlags::WRITABLE));
+    // I'm also using this utility function for GIC mmio mapping
+    let mmio_region = |phys_addr, num_pages| {
+        let phys_addr = PhysicalAddress::new(phys_addr).unwrap();
+        let range = FrameRange::from_phys_addr(phys_addr, num_pages);
+        let flags = PteFlags::DEVICE_MEMORY | PteFlags::NOT_EXECUTABLE | PteFlags::WRITABLE;
+        (range, MemoryRegionType::Free, Some(flags))
+    };
+
+    layout_vec.push(mmio_region(0x0900_0000, 1));
 
     info!("Calling memory::init();");
-    let iter = mapped_regions.drain(..);
-    info!("page table: {:?}", memory::init(&free_regions, &reserved_regions, iter));
+    info!("page table: {:?}", memory::init(&layout_vec));
 
     info!("Going to infinite loop now.");
     inf_loop_0xbeef();
