@@ -189,6 +189,15 @@ impl WaitQueue {
     pub fn notify_specific(&self, task_to_wakeup: &TaskRef) -> bool {
         self.notify(Some(task_to_wakeup))
     }
+
+    /// Wake up all `Task`s that are waiting on this queue.
+    pub fn notify_all(&self) {
+        for t in self.0.lock().drain(..) {
+            if t.unblock().is_err() {
+                warn!("WaitQueue::notify_all(): failed to unblock {:?}", t);
+            };
+        }
+    }
     
     /// The internal routine for notifying / waking up tasks that are blocking on the waitqueue. 
     /// If specified, the given `task_to_wakeup` will be notified, 
