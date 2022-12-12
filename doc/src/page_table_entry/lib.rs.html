@@ -135,8 +135,6 @@
 <span id="135">135</span>
 <span id="136">136</span>
 <span id="137">137</span>
-<span id="138">138</span>
-<span id="139">139</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines the structure of Page Table Entries (PTEs) on x86_64.
 //!
 //! This crate is also useful for frame deallocation, because it can determine
@@ -153,11 +151,9 @@
 
 </span><span class="kw">use </span>core::ops::Deref;
 <span class="kw">use </span>memory_structs::{Frame, FrameRange, PhysicalAddress};
-<span class="kw">use </span>pte_flags::{PteFlagsArch, PTE_FRAME_MASK};
-<span class="kw">use </span>bit_field::BitField;
-<span class="kw">use </span>kernel_config::memory::PAGE_SHIFT;
 <span class="kw">use </span>zerocopy::FromBytes;
 <span class="kw">use </span>frame_allocator::AllocatedFrame;
+<span class="kw">use </span>pte_flags::{PteFlagsArch, PTE_FRAME_MASK};
 
 <span class="doccomment">/// A page table entry, which is a `u64` value under the hood.
 ///
@@ -206,7 +202,7 @@
 
     <span class="doccomment">/// Returns this `PageTableEntry`&#39;s flags.
     </span><span class="kw">pub fn </span>flags(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PteFlagsArch {
-        PteFlagsArch::from_bits_truncate(<span class="self">self</span>.<span class="number">0</span>)
+        PteFlagsArch::from_bits_truncate(<span class="self">self</span>.<span class="number">0 </span>&amp; !PTE_FRAME_MASK)
     }
 
     <span class="doccomment">/// Returns the physical `Frame` pointed to (mapped by) this `PageTableEntry`.
@@ -222,7 +218,7 @@
     <span class="doccomment">/// Extracts the value of the frame referred to by this page table entry.
     </span><span class="kw">fn </span>frame_value(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Frame {
         <span class="kw">let </span><span class="kw-2">mut </span>frame_paddr = <span class="self">self</span>.<span class="number">0 </span><span class="kw">as </span>usize;
-        frame_paddr.set_bits(<span class="number">0 </span>.. (PAGE_SHIFT <span class="kw">as </span>u8), <span class="number">0</span>);
+        frame_paddr &amp;= PTE_FRAME_MASK <span class="kw">as </span>usize;
         Frame::containing_address(PhysicalAddress::new_canonical(frame_paddr))
     }
 

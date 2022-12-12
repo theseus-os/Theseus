@@ -337,7 +337,7 @@
 <span class="kw">use </span>static_assertions::const_assert_eq;
 
 <span class="doccomment">/// A mask for the bits of a page table entry that contain the physical frame address.
-</span><span class="kw">pub const </span>PTE_FRAME_MASK: u64 = <span class="number">0x000_FFFFFFFFFF_000</span>;
+</span><span class="kw">pub const </span>PTE_FRAME_MASK: u64 = <span class="number">0x000F_FFFF_FFFF_F000</span>;
 
 <span class="comment">// Ensure that we never expose reserved bits [12:51] as part of the `PteFlagsX86_64` interface.
 </span><span class="macro">const_assert_eq!</span>(PteFlagsX86_64::all().bits() &amp; PTE_FRAME_MASK, <span class="number">0</span>);
