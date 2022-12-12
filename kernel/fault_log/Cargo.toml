@@ -20,8 +20,8 @@ path = "../print"
 [dependencies.task]
 path = "../task"
 
-[dependencies.apic]
-path = "../apic"
+[dependencies.multicore]
+path = "../multicore"
 
 [dependencies.log]
 default-features = false

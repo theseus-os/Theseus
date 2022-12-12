@@ -27,7 +27,7 @@ pub fn schedule() -> bool {
     // If preemption was not previously enabled (before we disabled it above),
     // then we shouldn't perform a task switch here.
     if !preemption_guard.preemption_was_enabled() {
-        // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", get_my_apic_id());
+        // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", get_my_core_id());
         return false;
     }
 

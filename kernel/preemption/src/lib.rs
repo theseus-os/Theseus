@@ -26,7 +26,7 @@ static PREEMPTION_COUNT: [AtomicU8; MAX_CPU_CORES] = [ATOMIC_U8_ZERO; MAX_CPU_CO
 /// Prevents preemption (preemptive task switching) from occurring
 /// until the returned guard object is dropped.
 pub fn hold_preemption() -> PreemptionGuard {
-    let apic_id = apic::get_my_apic_id();
+    let apic_id = apic::get_my_core_id();
     let prev_val = PREEMPTION_COUNT[apic_id as usize].fetch_add(1, Ordering::Relaxed);
     // If the previous counter value was 0, that indicates we are transitioning
     // from preemption being enabled to disabled on this CPU.
@@ -105,7 +105,7 @@ impl PreemptionGuard {
 
 impl Drop for PreemptionGuard {
     fn drop(&mut self) {
-        let apic_id = apic::get_my_apic_id();
+        let apic_id = apic::get_my_core_id();
         assert!(
             self.apic_id == apic_id,
             "PreemptionGuard::drop(): BUG: APIC IDs did not match! \
@@ -137,7 +137,7 @@ impl Drop for PreemptionGuard {
 /// as it is just a snapshot that offers no guarantee that preemption
 /// will continue to be enabled or disabled immediately after returning.
 pub fn preemption_enabled() -> bool {
-    let apic_id = apic::get_my_apic_id();
+    let apic_id = apic::get_my_core_id();
     let val = PREEMPTION_COUNT[apic_id as usize].load(Ordering::Relaxed);
     val == 0
 }

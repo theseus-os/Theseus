@@ -223,7 +223,7 @@ fn more_pmcs_than_expected(num_pmc: u8) -> Result<bool, &'static str> {
 /// This function should only be called after all the cores have been booted up.
 pub fn init() -> Result<(), &'static str> {
     let mut cores_initialized = CORES_INITIALIZED.lock();
-    let core_id = apic::get_my_apic_id();
+    let core_id = apic::get_my_core_id();
 
     if cores_initialized.contains(&core_id) {
         warn!("PMU has already been intitialized on core {}", core_id);
@@ -556,7 +556,7 @@ fn create_general_counter(event_mask: u64) -> Result<Counter, &'static str> {
 
 /// Does the work of iterating through programmable counters and using whichever one is free. Returns Err if none free
 fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
-    let my_core = apic::get_my_apic_id();
+    let my_core = apic::get_my_core_id();
     let num_pmc = num_general_purpose_counters();
 
     for pmc in 0..num_pmc {
@@ -583,7 +583,7 @@ fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
 
 /// Creates a counter object for a fixed hardware counter
 fn create_fixed_counter(msr_mask: u32) -> Result<Counter, &'static str> {
-    let my_core = apic::get_my_apic_id();
+    let my_core = apic::get_my_core_id();
     let count = rdpmc(msr_mask);
     
     return Ok(Counter {
@@ -597,7 +597,7 @@ fn create_fixed_counter(msr_mask: u32) -> Result<Counter, &'static str> {
 /// Checks that the PMU has been initialized. If it has been,
 /// the version ID tells whether the system has performance monitoring capabilities. 
 fn check_pmu_availability() -> Result<(), &'static str>  {
-    let core_id = apic::get_my_apic_id();
+    let core_id = apic::get_my_core_id();
     if !CORES_INITIALIZED.lock().contains(&core_id) {
         if *PMU_VERSION >= MIN_PMU_VERSION {
             error!("PMU version {} is available. It still needs to be initialized on this core", *PMU_VERSION);
@@ -653,7 +653,7 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
     check_pmu_availability()?;
 
     // perform checks to ensure that counter is ready to use and that previous results are not being unintentionally discarded
-    let my_core_id = apic::get_my_apic_id();
+    let my_core_id = apic::get_my_core_id();
 
     trace!("start_samples: the core id is : {}", my_core_id);
 
@@ -752,7 +752,7 @@ pub struct SampleResults {
 /// Returns the samples that were stored during sampling in the form of a SampleResults object. 
 /// If samples are not yet finished, forces them to stop.  
 pub fn retrieve_samples() -> Result<SampleResults, &'static str> {
-    let my_core_id = apic::get_my_apic_id();
+    let my_core_id = apic::get_my_core_id();
 
     let mut sampling_info = SAMPLING_INFO.lock();
     let mut samples = sampling_info.get_mut(&my_core_id).ok_or("pmu_x86::retrieve_samples: could not retrieve sampling information for this core")?;
@@ -836,7 +836,7 @@ pub fn handle_sample(stack_frame: &InterruptStackFrame) -> Result<bool, &'static
 
     unsafe { Msr::new(IA32_PERF_GLOBAL_OVF_CTRL).write(CLEAR_PERF_STATUS_MSR); }
 
-    let my_core_id = apic::get_my_apic_id();
+    let my_core_id = apic::get_my_core_id();
 
     let mut sampling_info = SAMPLING_INFO.lock();
     let mut samples = sampling_info.get_mut(&my_core_id)

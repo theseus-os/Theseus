@@ -16,7 +16,7 @@
 extern crate memory;
 extern crate util;
 extern crate gdt;
-extern crate apic;
+extern crate multicore;
 extern crate alloc;
 extern crate x86_64;
 extern crate task;
@@ -25,7 +25,6 @@ extern crate dbus;
 use core::sync::atomic::{Ordering, compiler_fence};
 use util::c_str::{c_char, CStr, CString};
 use gdt::{AvailableSegmentSelector, get_segment_selector};
-use apic::get_my_apic_id;
 use memory::VirtualAddress;
 
 
@@ -132,7 +131,7 @@ unsafe extern "C" fn syscall_handler() {
     
     let curr_id = ::task::get_my_current_task_id();
     trace!("syscall_handler: (AP {}) task id={:?}  rax={:#x} rdi={:#x} rsi={:#x} rdx={:#x} r10={:#x} r8={:#x} r9={:#x}",
-           get_my_apic_id(), curr_id, rax, rdi, rsi, rdx, r10, r8, r9);
+           multicore::get_my_core_id(), curr_id, rax, rdi, rsi, rdx, r10, r8, r9);
 
 
     // FYI, Rust's calling conventions is as follows:  RDI,  RSI,  RDX,  RCX,  R8,  R9,  R10,  others on stack

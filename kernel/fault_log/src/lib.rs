@@ -12,7 +12,7 @@
 extern crate alloc;
 extern crate memory;
 extern crate task;
-extern crate apic;
+extern crate multicore;
 extern crate irq_safety;
 
 use alloc::{
@@ -20,7 +20,6 @@ use alloc::{
     vec::Vec,
 };
 use memory::VirtualAddress;
-use apic::get_my_apic_id;
 use irq_safety::MutexIrqSafe;
 use core::panic::PanicInfo;
 
@@ -142,7 +141,7 @@ fn update_and_insert_fault_entry_internal(
 ) {
 
     // Add the core the fault was detected
-    fe.core = Some(get_my_apic_id());
+    fe.core = Some(multicore::get_my_core_id());
 
     // If current task cannot be obtained we will just add `fault_entry` to 
     // the `fault_log` and return.

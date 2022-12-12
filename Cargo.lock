@@ -344,7 +344,6 @@ name = "captain"
 version = "0.1.0"
 dependencies = [
  "acpi",
- "apic",
  "console",
  "device_manager",
  "dfqueue",
@@ -358,6 +357,7 @@ dependencies = [
  "logger",
  "memory",
  "mod_mgmt",
+ "multicore",
  "multicore_bringup",
  "multiple_heaps",
  "network_manager",
@@ -433,9 +433,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 name = "channel_eval"
 version = "0.1.0"
 dependencies = [
- "apic",
  "getopts",
  "log",
+ "multicore",
  "spawn",
  "task",
  "terminal_print",
@@ -996,12 +996,12 @@ dependencies = [
 name = "exceptions_full"
 version = "0.1.0"
 dependencies = [
- "apic",
  "debug_info",
  "fault_log",
  "locked_idt",
  "log",
  "memory",
+ "multicore",
  "pmu_x86",
  "print",
  "runqueue",
@@ -1068,10 +1068,10 @@ dependencies = [
 name = "fault_log"
 version = "0.1.0"
 dependencies = [
- "apic",
  "irq_safety",
  "log",
  "memory",
+ "multicore",
  "print",
  "task",
  "vga_buffer",
@@ -2012,6 +2012,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "multicore"
+version = "0.1.0"
+dependencies = [
+ "apic",
+]
+
+[[package]]
 name = "multicore_bringup"
 version = "0.1.0"
 dependencies = [
@@ -2812,11 +2819,11 @@ dependencies = [
 name = "rq_eval"
 version = "0.1.0"
 dependencies = [
- "apic",
  "getopts",
  "hpet",
  "libtest",
  "log",
+ "multicore",
  "runqueue",
  "spawn",
  "task",
@@ -3139,12 +3146,12 @@ dependencies = [
 name = "simd_personality"
 version = "0.1.0"
 dependencies = [
- "apic",
  "cfg-if 0.1.10",
  "fs_node",
  "log",
  "memory",
  "mod_mgmt",
+ "multicore",
  "pit_clock",
  "spawn",
  "task",
@@ -3247,7 +3254,6 @@ dependencies = [
 name = "spawn"
 version = "0.1.0"
 dependencies = [
- "apic",
  "catch_unwind",
  "context_switch",
  "debugit",
@@ -3259,6 +3265,7 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
+ "multicore",
  "no_drop",
  "path",
  "pause",
@@ -3446,7 +3453,6 @@ source = "git+https://github.com/theseus-os/target-lexicon?branch=theseus#75d36c
 name = "task"
 version = "0.1.0"
 dependencies = [
- "apic",
  "context_switch",
  "crossbeam-utils",
  "environment",
@@ -3455,6 +3461,7 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
+ "multicore",
  "no_drop",
  "preemption",
  "root",
@@ -3517,10 +3524,10 @@ dependencies = [
 name = "test_channel"
 version = "0.1.0"
 dependencies = [
- "apic",
  "async_channel",
  "getopts",
  "log",
+ "multicore",
  "rendezvous",
  "scheduler",
  "spawn",
@@ -3533,7 +3540,6 @@ dependencies = [
 name = "test_downtime"
 version = "0.1.0"
 dependencies = [
- "apic",
  "async_channel",
  "color",
  "framebuffer",
@@ -3541,6 +3547,7 @@ dependencies = [
  "getopts",
  "hpet",
  "log",
+ "multicore",
  "rendezvous",
  "runqueue",
  "scheduler",
@@ -3598,8 +3605,8 @@ dependencies = [
 name = "test_mutex_sleep"
 version = "0.1.0"
 dependencies = [
- "apic",
  "log",
+ "multicore",
  "mutex_sleep",
  "scheduler",
  "spawn",
@@ -3673,8 +3680,8 @@ dependencies = [
 name = "test_wait_queue"
 version = "0.1.0"
 dependencies = [
- "apic",
  "log",
+ "multicore",
  "scheduler",
  "spawn",
  "spin 0.9.4",
@@ -3869,10 +3876,10 @@ dependencies = [
 name = "tss"
 version = "0.1.0"
 dependencies = [
- "apic",
  "atomic_linked_list",
  "log",
  "memory",
+ "multicore",
  "spin 0.9.4",
  "x86_64",
 ]

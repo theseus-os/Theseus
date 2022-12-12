@@ -22,5 +22,5 @@ path = "../../kernel/task"
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
-[dependencies.apic]
-path = "../../kernel/apic"
+[dependencies.multicore]
+path = "../../kernel/multicore"

@@ -21,8 +21,8 @@ path = "../gdt"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.apic]
-path = "../apic"
+[dependencies.multicore]
+path = "../multicore"
 
 [dependencies.task]
 path = "../task"

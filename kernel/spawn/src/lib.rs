@@ -31,7 +31,6 @@ use stack::Stack;
 use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef, RunState};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
-use apic::get_my_apic_id;
 use fs_node::FileOrDir;
 use preemption::{hold_preemption, PreemptionGuard};
 use no_drop::NoDrop;
@@ -975,7 +974,7 @@ fn remove_current_task_from_runqueue(current_task: &TaskRef) {
     // In the regular case, we do not perform task migration between cores,
     // so we can use the heuristic that the task is only on the current core's runqueue.
     #[cfg(not(rq_eval))] {
-        if let Err(e) = runqueue::get_runqueue(apic::get_my_apic_id())
+        if let Err(e) = runqueue::get_runqueue(multicore::get_my_core_id())
             .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
             .and_then(|rq| rq.write().remove_task(current_task)) 
         {
@@ -986,7 +985,7 @@ fn remove_current_task_from_runqueue(current_task: &TaskRef) {
 
 /// Spawns an idle task on the current CPU and adds it to this CPU's runqueue.
 pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
-    let apic_id = get_my_apic_id();
+    let apic_id = multicore::get_my_core_id();
     debug!("Spawning a new idle task on core {}", apic_id);
 
     new_task_builder(idle_task_entry, apic_id)
@@ -1001,7 +1000,7 @@ pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
 /// so we use `()` here instead. 
 #[inline(never)]
 fn idle_task_entry(_apic_id: u8) {
-    info!("Entered idle task loop on core {}: {:?}", apic::get_my_apic_id(), task::get_my_current_task());
+    info!("Entered idle task loop on core {}: {:?}", multicore::get_my_core_id(), task::get_my_current_task());
     loop {
         // TODO: put this core into a low-power state
         pause::spin_loop_hint();

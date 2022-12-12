@@ -43,7 +43,7 @@ pub struct PassStruct {
 }
 
 macro_rules! CPU_ID {
-	() => (apic::get_my_apic_id())
+	() => (multicore::get_my_core_id())
 }
 
 // ------------------------- Window fault injection section -------------------------------------------
@@ -360,7 +360,7 @@ pub fn pick_child_core() -> u8 {
 	if nr_tasks_in_rq(child_core) == Some(1) {return child_core;}
 
 	// if failed, try from the last to the first
-	for child_core in (0..apic::cpu_count()).rev() {
+	for child_core in (0..multicore::cores_count()).rev() {
 		if nr_tasks_in_rq(child_core) == Some(1) {return child_core;}
 	}
 	debug!("WARNING : Cannot pick a child core because cores are busy");
