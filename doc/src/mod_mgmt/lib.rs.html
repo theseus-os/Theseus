@@ -3371,7 +3371,7 @@
 
 <span class="doccomment">/// The name of the directory that contains all other &quot;extra_files&quot; contents.
 </span><span class="kw">pub const </span>EXTRA_FILES_DIRECTORY_NAME: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;extra_files&quot;</span>;
-<span class="kw">const </span>EXTRA_FILES_DIRECTORY_DELIMITER: char = <span class="string">&#39;?&#39;</span>;
+<span class="kw">const </span>EXTRA_FILES_DIRECTORY_DELIMITER: char = <span class="string">&#39;!&#39;</span>;
 
 <span class="doccomment">/// The initial `CrateNamespace` that all kernel crates are added to by default.
 </span><span class="kw">static </span>INITIAL_KERNEL_NAMESPACE: Once&lt;Arc&lt;CrateNamespace&gt;&gt; = Once::new();
@@ -3570,9 +3570,9 @@
 /// (files that exist as areas of pre-loaded memory).
 /// 
 /// Their file paths are encoded by flattening directory hierarchies into a the file name,
-/// using `&#39;?&#39;` (question marks) to replace the directory delimiter `&#39;/&#39;`.
+/// using `&#39;!&#39;` (exclamation marks) to replace the directory delimiter `&#39;/&#39;`.
 /// 
-/// Thus, for example, a file named `&quot;foo?bar?me?test.txt&quot;` will be placed at the path
+/// Thus, for example, a file named `&quot;foo!bar!me!test.txt&quot;` will be placed at the path
 /// `/extra_files/foo/bar/me/test.txt`.
 </span><span class="kw">fn </span>parse_extra_file(
     extra_file_name: <span class="kw-2">&amp;</span>str,
