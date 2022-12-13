@@ -96,6 +96,7 @@ dependencies = [
  "log",
  "memory",
  "no_drop",
+ "page_attribute_table",
  "scheduler",
  "spawn",
  "stack",
@@ -363,6 +364,7 @@ dependencies = [
  "network_manager",
  "no_drop",
  "ota_update_client",
+ "page_attribute_table",
  "print",
  "scheduler",
  "simd_personality",
@@ -2323,6 +2325,7 @@ dependencies = [
  "modular-bitfield",
  "msr",
  "raw-cpuid",
+ "spin 0.9.4",
  "x86_64",
 ]
 

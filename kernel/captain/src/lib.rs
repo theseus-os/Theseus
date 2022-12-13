@@ -137,11 +137,17 @@ pub fn init(
     // which rely on Local APICs to broadcast an IPI to all running CPUs.
     tlb_shootdown::init();
     
-    // //initialize the per core heaps
+    // Initialize the per-core heaps.
     multiple_heaps::switch_to_multiple_heaps()?;
     info!("Initialized per-core heaps");
 
-    // initialize window manager.
+    // Initialize the window manager, and also the PAT, if available.
+    // The PAT supports write-combining caching of graphics video memory for better performance
+    // and must be initialized explicitly on every CPU, 
+    // but it is not a fatal error if it doesn't exist.
+    if page_attribute_table::init().is_err() {
+        error!("This CPU does not support the Page Attribute Table");
+    }
     let (key_producer, mouse_producer) = window_manager::init()?;
 
     // initialize the rest of our drivers
