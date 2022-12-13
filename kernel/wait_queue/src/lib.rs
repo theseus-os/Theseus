@@ -194,12 +194,12 @@ impl WaitQueue {
     /// # Return 
     /// * returns `true` if all `Task`s were woken up 
     /// * busy forever if no `Task`s were waiting
-    pub fn notify_all(&self) -> bool {
-        let mut tasks_remain = true;
-        while tasks_remain {
-            tasks_remain = self.notify(None);
+    pub fn notify_all(&self) {
+        for t in self.0.lock().drain(..) {
+            if t.unblock().is_err() {
+                warn!("WaitQueue::notify_all(): failed to unblock {:?}", t);
+            }
         }
-        true
     }
     
     /// The internal routine for notifying / waking up tasks that are blocking on the waitqueue. 

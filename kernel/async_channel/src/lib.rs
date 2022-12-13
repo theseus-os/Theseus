@@ -266,7 +266,7 @@ pub struct Receiver<T: Send> {
     channel: Arc<Channel<T>>,
 }
 
-impl<T: Send> Receiver<T> {
+impl<T: Send> Clone for Receiver<T> {
     /// Increment the receiver's counter.
     /// If were are no receivers initially, then set channel status to `Connected`.
     /// Return a newly created receiver.
