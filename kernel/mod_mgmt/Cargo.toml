@@ -22,9 +22,6 @@ cpio_reader = { version = "0.1.0", optional = true }
 # Currently this is enabled when building for the 'limine' bootloader.
 extract_boot_modules = ["lz4_flex", "cpio_reader"]
 
-[dependencies.util]
-path = "../../libs/util"
-
 [dependencies.cow_arc]
 path = "../../libs/cow_arc"
 

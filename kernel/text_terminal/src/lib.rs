@@ -35,7 +35,6 @@ extern crate event_types;
 extern crate unicode_width;
 extern crate core2;
 extern crate vte;
-extern crate util;
 #[macro_use] extern crate derive_more;
 
 #[cfg(test)]
@@ -876,7 +875,7 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
 
         let unit_idx = self.scrollback_cursor.unit_idx;
         let screen_width = self.backend.screen_size().num_columns.0 as usize;
-        let index_of_previous_wrap = util::round_down(unit_idx.0, screen_width); 
+        let index_of_previous_wrap = round_down(unit_idx.0, screen_width); 
         
         debug!("carriage_return: setting scrollback buffer at {:?} from {:?} to {:?}",
             self.scrollback_cursor.line_idx, self.scrollback_cursor.unit_idx, index_of_previous_wrap
@@ -1036,7 +1035,7 @@ fn decrement_both_cursors(
     if wrap == Wrap::No {
         // Don't decrement past the beginning of a screen row. 
         let new_scrollback_position = max(
-            util::round_down(scrollback_position.unit_idx.0, screen_width),
+            round_down(scrollback_position.unit_idx.0, screen_width),
             scrollback_position.unit_idx.0.saturating_sub(num_units)
         );
         let new_scrollback_unit_idx = scrollback_buffer[scrollback_position.line_idx]
@@ -1148,7 +1147,7 @@ fn increment_both_cursors(
         let line = &scrollback_buffer[scrollback_position.line_idx];
         // Don't increment past the last screen column or past the end of this line.
         let new_scrollback_unit_idx = min(min(
-            util::round_down(scrollback_position.unit_idx.0, screen_width) + screen_width - 1,
+            round_down(scrollback_position.unit_idx.0, screen_width) + screen_width - 1,
             line.len()), // not `len() - 1` because we want to move the cursor to right after the last unit
             scrollback_position.unit_idx.0.saturating_add(num_units),
         );
@@ -1468,7 +1467,7 @@ impl ScreenPoint {
             // The scrollback buffer had enough lines.
             ScrollbackBufferPoint {
                 line_idx,
-                unit_idx: UnitIndex(util::round_down(unit_idx.0, screen_width) + target_column),
+                unit_idx: UnitIndex(round_down(unit_idx.0, screen_width) + target_column),
             }
         }
     }
@@ -1670,7 +1669,7 @@ fn decrement_scrollback_cursor(
     if wrap_lines == Wrap::No {
         // Don't decrement past the beginning of a screen row. 
         scrollback_cursor.unit_idx.0 = max(
-            util::round_down(scrollback_cursor.unit_idx.0, screen_width.0 as usize),
+            round_down(scrollback_cursor.unit_idx.0, screen_width.0 as usize),
             scrollback_cursor.unit_idx.0.saturating_sub(num_units)
         );
     } else {
@@ -2334,4 +2333,10 @@ impl WideDisplayedUnit {
             _ => false,
         }
     }
+}
+
+/// Rounds the given `value` down to the nearest `multiple`.
+#[inline]
+const fn round_down(value: usize, multiple: usize) -> usize {
+    (value / multiple) * multiple
 }

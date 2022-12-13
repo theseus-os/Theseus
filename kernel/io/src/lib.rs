@@ -38,6 +38,7 @@
 //!
 
 #![no_std]
+#![feature(int_roundings)]
 
 // #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
@@ -969,7 +970,7 @@ pub fn blocks_from_bytes(
                 };
                 transfers[transfer_idx] = Some(BlockByteTransfer {
                     byte_range_absolute: curr_byte .. end_byte,
-                    block_range: curr_block .. (round_up(end_byte, block_size) / block_size),
+                    block_range: curr_block .. (end_byte.next_multiple_of(block_size) / block_size),
                     bytes_in_block_range: 0 .. (end_byte - curr_byte),
                 });
                 transfer_idx += 1;
@@ -978,7 +979,7 @@ pub fn blocks_from_bytes(
         }
         // Otherwise, if the curr_byte is NOT block-aligned, then we can only do a single-block transfer.
         else {
-            let end_byte = min(byte_range.end, round_up(curr_byte, block_size));
+            let end_byte = min(byte_range.end, curr_byte.next_multiple_of(block_size));
             transfers[transfer_idx] = Some(BlockByteTransfer {
                 byte_range_absolute: curr_byte .. end_byte,
                 block_range: curr_block .. curr_block + 1, // just one block
@@ -1013,15 +1014,8 @@ pub struct BlockByteTransfer {
     pub bytes_in_block_range: Range<usize>,
 }
 
-
-/// Rounds the given `value` up to the nearest `multiple`.
-#[inline]
-pub fn round_up(value: usize, multiple: usize) -> usize {
-    ((value + multiple - 1) / multiple) * multiple
-}
-
 /// Rounds the given `value` down to the nearest `multiple`.
 #[inline]
-pub fn round_down(value: usize, multiple: usize) -> usize {
+fn round_down(value: usize, multiple: usize) -> usize {
     (value / multiple) * multiple
 }
