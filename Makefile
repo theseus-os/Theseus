@@ -600,11 +600,12 @@ doc: check-rustc
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/lockable/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/locked_idt/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/mouse_data/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/msr/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/owned_borrowed_trait/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/percent_encoding/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/port_io/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/stdio/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/str_ref/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/util/Cargo.toml
 ## Now, build the docs for all of Theseus's main kernel crates.
 	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
