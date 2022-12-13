@@ -109,6 +109,12 @@
 <span id="109">109</span>
 <span id="110">110</span>
 <span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for booting up secondary CPU cores, 
 //! aka application processors (APs) on x86_64.
 //! 
@@ -202,6 +208,12 @@
     // task management subsystem and create the idle task for this CPU.
     </span><span class="kw">let </span>bootstrap_task = spawn::init(kernel_mmi_ref.clone(), apic_id, this_ap_stack).unwrap();
     spawn::create_idle_task().unwrap();
+
+    <span class="comment">// The PAT must be initialized explicitly on every CPU,
+    // but it is not a fatal error if it doesn&#39;t exist.
+    </span><span class="kw">if </span>page_attribute_table::init().is_err() {
+        <span class="macro">error!</span>(<span class="string">&quot;This CPU does not support the Page Attribute Table&quot;</span>);
+    }
 
     <span class="macro">info!</span>(<span class="string">&quot;Initialization complete on AP core {}. Enabling interrupts...&quot;</span>, apic_id);
     <span class="comment">// The following final initialization steps are important, and order matters:

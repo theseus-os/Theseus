@@ -152,6 +152,14 @@
 <span id="152">152</span>
 <span id="153">153</span>
 <span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the Page Attribute Table (PAT) feature on x86.
 //!
 //! PAT replaces the legacy Memory Type Range Registers (MTRRs) on x86.
@@ -165,6 +173,7 @@
 <span class="kw">use </span>modular_bitfield::{specifiers::{B3, B5}, bitfield};
 <span class="kw">use </span>msr::IA32_PAT;
 <span class="kw">use </span>raw_cpuid::CpuId;
+<span class="kw">use </span>spin::Once;
 <span class="comment">// use x86_64::registers::control::{Cr0, Cr0Flags};
 
 </span><span class="doccomment">/// Theseus&#39;s fixed [`PageAttributeTable`] has slots that align with
@@ -278,21 +287,28 @@
     }
 }
 
+<span class="doccomment">/// Returns `true` if the Page Attribute Table is supported on this system.
+</span><span class="kw">pub fn </span>is_supported() -&gt; bool {
+    <span class="comment">// Cache the result of CpuId 
+    </span><span class="kw">static </span>PAT_SUPPORT: Once&lt;bool&gt; = Once::new();
+    
+    <span class="kw-2">*</span>PAT_SUPPORT.call_once(|| CpuId::new()
+        .get_feature_info()
+        .map(|finfo| finfo.has_pat())
+        .unwrap_or(<span class="bool-val">false</span>)
+    )
+}
 
-<span class="doccomment">/// Sets up the Page Attribute Table (PAT) for this CPU.
+
+<span class="doccomment">/// Sets up and enables the Page Attribute Table (PAT) for this (the current) CPU.
 ///
 /// This works by setting the [`IA32_PAT`] MSR to the value
-/// specified by [`FIXED_PAT`].
+/// specified by [`FIXED_PAT`];
+/// thus, it must be done separately on each and every CPU.
 ///
 /// Returns `Ok(())` upon success, and `Err(())` if PAT is unsupported.
 </span><span class="kw">pub fn </span>init() -&gt; <span class="prelude-ty">Result</span>&lt;(), ()&gt; {
-    <span class="kw">let </span>has_pat = CpuId::new()
-        .get_feature_info()
-        .map(|finfo| finfo.has_pat())
-        .ok_or(())<span class="question-mark">?</span>;
-    
-    <span class="kw">if </span>!has_pat {
-        <span class="macro">error!</span>(<span class="string">&quot;This CPU does not support the Page Attribute Table&quot;</span>);
+    <span class="kw">if </span>!is_supported() {
         <span class="kw">return </span><span class="prelude-val">Err</span>(());
     }
 
@@ -303,7 +319,7 @@
         pat_msr.write(FIXED_PAT.into());
     }
 
-    <span class="macro">debug!</span>(<span class="string">&quot;Enabled the Page Attribute Table&quot;</span>);
+    <span class="macro">debug!</span>(<span class="string">&quot;Enabled the Page Attribute Table for the current CPU.&quot;</span>);
     <span class="prelude-val">Ok</span>(())
 }
 </code></pre></div>

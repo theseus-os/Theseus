@@ -206,7 +206,6 @@
 <span id="206">206</span>
 <span id="207">207</span>
 <span id="208">208</span>
-<span id="209">209</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate defines a `Framebuffer` structure, which is effectively a region of memory
 //! that is interpreted as a 2-D array of pixels.
 
@@ -296,8 +295,7 @@
                 .into();
 
             <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
-                <span class="kw">let </span>use_pat = page_attribute_table::init().is_ok();
-                <span class="kw">if </span>use_pat {
+                <span class="kw">if </span>page_attribute_table::is_supported() {
                     flags = flags.pat_index(
                         page_attribute_table::MemoryCachingType::WriteCombining.pat_slot_index()
                     );
