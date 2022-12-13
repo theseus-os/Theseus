@@ -22,7 +22,7 @@ repeated calls in and amongst the sleep/wake behavior.</p>
 <p>It is the caller’s responsibility to notify or otherwise wake up the deferred interrupt task
 in the given <code>interrupt_handler</code> (or elsewhere, arbitrarily). 
 WIthout doing this, the <code>deferred_interrupt_action</code> will never be invoked.
-The returned [<code>TaskRef</code>] is useful for doing this, as you can <code>unblock</code> it when it needs to run,
+The returned [<code>JoinableTaskRef</code>] is useful for doing this, as you can <code>unblock</code> it when it needs to run,
 e.g., when an interrupt has occurred.</p>
 <h2 id="return"><a href="#return">Return</a></h2>
 <ul>

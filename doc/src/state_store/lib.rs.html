@@ -332,7 +332,7 @@
 <span class="kw">impl</span>&lt;S: Any&gt; SSCached&lt;S&gt; {
 
 	<span class="doccomment">/// Tries to upgrade the internal Weak pointer to a Strong (Arc) pointer.
-	/// If successful, the weak pointer is still valid, so we return the Arc&lt;S&gt;. 
+	/// If successful, the weak pointer is still valid, so we return the `Arc&lt;S&gt;`. 
 	/// If not, the current internal Weak reference is None, so we try to reaquire it.
 	/// If it cannot be reacquired, there is currently not a system-wide state of type `S`,
 	/// so we return None.  

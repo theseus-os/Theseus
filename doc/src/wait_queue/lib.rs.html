@@ -259,8 +259,8 @@
     <span class="doccomment">/// Blocks the given `Task` and returns a new `WaitGuard` object
     /// that will automatically unblock that Task when it is dropped. 
     ///
-    /// Returns an error if the task cannot be blocked. See [`Task::block`] for
-    ///  more details.
+    /// Returns an error if the task cannot be blocked;
+    /// see [`task::Task::block()`] for more details.
     </span><span class="kw">pub fn </span>new(task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;WaitGuard, RunState&gt; {
         task.block()<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(WaitGuard { task })
@@ -269,8 +269,8 @@
     <span class="doccomment">/// Blocks the task guarded by this waitguard,
     /// which is useful to re-block a task after it spuriously woke up. 
     ///
-    /// Returns an error if the task cannot be blocked. See [`Task::block`] for
-    ///  more details.
+    /// Returns an error if the task cannot be blocked;
+    /// see [`task::Task::block()`] for more details.
     </span><span class="kw">pub fn </span>block_again(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;RunState, RunState&gt; {
         <span class="self">self</span>.task.block()
     }

@@ -5,7 +5,7 @@ one primary method to access it: the <a href="struct.LocalKey.html#method.with">
 sent across threads or escape the given closure.</p>
 <h2 id="initialization-and-destruction"><a href="#initialization-and-destruction">Initialization and Destruction</a></h2>
 <p>Initialization is lazily performed dynamically on the first call to <a href="struct.LocalKey.html#method.with"><code>with</code></a>
-within a thread ([<code>task::Task</code>]), and values that implement <a href="https://doc.rust-lang.org/nightly/core/ops/drop/trait.Drop.html" title="Drop"><code>Drop</code></a> get destructed
+within a thread (<code>Task</code> in Theseus), and values that implement <a href="https://doc.rust-lang.org/nightly/core/ops/drop/trait.Drop.html" title="Drop"><code>Drop</code></a> get destructed
 when a thread exits.</p>
 <p>A <code>LocalKey</code>’s initializer cannot recursively depend on itself, and using
 a <code>LocalKey</code> in this way will cause the initializer to infinitely recurse

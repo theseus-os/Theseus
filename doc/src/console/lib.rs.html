@@ -154,8 +154,6 @@
 <span id="154">154</span>
 <span id="155">155</span>
 <span id="156">156</span>
-<span id="157">157</span>
-<span id="158">158</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Creation and management of virtual consoles or terminals atop Theseus.
 
 </span><span class="attr">#![no_std]
@@ -223,8 +221,6 @@
 ///
 /// The terminal created by this function will use a [`TtyBackend`]
 /// that writes terminal output and control commands to the given `output_stream`.
-///
-/// To start running the console, invoke the [`Console::spawn()`] function.
 </span><span class="kw">pub fn </span>new_serial_console&lt;S, I, O&gt;(
 	name: S,
 	input_stream: I,

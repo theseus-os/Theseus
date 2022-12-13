@@ -583,6 +583,8 @@
 <span id="583">583</span>
 <span id="584">584</span>
 <span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Style and formatting of text displayed in a terminal,
 //! following the ANSI, VT100, and xterm standards.
 
@@ -1159,6 +1161,8 @@
     </span><span class="kw">pub const </span>DeviceStatusRequest: u8 = <span class="string">b&#39;5&#39;</span>;
 
     <span class="doccomment">/// The response to a [`DeviceStatusRequest`] indicating the terminal device is Ok.
+    ///
+    /// [`DeviceStatusRequest`]: Self::DeviceStatusRequest
     </span><span class="kw">pub const </span>DeviceStatusOk: u8 = <span class="string">b&#39;0&#39;</span>;
 
     <span class="doccomment">/// (CSR) Queries the terminal device for a cursor position report.
