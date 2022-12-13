@@ -99,7 +99,7 @@ pub enum InterruptRegistrationError {
 /// It is the caller's responsibility to notify or otherwise wake up the deferred interrupt task
 /// in the given `interrupt_handler` (or elsewhere, arbitrarily). 
 /// WIthout doing this, the `deferred_interrupt_action` will never be invoked.
-/// The returned [`TaskRef`] is useful for doing this, as you can `unblock` it when it needs to run,
+/// The returned [`JoinableTaskRef`] is useful for doing this, as you can `unblock` it when it needs to run,
 /// e.g., when an interrupt has occurred.
 ///
 /// # Return

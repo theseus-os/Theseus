@@ -106,7 +106,7 @@ pub struct SSCached<S: Any> ( AtomicPtr<Option<Weak<S>>> );
 impl<S: Any> SSCached<S> {
 
 	/// Tries to upgrade the internal Weak pointer to a Strong (Arc) pointer.
-	/// If successful, the weak pointer is still valid, so we return the Arc<S>. 
+	/// If successful, the weak pointer is still valid, so we return the `Arc<S>`. 
 	/// If not, the current internal Weak reference is None, so we try to reaquire it.
 	/// If it cannot be reacquired, there is currently not a system-wide state of type `S`,
 	/// so we return None.  

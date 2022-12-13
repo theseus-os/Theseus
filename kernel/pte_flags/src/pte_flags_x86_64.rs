@@ -292,7 +292,7 @@ impl PteFlagsX86_64 {
     /// This sets the following bits:
     /// * [`PteFlagsX86_64::PAT_BIT0`] = Bit 0 of `pat_slot`
     /// * [`PteFlagsX86_64::PAT_BIT1`] = Bit 1 of `pat_slot`
-    /// * [`PteFlagsX86_64::PAT_BIT2`] = Bit 2 of `pat_slot`
+    /// * [`PteFlagsX86_64::PAT_BIT2_FOR_P1`] = Bit 2 of `pat_slot`
     ///
     /// The other bits `[3:7]` of `pat_slot` are ignored.
     #[must_use]

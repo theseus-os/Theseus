@@ -53,7 +53,7 @@ pub enum HostToControllerCommand {
     /// 
     /// Note: only if 2 PS/2 ports supported
     TestPort2 = 0xA9,
-    /// returns [ControllerTestResult]
+    /// returns `ControllerTestResult`
     TestController = 0xAA,
     /// returns [PortTestResult]
     TestPort1 = 0xAB,
