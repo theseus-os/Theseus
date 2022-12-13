@@ -190,10 +190,7 @@ impl WaitQueue {
         self.notify(Some(task_to_wakeup))
     }
 
-    /// Wake up every `Task` that is waiting on this queue.
-    /// # Return 
-    /// * returns `true` if all `Task`s were woken up 
-    /// * busy forever if no `Task`s were waiting
+    /// Wake up all `Task`s that are waiting on this queue.
     pub fn notify_all(&self) {
         for t in self.0.lock().drain(..) {
             if t.unblock().is_err() {
