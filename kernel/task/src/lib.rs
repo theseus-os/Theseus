@@ -1132,7 +1132,8 @@ fn task_switch_inner(
 /// Due to the above drop-based behavior, this type must not implement `Clone`
 /// because it assumes there is only ever one `JoinableTaskRef` per task.
 /// 
-/// However, this type auto-derefs into an inner [`TaskRef`], which *can* be cloned.
+/// However, this type auto-derefs into an inner [`TaskRef`], which *can* be cloned,
+/// so you can easily call `.clone()` on it thanks to auto-deref semantics.
 /// 
 // /// Note: this type is considered an internal implementation detail.
 // /// Instead, use the `TaskJoiner` type from the `spawn` crate, 
@@ -1146,6 +1147,37 @@ impl Deref for JoinableTaskRef {
     type Target = TaskRef;
     fn deref(&self) -> &Self::Target {
         &self.task
+    }
+}
+impl JoinableTaskRef {
+    /// Busy-waits (spins in a loop) until this task has exited or has been killed.
+    ///
+    /// Returns `Ok()` once this task has exited,
+    /// and `Err()` if there is a problem or interruption while waiting for it to exit. 
+    /// 
+    /// # Note
+    /// * You cannot call `join()` on the current task, because a task cannot wait for itself to finish running. 
+    ///   This will result in an `Err()` being immediately returned.
+    /// * You cannot call `join()` with interrupts disabled, because it will result in permanent deadlock
+    ///   (well, this is only true if the requested `task` is running on the same cpu...  but good enough for now).
+    pub fn join(&self) -> Result<(), &'static str> {
+        let self_is_current_task = with_current_task(|t| t == &self.task) 
+            .map_err(|_| "join(): failed to check what current task is")?;
+        if self_is_current_task {
+            return Err("BUG: cannot call `join()` on yourself (the current task)");
+        }
+
+        if !interrupts_enabled() {
+            return Err("BUG: cannot call join() with interrupts disabled; it will cause deadlock.")
+        }
+        
+        // First, wait for this Task to be marked as Exited (no longer runnable).
+        while !self.0.has_exited() { }
+
+        // Then, wait for it to actually stop running on any CPU core.
+        while self.0.is_running() { }
+
+        Ok(())
     }
 }
 impl Drop for JoinableTaskRef {
@@ -1185,36 +1217,6 @@ impl TaskRef {
         // Mark this task as joinable, now that it has been wrapped in the proper type.
         taskref.joinable.store(true, Ordering::Relaxed);
         JoinableTaskRef { task: taskref }
-    }
-
-    /// Blocks until this task has exited or has been killed.
-    ///
-    /// Returns `Ok()` once this task has exited,
-    /// and `Err()` if there is a problem or interruption while waiting for it to exit. 
-    /// 
-    /// # Note
-    /// * You cannot call `join()` on the current thread, because a thread cannot wait for itself to finish running. 
-    ///   This will result in an `Err()` being immediately returned.
-    /// * You cannot call `join()` with interrupts disabled, because it will result in permanent deadlock
-    ///   (well, this is only true if the requested `task` is running on the same cpu...  but good enough for now).
-    pub fn join(&self) -> Result<(), &'static str> {
-        let self_is_current_task = with_current_task(|t| t == self) 
-            .map_err(|_| "join(): failed to check what current task is")?;
-        if self_is_current_task {
-            return Err("BUG: cannot call `join()` on yourself (the current task)");
-        }
-
-        if !interrupts_enabled() {
-            return Err("BUG: cannot call join() with interrupts disabled; it will cause deadlock.")
-        }
-        
-        // First, wait for this Task to be marked as Exited (no longer runnable).
-        while !self.0.has_exited() { }
-
-        // Then, wait for it to actually stop running on any CPU core.
-        while self.0.is_running() { }
-
-        Ok(())
     }
 
     /// Call this function to indicate that this task has successfully ran to completion,
