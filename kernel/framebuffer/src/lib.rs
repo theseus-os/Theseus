@@ -87,8 +87,7 @@ impl<P: Pixel> Framebuffer<P> {
                 .into();
 
             #[cfg(target_arch = "x86_64")] {
-                let use_pat = page_attribute_table::init().is_ok();
-                if use_pat {
+                if page_attribute_table::is_supported() {
                     flags = flags.pat_index(
                         page_attribute_table::MemoryCachingType::WriteCombining.pat_slot_index()
                     );

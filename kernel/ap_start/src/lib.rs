@@ -92,6 +92,12 @@ pub fn kstart_ap(
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), apic_id, this_ap_stack).unwrap();
     spawn::create_idle_task().unwrap();
 
+    // The PAT must be initialized explicitly on every CPU,
+    // but it is not a fatal error if it doesn't exist.
+    if page_attribute_table::init().is_err() {
+        error!("This CPU does not support the Page Attribute Table");
+    }
+
     info!("Initialization complete on AP core {}. Enabling interrupts...", apic_id);
     // The following final initialization steps are important, and order matters:
     // 1. Drop any other local stack variables that still exist.

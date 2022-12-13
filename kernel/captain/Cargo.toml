@@ -64,6 +64,9 @@ path = "../acpi"
 [dependencies.multicore_bringup]
 path = "../multicore_bringup"
 
+[dependencies.page_attribute_table]
+path = "../page_attribute_table"
+
 [dependencies.device_manager]
 path = "../device_manager"
 
