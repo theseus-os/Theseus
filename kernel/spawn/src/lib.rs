@@ -78,12 +78,12 @@ pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
             let mut num_tasks_cleaned = 0;
             while num_tasks_cleaned < total_tasks {
                 if let Some(task) = BOOTSTRAP_TASKS.lock().pop() {
-                    task.join().unwrap();
-                    if let Some(_) = task.take_exit_value() {
-                        // trace!("Cleaned up bootstrap task {:?}", task);
-                        num_tasks_cleaned += 1;
-                    } else {
-                        panic!("BUG: bootstrap task didn't exit before cleanup: {:?}", task);
+                    match task.join() {
+                        Ok(_exit_val) => num_tasks_cleaned += 1,
+                        Err(_e) => panic!(
+                            "BUG: failed to join bootstrap task {:?}, error: {:?}",
+                            task, _e,
+                        ),
                     }
                 }
             }
@@ -850,7 +850,7 @@ fn task_cleanup_final_internal(current_task: &TaskRef) {
     // Third, reap the task if it has been orphaned (if it's non-joinable).
     if !current_task.is_joinable() {
         // trace!("Reaping orphaned task... {:?}", current_task);
-        let _exit_value = current_task.take_exit_value();
+        let _exit_value = current_task.retrieve_exit_value();
         // trace!("Reaped orphaned task {:?}, {:?}", current_task, _exit_value);
     }
 }
