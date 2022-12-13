@@ -1134,7 +1134,7 @@ fn task_switch_inner(
 /// However, this type auto-derefs into an inner [`TaskRef`],
 /// which *can* be cloned, so you can easily call `.clone()` on it.
 ///
-/// [`join`]: [JoinableTaskRef::join]
+/// [`join`]: JoinableTaskRef::join
 //
 // /// Note: this type is considered an internal implementation detail.
 // /// Instead, use the `TaskJoiner` type from the `spawn` crate, 

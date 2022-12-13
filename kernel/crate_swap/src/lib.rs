@@ -911,7 +911,7 @@ impl SwapRequest {
     /// 
     ///    Note that `old_crate_name` can be any string prefix, so long as it can uniquely identify a crate object file
     ///    in the given `old_namespace` or any of its recursive namespaces. 
-    ///    Thus, to be more accurate, it is wise to specify a full crate name with hash, e.g., "my_crate-<hash>".
+    ///    Thus, to be more accurate, it is wise to specify a full crate name with hash, e.g., `"my_crate-<hash>"`.
     /// 
     /// * `old_namespace`: the `CrateNamespace` that contains the old crate;
     ///    that old crate and its symbols will be removed from this namespace. 
