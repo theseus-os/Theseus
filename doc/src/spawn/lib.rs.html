@@ -1007,7 +1007,6 @@
 <span id="1007">1007</span>
 <span id="1008">1008</span>
 <span id="1009">1009</span>
-<span id="1010">1010</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks
 //! and convenient builder patterns for customizing new tasks. 
 //! 
@@ -1059,8 +1058,9 @@
 ) -&gt; <span class="prelude-ty">Result</span>&lt;BootstrapTaskRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     runqueue::init(apic_id)<span class="question-mark">?</span>;
     
-    <span class="kw">let </span>task_ref = task::bootstrap_task(apic_id, stack, kernel_mmi_ref)<span class="question-mark">?</span>;
-    BOOTSTRAP_TASKS.lock().push(task_ref.clone());
+    <span class="kw">let </span>joinable_bootstrap_task = task::bootstrap_task(apic_id, stack, kernel_mmi_ref)<span class="question-mark">?</span>;
+    <span class="kw">let </span>task_ref = joinable_bootstrap_task.clone();
+    BOOTSTRAP_TASKS.lock().push(joinable_bootstrap_task);
     runqueue::add_task_to_specific_runqueue(apic_id, task_ref.clone())<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>(BootstrapTaskRef {
         apic_id, 
@@ -1070,7 +1070,7 @@
 
 <span class="doccomment">/// The set of bootstrap tasks that are created using `task::bootstrap_task()`.
 /// These require special cleanup; see [`cleanup_bootstrap_tasks()`].
-</span><span class="kw">static </span>BOOTSTRAP_TASKS: Mutex&lt;Vec&lt;TaskRef&gt;&gt; = Mutex::new(Vec::new());
+</span><span class="kw">static </span>BOOTSTRAP_TASKS: Mutex&lt;Vec&lt;JoinableTaskRef&gt;&gt; = Mutex::new(Vec::new());
 
 <span class="doccomment">/// Spawns a dedicated task to cleanup all bootstrap tasks
 /// by reaping them, i.e., taking their exit value.
@@ -1119,7 +1119,7 @@
 </span><span class="kw">pub struct </span>BootstrapTaskRef {
     <span class="attr">#[allow(dead_code)]
     </span>apic_id: u8,
-    task_ref: JoinableTaskRef,
+    task_ref: TaskRef,
 }
 <span class="kw">impl </span>Deref <span class="kw">for </span>BootstrapTaskRef {
     <span class="kw">type </span>Target = TaskRef;
@@ -1133,9 +1133,7 @@
     /// This function does the following:
     /// 1. Consumes this bootstrap task such that it can no longer be accessed.
     /// 2. Marks this bootstrap task as exited.
-    /// 3. Removes this bootstrap task from all this CPU&#39;s runqueue.
-    /// 
-    /// This function consumes this bootstrap task, marks it as exited
+    /// 3. Removes this bootstrap task from this CPU&#39;s runqueue.
     </span><span class="kw">pub fn </span>finish(<span class="self">self</span>) {
         drop(<span class="self">self</span>);
     }
