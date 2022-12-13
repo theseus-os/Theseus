@@ -1087,12 +1087,12 @@
             <span class="kw">let </span><span class="kw-2">mut </span>num_tasks_cleaned = <span class="number">0</span>;
             <span class="kw">while </span>num_tasks_cleaned &lt; total_tasks {
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(task) = BOOTSTRAP_TASKS.lock().pop() {
-                    task.join().unwrap();
-                    <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw">_</span>) = task.take_exit_value() {
-                        <span class="comment">// trace!(&quot;Cleaned up bootstrap task {:?}&quot;, task);
-                        </span>num_tasks_cleaned += <span class="number">1</span>;
-                    } <span class="kw">else </span>{
-                        <span class="macro">panic!</span>(<span class="string">&quot;BUG: bootstrap task didn&#39;t exit before cleanup: {:?}&quot;</span>, task);
+                    <span class="kw">match </span>task.join() {
+                        <span class="prelude-val">Ok</span>(_exit_val) =&gt; num_tasks_cleaned += <span class="number">1</span>,
+                        <span class="prelude-val">Err</span>(_e) =&gt; <span class="macro">panic!</span>(
+                            <span class="string">&quot;BUG: failed to join bootstrap task {:?}, error: {:?}&quot;</span>,
+                            task, _e,
+                        ),
                     }
                 }
             }
@@ -1859,7 +1859,7 @@
     <span class="comment">// Third, reap the task if it has been orphaned (if it&#39;s non-joinable).
     </span><span class="kw">if </span>!current_task.is_joinable() {
         <span class="comment">// trace!(&quot;Reaping orphaned task... {:?}&quot;, current_task);
-        </span><span class="kw">let </span>_exit_value = current_task.take_exit_value();
+        </span><span class="kw">let </span>_exit_value = current_task.retrieve_exit_value();
         <span class="comment">// trace!(&quot;Reaped orphaned task {:?}, {:?}&quot;, current_task, _exit_value);
     </span>}
 }

@@ -1552,49 +1552,17 @@
 <span id="1552">1552</span>
 <span id="1553">1553</span>
 <span id="1554">1554</span>
-<span id="1555">1555</span>
-<span id="1556">1556</span>
-<span id="1557">1557</span>
-<span id="1558">1558</span>
-<span id="1559">1559</span>
-<span id="1560">1560</span>
-<span id="1561">1561</span>
-<span id="1562">1562</span>
-<span id="1563">1563</span>
-<span id="1564">1564</span>
-<span id="1565">1565</span>
-<span id="1566">1566</span>
-<span id="1567">1567</span>
-<span id="1568">1568</span>
-<span id="1569">1569</span>
-<span id="1570">1570</span>
-<span id="1571">1571</span>
-<span id="1572">1572</span>
-<span id="1573">1573</span>
-<span id="1574">1574</span>
-<span id="1575">1575</span>
-<span id="1576">1576</span>
-<span id="1577">1577</span>
-<span id="1578">1578</span>
-<span id="1579">1579</span>
-<span id="1580">1580</span>
-<span id="1581">1581</span>
-<span id="1582">1582</span>
-<span id="1583">1583</span>
-<span id="1584">1584</span>
-<span id="1585">1585</span>
-<span id="1586">1586</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, 
 //! and the associated code for dealing with tasks.
 //! 
 //! To create new `Task`s, use the [`spawn`](../spawn/index.html) crate.
 //! 
 //! # Examples
-//! How to wait for a `Task` to complete (using `join()`) and get its exit value.
+//! How to wait for a `Task` to finish (using `join()`) and get its exit value.
 //! ```
-//! taskref.join(); // taskref is the task that we&#39;re waiting on
-//! if let Some(exit_result) = taskref.take_exit_value() {
-//!     match exit_result {
+//! // `taskref` is the task that we&#39;re waiting on
+//! if let Ok(exit_value) = taskref.join() {
+//!     match exit_value {
 //!         ExitValue::Completed(exit_value) =&gt; {
 //!             // here: the task ran to completion successfully, so it has an exit value.
 //!             // We should know the return type of this task, e.g., if `isize`,
@@ -1609,7 +1577,6 @@
 //!     }
 //! }
 //! ```
-//! 
 
 </span><span class="attr">#![no_std]
 #![feature(panic_info_message)]
@@ -1649,7 +1616,7 @@
     sync::Arc,
 };
 <span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
-<span class="kw">use </span>irq_safety::{MutexIrqSafe, interrupts_enabled, hold_interrupts};
+<span class="kw">use </span>irq_safety::{MutexIrqSafe, hold_interrupts};
 <span class="kw">use </span>memory::MmiRef;
 <span class="kw">use </span>stack::Stack;
 <span class="kw">use </span>kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
@@ -2136,7 +2103,7 @@
     /// * If `true`, another task holds the [`JoinableTaskRef`] object that was created
     ///   by [`TaskRef::new()`], which indicates that that other task is able to
     ///   wait for this task to exit and thus be able to obtain this task&#39;s exit value.
-    /// * If `false`, the `TaskJoiner` object was dropped, and therefore no other task
+    /// * If `false`, the [`JoinableTaskRef`] object was dropped, and therefore no other task
     ///   can join this task or obtain its exit value.
     /// 
     /// When a task is not joinable, it is considered to be an orphan
@@ -2244,7 +2211,9 @@
         <span class="self">self</span>.inner.lock().restart_info.is_some()
     }
 
-    <span class="doccomment">/// Takes ownership of this `Task`&#39;s exit value and returns it,
+    <span class="doccomment">/// An internal function intended for use cleaning up exited tasks.
+    ///
+    /// Retrieves and removes the `ExitValue` from this `Task` and returns it,
     /// if and only if this `Task` was in the `Exited` runstate.
     ///
     /// If this `Task` was in the `Exited` runstate, after invoking this,
@@ -2256,8 +2225,8 @@
     ///
     /// # Locking / Deadlock
     /// Obtains the lock on this `Task`&#39;s inner state in order to mutate it.    
-    </span><span class="attr">#[doc(alias(<span class="string">&quot;reap&quot;</span>))]
-    </span><span class="kw">pub fn </span>take_exit_value(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ExitValue&gt; {
+    </span><span class="attr">#[doc(hidden)]
+    </span><span class="kw">pub fn </span>retrieve_exit_value(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ExitValue&gt; {
         <span class="kw">if </span><span class="self">self</span>.runstate.compare_exchange(RunState::Exited, RunState::Reaped).is_ok() {
             TASKLIST.lock().remove(<span class="kw-2">&amp;</span><span class="self">self</span>.id);
             <span class="self">self</span>.inner.lock().exit_value.take()
@@ -2700,28 +2669,28 @@
 }
 
 
-<span class="doccomment">/// Represents a joinable [`TaskRef`], created by [`TaskRef::new()`].
-/// Auto-derefs into a [`TaskRef`].
+<span class="doccomment">/// A reference to a `Task` that can be `join`ed; auto-derefs into [`TaskRef`].
 ///
-/// This allows another task to:
-/// * [`join`] this task, i.e., wait for this task to finish executing,
-/// * to obtain its [exit value] after it has completed.
-/// 
+/// This allows another task to [`join`] this task, i.e., wait for this task
+/// to finish executing, and to obtain its [`ExitValue`] thereafter.
+///
 /// ## [`Drop`]-based Behavior
 /// The contained [`Task`] is joinable until this object is dropped.
 /// When dropped, this task will be marked as non-joinable and treated as an &quot;orphan&quot; task.
 /// This means that there is no way for another task to wait for it to complete
 /// or obtain its exit value.
 /// As such, this task will be auto-reaped after it exits (in order to avoid zombie tasks).
-/// 
+///
 /// ## Not `Clone`-able
-/// Due to the above drop-based behavior, this type must not implement `Clone`
+/// Due to the above drop-based behavior, this type does not implement `Clone`
 /// because it assumes there is only ever one `JoinableTaskRef` per task.
-/// 
-/// However, this type auto-derefs into an inner [`TaskRef`], which *can* be cloned,
-/// so you can easily call `.clone()` on it thanks to auto-deref semantics.
-/// 
-</span><span class="comment">// /// Note: this type is considered an internal implementation detail.
+///
+/// However, this type auto-derefs into an inner [`TaskRef`],
+/// which *can* be cloned, so you can easily call `.clone()` on it.
+///
+/// [`join`]: [JoinableTaskRef::join]
+</span><span class="comment">//
+// /// Note: this type is considered an internal implementation detail.
 // /// Instead, use the `TaskJoiner` type from the `spawn` crate, 
 // /// which is intended to be the public-facing interface for joining a task.
 </span><span class="attr">#[derive(Debug)]
@@ -2738,32 +2707,23 @@
 <span class="kw">impl </span>JoinableTaskRef {
     <span class="doccomment">/// Busy-waits (spins in a loop) until this task has exited or has been killed.
     ///
-    /// Returns `Ok()` once this task has exited,
-    /// and `Err()` if there is a problem or interruption while waiting for it to exit. 
-    /// 
-    /// # Note
-    /// * You cannot call `join()` on the current task, because a task cannot wait for itself to finish running. 
-    ///   This will result in an `Err()` being immediately returned.
-    /// * You cannot call `join()` with interrupts disabled, because it will result in permanent deadlock
-    ///   (well, this is only true if the requested `task` is running on the same cpu...  but good enough for now).
-    </span><span class="kw">pub fn </span>join(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="kw">let </span>self_is_current_task = with_current_task(|t| t == <span class="kw-2">&amp;</span><span class="self">self</span>.task) 
-            .map_err(|<span class="kw">_</span>| <span class="string">&quot;join(): failed to check what current task is&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">if </span>self_is_current_task {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: cannot call `join()` on yourself (the current task)&quot;</span>);
-        }
-
-        <span class="kw">if </span>!interrupts_enabled() {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: cannot call join() with interrupts disabled; it will cause deadlock.&quot;</span>)
-        }
-        
+    /// # Return
+    /// * `Ok` containing this `Task`&#39;s [`ExitValue`] once this task has exited.
+    ///   * This includes cases where this `Task` failed or was killed.
+    /// * `Err` if there was a problem while waiting for this task to exit.
+    ///   * This does *not* include cases where this `Task` failed or was killed,
+    ///     rather only cases where the `join` operation itself failed.
+    </span><span class="attr">#[doc(alias(<span class="string">&quot;reap&quot;</span>, <span class="string">&quot;exit&quot;</span>))]
+    </span><span class="kw">pub fn </span>join(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;ExitValue, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="comment">// First, wait for this Task to be marked as Exited (no longer runnable).
         </span><span class="kw">while </span>!<span class="self">self</span>.<span class="number">0</span>.has_exited() { }
 
         <span class="comment">// Then, wait for it to actually stop running on any CPU core.
         </span><span class="kw">while </span><span class="self">self</span>.<span class="number">0</span>.is_running() { }
 
-        <span class="prelude-val">Ok</span>(())
+        <span class="self">self</span>.task
+            .retrieve_exit_value()
+            .ok_or(<span class="string">&quot;BUG: `join()` could not retrieve `ExitValue` after task had exited.&quot;</span>)
     }
 }
 <span class="kw">impl </span>Drop <span class="kw">for </span>JoinableTaskRef {
@@ -2898,10 +2858,14 @@
             <span class="comment">// Corner case: if the task isn&#39;t currently running (as with killed tasks), 
             // we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.
             </span><span class="kw">if </span>!<span class="self">self</span>.<span class="number">0</span>.is_running() {
-                <span class="macro">warn!</span>(<span class="string">&quot;\n\ninternal_exit(): [untested] de-initing current task TLS variable for non-running task {}&quot;</span>, <span class="kw-2">&amp;*</span><span class="self">self</span>.<span class="number">0</span>);
-                <span class="kw">let </span>_taskref_in_tls = deinit_current_task();
-                drop(_taskref_in_tls);
-            }
+                <span class="macro">todo!</span>(<span class="string">&quot;Unhandled scenario: internal_exit(): task {:?} wasn&#39;t running \
+                    but its current task TLS variable needs to be cleaned up!&quot;</span>, <span class="self">self</span>.<span class="number">0</span>);
+                <span class="comment">// Note: we cannot call `deinit_current_task()` here because if this task
+                //       isn&#39;t running, then it&#39;s definitely not the current task.
+                //
+                // let _taskref_in_tls = deinit_current_task();
+                // drop(_taskref_in_tls);
+            </span>}
         }
 
         <span class="attr">#[cfg(runqueue_spillful)] </span>{   
@@ -3140,34 +3104,6 @@
         } <span class="kw">else </span>{
             <span class="prelude-val">Err</span>(value)
         }
-    }
-
-    <span class="doccomment">/// De-initializes the current task TLS variable, ensuring that the task can be dropped.
-    ///
-    /// This function being public is completely safe, as it will only ever execute
-    /// once per task, typically after the task has exited and is being cleaned up.
-    ///
-    /// This returns an error if:
-    /// * The current task has not yet exited.
-    /// * The current task TLS variable hasn&#39;t been initialized.
-    /// * The current task TLS variable is already currently borrowed.
-    </span><span class="attr">#[doc(hidden)]
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>deinit_current_task() -&gt; <span class="prelude-ty">Result</span>&lt;TaskRef, ()&gt; {
-        <span class="kw">if </span>with_current_task(|t| !t.has_exited()).unwrap_or(<span class="bool-val">true</span>) {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(());
-        }
-        CURRENT_TASK.try_borrow_mut()
-            .map_err(|<span class="kw">_</span>| {
-                <span class="macro">error!</span>(<span class="string">&quot;deinit_current_task(): couldn&#39;t mutably borrow CURRENT_TASK, task ID {}&quot;</span>, get_my_current_task_id());
-                ()
-            })
-            .and_then(|<span class="kw-2">mut </span>t_opt| t_opt
-                .take()
-                .ok_or_else(|| {
-                    <span class="macro">warn!</span>(<span class="string">&quot;deinit_current_task(): CURRENT_TASK was `None`, task ID {}&quot;</span>, get_my_current_task_id());
-                    ()
-                })
-            )
     }
 }
 </code></pre></div>
