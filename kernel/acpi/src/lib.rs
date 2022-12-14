@@ -42,7 +42,7 @@ pub fn init(rsdp_address: Option<PhysicalAddress>, page_table: &mut PageTable) -
     // which contains the physical address of the RSDT/XSDG (Root/Extended System Descriptor Table).
     let rsdp = match rsdp_address {
         Some(rsdp_address) => {
-            debug!("using provided rsdp address {:#X}", rsdp_address);
+            debug!("Using bootloader-provided RSDP address {:#X}", rsdp_address);
             Rsdp::from_address(rsdp_address, page_table)
         },
         None => Rsdp::get_rsdp(page_table),
