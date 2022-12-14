@@ -7,12 +7,11 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
+use super::{PageTableEntry, VirtualAddress};
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
-use super::PageTableEntry;
-use crate::VirtualAddress;
 use pte_flags::PteFlagsArch;
-use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
 use zerocopy::FromBytes;
 
 
@@ -44,17 +43,48 @@ impl<L: TableLevel> Table<L> {
     }
 }
 
+/// Selects a way to get a mutable reference
+/// to a next-level table from an earlier table
+/// level
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum NextLevelAccess {
+    /// Use `Recursive` when the modified table
+    /// is currently active in the CPU and the MMU
+    /// is enabled. To access the next page table,
+    /// code will use the special recursive entry
+    /// in the P4 table.
+    Recursive,
+    #[allow(unused)]
+    /// If an identity mapping is active, or if
+    /// paging is fully disabled, then the physical
+    /// address in a page table entry is assumed
+    /// to be usable as a virtual address, and code
+    /// will use that address to access the next-level
+    /// page table.
+    Identity,
+}
+
 impl<L: HierarchicalLevel> Table<L> {
     /// Uses the given `index` as an index into this table's list of entries.
     ///
     /// Returns the virtual address of the next lowest page table:
     /// if `self` is a P4-level `Table`, then this returns a P3-level `Table`,
     /// and so on for P3 -> P3 and P2 -> P1.
-    fn next_table_address(&self, index: usize) -> Option<VirtualAddress> {
+    fn next_table_address(&self, index: usize, access: NextLevelAccess) -> Option<VirtualAddress> {
         let pte_flags = self[index].flags();
-        if pte_flags.is_valid() && !pte_flags.is_huge() {
+
+        #[cfg(target_arch = "aarch64")]
+        let is_huge = false;
+
+        #[cfg(target_arch = "x86_64")]
+        let is_huge = pte_flags.is_huge();
+
+        if pte_flags.is_valid() && !is_huge {
             let table_address = self as *const _ as usize;
-            let next_table_vaddr: usize = (table_address << 9) | (index << PAGE_SHIFT);
+            let next_table_vaddr: usize = match access {
+                NextLevelAccess::Recursive => (table_address << 9) | (index << PAGE_SHIFT),
+                NextLevelAccess::Identity => self[index].pointed_frame().unwrap().start_address().value(),
+            };
             Some(VirtualAddress::new_canonical(next_table_vaddr))
         } else {
             None
@@ -64,40 +94,39 @@ impl<L: HierarchicalLevel> Table<L> {
     /// Returns a reference to the next lowest-level page table.
     /// 
     /// A convenience wrapper around `next_table_address()`; see that method for more.
-    pub fn next_table(&self, index: usize) -> Option<&Table<L::NextLevel>> {
+    pub(crate) fn next_table(&self, index: usize, access: NextLevelAccess) -> Option<&Table<L::NextLevel>> {
         // convert the next table address from a raw pointer back to a Table type
-        self.next_table_address(index).map(|vaddr| unsafe { &*(vaddr.value() as *const _) })
+        self.next_table_address(index, access).map(|vaddr| unsafe { &*(vaddr.value() as *const _) })
     }
 
     /// Returns a mutable reference to the next lowest-level page table.
     /// 
     /// A convenience wrapper around `next_table_address()`; see that method for more.
-    pub fn next_table_mut(&mut self, index: usize) -> Option<&mut Table<L::NextLevel>> {
-        self.next_table_address(index).map(|vaddr| unsafe { &mut *(vaddr.value() as *mut _) })
+    pub(crate) fn next_table_mut(&mut self, index: usize, access: NextLevelAccess) -> Option<&mut Table<L::NextLevel>> {
+        self.next_table_address(index, access).map(|vaddr| unsafe { &mut *(vaddr.value() as *mut _) })
     }
 
     /// Returns a mutable reference to the next lowest-level page table, 
     /// creating and initializing a new one if it doesn't already exist.
     /// 
     /// A convenience wrapper around `next_table_address()`; see that method for more.
-    ///
-    /// TODO: return a `Result` here instead of panicking.
-    pub fn next_table_create(
+    pub(crate) fn next_table_create(
         &mut self,
         index: usize,
         flags: PteFlagsArch,
-    ) -> &mut Table<L::NextLevel> {
-        if self.next_table(index).is_none() {
-            assert!(!self[index].flags().is_huge(), "mapping code does not support huge pages");
-            let af = frame_allocator::allocate_frames(1).expect("next_table_create(): no frames available");
-            self[index].set_entry(
-                af.as_allocated_frame(),
-                flags.valid(true).writable(true), // must be valid and writable on x86_64
-            );
-            self.next_table_mut(index).unwrap().zero();
+        access: NextLevelAccess,
+    ) -> Result<&mut Table<L::NextLevel>, &'static str> {
+        if self.next_table(index, access).is_none() {
+            // commenting until we understand how huge pages work on aarch64
+            // assert!(!self[index].flags().is_huge(), "mapping code does not support huge pages");
+
+            let af = frame_allocator::allocate_frames(1).ok_or("next_table_create(): no frames available")?;
+            self[index].set_entry(af.as_allocated_frame(), flags.writable(true).valid(true));
+            let table = self.next_table_mut(index, access).unwrap();
+            table.zero();
             core::mem::forget(af); // we currently forget frames allocated as page table frames since we don't yet have a way to track them.
         }
-        self.next_table_mut(index).unwrap()
+        Ok(self.next_table_mut(index, access).unwrap())
     }
 }
 

@@ -379,9 +379,9 @@ impl PteFlagsAarch64 {
     /// * Sets the `VALID` bit, as every P4, P3, and P2 entry must be valid.
     #[must_use]
     pub fn adjust_for_higher_level_pte(self) -> Self {
-        Self::empty().accessed(true)
-                     .page_descriptor(true)
-                     .valid(true)
+        self.executable(true)
+            .exclusive(false)
+            .valid(true)
     }
 
     /// Returns a copy of this `PteFlagsAarch64` with the `PAGE_DESCRIPTOR` bit set or cleared.

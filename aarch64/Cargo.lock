@@ -3,10 +3,6 @@
 version = 3
 
 [[package]]
-name = "atomic_linked_list"
-version = "0.1.0"
-
-[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -191,7 +187,6 @@ dependencies = [
 name = "memory"
 version = "0.1.0"
 dependencies = [
- "atomic_linked_list",
  "bit_field 0.7.0",
  "bitflags",
  "frame_allocator",
@@ -201,7 +196,6 @@ dependencies = [
  "log",
  "memory_aarch64",
  "memory_structs",
- "memory_x86_64",
  "multiboot2",
  "no_drop",
  "owned_borrowed_trait",
@@ -209,7 +203,6 @@ dependencies = [
  "page_table_entry",
  "pte_flags",
  "spin 0.9.4",
- "x86_64",
  "xmas-elf",
  "zerocopy",
 ]
@@ -232,18 +225,6 @@ dependencies = [
  "kernel_config",
  "paste",
  "zerocopy",
-]
-
-[[package]]
-name = "memory_x86_64"
-version = "0.1.0"
-dependencies = [
- "kernel_config",
- "log",
- "memory_structs",
- "multiboot2",
- "pte_flags",
- "x86_64",
 ]
 
 [[package]]
@@ -390,12 +371,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustversion"
-version = "1.0.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97477e48b4cf8603ad5f7aaf897467cf42ab4218a38ef76fb14c2d6773a6d6a8"
-
-[[package]]
 name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -530,30 +505,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
-name = "volatile"
-version = "0.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3ca98349dda8a60ae74e04fd90c7fb4d6a4fbe01e6d3be095478aa0b76f6c0c"
-
-[[package]]
 name = "volatile-register"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ee8f19f9d74293faf70901bc20ad067dc1ad390d2cbf1e3f75f721ffee908b6"
 dependencies = [
  "vcell",
-]
-
-[[package]]
-name = "x86_64"
-version = "0.14.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "100555a863c0092238c2e0e814c1096c1e5cf066a309c696a87e907b5f8c5d69"
-dependencies = [
- "bit_field 0.10.1",
- "bitflags",
- "rustversion",
- "volatile",
 ]
 
 [[package]]

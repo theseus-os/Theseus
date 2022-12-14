@@ -35,9 +35,19 @@ pub use frame_allocator::{
 };
 
 #[cfg(target_arch = "x86_64")]
-use memory_x86_64::{
-    BootInformation, get_kernel_address, get_boot_info_mem_area, find_section_memory_bounds,
-    get_vga_mem_addr, get_modules_address, tlb_flush_virt_addr, tlb_flush_all, get_p4,
+use {
+    memory_x86_64::{
+        BootInformation, get_kernel_address, get_boot_info_mem_area, find_section_memory_bounds,
+        get_vga_mem_addr, get_modules_address, tlb_flush_virt_addr, tlb_flush_all, get_p4,
+        set_as_active_page_table_root
+    },
+    kernel_config::memory::KERNEL_OFFSET,
+};
+
+#[cfg(target_arch = "aarch64")]
+use memory_aarch64::{
+    tlb_flush_virt_addr, tlb_flush_all, get_p4, set_as_active_page_table_root,
+    disable_mmu, enable_mmu, configure_translation_registers
 };
 
 pub use pte_flags::*;
@@ -48,7 +58,6 @@ use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 use no_drop::NoDrop;
-use kernel_config::memory::KERNEL_OFFSET;
 pub use kernel_config::memory::PAGE_SIZE;
 
 /// The memory management info and address space of the kernel
@@ -125,7 +134,7 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
 }
 
 
-
+#[cfg(target_arch = "x86_64")]
 /// Initializes the virtual memory management system.
 /// Consumes the given BootInformation, because after the memory system is initialized,
 /// the original BootInformation will be unmapped and inaccessible.
@@ -218,6 +227,51 @@ pub fn init(
         .inspect(|(new_page_table, ..)| {
             debug!("Done with paging::init(). new page table: {:?}", new_page_table);
         })
+}
+
+#[cfg(target_arch = "aarch64")]
+/// Initializes the virtual memory management system.
+/// 
+/// A slice describing the current memory layout is required.
+/// 
+/// Returns the kernel's current PageTable, if successful.
+pub fn init(
+    layout: &[(FrameRange, MemoryRegionType, Option<PteFlags>)],
+) -> Result<PageTable, &'static str> {
+    // Identifying free and reserved regions so we can initialize the frame allocator.
+    let mut free_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
+    let mut free_index = 0;
+    let mut reserved_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
+    let mut reserved_index = 0;
+
+    for (range, mem_type, _) in layout {
+        let (dst, index) = match mem_type {
+            MemoryRegionType::Free => (&mut free_regions, &mut free_index),
+            MemoryRegionType::Reserved => (&mut reserved_regions, &mut reserved_index),
+            MemoryRegionType::Unknown => continue,
+        };
+
+        let region = PhysicalMemoryRegion::new(range.clone(), *mem_type);
+        dst[*index] = Some(region);
+        *index += 1;
+    }
+
+    let into_alloc_frames_fn = frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())?;
+    debug!("Initialized new frame allocator!");
+    // frame_allocator::dump_frame_allocator_state();
+
+    // On x86_64 `page_allocator` is initialized with a value obtained
+    // from the ELF layout. Here I'm choosing a value which is probably
+    // valid (uneducated guess); once we have an ELF aarch64 kernel
+    // we'll be able to use the original limit defined with KERNEL_OFFSET
+    // and the ELF layout.
+    page_allocator::init(VirtualAddress::new_canonical(0x100_000_000))?;
+    debug!("Initialized new page allocator!");
+    // page_allocator::dump_page_allocator_state();
+
+    // Initialize paging, which only bootstraps the current page table at the moment.
+    paging::init(into_alloc_frames_fn, layout)
+        .inspect(|page_table| debug!("Done with paging::init(). page table: {:?}", page_table))
 }
 
 /// Finishes initializing the memory management system after the heap is ready.
