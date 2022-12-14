@@ -99,7 +99,7 @@ However, deallocating a range of `AllocatedFrames` is much more difficult becaus
 This means we may have to deallocate many sets of `AllocatedFrames`, up to one per page.
 
 In existing OSes, there is no way to easily and immediately determine which frames are mapped to which virtual pages; this requires a *reverse mapping* from `1` frame to `N` pages, which is prohibitively expensive to maintain.
-As such, OS kernels typically run a periodic "garbage collection" thread on idle CPUs that sweeps the page tables to determine 
+As such, OS kernels typically run a periodic "garbage collection" thread on idle CPUs that sweeps the page tables to determine which frames can be reclaimed.
 
 However, Theseus's design vastly simplifies the procedure of reclaiming unused physical frames for deallocation.
 The single address space design and guaranteed bijective (1-to-1) mappings mean that a frame is mapped *exclusively* by a single page; when that page is no longer mapped to that frame, the frame can be deallocated.
