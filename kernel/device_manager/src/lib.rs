@@ -37,6 +37,7 @@ use alloc::vec::Vec;
 use io::{ByteReaderWriterWrapper, LockableIo, ReaderWriter};
 use serial_port::{SerialPortAddress, take_serial_port_basic};
 use storage_manager::StorageDevice;
+use memory::PhysicalAddress;
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
 /// TODO: use DHCP to acquire an IP address.
@@ -51,13 +52,16 @@ const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slir
 /// This includes:
 /// * local APICs ([`apic`]),
 /// * [`acpi`] tables for system configuration info, including the IOAPIC.
-pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
+pub fn early_init(
+    rsdp_address: Option<PhysicalAddress>,
+    kernel_mmi: &mut MemoryManagementInfo
+) -> Result<(), &'static str> {
     // First, initialize the local APIC hardware such that we can populate
     // and initialize each LocalAPIC discovered in the ACPI table initialization routine below.
     apic::init();
     
     // Then, parse the ACPI tables to acquire system configuration info.
-    acpi::init(&mut kernel_mmi.page_table)?;
+    acpi::init(rsdp_address, &mut kernel_mmi.page_table)?;
 
     Ok(())
 }
