@@ -31,6 +31,7 @@ use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
     get_vga_mem_addr, KERNEL_OFFSET};
 use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;
+use boot_info::BootInformation;
 use kernel_config::memory::{RECURSIVE_P4_INDEX};
 // use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
@@ -213,7 +214,7 @@ pub fn get_current_p4() -> Frame {
 ///
 /// Otherwise, it returns a str error message. 
 pub fn init(
-    boot_info: &multiboot2::BootInformation,
+    boot_info: &impl BootInformation,
     into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames,
 ) -> Result<(
         PageTable,
@@ -238,9 +239,9 @@ pub fn init(
     let mut page_table = PageTable::from_current(current_active_p4)?;
     debug!("Bootstrapped initial {:?}", page_table);
 
-    let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address()).ok_or("boot_info start virtual address was invalid")?;
+    let boot_info_start_vaddr = boot_info.start().ok_or("boot_info start virtual address was invalid")?;
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
-    let boot_info_size = boot_info.total_size();
+    let boot_info_size = boot_info.len();
     debug!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}\n", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
 
     let new_p4_frame = frame_allocator::allocate_frames(1).ok_or("couldn't allocate frame for new page table")?; 
