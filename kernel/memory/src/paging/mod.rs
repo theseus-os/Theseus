@@ -234,7 +234,7 @@ pub fn init(
     debug!("{:X?}\n{:X?}", aggregated_section_memory_bounds, _sections_memory_bounds);
     
     // bootstrap a PageTable from the currently-loaded page table
-    let current_active_p4 = frame_allocator::allocate_frames_at(aggregated_section_memory_bounds.page_table.start.1, 1)?;
+    let current_active_p4 = frame_allocator::allocate_frames_at(get_current_p4().start_address(), 1)?;
     let mut page_table = PageTable::from_current(current_active_p4)?;
     debug!("Bootstrapped initial {:?}", page_table);
 
