@@ -366,19 +366,6 @@
 <span id="366">366</span>
 <span id="367">367</span>
 <span id="368">368</span>
-<span id="369">369</span>
-<span id="370">370</span>
-<span id="371">371</span>
-<span id="372">372</span>
-<span id="373">373</span>
-<span id="374">374</span>
-<span id="375">375</span>
-<span id="376">376</span>
-<span id="377">377</span>
-<span id="378">378</span>
-<span id="379">379</span>
-<span id="380">380</span>
-<span id="381">381</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
 //!
 //! The `memory` crate uses this crate to obtain the multiboot2-provided memory layout
@@ -495,14 +482,12 @@
 /// * The `data` section bounds cover those that are writable (.data, .bss).
 /// 
 /// It also contains:
-/// * The `page_table` section bounds cover the initial page table&#39;s top-level (root) P4 frame. 
 /// * The `stack` section bounds cover the initial stack, which are maintained separately.
 </span><span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>AggregatedSectionMemoryBounds {
    <span class="kw">pub </span>text:        SectionMemoryBounds,
    <span class="kw">pub </span>rodata:      SectionMemoryBounds,
    <span class="kw">pub </span>data:        SectionMemoryBounds,
-   <span class="kw">pub </span>page_table:  SectionMemoryBounds,
    <span class="kw">pub </span>stack:       SectionMemoryBounds,
 }
 
@@ -526,8 +511,6 @@
     <span class="kw">let </span><span class="kw-2">mut </span>data_end:          <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>stack_start:       <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>stack_end:         <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>page_table_start:  <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>page_table_end:    <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
 
     <span class="kw">let </span><span class="kw-2">mut </span>text_flags:        <span class="prelude-ty">Option</span>&lt;PteFlags&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>rodata_flags:      <span class="prelude-ty">Option</span>&lt;PteFlags&gt; = <span class="prelude-val">None</span>;
@@ -638,10 +621,9 @@
                 <span class="string">&quot;nano_core .bss&quot;
             </span>}
             <span class="string">&quot;.page_table&quot; </span>=&gt; {
-                page_table_start = <span class="prelude-val">Some</span>((start_virt_addr, start_phys_addr));
-                page_table_end   = <span class="prelude-val">Some</span>((end_virt_addr, end_phys_addr));
-                <span class="string">&quot;initial page_table&quot;
-            </span>}
+                <span class="comment">// We bootstrap the page table from the CR3 register.
+                </span><span class="kw">continue</span>;
+            }
             <span class="string">&quot;.stack&quot; </span>=&gt; {
                 stack_start = <span class="prelude-val">Some</span>((start_virt_addr, start_phys_addr));
                 stack_end   = <span class="prelude-val">Some</span>((end_virt_addr, end_phys_addr));
@@ -670,8 +652,6 @@
     <span class="kw">let </span>rodata_end         = rodata_end       .ok_or(<span class="string">&quot;Couldn&#39;t find end of .rodata section&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>data_start         = data_start       .ok_or(<span class="string">&quot;Couldn&#39;t find start of .data section&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>data_end           = data_end         .ok_or(<span class="string">&quot;Couldn&#39;t find start of .data section&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>page_table_start   = page_table_start .ok_or(<span class="string">&quot;Couldn&#39;t find start of .page_table section&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>page_table_end     = page_table_end   .ok_or(<span class="string">&quot;Couldn&#39;t find start of .page_table section&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>stack_start        = stack_start      .ok_or(<span class="string">&quot;Couldn&#39;t find start of .stack section&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>stack_end          = stack_end        .ok_or(<span class="string">&quot;Couldn&#39;t find start of .stack section&quot;</span>)<span class="question-mark">?</span>;
      
@@ -694,11 +674,6 @@
         end: data_end,
         flags: data_flags,
     };
-    <span class="kw">let </span>page_table = SectionMemoryBounds {
-        start: page_table_start,
-        end: page_table_end,
-        flags: data_flags, <span class="comment">// same flags as data sections
-    </span>};
     <span class="kw">let </span>stack = SectionMemoryBounds {
         start: stack_start,
         end: stack_end,
@@ -709,7 +684,6 @@
         text,
         rodata,
         data,
-        page_table,
         stack,
     };
     <span class="prelude-val">Ok</span>((aggregated_sections_memory_bounds, sections_memory_bounds))

@@ -384,6 +384,7 @@
 <span id="384">384</span>
 <span id="385">385</span>
 <span id="386">386</span>
+<span id="387">387</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -620,7 +621,8 @@
     <span class="macro">debug!</span>(<span class="string">&quot;{:X?}\n{:X?}&quot;</span>, aggregated_section_memory_bounds, _sections_memory_bounds);
     
     <span class="comment">// bootstrap a PageTable from the currently-loaded page table
-    </span><span class="kw">let </span>current_active_p4 = frame_allocator::allocate_frames_at(aggregated_section_memory_bounds.page_table.start.<span class="number">1</span>, <span class="number">1</span>)<span class="question-mark">?</span>;
+    </span><span class="kw">let </span>current_active_p4 = frame_allocator::allocate_frames_at(get_current_p4().start_address(), <span class="number">1</span>)
+        .map_err(|<span class="kw">_</span>| <span class="string">&quot;Failed to allocate frame for initial page table; is it merged with another section?&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>page_table = PageTable::from_current(current_active_p4)<span class="question-mark">?</span>;
     <span class="macro">debug!</span>(<span class="string">&quot;Bootstrapped initial {:?}&quot;</span>, page_table);
 
