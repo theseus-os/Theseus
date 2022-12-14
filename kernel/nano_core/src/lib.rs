@@ -139,7 +139,7 @@ pub extern "C" fn nano_core_start(
         .map(|signature| signature as *const _ as *const () as usize)
         .and_then(|rsdp_address| PhysicalAddress::new(rsdp_address));
 
-    println_raw!("nano_core_start(): acquired RSDP address: {:#?}", rsdp_address);
+    println_raw!("nano_core_start(): bootloader-provided RSDP address: {:X?}", rsdp_address);
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     let (

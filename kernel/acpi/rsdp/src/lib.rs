@@ -85,7 +85,7 @@ impl Rsdp {
         let frames = allocate_frames_by_bytes_at(address, size)
             .map_err(|_e| "couldn't allocate physical frames for RSDP")?;
         let mapped_pages = page_table.map_allocated_pages_to(pages, frames, PteFlags::new().valid(true))?;
-        mapped_pages.into_borrowed((address.frame_offset()).value()).map_err(|(_, e)| e)
+        mapped_pages.into_borrowed(address.frame_offset()).map_err(|(_, e)| e)
     }
 
     /// Returns the `PhysicalAddress` of the RSDT or XSDT.
