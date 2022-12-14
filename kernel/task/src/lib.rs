@@ -1142,6 +1142,7 @@ fn task_switch_inner(
 #[derive(Debug)]
 pub struct JoinableTaskRef {
     task: TaskRef,
+    mailbox: Arc<Mutex<Option<ExitValue>>>,
 }
 assert_not_impl_any!(JoinableTaskRef: Clone);
 impl Deref for JoinableTaskRef {
@@ -1205,10 +1206,14 @@ impl TaskRef {
     /// and can be used to "join" this task (wait for it to exit) and obtain its exit value.
     pub fn new(task: Task) -> JoinableTaskRef {
         let taskref = TaskRef(Arc::new(task));
+        let mailbox = Arc::new(Mutex::new(None));
 
         // Mark this task as joinable, now that it has been wrapped in the proper type.
         taskref.joinable.store(true, Ordering::Relaxed);
-        JoinableTaskRef { task: taskref }
+        JoinableTaskRef {
+            task: taskref,
+            mailbox,
+        }
     }
 
     /// Call this function to indicate that this task has successfully ran to completion,
