@@ -103,13 +103,13 @@ check-rustc:
 
 ## The linker script applied to each output file in $(OBJECT_FILES_BUILD_DIR).
 partial_relinking_script := cfg/partial_linking_combine_sections.ld
-## This is the default output path defined by cargo.
+## The default file path where cargo outputs the nano_core's static library.
 nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
-## The output directory of where the nano_core binary should go
+## The output file path of the fully-linked nano_core kernel binary.
 nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
-## The linker script for linking the nano_core_binary to the assembly files
+## The linker script for linking the `nano_core_binary` with the compiled assembly files.
 linker_script := $(ROOT_DIR)/kernel/nano_core/linker_higher_half.ld
-## The assembly files compiled in the nano core build script.
+## The assembly files compiled by the nano_core build script.
 compiled_nano_core_asm := $(NANO_CORE_BUILD_DIR)/compiled_asm/bios/*.o
 
 ## Specify which crates should be considered as application-level libraries. 
