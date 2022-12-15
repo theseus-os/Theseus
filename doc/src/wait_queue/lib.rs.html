@@ -433,7 +433,7 @@
         <span class="kw">for </span>t <span class="kw">in </span><span class="self">self</span>.<span class="number">0</span>.lock().drain(..) {
             <span class="kw">if </span>t.unblock().is_err() {
                 <span class="macro">warn!</span>(<span class="string">&quot;WaitQueue::notify_all(): failed to unblock {:?}&quot;</span>, t);
-            };
+            }
         }
     }
     
@@ -473,5 +473,6 @@
             }
         }
     }
-}</code></pre></div>
+}
+</code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="wait_queue" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

@@ -364,6 +364,40 @@
 <span id="364">364</span>
 <span id="365">365</span>
 <span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
 </pre><pre class="rust"><code><span class="doccomment">//! An asynchronous channel for Inter-Task Communication (ITC) with an internal queue for buffering messages.
 //! 
 //! This crate offers an asynchronous channel that allows multiple tasks
@@ -394,7 +428,7 @@
 <span class="kw">use </span>mpmc::Queue <span class="kw">as </span>MpmcQueue;
 <span class="kw">use </span>wait_queue::WaitQueue;
 <span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
-
+<span class="kw">use </span>core::sync::atomic::{AtomicUsize, Ordering};
 
 <span class="doccomment">/// Create a new channel that allows senders and receivers to 
 /// asynchronously exchange messages via an internal intermediary buffer.
@@ -415,7 +449,9 @@
         queue: MpmcQueue::with_capacity(minimum_capacity),
         waiting_senders: WaitQueue::new(),
         waiting_receivers: WaitQueue::new(),
-        channel_status: AtomicCell::new(ChannelStatus::Connected)
+        channel_status: AtomicCell::new(ChannelStatus::Connected),
+        sender_count: AtomicUsize::new(<span class="number">1</span>),
+        receiver_count: AtomicUsize::new(<span class="number">1</span>),
     });
     (
         Sender   { channel: channel.clone() },
@@ -459,7 +495,9 @@
     queue: MpmcQueue&lt;T&gt;,
     waiting_senders: WaitQueue,
     waiting_receivers: WaitQueue,
-    channel_status: AtomicCell&lt;ChannelStatus&gt;
+    channel_status: AtomicCell&lt;ChannelStatus&gt;,
+    sender_count: AtomicUsize,
+    receiver_count: AtomicUsize,
 }
 
 <span class="comment">// Ensure that `AtomicCell&lt;ChannelStatus&gt;` is actually a lock-free atomic.
@@ -480,10 +518,22 @@
 }
 
 <span class="doccomment">/// The sender (transmit) side of a channel.
-</span><span class="attr">#[derive(Clone)]
 </span><span class="kw">pub struct </span>Sender&lt;T: Send&gt; {
     channel: Arc&lt;Channel&lt;T&gt;&gt;,
 }
+
+<span class="kw">impl</span>&lt;T:Send&gt; Clone <span class="kw">for </span>Sender&lt;T&gt; {
+    <span class="doccomment">/// Increment the sender&#39;s counter.
+    /// If were are no senders initially, then set channel status to `Connected`.
+    /// Return a newly created sender.
+    </span><span class="kw">fn </span>clone(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+        <span class="kw">if </span><span class="self">self</span>.channel.sender_count.fetch_add(<span class="number">1</span>, Ordering::SeqCst) == <span class="number">0 </span>{
+            <span class="self">self</span>.channel.channel_status.store(ChannelStatus::Connected);
+        }
+        Sender { channel: <span class="self">self</span>.channel.clone() }
+    }
+}
+
 <span class="kw">impl </span>&lt;T: Send&gt; Sender&lt;T&gt; {
     <span class="doccomment">/// Send a message, blocking until space in the channel&#39;s buffer is available. 
     /// 
@@ -612,10 +662,22 @@
 }
 
 <span class="doccomment">/// The receiver side of a channel.
-</span><span class="attr">#[derive(Clone)]
 </span><span class="kw">pub struct </span>Receiver&lt;T: Send&gt; {
     channel: Arc&lt;Channel&lt;T&gt;&gt;,
 }
+
+<span class="kw">impl</span>&lt;T: Send&gt; Clone <span class="kw">for </span>Receiver&lt;T&gt; {
+    <span class="doccomment">/// Increment the receiver&#39;s counter.
+    /// If were are no receivers initially, then set channel status to `Connected`.
+    /// Return a newly created receiver.
+    </span><span class="kw">fn </span>clone(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+        <span class="kw">if </span><span class="self">self</span>.channel.receiver_count.fetch_add(<span class="number">1</span>, Ordering::SeqCst) == <span class="number">0 </span>{
+            <span class="self">self</span>.channel.channel_status.store(ChannelStatus::Connected);
+        }
+        Receiver { channel: <span class="self">self</span>.channel.clone() }
+    }
+}
+
 <span class="kw">impl </span>&lt;T: Send&gt; Receiver&lt;T&gt; {
     <span class="doccomment">/// Receive a message, blocking until a message is available in the buffer.
     /// 
@@ -713,21 +775,28 @@
 }
 
 
-<span class="doccomment">/// Drop implementation marks the channel state and notifys the `Sender`
+<span class="doccomment">/// When the only remaining `Receiver` is dropped, we mark the channel as disconnected
+/// and notify all of the `Senders`
 </span><span class="kw">impl</span>&lt;T: Send&gt; Drop <span class="kw">for </span>Receiver&lt;T&gt; {
     <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="comment">// trace!(&quot;Dropping the receiver&quot;);
-        </span><span class="self">self</span>.channel.channel_status.store(ChannelStatus::ReceiverDisconnected);
-        <span class="self">self</span>.channel.waiting_senders.notify_one();
+        <span class="comment">// trace!(&quot;Dropping a receiver&quot;);
+        </span><span class="kw">if </span><span class="self">self</span>.channel.receiver_count.fetch_sub(<span class="number">1</span>, Ordering::SeqCst) == <span class="number">1 </span>{
+            <span class="self">self</span>.channel.channel_status.store(ChannelStatus::ReceiverDisconnected);
+            <span class="self">self</span>.channel.waiting_senders.notify_all();
+        }
     }
 }
 
-<span class="doccomment">/// Drop implementation marks the channel state and notifys the `Receiver`
+<span class="doccomment">/// When the only remaining `Sender` is dropped, we mark the channel as disconnected
+/// and notify all of the `Receivers`
 </span><span class="kw">impl</span>&lt;T: Send&gt; Drop <span class="kw">for </span>Sender&lt;T&gt; {
     <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="comment">// trace!(&quot;Dropping the sender&quot;);
-        </span><span class="self">self</span>.channel.channel_status.store(ChannelStatus::SenderDisconnected);
-        <span class="self">self</span>.channel.waiting_receivers.notify_one();
+        <span class="comment">// trace!(&quot;Dropping a sender&quot;);
+        </span><span class="kw">if </span><span class="self">self</span>.channel.sender_count.fetch_sub(<span class="number">1</span>, Ordering::SeqCst) == <span class="number">1 </span>{
+            <span class="self">self</span>.channel.channel_status.store(ChannelStatus::SenderDisconnected);
+            <span class="self">self</span>.channel.waiting_receivers.notify_all();
+        }
     }
-}</code></pre></div>
+}
+</code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="async_channel" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>
