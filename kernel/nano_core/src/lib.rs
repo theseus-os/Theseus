@@ -42,7 +42,6 @@ use core::ops::DerefMut;
 use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
 use serial_port_basic::{take_serial_port, SerialPortAddress};
-use memory::PhysicalAddress;
 use boot_info::BootInformation;
 
 /// Used to obtain information about this build of Theseus.

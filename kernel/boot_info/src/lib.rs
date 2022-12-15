@@ -98,5 +98,5 @@ pub trait BootInformation: 'static {
     fn rsdp(&self) -> Option<PhysicalAddress>;
 
     /// Returns the stack size in bytes.
-    fn stack_size(&self) -> usize;
+    fn stack_size(&self) -> Result<usize, &'static str>;
 }

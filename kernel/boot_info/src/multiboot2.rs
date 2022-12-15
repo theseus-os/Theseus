@@ -163,11 +163,10 @@ impl crate::BootInformation for multiboot2::BootInformation {
             .and_then(|rsdp_address| PhysicalAddress::new(rsdp_address))
     }
 
-    fn stack_size(&self) -> usize {
+    fn stack_size(&self) -> Result<usize, &'static str> {
         use crate::ElfSection;
 
-        self.elf_sections()
-            .expect("couldn't get elf sections")
+        self.elf_sections()?
             .filter(|section| section.name() == ".stack")
             .map(|section| {
                 let start = section.start();
@@ -175,6 +174,6 @@ impl crate::BootInformation for multiboot2::BootInformation {
                 (end - start).value()
             })
             .next()
-            .expect("no stack section")
+            .ok_or("no stack section")
     }
 }
