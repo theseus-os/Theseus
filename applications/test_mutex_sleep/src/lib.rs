@@ -6,7 +6,7 @@ extern crate task;
 extern crate spawn;
 extern crate scheduler;
 extern crate mutex_sleep;
-extern crate apic;
+extern crate multicore;
 
 use core::ops::Deref;
 

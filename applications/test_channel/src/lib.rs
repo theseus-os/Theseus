@@ -10,7 +10,7 @@ extern crate spawn;
 extern crate scheduler;
 extern crate rendezvous;
 extern crate async_channel;
-extern crate apic;
+extern crate multicore;
 
 
 use alloc::{

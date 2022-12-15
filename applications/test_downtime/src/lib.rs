@@ -10,7 +10,7 @@ extern crate spawn;
 extern crate scheduler;
 extern crate rendezvous;
 extern crate async_channel;
-extern crate apic;
+extern crate multicore;
 extern crate runqueue;
 extern crate window;
 extern crate framebuffer;
@@ -360,8 +360,11 @@ pub fn pick_child_core() -> u8 {
 	if nr_tasks_in_rq(child_core) == Some(1) {return child_core;}
 
 	// if failed, try from the last to the first
-	for child_core in (0..multicore::cores_count()).rev() {
-		if nr_tasks_in_rq(child_core) == Some(1) {return child_core;}
+    let last_core = multicore::cores_count().max(u8::MAX as usize);
+	for child_core in (0..last_core).rev() {
+		if nr_tasks_in_rq(child_core as u8) == Some(1) {
+            return child_core as u8;
+        }
 	}
 	debug!("WARNING : Cannot pick a child core because cores are busy");
 	debug!("WARNING : Selecting current core");
