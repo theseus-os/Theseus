@@ -24,9 +24,11 @@ use zerocopy::FromBytes;
 /// See these links for more: 
 /// * <http://forum.osdev.org/viewtopic.php?f=1&p=176913>
 /// * <http://forum.osdev.org/viewtopic.php?f=15&t=25545>
-pub const P4: *mut Table<Level4> = 0o177777_776_776_776_776_0000 as *mut _; 
-                                         // ^p4 ^p3 ^p2 ^p1 ^offset  
-                                         // ^ 0o776 means that we're always looking at the 510th entry recursively
+pub const P4: *mut Table<Level4> = VirtualAddress::new_canonical(
+    0o177777_776_776_776_776_0000
+    //       ^p4 ^p3 ^p2 ^p1 ^offset  
+    //       ^ 0o776 means that we're always looking at the 510th entry recursively
+).value() as *mut _;
 
 #[derive(FromBytes)]
 pub struct Table<L: TableLevel> {
