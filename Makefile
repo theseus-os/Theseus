@@ -105,8 +105,6 @@ check-rustc:
 partial_relinking_script := cfg/partial_linking_combine_sections.ld
 ## This is the default output path defined by cargo.
 nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
-## The directory where the nano_core source files are
-NANO_CORE_SRC_DIR := $(ROOT_DIR)/kernel/nano_core/src
 ## The output directory of where the nano_core binary should go
 nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
 ## The linker script for linking the nano_core_binary to the assembly files
