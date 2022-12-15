@@ -155,8 +155,12 @@ impl crate::BootInformation for multiboot2::BootInformation {
     }
 
     fn rsdp(&self) -> Option<PhysicalAddress> {
-        // FIXME: Implement. Depends on #734.
-        None
+        self.rsdp_v2_tag()
+            .map(|tag| tag.signature())
+            .or_else(|| self.rsdp_v1_tag().map(|tag| tag.signature()))
+            .and_then(|utf8_result| utf8_result.ok())
+            .map(|signature| signature as *const _ as *const () as usize)
+            .and_then(|rsdp_address| PhysicalAddress::new(rsdp_address))
     }
 
     fn stack_size(&self) -> usize {

@@ -2088,6 +2088,7 @@ dependencies = [
 name = "nano_core"
 version = "0.1.0"
 dependencies = [
+ "boot_info",
  "captain",
  "exceptions_early",
  "irq_safety",
