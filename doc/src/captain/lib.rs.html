@@ -197,6 +197,8 @@
 <span id="197">197</span>
 <span id="198">198</span>
 <span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. 
 //! 
 //! The `captain` steers the ship of Theseus, meaning that it contains basic logic 
@@ -256,6 +258,7 @@
 <span class="kw">use </span>irq_safety::enable_interrupts;
 <span class="kw">use </span>stack::Stack;
 <span class="kw">use </span>no_drop::NoDrop;
+<span class="kw">use </span>memory::PhysicalAddress;
 
 
 <span class="attr">#[cfg(mirror_log_to_vga)]
@@ -285,6 +288,7 @@
     bsp_initial_stack: NoDrop&lt;Stack&gt;,
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
+    rsdp_address: <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="attr">#[cfg(mirror_log_to_vga)]
     </span>{
@@ -298,7 +302,7 @@
     <span class="comment">// info!(&quot;TSC frequency calculated: {}&quot;, _tsc_freq);
 
     // now we initialize early driver stuff, like APIC/ACPI
-    </span>device_manager::early_init(kernel_mmi_ref.lock().deref_mut())<span class="question-mark">?</span>;
+    </span>device_manager::early_init(rsdp_address, kernel_mmi_ref.lock().deref_mut())<span class="question-mark">?</span>;
 
     <span class="comment">// initialize the rest of the BSP&#39;s interrupt stuff, including TSS &amp; GDT
     </span><span class="kw">let </span>(double_fault_stack, privilege_stack) = {

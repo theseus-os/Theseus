@@ -133,6 +133,10 @@
 <span id="133">133</span>
 <span id="134">134</span>
 <span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Code to parse the ACPI tables, based off of Redox. 
 </span><span class="attr">#![no_std]
 
@@ -172,10 +176,14 @@
 }
 
 <span class="doccomment">/// Parses the system&#39;s ACPI tables 
-</span><span class="kw">pub fn </span>init(page_table: <span class="kw-2">&amp;mut </span>PageTable) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+</span><span class="kw">pub fn </span>init(rsdp_address: <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;, page_table: <span class="kw-2">&amp;mut </span>PageTable) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="comment">// The first step is to search for the RSDP (Root System Descriptor Pointer),
     // which contains the physical address of the RSDT/XSDG (Root/Extended System Descriptor Table).
-    </span><span class="kw">let </span>rsdp = Rsdp::get_rsdp(page_table)<span class="question-mark">?</span>;
+    </span><span class="kw">let </span>rsdp = rsdp_address
+        <span class="comment">// This error message will be overwritten by the or_else statement.
+        </span>.ok_or(<span class="string">&quot;&quot;</span>)
+        .and_then(|rsdp_address| Rsdp::from_address(rsdp_address, page_table))
+        .or_else(|<span class="kw">_</span>| Rsdp::get_rsdp(page_table))<span class="question-mark">?</span>;
     <span class="kw">let </span>rsdt_phys_addr = rsdp.sdt_address();
     <span class="macro">debug!</span>(<span class="string">&quot;RXSDT is located in Frame {:#X}&quot;</span>, rsdt_phys_addr);
 
