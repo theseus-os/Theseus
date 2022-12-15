@@ -68,14 +68,12 @@ exclude = [
 	## Exclude kernel crates that exist purely for testing or benchmarking purposes.
 	"kernel/libtest",
 	"kernel/test_thread_local",
-	"kernel/mapper_spillful",
 	"kernel/unified_channel",
 
 	## Exclude benchmark-related crates in all builds; they must be explicitly included via features.
 	## TODO: move these to a specific "benches" folder so we can exclude that entire folder.
 	"applications/bm",
 	"applications/heap_eval",
-	"applications/mm_eval",
 	"applications/rq_eval",
 	"applications/scheduler_eval",
 
@@ -103,9 +101,6 @@ exclude = [
 
 
 [patch.crates-io]
-### Patch `spin` to use the `pause` asm instruction in busy-wait loops,
-### because the `core::hint::spin_loop()` only uses it if "sse2" is enabled.
-spin = { git = "https://github.com/theseus-os/spin-rs" }
 ### use our own version of volatile which supports zerocopy
 volatile = { git = "https://github.com/theseus-os/volatile" }
 ### use our own no_std-compatilbe getopts

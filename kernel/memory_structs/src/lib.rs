@@ -1,20 +1,19 @@
-//! This crate contains common types used for memory mapping. 
+//! This crate contains basic types used for memory management.
+//!
+//! The types of interest are divided into three categories:
+//! 1. addresses: `VirtualAddress` and `PhysicalAddress`.
+//! 2. "chunk" types: `Page` and `Frame`.
+//! 3. ranges of chunks: `PageRange` and `FrameRange`.  
 
 #![no_std]
 #![feature(step_trait)]
 
 extern crate kernel_config;
-extern crate multiboot2;
-extern crate xmas_elf;
 #[macro_use] extern crate derive_more;
 extern crate bit_field;
-#[cfg(target_arch = "x86_64")]
-extern crate entryflags_x86_64;
 extern crate zerocopy;
 extern crate paste;
 
-
-use bit_field::BitField;
 use core::{
     cmp::{min, max},
     fmt,
@@ -22,8 +21,6 @@ use core::{
     ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
-#[cfg(target_arch = "x86_64")]
-pub use entryflags_x86_64::{EntryFlags, PAGE_TABLE_ENTRY_FRAME_MASK};
 use zerocopy::FromBytes;
 use paste::paste;
 
@@ -126,37 +123,82 @@ macro_rules! implement_address {
     };
 }
 
-#[inline]
-fn is_canonical_virtual_address(virt_addr: usize) -> bool {
-    match virt_addr.get_bits(47..64) {
-        0 | 0b1_1111_1111_1111_1111 => true,
-        _ => false,
+#[cfg(target_arch = "x86_64")]
+mod canonical_address {
+    use bit_field::BitField;
+
+    #[inline]
+    pub fn is_canonical_virtual_address(virt_addr: usize) -> bool {
+        match virt_addr.get_bits(47..64) {
+            0 | 0b1_1111_1111_1111_1111 => true,
+            _ => false,
+        }
+    }
+
+    #[inline]
+    pub const fn canonicalize_virtual_address(virt_addr: usize) -> usize {
+        // match virt_addr.get_bit(47) {
+        //     false => virt_addr.set_bits(48..64, 0),
+        //     true =>  virt_addr.set_bits(48..64, 0xffff),
+        // };
+
+        // The below code is semantically equivalent to the above, but it works in const functions.
+        ((virt_addr << 16) as isize >> 16) as usize
+    }
+
+    #[inline]
+    pub fn is_canonical_physical_address(phys_addr: usize) -> bool {
+        match phys_addr.get_bits(52..64) {
+            0 => true,
+            _ => false,
+        }
+    }
+
+    #[inline]
+    pub const fn canonicalize_physical_address(phys_addr: usize) -> usize {
+        phys_addr & 0x000F_FFFF_FFFF_FFFF
     }
 }
 
-#[inline]
-const fn canonicalize_virtual_address(virt_addr: usize) -> usize {
-    // match virt_addr.get_bit(47) {
-    //     false => virt_addr.set_bits(48..64, 0),
-    //     true =>  virt_addr.set_bits(48..64, 0xffff),
-    // };
+#[cfg(target_arch = "aarch64")]
+mod canonical_address {
+    use bit_field::BitField;
 
-    // The below code is semantically equivalent to the above, but it works in const functions.
-    ((virt_addr << 16) as isize >> 16) as usize
-}
-
-#[inline]
-fn is_canonical_physical_address(phys_addr: usize) -> bool {
-    match phys_addr.get_bits(52..64) {
-        0 => true,
-        _ => false,
+    // aarch64 doesn't have a concept of canonical VA
+    // so this always returns true
+    #[inline]
+    pub fn is_canonical_virtual_address(_virt_addr: usize) -> bool {
+        true
+    }
+    
+    // aarch64 doesn't have a concept of canonical VA
+    // so this returns the address as-is
+    #[inline]
+    pub const fn canonicalize_virtual_address(virt_addr: usize) -> usize {
+        virt_addr
+    }
+    
+    /// On aarch64, we configure the MMU to use 48-bit
+    /// physical addresses; "canonical" physical addresses
+    /// have the 16 most significant bits cleared.
+    #[inline]
+    pub fn is_canonical_physical_address(phys_addr: usize) -> bool {
+        match phys_addr.get_bits(48..64) {
+            0 => true,
+            _ => false,
+        }
+    }
+    
+    /// On aarch64, we configure the MMU to use 48-bit
+    /// physical addresses; "canonical" physical addresses
+    /// have the 16 most significant bits cleared.
+    #[inline]
+    pub const fn canonicalize_physical_address(phys_addr: usize) -> usize {
+        phys_addr & 0x0000_FFFF_FFFF_FFFF
     }
 }
 
-#[inline]
-const fn canonicalize_physical_address(phys_addr: usize) -> usize {
-    phys_addr & 0x000F_FFFF_FFFF_FFFF
-}
+use canonical_address::*;
 
 implement_address!(
     VirtualAddress,
@@ -429,39 +471,3 @@ macro_rules! implement_page_frame_range {
 
 implement_page_frame_range!(PageRange, "virtual", virt, Page, VirtualAddress);
 implement_page_frame_range!(FrameRange, "physical", phys, Frame, PhysicalAddress);
-
-
-/// The address bounds and mapping flags of a section's memory region.
-#[derive(Debug)]
-pub struct SectionMemoryBounds {
-    /// The starting virtual address and physical address.
-    pub start: (VirtualAddress, PhysicalAddress),
-    /// The ending virtual address and physical address.
-    pub end: (VirtualAddress, PhysicalAddress),
-    /// The page table entry flags that should be used for mapping this section.
-    pub flags: EntryFlags,
-}
-
-/// The address bounds and flags of the initial kernel sections that need mapping. 
-/// 
-/// Individual sections in the kernel's ELF image are combined here according to their flags,
-/// as described below, but some are kept separate for the sake of correctness or ease of use.
-/// 
-/// It contains three main items, in which each item includes all sections that have identical flags:
-/// * The `text` section bounds cover all sections that are executable.
-/// * The `rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).
-///   * The `rodata` section also includes thread-local storage (TLS) areas (.tdata, .tbss) if they exist,
-///     because they can be mapped using the same page table flags.
-/// * The `data` section bounds cover those that are writable (.data, .bss).
-/// 
-/// It also contains:
-/// * The `page_table` section bounds cover the initial page table's top-level (root) P4 frame. 
-/// * The `stack` section bounds cover the initial stack, which are maintained separately.
-#[derive(Debug)]
-pub struct AggregatedSectionMemoryBounds {
-   pub text:        SectionMemoryBounds,
-   pub rodata:      SectionMemoryBounds,
-   pub data:        SectionMemoryBounds,
-   pub page_table:  SectionMemoryBounds,
-   pub stack:       SectionMemoryBounds,
-}

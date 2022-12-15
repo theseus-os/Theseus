@@ -17,7 +17,7 @@ dependencies = [
  "memory",
  "rsdp",
  "rsdt",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -65,10 +65,10 @@ dependencies = [
  "kernel_config",
  "log",
  "memory",
+ "no_drop",
  "scheduler",
  "spawn",
  "stack",
- "tlb_shootdown",
 ]
 
 [[package]]
@@ -83,10 +83,9 @@ dependencies = [
  "log",
  "memory",
  "msr",
- "owning_ref",
  "pit_clock_basic",
  "raw-cpuid",
- "spin 0.9.0",
+ "spin 0.9.4",
  "static_assertions",
  "volatile 0.2.7",
  "x86_64",
@@ -104,7 +103,7 @@ dependencies = [
  "log",
  "logger",
  "print",
- "spin 0.9.0",
+ "spin 0.9.4",
  "stdio",
  "task",
  "window_manager",
@@ -290,8 +289,8 @@ dependencies = [
 name = "cow_arc"
 version = "0.1.0"
 dependencies = [
- "owning_ref",
- "spin 0.9.0",
+ "dereffer",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -307,7 +306,8 @@ dependencies = [
  "memory",
  "qp-trie",
  "serde",
- "spin 0.9.0",
+ "spin 0.9.4",
+ "static_assertions",
  "str_ref",
  "xmas-elf",
 ]
@@ -343,7 +343,7 @@ dependencies = [
  "mod_mgmt",
  "path",
  "qp-trie",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -387,6 +387,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "dereffer"
+version = "0.1.0"
+
+[[package]]
 name = "derive_more"
 version = "0.99.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -409,7 +413,7 @@ dependencies = [
  "color",
  "framebuffer",
  "shapes",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -429,16 +433,6 @@ name = "either"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3be565ca5c557d7f59e7cfcf1844f9e3033650c929c6566f511e8005f205c1d0"
-
-[[package]]
-name = "entryflags_x86_64"
-version = "0.1.0"
-dependencies = [
- "bitflags",
- "multiboot2",
- "static_assertions",
- "xmas-elf",
-]
 
 [[package]]
 name = "environment"
@@ -467,7 +461,7 @@ dependencies = [
  "locked_idt",
  "memory",
  "mod_mgmt",
- "spin 0.9.0",
+ "spin 0.9.4",
  "tss",
  "vga_buffer",
  "x86_64",
@@ -479,7 +473,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -489,6 +483,7 @@ dependencies = [
  "acpi_table",
  "memory",
  "sdt",
+ "static_assertions",
  "zerocopy",
 ]
 
@@ -529,7 +524,7 @@ dependencies = [
 name = "font"
 version = "0.1.0"
 dependencies = [
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -540,7 +535,7 @@ dependencies = [
  "kernel_config",
  "log",
  "memory_structs",
- "spin 0.9.0",
+ "spin 0.9.4",
  "static_assertions",
 ]
 
@@ -552,7 +547,7 @@ dependencies = [
  "log",
  "memory",
  "multicore_bringup",
- "owning_ref",
+ "page_attribute_table",
  "shapes",
  "zerocopy",
 ]
@@ -565,7 +560,7 @@ dependencies = [
  "framebuffer",
  "hashbrown",
  "shapes",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -593,7 +588,7 @@ dependencies = [
  "lazy_static",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -605,7 +600,7 @@ dependencies = [
  "bitflags",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
  "tss",
  "x86_64",
 ]
@@ -656,7 +651,7 @@ dependencies = [
  "kernel_config",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -667,9 +662,9 @@ dependencies = [
  "kernel_config",
  "log",
  "memory",
- "owning_ref",
  "sdt",
- "spin 0.9.0",
+ "spin 0.9.4",
+ "static_assertions",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -687,7 +682,7 @@ dependencies = [
  "pic",
  "scheduler",
  "sleep",
- "spin 0.9.0",
+ "spin 0.9.4",
  "tss",
  "vga_buffer",
  "x86_64",
@@ -711,7 +706,7 @@ dependencies = [
  "lazy_static",
  "lockable",
  "log",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -721,8 +716,7 @@ dependencies = [
  "atomic_linked_list",
  "log",
  "memory",
- "owning_ref",
- "spin 0.9.0",
+ "spin 0.9.4",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -735,8 +729,7 @@ dependencies = [
  "irq_safety",
  "log",
  "memory",
- "owning_ref",
- "spin 0.9.0",
+ "spin 0.9.4",
  "static_assertions",
  "volatile 0.2.7",
  "zerocopy",
@@ -748,7 +741,7 @@ version = "0.1.1"
 source = "git+https://github.com/theseus-os/irq_safety#4908fbb38aca1513572e0b4c7a98884390ef361a"
 dependencies = [
  "owning_ref",
- "spin 0.9.0",
+ "spin 0.9.4",
  "stable_deref_trait",
 ]
 
@@ -770,6 +763,7 @@ name = "keycodes_ascii"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "num_enum",
 ]
 
 [[package]]
@@ -829,7 +823,7 @@ name = "lockable"
 version = "0.1.0"
 dependencies = [
  "irq_safety",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -856,7 +850,7 @@ dependencies = [
  "irq_safety",
  "log",
  "serial_port_basic",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -870,6 +864,7 @@ dependencies = [
  "memory",
  "pic",
  "sdt",
+ "static_assertions",
  "zerocopy",
 ]
 
@@ -888,7 +883,7 @@ dependencies = [
  "irq_safety",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -915,9 +910,12 @@ dependencies = [
  "memory_structs",
  "memory_x86_64",
  "multiboot2",
+ "no_drop",
+ "owned_borrowed_trait",
  "page_allocator",
  "page_table_entry",
- "spin 0.9.0",
+ "pte_flags",
+ "spin 0.9.4",
  "x86_64",
  "xmas-elf",
  "zerocopy",
@@ -929,11 +927,8 @@ version = "0.1.0"
 dependencies = [
  "bit_field 0.7.0",
  "derive_more",
- "entryflags_x86_64",
  "kernel_config",
- "multiboot2",
  "paste",
- "xmas-elf",
  "zerocopy",
 ]
 
@@ -941,11 +936,11 @@ dependencies = [
 name = "memory_x86_64"
 version = "0.1.0"
 dependencies = [
- "entryflags_x86_64",
  "kernel_config",
  "log",
  "memory_structs",
  "multiboot2",
+ "pte_flags",
  "x86_64",
 ]
 
@@ -973,10 +968,31 @@ dependencies = [
  "root",
  "rustc-demangle",
  "serde",
- "spin 0.9.0",
+ "spin 0.9.4",
  "util",
  "vfs_node",
  "xmas-elf",
+]
+
+[[package]]
+name = "modular-bitfield"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a53d79ba8304ac1c4f9eb3b9d281f21f7be9d4626f72ce7df4ad8fbde4f38a74"
+dependencies = [
+ "modular-bitfield-impl",
+ "static_assertions",
+]
+
+[[package]]
+name = "modular-bitfield-impl"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a7d5f7076603ebc68de2dc6a650ec331a062a13abaa346975be747bbfa4b789"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -989,13 +1005,16 @@ dependencies = [
  "mouse_data",
  "mpmc",
  "ps2",
- "spin 0.9.0",
+ "spin 0.9.4",
  "x86_64",
 ]
 
 [[package]]
 name = "mouse_data"
 version = "0.1.0"
+dependencies = [
+ "modular-bitfield",
+]
 
 [[package]]
 name = "mpmc"
@@ -1030,7 +1049,7 @@ dependencies = [
  "mod_mgmt",
  "pause",
  "pit_clock_basic",
- "spin 0.9.0",
+ "spin 0.9.4",
  "stack",
  "volatile 0.2.7",
  "zerocopy",
@@ -1041,10 +1060,8 @@ name = "mutex_preemption"
 version = "0.1.0"
 dependencies = [
  "lockable",
- "owning_ref",
  "preemption",
- "spin 0.9.0",
- "stable_deref_trait",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1057,6 +1074,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "no_drop"
+version = "0.1.0"
+
+[[package]]
 name = "num-traits"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1066,17 +1087,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "num_enum"
+version = "0.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf5395665662ef45796a4ff5486c5d41d29e0c09640af4c5f17fd94ee2c119c9"
+dependencies = [
+ "num_enum_derive",
+]
+
+[[package]]
+name = "num_enum_derive"
+version = "0.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b0498641e53dd6ac1a4f22547548caa6864cc4933784319cd1775271c5a46ce"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
 
 [[package]]
+name = "owned_borrowed_trait"
+version = "0.1.0"
+
+[[package]]
 name = "owning_ref"
 version = "0.4.1"
 source = "git+https://github.com/theseus-os/owning-ref-rs#0d2dcdcffd75b80157d0e72fb82593a8696a9c49"
 dependencies = [
- "spin 0.9.0",
+ "spin 0.9.4",
  "stable_deref_trait",
 ]
 
@@ -1088,8 +1133,20 @@ dependencies = [
  "kernel_config",
  "log",
  "memory_structs",
- "spin 0.9.0",
+ "spin 0.9.4",
  "static_assertions",
+]
+
+[[package]]
+name = "page_attribute_table"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "memory",
+ "modular-bitfield",
+ "msr",
+ "raw-cpuid",
+ "x86_64",
 ]
 
 [[package]]
@@ -1100,6 +1157,7 @@ dependencies = [
  "frame_allocator",
  "kernel_config",
  "memory_structs",
+ "pte_flags",
  "zerocopy",
 ]
 
@@ -1144,7 +1202,7 @@ dependencies = [
  "lazy_static",
  "log",
  "root",
- "spin 0.9.0",
+ "spin 0.9.4",
  "vfs_node",
 ]
 
@@ -1166,7 +1224,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "port_io",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1194,7 +1252,7 @@ dependencies = [
  "dfqueue",
  "event_types",
  "log",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1211,8 +1269,19 @@ name = "ps2"
 version = "0.1.0"
 dependencies = [
  "log",
+ "modular-bitfield",
+ "num_enum",
  "port_io",
- "spin 0.9.0",
+ "spin 0.9.4",
+]
+
+[[package]]
+name = "pte_flags"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "cfg-if 1.0.0",
+ "static_assertions",
 ]
 
 [[package]]
@@ -1237,7 +1306,7 @@ dependencies = [
 [[package]]
 name = "rangemap"
 version = "1.0.3"
-source = "git+https://github.com/jeffparsons/rangemap#0885c58aca1bbe124a03f2b74c3a792fef8611fa"
+source = "git+https://github.com/jeffparsons/rangemap#8b290d474bae680531bfba42e545e4d0121b70fd"
 
 [[package]]
 name = "raw-cpuid"
@@ -1255,7 +1324,7 @@ dependencies = [
  "fs_node",
  "lazy_static",
  "log",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1263,7 +1332,7 @@ name = "rsdp"
 version = "0.1.0"
 dependencies = [
  "memory",
- "owning_ref",
+ "static_assertions",
  "zerocopy",
 ]
 
@@ -1358,7 +1427,7 @@ dependencies = [
  "scheduler_priority",
  "scheduler_realtime",
  "scheduler_round_robin",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
 ]
 
@@ -1369,7 +1438,7 @@ dependencies = [
  "log",
  "runqueue",
  "runqueue_priority",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
 ]
 
@@ -1389,7 +1458,7 @@ dependencies = [
  "log",
  "runqueue",
  "runqueue_round_robin",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
 ]
 
@@ -1457,7 +1526,7 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "port_io",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1499,12 +1568,13 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
+ "no_drop",
  "path",
  "pause",
  "preemption",
  "runqueue",
  "scheduler",
- "spin 0.9.0",
+ "spin 0.9.4",
  "stack",
  "task",
  "thread_local_macro",
@@ -1518,8 +1588,9 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 
 [[package]]
 name = "spin"
-version = "0.9.0"
-source = "git+https://github.com/theseus-os/spin-rs#f6ffb27cb15ba30bc088c477550cb600db25a3a3"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f6002a767bff9e83f8eeecf883ecb8011875a21ae8da43bffb817a57e78cc09"
 dependencies = [
  "lock_api",
 ]
@@ -1529,7 +1600,7 @@ name = "stable_deref_trait"
 version = "1.1.1"
 source = "git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin#e006c79280042e27c4f16c7d29633eb2273752ee"
 dependencies = [
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1541,7 +1612,7 @@ dependencies = [
  "memory",
  "memory_structs",
  "page_allocator",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1575,7 +1646,7 @@ version = "0.1.0"
 dependencies = [
  "core2",
  "keycodes_ascii",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1618,9 +1689,10 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
+ "no_drop",
  "preemption",
  "root",
- "spin 0.9.0",
+ "spin 0.9.4",
  "stack",
  "static_assertions",
  "tss",
@@ -1637,7 +1709,7 @@ dependencies = [
  "framebuffer",
  "framebuffer_printer",
  "shapes",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1645,18 +1717,6 @@ name = "thread_local_macro"
 version = "0.1.0"
 dependencies = [
  "static_assertions",
-]
-
-[[package]]
-name = "tlb_shootdown"
-version = "0.1.0"
-dependencies = [
- "apic",
- "irq_safety",
- "log",
- "memory",
- "pause",
- "x86_64",
 ]
 
 [[package]]
@@ -1674,7 +1734,7 @@ dependencies = [
  "memchr",
  "memory",
  "panic_entry",
- "spin 0.9.0",
+ "spin 0.9.4",
  "task",
 ]
 
@@ -1694,7 +1754,7 @@ dependencies = [
  "atomic_linked_list",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
  "x86_64",
 ]
 
@@ -1750,7 +1810,7 @@ dependencies = [
  "fs_node",
  "log",
  "memory",
- "spin 0.9.0",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -1759,7 +1819,7 @@ version = "0.1.0"
 dependencies = [
  "kernel_config",
  "logger",
- "spin 0.9.0",
+ "spin 0.9.4",
  "volatile 0.2.7",
 ]
 
@@ -1794,17 +1854,17 @@ name = "window"
 version = "0.1.0"
 dependencies = [
  "color",
+ "dereffer",
  "event_types",
  "framebuffer",
  "framebuffer_drawer",
  "log",
  "mouse",
  "mpmc",
- "owning_ref",
  "path",
  "shapes",
  "spawn",
- "spin 0.9.0",
+ "spin 0.9.4",
  "window_inner",
  "window_manager",
 ]
@@ -1840,7 +1900,7 @@ dependencies = [
  "scheduler",
  "shapes",
  "spawn",
- "spin 0.9.0",
+ "spin 0.9.4",
  "window_inner",
 ]
 

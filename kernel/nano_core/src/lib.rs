@@ -41,6 +41,7 @@ use core::ops::DerefMut;
 use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
 use serial_port_basic::{take_serial_port, SerialPortAddress};
+use memory::PhysicalAddress;
 
 /// Used to obtain information about this build of Theseus.
 mod build_info {
@@ -130,6 +131,16 @@ pub extern "C" fn nano_core_start(
     );
     println_raw!("nano_core_start(): booted via multiboot2 with boot info at {:#X}.", multiboot_information_virtual_address); 
 
+    let rsdp_address = boot_info
+        .rsdp_v2_tag()
+        .map(|tag| tag.signature())
+        .or_else(|| boot_info.rsdp_v1_tag().map(|tag| tag.signature()))
+        .and_then(|utf8_result| utf8_result.ok())
+        .map(|signature| signature as *const _ as *const () as usize)
+        .and_then(|rsdp_address| PhysicalAddress::new(rsdp_address));
+
+    println_raw!("nano_core_start(): bootloader-provided RSDP address: {:X?}", rsdp_address);
+
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     let (
         kernel_mmi_ref,
@@ -214,7 +225,7 @@ pub extern "C" fn nano_core_start(
     println_raw!("nano_core_start(): invoking the captain...");     
     #[cfg(not(loadable))] {
         try_exit!(
-            captain::init(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end)
+            captain::init(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, rsdp_address)
         );
     }
     #[cfg(loadable)] {
@@ -229,11 +240,11 @@ pub extern "C" fn nano_core_start(
         );
         info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section.name);
 
-        type CaptainInitFunc = fn(MmiRef, NoDrop<Vec<MappedPages>>, NoDrop<stack::Stack>, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
+        type CaptainInitFunc = fn(MmiRef, NoDrop<Vec<MappedPages>>, NoDrop<stack::Stack>, VirtualAddress, VirtualAddress, Option<PhysicalAddress>) -> Result<(), &'static str>;
         let func: &CaptainInitFunc = try_exit!(unsafe { section.as_func() });
 
         try_exit!(
-            func(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end)
+            func(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, rsdp_address)
         );
     }
 

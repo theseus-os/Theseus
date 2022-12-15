@@ -230,11 +230,11 @@ impl ReceiveQueue {
                 .ok_or("Couldn't obtain a ReceiveBuffer from the pool")
                 .or_else(|_e| {
                     create_contiguous_mapping(buffer_size as usize, NIC_MAPPING_FLAGS)
-                        .map(|(buf_mapped, buf_paddr)| 
+                        .and_then(|(buf_mapped, buf_paddr)|
                             ReceiveBuffer::new(buf_mapped, buf_paddr, buffer_size as u16, mem_pool)
                         )
                 })?;
-            let paddr_buf = rx_buf.phys_addr;
+            let paddr_buf = rx_buf.phys_addr();
             rx_bufs_in_use.push(rx_buf); 
 
             wqe.update_buffer_info(self.lkey.0, paddr_buf, self.buffer_size_bytes); 

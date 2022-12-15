@@ -5,7 +5,7 @@ description = "Tests the wait queue functionality of Theseus with multiple tasks
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 
 [dependencies]
-spin = "0.9.0"
+spin = "0.9.4"
 
 [dependencies.log]
 version = "0.4.8"

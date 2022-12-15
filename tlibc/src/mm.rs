@@ -1,6 +1,6 @@
 use libc::{c_void, c_int, size_t, off_t};
-use libc::{MAP_FAILED, PROT_READ, PROT_WRITE};
-use memory::{MappedPages, EntryFlags};
+use libc::{MAP_FAILED, PROT_READ, PROT_WRITE, PROT_EXEC};
+use memory::{MappedPages, PteFlags};
 use errno::*;
 
 use alloc::{
@@ -72,7 +72,7 @@ pub unsafe extern "C" fn mmap(
             memory::allocate_pages_by_bytes(len).ok_or("out of virtual memory")
         }?;
 
-        let flags = entry_flags_from_prot(prot);
+        let flags = pte_flags_from_prot(prot);
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("Theseus memory subsystem not yet initialized.")?;
         let mp = kernel_mmi_ref.lock().page_table.map_allocated_pages(pages, flags)?;
 
@@ -116,24 +116,12 @@ pub unsafe extern "C" fn munmap(addr: *mut c_void, len: size_t) -> c_int {
 
 
 
-fn entry_flags_from_prot(prot: c_int) -> EntryFlags {
-    let mut flags = EntryFlags::empty();
-
-    if prot & PROT_READ != 0 {
-        // Theseus currently treats the PRESENT flag as readable.
-        flags.insert(EntryFlags::PRESENT);
-    }
-    if prot & PROT_WRITE != 0 {
-        flags.insert(EntryFlags::WRITABLE);
-    }
-    // Don't set the NO_EXECUTE flag if the protection flags were executable.
-    if prot & PROT_READ == 0 {
-        flags.insert(EntryFlags::NO_EXECUTE);
-    }
-
-    flags
+fn pte_flags_from_prot(prot: c_int) -> PteFlags {
+    PteFlags::new()
+        .valid(prot & PROT_READ != 0)
+        .writable(prot & PROT_WRITE != 0)
+        .executable(prot & PROT_EXEC != 0)
 }
-
 
 /// Returns the index of the MappedPages object in [`MAPPINGS`]
 /// that contains the given `base` address, if any.

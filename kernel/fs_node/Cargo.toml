@@ -6,7 +6,7 @@ description = "defines the traits for File and Directory. These files and direct
 
 
 [dependencies]
-spin = "0.9.0"
+spin = "0.9.4"
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]

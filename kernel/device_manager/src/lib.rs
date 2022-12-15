@@ -25,6 +25,7 @@ extern crate io;
 extern crate core2;
 #[macro_use] extern crate derive_more;
 extern crate mlx5;
+extern crate net;
 
 use core::convert::TryFrom;
 use mpmc::Queue;
@@ -36,6 +37,7 @@ use alloc::vec::Vec;
 use io::{ByteReaderWriterWrapper, LockableIo, ReaderWriter};
 use serial_port::{SerialPortAddress, take_serial_port_basic};
 use storage_manager::StorageDevice;
+use memory::PhysicalAddress;
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
 /// TODO: use DHCP to acquire an IP address.
@@ -50,13 +52,16 @@ const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slir
 /// This includes:
 /// * local APICs ([`apic`]),
 /// * [`acpi`] tables for system configuration info, including the IOAPIC.
-pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
+pub fn early_init(
+    rsdp_address: Option<PhysicalAddress>,
+    kernel_mmi: &mut MemoryManagementInfo
+) -> Result<(), &'static str> {
     // First, initialize the local APIC hardware such that we can populate
     // and initialize each LocalAPIC discovered in the ACPI table initialization routine below.
     apic::init();
     
     // Then, parse the ACPI tables to acquire system configuration info.
-    acpi::init(&mut kernel_mmi.page_table)?;
+    acpi::init(rsdp_address, &mut kernel_mmi.page_table)?;
 
     Ok(())
 }
@@ -96,6 +101,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
     init_serial_port(SerialPortAddress::COM1);
     init_serial_port(SerialPortAddress::COM2);
 
+    ps2_controller::init()?;
     keyboard::init(key_producer)?;
     mouse::init(mouse_producer)?;
 
@@ -135,9 +141,12 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
         if dev.class == 0x02 && dev.subclass == 0x00 {
             if dev.vendor_id == e1000::INTEL_VEND && dev.device_id == e1000::E1000_DEV {
                 info!("e1000 PCI device found at: {:?}", dev.location);
-                let e1000_nic_ref = e1000::E1000Nic::init(dev)?;
-                let e1000_interface = EthernetNetworkInterface::new_ipv4_interface(e1000_nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
+                let nic = e1000::E1000Nic::init(dev)?;
+                net::register_device(nic);
+
+                let e1000_interface = EthernetNetworkInterface::new_ipv4_interface(nic, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
                 add_to_network_interfaces(e1000_interface);
+                
                 continue;
             }
             if dev.vendor_id == ixgbe::INTEL_VEND && dev.device_id == ixgbe::INTEL_82599 {

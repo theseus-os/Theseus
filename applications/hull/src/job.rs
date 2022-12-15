@@ -49,7 +49,7 @@ impl Job {
             if part.state == State::Running {
                 match part.task.runstate() {
                     RunState::Exited => {
-                        let exit_value = match part.task.take_exit_value().unwrap() {
+                        let exit_value = match part.task.retrieve_exit_value().unwrap() {
                             ExitValue::Completed(status) => {
                                 match status.downcast_ref::<isize>() {
                                     Some(num) => *num,

@@ -49,7 +49,7 @@ impl ContextRegular {
     /// Sets the value of the first register to the given `value`.
     /// 
     /// This is useful for storing a value (e.g., task ID) in that register
-    /// and then recovering it later with [`ContextRegular::read_first_reg()`].
+    /// and then recovering it later with [`read_first_register()`].
     /// 
     /// On x86_64, this sets the `r15` register.
     pub fn set_first_register(&mut self, value: usize) {
@@ -61,7 +61,7 @@ impl ContextRegular {
 /// 
 /// This can be called at any time, but is intended for use as the second half
 /// of "saving and restoring" a register value.
-/// The first half was a previous call to [`ContextRegular::set_first_reg()`],
+/// The first half was a previous call to [`ContextRegular::set_first_register()`],
 /// and the second half is a call to this function immediately after the original
 /// `ContextRegular` has been used for switching to a new task for the first time.
 /// 

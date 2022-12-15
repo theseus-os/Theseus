@@ -23,7 +23,6 @@ use core::{
     fmt,
     ops::Deref,
 };
-use spin::Mutex;
 use alloc::{
     borrow::Cow,
     collections::BTreeSet,
@@ -31,8 +30,9 @@ use alloc::{
     sync::Arc,
     vec::Vec,
 };
+use spin::Mutex;
 use hashbrown::HashMap;
-use memory::{EntryFlags, MmiRef};
+use memory::MmiRef;
 use fs_node::{FsNode, FileOrDir, FileRef, DirRef};
 use mod_mgmt::{
     CrateNamespace,
@@ -428,7 +428,7 @@ pub fn swap_crates(
                         let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
                         let target_sec_initial_flags = target_sec_mapped_pages.flags();
                         if !target_sec_initial_flags.is_writable() {
-                            target_sec_mapped_pages.remap(&mut kernel_mmi_ref.lock().page_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
+                            target_sec_mapped_pages.remap(&mut kernel_mmi_ref.lock().page_table, target_sec_initial_flags.writable(true))?;
                         }
 
                         write_relocation(
@@ -911,7 +911,7 @@ impl SwapRequest {
     /// 
     ///    Note that `old_crate_name` can be any string prefix, so long as it can uniquely identify a crate object file
     ///    in the given `old_namespace` or any of its recursive namespaces. 
-    ///    Thus, to be more accurate, it is wise to specify a full crate name with hash, e.g., "my_crate-<hash>".
+    ///    Thus, to be more accurate, it is wise to specify a full crate name with hash, e.g., `"my_crate-<hash>"`.
     /// 
     /// * `old_namespace`: the `CrateNamespace` that contains the old crate;
     ///    that old crate and its symbols will be removed from this namespace. 

@@ -132,7 +132,6 @@ fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
 
     for t in &tasks {
         t.join()?;
-        let _ = t.take_exit_value();
     }
 
     let end = hpet.get_counter();
@@ -191,7 +190,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
 
     // cleanup the dummy task we created earlier
     taskref.mark_as_exited(Box::new(0usize))?;
-    taskref.take_exit_value();
+    taskref.join()?;
     
     Ok(())
 }
