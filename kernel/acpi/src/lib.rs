@@ -79,6 +79,14 @@ pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
         let acpi_tables = ACPI_TABLES.lock();
         if let Some(hpet_table) = hpet::HpetAcpiTable::get(&acpi_tables) {
             hpet_table.init_hpet(page_table)?;
+            let period = time::Period::new(
+                hpet::get_hpet()
+                    // Initialisation succedeed so this cannot fail.
+                    .expect("couldn't get HPET")
+                    .counter_period_femtoseconds()
+                    .into(),
+            );
+            time::register_clock_source::<hpet::Hpet>(period);
         } else {
             warn!("This machine has no HPET.");
         }
