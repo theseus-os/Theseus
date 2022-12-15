@@ -59,7 +59,7 @@ where
     fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         self.task.set_waker(context.waker().clone());
         if self.is_finished() {
-            Poll::Ready(match self.task.take_exit_value() {
+            Poll::Ready(match self.task.retrieve_exit_value() {
                 Some(exit_value) => match exit_value {
                     ExitValue::Completed(value) => {
                         // SAFETY: The task ran block_on which returns a T.

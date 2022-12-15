@@ -176,12 +176,7 @@ impl Mapper {
     {
         let frames = frames.into_inner();
         let flags = flags.into();
-        let top_level_flags = flags.valid(true)
-            // P4, P3, and P2 entries should never set NOT_EXECUTABLE; only the lowest-level P1 entry should.
-            .executable(true)
-            // Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
-            // because another page table frame may re-use (create another alias for) it without us knowing here.
-            .exclusive(false);
+        let higher_level_flags = flags.adjust_for_higher_level_pte();
 
         // Only the lowest-level P1 entry can be considered exclusive, and only when
         // we are mapping it exclusively (i.e., owned `AllocatedFrames` are passed in).
@@ -200,9 +195,9 @@ impl Mapper {
 
         // iterate over pages and frames in lockstep
         for (page, frame) in pages.deref().clone().into_iter().zip(frames.borrow().into_iter()) {
-            let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags);
-            let p2 = p3.next_table_create(page.p3_index(), top_level_flags);
-            let p1 = p2.next_table_create(page.p2_index(), top_level_flags);
+            let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
+            let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
+            let p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
 
             if !p1[page.p1_index()].is_unused() {
                 error!("map_allocated_pages_to(): page {:#X} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
@@ -253,16 +248,10 @@ impl Mapper {
         flags: F,
     ) -> Result<MappedPages, &'static str> {
         let flags = flags.into();
-        let top_level_flags = flags
-        // P4, P3, and P2 entries should never set NOT_EXECUTABLE; only the lowest-level P1 entry should.
-            .executable(true)
-            // Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
-            // because another page table frame may re-use (create another alias for) it without us knowing here.
-            .exclusive(false)
-            .valid(true);
+        let higher_level_flags = flags.adjust_for_higher_level_pte();
 
-        // Only the lowest-level P1 entry can be considered exclusive, and only when
-        // we are mapping it exclusively (i.e., owned `AllocatedFrames` are passed in).
+        // Only the lowest-level P1 entry can be considered exclusive, and only because
+        // we are mapping it exclusively (to owned `AllocatedFrames`).
         let actual_flags = flags
             .exclusive(true)
             .valid(true);
@@ -270,9 +259,9 @@ impl Mapper {
         for page in pages.deref().clone() {
             let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
 
-            let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags);
-            let p2 = p3.next_table_create(page.p3_index(), top_level_flags);
-            let p1 = p2.next_table_create(page.p2_index(), top_level_flags);
+            let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
+            let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
+            let p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
 
             if !p1[page.p1_index()].is_unused() {
                 error!("map_allocated_pages(): page {:#X} -> frame {:#X}, page was already in use!",
@@ -957,22 +946,6 @@ impl Drop for MappedPages {
         // Note that the AllocatedPages will automatically be dropped here too,
         // we do not need to call anything to make that happen.
     }
-}
-
-
-// Exposing private functions to the spillful mapper for benchmarking purposes.
-#[cfg(mapper_spillful)]
-pub fn mapped_pages_unmap(
-    mapped_pages: &mut MappedPages,
-    mapper: &mut Mapper,
-) -> Result<(), &'static str> {
-    mapped_pages.unmap(mapper)?;
-    Ok(())
-}
-
-#[cfg(mapper_spillful)]
-pub fn mapper_from_current() -> Mapper {
-    Mapper::from_current()
 }
 
 

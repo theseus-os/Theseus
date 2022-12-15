@@ -117,7 +117,7 @@ pub const MODULE_PREFIX_DELIMITER: &'static str = "#";
 /// A crate's name and its hash are separated by "-", i.e., "my_crate-hash".
 pub const CRATE_HASH_DELIMITER: &'static str = "-";
 /// A section's demangled name and its hash are separated by "::h", 
-/// e.g., "my_crate::section_name::h<hash>".
+/// e.g., `"my_crate::section_name::h<hash>"`.
 pub const SECTION_HASH_DELIMITER: &'static str = "::h";
 
 

@@ -102,8 +102,6 @@ fn test_multiple(iterations: usize) -> Result<(), &'static str> {
     t1.join()?;
     t2.join()?;
     info!("test_multiple(): Joined the sender and receiver tasks.");
-    let _t1_exit = t1.take_exit_value();
-    let _t2_exit = t2.take_exit_value();
     
     Ok(())
 }

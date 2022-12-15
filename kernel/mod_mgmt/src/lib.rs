@@ -32,7 +32,7 @@ pub const NAMESPACES_DIRECTORY_NAME: &'static str = "namespaces";
 
 /// The name of the directory that contains all other "extra_files" contents.
 pub const EXTRA_FILES_DIRECTORY_NAME: &'static str = "extra_files";
-const EXTRA_FILES_DIRECTORY_DELIMITER: char = '?';
+const EXTRA_FILES_DIRECTORY_DELIMITER: char = '!';
 
 /// The initial `CrateNamespace` that all kernel crates are added to by default.
 static INITIAL_KERNEL_NAMESPACE: Once<Arc<CrateNamespace>> = Once::new();
@@ -231,9 +231,9 @@ fn parse_bootloader_modules_into_files(
 /// (files that exist as areas of pre-loaded memory).
 /// 
 /// Their file paths are encoded by flattening directory hierarchies into a the file name,
-/// using `'?'` (question marks) to replace the directory delimiter `'/'`.
+/// using `'!'` (exclamation marks) to replace the directory delimiter `'/'`.
 /// 
-/// Thus, for example, a file named `"foo?bar?me?test.txt"` will be placed at the path
+/// Thus, for example, a file named `"foo!bar!me!test.txt"` will be placed at the path
 /// `/extra_files/foo/bar/me/test.txt`.
 fn parse_extra_file(
     extra_file_name: &str,

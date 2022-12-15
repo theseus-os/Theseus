@@ -6,7 +6,7 @@ description = "An implementation of in-memory files, backed by heap memory"
 
 
 [dependencies]
-spin = "0.9.0"
+spin = "0.9.4"
 
 [dependencies.fs_node]
 path = "../fs_node"

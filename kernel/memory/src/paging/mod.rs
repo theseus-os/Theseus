@@ -9,11 +9,7 @@
 
 mod temporary_page;
 mod mapper;
-#[cfg(not(mapper_spillful))]
 mod table;
-#[cfg(mapper_spillful)]
-pub mod table;
-
 
 pub use page_table_entry::PageTableEntry;
 pub use self::{
@@ -238,7 +234,8 @@ pub fn init(
     debug!("{:X?}\n{:X?}", aggregated_section_memory_bounds, _sections_memory_bounds);
     
     // bootstrap a PageTable from the currently-loaded page table
-    let current_active_p4 = frame_allocator::allocate_frames_at(aggregated_section_memory_bounds.page_table.start.1, 1)?;
+    let current_active_p4 = frame_allocator::allocate_frames_at(get_current_p4().start_address(), 1)
+        .map_err(|_| "Failed to allocate frame for initial page table; is it merged with another section?")?;
     let mut page_table = PageTable::from_current(current_active_p4)?;
     debug!("Bootstrapped initial {:?}", page_table);
 

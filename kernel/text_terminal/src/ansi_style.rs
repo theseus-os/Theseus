@@ -574,6 +574,8 @@ impl StatusReportCommands {
     pub const DeviceStatusRequest: u8 = b'5';
 
     /// The response to a [`DeviceStatusRequest`] indicating the terminal device is Ok.
+    ///
+    /// [`DeviceStatusRequest`]: Self::DeviceStatusRequest
     pub const DeviceStatusOk: u8 = b'0';
 
     /// (CSR) Queries the terminal device for a cursor position report.

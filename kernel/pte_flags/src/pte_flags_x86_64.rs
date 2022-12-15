@@ -5,7 +5,7 @@ use bitflags::bitflags;
 use static_assertions::const_assert_eq;
 
 /// A mask for the bits of a page table entry that contain the physical frame address.
-pub const PTE_FRAME_MASK: u64 = 0x000_FFFFFFFFFF_000;
+pub const PTE_FRAME_MASK: u64 = 0x000F_FFFF_FFFF_F000;
 
 // Ensure that we never expose reserved bits [12:51] as part of the `PteFlagsX86_64` interface.
 const_assert_eq!(PteFlagsX86_64::all().bits() & PTE_FRAME_MASK, 0);
@@ -49,7 +49,8 @@ bitflags! {
         /// the least-significant bit of the 3-bit index into the Page Attribute Table;
         /// that index is used to determine the PAT entry that holds the
         /// memory caching type that is applied to this page.
-        const _WRITE_THROUGH     = 1 << 3;
+        const WRITE_THROUGH      = 1 << 3;
+        const PAT_BIT0           = Self::WRITE_THROUGH.bits;
 
         /// * If set, this page's content is never cached, neither for read nor writes. 
         /// * If not set, this page's content is cached as normal, both for read nor writes. 
@@ -61,6 +62,7 @@ bitflags! {
         const CACHE_DISABLE      = 1 << 4;
         /// An alias for [`Self::CACHE_DISABLE`] in order to ease compatibility with aarch64.
         const DEVICE_MEMORY      = Self::CACHE_DISABLE.bits;
+        const PAT_BIT1           = Self::CACHE_DISABLE.bits;
 
         /// * The hardware will set this bit when the page is accessed.
         /// * The OS can then clear this bit once it has acknowledged that the page was accessed,
@@ -88,7 +90,7 @@ bitflags! {
         /// memory caching type that is applied to this page.
         /// 
         /// This *cannot* be used for PAT index bits in a mid-level (P2 or P3) entry.
-        const PAT_FOR_P1         = 1 <<  7;
+        const PAT_BIT2_FOR_P1    = 1 <<  7;
 
         /// * If set, this page is mapped identically across all address spaces
         ///   (all root page tables) and doesn't need to be flushed out of the TLB
@@ -109,7 +111,7 @@ bitflags! {
         // /// memory caching type that is applied to this page.
         // /// 
         // /// This *cannot* be used for PAT index bits in a lowest-level (P1) PTE.
-        // const PAT_FOR_P2_P3      = 1 << 12;
+        // const PAT_BIT2_FOR_P2_P3 = 1 << 12;
 
         /// See [PteFlags::EXCLUSIVE].
         ///  We use bit 55 because it is available for custom OS usage on both x86_64 and aarch64.
@@ -128,6 +130,7 @@ impl Default for PteFlagsX86_64 {
     }
 }
 
+/// Functions common to PTE flags on all architectures.
 impl PteFlagsX86_64 {
     /// Returns a new `PteFlagsX86_64` with the default value, in which
     /// only the `NOT_EXECUTABLE` bit is set.
@@ -250,13 +253,70 @@ impl PteFlagsX86_64 {
         self.contains(Self::ACCESSED)
     }
 
+    pub const fn is_exclusive(&self) -> bool {
+        self.contains(Self::EXCLUSIVE)
+    }
+}
+
+const BIT_0: u8 = 1 << 0;
+const BIT_1: u8 = 1 << 1;
+const BIT_2: u8 = 1 << 2;
+
+/// Functions specific to x86_64 PTE flags only.
+impl PteFlagsX86_64 {
+    /// Returns a copy of this `PteFlagsX86_64` with its flags adjusted
+    /// for use in a higher-level page table entry, e.g., P4, P3, P2.
+    ///
+    /// Currently, on x86_64, this does the following:
+    /// * Clears the `NOT_EXECUTABLE` bit.  
+    ///   * P4, P3, and P2 entries should never set `NOT_EXECUTABLE`,
+    ///     only the lowest-level P1 entry should.
+    /// * Clears the `EXCLUSIVE` bit.
+    ///   * Currently, we do not use the `EXCLUSIVE` bit for P4, P3, or P2 entries,
+    ///     because another page table frame may re-use it (create another alias to it)
+    ///     without our page table implementation knowing about it.
+    ///   * Only P1-level PTEs can map a frame exclusively.
+    /// * Clears the PAT index value, as we only support PAT on P1-level PTEs.
+    /// * Sets the `VALID` bit, as every P4, P3, and P2 entry must be valid.
+    #[must_use]
+    pub fn adjust_for_higher_level_pte(self) -> Self {
+        self.executable(true)
+            .exclusive(false)
+            .pat_index(0)
+            .valid(true)
+    }
+
+    /// Returns a copy of this `PteFlagsX86_64` with the PAT index bits
+    /// set to the value specifying the given `pat_slot`.
+    ///
+    /// This sets the following bits:
+    /// * [`PteFlagsX86_64::PAT_BIT0`] = Bit 0 of `pat_slot`
+    /// * [`PteFlagsX86_64::PAT_BIT1`] = Bit 1 of `pat_slot`
+    /// * [`PteFlagsX86_64::PAT_BIT2_FOR_P1`] = Bit 2 of `pat_slot`
+    ///
+    /// The other bits `[3:7]` of `pat_slot` are ignored.
+    #[must_use]
+    #[doc(alias("PAT", "page attribute table", "slot"))]
+    pub fn pat_index(mut self, pat_slot: u8) -> Self {
+        self.set(Self::PAT_BIT0,        pat_slot & BIT_0 == BIT_0);
+        self.set(Self::PAT_BIT1,        pat_slot & BIT_1 == BIT_1);
+        self.set(Self::PAT_BIT2_FOR_P1, pat_slot & BIT_2 == BIT_2);
+        self
+    }
+
+    #[doc(alias("PAT", "page attribute table", "slot"))]
+    pub fn get_pat_index(&self) -> u8 {
+        let mut pat_index = 0;
+        if self.contains(Self::PAT_BIT0)        { pat_index |= BIT_0; }
+        if self.contains(Self::PAT_BIT1)        { pat_index |= BIT_1; }
+        if self.contains(Self::PAT_BIT2_FOR_P1) { pat_index |= BIT_2; }
+        pat_index
+    }
+
     pub const fn is_huge(&self) -> bool {
         self.contains(Self::HUGE_PAGE)
     }
 
-    pub const fn is_exclusive(&self) -> bool {
-        self.contains(Self::EXCLUSIVE)
-    }
 }
 
 impl From<PteFlags> for PteFlagsX86_64 {
