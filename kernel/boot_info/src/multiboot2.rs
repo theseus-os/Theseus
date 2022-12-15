@@ -45,7 +45,22 @@ impl crate::ElfSection for multiboot2::ElfSection {
     }
 
     fn flags(&self) -> ElfSectionFlags {
-        ElfSectionFlags::from_bits_truncate(multiboot2::ElfSection::flags(self).bits())
+        let mut boot_info_flags = ElfSectionFlags::empty();
+        let flags = multiboot2::ElfSection::flags(self);
+
+        if flags.contains(multiboot2::ElfSectionFlags::WRITABLE) {
+            boot_info_flags |= ElfSectionFlags::WRITABLE;
+        }
+
+        if flags.contains(multiboot2::ElfSectionFlags::ALLOCATED) {
+            boot_info_flags |= ElfSectionFlags::ALLOCATED;
+        }
+
+        if flags.contains(multiboot2::ElfSectionFlags::EXECUTABLE) {
+            boot_info_flags |= ElfSectionFlags::EXECUTABLE;
+        }
+
+        boot_info_flags
     }
 }
 
