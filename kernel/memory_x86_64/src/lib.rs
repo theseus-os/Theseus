@@ -46,14 +46,12 @@ pub struct SectionMemoryBounds {
 /// * The `data` section bounds cover those that are writable (.data, .bss).
 /// 
 /// It also contains:
-/// * The `page_table` section bounds cover the initial page table's top-level (root) P4 frame. 
 /// * The `stack` section bounds cover the initial stack, which are maintained separately.
 #[derive(Debug)]
 pub struct AggregatedSectionMemoryBounds {
    pub text:        SectionMemoryBounds,
    pub rodata:      SectionMemoryBounds,
    pub data:        SectionMemoryBounds,
-   pub page_table:  SectionMemoryBounds,
    pub stack:       SectionMemoryBounds,
 }
 
@@ -75,8 +73,6 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
     let mut data_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut stack_start:       Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut stack_end:         Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut page_table_start:  Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut page_table_end:    Option<(VirtualAddress, PhysicalAddress)> = None;
 
     let mut text_flags:        Option<PteFlags> = None;
     let mut rodata_flags:      Option<PteFlags> = None;
@@ -187,9 +183,8 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
                 "nano_core .bss"
             }
             ".page_table" => {
-                page_table_start = Some((start_virt_addr, start_phys_addr));
-                page_table_end   = Some((end_virt_addr, end_phys_addr));
-                "initial page_table"
+                // We bootstrap the page table from the CR3 register.
+                continue;
             }
             ".stack" => {
                 stack_start = Some((start_virt_addr, start_phys_addr));
@@ -219,8 +214,6 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
     let rodata_end         = rodata_end       .ok_or("Couldn't find end of .rodata section")?;
     let data_start         = data_start       .ok_or("Couldn't find start of .data section")?;
     let data_end           = data_end         .ok_or("Couldn't find start of .data section")?;
-    let page_table_start   = page_table_start .ok_or("Couldn't find start of .page_table section")?;
-    let page_table_end     = page_table_end   .ok_or("Couldn't find start of .page_table section")?;
     let stack_start        = stack_start      .ok_or("Couldn't find start of .stack section")?;
     let stack_end          = stack_end        .ok_or("Couldn't find start of .stack section")?;
      
@@ -243,11 +236,6 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
         end: data_end,
         flags: data_flags,
     };
-    let page_table = SectionMemoryBounds {
-        start: page_table_start,
-        end: page_table_end,
-        flags: data_flags, // same flags as data sections
-    };
     let stack = SectionMemoryBounds {
         start: stack_start,
         end: stack_end,
@@ -258,7 +246,6 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
         text,
         rodata,
         data,
-        page_table,
         stack,
     };
     Ok((aggregated_sections_memory_bounds, sections_memory_bounds))
