@@ -8,7 +8,7 @@ extern crate task;
 extern crate spawn;
 extern crate scheduler;
 extern crate wait_condition;
-extern crate apic;
+extern crate multicore;
 
 // use core::sync::atomic::{Ordering, AtomicBool};
 use alloc::{
