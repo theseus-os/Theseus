@@ -113,15 +113,15 @@ fn compile_asm() {
 
     for file in include_path
         .read_dir()
-        .unwrap_or_else(|| panic!("failed to open dir: {}", include_path.display()))
+        .unwrap_or_else(|_| panic!("failed to open dir: {}", include_path.display()))
         .chain(
-            asm_path.read_dir().unwrap_or_else(|| panic!("failed to open asm dir: {}", asm_path.display()))
+            asm_path.read_dir().unwrap_or_else(|_| panic!("failed to open asm dir: {}", asm_path.display()))
         )
     {
         let file = file.expect("failed to read asm file");
         if file
             .file_type()
-            .unwrap_or_else(|| panic!("couldn't get file type of {:?}", file))
+            .unwrap_or_else(|_| panic!("couldn't get file type of {:?}", file))
             .is_file()
         {
             assert_eq!(file.path().extension(), Some("asm".as_ref()),
