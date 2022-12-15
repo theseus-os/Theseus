@@ -7,7 +7,7 @@ const EMIT_BUILT_RS_FILE: bool = false;
 /// when it transforms them into environment variables.
 const CARGO_CFG_PREFIX: &str = "CARGO_CFG_";
 
-const SPECIFICATION: &str = "bios";
+const BOOT_SPECIFICATION: &str = "bios";
 
 /// The set of built-in environment variables defined by cargo.
 static NON_CUSTOM_CFGS: [&str; 12] = [
@@ -92,7 +92,7 @@ fn compile_asm() {
         Err(_) => std::env::temp_dir(),
     }
     .join("compiled_asm")
-    .join(SPECIFICATION);
+    .join(BOOT_SPECIFICATION);
     if let Err(e) = std::fs::create_dir_all(&out_dir) {
         if e.kind() != std::io::ErrorKind::AlreadyExists {
             panic!("failed to create compiled_asm directory: {}", e);
@@ -103,21 +103,30 @@ fn compile_asm() {
         .join("asm");
 
     println!("cargo:rerun-if-changed={}", include_path.display());
-    // TODO: This recompiles the assembly files every time.
+    // Note: the below line causes the assembly files to be re-compiled on every nano_core build.
+    //       This is currently favored because it is fast and avoids the need for a `make clean`.
     println!("cargo:rerun-if-changed={}", out_dir.display());
 
-    let asm_path = include_path.join(SPECIFICATION);
+    let asm_path = include_path.join(BOOT_SPECIFICATION);
 
     let cflags = env::var("THESEUS_CFLAGS").unwrap_or_default();
 
     for file in include_path
         .read_dir()
-        .expect("failed to open include directory")
-        .chain(asm_path.read_dir().expect("failed to open asm directory"))
+        .unwrap_or_else(|| panic!("failed to open dir: {}", include_path.display()))
+        .chain(
+            asm_path.read_dir().unwrap_or_else(|| panic!("failed to open asm dir: {}", asm_path.display()))
+        )
     {
         let file = file.expect("failed to read asm file");
-        if file.file_type().expect("couldn't get file type").is_file() {
-            assert_eq!(file.path().extension(), Some("asm".as_ref()));
+        if file
+            .file_type()
+            .unwrap_or_else(|| panic!("couldn't get file type of {:?}", file))
+            .is_file()
+        {
+            assert_eq!(file.path().extension(), Some("asm".as_ref()),
+                "File {:?} did not have '.asm' extension", file.path(),
+            );
 
             let mut output_path = out_dir.join(file.path().file_name().unwrap());
             assert!(output_path.set_extension("o"));
