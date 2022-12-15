@@ -1,12 +1,16 @@
 [package]
 name = "framebuffer"
 version = "0.1.0"
-authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Wenqiu Yu <yuwenqiuj@gmail.com>"]
 description = "a framebuffer is a buffer of pixels which can be composited to another framebuffer or be mapped to some physical memory"
+edition = "2021"
 
 [dependencies]
 log = "0.4.8"
 zerocopy = "0.5.0"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+page_attribute_table = { path = "../page_attribute_table" }
 
 [dependencies.memory]
 path = "../memory"

@@ -70,10 +70,10 @@ pub fn dhcp_request_packet() -> Result<(), &'static str> {
         0x37, 0x04, 0x01, 0x03, 0x06, 0x2a, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ];
     let mut transmit_buffer = TransmitBuffer::new(packet.len() as u16)?;
-    { 
-        let buffer: &mut [u8] = transmit_buffer.as_slice_mut(0, 314)?;
+    {
+        let buffer = &mut transmit_buffer;
         buffer.copy_from_slice(&packet);
     }
-    let mut e1000_nc = E1000_NIC.get().ok_or("e1000 NIC hasn't been initialized yet")?.lock();
-    e1000_nc.send_packet(transmit_buffer)
+    let mut e1000_nic = E1000_NIC.get().ok_or("e1000 NIC hasn't been initialized yet")?.lock();
+    e1000_nic.send_packet(transmit_buffer)
 }

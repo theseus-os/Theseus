@@ -38,7 +38,7 @@ use heapfile::HeapFile;
 use path::Path;
 use fs_node::{DirRef, FileOrDir, FileRef};
 use libtest::*;
-use memory::{create_mapping, EntryFlags};
+use memory::{create_mapping, PteFlags};
 use getopts::Options;
 use mod_mgmt::crate_name_from_path;
 
@@ -341,7 +341,6 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, _child_core: u8) -> Re
 	        .spawn()?;
 
 	    child.join()?;
-	    child.take_exit_value().ok_or("Couldn't retrieve exit value")?;
 	    end_hpet = hpet.get_counter();
 		delta_hpet += end_hpet - start_hpet - overhead_ct;		
 	}
@@ -429,10 +428,6 @@ fn do_ctx_inner(th: usize, nr: usize, child_core: u8) -> Result<u64, &'static st
 		taskref3.join()?;
 		taskref4.join()?;
 
-		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
-		taskref4.take_exit_value().ok_or("could not retrieve exit value")?;
-
-
 	overhead_end_hpet = hpet.get_counter();
 
 	// we then spawn them with yielding enabled
@@ -449,9 +444,6 @@ fn do_ctx_inner(th: usize, nr: usize, child_core: u8) -> Result<u64, &'static st
 
 		taskref1.join()?;
 		taskref2.join()?;
-
-		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
-		taskref2.take_exit_value().ok_or("could not retrieve exit value")?;
 
     end_hpet = hpet.get_counter();
 
@@ -514,7 +506,7 @@ fn do_memory_map_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'
 	start_hpet = hpet.get_counter();
 
 	for _ in 0..ITERATIONS{
-		let mapping = create_mapping(MAPPING_SIZE, EntryFlags::WRITABLE)?;
+		let mapping = create_mapping(MAPPING_SIZE, PteFlags::new().writable(true))?;
 		// write 0xFF to the first byte as lmbench does
 		unsafe{ *(mapping.start_address().value() as *mut u8)  = 0xFF; }
 		drop(mapping);
@@ -606,7 +598,6 @@ fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>) -> Resu
 		}
 		
 		taskref3.join()?;
-		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let overhead = hpet.get_counter();
 
@@ -632,7 +623,6 @@ fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>) -> Resu
 		rendezvous_task_receiver((sender2, receiver1));
 
 		taskref1.join()?;
-		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let end = hpet.get_counter();
 
@@ -673,7 +663,6 @@ fn do_ipc_rendezvous_inner_cycles(th: usize, nr: usize, child_core: Option<u8>) 
 		}
 		
 		taskref3.join()?;
-		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let overhead = counter.diff();
 	counter.start()?;
@@ -700,7 +689,6 @@ fn do_ipc_rendezvous_inner_cycles(th: usize, nr: usize, child_core: Option<u8>) 
 		rendezvous_task_receiver((sender2, receiver1));
 
 		taskref1.join()?;
-		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let end = counter.end()?;
 
@@ -812,7 +800,6 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 		}
 		
 		taskref3.join()?;
-		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let overhead = hpet.get_counter();
 
@@ -841,7 +828,6 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 		receiver_task((sender2, receiver1));
 
 		taskref1.join()?;
-		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let end = hpet.get_counter();
 
@@ -888,7 +874,6 @@ fn do_ipc_async_inner_cycles(th: usize, nr: usize, child_core: Option<u8>, block
 		}
 		
 		taskref3.join()?;
-		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let overhead = counter.diff();
 	counter.start()?;
@@ -918,7 +903,6 @@ fn do_ipc_async_inner_cycles(th: usize, nr: usize, child_core: Option<u8>, block
 		receiver_task((sender2, receiver1));
 
 		taskref1.join()?;
-		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let end = counter.end()?;
 
@@ -1049,7 +1033,6 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u
 		}
 		
 		taskref3.join()?;
-		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let overhead = hpet.get_counter();
 
@@ -1075,7 +1058,6 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u
 		simple_task_receiver((sender2, receiver1));
 
 		taskref1.join()?;
-		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let end = hpet.get_counter();
 
@@ -1116,7 +1098,6 @@ fn do_ipc_simple_inner_cycles(th: usize, nr: usize, child_core: Option<u8>) -> R
 		}
 		
 		taskref3.join()?;
-		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let overhead = counter.diff();
 	counter.start()?;
@@ -1143,7 +1124,6 @@ fn do_ipc_simple_inner_cycles(th: usize, nr: usize, child_core: Option<u8>) -> R
 		simple_task_receiver((sender2, receiver1));
 
 		taskref1.join()?;
-		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let end = counter.end()?;
 		

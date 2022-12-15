@@ -9,11 +9,7 @@
 
 mod temporary_page;
 mod mapper;
-#[cfg(not(mapper_spillful))]
 mod table;
-#[cfg(mapper_spillful)]
-pub mod table;
-
 
 pub use page_table_entry::PageTableEntry;
 pub use self::{
@@ -28,10 +24,12 @@ use core::{
     ops::{Deref, DerefMut},
     fmt,
 };
+use log::debug;
 use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
-    AllocatedPages, allocate_pages, AllocatedFrames, EntryFlags,
+    AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
     tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
     get_vga_mem_addr, KERNEL_OFFSET};
+use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;
 use kernel_config::memory::{RECURSIVE_P4_INDEX};
 // use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
@@ -101,7 +99,10 @@ impl PageTable {
         let mut temporary_page = TemporaryPage::create_and_map_table_frame(page, new_p4_frame, current_page_table)?;
         temporary_page.with_table_and_frame(|table, frame| {
             table.zero();
-            table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            table[RECURSIVE_P4_INDEX].set_entry(
+                frame.as_allocated_frame(),
+                PteFlagsArch::new().valid(true).writable(true),
+            );
         })?;
 
         let (_temp_page, inited_new_p4_frame) = temporary_page.unmap_into_parts(current_page_table)?;
@@ -136,7 +137,10 @@ impl PageTable {
         let mut temporary_page = TemporaryPage::create_and_map_table_frame(None, this_p4, self)?;
 
         // overwrite recursive mapping
-        self.p4_mut()[RECURSIVE_P4_INDEX].set_entry(other_table.p4_table.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
+        self.p4_mut()[RECURSIVE_P4_INDEX].set_entry(
+            other_table.p4_table.as_allocated_frame(),
+            PteFlagsArch::new().valid(true).writable(true),
+        );
         tlb_flush_all();
 
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
@@ -150,7 +154,10 @@ impl PageTable {
 
         // restore recursive mapping to original p4 table
         temporary_page.with_table_and_frame(|p4_table, frame| {
-            p4_table[RECURSIVE_P4_INDEX].set_entry(frame.as_allocated_frame(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
+            p4_table[RECURSIVE_P4_INDEX].set_entry(
+                frame.as_allocated_frame(),
+                PteFlagsArch::new().valid(true).writable(true),
+            );
         })?;
         tlb_flush_all();
 
@@ -227,7 +234,8 @@ pub fn init(
     debug!("{:X?}\n{:X?}", aggregated_section_memory_bounds, _sections_memory_bounds);
     
     // bootstrap a PageTable from the currently-loaded page table
-    let current_active_p4 = frame_allocator::allocate_frames_at(aggregated_section_memory_bounds.page_table.start.1, 1)?;
+    let current_active_p4 = frame_allocator::allocate_frames_at(get_current_p4().start_address(), 1)
+        .map_err(|_| "Failed to allocate frame for initial page table; is it merged with another section?")?;
     let mut page_table = PageTable::from_current(current_active_p4)?;
     debug!("Bootstrapped initial {:?}", page_table);
 
@@ -343,7 +351,7 @@ pub fn init(
         boot_info_mapped_pages = Some(mapper.map_allocated_pages_to(
             boot_info_pages,
             boot_info_frames,
-            EntryFlags::PRESENT,
+            PteFlags::new(),
         )?);
 
         debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[..index]);

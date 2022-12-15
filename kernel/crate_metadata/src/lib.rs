@@ -57,13 +57,12 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use memory::{MappedPages, VirtualAddress, EntryFlags};
-#[cfg(internal_deps)]
-use memory::PageTable;
+use memory::{MappedPages, VirtualAddress, PteFlags};
 use cow_arc::{CowArc, CowWeak};
 use fs_node::{FileRef, WeakFileRef};
 use hashbrown::HashMap;
 use goblin::elf::reloc::*;
+use static_assertions::const_assert;
 
 pub use str_ref::StrRef;
 pub use crate_metadata_serde::{
@@ -90,11 +89,25 @@ pub type StrongSectionRef  = Arc<LoadedSection>;
 pub type WeakSectionRef = Weak<LoadedSection>;
 
 /// `.text` sections are read-only and executable.
-pub const TEXT_SECTION_FLAGS:     EntryFlags = EntryFlags::PRESENT;
+pub const TEXT_SECTION_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    (PteFlags::new().bits() | PteFlags::VALID.bits())
+    & !PteFlags::NOT_EXECUTABLE.bits() // clear the no-exec bits
+);
 /// `.rodata` sections are read-only and non-executable.
-pub const RODATA_SECTION_FLAGS:   EntryFlags = EntryFlags::from_bits_truncate(EntryFlags::PRESENT.bits() | EntryFlags::NO_EXECUTE.bits());
+pub const RODATA_SECTION_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    (PteFlags::new().bits() | PteFlags::VALID.bits())
+    & !PteFlags::WRITABLE.bits()
+);
 /// `.data` and `.bss` sections are read-write and non-executable.
-pub const DATA_BSS_SECTION_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(EntryFlags::PRESENT.bits() | EntryFlags::NO_EXECUTE.bits() | EntryFlags::WRITABLE.bits());
+pub const DATA_BSS_SECTION_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    (PteFlags::new().bits() | PteFlags::VALID.bits())
+    | PteFlags::WRITABLE.bits()
+);
+
+// Double-check section flags were defined correctly.
+const_assert!(TEXT_SECTION_FLAGS.is_executable() && !TEXT_SECTION_FLAGS.is_writable());
+const_assert!(!RODATA_SECTION_FLAGS.is_writable() && !RODATA_SECTION_FLAGS.is_executable());
+const_assert!(DATA_BSS_SECTION_FLAGS.is_writable() && !DATA_BSS_SECTION_FLAGS.is_executable());
 
 
 /// The Theseus Makefile appends prefixes onto bootloader module names,
@@ -104,7 +117,7 @@ pub const MODULE_PREFIX_DELIMITER: &'static str = "#";
 /// A crate's name and its hash are separated by "-", i.e., "my_crate-hash".
 pub const CRATE_HASH_DELIMITER: &'static str = "-";
 /// A section's demangled name and its hash are separated by "::h", 
-/// e.g., "my_crate::section_name::h<hash>".
+/// e.g., `"my_crate::section_name::h<hash>"`.
 pub const SECTION_HASH_DELIMITER: &'static str = "::h";
 
 
@@ -379,19 +392,19 @@ impl LoadedCrate {
     #[cfg(internal_deps)]
     pub fn deep_copy(
         &self, 
-        page_table: &mut PageTable, 
+        page_table: &mut memory::PageTable, 
     ) -> Result<StrongCrateRef, &'static str> {
 
         // This closure deep copies the given mapped_pages (mapping them as WRITABLE)
         // and recalculates the the range of addresses covered by the new mapping.
-        let mut deep_copy_mp = |old_mp_range: &(Arc<Mutex<MappedPages>>, Range<VirtualAddress>), flags: EntryFlags|
+        let mut deep_copy_mp = |old_mp_range: &(Arc<Mutex<MappedPages>>, Range<VirtualAddress>), flags: PteFlags|
             -> Result<(Arc<Mutex<MappedPages>>, Range<VirtualAddress>), &'static str> 
         {
             let old_mp_locked = old_mp_range.0.lock();
             let old_start_address = old_mp_range.1.start.value();
             let size = old_mp_range.1.end.value() - old_start_address;
             let offset = old_start_address - old_mp_locked.start_address().value();
-            let new_mp = old_mp_range.0.lock().deep_copy(Some(flags | EntryFlags::WRITABLE), page_table)?;
+            let new_mp = old_mp_range.0.lock().deep_copy(page_table, Some(flags.writable(true)))?;
             let new_start_address = new_mp.start_address() + offset;
             Ok((Arc::new(Mutex::new(new_mp)), new_start_address .. (new_start_address + size)))
         };
@@ -523,7 +536,7 @@ impl LoadedCrate {
                         strong_dep.relocation, 
                         new_sec_slice, 
                         new_sec_mapped_pages_offset,
-                        source_sec.start_address(),
+                        source_sec.virt_addr,
                         true
                     )?;
 
@@ -549,10 +562,10 @@ impl LoadedCrate {
                 // to ensure that we don't cause deadlock by trying to lock the same section twice.
                 let source_sec_vaddr = if Arc::ptr_eq(source_sec, new_sec) {
                     // here: the source_sec and new_sec are the same, so just use the already-locked new_sec
-                    new_sec.start_address()
+                    new_sec.virt_addr
                 } else {
                     // here: the source_sec and new_sec are different, so we can go ahead and safely lock the source_sec
-                    source_sec.start_address()
+                    source_sec.virt_addr
                 };
                 write_relocation(
                     internal_dep.relocation, 

@@ -6,17 +6,12 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-bit_field = "0.7.0"
 zerocopy = "0.5.0"
 
-[dependencies.kernel_config]
-path = "../kernel_config"
-
-[dependencies.memory_structs]
-path = "../memory_structs"
-
-[dependencies.frame_allocator]
-path = "../frame_allocator"
+frame_allocator = { path = "../frame_allocator" }
+memory_structs = { path = "../memory_structs" }
+kernel_config = { path = "../kernel_config" }
+pte_flags = { path = "../pte_flags" }
 
 [lib]
 crate-type = ["rlib"]

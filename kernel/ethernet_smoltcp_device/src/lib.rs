@@ -234,11 +234,7 @@ impl<N: NetworkInterfaceCard + 'static> smoltcp::phy::TxToken for TxToken<N> {
         })?;
 
         let closure_retval = {
-            let txbuf_byte_slice = txbuf.as_slice_mut::<u8>(0, len).map_err(|e| {
-                error!("EthernetDevice::transmit(): couldn't convert TransmitBuffer of length {} into byte slice, error {:?}", len, e);
-                smoltcp::Error::Exhausted
-            })?;
-            f(txbuf_byte_slice)?
+            f(&mut txbuf)?
         };
         self.nic_ref.lock()
             .send_packet(txbuf)
@@ -265,12 +261,6 @@ impl smoltcp::phy::RxToken for RxToken {
             smoltcp::Error::Exhausted
         })?;
 
-        let first_buf_len = first_buf.length as usize;
-        let slice_mut: &mut [u8] = first_buf.mp.as_slice_mut(0, first_buf_len).map_err(|e| {
-            error!("EthernetDevice::receive(): couldn't convert receive buffer of length {} into byte slice, error {:?}", first_buf_len, e);
-            smoltcp::Error::Exhausted
-        })?;
-
-        f(slice_mut)
+        f(first_buf)
     }
 }

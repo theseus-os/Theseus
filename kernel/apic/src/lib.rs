@@ -8,7 +8,7 @@ use spin::Once;
 use raw_cpuid::CpuId;
 use msr::*;
 use irq_safety::RwLockIrqSafe;
-use memory::{PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages, allocate_frames_at, AllocatedFrames, BorrowedMappedPages, Mutable};
+use memory::{PageTable, PhysicalAddress, PteFlags, MappedPages, allocate_pages, allocate_frames_at, AllocatedFrames, BorrowedMappedPages, Mutable};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
 use crossbeam_utils::atomic::AtomicCell;
@@ -158,7 +158,7 @@ fn map_apic(page_table: &mut PageTable) -> Result<MappedPages, &'static str> {
             page_table,
             new_page,
             frame,
-            EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
+            PteFlags::new().valid(true).writable(true).device_memory(true),
         )
     }
 }
@@ -354,7 +354,7 @@ impl LocalApic {
     /// * `processor_id`: the processor ID specified in the ACPI `Madt` table.
     ///    This value is currently unused in Theseus.
     /// * `expected_apic_id`: the expected APIC ID as specified in the ACPI `Madt` table.
-    ///    * If `Some`, the APIC's own ID (given by [`LocalApic::id()`]) *must* match this value,
+    ///    * If `Some`, the APIC's own ID (given by [`LocalApic::read_apic_id()`]) *must* match this value,
     ///      otherwise an error will be returned.
     ///    * If `None`, the local APIC will determine its own ID value, and no check is performed.
     /// * `should_be_bsp`: whether or not this CPU is expected to be the BSP.
@@ -613,7 +613,7 @@ impl LocalApic {
 
     /// Returns the ID of this Local APIC (fast).
     /// 
-    /// Unlike [`read_apic_id()`], this does not read any hardware registers.
+    /// Unlike [`LocalApic::read_apic_id()`], this does not read any hardware registers.
     pub fn apic_id(&self) -> u8 { self.apic_id }
 
     /// Reads the hardware-provided ID of this Local APIC from its registers (slow).

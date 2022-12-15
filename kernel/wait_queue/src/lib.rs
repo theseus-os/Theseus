@@ -21,8 +21,8 @@ impl WaitGuard {
     /// Blocks the given `Task` and returns a new `WaitGuard` object
     /// that will automatically unblock that Task when it is dropped. 
     ///
-    /// Returns an error if the task cannot be blocked. See [`Task::block`] for
-    ///  more details.
+    /// Returns an error if the task cannot be blocked;
+    /// see [`task::Task::block()`] for more details.
     pub fn new(task: TaskRef) -> Result<WaitGuard, RunState> {
         task.block()?;
         Ok(WaitGuard { task })
@@ -31,8 +31,8 @@ impl WaitGuard {
     /// Blocks the task guarded by this waitguard,
     /// which is useful to re-block a task after it spuriously woke up. 
     ///
-    /// Returns an error if the task cannot be blocked. See [`Task::block`] for
-    ///  more details.
+    /// Returns an error if the task cannot be blocked;
+    /// see [`task::Task::block()`] for more details.
     pub fn block_again(&self) -> Result<RunState, RunState> {
         self.task.block()
     }

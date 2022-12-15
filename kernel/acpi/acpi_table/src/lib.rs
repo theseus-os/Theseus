@@ -14,7 +14,7 @@ extern crate sdt;
 extern crate zerocopy;
 
 use alloc::collections::BTreeMap;
-use memory::{MappedPages, allocate_pages, allocate_frames_at, PageTable, EntryFlags, PhysicalAddress, Frame, FrameRange};
+use memory::{MappedPages, allocate_pages, allocate_frames_at, PageTable, PteFlags, PhysicalAddress, Frame, FrameRange};
 use sdt::Sdt;
 use core::ops::Add;
 use zerocopy::FromBytes;
@@ -89,7 +89,7 @@ impl AcpiTables {
             let new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 
                 af,
-                EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE,
+                PteFlags::new().valid(true).writable(true),
             )?;
 
             self.adjust_mapping_offsets(new_frames, new_mapped_pages);
@@ -114,7 +114,7 @@ impl AcpiTables {
             let new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 
                 af,
-                EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE,
+                PteFlags::new().valid(true).writable(true),
             )?;
 
             self.adjust_mapping_offsets(new_frames, new_mapped_pages);
@@ -142,7 +142,7 @@ impl AcpiTables {
             let new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 
                 af,
-                EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE,
+                PteFlags::new().valid(true).writable(true),
             )?;
             // No real need to adjust mapping offsets here, since we've only appended frames (not prepended);
             // we call this just to set the new frames and new mapped pages

@@ -66,11 +66,6 @@ pub fn do_shbench() -> Result<(), &'static str> {
 
         let end = hpet.get_counter() - hpet_overhead;
 
-        // Don't want this to be part of the timing measurement
-        for thread in threads {
-            thread.take_exit_value();
-        }
-
         let diff = hpet_2_us(end - start);
         println!("[{}] shbench time: {} us", try, diff);
         tries.push(diff);

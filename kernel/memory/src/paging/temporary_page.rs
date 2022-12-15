@@ -8,11 +8,14 @@
 // except according to those terms.
 
 use core::mem::ManuallyDrop;
+use log::error;
 use super::{
     AllocatedPages, AllocatedFrames, PageTable, MappedPages, VirtualAddress,
     table::{Table, Level1},
 };
+use pte_flags::PteFlagsArch;
 use kernel_config::memory::{TEMPORARY_PAGE_VIRT_ADDR, PAGE_SIZE};
+use owned_borrowed_trait::Owned;
 
 
 /// A page that can be temporarily mapped to the recursive page table frame,
@@ -56,8 +59,8 @@ impl TemporaryPage {
         }
         let (mapped_page, frame) = page_table.internal_map_to(
             page.ok_or("Couldn't allocate a new Page for the temporary P4 table frame")?,
-            frame,
-            super::EntryFlags::WRITABLE,
+            Owned(frame),
+            PteFlagsArch::new().valid(true).writable(true),
         )?;
         Ok(TemporaryPage {
             mapped_page,
