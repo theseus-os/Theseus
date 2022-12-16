@@ -11,6 +11,7 @@ var sourcesIndex = JSON.parse('{\
 "atomic_linked_list":["",[],["atomic_linked_list.rs","atomic_map.rs","lib.rs"]],\
 "block_allocator":["",[],["lib.rs"]],\
 "block_cache":["",[],["lib.rs"]],\
+"boot_info":["",[],["lib.rs","multiboot2.rs"]],\
 "bootloader_modules":["",[],["lib.rs"]],\
 "captain":["",[],["lib.rs"]],\
 "catch_unwind":["",[],["lib.rs"]],\

@@ -127,10 +127,6 @@
 <span id="127">127</span>
 <span id="128">128</span>
 <span id="129">129</span>
-<span id="130">130</span>
-<span id="131">131</span>
-<span id="132">132</span>
-<span id="133">133</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
@@ -140,12 +136,12 @@
 <span class="kw">extern crate </span>memory;
 <span class="kw">extern crate </span>stack;
 <span class="kw">extern crate </span>no_drop;
-<span class="kw">extern crate </span>multiboot2;
 <span class="kw">extern crate </span>bootloader_modules;
+<span class="kw">extern crate </span>boot_info;
 
-<span class="kw">use </span>memory::{MmiRef, MappedPages, VirtualAddress, PhysicalAddress};
+<span class="kw">use </span>memory::{MmiRef, MappedPages, VirtualAddress};
 <span class="kw">use </span>kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
-<span class="kw">use </span>multiboot2::BootInformation;
+<span class="kw">use </span>boot_info::{BootInformation, Module};
 <span class="kw">use </span>alloc::{
     string::String, 
     vec::Vec,
@@ -173,7 +169,7 @@
 ///     which must not be dropped until all AP (additional CPUs) are fully booted,
 ///     but *should* be dropped before starting the first user application.
 </span><span class="kw">pub fn </span>init_memory_management(
-    boot_info: BootInformation
+    boot_info: <span class="kw">impl </span>BootInformation
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(
         MmiRef,
         NoDrop&lt;MappedPages&gt;,
@@ -239,13 +235,9 @@
     <span class="comment">// Because bootloader modules may overlap with the actual boot information, 
     // we need to preserve those records here in a separate list,
     // such that we can unmap the boot info pages &amp; frames here but still access that info in the future.
-    </span><span class="kw">let </span>bootloader_modules: Vec&lt;BootloaderModule&gt; = boot_info.module_tags()
-        .map(|m| m.cmdline().map(|module_name| 
-            BootloaderModule::new(
-                PhysicalAddress::new_canonical(m.start_address() <span class="kw">as </span>usize),
-                PhysicalAddress::new_canonical(m.end_address()   <span class="kw">as </span>usize),
-                String::from(module_name),
-            )
+    </span><span class="kw">let </span>bootloader_modules: Vec&lt;BootloaderModule&gt; = boot_info.modules()
+        .map(|m| m.name().map(|module_name|
+            BootloaderModule::new(m.start(), m.start() + m.len(), String::from(module_name))
         ))
         .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;() <span class="comment">// collect the `Vec&lt;Result&lt;...&gt;&gt;` into `Result&lt;Vec&lt;...&gt;&gt;`
         </span>.map_err(|_e| <span class="string">&quot;BUG: Bootloader module had invalid non-UTF8 name (cmdline) string&quot;</span>)<span class="question-mark">?</span>;

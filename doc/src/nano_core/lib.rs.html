@@ -272,11 +272,6 @@
 <span id="272">272</span>
 <span id="273">273</span>
 <span id="274">274</span>
-<span id="275">275</span>
-<span id="276">276</span>
-<span id="277">277</span>
-<span id="278">278</span>
-<span id="279">279</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.
 //! 
 //! The `nano_core` is very simple, and only does the following things:
@@ -314,13 +309,14 @@
 <span class="kw">extern crate </span>panic_entry; <span class="comment">// contains required panic-related lang items
 </span><span class="attr">#[cfg(not(loadable))] </span><span class="kw">extern crate </span>captain;
 <span class="kw">extern crate </span>memory_initialization;
+<span class="kw">extern crate </span>boot_info;
 
 
 <span class="kw">use </span>core::ops::DerefMut;
 <span class="kw">use </span>memory::VirtualAddress;
 <span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
 <span class="kw">use </span>serial_port_basic::{take_serial_port, SerialPortAddress};
-<span class="kw">use </span>memory::PhysicalAddress;
+<span class="kw">use </span>boot_info::BootInformation;
 
 <span class="doccomment">/// Used to obtain information about this build of Theseus.
 </span><span class="kw">mod </span>build_info {
@@ -410,13 +406,7 @@
     );
     <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core_start(): booted via multiboot2 with boot info at {:#X}.&quot;</span>, multiboot_information_virtual_address); 
 
-    <span class="kw">let </span>rsdp_address = boot_info
-        .rsdp_v2_tag()
-        .map(|tag| tag.signature())
-        .or_else(|| boot_info.rsdp_v1_tag().map(|tag| tag.signature()))
-        .and_then(|utf8_result| utf8_result.ok())
-        .map(|signature| signature <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span><span class="kw-2">*const </span>() <span class="kw">as </span>usize)
-        .and_then(|rsdp_address| PhysicalAddress::new(rsdp_address));
+    <span class="kw">let </span>rsdp_address = boot_info.rsdp();
 
     <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core_start(): bootloader-provided RSDP address: {:X?}&quot;</span>, rsdp_address);
 
@@ -509,7 +499,7 @@
     }
     <span class="attr">#[cfg(loadable)] </span>{
         <span class="kw">use </span>alloc::vec::Vec;
-        <span class="kw">use </span>memory::{MmiRef, MappedPages};
+        <span class="kw">use </span>memory::{MmiRef, MappedPages, PhysicalMemory};
         <span class="kw">use </span>no_drop::NoDrop;
 
         <span class="kw">let </span>section = <span class="macro">try_exit!</span>(

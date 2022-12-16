@@ -385,6 +385,7 @@
 <span id="385">385</span>
 <span id="386">386</span>
 <span id="387">387</span>
+<span id="388">388</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -418,6 +419,7 @@
     get_vga_mem_addr, KERNEL_OFFSET};
 <span class="kw">use </span>pte_flags::PteFlagsArch;
 <span class="kw">use </span>no_drop::NoDrop;
+<span class="kw">use </span>boot_info::BootInformation;
 <span class="kw">use </span>kernel_config::memory::{RECURSIVE_P4_INDEX};
 <span class="comment">// use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
@@ -600,7 +602,7 @@
 ///
 /// Otherwise, it returns a str error message. 
 </span><span class="kw">pub fn </span>init(
-    boot_info: <span class="kw-2">&amp;</span>multiboot2::BootInformation,
+    boot_info: <span class="kw-2">&amp;</span><span class="kw">impl </span>BootInformation,
     into_alloc_frames_fn: <span class="kw">fn</span>(FrameRange) -&gt; AllocatedFrames,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(
         PageTable,
@@ -626,9 +628,9 @@
     <span class="kw">let </span><span class="kw-2">mut </span>page_table = PageTable::from_current(current_active_p4)<span class="question-mark">?</span>;
     <span class="macro">debug!</span>(<span class="string">&quot;Bootstrapped initial {:?}&quot;</span>, page_table);
 
-    <span class="kw">let </span>boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address()).ok_or(<span class="string">&quot;boot_info start virtual address was invalid&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>boot_info_start_vaddr = boot_info.start().ok_or(<span class="string">&quot;boot_info start virtual address was invalid&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or(<span class="string">&quot;Couldn&#39;t get boot_info start physical address&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>boot_info_size = boot_info.total_size();
+    <span class="kw">let </span>boot_info_size = boot_info.len();
     <span class="macro">debug!</span>(<span class="string">&quot;multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}\n&quot;</span>, boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
 
     <span class="kw">let </span>new_p4_frame = frame_allocator::allocate_frames(<span class="number">1</span>).ok_or(<span class="string">&quot;couldn&#39;t allocate frame for new page table&quot;</span>)<span class="question-mark">?</span>; 
