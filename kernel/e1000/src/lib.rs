@@ -24,19 +24,20 @@ extern crate nic_buffers;
 extern crate nic_queues;
 extern crate nic_initialization;
 extern crate net;
+extern crate deferred_interrupt_tasks;
+extern crate task;
 
 pub mod test_e1000_driver;
 mod regs;
 use regs::*;
 
 use spin::Once; 
-use alloc::vec::Vec;
-use alloc::collections::VecDeque;
+use alloc::{collections::VecDeque, format, sync::Arc, vec::Vec};
 use irq_safety::MutexIrqSafe;
 use memory::{PhysicalAddress, BorrowedMappedPages, BorrowedSliceMappedPages, Mutable};
 use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
-use interrupts::{eoi, register_interrupt};
+use interrupts::eoi;
 use x86_64::structures::idt::InterruptStackFrame;
 use network_interface_card:: NetworkInterfaceCard;
 use nic_initialization::{allocate_memory, init_rx_buf_pool, init_rx_queue, init_tx_queue};
@@ -142,7 +143,8 @@ pub struct E1000Nic {
     /// memory-mapped control registers
     regs: BorrowedMappedPages<E1000Registers, Mutable>,
     /// memory-mapped registers holding the MAC address
-    mac_regs: BorrowedMappedPages<E1000MacRegisters, Mutable>
+    mac_regs: BorrowedMappedPages<E1000MacRegisters, Mutable>,
+    deferred_task: Option<task::JoinableTaskRef>,
 }
 
 
@@ -171,6 +173,8 @@ impl NetworkInterfaceCard for E1000Nic {
 /// Functions that setup the NIC struct and handle the sending and receiving of packets.
 impl E1000Nic {
     /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
+    ///
+    /// `enable_interrupts` must be called after the NIC has been registered with the `net` subsystem.
     pub fn init(e1000_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<E1000Nic>, &'static str> {
         use interrupts::IRQ_BASE_OFFSET;
 
@@ -206,12 +210,6 @@ impl E1000Nic {
         //e1000_nc.clear_multicast();
         //e1000_nc.clear_statistics();
         
-        Self::enable_interrupts(&mut mapped_registers);
-        register_interrupt(interrupt_num, e1000_handler).map_err(|_handler_addr| {
-            error!("e1000 IRQ {:#X} was already in use by handler {:#X}! Sharing IRQs is currently unsupported.", interrupt_num, _handler_addr);
-            "e1000 interrupt number was already in use! Sharing IRQs is currently unsupported."
-        })?;
-
         // initialize the buffer pool
         init_rx_buf_pool(RX_BUFFER_POOL_SIZE, E1000_RX_BUFFER_SIZE_IN_BYTES, &RX_BUFFER_POOL)?;
 
@@ -250,13 +248,41 @@ impl E1000Nic {
             rx_queue: rxq,
             tx_queue: txq,
             regs: mapped_registers,
-            mac_regs: mac_registers
+            mac_regs: mac_registers,
+            deferred_task: None,
         };
         
         let nic_ref = E1000_NIC.call_once(|| MutexIrqSafe::new(e1000_nic));
         Ok(nic_ref)
     }
     
+    /// Enables interrupts.
+    ///
+    /// The provided interface must be the interface associated with the E1000
+    /// NIC, as it will be polled when an interrupt is received.
+    pub fn enable_interrupts(&mut self, interface: Arc<net::NetworkInterface>) -> Result<(), &'static str> {
+        //self.write_command(REG_IMASK ,0x1F6DC);
+        //self.write_command(REG_IMASK ,0xff & !4);
+
+        self.regs.ims.write(INT_LSC|INT_RX); //RXT and LSC
+        self.regs.icr.read(); // clear all interrupts
+
+        let deferred_task = deferred_interrupt_tasks::register_interrupt_handler(
+            self.interrupt_num,
+            e1000_handler,
+            poll_interface,
+            interface,
+            Some(format!("e1000_deferred_task_irq_{:#X}", self.interrupt_num)),
+        )
+        .map_err(|error| {
+            error!("error registering e1000 handler: {:?}", error);
+            "e1000 interrupt number was already in use! Sharing IRQs is currently unsupported."
+        })?;
+        self.deferred_task = Some(deferred_task);
+
+        Ok(())
+    }
+
     /// Allocates memory for the NIC and maps the E1000 Register struct to that memory area.
     /// Returns a reference to the E1000 Registers, tied to their backing `MappedPages`.
     /// 
@@ -376,15 +402,6 @@ impl E1000Nic {
         Ok(tx_descs)
     }       
     
-    /// Enable Interrupts 
-    fn enable_interrupts(regs: &mut E1000Registers) {
-        //self.write_command(REG_IMASK ,0x1F6DC);
-        //self.write_command(REG_IMASK ,0xff & !4);
-    
-        regs.ims.write(INT_LSC|INT_RX); //RXT and LSC
-        regs.icr.read(); // clear all interrupts
-    }      
-
     // reads status and clears interrupt
     fn clear_interrupt_status(&self) -> u32 {
         self.regs.icr.read()
@@ -413,6 +430,14 @@ impl E1000Nic {
 
         if !handled {
             error!("e1000::handle_interrupt(): unhandled interrupt!  status: {:#X}", status);
+        } else {
+            if let Some(ref deferred_task) = self.deferred_task {
+                let _ = deferred_task
+                    .unblock()
+                    .expect("BUG: e1000::handle_interrupt(): couldn't unblock deferred task");
+            } else {
+                error!("e1000::handle_interrupt(): no deferred task");
+            }
         }
         //regs.icr.read(); //clear interrupt
         Ok(())
@@ -451,4 +476,11 @@ extern "x86-interrupt" fn e1000_handler(_stack_frame: InterruptStackFrame) {
         error!("BUG: e1000_handler(): E1000 NIC hasn't yet been initialized!");
     }
 
+}
+
+/// This function is used as a deferred interrupt task.
+///
+/// After processing the interrupt, the network interface associated with the `e1000` NIC will be polled to process the received data.
+fn poll_interface(interface: &Arc<net::NetworkInterface>) -> Result<(), net::Error> {
+    interface.poll()
 }

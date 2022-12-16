@@ -62,6 +62,7 @@ pub type InterruptHandlerFunction = x86_64::structures::idt::HandlerFunc;
 
 
 /// The errors that may occur in [`register_interrupt_handler()`].
+#[derive(Debug)]
 pub enum InterruptRegistrationError {
     /// The given `irq` number was already in use and is registered to 
     /// the interrupt handler at the given `existing_handler_address`.
