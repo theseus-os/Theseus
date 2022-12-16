@@ -64,6 +64,7 @@ path = "../memory_initialization"
 
 [dependencies.boot_info]
 path = "../boot_info"
+features = ["multiboot2"]
 
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 
