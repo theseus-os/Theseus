@@ -593,17 +593,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cpu"
-version = "0.1.0"
-dependencies = [
- "apic",
- "getopts",
- "runqueue",
- "task",
- "terminal_print",
-]
-
-[[package]]
 name = "cranelift-entity"
 version = "0.77.0"
 dependencies = [
@@ -2823,6 +2812,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rq"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "getopts",
+ "runqueue",
+ "task",
+ "terminal_print",
+]
+
+[[package]]
 name = "rq_eval"
 version = "0.1.0"
 dependencies = [
@@ -3745,7 +3745,6 @@ dependencies = [
  "cat",
  "cd",
  "channel_eval",
- "cpu",
  "date",
  "deps",
  "example",
@@ -3769,6 +3768,7 @@ dependencies = [
  "ps",
  "pwd",
  "rm",
+ "rq",
  "rq_eval",
  "scheduler_eval",
  "shell",
