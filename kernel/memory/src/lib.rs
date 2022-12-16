@@ -38,6 +38,7 @@ pub use frame_allocator::{
 use memory_x86_64::{
     BootInformation, get_kernel_address, get_boot_info_mem_area, find_section_memory_bounds,
     get_vga_mem_addr, get_modules_address, tlb_flush_virt_addr, tlb_flush_all, get_p4,
+    set_as_active_page_table_root,
 };
 
 pub use pte_flags::*;

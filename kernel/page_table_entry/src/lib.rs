@@ -18,9 +18,6 @@ use zerocopy::FromBytes;
 use frame_allocator::AllocatedFrame;
 use pte_flags::{PteFlagsArch, PTE_FRAME_MASK};
 
-#[cfg(target_arch = "x86_64")]
-use {bit_field::BitField, kernel_config::memory::PAGE_SHIFT};
-
 /// A page table entry, which is a `u64` value under the hood.
 ///
 /// It contains a the physical address of the `Frame` being mapped by this entry
@@ -68,17 +65,7 @@ impl PageTableEntry {
 
     /// Returns this `PageTableEntry`'s flags.
     pub fn flags(&self) -> PteFlagsArch {
-        #[cfg(target_arch = "x86_64")]
-        {
-            PteFlagsArch::from_bits_truncate(self.0)
-        }
-
-        #[cfg(target_arch = "aarch64")]
-        {
-            let mut arch_flags = PteFlagsArch::from_bits_truncate(self.0);
-            arch_flags.remove(PteFlagsArch::PAGE_DESCRIPTOR);
-            arch_flags
-        }
+        PteFlagsArch::from_bits_truncate(self.0)
     }
 
     /// Returns the physical `Frame` pointed to (mapped by) this `PageTableEntry`.
@@ -93,19 +80,9 @@ impl PageTableEntry {
 
     /// Extracts the value of the frame referred to by this page table entry.
     fn frame_value(&self) -> Frame {
-        #[cfg(target_arch = "x86_64")]
-        {
-            let mut frame_paddr = self.0 as usize;
-            frame_paddr.set_bits(0 .. (PAGE_SHIFT as u8), 0);
-            Frame::containing_address(PhysicalAddress::new_canonical(frame_paddr))
-        }
-
-        #[cfg(target_arch = "aarch64")]
-        {
-            let mut frame_paddr = self.0 as usize;
-            frame_paddr &= PTE_FRAME_MASK as usize;
-            Frame::containing_address(PhysicalAddress::new_canonical(frame_paddr))
-        }
+        let mut frame_paddr = self.0 as usize;
+        frame_paddr &= PTE_FRAME_MASK as usize;
+        Frame::containing_address(PhysicalAddress::new_canonical(frame_paddr))
     }
 
     /// Sets this `PageTableEntry` to map the given `frame` with the given `flags`.
@@ -114,47 +91,15 @@ impl PageTableEntry {
     ///
     /// Note: this performs no checks about the current value of this page table entry.
     pub fn set_entry(&mut self, frame: AllocatedFrame, flags: PteFlagsArch) {
-        #[cfg(target_arch = "x86_64")]
-        {
-            self.0 = (frame.start_address().value() as u64) | flags.bits();
-        }
-
-        #[cfg(target_arch = "aarch64")]
-        {
-            let mut flags = flags;
-
-            // telling the MMU that this is not a Block Descriptor
-            flags.insert(PteFlagsArch::PAGE_DESCRIPTOR);
-
-            // we currently insert ACCESSED to avoid Access Faults
-            flags.insert(PteFlagsArch::ACCESSED);
-
-            self.0 = (frame.start_address().value() as u64) | flags.bits();
-        }
+        self.0 = (frame.start_address().value() as u64) | flags.bits();
     }
 
     /// Sets the flags components of this `PageTableEntry` to `new_flags`.
     ///
     /// This does not modify the frame part of the page table entry.
     pub fn set_flags(&mut self, new_flags: PteFlagsArch) {
-        #[cfg(target_arch = "x86_64")]
-        {
-            let only_flag_bits = new_flags.bits() & !PTE_FRAME_MASK;
-            self.0 = (self.0 & PTE_FRAME_MASK) | only_flag_bits;
-        }
-
-        #[cfg(target_arch = "aarch64")]
-        {
-            let mut new_flags = new_flags;
-
-            // telling the MMU that this is not a Block Descriptor
-            new_flags.insert(PteFlagsArch::PAGE_DESCRIPTOR);
-
-            // we currently insert ACCESSED to avoid Access Faults
-            new_flags.insert(PteFlagsArch::ACCESSED);
-
-            self.0 = self.0 & PTE_FRAME_MASK | new_flags.bits();
-        }
+        let only_flag_bits = new_flags.bits() & !PTE_FRAME_MASK;
+        self.0 = (self.0 & PTE_FRAME_MASK) | only_flag_bits;
     }
 
     pub fn value(&self) -> u64 {

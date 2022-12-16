@@ -381,6 +381,8 @@ impl PteFlagsAarch64 {
     pub fn adjust_for_higher_level_pte(self) -> Self {
         self.executable(true)
             .exclusive(false)
+            .accessed(true)
+            .page_descriptor(true)
             .valid(true)
     }
 
