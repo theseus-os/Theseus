@@ -48,7 +48,8 @@ use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 use no_drop::NoDrop;
-pub use kernel_config::memory::{PAGE_SIZE, KERNEL_OFFSET};
+use kernel_config::memory::KERNEL_OFFSET;
+pub use kernel_config::memory::PAGE_SIZE;
 
 /// The memory management info and address space of the kernel
 static KERNEL_MMI: Once<MmiRef> = Once::new();
