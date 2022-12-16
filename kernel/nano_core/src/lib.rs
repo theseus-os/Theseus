@@ -35,13 +35,14 @@ extern crate exceptions_early;
 extern crate panic_entry; // contains required panic-related lang items
 #[cfg(not(loadable))] extern crate captain;
 extern crate memory_initialization;
+extern crate boot_info;
 
 
 use core::ops::DerefMut;
 use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
 use serial_port_basic::{take_serial_port, SerialPortAddress};
-use memory::PhysicalAddress;
+use boot_info::BootInformation;
 
 /// Used to obtain information about this build of Theseus.
 mod build_info {
@@ -131,13 +132,7 @@ pub extern "C" fn nano_core_start(
     );
     println_raw!("nano_core_start(): booted via multiboot2 with boot info at {:#X}.", multiboot_information_virtual_address); 
 
-    let rsdp_address = boot_info
-        .rsdp_v2_tag()
-        .map(|tag| tag.signature())
-        .or_else(|| boot_info.rsdp_v1_tag().map(|tag| tag.signature()))
-        .and_then(|utf8_result| utf8_result.ok())
-        .map(|signature| signature as *const _ as *const () as usize)
-        .and_then(|rsdp_address| PhysicalAddress::new(rsdp_address));
+    let rsdp_address = boot_info.rsdp();
 
     println_raw!("nano_core_start(): bootloader-provided RSDP address: {:X?}", rsdp_address);
 
@@ -230,7 +225,7 @@ pub extern "C" fn nano_core_start(
     }
     #[cfg(loadable)] {
         use alloc::vec::Vec;
-        use memory::{MmiRef, MappedPages};
+        use memory::{MmiRef, MappedPages, PhysicalMemory};
         use no_drop::NoDrop;
 
         let section = try_exit!(
