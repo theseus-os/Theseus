@@ -7,7 +7,22 @@ const EMIT_BUILT_RS_FILE: bool = false;
 /// when it transforms them into environment variables.
 const CARGO_CFG_PREFIX: &str = "CARGO_CFG_";
 
-const BOOT_SPECIFICATION: &str = "bios";
+// We put the feature checks here because the build script will give unhelpful
+// errors if it's built with the wrong combination of features.
+//
+// We prefer BIOS over UEFI to avoid mutually exclusive features as they mess up
+// building with --all-features.
+// https://doc.rust-lang.org/cargo/reference/features.html#mutually-exclusive-features
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "bios")] {
+        const BOOT_SPECIFICATION: &str = "bios";
+    } else if #[cfg(feature = "uefi")] {
+        const BOOT_SPECIFICATION: &str = "uefi";
+    } else {
+        compile_error!("either the bios or uefi features must be enabled");
+    }
+}
 
 /// The set of built-in environment variables defined by cargo.
 static NON_CUSTOM_CFGS: [&str; 12] = [

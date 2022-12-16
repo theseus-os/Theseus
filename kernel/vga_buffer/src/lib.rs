@@ -39,14 +39,15 @@ static EARLY_VGA_WRITER: Mutex<VgaBuffer> = Mutex::new(
 #[macro_export]
 macro_rules! print_raw {
     ($($arg:tt)*) => ({
-        let _ = $crate::print_args_raw(format_args!($($arg)*));
+        // FIXME
+        // let _ = $crate::print_args_raw(format_args!($($arg)*));
     });
 }
 
 #[macro_export]
 macro_rules! println_raw {
-    ($fmt:expr) => (print_raw!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print_raw!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => ($crate::print_raw!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => ($crate::print_raw!(concat!($fmt, "\n"), $($arg)*));
 }
 
 #[doc(hidden)]

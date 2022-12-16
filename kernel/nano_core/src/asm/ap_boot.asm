@@ -23,25 +23,8 @@ ap_start_protected_mode:
     
 	call set_up_paging_ap
 	
-
-    ; each character is reversed in the dword cuz of little endianness
-	; prints PGTBL
-	mov dword [0xb8018], 0x4f2E4f2E ; ".."
-    mov dword [0xb801c], 0x4f504f2E ; ".P"
-	mov dword [0xb8020], 0x4f544f47 ; "GT"
-	mov dword [0xb8024], 0x4f4C4f42 ; "BL"
-
 	; Load the 64-bit GDT
 	lgdt [GDT_AP.ptr_low - KERNEL_OFFSET]
-
-
-	; prints GDT
-	mov dword [0xb8028], 0x4f2E4f2E ; ".."
-    mov dword [0xb802c], 0x4f474f2E ; ".G"
-	mov dword [0xb8030], 0x4f544f44 ; "DT"
-	mov eax, 0x4f004f00
-	or eax, GDT_AP.code + 0x30 ; convert GDT_AP.code value to ASCII char
-	mov dword [0xb8034], eax ; prints GDT_AP.code value
 
 
 	; Load the code selector via a far jmp
@@ -113,11 +96,6 @@ long_mode_start_ap:
 	; mov rsp, 0xFC00
 	
 
-	; each character is reversed in the dword cuz of little endianness
-	mov dword [0xFFFFFFFF800b8038], 0x4f2E4f2E ; ".."
-    mov dword [0xFFFFFFFF800b803c], 0x4f4f4f4c ; "LO"
-	mov dword [0xFFFFFFFF800b8040], 0x4f474f4e ; "NG"
-
 	; Long jump to the higher half. Because `jmp` does not take
 	; a 64 bit address (which we need because we are practically
 	; jumping to address +254Tb), we must first load the address
@@ -159,12 +137,6 @@ start_high_ap:
 	mov ecx, 0xc0000102   ; GS KERNEL BASE MSR
 	wrmsr
 	
-	; each character is reversed in the dword cuz of little endianness
-	mov dword [0xb8048 + KERNEL_OFFSET], 0x4f2E4f2E ; ".."
-    mov dword [0xb804c + KERNEL_OFFSET], 0x4f494f48 ; "HI"
-	mov dword [0xb8050 + KERNEL_OFFSET], 0x4f484f47 ; "GH"
-	mov dword [0xb8054 + KERNEL_OFFSET], 0x4f524f45 ; "ER"
-
 	; move to the new stack that was alloc'd for this AP
 	mov rcx, [AP_STACK_END]
 	lea rsp, [rcx - 256]

@@ -103,5 +103,9 @@ path = "../task_fs"
 [dependencies.multiple_heaps]
 path = "../multiple_heaps"
 
+[features]
+# TODO: Remove when UEFI is fully implemented.
+uefi = []
+
 [lib]
 crate-type = ["rlib"]

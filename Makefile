@@ -18,7 +18,12 @@ include cfg/Config.mk
 debug ?= none
 net ?= none
 merge_sections ?= yes
-bootloader ?= grub
+uefi ?= no
+ifeq ($(uefi), yes)
+	bootloader ?= none
+else
+	bootloader ?= grub
+endif
 
 ## test for Windows Subsystem for Linux (Linux on Windows)
 IS_WSL = $(shell grep -is 'microsoft' /proc/version)
@@ -29,7 +34,11 @@ IS_WSL = $(shell grep -is 'microsoft' /proc/version)
 ###################################################################################################
 BUILD_DIR               := $(ROOT_DIR)/build
 NANO_CORE_BUILD_DIR     := $(BUILD_DIR)/nano_core
-iso                     := $(BUILD_DIR)/theseus-$(ARCH).iso
+ifeq ($(uefi), yes)
+	iso					:= $(BUILD_DIR)/theseus-$(ARCH).efi
+else
+	iso					:= $(BUILD_DIR)/theseus-$(ARCH).iso
+endif
 ISOFILES                := $(BUILD_DIR)/isofiles
 OBJECT_FILES_BUILD_DIR  := $(ISOFILES)/modules
 DEBUG_SYMBOLS_DIR       := $(BUILD_DIR)/debug_symbols
@@ -76,6 +85,10 @@ else ifeq ($(bootloader),limine)
 	else
 $(error Error: missing '$(LIMINE_DIR)' directory! Please follow the limine instructions in the README)
 	endif
+else ifeq ($(bootloader),none)
+	ifneq ($(uefi), yes)
+$(error Error: bootloader must be specified in non-UEFI mode. Options are 'grub' or 'limine')
+	endif
 else
 $(error Error: unsupported option "bootloader=$(bootloader)". Options are 'grub' or 'limine')
 endif
@@ -110,7 +123,12 @@ nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
 ## The linker script for linking the `nano_core_binary` with the compiled assembly files.
 linker_script := $(ROOT_DIR)/kernel/nano_core/linker_higher_half.ld
 ## The assembly files compiled by the nano_core build script.
-compiled_nano_core_asm := $(NANO_CORE_BUILD_DIR)/compiled_asm/bios/*.o
+efi_firmware := $(BUILD_DIR)/ovmf.fd
+ifeq ($(uefi), yes)
+	compiled_nano_core_asm := $(NANO_CORE_BUILD_DIR)/compiled_asm/uefi/*.o
+else
+	compiled_nano_core_asm := $(NANO_CORE_BUILD_DIR)/compiled_asm/bios/*.o
+endif
 
 ## Specify which crates should be considered as application-level libraries. 
 ## These crates can be instantiated multiply (per-task, per-namespace) rather than once (system-wide);
@@ -161,6 +179,11 @@ endif
 ###       because those should be built as normal for the host OS environment.
 export override RUSTFLAGS += $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 
+ifeq ($(uefi),yes)
+	export override FEATURES += --features nano_core/uefi
+else
+	export override FEATURES += --features nano_core/bios
+endif
 
 ### Convenience targets for building the entire Theseus workspace
 ### with all optional features enabled. 
@@ -177,8 +200,15 @@ full: iso
 iso: $(iso)
 
 ### This target builds an .iso OS image from all of the compiled crates.
-$(iso): clean-old-build build extra_files copy_kernel $(bootloader)
-
+$(iso) $(efi_firmware): clean-old-build build extra_files copy_kernel $(bootloader)
+ifeq ($(uefi), yes)
+	@cargo r \
+		--release \
+		-Z bindeps \
+		--manifest-path \
+		$(ROOT_DIR)/tools/uefi_builder/Cargo.toml -- \
+		$(nano_core_binary) $(OBJECT_FILES_BUILD_DIR) $(iso) $(efi_firmware)
+endif
 
 ## Copy the kernel boot image into the proper ISOFILES directory.
 ## Should be invoked after building all Theseus kernel/application crates.
@@ -589,7 +619,7 @@ doc: check-rustc
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/str_ref/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/util/Cargo.toml
 ## Now, build the docs for all of Theseus's main kernel crates.
-	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
+	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES)) --features nano_core/bios
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
 	@rm -rf $(RUSTDOC_OUT)
 	@mkdir -p $(RUSTDOC_OUT)
@@ -771,8 +801,13 @@ ifdef IOMMU
 	QEMU_FLAGS += -device intel-iommu,intremap=on,caching-mode=on
 endif
 
-## Boot from the cd-rom drive
-QEMU_FLAGS += -cdrom $(iso) -boot d
+## Set boot drive
+ifeq ($(uefi),yes)
+	QEMU_FLAGS += -bios $(efi_firmware)
+	QEMU_FLAGS += -drive format=raw,file=$(iso)
+else
+	QEMU_FLAGS += -cdrom $(iso) -boot d
+endif
 ## Don't reboot or shutdown upon failure or a triple reset
 QEMU_FLAGS += -no-reboot -no-shutdown
 ## Enable a GDB stub so we can connect GDB to the QEMU instance 
